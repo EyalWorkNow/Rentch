@@ -1810,17 +1810,23 @@ IconData _sortIcon(SearchSortOption option) {
     case SearchSortOption.priceHighToLow:
       return IconsaxPlusLinear.sort;
     case SearchSortOption.newestEntry:
-      return IconsaxPlusLinear.calendar_1;
+      return IconsaxPlusLinear.calendar;
     case SearchSortOption.biggestFirst:
-      return IconsaxPlusLinear.maximize_4;
+      return IconsaxPlusLinear.maximize_3;
     case SearchSortOption.bestMatch:
-      return IconsaxPlusBold.filter;
+      return IconsaxPlusBold.star;
   }
 }
 
 IconData _propertyTypeIcon(String type) {
   final lower = type.trim().toLowerCase();
-  if (lower.contains('בית') || lower.contains('פרטי')) {
+  if (lower.contains('גג') || lower.contains('פנטהאוז') || lower.contains('דופלקס')) {
+    return IconsaxPlusLinear.buildings;
+  }
+  if (lower.contains('גן') || lower.contains('חצר') || lower.contains('גינה')) {
+    return IconsaxPlusLinear.map_1;
+  }
+  if (lower.contains('בית') || lower.contains('קוטג') || lower.contains('יחידת') || lower.contains('סטודיו')) {
     return IconsaxPlusLinear.home;
   }
   return IconsaxPlusLinear.building;
@@ -1833,15 +1839,24 @@ IconData _listingSourceIcon(ListingSourceFilter source) {
     case ListingSourceFilter.privateOnly:
       return IconsaxPlusLinear.user;
     case ListingSourceFilter.agencyOnly:
-      return IconsaxPlusLinear.building;
+      return IconsaxPlusLinear.buildings;
   }
 }
 
 IconData _featureIcon(String feature) {
   final lower = feature.trim().toLowerCase();
   if (lower.contains('חניה')) return IconsaxPlusLinear.routing;
-  if (lower.contains('מעלית')) return IconsaxPlusLinear.building;
+  if (lower.contains('מעלית')) return IconsaxPlusLinear.buildings;
   if (lower.contains('ממ"ד') || lower.contains('ממד')) return IconsaxPlusLinear.shield_tick;
   if (lower.contains('מזגן') || lower.contains('מיזוג')) return IconsaxPlusLinear.layer;
+  if (lower.contains('מרפסת')) return IconsaxPlusLinear.layer;
+  if (lower.contains('מחסן')) return IconsaxPlusLinear.lock;
+  if (lower.contains('ריהוט') || lower.contains('מרוהטת')) return IconsaxPlusLinear.home;
+  if (lower.contains('חיות')) return IconsaxPlusBold.heart;
+  if (lower.contains('סורגים')) return IconsaxPlusLinear.lock;
+  if (lower.contains('נגישות')) return IconsaxPlusLinear.profile_circle;
+  if (lower.contains('גינה') || lower.contains('חצר')) return IconsaxPlusLinear.map;
+  if (lower.contains('שומר') || lower.contains('אבטחה')) return IconsaxPlusLinear.shield_tick;
+  if (lower.contains('משופצת') || lower.contains('משופץ')) return IconsaxPlusLinear.setting_4;
   return IconsaxPlusLinear.hashtag;
 }
