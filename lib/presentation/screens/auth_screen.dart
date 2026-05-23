@@ -90,16 +90,12 @@ class _MobileLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    final screenH = MediaQuery.sizeOf(context).height;
-    final heroH = (screenH < 760 ? 175.0 : 210.0) + topPad;
-
     return Column(
       children: [
-        SizedBox(
-          height: heroH,
+        SafeArea(
+          bottom: false,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(26, topPad + 20, 26, 16),
+            padding: const EdgeInsets.fromLTRB(26, 20, 26, 16),
             child: const _HeroContent(),
           ),
         ),
