@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 class StorageService {
-  static const _bucketId = 'profile_photos';
+  static const _bucketId = appwriteStorageBucketId;
 
   final Storage _storage = Storage(client);
 
