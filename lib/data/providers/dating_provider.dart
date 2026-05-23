@@ -21,10 +21,19 @@ class DatingProvider extends ChangeNotifier {
   String _userRole = 'tenant';
   TenantProfile? _tenantProfile;
   SearchFilters _filters = const SearchFilters(
+    query: '',
     maxBudget: 9000,
     minRooms: 2,
     areaId: 'gush_dan',
     requiredFeatures: <String>{},
+    minSizeM2: 0,
+    maxSizeM2: 400,
+    propertyTypes: <String>{},
+    conditions: <String>{},
+    listingSource: ListingSourceFilter.any,
+    minFloor: 0,
+    moveInFilter: MoveInFilter.any,
+    sortBy: SearchSortOption.bestMatch,
   );
   List<RentalProperty> _baseProperties = const [];
   List<RentalProperty> _customProperties = [];
@@ -90,21 +99,140 @@ class DatingProvider extends ChangeNotifier {
     return sorted;
   }
 
+  List<String> get availablePropertyTypes {
+    final types = _allProperties
+        .map((property) => property.propertyType.trim())
+        .where((type) => type.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return types;
+  }
+
+  List<String> get availableConditions {
+    final conditions = _allProperties
+        .map((property) => property.condition.trim())
+        .where((condition) => condition.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return conditions;
+  }
+
+  int get activeFilterCount {
+    var count = 0;
+    if (_filters.hasQuery) count++;
+    if (_filters.maxBudget != 9000) count++;
+    if (_filters.minRooms != 2) count++;
+    if (_filters.minSizeM2 > 0) count++;
+    if (_filters.maxSizeM2 < 400) count++;
+    if (_filters.minFloor > 0) count++;
+    if (_filters.requiredFeatures.isNotEmpty) count++;
+    if (_filters.propertyTypes.isNotEmpty) count++;
+    if (_filters.conditions.isNotEmpty) count++;
+    if (_filters.listingSource != ListingSourceFilter.any) count++;
+    if (_filters.moveInFilter != MoveInFilter.any) count++;
+    if (_filters.sortBy != SearchSortOption.bestMatch) count++;
+    return count;
+  }
+
+  double get averageFilteredPrice {
+    final properties = filteredProperties;
+    if (properties.isEmpty) return 0;
+    final total =
+        properties.fold<int>(0, (sum, property) => sum + property.price);
+    return total / properties.length;
+  }
+
+  double get averageFilteredSize {
+    final properties = filteredProperties;
+    if (properties.isEmpty) return 0;
+    final total =
+        properties.fold<int>(0, (sum, property) => sum + property.sizeM2);
+    return total / properties.length;
+  }
+
   List<RentalProperty> get filteredProperties {
     if (_searchAreas.isEmpty) return const [];
+    final normalizedQuery = _filters.query.trim().toLowerCase();
+    final now = DateTime.now();
 
-    return _allProperties.where((property) {
+    final filtered = _allProperties.where((property) {
       if (_likedPropertyIds.contains(property.id) ||
           _passedPropertyIds.contains(property.id)) {
         return false;
       }
+      if (normalizedQuery.isNotEmpty &&
+          !property.searchableText.contains(normalizedQuery)) {
+        return false;
+      }
       if (property.price > _filters.maxBudget) return false;
       if (property.rooms < _filters.minRooms) return false;
+      if (property.sizeM2 < _filters.minSizeM2) return false;
+      if (property.sizeM2 > _filters.maxSizeM2) return false;
+      if (property.floorNumber != null &&
+          property.floorNumber! < _filters.minFloor) {
+        return false;
+      }
+      if (_filters.propertyTypes.isNotEmpty &&
+          !_filters.propertyTypes.contains(property.propertyType)) {
+        return false;
+      }
+      if (_filters.conditions.isNotEmpty &&
+          !_filters.conditions.contains(property.condition)) {
+        return false;
+      }
+      if (_filters.listingSource == ListingSourceFilter.privateOnly &&
+          property.agencyListing) {
+        return false;
+      }
+      if (_filters.listingSource == ListingSourceFilter.agencyOnly &&
+          !property.agencyListing) {
+        return false;
+      }
       if (!_filters.requiredFeatures.every(property.features.contains)) {
+        return false;
+      }
+      final entryDate = property.entryDateValue;
+      if (_filters.moveInFilter == MoveInFilter.immediate &&
+          (entryDate == null || entryDate.isAfter(now))) {
+        return false;
+      }
+      if (_filters.moveInFilter == MoveInFilter.within30Days &&
+          (entryDate == null ||
+              entryDate.isAfter(now.add(const Duration(days: 30))))) {
+        return false;
+      }
+      if (_filters.moveInFilter == MoveInFilter.within90Days &&
+          (entryDate == null ||
+              entryDate.isAfter(now.add(const Duration(days: 90))))) {
         return false;
       }
       return selectedArea.contains(property.point);
     }).toList();
+
+    filtered.sort((a, b) {
+      switch (_filters.sortBy) {
+        case SearchSortOption.priceLowToHigh:
+          return a.price.compareTo(b.price);
+        case SearchSortOption.priceHighToLow:
+          return b.price.compareTo(a.price);
+        case SearchSortOption.newestEntry:
+          final aDate =
+              a.entryDateValue ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate =
+              b.entryDateValue ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bDate.compareTo(aDate);
+        case SearchSortOption.biggestFirst:
+          return b.sizeM2.compareTo(a.sizeM2);
+        case SearchSortOption.bestMatch:
+          final scoreDelta = matchScore(b).compareTo(matchScore(a));
+          if (scoreDelta != 0) return scoreDelta;
+          return a.price.compareTo(b.price);
+      }
+    });
+
+    return filtered;
   }
 
   List<RentalProperty> get ownerLeads {
@@ -126,8 +254,10 @@ class DatingProvider extends ChangeNotifier {
     final storedState = await _localStorageService.loadAppState();
     if (storedState == null || storedState['schema'] != 'rental_match_v1') {
       _seedInitialState();
+      await _persist();
     } else {
       _hydrateFromState(storedState);
+      await _persist();
     }
 
     _isLoading = false;
@@ -145,6 +275,7 @@ class DatingProvider extends ChangeNotifier {
     _customProperties = [];
     _userRole = 'tenant';
     _seedInitialState();
+    await _persist();
     notifyListeners();
   }
 
@@ -176,8 +307,7 @@ class DatingProvider extends ChangeNotifier {
   Future<void> likeProperty(String propertyId) async {
     if (!_likedPropertyIds.contains(propertyId)) {
       _likedPropertyIds.add(propertyId);
-      _swipeHistory
-          .add(_SwipeRecord(propertyId: propertyId, liked: true));
+      _swipeHistory.add(_SwipeRecord(propertyId: propertyId, liked: true));
       if (_swipeHistory.length > 10) _swipeHistory.removeAt(0);
       await _persist();
       notifyListeners();
@@ -487,10 +617,19 @@ class DatingProvider extends ChangeNotifier {
         property.id: _rentalDataService.createPropertyReviews(property),
     };
     _filters = const SearchFilters(
+      query: '',
       maxBudget: 9000,
       minRooms: 2,
       areaId: 'gush_dan',
       requiredFeatures: <String>{},
+      minSizeM2: 0,
+      maxSizeM2: 400,
+      propertyTypes: <String>{},
+      conditions: <String>{},
+      listingSource: ListingSourceFilter.any,
+      minFloor: 0,
+      moveInFilter: MoveInFilter.any,
+      sortBy: SearchSortOption.bestMatch,
     );
     _likedPropertyIds = <String>{};
     _passedPropertyIds = <String>{};
@@ -637,7 +776,6 @@ class LandlordStats {
   final int matchesCount;
   final int pendingCount;
 
-  double get conversionRate => totalCandidatesSeen == 0
-      ? 0
-      : matchesCount / totalCandidatesSeen * 100;
+  double get conversionRate =>
+      totalCandidatesSeen == 0 ? 0 : matchesCount / totalCandidatesSeen * 100;
 }

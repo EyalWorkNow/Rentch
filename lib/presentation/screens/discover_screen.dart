@@ -835,9 +835,32 @@ class _MatchCelebrationOverlayState extends State<_MatchCelebrationOverlay>
 
 // ─── Filters Sheet ────────────────────────────────────────────────────────────
 
-class _FiltersSheet extends StatelessWidget {
+class _FiltersSheet extends StatefulWidget {
   const _FiltersSheet({required this.provider});
   final DatingProvider provider;
+
+  @override
+  State<_FiltersSheet> createState() => _FiltersSheetState();
+}
+
+class _FiltersSheetState extends State<_FiltersSheet> {
+  late final TextEditingController _areaSearchCtrl;
+  late final FocusNode _areaSearchFocusNode;
+  bool _showAreaSearch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _areaSearchCtrl = TextEditingController();
+    _areaSearchFocusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _areaSearchCtrl.dispose();
+    _areaSearchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -848,6 +871,11 @@ class _FiltersSheet extends StatelessWidget {
           (item) => item.id == f.areaId,
           orElse: () => provider.selectedArea,
         );
+
+        final filteredSearchAreas = provider.searchAreas.where((searchArea) {
+          final query = _areaSearchCtrl.text.trim().toLowerCase();
+          return searchArea.name.toLowerCase().contains(query);
+        }).toList();
 
         return Container(
           constraints: BoxConstraints(
@@ -888,6 +916,11 @@ class _FiltersSheet extends StatelessWidget {
                     const Spacer(),
                     TextButton(
                       onPressed: () {
+                        setState(() {
+                          _areaSearchCtrl.clear();
+                          _showAreaSearch = false;
+                          _areaSearchFocusNode.unfocus();
+                        });
                         provider.updateFilters(const SearchFilters(
                           query: '',
                           maxBudget: 9000,
@@ -976,44 +1009,101 @@ class _FiltersSheet extends StatelessWidget {
                     _FilterSection(
                       title: 'אזור חיפוש',
                       icon: IconsaxPlusLinear.location,
+                      action: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          _showAreaSearch
+                              ? IconsaxPlusLinear.close_square
+                              : IconsaxPlusLinear.search_normal_1,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showAreaSearch = !_showAreaSearch;
+                            if (!_showAreaSearch) {
+                              _areaSearchCtrl.clear();
+                              _areaSearchFocusNode.unfocus();
+                            } else {
+                              _areaSearchFocusNode.requestFocus();
+                            }
+                          });
+                        },
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: provider.searchAreas.map((searchArea) {
-                        final sel = f.areaId == searchArea.id;
-                        return ChoiceChip(
-                          selected: sel,
-                          label: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                IconsaxPlusLinear.location,
-                                size: 14,
-                                color: sel ? Colors.white : AppColors.navy,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(searchArea.name),
-                            ],
+                    AnimatedCrossFade(
+                      firstChild: const SizedBox.shrink(),
+                      secondChild: Padding(
+                        padding: const EdgeInsets.only(top: 10, bottom: 6),
+                        child: TextField(
+                          controller: _areaSearchCtrl,
+                          focusNode: _areaSearchFocusNode,
+                          textDirection: TextDirection.rtl,
+                          onChanged: (value) {
+                            setState(() {}); // Rebuild to filter chips
+                          },
+                          decoration: const InputDecoration(
+                            hintText: 'חפש אזור (למשל: תל אביב, גוש דן, השרון)',
+                            prefixIcon: Icon(IconsaxPlusLinear.search_normal),
                           ),
-                          labelStyle: TextStyle(
-                            color: sel ? Colors.white : AppColors.navy,
-                            fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      crossFadeState: _showAreaSearch
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      duration: const Duration(milliseconds: 200),
+                    ),
+                    const SizedBox(height: 12),
+                    if (filteredSearchAreas.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'לא נמצאו אזורים מתאימים',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
                             fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
-                          selectedColor: AppColors.primary,
-                          backgroundColor: AppColors.primaryLight2,
-                          side: BorderSide(
-                            color: sel ? AppColors.primary : AppColors.borderLight,
-                          ),
-                          showCheckmark: false,
-                          onSelected: (_) => provider.updateFilters(
-                            f.copyWith(areaId: searchArea.id),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: filteredSearchAreas.map((searchArea) {
+                          final sel = f.areaId == searchArea.id;
+                          return ChoiceChip(
+                            selected: sel,
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  IconsaxPlusLinear.location,
+                                  size: 14,
+                                  color: sel ? Colors.white : AppColors.navy,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(searchArea.name),
+                              ],
+                            ),
+                            labelStyle: TextStyle(
+                              color: sel ? Colors.white : AppColors.navy,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                            selectedColor: AppColors.primary,
+                            backgroundColor: AppColors.primaryLight2,
+                            side: BorderSide(
+                              color: sel ? AppColors.primary : AppColors.borderLight,
+                            ),
+                            showCheckmark: false,
+                            onSelected: (_) => provider.updateFilters(
+                              f.copyWith(areaId: searchArea.id),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     const SizedBox(height: 22),
                     _FilterSection(
                       title: 'מיון דק הדירות',
@@ -1391,9 +1481,10 @@ class _FiltersSheet extends StatelessWidget {
 }
 
 class _FilterSection extends StatelessWidget {
-  const _FilterSection({required this.title, this.icon});
+  const _FilterSection({required this.title, this.icon, this.action});
   final String title;
   final IconData? icon;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -1411,6 +1502,10 @@ class _FilterSection extends StatelessWidget {
             color: AppColors.navy,
           ),
         ),
+        if (action != null) ...[
+          const Spacer(),
+          action!,
+        ],
       ],
     );
   }

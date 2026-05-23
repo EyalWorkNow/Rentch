@@ -1,5 +1,26 @@
 import 'package:latlong2/latlong.dart';
 
+enum SearchSortOption {
+  bestMatch,
+  priceLowToHigh,
+  priceHighToLow,
+  newestEntry,
+  biggestFirst,
+}
+
+enum ListingSourceFilter {
+  any,
+  privateOnly,
+  agencyOnly,
+}
+
+enum MoveInFilter {
+  any,
+  immediate,
+  within30Days,
+  within90Days,
+}
+
 class RentalProperty {
   const RentalProperty({
     required this.id,
@@ -47,6 +68,18 @@ class RentalProperty {
 
   String get imageUrl => imageUrls.isEmpty ? '' : imageUrls.first;
   LatLng get point => LatLng(lat, lon);
+  int? get floorNumber => int.tryParse(floor);
+  DateTime? get entryDateValue => DateTime.tryParse(entryDate);
+  int? get pricePerSquareMeter => sizeM2 > 0 ? (price / sizeM2).round() : null;
+  String get searchableText => [
+        city,
+        neighborhood,
+        street,
+        ownerName,
+        propertyType,
+        condition,
+        ...features,
+      ].join(' ').toLowerCase();
 
   String get address {
     final streetPart = streetNumber > 0 ? '$street $streetNumber' : street;
@@ -221,48 +254,114 @@ class SearchArea {
 
 class SearchFilters {
   const SearchFilters({
+    required this.query,
     required this.maxBudget,
     required this.minRooms,
     required this.areaId,
     required this.requiredFeatures,
+    required this.minSizeM2,
+    required this.maxSizeM2,
+    required this.propertyTypes,
+    required this.conditions,
+    required this.listingSource,
+    required this.minFloor,
+    required this.moveInFilter,
+    required this.sortBy,
   });
 
+  final String query;
   final int maxBudget;
   final double minRooms;
   final String areaId;
   final Set<String> requiredFeatures;
+  final int minSizeM2;
+  final int maxSizeM2;
+  final Set<String> propertyTypes;
+  final Set<String> conditions;
+  final ListingSourceFilter listingSource;
+  final int minFloor;
+  final MoveInFilter moveInFilter;
+  final SearchSortOption sortBy;
+
+  bool get hasQuery => query.trim().isNotEmpty;
 
   SearchFilters copyWith({
+    String? query,
     int? maxBudget,
     double? minRooms,
     String? areaId,
     Set<String>? requiredFeatures,
+    int? minSizeM2,
+    int? maxSizeM2,
+    Set<String>? propertyTypes,
+    Set<String>? conditions,
+    ListingSourceFilter? listingSource,
+    int? minFloor,
+    MoveInFilter? moveInFilter,
+    SearchSortOption? sortBy,
   }) {
     return SearchFilters(
+      query: query ?? this.query,
       maxBudget: maxBudget ?? this.maxBudget,
       minRooms: minRooms ?? this.minRooms,
       areaId: areaId ?? this.areaId,
       requiredFeatures: requiredFeatures ?? this.requiredFeatures,
+      minSizeM2: minSizeM2 ?? this.minSizeM2,
+      maxSizeM2: maxSizeM2 ?? this.maxSizeM2,
+      propertyTypes: propertyTypes ?? this.propertyTypes,
+      conditions: conditions ?? this.conditions,
+      listingSource: listingSource ?? this.listingSource,
+      minFloor: minFloor ?? this.minFloor,
+      moveInFilter: moveInFilter ?? this.moveInFilter,
+      sortBy: sortBy ?? this.sortBy,
     );
   }
 
   factory SearchFilters.fromJson(Map<String, dynamic> json) {
     return SearchFilters(
+      query: json['query'] as String? ?? '',
       maxBudget: json['maxBudget'] as int? ?? 9000,
       minRooms: (json['minRooms'] as num? ?? 2).toDouble(),
       areaId: json['areaId'] as String? ?? 'central_tel_aviv',
       requiredFeatures: Set<String>.from(
         json['requiredFeatures'] as List<dynamic>? ?? const [],
       ),
+      minSizeM2: json['minSizeM2'] as int? ?? 0,
+      maxSizeM2: json['maxSizeM2'] as int? ?? 400,
+      propertyTypes: Set<String>.from(
+        json['propertyTypes'] as List<dynamic>? ?? const [],
+      ),
+      conditions: Set<String>.from(
+        json['conditions'] as List<dynamic>? ?? const [],
+      ),
+      listingSource: ListingSourceFilter.values.byName(
+        json['listingSource'] as String? ?? ListingSourceFilter.any.name,
+      ),
+      minFloor: json['minFloor'] as int? ?? 0,
+      moveInFilter: MoveInFilter.values.byName(
+        json['moveInFilter'] as String? ?? MoveInFilter.any.name,
+      ),
+      sortBy: SearchSortOption.values.byName(
+        json['sortBy'] as String? ?? SearchSortOption.bestMatch.name,
+      ),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'query': query,
       'maxBudget': maxBudget,
       'minRooms': minRooms,
       'areaId': areaId,
       'requiredFeatures': requiredFeatures.toList(),
+      'minSizeM2': minSizeM2,
+      'maxSizeM2': maxSizeM2,
+      'propertyTypes': propertyTypes.toList(),
+      'conditions': conditions.toList(),
+      'listingSource': listingSource.name,
+      'minFloor': minFloor,
+      'moveInFilter': moveInFilter.name,
+      'sortBy': sortBy.name,
     };
   }
 }

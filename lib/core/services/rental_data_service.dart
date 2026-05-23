@@ -74,7 +74,7 @@ class RentalDataService {
     return const [
       SearchArea(
         id: 'central_tel_aviv',
-        name: 'פוליגון תל אביב מרכז',
+        name: 'תל אביב מרכז',
         center: LatLng(32.075, 34.785),
         polygon: [
           LatLng(32.045, 34.745),
@@ -85,7 +85,7 @@ class RentalDataService {
       ),
       SearchArea(
         id: 'gush_dan',
-        name: 'פוליגון גוש דן',
+        name: 'גוש דן',
         center: LatLng(32.065, 34.805),
         polygon: [
           LatLng(31.990, 34.735),
@@ -96,7 +96,7 @@ class RentalDataService {
       ),
       SearchArea(
         id: 'hasharon',
-        name: 'פוליגון השרון',
+        name: 'השרון',
         center: LatLng(32.165, 34.835),
         polygon: [
           LatLng(32.120, 34.780),

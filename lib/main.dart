@@ -22,6 +22,7 @@ class RentchApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
+      lazy: false,
       create: (_) => DatingProvider()..initialize(),
       child: MaterialApp(
         title: 'Rentch',
@@ -116,7 +117,8 @@ class RentchApp extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
