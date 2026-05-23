@@ -233,28 +233,34 @@ class _ProfileCardState extends State<ProfileCard> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _StatPill(icon: IconsaxPlusBold.building,
-                          label: '${p.roomsLabel} חדרים'),
-                      const SizedBox(width: 6),
-                      _StatPill(icon: IconsaxPlusBold.maximize_3,
-                          label: '${p.sizeM2} מ"ר'),
-                      if (p.floor.isNotEmpty) ...[
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        _StatPill(
+                            icon: IconsaxPlusBold.building,
+                            label: '${p.roomsLabel} חדרים'),
                         const SizedBox(width: 6),
                         _StatPill(
-                            icon: IconsaxPlusBold.layer,
-                            label: 'קומה ${p.floor}'),
+                            icon: IconsaxPlusBold.maximize_3,
+                            label: '${p.sizeM2} מ"ר'),
+                        if (p.floor.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          _StatPill(
+                              icon: IconsaxPlusBold.layer,
+                              label: 'קומה ${p.floor}'),
+                        ],
+                        // Price per m²
+                        if (p.sizeM2 > 0) ...[
+                          const SizedBox(width: 6),
+                          _StatPill(
+                            icon: IconsaxPlusBold.moneys,
+                            label: '₪${(p.price / p.sizeM2).round()}/מ"ר',
+                          ),
+                        ],
                       ],
-                      // Price per m²
-                      if (p.sizeM2 > 0) ...[
-                        const SizedBox(width: 6),
-                        _StatPill(
-                          icon: IconsaxPlusBold.moneys,
-                          label: '₪${(p.price / p.sizeM2).round()}/מ"ר',
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
                   if (p.features.isNotEmpty) ...[
                     const SizedBox(height: 8),

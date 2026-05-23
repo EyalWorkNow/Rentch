@@ -220,7 +220,6 @@ class _FilterPills extends StatelessWidget {
             _Pill(
               icon: IconsaxPlusLinear.search_normal,
               label: provider.filters.query,
-              onTap: () => _showFilters(context, provider),
               highlighted: true,
             ),
             const SizedBox(width: 8),
@@ -228,49 +227,33 @@ class _FilterPills extends StatelessWidget {
           _Pill(
             icon: IconsaxPlusLinear.location,
             label: provider.selectedArea.name,
-            onTap: () => _showFilters(context, provider),
           ),
           const SizedBox(width: 8),
           _Pill(
             icon: IconsaxPlusLinear.money,
             label: 'עד ${_formatCurrency(provider.filters.maxBudget)}',
-            onTap: () => _showFilters(context, provider),
           ),
           const SizedBox(width: 8),
           _Pill(
             icon: IconsaxPlusLinear.home,
             label: 'מינ. ${provider.filters.minRooms.toStringAsFixed(0)} חדרים',
-            onTap: () => _showFilters(context, provider),
           ),
           const SizedBox(width: 8),
           _Pill(
             icon: IconsaxPlusLinear.maximize_4,
             label:
                 '${provider.filters.minSizeM2}-${provider.filters.maxSizeM2} מ"ר',
-            onTap: () => _showFilters(context, provider),
           ),
           if (provider.activeFilterCount > 0) ...[
             const SizedBox(width: 8),
             _Pill(
               icon: IconsaxPlusBold.filter,
               label: '${provider.activeFilterCount} מסננים פעילים',
-              onTap: () => _showFilters(context, provider),
               highlighted: true,
             ),
           ],
         ],
       ),
-    );
-  }
-
-  Future<void> _showFilters(
-      BuildContext context, DatingProvider provider) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _FiltersSheet(provider: provider),
     );
   }
 }
@@ -279,56 +262,51 @@ class _Pill extends StatelessWidget {
   const _Pill({
     required this.icon,
     required this.label,
-    required this.onTap,
     this.highlighted = false,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
   final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: highlighted
-              ? AppColors.primary.withValues(alpha: 0.12)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: highlighted ? AppColors.primary : AppColors.borderLight,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? AppColors.primary.withValues(alpha: 0.12)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: highlighted ? AppColors.primary : AppColors.borderLight,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: Offset(0, 2),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: highlighted ? AppColors.primary : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: highlighted ? AppColors.primary : AppColors.navy,
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: highlighted ? AppColors.primary : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: highlighted ? AppColors.primary : AppColors.navy,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
