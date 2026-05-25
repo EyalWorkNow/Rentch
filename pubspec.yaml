@@ -46,6 +46,9 @@ dependencies:
   appwrite: 24.1.1
   image_picker: ^1.1.2
   path_provider: ^2.1.4
+  firebase_core: ^4.1.0
+  firebase_auth: ^6.0.2
+  google_sign_in: ^7.1.1
 
 dev_dependencies:
   flutter_test:

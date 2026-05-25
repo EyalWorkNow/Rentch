@@ -19,6 +19,7 @@ class DatingProvider extends ChangeNotifier {
 
   bool _isLoading = true;
   String _userRole = 'tenant';
+  bool _isGuestMode = false;
   TenantProfile? _tenantProfile;
   SearchFilters _filters = const SearchFilters(
     query: '',
@@ -57,6 +58,7 @@ class DatingProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLandlord => _userRole == 'landlord';
   String get userRole => _userRole;
+  bool get isGuestMode => _isGuestMode;
   TenantProfile? get tenantProfile => _tenantProfile;
   SearchFilters get filters => _filters;
   List<SearchArea> get searchAreas => _searchAreas;
@@ -244,6 +246,28 @@ class DatingProvider extends ChangeNotifier {
     }).toList();
   }
 
+  RentalProperty? get activeLandlordProxy {
+    if (_allProperties.isEmpty) return null;
+    if (_likedPropertyIds.isNotEmpty) {
+      return propertyById(_likedPropertyIds.first);
+    }
+    return filteredProperties.isNotEmpty ? filteredProperties.first : _allProperties.first;
+  }
+
+  List<RentalProperty> get landlordProxyPortfolio {
+    final featured = <RentalProperty>[];
+    final active = activeLandlordProxy;
+    if (active != null) {
+      featured.add(active);
+    }
+    for (final property in _allProperties) {
+      if (featured.length >= 2) break;
+      if (active != null && property.id == active.id) continue;
+      featured.add(property);
+    }
+    return featured;
+  }
+
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
@@ -266,6 +290,13 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> setUserRole(String role) async {
     _userRole = role;
+    _isGuestMode = false;
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> enterGuestMode(String role) async {
+    _seedGuestDemoState(role);
     await _persist();
     notifyListeners();
   }
@@ -274,6 +305,7 @@ class DatingProvider extends ChangeNotifier {
     await _localStorageService.clearAppState();
     _customProperties = [];
     _userRole = 'tenant';
+    _isGuestMode = false;
     _seedInitialState();
     await _persist();
     notifyListeners();
@@ -281,6 +313,24 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> updateTenantProfile(TenantProfile updatedProfile) async {
     _tenantProfile = updatedProfile;
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> applyGoogleIdentity({
+    required String displayName,
+    String? photoUrl,
+  }) async {
+    final current = _tenantProfile ?? _rentalDataService.createDefaultTenantProfile();
+    final nextPhotos = <String>[
+      if (photoUrl != null && photoUrl.trim().isNotEmpty) photoUrl.trim(),
+      ...current.photoUrls.where((url) => url != photoUrl),
+    ];
+    _tenantProfile = current.copyWith(
+      name: displayName.trim().isEmpty ? current.name : displayName.trim(),
+      photoUrls: nextPhotos,
+    );
+    _isGuestMode = false;
     await _persist();
     notifyListeners();
   }
@@ -293,6 +343,14 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> addLandlordProperty(RentalProperty property) async {
     _customProperties = [..._customProperties, property];
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> updateLandlordProperty(RentalProperty updated) async {
+    _customProperties = _customProperties
+        .map((p) => p.id == updated.id ? updated : p)
+        .toList();
     await _persist();
     notifyListeners();
   }
@@ -641,6 +699,172 @@ class DatingProvider extends ChangeNotifier {
     _lastSeenMatchCount = 0;
   }
 
+  void _seedGuestDemoState(String role) {
+    final tenant = _rentalDataService.createDefaultTenantProfile().copyWith(
+      name: 'נועה לוי',
+      bio:
+          'מחפשת דירת 2-3 חדרים בצפון תל אביב או רמת גן. כבר כמה שבועות פעילה באפליקציה, עם תגובות מהירות, מסמכים מוכנים והעדפה לבניין מטופח.',
+      budgetMax: 11200,
+      desiredRooms: 2.5,
+      moveInWindow: 'כניסה תוך 30 יום',
+      importantDetails: const [
+        'אישור הכנסה מוכן',
+        'שוכרת כבר 5 שנים רצוף',
+        'זמינה לסיור גם בערב',
+        'מחפשת חוזה לשנה לפחות',
+      ],
+    );
+    final propertyPool = _baseProperties.take(6).toList();
+    if (propertyPool.length < 4) {
+      _seedInitialState();
+      _isGuestMode = true;
+      _userRole = role;
+      return;
+    }
+
+    final matchedOne = propertyPool[0];
+    final matchedTwo = propertyPool[1];
+    final pendingLead = propertyPool[2];
+    final savedProperty = propertyPool[3];
+
+    _tenantProfile = tenant;
+    _tenantReviews = [
+      ..._rentalDataService.createTenantReviews(),
+      const AppReview(
+        id: 'tenant-review-3',
+        authorName: 'דנה, בעלת דירה ברמת גן',
+        rating: 5,
+        text: 'סגרה מהר, שלחה כל מסמך בזמן ושמרה על קשר רציף לאורך כל התהליך.',
+      ),
+    ];
+    _propertyReviews = {
+      for (final property in propertyPool)
+        property.id: _rentalDataService.createPropertyReviews(property),
+    };
+    _filters = const SearchFilters(
+      query: '',
+      maxBudget: 12000,
+      minRooms: 2,
+      areaId: 'gush_dan',
+      requiredFeatures: <String>{'מעלית'},
+      minSizeM2: 55,
+      maxSizeM2: 140,
+      propertyTypes: <String>{},
+      conditions: <String>{},
+      listingSource: ListingSourceFilter.any,
+      minFloor: 1,
+      moveInFilter: MoveInFilter.within30Days,
+      sortBy: SearchSortOption.bestMatch,
+    );
+    _customProperties = [
+      _cloneProperty(
+        matchedOne,
+        id: 'guest-owner-1',
+        ownerName: 'יואב כהן',
+        price: matchedOne.price + 300,
+      ),
+      _cloneProperty(
+        matchedTwo,
+        id: 'guest-owner-2',
+        ownerName: 'יואב כהן',
+        price: matchedTwo.price + 500,
+      ),
+    ];
+    _likedPropertyIds = <String>{
+      matchedOne.id,
+      matchedTwo.id,
+      pendingLead.id,
+    };
+    _passedPropertyIds = <String>{savedProperty.id};
+    _ownerAcceptedPropertyIds = <String>{matchedOne.id, matchedTwo.id};
+    _ownerRejectedPropertyIds = <String>{};
+    _matches = [
+      RentalMatch(
+        id: 'guest-match-${matchedOne.id}',
+        propertyId: matchedOne.id,
+        createdAt: DateTime.now().subtract(const Duration(days: 18)),
+        contractSent: true,
+        ownerSigned: true,
+        tenantSigned: false,
+        messages: [
+          ChatMessage(
+            id: 'm1-1',
+            sender: 'מערכת',
+            text: 'נוצר מאצ׳ לפני 18 ימים. השיחה פעילה.',
+            createdAt: DateTime.now().subtract(const Duration(days: 18)),
+          ),
+          ChatMessage(
+            id: 'm1-2',
+            sender: 'יואב כהן',
+            text: 'היי נועה, הדירה עדיין זמינה. אפשר לתאם ביקור ביום שלישי?',
+            createdAt: DateTime.now().subtract(const Duration(days: 17)),
+          ),
+          ChatMessage(
+            id: 'm1-3',
+            sender: tenant.name,
+            text: 'כן, מצוין. שלחתי גם תלושי שכר וערבים לעיון.',
+            createdAt: DateTime.now().subtract(const Duration(days: 16)),
+          ),
+          ChatMessage(
+            id: 'm1-4',
+            sender: 'יואב כהן',
+            text: 'ראיתי, הכל מסודר. שלחתי חוזה לעבור עליו לפני הפגישה.',
+            createdAt: DateTime.now().subtract(const Duration(days: 14)),
+          ),
+        ],
+      ),
+      RentalMatch(
+        id: 'guest-match-${matchedTwo.id}',
+        propertyId: matchedTwo.id,
+        createdAt: DateTime.now().subtract(const Duration(days: 7)),
+        contractSent: false,
+        ownerSigned: false,
+        tenantSigned: false,
+        messages: [
+          ChatMessage(
+            id: 'm2-1',
+            sender: 'מערכת',
+            text: 'נוצר מאצ׳ לפני שבוע. שני הצדדים ממשיכים שיחה.',
+            createdAt: DateTime.now().subtract(const Duration(days: 7)),
+          ),
+          ChatMessage(
+            id: 'm2-2',
+            sender: 'יעל אברמוב',
+            text: 'נועה, יש לנו עוד חלון ביקור מחר ב-19:30 אם זה מתאים.',
+            createdAt: DateTime.now().subtract(const Duration(days: 2)),
+          ),
+          ChatMessage(
+            id: 'm2-3',
+            sender: tenant.name,
+            text: 'מעולה, זה מסתדר. אשמח גם לדעת אם אפשר חניה בהמשך הרחוב.',
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          ),
+        ],
+      ),
+    ];
+    _pendingMatchPropertyId = null;
+    _swipeHistory.clear();
+    _savedPropertyIds = <String>{savedProperty.id, matchedTwo.id};
+    _lastSeenMatchCount = 1;
+    _isGuestMode = true;
+    _userRole = role;
+  }
+
+  RentalProperty _cloneProperty(
+    RentalProperty property, {
+    required String id,
+    required String ownerName,
+    int? price,
+  }) {
+    final json = property.toJson();
+    json['id'] = id;
+    json['ownerName'] = ownerName;
+    if (price != null) {
+      json['price'] = price;
+    }
+    return RentalProperty.fromJson(json);
+  }
+
   void _hydrateFromState(Map<String, dynamic> storedState) {
     final tenantJson = storedState['tenantProfile'] as Map<dynamic, dynamic>?;
     _tenantProfile = tenantJson == null
@@ -691,6 +915,7 @@ class DatingProvider extends ChangeNotifier {
             .toList();
 
     _userRole = storedState['userRole'] as String? ?? 'tenant';
+    _isGuestMode = storedState['isGuestMode'] as bool? ?? false;
 
     if (_tenantReviews.isEmpty) {
       _tenantReviews = _rentalDataService.createTenantReviews();
@@ -749,6 +974,7 @@ class DatingProvider extends ChangeNotifier {
       ),
       'customProperties': _customProperties.map((p) => p.toJson()).toList(),
       'userRole': _userRole,
+      'isGuestMode': _isGuestMode,
       'savedPropertyIds': _savedPropertyIds.toList(),
       'lastSeenMatchCount': _lastSeenMatchCount,
     });

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:appwrite/appwrite.dart';
+import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/services/appwrite_client.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,20 +11,21 @@ class LocalStorageService {
   static const String _payloadField = 'payload';
   static const String _schemaField = 'schema';
   static const String _updatedAtField = 'updatedAt';
+  static const String _remoteStateIdKey = 'rentch_remote_state_document_id';
 
   Future<Map<String, dynamic>?> loadAppState() async {
     final preferences = await SharedPreferences.getInstance();
     final rawLocalState = preferences.getString(_appStateKey);
     final localState = _decodeState(rawLocalState);
 
-    final remoteState = await _loadRemoteState();
+    final remoteState = await _loadRemoteState(preferences);
     if (remoteState != null) {
       await preferences.setString(_appStateKey, jsonEncode(remoteState));
       return remoteState;
     }
 
     if (localState != null && rawLocalState != null) {
-      await _saveRemoteState(localState, rawLocalState);
+      await _saveRemoteState(preferences, localState, rawLocalState);
     }
 
     return localState;
@@ -33,7 +35,7 @@ class LocalStorageService {
     final preferences = await SharedPreferences.getInstance();
     final encodedState = jsonEncode(state);
     await preferences.setString(_appStateKey, encodedState);
-    await _saveRemoteState(state, encodedState);
+    await _saveRemoteState(preferences, state, encodedState);
   }
 
   Future<void> clearAppState() async {
@@ -61,12 +63,16 @@ class LocalStorageService {
     return null;
   }
 
-  Future<Map<String, dynamic>?> _loadRemoteState() async {
+  Future<Map<String, dynamic>?> _loadRemoteState(
+    SharedPreferences preferences,
+  ) async {
+    if (!AppConfig.canUseRemoteState) return null;
+
     try {
       final row = await tables.getRow(
         databaseId: appwriteDatabaseId,
         tableId: appwriteAppStateCollectionId,
-        rowId: appwriteAppStateDocumentId,
+        rowId: await _remoteStateDocumentId(preferences),
       );
       final payload = row.data[_payloadField];
       if (payload is String) {
@@ -84,27 +90,24 @@ class LocalStorageService {
   }
 
   Future<void> _saveRemoteState(
+    SharedPreferences preferences,
     Map<String, dynamic> state,
     String encodedState,
   ) async {
+    if (!AppConfig.canUseRemoteState) return;
+
     final data = {
       _payloadField: encodedState,
       _schemaField: state[_schemaField],
       _updatedAtField: DateTime.now().toUtc().toIso8601String(),
     };
-    final permissions = [
-      Permission.read(Role.any()),
-      Permission.update(Role.any()),
-      Permission.delete(Role.any()),
-    ];
 
     try {
       await tables.upsertRow(
         databaseId: appwriteDatabaseId,
         tableId: appwriteAppStateCollectionId,
-        rowId: appwriteAppStateDocumentId,
+        rowId: await _remoteStateDocumentId(preferences),
         data: data,
-        permissions: permissions,
       );
     } on AppwriteException catch (error) {
       _logRemoteError('save', error);
@@ -118,5 +121,14 @@ class LocalStorageService {
   void _logRemoteError(String action, Object error) {
     if (!kDebugMode) return;
     debugPrint('Appwrite state $action failed: $error');
+  }
+
+  Future<String> _remoteStateDocumentId(SharedPreferences preferences) async {
+    final existing = preferences.getString(_remoteStateIdKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+
+    final generated = 'state_${DateTime.now().microsecondsSinceEpoch}';
+    await preferences.setString(_remoteStateIdKey, generated);
+    return generated;
   }
 }

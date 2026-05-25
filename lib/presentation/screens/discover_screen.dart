@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:dating_app/core/constants/app_colors.dart';
@@ -753,17 +754,7 @@ class _MatchCelebrationOverlayState extends State<_MatchCelebrationOverlay>
                   child: SizedBox(
                     width: 220,
                     height: 150,
-                    child: Image.network(
-                      imgUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: AppColors.navy,
-                        child: const Center(
-                          child: Icon(IconsaxPlusBold.building,
-                              color: Colors.white30, size: 40),
-                        ),
-                      ),
-                    ),
+                    child: _MatchPropertyImage(imageUrl: imgUrl),
                   ),
                 ),
               const SizedBox(height: 36),
@@ -809,6 +800,40 @@ class _MatchCelebrationOverlayState extends State<_MatchCelebrationOverlay>
       ),
     );
   }
+}
+
+class _MatchPropertyImage extends StatelessWidget {
+  const _MatchPropertyImage({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
+      final path = imageUrl.startsWith('file://') ? imageUrl.substring(7) : imageUrl;
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+    }
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallback(),
+    );
+  }
+
+  Widget _fallback() => Container(
+        color: AppColors.navy,
+        child: const Center(
+          child: Icon(
+            IconsaxPlusBold.building,
+            color: Colors.white30,
+            size: 40,
+          ),
+        ),
+      );
 }
 
 // ─── Filters Sheet ────────────────────────────────────────────────────────────

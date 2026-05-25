@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -311,6 +313,14 @@ class _CardImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (imageUrl.isEmpty) return _ImageFallback(city: city);
+    if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
+      final path = imageUrl.startsWith('file://') ? imageUrl.substring(7) : imageUrl;
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _ImageFallback(city: city),
+      );
+    }
     return Image.network(
       imageUrl,
       fit: BoxFit.cover,

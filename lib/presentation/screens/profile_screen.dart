@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
@@ -17,11 +18,10 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('יציאה מהחשבון',
-            style: TextStyle(
-                color: AppColors.navy, fontWeight: FontWeight.w900)),
+            style:
+                TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
         content: const Text(
           'האם אתה בטוח שברצונך לצאת?',
           style: TextStyle(color: AppColors.textSecondary),
@@ -47,11 +47,16 @@ class ProfileScreen extends StatelessWidget {
 
     if (confirmed != true) return;
     if (!context.mounted) return;
+    final provider = context.read<DatingProvider>();
+    final navigator = Navigator.of(context);
 
-    await context.read<DatingProvider>().logout();
+    try {
+      await GoogleAuthService().signOut();
+    } catch (_) {}
+    await provider.logout();
 
     if (!context.mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
+    navigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AuthScreen()),
       (_) => false,
     );
@@ -210,8 +215,7 @@ class ProfileScreen extends StatelessWidget {
                         label: 'עריכת פרופיל',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) =>
-                                EditProfileScreen(profile: profile),
+                            builder: (_) => EditProfileScreen(profile: profile),
                           ),
                         ),
                       ),
@@ -300,8 +304,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                     controller: _pageCtrl,
                     itemCount: photos.length,
                     onPageChanged: (i) => setState(() => _currentPage = i),
-                    itemBuilder: (_, i) =>
-                        _ProfileImageCell(url: photos[i]),
+                    itemBuilder: (_, i) => _ProfileImageCell(url: photos[i]),
                   ),
 
             // Invisible tap zones for gallery navigation
@@ -664,7 +667,8 @@ class _ReviewCard extends StatelessWidget {
               Text(
                 review.authorName,
                 style: const TextStyle(
-                    color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -696,23 +700,26 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isDestructive ? AppColors.coral : AppColors.navy;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 3),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(
-          label,
-          style: TextStyle(fontWeight: FontWeight.w700, color: color),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderLight),
         ),
-        trailing: const Icon(IconsaxPlusLinear.arrow_left,
-            size: 18, color: AppColors.textSecondary),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ListTile(
+          leading: Icon(icon, color: color),
+          title: Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.w700, color: color),
+          ),
+          trailing: const Icon(IconsaxPlusLinear.arrow_left,
+              size: 18, color: AppColors.textSecondary),
+          onTap: onTap,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
       ),
     );
   }

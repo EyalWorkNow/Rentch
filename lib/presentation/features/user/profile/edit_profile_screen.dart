@@ -811,7 +811,7 @@ class _PhotoManagerSheetState extends State<_PhotoManagerSheet> {
                   scrollController: scrollCtrl,
                   padding: const EdgeInsets.all(16),
                   proxyDecorator: (child, index, animation) => child,
-                  onReorder: (oldIndex, newIndex) {
+                  onReorderItem: (oldIndex, newIndex) {
                     setState(() => widget.onReorder(oldIndex, newIndex));
                   },
                   itemCount:

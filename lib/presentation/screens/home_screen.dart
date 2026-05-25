@@ -1,8 +1,9 @@
 import 'package:dating_app/core/constants/app_colors.dart';
-import 'package:dating_app/core/services/appwrite_client.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
+import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
+import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
@@ -20,37 +21,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool? _cachedIsLandlord;
-  bool _isPinging = false;
 
   void _onTabTap(int index, DatingProvider provider) {
     HapticFeedback.selectionClick();
     setState(() => _currentIndex = index);
-    // matches tab is always index 1 — clear badge when visited
-    if (index == 1) provider.markMatchesSeen();
-  }
-
-  Future<void> _sendPing() async {
-    if (_isPinging) return;
-
-    setState(() => _isPinging = true);
-
-    try {
-      final response = await client.ping();
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ping response: $response')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ping failed: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isPinging = false);
-      }
+    final matchesIndex = provider.isLandlord ? 2 : 1;
+    if (index == matchesIndex) {
+      provider.markMatchesSeen();
     }
   }
 
@@ -66,7 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _cachedIsLandlord = isLandlord;
 
         final screens = isLandlord
-            ? const <Widget>[ExploreScreen(), MatchesScreen(), ProfileScreen()]
+            ? const <Widget>[
+                LandlordDashboardScreen(),
+                ExploreScreen(),
+                MatchesScreen(),
+                LandlordPropertiesScreen(),
+              ]
             : const <Widget>[
                 DiscoverScreen(),
                 MatchesScreen(),
@@ -84,28 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
             index: safeIndex,
             children: screens,
           ),
-          floatingActionButton: safeIndex == 0
-              ? Padding(
-                  padding: const EdgeInsets.only(bottom: 84),
-                  child: FloatingActionButton.extended(
-                    onPressed: _isPinging ? null : _sendPing,
-                    backgroundColor: AppColors.navy,
-                    foregroundColor: Colors.white,
-                    icon: _isPinging
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.wifi_tethering_rounded),
-                    label: Text(_isPinging ? 'Sending...' : 'Send a ping'),
-                  ),
-                )
-              : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           bottomNavigationBar: SafeArea(
             minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Container(
@@ -125,8 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: List.generate(items.length, (index) {
                   final item = items[index];
                   final isSelected = index == safeIndex;
-                  // matches tab is always index 1
-                  final showBadge = index == 1 && unseenCount > 0;
+                  final showBadge =
+                      index == (isLandlord ? 2 : 1) && unseenCount > 0;
 
                   return Expanded(
                     child: Padding(
@@ -236,7 +196,12 @@ const _tenantItems = [
 
 const _landlordItems = [
   _NavItem(
-    label: 'מועמדים',
+    label: 'דשבורד',
+    icon: IconsaxPlusLinear.category,
+    activeIcon: IconsaxPlusBold.category,
+  ),
+  _NavItem(
+    label: 'סוויפים',
     icon: IconsaxPlusLinear.profile_2user,
     activeIcon: IconsaxPlusBold.profile_2user,
   ),
@@ -246,9 +211,9 @@ const _landlordItems = [
     activeIcon: IconsaxPlusBold.message,
   ),
   _NavItem(
-    label: 'פרופיל',
-    icon: IconsaxPlusLinear.profile_circle,
-    activeIcon: IconsaxPlusBold.profile_circle,
+    label: 'הדירות שלי',
+    icon: IconsaxPlusLinear.buildings_2,
+    activeIcon: IconsaxPlusBold.buildings_2,
   ),
 ];
 

@@ -95,6 +95,13 @@ The project follows a **Feature-First / Clean Architecture** folder structure:
    flutter run
    ```
 
+## 🚢 Production
+
+Production-only integrations are disabled by default and must be enabled with
+`--dart-define` flags. See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)
+for the release checklist, Firebase/Appwrite configuration, and verification
+commands.
+
 ---
 
 ## 🎨 Asset Configuration

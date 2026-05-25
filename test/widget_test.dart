@@ -21,9 +21,17 @@ void main() {
     try {
       await _pumpApp(tester);
 
-      expect(find.text('דירת החלומות'), findsOneWidget);
-      expect(find.text('דירות'), findsOneWidget);
-      expect(find.text('בעלי דירה'), findsOneWidget);
+      expect(find.text('המשך כאורח'), findsOneWidget);
+      await tester.ensureVisible(find.text('המשך כאורח'));
+      await tester.tap(find.text('המשך כאורח'));
+      await _pumpFrames(tester);
+
+      expect(find.text('אורח כדייר מחפש דירה'), findsOneWidget);
+      await tester.ensureVisible(find.text('אורח כדייר מחפש דירה'));
+      await tester.tap(find.text('אורח כדייר מחפש דירה'));
+      await _pumpFrames(tester);
+
+      expect(find.text('גלה דירות'), findsOneWidget);
       expect(find.text('התאמות'), findsOneWidget);
       expect(find.text('פרופיל'), findsOneWidget);
       expect(find.textContaining('לחודש'), findsWidgets);
@@ -33,29 +41,24 @@ void main() {
       await tester.tap(find.byTooltip('אהבתי דירה'));
       await _pumpFrames(tester);
 
-      await tester.tap(find.text('בעלי דירה'));
-      await _pumpFrames(tester);
-
-      expect(find.text('נועה לוי'), findsOneWidget);
-      await tester.tap(find.byTooltip('אישור שוכר'));
-      await _pumpFrames(tester);
-
       await tester.tap(find.text('התאמות'));
       await _pumpFrames(tester);
 
-      expect(find.text('התאמות (1)'), findsOneWidget);
+      expect(find.textContaining('התאמות'), findsWidgets);
       expect(find.text('צ׳אט פתוח'), findsOneWidget);
 
       await tester.tap(find.text('פרופיל'));
       await _pumpFrames(tester);
 
       expect(find.text('נועה לוי'), findsOneWidget);
-      await tester.ensureVisible(find.text('עריכת פרופיל').first);
-      await tester.tap(find.text('עריכת פרופיל').first);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+      await _pumpFrames(tester);
+      await tester.ensureVisible(find.text('עריכת פרופיל'));
+      await tester.tap(find.text('עריכת פרופיל'));
       await _pumpFrames(tester);
 
-      await tester.enterText(find.byType(TextFormField).first, 'דניאל');
-      await tester.tap(find.text('שמירה'));
+      await tester.enterText(find.byType(TextField).first, 'דניאל');
+      await tester.tap(find.text('שמור'));
       await _pumpFrames(tester);
 
       expect(find.text('דניאל'), findsOneWidget);

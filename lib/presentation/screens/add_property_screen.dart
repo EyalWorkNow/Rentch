@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 class AddPropertyScreen extends StatefulWidget {
@@ -48,9 +52,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _totalFloorsCtrl = TextEditingController();
   final _sizeCtrl = TextEditingController();
   final _entryDateCtrl = TextEditingController();
-  final List<TextEditingController> _imageCtrlList = [
-    TextEditingController()
-  ];
+  final List<TextEditingController> _imageCtrlList = [TextEditingController()];
+  final _picker = ImagePicker();
+  final _storageService = StorageService();
 
   int _price = 5000;
   double _rooms = 3;
@@ -120,6 +124,33 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     } else {
       Navigator.of(context).pop();
     }
+  }
+
+  Future<void> _pickPropertyImage(ImageSource source) async {
+    final file = await _picker.pickImage(
+      source: source,
+      imageQuality: 86,
+      maxWidth: 1800,
+    );
+    if (file == null) return;
+
+    final localPath = await _storageService.saveImageLocally(
+      file,
+      folderName: 'property_photos',
+    );
+    final remoteUrl = await _storageService.uploadToCloud(localPath);
+    final imagePath = remoteUrl ?? localPath;
+    if (!mounted) return;
+
+    setState(() {
+      final emptyIndex =
+          _imageCtrlList.indexWhere((ctrl) => ctrl.text.trim().isEmpty);
+      if (emptyIndex == -1 && _imageCtrlList.length < 6) {
+        _imageCtrlList.add(TextEditingController(text: imagePath));
+      } else if (emptyIndex != -1) {
+        _imageCtrlList[emptyIndex].text = imagePath;
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -216,8 +247,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             agencyListing: _agencyListing,
             onPriceChanged: (v) =>
                 setState(() => _price = (v / 100).round() * 100),
-            onRoomsChanged: (v) =>
-                setState(() => _rooms = (v * 2).round() / 2),
+            onRoomsChanged: (v) => setState(() => _rooms = (v * 2).round() / 2),
             onTypeChanged: (v) => setState(() => _propertyType = v!),
             onConditionChanged: (v) => setState(() => _condition = v!),
             onAgencyChanged: (v) => setState(() => _agencyListing = v),
@@ -235,6 +265,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           ),
           _StepPhotos(
             imageCtrlList: _imageCtrlList,
+            onPickFromGallery: () => _pickPropertyImage(ImageSource.gallery),
+            onPickFromCamera: () => _pickPropertyImage(ImageSource.camera),
             onAddImage: () =>
                 setState(() => _imageCtrlList.add(TextEditingController())),
             onRemoveImage: (i) => setState(() {
@@ -330,8 +362,7 @@ class _StepIndicator extends StatelessWidget {
                   color: isActive || isDone
                       ? Colors.white
                       : Colors.white.withValues(alpha: 0.5),
-                  fontWeight:
-                      isActive ? FontWeight.w800 : FontWeight.w500,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
                 ),
               ),
             ],
@@ -351,12 +382,14 @@ class _WizardNavBar extends StatelessWidget {
     required this.isLoading,
     required this.onNext,
     required this.onPrev,
+    this.saveLabel,
   });
   final int step;
   final int total;
   final bool isLoading;
   final VoidCallback onNext;
   final VoidCallback onPrev;
+  final String? saveLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -401,9 +434,10 @@ class _WizardNavBar extends StatelessWidget {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : Icon(isLast ? IconsaxPlusBold.add_square : null, size: 16),
-              label: Text(isLoading
-                  ? 'מפרסם...'
-                  : (isLast ? 'פרסום הדירה' : 'הבא →')),
+              label: Text(
+                  isLoading
+                      ? 'שומר...'
+                      : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 disabledBackgroundColor:
@@ -449,9 +483,7 @@ class _StepLocation extends StatelessWidget {
           child: Column(
             children: [
               _Field(
-                  ctrl: cityCtrl,
-                  label: 'עיר *',
-                  icon: IconsaxPlusLinear.map),
+                  ctrl: cityCtrl, label: 'עיר *', icon: IconsaxPlusLinear.map),
               const SizedBox(height: 12),
               _Field(
                   ctrl: neighborhoodCtrl,
@@ -587,7 +619,12 @@ class _StepDetails extends StatelessWidget {
                 label: 'סוג נכס',
                 value: propertyType,
                 options: const [
-                  'דירה', 'דירת גג', 'דירת גן', 'סטודיו', 'קוטג׳', 'בית פרטי',
+                  'דירה',
+                  'דירת גג',
+                  'דירת גן',
+                  'סטודיו',
+                  'קוטג׳',
+                  'בית פרטי',
                 ],
                 onChanged: onTypeChanged,
               ),
@@ -617,7 +654,7 @@ class _StepDetails extends StatelessWidget {
                   const Spacer(),
                   Switch.adaptive(
                     value: agencyListing,
-                    activeColor: AppColors.primary,
+                    activeThumbColor: AppColors.primary,
                     onChanged: onAgencyChanged,
                   ),
                 ],
@@ -680,9 +717,8 @@ class _StepFeatures extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 9),
                       decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.primary
-                            : AppColors.background,
+                        color:
+                            selected ? AppColors.primary : AppColors.background,
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
                           color: selected
@@ -695,9 +731,8 @@ class _StepFeatures extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: selected
-                              ? Colors.white
-                              : AppColors.textSecondary,
+                          color:
+                              selected ? Colors.white : AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -717,10 +752,14 @@ class _StepFeatures extends StatelessWidget {
 class _StepPhotos extends StatelessWidget {
   const _StepPhotos({
     required this.imageCtrlList,
+    required this.onPickFromGallery,
+    required this.onPickFromCamera,
     required this.onAddImage,
     required this.onRemoveImage,
   });
   final List<TextEditingController> imageCtrlList;
+  final VoidCallback onPickFromGallery;
+  final VoidCallback onPickFromCamera;
   final VoidCallback onAddImage;
   final ValueChanged<int> onRemoveImage;
 
@@ -732,12 +771,50 @@ class _StepPhotos extends StatelessWidget {
         _SectionHint(
           icon: IconsaxPlusBold.gallery,
           title: 'תמונות הדירה',
-          subtitle: 'הוסף קישורי תמונה (URL). זה אופציונלי',
+          subtitle: 'אפשר להעלות תמונה מהמכשיר או להדביק קישור',
         ),
         const SizedBox(height: 16),
         _FormCard(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onPickFromGallery,
+                      icon: const Icon(IconsaxPlusBold.gallery, size: 17),
+                      label: const Text('בחר מהגלריה'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onPickFromCamera,
+                      icon: const Icon(IconsaxPlusLinear.camera, size: 17),
+                      label: const Text('צלם עכשיו'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        side: const BorderSide(color: AppColors.borderLight),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _PhotoPreviewStrip(imageCtrlList: imageCtrlList),
+              const SizedBox(height: 14),
               ...imageCtrlList.asMap().entries.map((e) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -746,7 +823,7 @@ class _StepPhotos extends StatelessWidget {
                       Expanded(
                         child: _Field(
                           ctrl: e.value,
-                          label: 'קישור תמונה ${e.key + 1}',
+                          label: 'תמונה ${e.key + 1} - קישור או נתיב קובץ',
                           icon: IconsaxPlusLinear.image,
                         ),
                       ),
@@ -774,8 +851,8 @@ class _StepPhotos extends StatelessWidget {
                 GestureDetector(
                   onTap: onAddImage,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
                       border: Border.all(color: AppColors.primary),
                       borderRadius: BorderRadius.circular(999),
@@ -803,6 +880,95 @@ class _StepPhotos extends StatelessWidget {
       ],
     );
   }
+}
+
+class _PhotoPreviewStrip extends StatelessWidget {
+  const _PhotoPreviewStrip({required this.imageCtrlList});
+
+  final List<TextEditingController> imageCtrlList;
+
+  @override
+  Widget build(BuildContext context) {
+    final images = imageCtrlList
+        .map((ctrl) => ctrl.text.trim())
+        .where((url) => url.isNotEmpty)
+        .toList();
+    if (images.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: const Row(
+          children: [
+            Icon(IconsaxPlusLinear.image, color: AppColors.textSecondary),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'תמונה טובה מעלה אמון ומבליטה את הדירה בסוויפים.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 92,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, i) => ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: 112,
+            height: 92,
+            child: _PropertyImagePreview(url: images[i]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PropertyImagePreview extends StatelessWidget {
+  const _PropertyImagePreview({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.startsWith('/') || url.startsWith('file://')) {
+      final path = url.startsWith('file://') ? url.substring(7) : url;
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _fallback(),
+    );
+  }
+
+  Widget _fallback() => Container(
+        color: AppColors.primaryLight2,
+        child: const Icon(
+          IconsaxPlusBold.building,
+          color: AppColors.primary,
+        ),
+      );
 }
 
 // ─── Shared widgets ───────────────────────────────────────────────────────────
@@ -893,8 +1059,8 @@ class _Field extends StatelessWidget {
       style: const TextStyle(color: AppColors.navy, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(
-            color: AppColors.textSecondary, fontSize: 13),
+        labelStyle:
+            const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         prefixIcon: Icon(icon, size: 16, color: AppColors.primary),
         filled: true,
         fillColor: AppColors.background,
@@ -1001,9 +1167,7 @@ class _DropdownRow extends StatelessWidget {
           value: value,
           underline: const SizedBox.shrink(),
           style: const TextStyle(
-              color: AppColors.navy,
-              fontWeight: FontWeight.w700,
-              fontSize: 14),
+              color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
           items: options
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
               .toList(),
@@ -1023,4 +1187,291 @@ String _fmtPrice(int value) {
     if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
   }
   return '₪$buffer';
+}
+
+// ─── Edit Property Screen ─────────────────────────────────────────────────────
+
+class EditPropertyScreen extends StatefulWidget {
+  const EditPropertyScreen({super.key, required this.property});
+
+  final RentalProperty property;
+
+  @override
+  State<EditPropertyScreen> createState() => _EditPropertyScreenState();
+}
+
+class _EditPropertyScreenState extends State<EditPropertyScreen> {
+  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'תמונות'];
+
+  static const _allFeatures = [
+    'מרפסת', 'חניה', 'מחסן', 'מזגן', 'ממ"ד', 'מרפסת שמש', 'גינה', 'מעלית',
+    'ריהוט', 'אינטרנט כלול', 'מטבח מאובזר', 'חיות מחמד מותר', 'כביסה כלולה',
+    'שומר/אבטחה', 'נגישות לנכים', 'גג משותף', 'בריכה', 'חדר כושר',
+  ];
+
+  final _pageCtrl = PageController();
+  int _step = 0;
+
+  late final TextEditingController _cityCtrl;
+  late final TextEditingController _neighborhoodCtrl;
+  late final TextEditingController _streetCtrl;
+  late final TextEditingController _streetNumCtrl;
+  late final TextEditingController _floorCtrl;
+  late final TextEditingController _totalFloorsCtrl;
+  late final TextEditingController _sizeCtrl;
+  late final TextEditingController _entryDateCtrl;
+  late final List<TextEditingController> _imageCtrlList;
+  final _picker = ImagePicker();
+  final _storageService = StorageService();
+
+  late int _price;
+  late double _rooms;
+  late String _propertyType;
+  late String _condition;
+  late bool _agencyListing;
+  late final Set<String> _selectedFeatures;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.property;
+    _cityCtrl = TextEditingController(text: p.city);
+    _neighborhoodCtrl = TextEditingController(text: p.neighborhood);
+    _streetCtrl = TextEditingController(text: p.street);
+    _streetNumCtrl =
+        TextEditingController(text: p.streetNumber > 0 ? '${p.streetNumber}' : '');
+    _floorCtrl = TextEditingController(text: p.floor);
+    _totalFloorsCtrl = TextEditingController(text: p.totalFloors);
+    _sizeCtrl = TextEditingController(text: '${p.sizeM2}');
+    _entryDateCtrl = TextEditingController(text: p.entryDate);
+    _imageCtrlList = p.imageUrls.isNotEmpty
+        ? p.imageUrls.map((u) => TextEditingController(text: u)).toList()
+        : [TextEditingController()];
+    _price = p.price;
+    _rooms = p.rooms;
+    _propertyType = p.propertyType;
+    _condition = p.condition.isNotEmpty ? p.condition : 'תקין';
+    _agencyListing = p.agencyListing;
+    _selectedFeatures = Set<String>.from(p.features);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    _cityCtrl.dispose();
+    _neighborhoodCtrl.dispose();
+    _streetCtrl.dispose();
+    _streetNumCtrl.dispose();
+    _floorCtrl.dispose();
+    _totalFloorsCtrl.dispose();
+    _sizeCtrl.dispose();
+    _entryDateCtrl.dispose();
+    for (final c in _imageCtrlList) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  bool _validateCurrentStep() {
+    switch (_step) {
+      case 0:
+        return _cityCtrl.text.trim().isNotEmpty &&
+            _streetCtrl.text.trim().isNotEmpty;
+      case 1:
+        return _sizeCtrl.text.trim().isNotEmpty;
+      default:
+        return true;
+    }
+  }
+
+  void _next() {
+    if (!_validateCurrentStep()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('יש למלא את השדות הנדרשים'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+    if (_step < 3) {
+      setState(() => _step++);
+      _pageCtrl.nextPage(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _save();
+    }
+  }
+
+  void _prev() {
+    if (_step > 0) {
+      setState(() => _step--);
+      _pageCtrl.previousPage(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _pickPropertyImage(ImageSource source) async {
+    final file = await _picker.pickImage(
+      source: source,
+      imageQuality: 86,
+      maxWidth: 1800,
+    );
+    if (file == null) return;
+    final localPath =
+        await _storageService.saveImageLocally(file, folderName: 'property_photos');
+    final remoteUrl = await _storageService.uploadToCloud(localPath);
+    final imagePath = remoteUrl ?? localPath;
+    if (!mounted) return;
+    setState(() {
+      final emptyIndex =
+          _imageCtrlList.indexWhere((ctrl) => ctrl.text.trim().isEmpty);
+      if (emptyIndex == -1 && _imageCtrlList.length < 6) {
+        _imageCtrlList.add(TextEditingController(text: imagePath));
+      } else if (emptyIndex != -1) {
+        _imageCtrlList[emptyIndex].text = imagePath;
+      }
+    });
+  }
+
+  Future<void> _save() async {
+    final city = _cityCtrl.text.trim();
+    final street = _streetCtrl.text.trim();
+    final size = int.tryParse(_sizeCtrl.text.trim()) ?? 0;
+    if (city.isEmpty || street.isEmpty || size == 0) return;
+
+    setState(() => _isSaving = true);
+
+    final imageUrls = _imageCtrlList
+        .map((c) => c.text.trim())
+        .where((u) => u.isNotEmpty)
+        .toList();
+
+    final updated = RentalProperty(
+      id: widget.property.id,
+      url: widget.property.url,
+      price: _price,
+      rooms: _rooms,
+      sizeM2: size,
+      floor: _floorCtrl.text.trim(),
+      totalFloors: _totalFloorsCtrl.text.trim(),
+      city: city,
+      neighborhood: _neighborhoodCtrl.text.trim(),
+      street: street,
+      streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
+      lat: widget.property.lat,
+      lon: widget.property.lon,
+      propertyType: _propertyType,
+      entryDate: _entryDateCtrl.text.trim(),
+      condition: _condition,
+      ownerName: widget.property.ownerName,
+      agencyListing: _agencyListing,
+      features: _selectedFeatures.toList(),
+      imageUrls: imageUrls,
+    );
+
+    await context.read<DatingProvider>().updateLandlordProperty(updated);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('הנכס עודכן בהצלחה'),
+        backgroundColor: Color(0xFF1B9C6A),
+      ),
+    );
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.navy,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(IconsaxPlusLinear.arrow_right, color: Colors.white),
+          onPressed: _prev,
+        ),
+        title: Text(
+          'עריכת נכס · ${_stepLabels[_step]}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(64),
+          child: _StepIndicator(step: _step, total: 4, labels: _stepLabels),
+        ),
+      ),
+      body: PageView(
+        controller: _pageCtrl,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _StepLocation(
+            cityCtrl: _cityCtrl,
+            neighborhoodCtrl: _neighborhoodCtrl,
+            streetCtrl: _streetCtrl,
+            streetNumCtrl: _streetNumCtrl,
+          ),
+          _StepDetails(
+            price: _price,
+            rooms: _rooms,
+            sizeCtrl: _sizeCtrl,
+            floorCtrl: _floorCtrl,
+            totalFloorsCtrl: _totalFloorsCtrl,
+            entryDateCtrl: _entryDateCtrl,
+            propertyType: _propertyType,
+            condition: _condition,
+            agencyListing: _agencyListing,
+            onPriceChanged: (v) =>
+                setState(() => _price = (v / 100).round() * 100),
+            onRoomsChanged: (v) => setState(() => _rooms = (v * 2).round() / 2),
+            onTypeChanged: (v) => setState(() => _propertyType = v!),
+            onConditionChanged: (v) => setState(() => _condition = v!),
+            onAgencyChanged: (v) => setState(() => _agencyListing = v),
+          ),
+          _StepFeatures(
+            allFeatures: _allFeatures,
+            selectedFeatures: _selectedFeatures,
+            onToggle: (f) => setState(() {
+              if (_selectedFeatures.contains(f)) {
+                _selectedFeatures.remove(f);
+              } else {
+                _selectedFeatures.add(f);
+              }
+            }),
+          ),
+          _StepPhotos(
+            imageCtrlList: _imageCtrlList,
+            onPickFromGallery: () => _pickPropertyImage(ImageSource.gallery),
+            onPickFromCamera: () => _pickPropertyImage(ImageSource.camera),
+            onAddImage: () =>
+                setState(() => _imageCtrlList.add(TextEditingController())),
+            onRemoveImage: (i) => setState(() {
+              _imageCtrlList[i].dispose();
+              _imageCtrlList.removeAt(i);
+            }),
+          ),
+        ],
+      ),
+      bottomSheet: _WizardNavBar(
+        step: _step,
+        total: 4,
+        isLoading: _isSaving,
+        saveLabel: 'עדכון הנכס',
+        onNext: _next,
+        onPrev: _prev,
+      ),
+    );
+  }
 }

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Dating App</string>
+	<string>Rentch</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>dating_app</string>
+	<string>Rentch</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -27,11 +27,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>נדרשת גישה למצלמה כדי לצלם תמונת פרופיל</string>
+	<string>נדרשת גישה למצלמה כדי לצלם תמונות פרופיל ודירה</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>נדרשת גישה לשמירה בגלריה</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>נדרשת גישה לגלריה כדי לעדכן תמונות פרופיל</string>
+	<string>נדרשת גישה לגלריה כדי להעלות תמונות פרופיל ודירה</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

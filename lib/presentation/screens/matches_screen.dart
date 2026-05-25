@@ -99,40 +99,49 @@ class _MatchCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2ECF1), width: 1.2),
           boxShadow: const [
             BoxShadow(
-                color: AppColors.shadow, blurRadius: 14, offset: Offset(0, 6))
+              color: Color(0x06072946),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            )
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(22),
-              ),
-              child: SizedBox(
-                width: 100,
-                height: 116,
-                child: imageUrl.isEmpty
-                    ? Container(
-                        color: AppColors.primaryLight2,
-                        child: const Icon(IconsaxPlusBold.building,
-                            color: AppColors.primary, size: 32),
-                      )
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Container(
+                width: 90,
+                height: 94,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE2ECF1), width: 1),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(17),
+                  child: imageUrl.isEmpty
+                      ? Container(
                           color: AppColors.primaryLight2,
                           child: const Icon(IconsaxPlusBold.building,
-                              color: AppColors.primary, size: 32),
+                              color: AppColors.primary, size: 28),
+                        )
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: AppColors.primaryLight2,
+                            child: const Icon(IconsaxPlusBold.building,
+                                color: AppColors.primary, size: 28),
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 4),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -141,7 +150,7 @@ class _MatchCard extends StatelessWidget {
                   children: [
                     Text(
                       property.address,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 15,
@@ -150,7 +159,7 @@ class _MatchCard extends StatelessWidget {
                         height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(IconsaxPlusLinear.money,
@@ -161,30 +170,62 @@ class _MatchCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    if (match.messages.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            IconsaxPlusLinear.message,
+                            size: 11,
+                            color: AppColors.textSecondary.withValues(alpha: 0.7),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              match.messages.last.text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.textSecondary.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 6,
-                      runSpacing: 5,
+                      runSpacing: 6,
                       children: [
                         _StatusChip(
                           label: match.contractSent ? 'חוזה נשלח' : 'צ׳אט פתוח',
                           color: match.contractSent
-                              ? const Color(0xFF14A87A)
+                              ? const Color(0xFF27AE60)
                               : AppColors.primary,
+                          icon: match.contractSent
+                              ? IconsaxPlusBold.document_text
+                              : IconsaxPlusBold.message,
                         ),
                         if (match.ownerSigned)
                           const _StatusChip(
-                              label: 'בעלים חתם',
-                              color: Color(0xFF14A87A)),
+                            label: 'בעלים חתם',
+                            color: Color(0xFF27AE60),
+                            icon: IconsaxPlusBold.pen_tool,
+                          ),
                         if (match.tenantSigned)
                           const _StatusChip(
-                              label: 'שוכר חתם',
-                              color: Color(0xFF14A87A)),
+                            label: 'שוכר חתם',
+                            color: Color(0xFF27AE60),
+                            icon: IconsaxPlusBold.edit,
+                          ),
                       ],
                     ),
                   ],
@@ -192,9 +233,9 @@ class _MatchCard extends StatelessWidget {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.only(left: 14),
+              padding: EdgeInsets.only(left: 16),
               child: Icon(IconsaxPlusLinear.arrow_left,
-                  size: 18, color: AppColors.textSecondary),
+                  size: 16, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -204,23 +245,37 @@ class _MatchCard extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.color});
+  const _StatusChip({required this.label, required this.color, this.icon});
 
   final String label;
   final Color color;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 0.8),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-            color: color, fontWeight: FontWeight.w700, fontSize: 11),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+            ),
+          ),
+        ],
       ),
     );
   }

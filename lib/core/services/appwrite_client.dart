@@ -1,15 +1,14 @@
 import 'package:appwrite/appwrite.dart';
+import 'package:dating_app/core/config/app_config.dart';
 
-const String appwriteProjectId = '6a11629d0022b837a38e';
-const String appwriteProjectName = 'mydatingapp';
-const String appwritePublicEndpoint = 'https://fra.cloud.appwrite.io/v1';
-const String appwriteDatabaseId = '6a1201ae0028f7ff2e77';
-const String appwriteAppStateCollectionId = 'app_state';
-const String appwriteAppStateDocumentId = 'global_state';
-const String appwriteStorageBucketId = '6a122da400013ecd35e0';
+const String appwriteProjectId = AppConfig.appwriteProjectId;
+const String appwritePublicEndpoint = AppConfig.appwriteEndpoint;
+const String appwriteDatabaseId = AppConfig.appwriteDatabaseId;
+const String appwriteAppStateCollectionId = AppConfig.appwriteAppStateTableId;
+const String appwriteStorageBucketId = AppConfig.appwriteStorageBucketId;
 
 final Client client = Client()
-  ..setProject(appwriteProjectId)
-  ..setEndpoint(appwritePublicEndpoint);
+  ..setEndpoint(appwritePublicEndpoint)
+  ..setProject(appwriteProjectId);
 
 final TablesDB tables = TablesDB(client);

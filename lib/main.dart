@@ -1,12 +1,25 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
+import 'package:dating_app/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (AppConfig.enableGoogleSignIn) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (error) {
+      if (AppConfig.isProduction) rethrow;
+      debugPrint('Firebase initialization skipped: $error');
+    }
+  }
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

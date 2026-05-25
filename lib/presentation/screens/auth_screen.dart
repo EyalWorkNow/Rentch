@@ -1,4 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/config/app_config.dart';
+import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
@@ -41,6 +43,20 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
+  Future<void> _onGuestEnter() async {
+    final role = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => const _GuestModeDialog(),
+    );
+    if (!mounted || role == null) return;
+
+    await context.read<DatingProvider>().enterGuestMode(role);
+    if (mounted) {
+      _onEnter();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 1040;
@@ -62,11 +78,13 @@ class _AuthScreenState extends State<AuthScreen>
               _WideLayout(
                   tabController: _tabController,
                   onLogin: _onEnter,
+                  onGuestLogin: _onGuestEnter,
                   onDone: _onEnter)
             else
               _MobileLayout(
                   tabController: _tabController,
                   onLogin: _onEnter,
+                  onGuestLogin: _onGuestEnter,
                   onDone: _onEnter),
           ],
         ),
@@ -81,11 +99,13 @@ class _MobileLayout extends StatelessWidget {
   const _MobileLayout({
     required this.tabController,
     required this.onLogin,
+    required this.onGuestLogin,
     required this.onDone,
   });
 
   final TabController tabController;
   final VoidCallback onLogin;
+  final VoidCallback onGuestLogin;
   final VoidCallback onDone;
 
   @override
@@ -103,6 +123,7 @@ class _MobileLayout extends StatelessWidget {
           child: _AuthCard(
             tabController: tabController,
             onLogin: onLogin,
+            onGuestLogin: onGuestLogin,
             onDone: onDone,
           ),
         ),
@@ -117,11 +138,13 @@ class _WideLayout extends StatelessWidget {
   const _WideLayout({
     required this.tabController,
     required this.onLogin,
+    required this.onGuestLogin,
     required this.onDone,
   });
 
   final TabController tabController;
   final VoidCallback onLogin;
+  final VoidCallback onGuestLogin;
   final VoidCallback onDone;
 
   @override
@@ -147,6 +170,7 @@ class _WideLayout extends StatelessWidget {
                   child: _AuthCard(
                     tabController: tabController,
                     onLogin: onLogin,
+                    onGuestLogin: onGuestLogin,
                     onDone: onDone,
                     isWide: true,
                   ),
@@ -174,8 +198,7 @@ class _HeroContent extends StatelessWidget {
         SvgPicture.asset(
           'assets/images/rentch_logo_full.svg',
           height: 44,
-          colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
           placeholderBuilder: (_) => const Text(
             'Rentch',
             style: TextStyle(
@@ -203,8 +226,7 @@ class _HeroContent extends StatelessWidget {
             _FeaturePill(
                 icon: IconsaxPlusBold.building, label: 'דירות מותאמות'),
             const SizedBox(width: 10),
-            _FeaturePill(
-                icon: IconsaxPlusBold.heart, label: 'התאמה אישית'),
+            _FeaturePill(icon: IconsaxPlusBold.heart, label: 'התאמה אישית'),
           ],
         ),
       ],
@@ -226,8 +248,7 @@ class _HeroContentWide extends StatelessWidget {
         SvgPicture.asset(
           'assets/images/rentch_logo_full.svg',
           height: 58,
-          colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
           placeholderBuilder: (_) => const Text(
             'Rentch',
             style: TextStyle(
@@ -388,12 +409,14 @@ class _AuthCard extends StatelessWidget {
   const _AuthCard({
     required this.tabController,
     required this.onLogin,
+    required this.onGuestLogin,
     required this.onDone,
     this.isWide = false,
   });
 
   final TabController tabController;
   final VoidCallback onLogin;
+  final VoidCallback onGuestLogin;
   final VoidCallback onDone;
   final bool isWide;
 
@@ -434,8 +457,7 @@ class _AuthCard extends StatelessWidget {
 
           // Tab selector
           Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: isWide ? 28 : 20),
+            padding: EdgeInsets.symmetric(horizontal: isWide ? 28 : 20),
             child: _ModeTabs(controller: tabController),
           ),
           const SizedBox(height: 4),
@@ -445,7 +467,7 @@ class _AuthCard extends StatelessWidget {
             child: TabBarView(
               controller: tabController,
               children: [
-                _LoginTab(onLogin: onLogin),
+                _LoginTab(onLogin: onLogin, onGuestLogin: onGuestLogin),
                 _RegisterFlow(onDone: onDone),
               ],
             ),
@@ -470,29 +492,25 @@ class _BackdropOrbs extends StatelessWidget {
             top: -120,
             right: -40,
             child: _GlowOrb(
-                size: 260,
-                color: AppColors.primary.withValues(alpha: 0.20)),
+                size: 260, color: AppColors.primary.withValues(alpha: 0.20)),
           ),
           Positioned(
             left: -90,
             top: 140,
             child: _GlowOrb(
-                size: 220,
-                color: Colors.white.withValues(alpha: 0.08)),
+                size: 220, color: Colors.white.withValues(alpha: 0.08)),
           ),
           Positioned(
             bottom: -80,
             left: 40,
             child: _GlowOrb(
-                size: 240,
-                color: AppColors.coral.withValues(alpha: 0.14)),
+                size: 240, color: AppColors.coral.withValues(alpha: 0.14)),
           ),
           Positioned(
             bottom: 90,
             right: 80,
             child: _GlowOrb(
-                size: 160,
-                color: Colors.white.withValues(alpha: 0.05)),
+                size: 160, color: Colors.white.withValues(alpha: 0.05)),
           ),
         ],
       ),
@@ -518,6 +536,147 @@ class _GlowOrb extends StatelessWidget {
             color,
             color.withValues(alpha: color.a * 0.32),
             Colors.transparent,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuestModeDialog extends StatelessWidget {
+  const _GuestModeDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x30072946),
+              blurRadius: 30,
+              offset: Offset(0, 16),
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'המשך כאורח',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.navy,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'בחרו האם להיכנס כבעל דירה או כדייר שמחפש דירה. אחרי הבחירה תראו מיד גם נתוני פרוקסי, מאצ׳ים ושיחות קיימות.',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _GuestRoleOption(
+                title: 'אורח כדייר מחפש דירה',
+                subtitle:
+                    'דירות פעילות, משכירים שכבר מדברים איתך ומאצ׳ים פתוחים.',
+                icon: IconsaxPlusBold.profile_circle,
+                color: AppColors.primary,
+                onTap: () => Navigator.of(context).pop('tenant'),
+              ),
+              const SizedBox(height: 12),
+              _GuestRoleOption(
+                title: 'אורח כבעל דירה',
+                subtitle:
+                    'נכסים פעילים, מועמדים בתהליך ושיחות קיימות עם שוכרים.',
+                icon: IconsaxPlusBold.home,
+                color: AppColors.navy,
+                onTap: () => Navigator.of(context).pop('landlord'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GuestRoleOption extends StatelessWidget {
+  const _GuestRoleOption({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Ink(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: AppColors.borderLight),
+          color: color.withValues(alpha: 0.06),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.navy,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.45,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(IconsaxPlusLinear.arrow_left_2, color: color, size: 18),
           ],
         ),
       ),
@@ -562,8 +721,7 @@ class _ModeTabs extends StatelessWidget {
         ),
         labelColor: Colors.white,
         unselectedLabelColor: AppColors.textSecondary,
-        labelStyle:
-            const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
         tabs: const [
           Tab(
             child: Row(
@@ -594,18 +752,21 @@ class _ModeTabs extends StatelessWidget {
 // ─── Login Tab ────────────────────────────────────────────────────────────────
 
 class _LoginTab extends StatefulWidget {
-  const _LoginTab({required this.onLogin});
+  const _LoginTab({required this.onLogin, required this.onGuestLogin});
 
   final VoidCallback onLogin;
+  final VoidCallback onGuestLogin;
 
   @override
   State<_LoginTab> createState() => _LoginTabState();
 }
 
 class _LoginTabState extends State<_LoginTab> {
+  final _googleAuthService = GoogleAuthService();
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
+  bool _googleLoading = false;
   bool _obscure = true;
 
   @override
@@ -616,6 +777,7 @@ class _LoginTabState extends State<_LoginTab> {
   }
 
   Future<void> _login() async {
+    final provider = context.read<DatingProvider>();
     FocusScope.of(context).unfocus();
     if (_phoneCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -625,7 +787,51 @@ class _LoginTabState extends State<_LoginTab> {
     }
     setState(() => _loading = true);
     await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    await provider.setUserRole(provider.userRole);
     if (mounted) widget.onLogin();
+  }
+
+  Future<void> _loginWithGoogle() async {
+    if (_googleLoading) return;
+    if (!AppConfig.enableGoogleSignIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('כניסה עם Google לא מופעלת בסביבת ההרצה הזו'),
+        ),
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _googleLoading = true);
+
+    try {
+      final result = await _googleAuthService.signIn();
+      if (!mounted) return;
+      final provider = context.read<DatingProvider>();
+      await provider.applyGoogleIdentity(
+        displayName: result.displayName,
+        photoUrl: result.photoUrl,
+      );
+      await provider.setUserRole(provider.userRole);
+      if (!mounted) return;
+      widget.onLogin();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'כניסה עם Google לא הושלמה: $error',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _googleLoading = false);
+      }
+    }
   }
 
   @override
@@ -707,18 +913,48 @@ class _LoginTabState extends State<_LoginTab> {
                   : const Icon(Icons.login_rounded, size: 20),
               label: Text(
                 _loading ? 'מתחבר...' : 'כניסה לחשבון',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
             ),
           ),
           const SizedBox(height: 10),
+          if (AppConfig.enableGoogleSignIn) ...[
+            SizedBox(
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: _googleLoading ? null : _loginWithGoogle,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.navy,
+                  side: const BorderSide(color: AppColors.borderLight),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                icon: _googleLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: AppColors.navy,
+                        ),
+                      )
+                    : const Icon(IconsaxPlusLinear.profile_circle, size: 18),
+                label: const Text(
+                  'כניסה עם Google',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
 
           // Guest CTA
           SizedBox(
             height: 52,
             child: OutlinedButton.icon(
-              onPressed: widget.onLogin,
+              onPressed: widget.onGuestLogin,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.navy,
                 side: const BorderSide(color: AppColors.borderLight),
@@ -728,8 +964,7 @@ class _LoginTabState extends State<_LoginTab> {
               icon: Icon(IconsaxPlusLinear.eye, size: 18),
               label: const Text(
                 'המשך כאורח',
-                style:
-                    TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -896,8 +1131,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                   moveIn: _moveIn,
                   onBudget: (v) =>
                       setState(() => _budget = (v / 100).round() * 100),
-                  onRooms: (v) =>
-                      setState(() => _rooms = (v * 2).round() / 2),
+                  onRooms: (v) => setState(() => _rooms = (v * 2).round() / 2),
                   onMoveIn: (v) => setState(() => _moveIn = v),
                 ),
             ],
@@ -1056,9 +1290,8 @@ class _RoleCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: selected
-                  ? accent.withValues(alpha: 0.25)
-                  : AppColors.shadow,
+              color:
+                  selected ? accent.withValues(alpha: 0.25) : AppColors.shadow,
               blurRadius: selected ? 20 : 10,
               offset: const Offset(0, 6),
             ),
@@ -1119,9 +1352,7 @@ class _RoleCard extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                selected
-                    ? Icons.check_rounded
-                    : Icons.circle_outlined,
+                selected ? Icons.check_rounded : Icons.circle_outlined,
                 size: 14,
                 color: selected ? accent : AppColors.textDisabled,
               ),
@@ -1292,21 +1523,18 @@ class _StepPreferences extends StatelessWidget {
                 onTap: () => onMoveIn(opt),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 9),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
                     color: sel ? AppColors.primary : Colors.white,
                     border: Border.all(
-                      color: sel
-                          ? AppColors.primary
-                          : AppColors.borderLight,
+                      color: sel ? AppColors.primary : AppColors.borderLight,
                     ),
                     boxShadow: sel
                         ? [
                             BoxShadow(
-                              color:
-                                  AppColors.primary.withValues(alpha: 0.22),
+                              color: AppColors.primary.withValues(alpha: 0.22),
                               blurRadius: 12,
                               offset: const Offset(0, 6),
                             ),
@@ -1392,8 +1620,8 @@ class _NavButtons extends StatelessWidget {
                   : const Icon(Icons.arrow_back_ios_rounded, size: 16),
               label: Text(
                 nextLabel,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w800),
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
             ),
           ),
@@ -1473,8 +1701,7 @@ class _AuthTextField extends StatelessWidget {
         border: border,
         enabledBorder: border,
         focusedBorder: border.copyWith(
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.6),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
         ),
       ),
     );
