@@ -20,7 +20,9 @@ class LandlordDashboardScreen extends StatelessWidget {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final stats = provider.landlordStats;
-        final landlordName = provider.tenantProfile?.name ?? 'בעל הדירה';
+        final profile = provider.tenantProfile;
+        final landlordName = profile?.name ?? 'בעל הדירה';
+        final photoUrl = profile?.photoUrl ?? '';
         final matches = provider.matches.take(3).toList();
         final properties = provider.myProperties;
         final pendingCount = stats.pendingCount;
@@ -43,24 +45,15 @@ class LandlordDashboardScreen extends StatelessWidget {
               // ── Collapsible hero ─────────────────────────────────────
               SliverAppBar(
                 automaticallyImplyLeading: false,
-                expandedHeight: 210,
+                expandedHeight: 220,
                 pinned: true,
                 stretch: true,
                 backgroundColor: const Color(0xFF06243A),
                 flexibleSpace: FlexibleSpaceBar(
                   collapseMode: CollapseMode.parallax,
-                  titlePadding: const EdgeInsetsDirectional.only(
-                      start: 18, bottom: 14),
-                  title: Text(
-                    'שלום, $landlordName 👋',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
                   background: _HeroBackground(
                     name: landlordName,
+                    photoUrl: photoUrl,
                     stats: stats,
                     pendingCount: pendingCount,
                     unseenCount: unseenCount,
@@ -71,19 +64,9 @@ class LandlordDashboardScreen extends StatelessWidget {
               // ── Main content ─────────────────────────────────────────
               SliverPadding(
                 padding:
-                    const EdgeInsets.fromLTRB(16, 14, 16, 120),
+                    const EdgeInsets.fromLTRB(16, 20, 16, 120),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // Urgent pending banner
-                    if (pendingCount > 0) ...[
-                      _UrgentBanner(
-                        pendingCount: pendingCount,
-                        onTap: () => _push(
-                            context, const ExploreScreen()),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-
                     // Pipeline visualizer
                     _PipelineCard(
                       leadsCount: provider.ownerLeads.length,
@@ -94,11 +77,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                       onMatches: () =>
                           _push(context, const MatchesScreen()),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Metrics row
-                    _MetricsRow(stats: stats),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
 
                     // Quick actions
                     _QuickActionsGrid(
@@ -113,14 +92,14 @@ class LandlordDashboardScreen extends StatelessWidget {
                       onProperties: () => _push(
                           context, const MatchesScreen()),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
 
                     // Activity feed
                     _ActivitySection(
                       provider: provider,
                       context: context,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
 
                     // Recent matches
                     if (matches.isNotEmpty) ...[
@@ -130,18 +109,18 @@ class LandlordDashboardScreen extends StatelessWidget {
                         onSeeAll: () =>
                             _push(context, const MatchesScreen()),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       ...matches.map(
                         (m) => Padding(
                           padding:
-                              const EdgeInsets.only(bottom: 10),
+                              const EdgeInsets.only(bottom: 12),
                           child: _MatchRow(
                             match: m,
                             provider: provider,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                     ],
 
                     // My properties preview
@@ -152,7 +131,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                         onSeeAll: () =>
                             _push(context, const MatchesScreen()),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       _PropertiesScroll(
                         properties: properties,
                         provider: provider,
@@ -185,12 +164,14 @@ class LandlordDashboardScreen extends StatelessWidget {
 class _HeroBackground extends StatelessWidget {
   const _HeroBackground({
     required this.name,
+    required this.photoUrl,
     required this.stats,
     required this.pendingCount,
     required this.unseenCount,
   });
 
   final String name;
+  final String photoUrl;
   final LandlordStats stats;
   final int pendingCount;
   final int unseenCount;
@@ -205,25 +186,13 @@ class _HeroBackground extends StatelessWidget {
           end: Alignment.bottomLeft,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 52, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Icon(
-                  IconsaxPlusBold.home_2,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
+              _ProfileAvatar(photoUrl: photoUrl, name: name),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -233,7 +202,7 @@ class _HeroBackground extends StatelessWidget {
                       'שלום, $name 👋',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
@@ -316,6 +285,59 @@ class _HeroBackground extends StatelessWidget {
   }
 }
 
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.photoUrl, required this.name});
+  final String photoUrl;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name.trim().isNotEmpty
+        ? name.trim().split(' ').map((w) => w.isEmpty ? '' : w[0]).take(2).join()
+        : '?';
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+            color: Colors.white.withValues(alpha: 0.4), width: 2),
+      ),
+      child: ClipOval(
+        child: photoUrl.isNotEmpty
+            ? Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _InitialsCircle(initials: initials),
+              )
+            : _InitialsCircle(initials: initials),
+      ),
+    );
+  }
+}
+
+class _InitialsCircle extends StatelessWidget {
+  const _InitialsCircle({required this.initials});
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white.withValues(alpha: 0.18),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroStatPill extends StatelessWidget {
   const _HeroStatPill({
     required this.label,
@@ -361,97 +383,6 @@ class _HeroStatPill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Urgent Banner ────────────────────────────────────────────────────────────
-
-class _UrgentBanner extends StatelessWidget {
-  const _UrgentBanner(
-      {required this.pendingCount, required this.onTap});
-
-  final int pendingCount;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        onTap();
-      },
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 14,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(IconsaxPlusBold.profile_2user,
-                  color: AppColors.primary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$pendingCount מועמדים ממתינים לאישורך',
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'טפל עכשיו לפני שיעברו לאפשרות אחרת',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'סווייפ',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -710,102 +641,6 @@ class _PipelineProgressBar extends StatelessWidget {
       ],
     );
   }
-}
-
-// ─── Metrics Row ──────────────────────────────────────────────────────────────
-
-class _MetricsRow extends StatelessWidget {
-  const _MetricsRow({required this.stats});
-  final LandlordStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final metrics = [
-      _MetricData(
-        label: 'דירות פעילות',
-        value: '${stats.propertiesCount}',
-        icon: IconsaxPlusBold.building_3,
-      ),
-      _MetricData(
-        label: 'ממתינים',
-        value: '${stats.pendingCount}',
-        icon: IconsaxPlusBold.profile_2user,
-      ),
-      _MetricData(
-        label: "מאצ'ים",
-        value: '${stats.matchesCount}',
-        icon: IconsaxPlusBold.heart,
-      ),
-      _MetricData(
-        label: 'המרה',
-        value: '${stats.conversionRate.round()}%',
-        icon: IconsaxPlusBold.chart_2,
-      ),
-    ];
-
-    return Row(
-      children: metrics.map((m) {
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12, horizontal: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(m.icon, size: 15, color: AppColors.primary),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    m.value,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      height: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    m.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _MetricData {
-  const _MetricData(
-      {required this.label, required this.value, required this.icon});
-  final String label;
-  final String value;
-  final IconData icon;
 }
 
 // ─── Quick Actions Grid ───────────────────────────────────────────────────────
@@ -1431,7 +1266,7 @@ class _PropertiesScroll extends StatelessWidget {
   @override
   Widget build(BuildContext outerContext) {
     return SizedBox(
-      height: 158,
+      height: 178,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1501,9 +1336,10 @@ class _PropertyMiniCard extends StatelessWidget {
               ),
               // Details
               Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       property.city.isNotEmpty
@@ -1528,7 +1364,7 @@ class _PropertyMiniCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 3),
