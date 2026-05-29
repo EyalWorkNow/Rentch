@@ -1,9 +1,10 @@
-import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -33,7 +34,7 @@ class _ProfileCardState extends State<ProfileCard> {
   }
 
   void _nextImage() {
-    if (_currentImage < p.imageUrls.length - 1) {
+    if (_currentImage < p.media.length - 1) {
       setState(() => _currentImage++);
     }
   }
@@ -51,8 +52,8 @@ class _ProfileCardState extends State<ProfileCard> {
     final provider = context.watch<DatingProvider>();
     final isLiking = widget.horizontalOffsetPercentage > 10;
     final isPassing = widget.horizontalOffsetPercentage < -10;
-    final images = p.imageUrls;
-    final hasMultiple = images.length > 1;
+    final media = p.media;
+    final hasMultiple = media.length > 1;
     final isSaved = provider.isSaved(p.id);
     final score = provider.matchScore(p);
     final priceCtx = provider.priceContext(p);
@@ -64,10 +65,21 @@ class _ProfileCardState extends State<ProfileCard> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Background image
-            _CardImage(
-              imageUrl: images.isNotEmpty ? images[_currentImage] : '',
-              city: p.city,
+            // Background image — AnimatedSwitcher crossfades between images
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                fit: StackFit.expand,
+                children: [
+                  ...previousChildren,
+                  if (currentChild != null) currentChild,
+                ],
+              ),
+              child: _CardImage(
+                key: ValueKey<int>(_currentImage),
+                media: media.isNotEmpty ? media[_currentImage] : null,
+                city: p.city,
+              ),
             ),
 
             // Dark gradient
@@ -141,7 +153,7 @@ class _ProfileCardState extends State<ProfileCard> {
                   _AgencyBadge(agencyListing: p.agencyListing),
                   const Spacer(),
                   if (hasMultiple) ...[
-                    _ImageDots(count: images.length, current: _currentImage),
+                    _ImageDots(count: media.length, current: _currentImage),
                     const SizedBox(width: 8),
                   ],
                   GestureDetector(
@@ -159,7 +171,7 @@ class _ProfileCardState extends State<ProfileCard> {
                       child: Icon(
                         isSaved
                             ? IconsaxPlusBold.bookmark
-                            : IconsaxPlusLinear.bookmark,
+                            : IconsaxPlusBold.bookmark,
                         color: isSaved ? AppColors.primary : Colors.white,
                         size: 16,
                       ),
@@ -217,7 +229,7 @@ class _ProfileCardState extends State<ProfileCard> {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      const Icon(IconsaxPlusLinear.location,
+                      const Icon(IconsaxPlusBold.location,
                           size: 14, color: Colors.white70),
                       const SizedBox(width: 4),
                       Expanded(
@@ -289,7 +301,7 @@ class _ProfileCardState extends State<ProfileCard> {
                           ),
                         ),
                         const SizedBox(width: 3),
-                        Icon(IconsaxPlusLinear.arrow_left,
+                        Icon(IconsaxPlusBold.arrow_left,
                             size: 12,
                             color: AppColors.primary.withValues(alpha: 0.9)),
                       ],
@@ -306,25 +318,63 @@ class _ProfileCardState extends State<ProfileCard> {
 }
 
 class _CardImage extends StatelessWidget {
-  const _CardImage({required this.imageUrl, required this.city});
-  final String imageUrl;
+  const _CardImage({super.key, required this.media, required this.city});
+  final PropertyMedia? media;
   final String city;
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.isEmpty) return _ImageFallback(city: city);
-    if (imageUrl.startsWith('/') || imageUrl.startsWith('file://')) {
-      final path = imageUrl.startsWith('file://') ? imageUrl.substring(7) : imageUrl;
-      return Image.file(
-        File(path),
+    final item = media;
+    final fallback = _ImageFallback(city: city);
+    if (item == null || item.url.trim().isEmpty) return fallback;
+    if (!item.isImage) {
+      return SafeMedia(
+        media: item,
+        fallback: fallback,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _ImageFallback(city: city),
+        alignment: Alignment.topCenter,
       );
     }
-    return Image.network(
-      imageUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _ImageFallback(city: city),
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Transform.scale(
+          scale: 1.08,
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: SafeMedia(
+              media: item,
+              fallback: fallback,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.18),
+                Colors.black.withValues(alpha: 0.05),
+                Colors.black.withValues(alpha: 0.28),
+              ],
+              stops: const [0, 0.45, 1],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: SafeMedia(
+            media: item,
+            fallback: fallback,
+            fit: BoxFit.contain,
+            alignment: Alignment.topCenter,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -446,8 +496,8 @@ class _SwipeBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-            color: color, fontSize: 20, fontWeight: FontWeight.w900),
+        style:
+            TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w900),
       ),
     );
   }
