@@ -538,11 +538,14 @@ class _MatchCard extends StatelessWidget {
     final media = property.primaryMedia;
     final lastMessage = match.messages.isEmpty ? null : match.messages.last;
     final stage = _matchStage(match);
-    final isLandlord = context.read<DatingProvider>().isLandlord;
+    final provider = context.read<DatingProvider>();
+    final isLandlord = provider.isLandlord;
+    final tenantName = provider.tenantProfile?.name ?? '';
     // Tenant sent the last message and landlord hasn't replied yet
     final awaitingReply = isLandlord &&
         lastMessage != null &&
-        lastMessage.sender == 'tenant';
+        tenantName.isNotEmpty &&
+        lastMessage.sender == tenantName;
 
     return GestureDetector(
       onTap: onTap,

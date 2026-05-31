@@ -329,18 +329,64 @@ class DatingProvider extends ChangeNotifier {
 
     _baseProperties = await _rentalDataService.loadListings();
     _searchAreas = _rentalDataService.createSearchAreas();
+    if (kDebugMode) {
+      debugPrint(
+        'DatingProvider.initialize: loaded ${_baseProperties.length} base properties',
+      );
+    }
 
     final storedState = await _localStorageService.loadAppState();
     if (storedState == null || storedState['schema'] != 'rental_match_v2') {
       _seedInitialState();
-      await _persist();
     } else {
       _hydrateFromState(storedState);
-      await _persist();
     }
+
+    _ensureVisibleListings();
+    await _persist();
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  void _ensureVisibleListings() {
+    if (_baseProperties.isEmpty || filteredProperties.isNotEmpty) return;
+
+    _filters = _filters.copyWith(
+      query: '',
+      maxBudget: 2000000000,
+      minRooms: 0,
+      areaId: 'all_israel',
+      requiredFeatures: <String>{},
+      minSizeM2: 0,
+      maxSizeM2: 1000000,
+      propertyTypes: <String>{},
+      conditions: <String>{},
+      listingSource: ListingSourceFilter.any,
+      minFloor: 0,
+      moveInFilter: MoveInFilter.any,
+      sortBy: SearchSortOption.bestMatch,
+      city: '',
+      transactionType: TransactionTypeFilter.any,
+    );
+
+    if (filteredProperties.isNotEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+          'DatingProvider.initialize: widened filters to show remote listings',
+        );
+      }
+      return;
+    }
+
+    _likedPropertyIds.clear();
+    _passedPropertyIds.clear();
+
+    if (kDebugMode) {
+      debugPrint(
+        'DatingProvider.initialize: cleared swipe history to restore visible listings',
+      );
+    }
   }
 
   Future<void> setUserRole(String role) async {
@@ -830,8 +876,6 @@ class DatingProvider extends ChangeNotifier {
       return;
     }
 
-    final matchedOne = propertyPool[0];
-    final matchedTwo = propertyPool[1];
     final pendingLead = propertyPool[2];
     final savedProperty = propertyPool[3];
 
@@ -867,112 +911,256 @@ class DatingProvider extends ChangeNotifier {
       transactionType: TransactionTypeFilter.rent,
     );
     _customProperties = [
-      _cloneProperty(
-        matchedOne,
-        id: 'guest-owner-1',
+      RentalProperty(
+        id: 'demo-prop-1',
+        url: '',
+        price: 8500,
+        rooms: 3,
+        sizeM2: 82,
+        floor: '4',
+        totalFloors: '9',
+        city: 'תל אביב',
+        neighborhood: 'לב תל אביב',
+        street: 'דיזנגוף',
+        streetNumber: 142,
+        lat: 32.0809,
+        lon: 34.7742,
+        propertyType: 'דירה',
+        entryDate: '01/08',
+        condition: 'משופץ',
         ownerName: 'יואב כהן',
-        price: matchedOne.price + 300,
+        agencyListing: false,
+        features: ['מעלית', 'מרפסת', 'מזגן', 'חניה', 'אינטרנט כלול'],
+        media: const [
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1554995207-c18203ef2d6f?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+        ],
       ),
-      _cloneProperty(
-        matchedTwo,
-        id: 'guest-owner-2',
+      RentalProperty(
+        id: 'demo-prop-2',
+        url: '',
+        price: 6900,
+        rooms: 4,
+        sizeM2: 108,
+        floor: '7',
+        totalFloors: '12',
+        city: 'רמת גן',
+        neighborhood: 'בורוכוב',
+        street: 'ביאליק',
+        streetNumber: 38,
+        lat: 32.0748,
+        lon: 34.8107,
+        propertyType: 'דירה',
+        entryDate: '15/09',
+        condition: 'תקין',
         ownerName: 'יואב כהן',
-        price: matchedTwo.price + 500,
+        agencyListing: false,
+        features: ['חניה', 'מחסן', 'מעלית', 'מזגן', 'חיות מחמד מותר'],
+        media: const [
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1615873968403-89e068629265?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+        ],
+      ),
+      RentalProperty(
+        id: 'demo-prop-3',
+        url: '',
+        price: 7200,
+        rooms: 2.5,
+        sizeM2: 68,
+        floor: '5',
+        totalFloors: '5',
+        city: 'גבעתיים',
+        neighborhood: 'גבעת רמב"ם',
+        street: 'כצנלסון',
+        streetNumber: 22,
+        lat: 32.0693,
+        lon: 34.8096,
+        propertyType: 'דירת גג',
+        entryDate: '01/10',
+        condition: 'משופץ',
+        ownerName: 'יואב כהן',
+        agencyListing: false,
+        features: ['מרפסת שמש', 'מזגן', 'אינטרנט כלול', 'ריהוט', 'גינה'],
+        media: const [
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+        ],
+      ),
+      RentalProperty(
+        id: 'demo-prop-4',
+        url: '',
+        price: 5400,
+        rooms: 1.5,
+        sizeM2: 44,
+        floor: '2',
+        totalFloors: '8',
+        city: 'הרצליה',
+        neighborhood: 'הרצליה פיתוח',
+        street: 'מסגר',
+        streetNumber: 5,
+        lat: 32.1656,
+        lon: 34.8451,
+        propertyType: 'סטודיו',
+        entryDate: 'גמיש',
+        condition: 'חדש מקבלן',
+        ownerName: 'יואב כהן',
+        agencyListing: false,
+        features: ['מעלית', 'מזגן', 'חניה', 'ממ"ד', 'בריכה', 'חדר כושר'],
+        media: const [
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1556020685-ae41abfc9365?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+          PropertyMedia(
+            url: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=900&q=80',
+            type: PropertyMediaType.image,
+          ),
+        ],
       ),
     ];
     _likedPropertyIds = <String>{
-      matchedOne.id,
-      matchedTwo.id,
+      'demo-prop-1',
+      'demo-prop-2',
+      'demo-prop-3',
       pendingLead.id,
     };
     _passedPropertyIds = <String>{savedProperty.id};
-    _ownerAcceptedPropertyIds = <String>{matchedOne.id, matchedTwo.id};
+    _ownerAcceptedPropertyIds = <String>{
+      'demo-prop-1',
+      'demo-prop-2',
+      'demo-prop-3',
+    };
     _ownerRejectedPropertyIds = <String>{};
     _matches = [
       RentalMatch(
-        id: 'guest-match-${matchedOne.id}',
-        propertyId: matchedOne.id,
+        id: 'guest-match-demo-1',
+        propertyId: 'demo-prop-1',
         createdAt: DateTime.now().subtract(const Duration(days: 18)),
         contractSent: true,
         ownerSigned: true,
         tenantSigned: false,
         messages: [
           ChatMessage(
-            id: 'm1-1',
+            id: 'd1-1',
             sender: 'מערכת',
-            text: 'נוצר מאצ׳ לפני 18 ימים. השיחה פעילה.',
+            text: 'נוצר מאצ׳ — שני הצדדים הסכימו להתקדם.',
             createdAt: DateTime.now().subtract(const Duration(days: 18)),
           ),
           ChatMessage(
-            id: 'm1-2',
+            id: 'd1-2',
             sender: 'יואב כהן',
-            text: 'היי נועה, הדירה עדיין זמינה. אפשר לתאם ביקור ביום שלישי?',
+            text: 'היי נועה, הדירה עדיין פנויה. נשמח לתאם סיור השבוע — איזה ימים מתאים לך?',
             createdAt: DateTime.now().subtract(const Duration(days: 17)),
           ),
           ChatMessage(
-            id: 'm1-3',
+            id: 'd1-3',
             sender: tenant.name,
-            text: 'כן, מצוין. שלחתי גם תלושי שכר וערבים לעיון.',
+            text: 'יום שלישי או רביעי ב-18:30 מצוין. שלחתי גם תלוש שכר ואישור הכנסה.',
             createdAt: DateTime.now().subtract(const Duration(days: 16)),
           ),
           ChatMessage(
-            id: 'm1-4',
+            id: 'd1-4',
             sender: 'יואב כהן',
-            text: 'ראיתי, הכל מסודר. שלחתי חוזה לעבור עליו לפני הפגישה.',
+            text: 'קיבלתי, נראה מסודר מאוד. שלחתי חוזה לעיון — אפשר לחתום דיגיטלית דרך האפליקציה.',
             createdAt: DateTime.now().subtract(const Duration(days: 14)),
+          ),
+          ChatMessage(
+            id: 'd1-5',
+            sender: tenant.name,
+            text: 'קראתי את החוזה, הכל נראה טוב. שאלה אחת — מה הסיפור עם ועד הבית, האם זה כלול בשכירות?',
+            createdAt: DateTime.now().subtract(const Duration(hours: 5)),
           ),
         ],
       ),
       RentalMatch(
-        id: 'guest-match-${matchedTwo.id}',
-        propertyId: matchedTwo.id,
-        createdAt: DateTime.now().subtract(const Duration(days: 7)),
+        id: 'guest-match-demo-2',
+        propertyId: 'demo-prop-2',
+        createdAt: DateTime.now().subtract(const Duration(days: 9)),
         contractSent: false,
         ownerSigned: false,
         tenantSigned: false,
         messages: [
           ChatMessage(
-            id: 'm2-1',
+            id: 'd2-1',
             sender: 'מערכת',
-            text: 'נוצר מאצ׳ לפני שבוע. שני הצדדים ממשיכים שיחה.',
+            text: 'נוצר מאצ׳ — שני הצדדים מעוניינים.',
+            createdAt: DateTime.now().subtract(const Duration(days: 9)),
+          ),
+          ChatMessage(
+            id: 'd2-2',
+            sender: tenant.name,
+            text: 'שלום! ראיתי את הדירה ברמת גן — ממש מוצאת חן בעיניי. מה הסיפור עם החניה, מוצמדת לדירה?',
+            createdAt: DateTime.now().subtract(const Duration(days: 8)),
+          ),
+          ChatMessage(
+            id: 'd2-3',
+            sender: 'יואב כהן',
+            text: 'כן, חניה מוצמדת לדירה כלולה בשכירות. יש גם מחסן בקומת המרתף.',
             createdAt: DateTime.now().subtract(const Duration(days: 7)),
           ),
           ChatMessage(
-            id: 'm2-2',
-            sender: 'יעל אברמוב',
-            text: 'נועה, יש לנו עוד חלון ביקור מחר ב-19:30 אם זה מתאים.',
-            createdAt: DateTime.now().subtract(const Duration(days: 2)),
+            id: 'd2-4',
+            sender: tenant.name,
+            text: 'מעולה! אפשר לקבוע סיור לשבוע הבא? אנחנו שניים — אני ועוד שותפה.',
+            createdAt: DateTime.now().subtract(const Duration(hours: 14)),
+          ),
+        ],
+      ),
+      RentalMatch(
+        id: 'guest-match-demo-3',
+        propertyId: 'demo-prop-3',
+        createdAt: DateTime.now().subtract(const Duration(days: 3)),
+        contractSent: false,
+        ownerSigned: false,
+        tenantSigned: false,
+        messages: [
+          ChatMessage(
+            id: 'd3-1',
+            sender: 'מערכת',
+            text: 'התאמה חדשה! שני הצדדים הראו עניין.',
+            createdAt: DateTime.now().subtract(const Duration(days: 3)),
           ),
           ChatMessage(
-            id: 'm2-3',
+            id: 'd3-2',
             sender: tenant.name,
-            text: 'מעולה, זה מסתדר. אשמח גם לדעת אם אפשר חניה בהמשך הרחוב.',
-            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+            text: 'היי! האם המרפסת שבתמונה פרטית לגמרי לדירה, או שהיא משותפת עם הקומה?',
+            createdAt: DateTime.now().subtract(const Duration(days: 2)),
           ),
         ],
       ),
     ];
     _pendingMatchPropertyId = null;
     _swipeHistory.clear();
-    _savedPropertyIds = <String>{savedProperty.id, matchedTwo.id};
-    _lastSeenMatchCount = 1;
+    _savedPropertyIds = <String>{'demo-prop-4', savedProperty.id};
+    _lastSeenMatchCount = 2;
     _isGuestMode = true;
     _userRole = role;
-  }
-
-  RentalProperty _cloneProperty(
-    RentalProperty property, {
-    required String id,
-    required String ownerName,
-    int? price,
-  }) {
-    final json = property.toJson();
-    json['id'] = id;
-    json['ownerName'] = ownerName;
-    if (price != null) {
-      json['price'] = price;
-    }
-    return RentalProperty.fromJson(json);
   }
 
   void _hydrateFromState(Map<String, dynamic> storedState) {
