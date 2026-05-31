@@ -130,7 +130,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                         title: 'הנכסים שלי',
                         subtitle: '${properties.length} נכסים פעילים',
                         onSeeAll: () =>
-                            _push(context, const MatchesScreen()),
+                            _push(context, const LandlordPropertiesScreen()),
                       ),
                       const SizedBox(height: 12),
                       _PropertiesScroll(

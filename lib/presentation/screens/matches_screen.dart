@@ -7,6 +7,16 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 
+String _relativeTime(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 60) return 'לפני ${diff.inMinutes} דק׳';
+  if (diff.inHours < 24) return 'לפני ${diff.inHours} שע׳';
+  if (diff.inDays == 1) return 'אתמול';
+  if (diff.inDays < 7) return 'לפני ${diff.inDays} ימים';
+  if (diff.inDays < 14) return 'לפני שבוע';
+  return 'לפני ${(diff.inDays / 7).round()} שבועות';
+}
+
 // ─── Filter chip descriptors ──────────────────────────────────────────────────
 
 const _kFilterAll = 'all';
@@ -175,7 +185,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
               ? const Center(
                   child: CircularProgressIndicator(color: AppColors.primary))
               : allMatches.isEmpty
-                  ? const _EmptyMatches()
+                  ? _EmptyMatches(isLandlord: provider.isLandlord)
                   : Column(
                       children: [
                         _MatchesToolbar(
@@ -315,7 +325,7 @@ class _MatchesToolbar extends StatelessWidget {
               const Padding(
                 padding: EdgeInsetsDirectional.only(end: 10),
                 child: Text(
-                  'Sort by',
+                  'מיין:',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -528,6 +538,11 @@ class _MatchCard extends StatelessWidget {
     final media = property.primaryMedia;
     final lastMessage = match.messages.isEmpty ? null : match.messages.last;
     final stage = _matchStage(match);
+    final isLandlord = context.read<DatingProvider>().isLandlord;
+    // Tenant sent the last message and landlord hasn't replied yet
+    final awaitingReply = isLandlord &&
+        lastMessage != null &&
+        lastMessage.sender == 'tenant';
 
     return GestureDetector(
       onTap: onTap,
@@ -644,6 +659,12 @@ class _MatchCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        if (awaitingReply)
+                          const _StatusChip(
+                            label: 'ממתין לתגובתך',
+                            color: Color(0xFFE67E22),
+                            icon: IconsaxPlusBold.message_notif,
+                          ),
                         _StatusChip(
                           label: stage.label,
                           color: stage.color,
@@ -764,8 +785,12 @@ class _FreshnessBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isNew =
-        DateTime.now().difference(match.createdAt) <= _kNewMatchWindow;
+    final lastActivity = match.messages.isNotEmpty
+        ? match.messages.last.createdAt
+        : match.createdAt;
+    final isNew = DateTime.now().difference(match.createdAt) <= _kNewMatchWindow;
+    final timeLabel = _relativeTime(lastActivity);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
@@ -774,7 +799,7 @@ class _FreshnessBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        isNew ? 'חדש' : 'ישן',
+        isNew && match.messages.isEmpty ? 'חדש' : timeLabel,
         style: TextStyle(
           color: isNew ? AppColors.primary : AppColors.textSecondary,
           fontSize: 10,
@@ -869,7 +894,8 @@ class _StatusChip extends StatelessWidget {
 // ─── Empty matches (no matches at all) ───────────────────────────────────────
 
 class _EmptyMatches extends StatelessWidget {
-  const _EmptyMatches();
+  const _EmptyMatches({required this.isLandlord});
+  final bool isLandlord;
 
   @override
   Widget build(BuildContext context) {
@@ -902,10 +928,12 @@ class _EmptyMatches extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'כשתאהב דירה ובעל הדירה יאשר אותך — ההתאמה תופיע כאן.',
+            Text(
+              isLandlord
+                  ? 'כשתאשר שוכרים מועמדים בסוויפים — ההתאמות יופיעו כאן.'
+                  : 'כשתאהב דירה ובעל הדירה יאשר אותך — ההתאמה תופיע כאן.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
                 height: 1.55,

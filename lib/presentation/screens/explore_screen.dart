@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/screens/add_property_screen.dart';
+import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1004,6 +1006,10 @@ class _EmptyOwnerQueue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasProperties =
+        context.read<DatingProvider>().myProperties.isNotEmpty;
+    final hasMatches = context.read<DatingProvider>().matches.isNotEmpty;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1034,16 +1040,55 @@ class _EmptyOwnerQueue extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'כאשר שוכרים יאהבו את הנכסים שלך הם יופיעו כאן לאישור.',
+            Text(
+              hasProperties
+                  ? 'כאשר שוכרים יאהבו את הנכסים שלך הם יופיעו כאן לאישור.'
+                  : 'הוסף נכס ראשון — שוכרים שיאהבו אותו יופיעו כאן.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 height: 1.6,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
             ),
+            const SizedBox(height: 28),
+            if (!hasProperties)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const AddPropertyScreen()),
+                  ),
+                  icon: const Icon(IconsaxPlusBold.add_square, size: 17),
+                  label: const Text('הוסף נכס עכשיו'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+            if (hasProperties && hasMatches)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MatchesScreen()),
+                  ),
+                  icon: const Icon(IconsaxPlusBold.message, size: 17),
+                  label: const Text('עבור לשיחות'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    side: const BorderSide(color: AppColors.borderLight),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
