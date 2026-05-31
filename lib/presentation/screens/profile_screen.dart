@@ -5,7 +5,12 @@ import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
+import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
+import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
+import 'package:dating_app/presentation/screens/matches_screen.dart';
+import 'package:dating_app/presentation/screens/message_screen.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
@@ -121,6 +126,15 @@ class ProfileScreen extends StatelessWidget {
             backgroundColor: AppColors.background,
             body: Center(
                 child: CircularProgressIndicator(color: AppColors.primary)),
+          );
+        }
+
+        if (provider.isLandlord) {
+          return _LandlordProfileScreen(
+            profile: profile,
+            provider: provider,
+            onLogout: () => _confirmLogout(context),
+            onDeleteAccount: () => _confirmDeleteAccount(context),
           );
         }
 
@@ -1032,4 +1046,1255 @@ String _fmt(int value) {
     if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
   }
   return '₪$buffer';
+}
+
+// ===========================================================================
+// LANDLORD PROFILE — full redesign
+// ===========================================================================
+
+class _LandlordProfileScreen extends StatelessWidget {
+  const _LandlordProfileScreen({
+    required this.profile,
+    required this.provider,
+    required this.onLogout,
+    required this.onDeleteAccount,
+  });
+
+  final TenantProfile profile;
+  final DatingProvider provider;
+  final VoidCallback onLogout;
+  final VoidCallback onDeleteAccount;
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}';
+    return name.isNotEmpty ? name[0] : '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = provider.landlordStats;
+    final properties = provider.myProperties;
+    final matches = provider.matches;
+    final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
+    final initials = _initials(tenantName);
+    final cities = properties.map((p) => p.city).toSet().take(2).join(', ');
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // ── Hero ────────────────────────────────────────────────────────
+          SliverAppBar(
+            automaticallyImplyLeading: false,
+            expandedHeight: 260,
+            pinned: true,
+            stretch: true,
+            backgroundColor: const Color(0xFF06243A),
+            surfaceTintColor: Colors.transparent,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => EditProfileScreen(profile: profile)),
+                  ),
+                  icon: const Icon(IconsaxPlusBold.edit_2,
+                      color: Colors.white, size: 15),
+                  label: const Text('עריכה',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w700)),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999)),
+                  ),
+                ),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.parallax,
+              background: _LandlordHero(
+                profile: profile,
+                initials: initials,
+                cities: cities,
+                propertiesCount: stats.propertiesCount,
+              ),
+            ),
+          ),
+
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // ── KPI bar ────────────────────────────────────────────
+                _LandlordKpiBar(stats: stats),
+                const SizedBox(height: 20),
+
+                // ── Properties ─────────────────────────────────────────
+                _LandlordSectionHeader(
+                  title: 'הנכסים שלי',
+                  subtitle: '${properties.length} נכסים פעילים',
+                  icon: IconsaxPlusBold.buildings_2,
+                  actionLabel: properties.isNotEmpty ? 'ניהול' : null,
+                  onAction: properties.isNotEmpty
+                      ? () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const LandlordPropertiesScreen()))
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                _PropertiesHorizontalScroll(
+                  properties: properties,
+                  onAdd: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const AddPropertyScreen())),
+                  onTap: (p) => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => EditPropertyScreen(property: p))),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Active conversations ────────────────────────────────
+                if (matches.isNotEmpty) ...[
+                  _LandlordSectionHeader(
+                    title: 'שיחות פעילות',
+                    subtitle: '${matches.length} שיחות פתוחות',
+                    icon: IconsaxPlusBold.message,
+                    actionLabel: 'הכל',
+                    onAction: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const MatchesScreen())),
+                  ),
+                  const SizedBox(height: 12),
+                  _MatchConversationList(
+                    matches: matches.take(3).toList(),
+                    provider: provider,
+                    tenantName: tenantName,
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // ── Performance card ────────────────────────────────────
+                _PerformanceCard(stats: stats),
+                const SizedBox(height: 20),
+
+                // ── Settings ────────────────────────────────────────────
+                _SettingsCard(
+                  onEditProfile: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => EditProfileScreen(profile: profile)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ── Account actions ─────────────────────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.borderLight),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: AppColors.shadow,
+                          blurRadius: 12,
+                          offset: Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _ActionTile(
+                        icon: IconsaxPlusBold.logout,
+                        label: 'יציאה מהחשבון',
+                        isDestructive: true,
+                        onTap: onLogout,
+                      ),
+                      const Divider(
+                          height: 1,
+                          indent: 74,
+                          color: AppColors.borderLight),
+                      _ActionTile(
+                        icon: IconsaxPlusBold.trash,
+                        label: 'מחיקת חשבון',
+                        isDestructive: true,
+                        onTap: onDeleteAccount,
+                      ),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Hero background ──────────────────────────────────────────────────────────
+
+class _LandlordHero extends StatelessWidget {
+  const _LandlordHero({
+    required this.profile,
+    required this.initials,
+    required this.cities,
+    required this.propertiesCount,
+  });
+
+  final TenantProfile profile;
+  final String initials;
+  final String cities;
+  final int propertiesCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = profile.photoUrl;
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF06243A), Color(0xFF0D3554)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(22, 60, 22, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Avatar
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    child: ClipOval(
+                      child: photoUrl.isNotEmpty &&
+                              !photoUrl.startsWith('/')
+                          ? Image.network(photoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _InitialsBubble(initials: initials))
+                          : photoUrl.startsWith('/')
+                              ? Image.file(File(photoUrl),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _InitialsBubble(initials: initials))
+                              : _InitialsBubble(initials: initials),
+                    ),
+                  ),
+                  // "בעל דירה" verified badge
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(IconsaxPlusBold.verify,
+                          size: 13, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      profile.name.isNotEmpty ? profile.name : 'בעל דירה',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        _HeroPill(
+                          icon: IconsaxPlusBold.buildings_2,
+                          label: 'בעל דירה',
+                          color: AppColors.primary,
+                        ),
+                        if (cities.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          _HeroPill(
+                            icon: IconsaxPlusBold.location,
+                            label: cities,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            bg: Colors.white.withValues(alpha: 0.12),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          // Bottom pill: quick portfolio summary
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.14)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(IconsaxPlusBold.building,
+                    size: 14, color: Colors.white70),
+                const SizedBox(width: 6),
+                Text(
+                  '$propertiesCount נכסים פעילים בתיק',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InitialsBubble extends StatelessWidget {
+  const _InitialsBubble({required this.initials});
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.primary.withValues(alpha: 0.25),
+      child: Center(
+        child: Text(
+          initials,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.bg,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color? bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg ?? color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontSize: 11, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── KPI bar ──────────────────────────────────────────────────────────────────
+
+class _LandlordKpiBar extends StatelessWidget {
+  const _LandlordKpiBar({required this.stats});
+  final LandlordStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+              color: AppColors.shadow, blurRadius: 18, offset: Offset(0, 6)),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            _KpiCell(
+              value: '${stats.propertiesCount}',
+              label: 'דירות',
+              icon: IconsaxPlusBold.buildings_2,
+              color: AppColors.primary,
+              isFirst: true,
+            ),
+            const _KpiDivider(),
+            _KpiCell(
+              value: '${stats.matchesCount}',
+              label: 'שיחות',
+              icon: IconsaxPlusBold.message,
+              color: const Color(0xFF4A6CF7),
+            ),
+            const _KpiDivider(),
+            _KpiCell(
+              value: '${stats.conversionRate.round()}%',
+              label: 'המרה',
+              icon: IconsaxPlusBold.chart_2,
+              color: AppColors.success,
+            ),
+            const _KpiDivider(),
+            _KpiCell(
+              value: '${stats.pendingCount}',
+              label: 'ממתינים',
+              icon: IconsaxPlusBold.profile_2user,
+              color: stats.pendingCount > 0
+                  ? const Color(0xFFE67E22)
+                  : AppColors.textSecondary,
+              isLast: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiCell extends StatelessWidget {
+  const _KpiCell({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.color,
+    this.isFirst = false,
+    this.isLast = false,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool isFirst;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.horizontal(
+            right: isFirst ? const Radius.circular(22) : Radius.zero,
+            left: isLast ? const Radius.circular(22) : Radius.zero,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(height: 7),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    height: 1)),
+            const SizedBox(height: 3),
+            Text(label,
+                style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiDivider extends StatelessWidget {
+  const _KpiDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      const VerticalDivider(width: 1, thickness: 1, color: AppColors.borderLight);
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+
+class _LandlordSectionHeader extends StatelessWidget {
+  const _LandlordSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, size: 17, color: AppColors.primary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900)),
+              Text(subtitle,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+        if (actionLabel != null && onAction != null)
+          GestureDetector(
+            onTap: onAction,
+            child: Row(
+              children: [
+                Text(actionLabel!,
+                    style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800)),
+                const Icon(IconsaxPlusBold.arrow_left,
+                    size: 13, color: AppColors.primary),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Properties horizontal scroll ──────────────────────────────────────────────
+
+class _PropertiesHorizontalScroll extends StatelessWidget {
+  const _PropertiesHorizontalScroll({
+    required this.properties,
+    required this.onAdd,
+    required this.onTap,
+  });
+
+  final List<RentalProperty> properties;
+  final VoidCallback onAdd;
+  final ValueChanged<RentalProperty> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 172,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: properties.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, i) {
+          if (i == properties.length) {
+            return _AddPropertyCard(onTap: onAdd);
+          }
+          return _PropertyMiniTile(
+            property: properties[i],
+            onTap: () => onTap(properties[i]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PropertyMiniTile extends StatelessWidget {
+  const _PropertyMiniTile({required this.property, required this.onTap});
+  final RentalProperty property;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final media =
+        property.media.isNotEmpty ? property.media.first : null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 138,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.borderLight),
+          boxShadow: const [
+            BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 10,
+                offset: Offset(0, 4)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image
+              SizedBox(
+                height: 96,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    SafeMedia(
+                      media: media,
+                      fallback: Container(
+                        color: AppColors.navy.withValues(alpha: 0.8),
+                        child: const Center(
+                          child: Icon(IconsaxPlusBold.building,
+                              color: Colors.white30, size: 30),
+                        ),
+                      ),
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                    ),
+                    // Price badge
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.navy.withValues(alpha: 0.82),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          property.priceLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Details
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 7, 10, 9),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      property.city,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${property.roomsLabel} חד׳ • ${property.sizeM2} מ"ר',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('פעיל',
+                          style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddPropertyCard extends StatelessWidget {
+  const _AddPropertyCard({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 120,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              style: BorderStyle.solid),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(IconsaxPlusBold.add_square,
+                  color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'הוסף\nדירה',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Match conversations list ──────────────────────────────────────────────────
+
+class _MatchConversationList extends StatelessWidget {
+  const _MatchConversationList({
+    required this.matches,
+    required this.provider,
+    required this.tenantName,
+  });
+
+  final List<RentalMatch> matches;
+  final DatingProvider provider;
+  final String tenantName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+              color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        children: matches.asMap().entries.map((entry) {
+          final isLast = entry.key == matches.length - 1;
+          return _ConversationRow(
+            match: entry.value,
+            provider: provider,
+            tenantName: tenantName,
+            isLast: isLast,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => MessageScreen(matchId: entry.value.id))),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _ConversationRow extends StatelessWidget {
+  const _ConversationRow({
+    required this.match,
+    required this.provider,
+    required this.tenantName,
+    required this.isLast,
+    required this.onTap,
+  });
+
+  final RentalMatch match;
+  final DatingProvider provider;
+  final String tenantName;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final property = provider.propertyById(match.propertyId);
+    if (property == null) return const SizedBox.shrink();
+
+    final lastMsg =
+        match.messages.isNotEmpty ? match.messages.last : null;
+    final awaitingReply = lastMsg != null && lastMsg.sender == tenantName;
+    final media = property.media.isNotEmpty ? property.media.first : null;
+
+    Color stageColor;
+    String stageLabel;
+    if (match.ownerSigned && match.tenantSigned) {
+      stageColor = AppColors.success;
+      stageLabel = 'מאומת';
+    } else if (match.contractSent) {
+      stageColor = AppColors.primary;
+      stageLabel = 'חוזה נשלח';
+    } else {
+      stageColor = AppColors.navy;
+      stageLabel = 'שיחה פתוחה';
+    }
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(
+              children: [
+                // Property thumbnail
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 54,
+                    height: 54,
+                    child: SafeMedia(
+                      media: media,
+                      fallback: Container(
+                        color: AppColors.primaryLight2,
+                        child: const Center(
+                            child: Icon(IconsaxPlusBold.building,
+                                color: AppColors.primary, size: 22)),
+                      ),
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              property.address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.navy,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: stageColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                  color:
+                                      stageColor.withValues(alpha: 0.25)),
+                            ),
+                            child: Text(stageLabel,
+                                style: TextStyle(
+                                    color: stageColor,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (awaitingReply) ...[
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE67E22)
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text('ממתין לתגובתך',
+                                  style: TextStyle(
+                                      color: Color(0xFFE67E22),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900)),
+                            ),
+                          ],
+                          Expanded(
+                            child: Text(
+                              lastMsg?.text ?? 'שיחה חדשה',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(IconsaxPlusBold.arrow_left,
+                      size: 15, color: AppColors.primary),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (!isLast)
+          const Divider(
+              height: 1, indent: 80, color: AppColors.borderLight),
+      ],
+    );
+  }
+}
+
+// ── Performance card ──────────────────────────────────────────────────────────
+
+class _PerformanceCard extends StatelessWidget {
+  const _PerformanceCard({required this.stats});
+  final LandlordStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final convRate =
+        (stats.conversionRate / 100).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+              color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(IconsaxPlusBold.chart_2,
+                    size: 17, color: AppColors.primary),
+              ),
+              const SizedBox(width: 10),
+              const Text('ביצועי החשבון',
+                  style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _PerformanceRow(
+            label: 'מועמדים סה"כ',
+            value: '${stats.totalCandidatesSeen}',
+            icon: IconsaxPlusBold.profile_2user,
+            color: AppColors.navy,
+          ),
+          const SizedBox(height: 10),
+          _PerformanceRow(
+            label: 'שיחות פעילות',
+            value: '${stats.matchesCount}',
+            icon: IconsaxPlusBold.message,
+            color: const Color(0xFF4A6CF7),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('יחס המרה',
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700)),
+              Text(
+                '${stats.conversionRate.round()}% מהמועמדים הפכו לשיחות',
+                style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: convRate,
+              backgroundColor: AppColors.borderLight,
+              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+              minHeight: 7,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PerformanceRow extends StatelessWidget {
+  const _PerformanceRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 8),
+        Text(label,
+            style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600)),
+        const Spacer(),
+        Text(value,
+            style: TextStyle(
+                color: color,
+                fontSize: 15,
+                fontWeight: FontWeight.w900)),
+      ],
+    );
+  }
+}
+
+// ── Settings card ────────────────────────────────────────────────────────────
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.onEditProfile});
+  final VoidCallback onEditProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+              color: AppColors.shadow, blurRadius: 12, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        children: [
+          _SettingsTile(
+            icon: IconsaxPlusBold.user_edit,
+            label: 'עריכת פרופיל',
+            subtitle: 'שם, תמונה, פרטי קשר',
+            color: AppColors.primary,
+            onTap: onEditProfile,
+          ),
+          const Divider(
+              height: 1, indent: 74, color: AppColors.borderLight),
+          _SettingsTile(
+            icon: IconsaxPlusBold.notification,
+            label: 'הגדרות התראות',
+            subtitle: 'לידים, שיחות, התאמות',
+            color: AppColors.navy,
+            onTap: () {},
+          ),
+          const Divider(
+              height: 1, indent: 74, color: AppColors.borderLight),
+          _SettingsTile(
+            icon: IconsaxPlusBold.shield_tick,
+            label: 'פרטיות ואבטחה',
+            subtitle: 'ניהול הרשאות',
+            color: const Color(0xFF4A6CF7),
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            color: AppColors.navy)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+              Icon(IconsaxPlusBold.arrow_left,
+                  size: 16,
+                  color: AppColors.textSecondary.withValues(alpha: 0.5)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
