@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/main.dart';
 import 'package:flutter/material.dart';
@@ -65,6 +66,47 @@ void main() {
     } finally {
       debugNetworkImageHttpClientProvider = null;
     }
+  });
+
+  test('rental property media preserves image and video entries', () {
+    const property = RentalProperty(
+      id: 'custom-1',
+      url: '',
+      price: 8500,
+      rooms: 3,
+      sizeM2: 88,
+      floor: '3',
+      totalFloors: '6',
+      city: 'תל אביב',
+      neighborhood: 'הצפון הישן',
+      street: 'דיזנגוף',
+      streetNumber: 120,
+      lat: 32.08,
+      lon: 34.77,
+      propertyType: 'דירה',
+      entryDate: '2026-06-01',
+      condition: 'משופץ',
+      ownerName: 'נועה',
+      agencyListing: false,
+      features: ['מרפסת'],
+      media: [
+        PropertyMedia(
+          url: 'https://example.com/cover.jpg',
+          type: PropertyMediaType.image,
+        ),
+        PropertyMedia(
+          url: 'https://example.com/tour.mp4',
+          type: PropertyMediaType.video,
+        ),
+      ],
+    );
+
+    final decoded = RentalProperty.fromJson(property.toJson());
+
+    expect(decoded.media, hasLength(2));
+    expect(decoded.imageUrls, ['https://example.com/cover.jpg']);
+    expect(decoded.videoUrls, ['https://example.com/tour.mp4']);
+    expect(decoded.primaryMedia?.type, PropertyMediaType.image);
   });
 }
 

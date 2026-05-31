@@ -48,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ExploreScreen(),
                 MatchesScreen(),
                 LandlordPropertiesScreen(),
+                ProfileScreen(),
               ]
             : const <Widget>[
                 DiscoverScreen(),
@@ -88,17 +89,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   final showBadge =
                       index == (isLandlord ? 2 : 1) && unseenCount > 0;
 
+                  final isCompact = items.length >= 5;
                   return Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isCompact ? 1 : 4),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
                         onTap: () => _onTabTap(index, provider),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: isCompact ? 4 : 12,
+                              vertical: 10),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
                             color: isSelected
@@ -116,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: isSelected
                                         ? AppColors.primary
                                         : AppColors.textSecondary,
-                                    size: 22,
+                                    size: isCompact ? 20 : 22,
                                   ),
                                   if (showBadge)
                                     Positioned(
@@ -147,11 +151,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 3),
                               Text(
                                 item.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: isCompact ? 9.5 : 11,
                                   fontWeight: isSelected
                                       ? FontWeight.w800
                                       : FontWeight.w500,
@@ -179,17 +186,17 @@ class _HomeScreenState extends State<HomeScreen> {
 const _tenantItems = [
   _NavItem(
     label: 'גלה דירות',
-    icon: IconsaxPlusLinear.building,
+    icon: IconsaxPlusBold.building,
     activeIcon: IconsaxPlusBold.building,
   ),
   _NavItem(
     label: 'התאמות',
-    icon: IconsaxPlusLinear.message,
+    icon: IconsaxPlusBold.message,
     activeIcon: IconsaxPlusBold.message,
   ),
   _NavItem(
     label: 'פרופיל',
-    icon: IconsaxPlusLinear.profile_circle,
+    icon: IconsaxPlusBold.profile_circle,
     activeIcon: IconsaxPlusBold.profile_circle,
   ),
 ];
@@ -197,23 +204,28 @@ const _tenantItems = [
 const _landlordItems = [
   _NavItem(
     label: 'דשבורד',
-    icon: IconsaxPlusLinear.category,
+    icon: IconsaxPlusBold.category,
     activeIcon: IconsaxPlusBold.category,
   ),
   _NavItem(
     label: 'סוויפים',
-    icon: IconsaxPlusLinear.profile_2user,
+    icon: IconsaxPlusBold.profile_2user,
     activeIcon: IconsaxPlusBold.profile_2user,
   ),
   _NavItem(
     label: 'התאמות',
-    icon: IconsaxPlusLinear.message,
+    icon: IconsaxPlusBold.message,
     activeIcon: IconsaxPlusBold.message,
   ),
   _NavItem(
     label: 'הדירות שלי',
-    icon: IconsaxPlusLinear.buildings_2,
+    icon: IconsaxPlusBold.buildings_2,
     activeIcon: IconsaxPlusBold.buildings_2,
+  ),
+  _NavItem(
+    label: 'פרופיל',
+    icon: IconsaxPlusBold.profile_circle,
+    activeIcon: IconsaxPlusBold.profile_circle,
   ),
 ];
 

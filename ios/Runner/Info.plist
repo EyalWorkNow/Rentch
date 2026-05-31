@@ -55,6 +55,23 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- GIDClientID is required by google_sign_in v7+ on iOS.
+	     The value matches CLIENT_ID in ios/Runner/GoogleService-Info.plist. -->
+	<key>GIDClientID</key>
+	<string>116035400248-8vr9h6b5nq73k8fihunjbes1kuufkr8p.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.116035400248-8vr9h6b5nq73k8fihunjbes1kuufkr8p</string>
+			</array>
+		</dict>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

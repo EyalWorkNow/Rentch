@@ -51,6 +51,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'גמיש',
   ];
 
+  static const List<double> _roomOptions = [
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
+  ];
+
   final _storageService = StorageService();
   final _picker = ImagePicker();
 
@@ -304,241 +316,393 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = MediaQuery.of(context).padding.bottom;
     return Scaffold(
       backgroundColor: AppColors.background,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(IconsaxPlusLinear.arrow_right,
-                color: Colors.white, size: 20),
-          ),
-        ),
-        title: const Text(
-          'עריכת פרופיל',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: _isSaving
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                : TextButton(
-                    onPressed: _save,
-                    style: TextButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20)),
-                    ),
-                    child: const Text(
-                      'שמור',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                    ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: _isSaving
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary))
+            : SizedBox(
+                height: 54,
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18)),
                   ),
-          ),
-        ],
-      ),
-      body: CustomScrollView(
-        slivers: [
-          // Photo header
-          SliverToBoxAdapter(child: _buildPhotoHeader()),
-          // Form
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 32),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: 16),
-                _FormCard(
-                  icon: IconsaxPlusBold.profile_circle,
-                  title: 'פרטים אישיים',
-                  child: Column(
-                    children: [
-                      _RentchField(
-                        controller: _nameCtrl,
-                        label: 'שם מלא',
-                        icon: IconsaxPlusLinear.user,
-                      ),
-                      const SizedBox(height: 14),
-                      _RentchField(
-                        controller: _bioCtrl,
-                        label: 'ספר/י על עצמך',
-                        icon: IconsaxPlusLinear.message_text,
-                        maxLines: 4,
-                      ),
-                    ],
+                  child: const Text(
+                    'שמור שינויים',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                 ),
-                const SizedBox(height: 14),
-                _FormCard(
-                  icon: IconsaxPlusBold.search_normal,
-                  title: 'העדפות חיפוש',
-                  child: Column(
-                    children: [
-                      _SliderRow(
-                        label: 'תקציב מקסימלי',
-                        displayValue: _fmtCurrency(_budget),
-                        value: _budget.toDouble(),
-                        min: 2000,
-                        max: 20000,
-                        divisions: 180,
-                        onChanged: (v) =>
-                            setState(() => _budget = (v / 100).round() * 100),
+              ),
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: CustomScrollView(
+          slivers: [
+            // ── Pinned SliverAppBar ──────────────────────────────────────
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: AppColors.navy,
+              foregroundColor: Colors.white,
+              title: const Text(
+                'עריכת פרופיל',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              actions: [
+                if (!_isSaving)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: TextButton(
+                      onPressed: _save,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
                       ),
-                      const SizedBox(height: 10),
-                      _SliderRow(
-                        label: 'מספר חדרים',
-                        displayValue: _rooms % 1 == 0
-                            ? _rooms.toInt().toString()
-                            : '$_rooms',
-                        value: _rooms,
-                        min: 1,
-                        max: 6,
-                        divisions: 10,
-                        onChanged: (v) =>
-                            setState(() => _rooms = (v * 2).round() / 2),
+                      child: const Text(
+                        'שמור',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14),
                       ),
-                      const SizedBox(height: 14),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          'מועד כניסה',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+
+            // ── Photo header ─────────────────────────────────────────────
+            SliverToBoxAdapter(child: _buildPhotoHeader()),
+
+            // ── Form sections ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // 1. Personal details
+                    _FormSection(
+                      title: 'פרטים אישיים',
+                      icon: IconsaxPlusBold.profile_circle,
+                      child: Column(
+                        children: [
+                          // Name field
+                          TextField(
+                            controller: _nameCtrl,
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                color: AppColors.navy, fontSize: 15),
+                            decoration: InputDecoration(
+                              labelText: 'שם מלא',
+                              hintText: 'שם וכינוי',
+                              labelStyle: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600),
+                              suffixIcon: const Icon(
+                                  IconsaxPlusBold.profile_circle,
+                                  size: 18,
+                                  color: AppColors.primary),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: AppColors.borderLight),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: AppColors.borderLight),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: AppColors.primary, width: 2),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 14),
+                          // Bio field
+                          TextField(
+                            controller: _bioCtrl,
+                            maxLines: 4,
+                            minLines: 3,
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                color: AppColors.navy, fontSize: 15),
+                            decoration: InputDecoration(
+                              labelText: 'עליי',
+                              hintText: 'תאר/י את עצמך לבעלי דירות...',
+                              alignLabelWithHint: true,
+                              labelStyle: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: AppColors.borderLight),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: AppColors.borderLight),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                    color: AppColors.primary, width: 2),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _moveInOptions.map((opt) {
-                          final selected = opt == _moveIn;
-                          return GestureDetector(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() => _moveIn = opt);
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
+                    ),
+
+                    // 2. Apartment preferences
+                    _FormSection(
+                      title: 'העדפות דירה',
+                      icon: IconsaxPlusBold.building,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Budget pill badge
+                          Center(
+                            child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
+                                  horizontal: 18, vertical: 8),
                               decoration: BoxDecoration(
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.background,
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.10),
                                 borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: selected
-                                      ? AppColors.primary
-                                      : AppColors.borderLight,
-                                ),
                               ),
                               child: Text(
-                                opt,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color:
-                                      selected ? Colors.white : AppColors.navy,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _FormCard(
-                  icon: IconsaxPlusBold.info_circle,
-                  title: 'פרטים לבעלי דירות',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_details.isNotEmpty) ...[
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _details.map((d) {
-                            return _DetailTag(
-                              label: d,
-                              onRemove: () {
-                                HapticFeedback.lightImpact();
-                                setState(() => _details.remove(d));
-                              },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      GestureDetector(
-                        onTap: _addDetail,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 9),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: AppColors.primary,
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(IconsaxPlusLinear.add,
-                                  size: 14, color: AppColors.primary),
-                              SizedBox(width: 5),
-                              Text(
-                                'הוסף פרט',
-                                style: TextStyle(
+                                'תקציב מקסימאלי: ₪${_budget.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+                                style: const TextStyle(
                                   color: AppColors.primary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
                                 ),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: AppColors.primary,
+                              inactiveTrackColor: AppColors.borderLight,
+                              thumbColor: AppColors.primary,
+                              overlayColor:
+                                  AppColors.primary.withValues(alpha: 0.15),
+                              trackHeight: 3,
+                            ),
+                            child: Slider(
+                              value: _budget.toDouble().clamp(3000, 15000),
+                              min: 3000,
+                              max: 15000,
+                              divisions: 120,
+                              onChanged: (v) => setState(
+                                  () => _budget = (v / 100).round() * 100),
+                            ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: const [
+                              Text('₪3,000',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600)),
+                              Text('₪15,000',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600)),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 20),
+
+                          // Rooms label
+                          const Text(
+                            'מספר חדרים',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Rooms selector
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _roomOptions.map((r) {
+                                final selected = _rooms == r;
+                                final label = r % 1 == 0
+                                    ? r.toInt().toString()
+                                    : r.toString();
+                                return GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _rooms = r);
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    width: 44,
+                                    height: 36,
+                                    margin: const EdgeInsets.only(left: 8),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: selected
+                                            ? AppColors.primary
+                                            : AppColors.borderLight,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        label,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Move-in label
+                          const Text(
+                            'מועד כניסה',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Move-in chips
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _moveInOptions.map((opt) {
+                              final selected = opt == _moveIn;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _moveIn = opt);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    opt,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.navy,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+
+                    // 3. Important details for landlords
+                    _FormSection(
+                      title: 'פרטים לבעלי דירות',
+                      icon: IconsaxPlusBold.info_circle,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_details.isNotEmpty) ...[
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _details.map((d) {
+                                return _DetailTag(
+                                  label: d,
+                                  onRemove: () {
+                                    HapticFeedback.lightImpact();
+                                    setState(() => _details.remove(d));
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          FilledButton.icon(
+                            onPressed: _addDetail,
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  AppColors.primary.withValues(alpha: 0.12),
+                              foregroundColor: AppColors.primary,
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 9),
+                            ),
+                            icon: const Icon(IconsaxPlusBold.add, size: 14),
+                            label: const Text(
+                              'הוסף פרט',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ]),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -623,7 +787,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   colors: [
                     Color(0xCC072946),
                     Colors.transparent,
-                    Color(0xBB072946)
+                    Color(0xBB072946),
                   ],
                   stops: [0.0, 0.45, 1.0],
                 ),
@@ -730,6 +894,66 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Form section card ────────────────────────────────────────────────────────
+
+class _FormSection extends StatelessWidget {
+  const _FormSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+              color: AppColors.shadow, blurRadius: 12, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 16, color: AppColors.primary),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.navy,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
         ],
       ),
     );
@@ -987,7 +1211,7 @@ class _AddPhotoCell extends StatelessWidget {
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(IconsaxPlusLinear.add, color: AppColors.primary, size: 20),
+            Icon(IconsaxPlusBold.add, color: AppColors.primary, size: 20),
             SizedBox(width: 8),
             Text(
               'הוספת תמונה',
@@ -1091,160 +1315,7 @@ class _SourceButton extends StatelessWidget {
   }
 }
 
-// ─── Reusable form widgets ────────────────────────────────────────────────────
-
-class _FormCard extends StatelessWidget {
-  const _FormCard({
-    required this.icon,
-    required this.title,
-    required this.child,
-  });
-
-  final IconData icon;
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 10, offset: Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 17, color: AppColors.primary),
-              const SizedBox(width: 7),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.navy,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _RentchField extends StatelessWidget {
-  const _RentchField({
-    required this.controller,
-    required this.label,
-    required this.icon,
-    this.maxLines = 1,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final IconData icon;
-  final int maxLines;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      textDirection: TextDirection.rtl,
-      style: const TextStyle(color: AppColors.navy, fontSize: 15),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(
-            color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-        prefixIcon: Icon(icon, size: 18, color: AppColors.primary),
-        filled: true,
-        fillColor: AppColors.background,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.borderLight),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.borderLight),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-        alignLabelWithHint: maxLines > 1,
-      ),
-    );
-  }
-}
-
-class _SliderRow extends StatelessWidget {
-  const _SliderRow({
-    required this.label,
-    required this.displayValue,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.divisions,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String displayValue;
-  final double value;
-  final double min;
-  final double max;
-  final int divisions;
-  final ValueChanged<double> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600)),
-            const Spacer(),
-            Text(displayValue,
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primary)),
-          ],
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: AppColors.primary,
-            inactiveTrackColor: AppColors.borderLight,
-            thumbColor: AppColors.primary,
-            overlayColor: AppColors.primary.withValues(alpha: 0.15),
-            trackHeight: 3,
-          ),
-          child: Slider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
-          ),
-        ),
-      ],
-    );
-  }
-}
+// ─── Detail tag chip ──────────────────────────────────────────────────────────
 
 class _DetailTag extends StatelessWidget {
   const _DetailTag({required this.label, required this.onRemove});
@@ -1289,15 +1360,4 @@ class _DetailTag extends StatelessWidget {
       ),
     );
   }
-}
-
-String _fmtCurrency(int value) {
-  final raw = value.toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < raw.length; i++) {
-    final remaining = raw.length - i;
-    buffer.write(raw[i]);
-    if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
-  }
-  return '₪$buffer';
 }

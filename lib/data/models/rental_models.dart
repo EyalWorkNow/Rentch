@@ -21,6 +21,45 @@ enum MoveInFilter {
   within90Days,
 }
 
+enum PropertyTransactionType { rent, sale }
+
+enum TransactionTypeFilter { any, rent, sale }
+
+enum PropertyMediaType { image, video }
+
+class PropertyMedia {
+  const PropertyMedia({
+    required this.url,
+    required this.type,
+  });
+
+  final String url;
+  final PropertyMediaType type;
+
+  bool get isImage => type == PropertyMediaType.image;
+  bool get isVideo => type == PropertyMediaType.video;
+
+  factory PropertyMedia.fromJson(Map<String, dynamic> json) {
+    final rawType = json['type'] as String?;
+    final url = json['url'] as String? ?? '';
+    return PropertyMedia(
+      url: url,
+      type: rawType == 'video'
+          ? PropertyMediaType.video
+          : rawType == 'image'
+              ? PropertyMediaType.image
+              : _inferMediaType(url),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'url': url,
+      'type': type.name,
+    };
+  }
+}
+
 class RentalProperty {
   const RentalProperty({
     required this.id,
@@ -42,7 +81,8 @@ class RentalProperty {
     required this.ownerName,
     required this.agencyListing,
     required this.features,
-    required this.imageUrls,
+    required this.media,
+    this.transactionType = PropertyTransactionType.rent,
   });
 
   final String id;
@@ -64,8 +104,15 @@ class RentalProperty {
   final String ownerName;
   final bool agencyListing;
   final List<String> features;
-  final List<String> imageUrls;
+  final List<PropertyMedia> media;
+  final PropertyTransactionType transactionType;
 
+  PropertyMedia? get primaryMedia => media.isEmpty ? null : media.first;
+  List<String> get mediaUrls => media.map((item) => item.url).toList();
+  List<String> get imageUrls =>
+      media.where((item) => item.isImage).map((item) => item.url).toList();
+  List<String> get videoUrls =>
+      media.where((item) => item.isVideo).map((item) => item.url).toList();
   String get imageUrl => imageUrls.isEmpty ? '' : imageUrls.first;
   LatLng get point => LatLng(lat, lon);
   int? get floorNumber => int.tryParse(floor);
@@ -78,6 +125,7 @@ class RentalProperty {
         ownerName,
         propertyType,
         condition,
+        transactionType == PropertyTransactionType.sale ? 'מכירה' : 'השכרה',
         ...features,
       ].join(' ').toLowerCase();
 
@@ -91,10 +139,39 @@ class RentalProperty {
   }
 
   String get priceLabel => '₪${_formatNumber(price)}';
+  String get priceSuffixLabel =>
+      transactionType == PropertyTransactionType.sale ? 'למכירה' : 'לחודש';
+  String get transactionLabel =>
+      transactionType == PropertyTransactionType.sale ? 'מכירה' : 'השכרה';
   String get roomsLabel =>
       rooms % 1 == 0 ? rooms.toInt().toString() : rooms.toString();
 
   factory RentalProperty.fromJson(Map<String, dynamic> json) {
+    final mediaJson = json['media'] as List<dynamic>? ?? const [];
+    final legacyImageUrls =
+        List<String>.from(json['imageUrls'] as List<dynamic>? ?? const []);
+    final legacyVideoUrls =
+        List<String>.from(json['videoUrls'] as List<dynamic>? ?? const []);
+    final media = mediaJson.isNotEmpty
+        ? mediaJson
+            .map((item) =>
+                PropertyMedia.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList()
+        : [
+            ...legacyImageUrls.map(
+              (url) => PropertyMedia(
+                url: url,
+                type: PropertyMediaType.image,
+              ),
+            ),
+            ...legacyVideoUrls.map(
+              (url) => PropertyMedia(
+                url: url,
+                type: PropertyMediaType.video,
+              ),
+            ),
+          ];
+
     return RentalProperty(
       id: json['id'] as String,
       url: json['url'] as String,
@@ -116,8 +193,8 @@ class RentalProperty {
       agencyListing: json['agencyListing'] as bool? ?? false,
       features:
           List<String>.from(json['features'] as List<dynamic>? ?? const []),
-      imageUrls:
-          List<String>.from(json['imageUrls'] as List<dynamic>? ?? const []),
+      media: media,
+      transactionType: _parseTransactionType(json['transactionType']),
     );
   }
 
@@ -142,7 +219,10 @@ class RentalProperty {
       'ownerName': ownerName,
       'agencyListing': agencyListing,
       'features': features,
+      'media': media.map((item) => item.toJson()).toList(),
       'imageUrls': imageUrls,
+      'videoUrls': videoUrls,
+      'transactionType': transactionType.name,
     };
   }
 }
@@ -267,6 +347,8 @@ class SearchFilters {
     required this.minFloor,
     required this.moveInFilter,
     required this.sortBy,
+    this.city = '',
+    this.transactionType = TransactionTypeFilter.rent,
   });
 
   final String query;
@@ -282,6 +364,8 @@ class SearchFilters {
   final int minFloor;
   final MoveInFilter moveInFilter;
   final SearchSortOption sortBy;
+  final String city;
+  final TransactionTypeFilter transactionType;
 
   bool get hasQuery => query.trim().isNotEmpty;
 
@@ -299,6 +383,8 @@ class SearchFilters {
     int? minFloor,
     MoveInFilter? moveInFilter,
     SearchSortOption? sortBy,
+    String? city,
+    TransactionTypeFilter? transactionType,
   }) {
     return SearchFilters(
       query: query ?? this.query,
@@ -314,6 +400,8 @@ class SearchFilters {
       minFloor: minFloor ?? this.minFloor,
       moveInFilter: moveInFilter ?? this.moveInFilter,
       sortBy: sortBy ?? this.sortBy,
+      city: city ?? this.city,
+      transactionType: transactionType ?? this.transactionType,
     );
   }
 
@@ -321,8 +409,8 @@ class SearchFilters {
     return SearchFilters(
       query: json['query'] as String? ?? '',
       maxBudget: json['maxBudget'] as int? ?? 9000,
-      minRooms: (json['minRooms'] as num? ?? 2).toDouble(),
-      areaId: json['areaId'] as String? ?? 'central_tel_aviv',
+      minRooms: (json['minRooms'] as num? ?? 1).toDouble(),
+      areaId: json['areaId'] as String? ?? 'all_israel',
       requiredFeatures: Set<String>.from(
         json['requiredFeatures'] as List<dynamic>? ?? const [],
       ),
@@ -344,6 +432,10 @@ class SearchFilters {
       sortBy: SearchSortOption.values.byName(
         json['sortBy'] as String? ?? SearchSortOption.bestMatch.name,
       ),
+      city: json['city'] as String? ?? '',
+      transactionType: TransactionTypeFilter.values.byName(
+        json['transactionType'] as String? ?? TransactionTypeFilter.rent.name,
+      ),
     );
   }
 
@@ -362,6 +454,8 @@ class SearchFilters {
       'minFloor': minFloor,
       'moveInFilter': moveInFilter.name,
       'sortBy': sortBy.name,
+      'city': city,
+      'transactionType': transactionType.name,
     };
   }
 }
@@ -505,4 +599,23 @@ String _formatNumber(int value) {
     }
   }
   return buffer.toString();
+}
+
+PropertyMediaType _inferMediaType(String url) {
+  final normalized = url.split('?').first.toLowerCase();
+  if (normalized.endsWith('.mp4') ||
+      normalized.endsWith('.mov') ||
+      normalized.endsWith('.m4v') ||
+      normalized.endsWith('.webm')) {
+    return PropertyMediaType.video;
+  }
+  return PropertyMediaType.image;
+}
+
+PropertyTransactionType _parseTransactionType(Object? value) {
+  final normalized = value?.toString().trim().toLowerCase();
+  return switch (normalized) {
+    'sale' || 'sell' || 'for_sale' => PropertyTransactionType.sale,
+    _ => PropertyTransactionType.rent,
+  };
 }

@@ -13,6 +13,55 @@ import 'package:provider/provider.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text('מחיקת חשבון',
+            style:
+                TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
+        content: const Text(
+          'פעולה זו תמחק לצמיתות את החשבון ואת כל הנתונים שלך. לא ניתן לבטל פעולה זו.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ביטול',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('מחק חשבון'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    final provider = context.read<DatingProvider>();
+    final navigator = Navigator.of(context);
+
+    try {
+      await GoogleAuthService().signOut();
+    } catch (_) {}
+    await provider.deleteAccount();
+
+    if (!context.mounted) return;
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      (_) => false,
+    );
+  }
+
   Future<void> _confirmLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -81,6 +130,7 @@ class ProfileScreen extends StatelessWidget {
             slivers: [
               _ProfileSliverHeader(
                 profile: profile,
+                profileCompletion: provider.profileCompletion,
                 onEdit: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => EditProfileScreen(profile: profile),
@@ -93,33 +143,14 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 16),
-                      // Stats row
-                      Row(
-                        children: [
-                          _StatCard(
-                            icon: IconsaxPlusBold.heart,
-                            color: AppColors.primary,
-                            value: provider.likesCount.toString(),
-                            label: 'אהבתי',
-                          ),
-                          const SizedBox(width: 10),
-                          _StatCard(
-                            icon: IconsaxPlusBold.message,
-                            color: const Color(0xFF4A6CF7),
-                            value: provider.matchesCount.toString(),
-                            label: 'התאמות',
-                          ),
-                          const SizedBox(width: 10),
-                          _StatCard(
-                            icon: IconsaxPlusBold.close_circle,
-                            color: AppColors.coral,
-                            value: provider.passedCount.toString(),
-                            label: 'דילגתי',
-                          ),
-                        ],
+                      const SizedBox(height: 8),
+                      // Stats bar
+                      _StatsBar(
+                        likes: provider.likesCount,
+                        matches: provider.matchesCount,
+                        passed: provider.passedCount,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       // Search preferences
                       _SectionCard(
                         title: 'העדפות חיפוש',
@@ -127,26 +158,26 @@ class ProfileScreen extends StatelessWidget {
                         child: Column(
                           children: [
                             _PreferenceRow(
-                              icon: IconsaxPlusLinear.money,
+                              icon: IconsaxPlusBold.money,
                               label: 'תקציב מקסימלי',
                               value: _fmt(profile.budgetMax),
                             ),
                             const _Divider(),
                             _PreferenceRow(
-                              icon: IconsaxPlusLinear.building,
+                              icon: IconsaxPlusBold.building,
                               label: 'מספר חדרים',
                               value: '${profile.desiredRooms} חדרים',
                             ),
                             const _Divider(),
                             _PreferenceRow(
-                              icon: IconsaxPlusLinear.calendar,
+                              icon: IconsaxPlusBold.calendar,
                               label: 'מועד כניסה',
                               value: profile.moveInWindow,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       // About me
                       if (profile.bio.isNotEmpty)
                         _SectionCard(
@@ -161,7 +192,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                      const SizedBox(height: 14),
+                      if (profile.bio.isNotEmpty) const SizedBox(height: 16),
                       // Important details
                       if (profile.importantDetails.isNotEmpty)
                         _SectionCard(
@@ -195,7 +226,8 @@ class ProfileScreen extends StatelessWidget {
                             }).toList(),
                           ),
                         ),
-                      const SizedBox(height: 14),
+                      if (profile.importantDetails.isNotEmpty)
+                        const SizedBox(height: 16),
                       // Reviews
                       if (provider.tenantReviews.isNotEmpty)
                         _SectionCard(
@@ -208,23 +240,43 @@ class ProfileScreen extends StatelessWidget {
                                 .toList(),
                           ),
                         ),
-                      const SizedBox(height: 14),
-                      // Actions
-                      _ActionTile(
-                        icon: IconsaxPlusLinear.edit,
-                        label: 'עריכת פרופיל',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => EditProfileScreen(profile: profile),
-                          ),
+                      if (provider.tenantReviews.isNotEmpty)
+                        const SizedBox(height: 16),
+                      // Actions grouped in a single card
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.borderLight),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: AppColors.shadow,
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 1),
-                      _ActionTile(
-                        icon: IconsaxPlusLinear.logout,
-                        label: 'יציאה מהחשבון',
-                        isDestructive: true,
-                        onTap: () => _confirmLogout(context),
+                        child: Column(
+                          children: [
+                            _ActionTile(
+                              icon: IconsaxPlusBold.logout,
+                              label: 'יציאה מהחשבון',
+                              isDestructive: true,
+                              onTap: () => _confirmLogout(context),
+                            ),
+                            Divider(
+                              height: 1,
+                              indent: 74,
+                              color: AppColors.borderLight,
+                            ),
+                            _ActionTile(
+                              icon: IconsaxPlusBold.trash,
+                              label: 'מחיקת חשבון',
+                              isDestructive: true,
+                              onTap: () => _confirmDeleteAccount(context),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -238,13 +290,19 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Sliver header
+// ---------------------------------------------------------------------------
+
 class _ProfileSliverHeader extends StatefulWidget {
   const _ProfileSliverHeader({
     required this.profile,
+    required this.profileCompletion,
     required this.onEdit,
   });
 
   final TenantProfile profile;
+  final int profileCompletion;
   final VoidCallback onEdit;
 
   @override
@@ -261,13 +319,20 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
     super.dispose();
   }
 
+  /// Pick the first meaningful badge detail from importantDetails.
+  String? _badgeDetail(List<String> details) {
+    if (details.isEmpty) return null;
+    return details.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = widget.profile;
     final photos = profile.photoUrls;
+    final badge = _badgeDetail(profile.importantDetails);
 
     return SliverAppBar(
-      expandedHeight: 300,
+      expandedHeight: 340,
       pinned: true,
       automaticallyImplyLeading: false,
       backgroundColor: AppColors.navy,
@@ -279,11 +344,23 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
       ),
       title: const Text('הפרופיל שלי'),
       actions: [
-        IconButton(
-          icon: const Icon(IconsaxPlusLinear.edit, color: Colors.white),
+        TextButton.icon(
           onPressed: widget.onEdit,
+          icon:
+              const Icon(IconsaxPlusBold.edit, color: Colors.white, size: 16),
+          label: const Text(
+            'עריכה',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+          style: TextButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 12),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -342,7 +419,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                 ),
               ),
 
-            // Gradient overlay (wrapped in IgnorePointer)
+            // Gradient overlay
             const IgnorePointer(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -356,10 +433,10 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
               ),
             ),
 
-            // Photo dots (wrapped in IgnorePointer)
+            // Photo dots
             if (photos.length > 1)
               Positioned(
-                bottom: 80,
+                bottom: 88,
                 left: 0,
                 right: 0,
                 child: IgnorePointer(
@@ -383,7 +460,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                 ),
               ),
 
-            // Name and budget (wrapped in IgnorePointer)
+            // Name, avatar, budget
             Positioned(
               bottom: 20,
               right: 20,
@@ -392,36 +469,76 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar circle
-                    CircleAvatar(
-                      radius: 36,
-                      backgroundColor: AppColors.primary,
-                      backgroundImage: profile.photoUrl.isNotEmpty &&
-                              !profile.photoUrl.startsWith('/')
-                          ? NetworkImage(profile.photoUrl)
-                          : null,
-                      foregroundImage: profile.photoUrl.startsWith('/')
-                          ? FileImage(File(profile.photoUrl))
-                          : null,
-                      child: profile.photoUrl.isEmpty
-                          ? const Icon(IconsaxPlusBold.profile_circle,
-                              color: Colors.white, size: 34)
-                          : null,
+                    // Avatar with white border + completion mini chart
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                          ),
+                          child: CircleAvatar(
+                            radius: 36,
+                            backgroundColor: AppColors.primary,
+                            backgroundImage: profile.photoUrl.isNotEmpty &&
+                                    !profile.photoUrl.startsWith('/')
+                                ? NetworkImage(profile.photoUrl)
+                                : null,
+                            foregroundImage: profile.photoUrl.startsWith('/')
+                                ? FileImage(File(profile.photoUrl))
+                                : null,
+                            child: profile.photoUrl.isEmpty
+                                ? const Icon(IconsaxPlusBold.profile_circle,
+                                    color: Colors.white, size: 34)
+                                : null,
+                          ),
+                        ),
+                        if (widget.profileCompletion < 100)
+                          Positioned(
+                            bottom: -5,
+                            left: -5,
+                            child: _MiniCompletion(
+                                percent: widget.profileCompletion),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     Text(
                       profile.name,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 26,
+                        fontSize: 28,
                         fontWeight: FontWeight.w900,
                         height: 1.1,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    if (badge != null) ...[
+                      const SizedBox(height: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.5)),
+                        ),
+                        child: Text(
+                          badge,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(IconsaxPlusLinear.money,
+                        const Icon(IconsaxPlusBold.money,
                             size: 14, color: Colors.white60),
                         const SizedBox(width: 5),
                         Text(
@@ -444,6 +561,10 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Profile image cell
+// ---------------------------------------------------------------------------
 
 class _ProfileImageCell extends StatelessWidget {
   const _ProfileImageCell({required this.url});
@@ -472,34 +593,104 @@ class _ProfileImageCell extends StatelessWidget {
       );
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+// ---------------------------------------------------------------------------
+// Stats bar
+// ---------------------------------------------------------------------------
+
+class _StatsBar extends StatelessWidget {
+  const _StatsBar({
+    required this.likes,
+    required this.matches,
+    required this.passed,
+  });
+
+  final int likes;
+  final int matches;
+  final int passed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+              color: AppColors.shadow, blurRadius: 12, offset: Offset(0, 4)),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            _StatBarItem(
+              icon: IconsaxPlusBold.heart,
+              color: AppColors.primary,
+              value: likes.toString(),
+              label: 'אהבתי',
+              isFirst: true,
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: AppColors.borderLight,
+            ),
+            _StatBarItem(
+              icon: IconsaxPlusBold.message,
+              color: const Color(0xFF4A6CF7),
+              value: matches.toString(),
+              label: 'התאמות',
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: AppColors.borderLight,
+            ),
+            _StatBarItem(
+              icon: IconsaxPlusBold.close_circle,
+              color: AppColors.coral,
+              value: passed.toString(),
+              label: 'דילגתי',
+              isLast: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatBarItem extends StatelessWidget {
+  const _StatBarItem({
     required this.icon,
     required this.color,
     required this.value,
     required this.label,
+    this.isFirst = false,
+    this.isLast = false,
   });
 
   final IconData icon;
   final Color color;
   final String value;
   final String label;
+  final bool isFirst;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: const [
-            BoxShadow(
-                color: AppColors.shadow, blurRadius: 12, offset: Offset(0, 4))
-          ],
+          color: color.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.horizontal(
+            left: isLast ? const Radius.circular(20) : Radius.zero,
+            right: isFirst ? const Radius.circular(20) : Radius.zero,
+          ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 36,
@@ -514,7 +705,7 @@ class _StatCard extends StatelessWidget {
             Text(
               value,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 24,
                 fontWeight: FontWeight.w900,
                 color: color,
               ),
@@ -536,6 +727,10 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Section card
+// ---------------------------------------------------------------------------
+
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
@@ -550,7 +745,7 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -565,12 +760,20 @@ class _SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 17, color: AppColors.primary),
-              const SizedBox(width: 7),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 16, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                   color: AppColors.navy,
                 ),
@@ -584,6 +787,10 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Preference row
+// ---------------------------------------------------------------------------
 
 class _PreferenceRow extends StatelessWidget {
   const _PreferenceRow({
@@ -627,6 +834,10 @@ class _PreferenceRow extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Divider
+// ---------------------------------------------------------------------------
+
 class _Divider extends StatelessWidget {
   const _Divider();
 
@@ -635,6 +846,10 @@ class _Divider extends StatelessWidget {
     return const Divider(height: 1, thickness: 1, color: AppColors.borderLight);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Review card
+// ---------------------------------------------------------------------------
 
 class _ReviewCard extends StatelessWidget {
   const _ReviewCard({required this.review});
@@ -684,6 +899,10 @@ class _ReviewCard extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Action tile
+// ---------------------------------------------------------------------------
+
 class _ActionTile extends StatelessWidget {
   const _ActionTile({
     required this.icon,
@@ -700,30 +919,109 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isDestructive ? AppColors.coral : AppColors.navy;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.borderLight),
-        ),
-        child: ListTile(
-          leading: Icon(icon, color: color),
-          title: Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.w700, color: color),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: color,
+                  ),
+                ),
+              ),
+              Icon(
+                IconsaxPlusBold.arrow_left,
+                size: 16,
+                color: AppColors.textSecondary.withValues(alpha: 0.5),
+              ),
+            ],
           ),
-          trailing: const Icon(IconsaxPlusLinear.arrow_left,
-              size: 18, color: AppColors.textSecondary),
-          onTap: onTap,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Mini completion chart
+// ---------------------------------------------------------------------------
+
+class _MiniCompletion extends StatelessWidget {
+  const _MiniCompletion({required this.percent});
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = percent >= 80
+        ? const Color(0xFF27AE60)
+        : percent >= 50
+            ? AppColors.primary
+            : const Color(0xFFF39C12);
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              value: percent / 100,
+              strokeWidth: 3,
+              backgroundColor: AppColors.borderLight,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+          Text(
+            '$percent',
+            style: const TextStyle(
+              fontSize: 7,
+              fontWeight: FontWeight.w900,
+              color: AppColors.navy,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 String _fmt(int value) {
   final raw = value.toString();

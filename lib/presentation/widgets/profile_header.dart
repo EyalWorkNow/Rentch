@@ -1,4 +1,5 @@
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 
 class ProfileHeader extends StatelessWidget {
@@ -18,15 +19,10 @@ class ProfileHeader extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          profile.photoUrl.isEmpty
-              ? const ColoredBox(color: Color(0xFFEAF4EF))
-              : Image.network(
-                  profile.photoUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const ColoredBox(color: Color(0xFFEAF4EF));
-                  },
-                ),
+          SafeImage(
+            source: profile.photoUrl,
+            fallback: const ColoredBox(color: Color(0xFFEAF4EF)),
+          ),
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

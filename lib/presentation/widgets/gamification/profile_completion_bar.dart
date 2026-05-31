@@ -1,0 +1,125 @@
+import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:flutter/material.dart';
+
+class ProfileCompletionBar extends StatelessWidget {
+  const ProfileCompletionBar({
+    super.key,
+    required this.percent,
+    required this.hint,
+    required this.onTap,
+  });
+
+  final int percent;
+  final String hint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (percent >= 100) return const _CompleteBanner();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primary.withValues(alpha: 0.12),
+              AppColors.navy.withValues(alpha: 0.06),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.25),
+            width: 1.2,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.person_outline_rounded,
+                    size: 18, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'השלמת הפרופיל — $percent%',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.navy,
+                  ),
+                ),
+                const Spacer(),
+                Icon(Icons.chevron_right_rounded,
+                    size: 18, color: AppColors.textSecondary),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: percent / 100,
+                minHeight: 7,
+                backgroundColor: AppColors.borderLight,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(_barColor(percent)),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hint,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _barColor(int p) {
+    if (p >= 80) return const Color(0xFF27AE60);
+    if (p >= 50) return AppColors.primary;
+    return const Color(0xFFF39C12);
+  }
+}
+
+class _CompleteBanner extends StatelessWidget {
+  const _CompleteBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF27AE60).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF27AE60).withValues(alpha: 0.3),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_rounded,
+              color: Color(0xFF27AE60), size: 20),
+          const SizedBox(width: 8),
+          Text(
+            'הפרופיל מושלם — בעלי דירות רואים אותך ראשון',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF27AE60),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

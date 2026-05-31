@@ -1,4 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -6,12 +8,12 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({
     super.key,
-    required this.images,
+    required this.media,
     required this.initialIndex,
     this.title = '',
   });
 
-  final List<String> images;
+  final List<PropertyMedia> media;
   final int initialIndex;
   final String title;
 
@@ -72,7 +74,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                 color: Colors.black.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(IconsaxPlusLinear.arrow_right,
+              child: const Icon(IconsaxPlusBold.arrow_right,
                   color: Colors.white, size: 18),
             ),
             onPressed: _close,
@@ -89,7 +91,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                   ),
                 ),
               Text(
-                '${_current + 1} / ${widget.images.length}',
+                '${_current + 1} / ${widget.media.length}',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
@@ -104,7 +106,8 @@ class _GalleryScreenState extends State<GalleryScreen>
             setState(() => _dragOffset += d.delta.dy);
           },
           onVerticalDragEnd: (d) {
-            if (_dragOffset.abs() > 100 || d.velocity.pixelsPerSecond.dy.abs() > 600) {
+            if (_dragOffset.abs() > 100 ||
+                d.velocity.pixelsPerSecond.dy.abs() > 600) {
               _close();
             } else {
               setState(() => _dragOffset = 0);
@@ -121,19 +124,19 @@ class _GalleryScreenState extends State<GalleryScreen>
                   PageView.builder(
                     controller: _pageCtrl,
                     onPageChanged: (i) => setState(() => _current = i),
-                    itemCount: widget.images.length,
-                    itemBuilder: (_, i) => _GalleryPage(imageUrl: widget.images[i]),
+                    itemCount: widget.media.length,
+                    itemBuilder: (_, i) => _GalleryPage(media: widget.media[i]),
                   ),
 
                   // Dot indicator bottom
-                  if (widget.images.length > 1)
+                  if (widget.media.length > 1)
                     Positioned(
                       bottom: 40 + MediaQuery.of(context).padding.bottom,
                       left: 0,
                       right: 0,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(widget.images.length, (i) {
+                        children: List.generate(widget.media.length, (i) {
                           final active = i == _current;
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
@@ -163,7 +166,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                         child: const Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(IconsaxPlusLinear.arrow_up,
+                            Icon(IconsaxPlusBold.arrow_up,
                                 color: Colors.white54, size: 18),
                             SizedBox(height: 3),
                             Text(
@@ -189,8 +192,8 @@ class _GalleryScreenState extends State<GalleryScreen>
 }
 
 class _GalleryPage extends StatelessWidget {
-  const _GalleryPage({required this.imageUrl});
-  final String imageUrl;
+  const _GalleryPage({required this.media});
+  final PropertyMedia media;
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +201,7 @@ class _GalleryPage extends StatelessWidget {
       minScale: 0.8,
       maxScale: 4.0,
       child: Center(
-        child: imageUrl.isEmpty
+        child: media.url.isEmpty
             ? Container(
                 color: AppColors.navy,
                 child: const Center(
@@ -206,14 +209,18 @@ class _GalleryPage extends StatelessWidget {
                       color: Colors.white30, size: 64),
                 ),
               )
-            : Image.network(
-                imageUrl,
+            : SafeMedia(
+                media: media,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Container(
+                videoMode: SafeVideoDisplayMode.playback,
+                fallback: Container(
                   color: AppColors.navy,
                   child: const Center(
-                    child: Icon(IconsaxPlusBold.gallery,
-                        color: Colors.white30, size: 64),
+                    child: Icon(
+                      IconsaxPlusBold.gallery,
+                      color: Colors.white30,
+                      size: 64,
+                    ),
                   ),
                 ),
               ),

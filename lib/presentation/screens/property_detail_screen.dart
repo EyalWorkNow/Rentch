@@ -1,6 +1,8 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -21,6 +23,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _currentPage = 0;
 
   RentalProperty get p => widget.property;
+  bool get _hasVirtualTour => p.videoUrls.isNotEmpty;
 
   @override
   void dispose() {
@@ -30,10 +33,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final images = p.imageUrls;
+    final media = p.media;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF4F8FB),
       body: Stack(
         children: [
           CustomScrollView(
@@ -41,9 +44,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               // Image gallery as a plain SliverToBoxAdapter (no SliverAppBar conflict)
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 340,
+                  height: 390,
                   child: _ImageGallery(
-                    images: images,
+                    media: media,
                     controller: _pageController,
                     currentPage: _currentPage,
                     onPageChanged: (i) => setState(() => _currentPage = i),
@@ -53,31 +56,47 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _PriceRow(property: p),
-                      const SizedBox(height: 10),
-                      _AddressRow(property: p),
-                      const SizedBox(height: 20),
-                      _StatsRow(property: p),
-                      const SizedBox(height: 24),
-                      _OwnerCard(property: p),
-                      const SizedBox(height: 24),
+                      _OverviewCard(
+                        property: p,
+                        hasVirtualTour: _hasVirtualTour,
+                        onTourTap: () => openPropertyTour(context, p),
+                      ),
+                      const SizedBox(height: 16),
+                      _SectionCardShell(
+                        title: 'פרטי הדירה',
+                        icon: IconsaxPlusBold.building_4,
+                        child: Column(
+                          children: [
+                            _PrimaryFactsGrid(property: p),
+                            const SizedBox(height: 14),
+                            _DetailsList(property: p),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _SectionCardShell(
+                        title: 'בעל הנכס',
+                        icon: IconsaxPlusBold.profile_2user,
+                        child: _OwnerCard(property: p),
+                      ),
                       if (p.features.isNotEmpty) ...[
-                        _SectionTitle('מאפיינים'),
-                        const SizedBox(height: 10),
-                        _FeatureWrap(features: p.features),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+                        _SectionCardShell(
+                          title: 'מאפיינים חשובים',
+                          icon: IconsaxPlusBold.flash_1,
+                          child: _FeatureWrap(features: p.features),
+                        ),
                       ],
-                      _SectionTitle('פרטים נוספים'),
-                      const SizedBox(height: 10),
-                      _DetailsList(property: p),
-                      const SizedBox(height: 24),
-                      _SectionTitle('מיקום'),
-                      const SizedBox(height: 10),
-                      _MapSection(property: p),
+                      const SizedBox(height: 16),
+                      _SectionCardShell(
+                        title: 'מיקום',
+                        icon: IconsaxPlusBold.location,
+                        child: _MapSection(property: p),
+                      ),
                     ],
                   ),
                 ),
@@ -85,37 +104,23 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             ],
           ),
 
-          // Floating top bar (back + like buttons)
+          // Floating top bar (back + share buttons)
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
                   _FloatingNavBtn(
-                    icon: IconsaxPlusLinear.arrow_right,
+                    icon: IconsaxPlusBold.arrow_right,
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
-                  Consumer<DatingProvider>(
-                    builder: (context, provider, _) => _FloatingNavBtn(
-                      icon: provider.isSaved(p.id)
-                          ? IconsaxPlusBold.bookmark
-                          : IconsaxPlusLinear.bookmark,
-                      onTap: () => provider.toggleSave(p.id),
-                      tint: provider.isSaved(p.id)
-                          ? AppColors.primary
-                          : Colors.white,
-                    ),
+                  _FloatingNavBtn(
+                    icon: IconsaxPlusBold.send_2,
+                    onTap: () => showPropertyShareSheet(context, p),
+                    tint: Colors.white,
                   ),
                   const SizedBox(width: 8),
-                  _FloatingNavBtn(
-                    icon: IconsaxPlusLinear.heart,
-                    onTap: () {
-                      context.read<DatingProvider>().likeProperty(p.id);
-                      Navigator.of(context).pop();
-                    },
-                    tint: AppColors.coral,
-                  ),
                 ],
               ),
             ),
@@ -126,7 +131,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _BottomBar(property: p),
+            child: _BottomBar(
+              property: p,
+              hasVirtualTour: _hasVirtualTour,
+              onLike: () {
+                context.read<DatingProvider>().likeProperty(p.id);
+                Navigator.of(context).pop();
+              },
+              onTour: () => openPropertyTour(context, p),
+            ),
           ),
         ],
       ),
@@ -138,14 +151,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
 class _ImageGallery extends StatelessWidget {
   const _ImageGallery({
-    required this.images,
+    required this.media,
     required this.controller,
     required this.currentPage,
     required this.onPageChanged,
     required this.city,
   });
 
-  final List<String> images;
+  final List<PropertyMedia> media;
   final PageController controller;
   final int currentPage;
   final ValueChanged<int> onPageChanged;
@@ -156,21 +169,23 @@ class _ImageGallery extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        images.isEmpty
+        media.isEmpty
             ? _ImageFallback(city: city)
             : PageView.builder(
                 controller: controller,
                 onPageChanged: onPageChanged,
-                itemCount: images.length,
-                itemBuilder: (_, i) => Image.network(
-                  images[i],
+                itemCount: media.length,
+                itemBuilder: (_, i) => SafeMedia(
+                  media: media[i],
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _ImageFallback(city: city),
+                  alignment: Alignment.topCenter,
+                  fallback: _ImageFallback(city: city),
+                  videoMode: SafeVideoDisplayMode.playback,
                 ),
               ),
 
         // Invisible tap zones for gallery navigation
-        if (images.length > 1)
+        if (media.length > 1)
           Positioned.fill(
             child: Row(
               children: [
@@ -191,7 +206,7 @@ class _ImageGallery extends StatelessWidget {
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onTap: () {
-                      if (currentPage < images.length - 1) {
+                      if (currentPage < media.length - 1) {
                         controller.nextPage(
                           duration: const Duration(milliseconds: 280),
                           curve: Curves.easeInOut,
@@ -219,24 +234,25 @@ class _ImageGallery extends StatelessWidget {
         ),
 
         // Carousel indicator at bottom
-        if (images.length > 1)
+        if (media.length > 1)
           Positioned(
             bottom: 18,
             left: 0,
             right: 0,
             child: IgnorePointer(
-              child: _CarouselDots(count: images.length, current: currentPage),
+              child: _CarouselDots(count: media.length, current: currentPage),
             ),
           ),
 
         // Image counter badge (top right)
-        if (images.length > 1)
+        if (media.length > 1)
           Positioned(
             top: 60,
             left: 16,
             child: IgnorePointer(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(999),
@@ -248,11 +264,41 @@ class _ImageGallery extends StatelessWidget {
                         size: 12, color: Colors.white),
                     const SizedBox(width: 4),
                     Text(
-                      '${currentPage + 1} / ${images.length}',
+                      '${currentPage + 1} / ${media.length}',
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (media.isNotEmpty && media[currentPage].isVideo)
+          Positioned(
+            top: 60,
+            right: 16,
+            child: IgnorePointer(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(IconsaxPlusBold.video, size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'וידאו',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -325,8 +371,7 @@ class _ImageFallback extends StatelessWidget {
 // ─── Floating navigation buttons ─────────────────────────────────────────────
 
 class _FloatingNavBtn extends StatelessWidget {
-  const _FloatingNavBtn(
-      {required this.icon, required this.onTap, this.tint});
+  const _FloatingNavBtn({required this.icon, required this.onTap, this.tint});
   final IconData icon;
   final VoidCallback onTap;
   final Color? tint;
@@ -348,6 +393,25 @@ class _FloatingNavBtn extends StatelessWidget {
   }
 }
 
+Future<void> openPropertyTour(
+  BuildContext context,
+  RentalProperty property,
+) async {
+  if (property.videoUrls.isEmpty) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TourUnavailableSheet(property: property),
+    );
+    return;
+  }
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => _VirtualTourScreen(property: property),
+    ),
+  );
+}
+
 // ─── Owner Card ───────────────────────────────────────────────────────────────
 
 class _OwnerCard extends StatelessWidget {
@@ -365,173 +429,163 @@ class _OwnerCard extends StatelessWidget {
             : '?';
         final isAgency = property.agencyListing;
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 12,
-                  offset: Offset(0, 4)),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // Avatar
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: isAgency
-                          ? AppColors.primary
-                          : AppColors.navy,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Avatar
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: isAgency ? AppColors.primary : AppColors.navy,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          property.ownerName,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.navy,
-                          ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        property.ownerName,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.navy,
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isAgency
-                                    ? AppColors.primaryLight2
-                                    : const Color(0xFFFFF3E0),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isAgency
-                                        ? IconsaxPlusBold.verify
-                                        : IconsaxPlusBold.home_2,
-                                    size: 11,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isAgency
+                                  ? AppColors.primaryLight2
+                                  : const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isAgency
+                                      ? IconsaxPlusBold.verify
+                                      : IconsaxPlusBold.home_2,
+                                  size: 11,
+                                  color: isAgency
+                                      ? AppColors.primary
+                                      : const Color(0xFFE67E22),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isAgency ? 'מתווך מאומת' : 'בעל דירה',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                     color: isAgency
                                         ? AppColors.primary
                                         : const Color(0xFFE67E22),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isAgency ? 'מתווך מאומת' : 'בעל דירה',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isAgency
-                                          ? AppColors.primary
-                                          : const Color(0xFFE67E22),
-                                    ),
-                                  ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (reviews.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              IconsaxPlusBold.star_1,
+                              size: 13,
+                              color: Color(0xFFE8A84A),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              avgRating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy,
                               ),
                             ),
-                            if (reviews.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              const Icon(IconsaxPlusBold.star_1,
-                                  size: 13, color: Color(0xFFE8A84A)),
-                              const SizedBox(width: 3),
-                              Text(
-                                avgRating.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.navy,
-                                ),
+                            Text(
+                              ' (${reviews.length})',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
                               ),
-                              Text(
-                                ' (${reviews.length})',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary),
-                              ),
-                            ],
+                            ),
                           ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (reviews.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: AppColors.borderLight),
-                const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () => _showOwnerSheet(context, property, reviews),
-                  child: Row(
-                    children: [
-                      const Icon(IconsaxPlusLinear.star,
-                          size: 15, color: AppColors.primary),
-                      const SizedBox(width: 6),
-                      Text(
-                        'ביקורות על ${property.ownerName}',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
+                        ],
                       ),
-                      const Spacer(),
-                      const Icon(IconsaxPlusLinear.arrow_left,
-                          size: 14, color: AppColors.primary),
                     ],
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
+            ),
+            if (reviews.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: AppColors.borderLight),
+              const SizedBox(height: 12),
               GestureDetector(
                 onTap: () => _showOwnerSheet(context, property, reviews),
                 child: Row(
                   children: [
-                    const Icon(IconsaxPlusLinear.profile_circle,
-                        size: 15, color: AppColors.textSecondary),
+                    const Icon(IconsaxPlusBold.star,
+                        size: 15, color: AppColors.primary),
                     const SizedBox(width: 6),
-                    const Text(
-                      'צפה בפרופיל המלא',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
+                    Text(
+                      'ביקורות על ${property.ownerName}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
                     const Spacer(),
-                    const Icon(IconsaxPlusLinear.arrow_left,
-                        size: 14, color: AppColors.textSecondary),
+                    const Icon(IconsaxPlusBold.arrow_left,
+                        size: 14, color: AppColors.primary),
                   ],
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => _showOwnerSheet(context, property, reviews),
+              child: Row(
+                children: [
+                  const Icon(IconsaxPlusBold.profile_circle,
+                      size: 15, color: AppColors.textSecondary),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'צפה בפרופיל המלא',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(IconsaxPlusBold.arrow_left,
+                      size: 14, color: AppColors.textSecondary),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -549,8 +603,7 @@ class _OwnerCard extends StatelessWidget {
 }
 
 class _OwnerProfileSheet extends StatelessWidget {
-  const _OwnerProfileSheet(
-      {required this.property, required this.reviews});
+  const _OwnerProfileSheet({required this.property, required this.reviews});
   final RentalProperty property;
   final List<AppReview> reviews;
 
@@ -689,8 +742,7 @@ class _OwnerProfileSheet extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
               child: Text(
                 'עוד אין ביקורות על המשכיר הזה.',
-                style: TextStyle(
-                    color: AppColors.textSecondary, fontSize: 14),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ),
           ],
@@ -723,7 +775,7 @@ class _ReviewTile extends StatelessWidget {
                   (i) => Icon(
                         i < review.rating
                             ? IconsaxPlusBold.star_1
-                            : IconsaxPlusLinear.star,
+                            : IconsaxPlusBold.star,
                         size: 13,
                         color: i < review.rating
                             ? const Color(0xFFE8A84A)
@@ -754,155 +806,184 @@ class _ReviewTile extends StatelessWidget {
 
 // ─── Content widgets ──────────────────────────────────────────────────────────
 
-class _PriceRow extends StatelessWidget {
-  const _PriceRow({required this.property});
+class _PrimaryFactsGrid extends StatelessWidget {
+  const _PrimaryFactsGrid({required this.property});
   final RentalProperty property;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Text(
-          property.priceLabel,
-          style: const TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
-            color: AppColors.navy,
-            letterSpacing: -1,
-          ),
+    final items = <_FactDetailItem>[
+      _FactDetailItem(
+        icon: IconsaxPlusBold.building,
+        value: property.roomsLabel,
+        label: 'חדרים',
+      ),
+      _FactDetailItem(
+        icon: IconsaxPlusBold.maximize_3,
+        value: property.sizeM2.toString(),
+        label: 'מ"ר',
+      ),
+      if (property.floor.isNotEmpty)
+        _FactDetailItem(
+          icon: IconsaxPlusBold.layer,
+          value: property.floor,
+          label: 'קומה',
         ),
-        const SizedBox(width: 6),
-        const Padding(
-          padding: EdgeInsets.only(bottom: 6),
-          child: Text(
-            'לחודש',
-            style: TextStyle(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600),
-          ),
+      if (property.entryDate.isNotEmpty)
+        _FactDetailItem(
+          icon: IconsaxPlusBold.calendar,
+          value: _formatEntryDate(property.entryDate),
+          label: 'כניסה',
         ),
-      ],
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.7,
+      ),
+      itemBuilder: (_, index) => _FactDetailCard(item: items[index]),
     );
   }
 }
 
-class _AddressRow extends StatelessWidget {
-  const _AddressRow({required this.property});
-  final RentalProperty property;
+class _FactDetailItem {
+  const _FactDetailItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+}
+
+class _FactDetailCard extends StatelessWidget {
+  const _FactDetailCard({required this.item});
+
+  final _FactDetailItem item;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(IconsaxPlusLinear.location,
-            size: 18, color: AppColors.primary),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            property.address,
+    final iconBadge = Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(item.icon, size: 18, color: AppColors.primary),
+    );
+
+    final textBlock = Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 15,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-              height: 1.3,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: AppColors.navy,
+              height: 1.15,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            item.label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFD),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE0EBF2)),
+      ),
+      child: Row(
+        children: [
+          iconBadge,
+          const SizedBox(width: 12),
+          textBlock,
+        ],
+      ),
     );
   }
 }
 
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.property});
-  final RentalProperty property;
+class _SectionCardShell extends StatelessWidget {
+  const _SectionCardShell({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.borderLight),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2ECF1)),
         boxShadow: const [
           BoxShadow(
-              color: AppColors.shadow, blurRadius: 12, offset: Offset(0, 4)),
+            color: AppColors.shadow,
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _StatCell(
-              icon: IconsaxPlusBold.building,
-              value: '${property.roomsLabel} חדרים'),
-          _StatDivider(),
-          _StatCell(
-              icon: IconsaxPlusBold.maximize_3,
-              value: '${property.sizeM2} מ"ר'),
-          if (property.floor.isNotEmpty) ...[
-            _StatDivider(),
-            _StatCell(
-                icon: IconsaxPlusBold.layer,
-                value: 'קומה ${property.floor}'),
-          ],
-          if (property.entryDate.isNotEmpty) ...[
-            _StatDivider(),
-            _StatCell(
-                icon: IconsaxPlusBold.calendar, value: property.entryDate),
-          ],
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight2,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.navy,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
         ],
       ),
-    );
-  }
-}
-
-class _StatCell extends StatelessWidget {
-  const _StatCell({required this.icon, required this.value});
-  final IconData icon;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Column(
-          children: [
-            Icon(icon, size: 20, color: AppColors.primary),
-            const SizedBox(height: 5),
-            Text(
-              value,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.navy),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Container(width: 1, height: 36, color: AppColors.borderLight);
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-          fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.navy),
     );
   }
 }
@@ -914,23 +995,34 @@ class _FeatureWrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 10,
+      runSpacing: 10,
       children: features.map((f) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.primaryLight2,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.3)),
+            color: const Color(0xFFF8FBFD),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE0EBF2)),
           ),
-          child: Text(
-            f,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                IconsaxPlusBold.tick_circle,
+                size: 14,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                f,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.navy,
+                ),
+              ),
+            ],
           ),
         );
       }).toList(),
@@ -945,11 +1037,6 @@ class _DetailsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      if (property.propertyType.isNotEmpty)
-        _DetailItem(
-            icon: IconsaxPlusBold.building,
-            label: 'סוג נכס',
-            value: property.propertyType),
       if (property.condition.isNotEmpty)
         _DetailItem(
             icon: IconsaxPlusBold.star,
@@ -964,67 +1051,17 @@ class _DetailsList extends StatelessWidget {
 
     if (items.isEmpty) return const SizedBox.shrink();
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: items.length == 1 ? 1 : (items.length == 2 ? 2 : 3),
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: items.length == 1 ? 4.5 : 1.45,
-      ),
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final d = items[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                  color: AppColors.shadow, blurRadius: 8, offset: Offset(0, 3)),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Icon(d.icon, size: 18, color: AppColors.primary),
-                ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                d.value,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.navy,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                d.label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.textSecondary,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return Column(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          _SecondaryDetailRow(item: items[i]),
+          if (i != items.length - 1)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1, color: AppColors.borderLight),
+            ),
+        ],
+      ],
     );
   }
 }
@@ -1035,6 +1072,63 @@ class _DetailItem {
   final IconData icon;
   final String label;
   final String value;
+}
+
+class _SecondaryDetailRow extends StatelessWidget {
+  const _SecondaryDetailRow({required this.item});
+
+  final _DetailItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(item.icon, size: 18, color: AppColors.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.navy,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                item.label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatEntryDate(String rawValue) {
+  final parsed = DateTime.tryParse(rawValue);
+  if (parsed == null) return rawValue;
+  final dd = parsed.day.toString().padLeft(2, '0');
+  final mm = parsed.month.toString().padLeft(2, '0');
+  final yyyy = parsed.year.toString();
+  return '$dd/$mm/$yyyy';
 }
 
 class _MapSection extends StatelessWidget {
@@ -1105,7 +1199,7 @@ class _MapSection extends StatelessWidget {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(IconsaxPlusLinear.export_2,
+                      Icon(IconsaxPlusBold.export_2,
                           size: 13, color: Colors.white),
                       SizedBox(width: 5),
                       Text(
@@ -1136,8 +1230,16 @@ class _MapSection extends StatelessWidget {
 }
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.property});
+  const _BottomBar({
+    required this.property,
+    required this.hasVirtualTour,
+    required this.onLike,
+    required this.onTour,
+  });
   final RentalProperty property;
+  final bool hasVirtualTour;
+  final VoidCallback onLike;
+  final VoidCallback onTour;
 
   @override
   Widget build(BuildContext context) {
@@ -1155,9 +1257,9 @@ class _BottomBar extends StatelessWidget {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(IconsaxPlusLinear.arrow_right),
-              label: const Text('חזרה'),
+              onPressed: onLike,
+              icon: const Icon(IconsaxPlusBold.heart),
+              label: const Text('אהבתי'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.navy,
                 side: const BorderSide(color: AppColors.borderLight),
@@ -1170,24 +1272,507 @@ class _BottomBar extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             flex: 2,
-            child: Consumer<DatingProvider>(
-              builder: (context, provider, _) => FilledButton.icon(
-                onPressed: () {
-                  provider.likeProperty(property.id);
-                  Navigator.of(context).pop();
-                },
-                icon: const Icon(IconsaxPlusBold.heart),
-                label: const Text('אהבתי!'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
+            child: FilledButton.icon(
+              onPressed: onTour,
+              icon: const Icon(Icons.view_in_ar_rounded),
+              label: Text(hasVirtualTour ? 'סיור תלת־ממדי' : 'בקש סיור תלת־ממדי'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OverviewCard extends StatelessWidget {
+  const _OverviewCard({
+    required this.property,
+    required this.hasVirtualTour,
+    required this.onTourTap,
+  });
+
+  final RentalProperty property;
+  final bool hasVirtualTour;
+  final VoidCallback onTourTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE2ECF1)),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _MetaPill(
+                          icon: property.transactionType ==
+                                  PropertyTransactionType.sale
+                              ? IconsaxPlusBold.tag
+                              : IconsaxPlusBold.key,
+                          label: property.transactionLabel,
+                        ),
+                        if (property.propertyType.trim().isNotEmpty)
+                          _MetaPill(
+                            icon: IconsaxPlusBold.building_4,
+                            label: property.propertyType,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          property.priceLabel,
+                          style: const TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.navy,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            property.priceSuffixLabel,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          IconsaxPlusBold.location,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            property.address,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _CompactFactsRow(property: property),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: onTourTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0B3957), Color(0xFF0F5478)],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.view_in_ar_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hasVirtualTour
+                              ? 'סיור תלת־ממדי זמין עכשיו'
+                              : 'אין עדיין סריקת 3D לנכס הזה',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          hasVirtualTour
+                              ? 'פתח סיור עצמי ועבור בין חללי הדירה'
+                              : 'אפשר לפתוח בקשה לסריקה או לצפות במדיה הקיימת',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    IconsaxPlusBold.arrow_left_2,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4FAFD),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFD9EAF2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactFactsRow extends StatelessWidget {
+  const _CompactFactsRow({required this.property});
+
+  final RentalProperty property;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _FactChip(
+          icon: IconsaxPlusBold.building,
+          label: '${property.roomsLabel} חדרים',
+        ),
+        _FactChip(
+          icon: IconsaxPlusBold.maximize_3,
+          label: '${property.sizeM2} מ"ר',
+        ),
+        if (property.floor.isNotEmpty)
+          _FactChip(
+            icon: IconsaxPlusBold.layer,
+            label: 'קומה ${property.floor}',
+          ),
+      ],
+    );
+  }
+}
+
+class _FactChip extends StatelessWidget {
+  const _FactChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0EBF2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.primary),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TourUnavailableSheet extends StatelessWidget {
+  const _TourUnavailableSheet({required this.property});
+
+  final RentalProperty property;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        20 + MediaQuery.of(context).padding.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.borderLight,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight2,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.view_in_ar_rounded,
+              color: AppColors.primary,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'עדיין אין סיור תלת־ממדי לנכס הזה',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.navy,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'כדי לפתוח הליכה חופשית בתוך הדירה צריך שתהיה סריקה או וידאו ייעודי של הנכס. כרגע אפשר להמשיך דרך התמונות והמודעה המקורית.',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              height: 1.55,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(IconsaxPlusBold.close_circle),
+                  label: const Text('סגור'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await launchUrl(
+                      Uri.parse(property.url),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  icon: const Icon(IconsaxPlusBold.export_2),
+                  label: const Text('פתח מודעה'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VirtualTourScreen extends StatelessWidget {
+  const _VirtualTourScreen({required this.property});
+
+  final RentalProperty property;
+
+  @override
+  Widget build(BuildContext context) {
+    final tourMedia = property.media.where((item) => item.isVideo).toList();
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              itemCount: tourMedia.length,
+              itemBuilder: (_, index) => SafeMedia(
+                media: tourMedia[index],
+                fit: BoxFit.contain,
+                videoMode: SafeVideoDisplayMode.playback,
+                fallback: const Center(
+                  child: Icon(
+                    Icons.view_in_ar_rounded,
+                    color: Colors.white30,
+                    size: 54,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              left: 12,
+              right: 12,
+              child: Row(
+                children: [
+                  _FloatingNavBtn(
+                    icon: IconsaxPlusBold.arrow_right,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.view_in_ar_rounded,
+                            size: 16, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'סיור תלת־ממדי',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 24,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.42),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      property.address,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'גרור בין קטעי הסיור כדי להרגיש את החלל לפני ביקור פיזי.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

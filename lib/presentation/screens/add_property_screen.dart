@@ -1,14 +1,36 @@
-import 'dart:io';
-
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/security/input_sanitizer.dart';
+import 'package:dating_app/core/security/rate_limiter.dart';
+import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
+class _PropertyMediaDraft {
+  _PropertyMediaDraft({
+    String initialValue = '',
+    this.type = PropertyMediaType.image,
+  }) : controller = TextEditingController(text: initialValue);
+
+  final TextEditingController controller;
+  PropertyMediaType type;
+
+  void dispose() => controller.dispose();
+}
+
+extension _PropertyMediaTypeUi on PropertyMediaType {
+  String get label => this == PropertyMediaType.image ? 'תמונה' : 'וידאו';
+
+  IconData get icon => this == PropertyMediaType.image
+      ? IconsaxPlusBold.image
+      : IconsaxPlusBold.video;
+}
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -18,7 +40,7 @@ class AddPropertyScreen extends StatefulWidget {
 }
 
 class _AddPropertyScreenState extends State<AddPropertyScreen> {
-  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'תמונות'];
+  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'מדיה'];
 
   static const _allFeatures = [
     'מרפסת',
@@ -52,7 +74,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _totalFloorsCtrl = TextEditingController();
   final _sizeCtrl = TextEditingController();
   final _entryDateCtrl = TextEditingController();
-  final List<TextEditingController> _imageCtrlList = [TextEditingController()];
+  final List<_PropertyMediaDraft> _mediaDrafts = [_PropertyMediaDraft()];
   final _picker = ImagePicker();
   final _storageService = StorageService();
 
@@ -75,8 +97,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     _totalFloorsCtrl.dispose();
     _sizeCtrl.dispose();
     _entryDateCtrl.dispose();
-    for (final c in _imageCtrlList) {
-      c.dispose();
+    for (final item in _mediaDrafts) {
+      item.dispose();
     }
     super.dispose();
   }
@@ -127,68 +149,139 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   }
 
   Future<void> _pickPropertyImage(ImageSource source) async {
-    final file = await _picker.pickImage(
-      source: source,
-      imageQuality: 86,
-      maxWidth: 1800,
-    );
-    if (file == null) return;
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: 86,
+        maxWidth: 1800,
+      );
+      if (file == null) return;
 
-    final localPath = await _storageService.saveImageLocally(
-      file,
-      folderName: 'property_photos',
-    );
-    final remoteUrl = await _storageService.uploadToCloud(localPath);
-    final imagePath = remoteUrl ?? localPath;
+      final localPath = await _storageService.saveImageLocally(
+        file,
+        folderName: 'property_photos',
+      );
+      final remoteUrl = await _storageService.uploadToCloud(localPath);
+      _assignPickedMedia(
+        remoteUrl ?? localPath,
+        PropertyMediaType.image,
+      );
+    } on StorageException catch (error) {
+      _showMediaError(error.message);
+    }
+  }
+
+  Future<void> _pickPropertyVideo(ImageSource source) async {
+    try {
+      final file = await _picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 90),
+      );
+      if (file == null) return;
+
+      final localPath = await _storageService.saveVideoLocally(
+        file,
+        folderName: 'property_videos',
+      );
+      final remoteUrl = await _storageService.uploadToCloud(localPath);
+      _assignPickedMedia(
+        remoteUrl ?? localPath,
+        PropertyMediaType.video,
+      );
+    } on StorageException catch (error) {
+      _showMediaError(error.message);
+    }
+  }
+
+  void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
-
+    final emptyIndex = _mediaDrafts.indexWhere(
+      (draft) => draft.controller.text.trim().isEmpty,
+    );
+    if (emptyIndex != -1) {
+      setState(() {
+        _mediaDrafts[emptyIndex].controller.text = path;
+        _mediaDrafts[emptyIndex].type = type;
+      });
+      return;
+    }
+    if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
+      _showMediaError(
+        'אפשר לצרף עד ${SecurityConfig.maxPropertyMediaItems} פריטי מדיה.',
+      );
+      return;
+    }
     setState(() {
-      final emptyIndex =
-          _imageCtrlList.indexWhere((ctrl) => ctrl.text.trim().isEmpty);
-      if (emptyIndex == -1 && _imageCtrlList.length < 6) {
-        _imageCtrlList.add(TextEditingController(text: imagePath));
-      } else if (emptyIndex != -1) {
-        _imageCtrlList[emptyIndex].text = imagePath;
-      }
+      _mediaDrafts.add(_PropertyMediaDraft(initialValue: path, type: type));
     });
   }
 
+  void _showMediaError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.coral,
+      ),
+    );
+  }
+
   Future<void> _save() async {
-    final city = _cityCtrl.text.trim();
-    final street = _streetCtrl.text.trim();
-    final size = int.tryParse(_sizeCtrl.text.trim()) ?? 0;
+    // SEC-rate: prevent property spam
+    if (!RateLimiter.instance.allowPropertyAdd()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('הוספת יותר מדי נכסים לאחרונה. נסה שוב מאוחר יותר.'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+
+    // SEC-2: Sanitize all text inputs before persistence
+    final city = InputSanitizer.sanitizeAddress(_cityCtrl.text);
+    final street = InputSanitizer.sanitizeAddress(_streetCtrl.text);
+    final size = (int.tryParse(_sizeCtrl.text.trim()) ?? 0)
+        .clamp(SecurityConfig.minSizeM2, SecurityConfig.maxSizeM2);
 
     if (city.isEmpty || street.isEmpty || size == 0) return;
 
     setState(() => _isSaving = true);
 
-    final imageUrls = _imageCtrlList
-        .map((c) => c.text.trim())
-        .where((u) => u.isNotEmpty)
+    final media = _mediaDrafts
+        .map((draft) {
+          final sanitized =
+              InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
+          if (sanitized == null || sanitized.isEmpty) return null;
+          return PropertyMedia(url: sanitized, type: draft.type);
+        })
+        .whereType<PropertyMedia>()
         .toList();
 
     final property = RentalProperty(
       id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
       url: '',
-      price: _price,
-      rooms: _rooms,
-      sizeM2: size,
-      floor: _floorCtrl.text.trim(),
-      totalFloors: _totalFloorsCtrl.text.trim(),
+      price: InputSanitizer.clampPrice(_price),
+      rooms: InputSanitizer.clampRooms(_rooms),
+      sizeM2: InputSanitizer.clampSize(size),
+      floor: InputSanitizer.sanitizeText(_floorCtrl.text.trim(), maxLength: 10),
+      totalFloors: InputSanitizer.sanitizeText(_totalFloorsCtrl.text.trim(),
+          maxLength: 10),
       city: city,
-      neighborhood: _neighborhoodCtrl.text.trim(),
+      neighborhood: InputSanitizer.sanitizeAddress(_neighborhoodCtrl.text),
       street: street,
       streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
       lat: 32.0853,
       lon: 34.7818,
       propertyType: _propertyType,
-      entryDate: _entryDateCtrl.text.trim(),
+      entryDate: InputSanitizer.sanitizeText(_entryDateCtrl.text.trim(),
+          maxLength: 20),
       condition: _condition,
       ownerName:
           context.read<DatingProvider>().tenantProfile?.name ?? 'בעל הדירה',
       agencyListing: _agencyListing,
       features: _selectedFeatures.toList(),
-      imageUrls: imageUrls,
+      media: media,
     );
 
     await context.read<DatingProvider>().addLandlordProperty(property);
@@ -205,7 +298,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         backgroundColor: AppColors.navy,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(IconsaxPlusLinear.arrow_right, color: Colors.white),
+          icon: const Icon(IconsaxPlusBold.arrow_right, color: Colors.white),
           onPressed: _prev,
         ),
         title: Text(
@@ -264,14 +357,25 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             }),
           ),
           _StepPhotos(
-            imageCtrlList: _imageCtrlList,
-            onPickFromGallery: () => _pickPropertyImage(ImageSource.gallery),
-            onPickFromCamera: () => _pickPropertyImage(ImageSource.camera),
-            onAddImage: () =>
-                setState(() => _imageCtrlList.add(TextEditingController())),
-            onRemoveImage: (i) => setState(() {
-              _imageCtrlList[i].dispose();
-              _imageCtrlList.removeAt(i);
+            mediaDrafts: _mediaDrafts,
+            onPickImageFromGallery: () =>
+                _pickPropertyImage(ImageSource.gallery),
+            onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
+            onPickVideoFromGallery: () =>
+                _pickPropertyVideo(ImageSource.gallery),
+            onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
+            onAddMedia: () => setState(() {
+              if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
+                return;
+              }
+              _mediaDrafts.add(_PropertyMediaDraft());
+            }),
+            onRemoveMedia: (i) => setState(() {
+              _mediaDrafts[i].dispose();
+              _mediaDrafts.removeAt(i);
+            }),
+            onTypeChanged: (i, type) => setState(() {
+              _mediaDrafts[i].type = type;
             }),
           ),
         ],
@@ -410,7 +514,7 @@ class _WizardNavBar extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: onPrev,
-                icon: const Icon(IconsaxPlusLinear.arrow_right, size: 16),
+                icon: const Icon(IconsaxPlusBold.arrow_right, size: 16),
                 label: const Text('חזרה'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.navy,
@@ -434,10 +538,9 @@ class _WizardNavBar extends StatelessWidget {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : Icon(isLast ? IconsaxPlusBold.add_square : null, size: 16),
-              label: Text(
-                  isLoading
-                      ? 'שומר...'
-                      : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
+              label: Text(isLoading
+                  ? 'שומר...'
+                  : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 disabledBackgroundColor:
@@ -483,12 +586,12 @@ class _StepLocation extends StatelessWidget {
           child: Column(
             children: [
               _Field(
-                  ctrl: cityCtrl, label: 'עיר *', icon: IconsaxPlusLinear.map),
+                  ctrl: cityCtrl, label: 'עיר *', icon: IconsaxPlusBold.map),
               const SizedBox(height: 12),
               _Field(
                   ctrl: neighborhoodCtrl,
                   label: 'שכונה (אופציונלי)',
-                  icon: IconsaxPlusLinear.map_1),
+                  icon: IconsaxPlusBold.map_1),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -497,14 +600,14 @@ class _StepLocation extends StatelessWidget {
                     child: _Field(
                         ctrl: streetCtrl,
                         label: 'רחוב *',
-                        icon: IconsaxPlusLinear.routing),
+                        icon: IconsaxPlusBold.routing),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Field(
                       ctrl: streetNumCtrl,
                       label: 'מספר',
-                      icon: IconsaxPlusLinear.hashtag,
+                      icon: IconsaxPlusBold.hashtag,
                       numeric: true,
                     ),
                   ),
@@ -594,7 +697,7 @@ class _StepDetails extends StatelessWidget {
                     child: _Field(
                       ctrl: sizeCtrl,
                       label: 'גודל (מ"ר) *',
-                      icon: IconsaxPlusLinear.maximize_3,
+                      icon: IconsaxPlusBold.maximize_3,
                       numeric: true,
                     ),
                   ),
@@ -603,14 +706,14 @@ class _StepDetails extends StatelessWidget {
                     child: _Field(
                         ctrl: floorCtrl,
                         label: 'קומה',
-                        icon: IconsaxPlusLinear.layer),
+                        icon: IconsaxPlusBold.layer),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Field(
                         ctrl: totalFloorsCtrl,
                         label: 'סה"כ קומות',
-                        icon: IconsaxPlusLinear.buildings),
+                        icon: IconsaxPlusBold.buildings),
                   ),
                 ],
               ),
@@ -639,7 +742,7 @@ class _StepDetails extends StatelessWidget {
               _Field(
                 ctrl: entryDateCtrl,
                 label: 'תאריך כניסה (לדוגמה: 01/09)',
-                icon: IconsaxPlusLinear.calendar,
+                icon: IconsaxPlusBold.calendar,
               ),
               const SizedBox(height: 12),
               Row(
@@ -751,17 +854,23 @@ class _StepFeatures extends StatelessWidget {
 
 class _StepPhotos extends StatelessWidget {
   const _StepPhotos({
-    required this.imageCtrlList,
-    required this.onPickFromGallery,
-    required this.onPickFromCamera,
-    required this.onAddImage,
-    required this.onRemoveImage,
+    required this.mediaDrafts,
+    required this.onPickImageFromGallery,
+    required this.onPickImageFromCamera,
+    required this.onPickVideoFromGallery,
+    required this.onPickVideoFromCamera,
+    required this.onAddMedia,
+    required this.onRemoveMedia,
+    required this.onTypeChanged,
   });
-  final List<TextEditingController> imageCtrlList;
-  final VoidCallback onPickFromGallery;
-  final VoidCallback onPickFromCamera;
-  final VoidCallback onAddImage;
-  final ValueChanged<int> onRemoveImage;
+  final List<_PropertyMediaDraft> mediaDrafts;
+  final VoidCallback onPickImageFromGallery;
+  final VoidCallback onPickImageFromCamera;
+  final VoidCallback onPickVideoFromGallery;
+  final VoidCallback onPickVideoFromCamera;
+  final VoidCallback onAddMedia;
+  final ValueChanged<int> onRemoveMedia;
+  final void Function(int index, PropertyMediaType type) onTypeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -770,21 +879,24 @@ class _StepPhotos extends StatelessWidget {
       children: [
         _SectionHint(
           icon: IconsaxPlusBold.gallery,
-          title: 'תמונות הדירה',
-          subtitle: 'אפשר להעלות תמונה מהמכשיר או להדביק קישור',
+          title: 'תמונות וסרטונים',
+          subtitle: 'אפשר להעלות מדיה מהמכשיר או להדביק קישור',
         ),
         const SizedBox(height: 16),
         _FormCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 150,
                     child: FilledButton.icon(
-                      onPressed: onPickFromGallery,
+                      onPressed: onPickImageFromGallery,
                       icon: const Icon(IconsaxPlusBold.gallery, size: 17),
-                      label: const Text('בחר מהגלריה'),
+                      label: const Text('תמונה מהגלריה'),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 13),
@@ -794,12 +906,44 @@ class _StepPhotos extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
+                  SizedBox(
+                    width: 150,
                     child: OutlinedButton.icon(
-                      onPressed: onPickFromCamera,
-                      icon: const Icon(IconsaxPlusLinear.camera, size: 17),
-                      label: const Text('צלם עכשיו'),
+                      onPressed: onPickImageFromCamera,
+                      icon: const Icon(IconsaxPlusBold.camera, size: 17),
+                      label: const Text('צלם תמונה'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        side: const BorderSide(color: AppColors.borderLight),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: OutlinedButton.icon(
+                      onPressed: onPickVideoFromGallery,
+                      icon: const Icon(IconsaxPlusBold.video, size: 17),
+                      label: const Text('וידאו מהגלריה'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        side: const BorderSide(color: AppColors.borderLight),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: OutlinedButton.icon(
+                      onPressed: onPickVideoFromCamera,
+                      icon: const Icon(IconsaxPlusBold.video_play, size: 17),
+                      label: const Text('צלם וידאו'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.navy,
                         side: const BorderSide(color: AppColors.borderLight),
@@ -813,24 +957,34 @@ class _StepPhotos extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              _PhotoPreviewStrip(imageCtrlList: imageCtrlList),
+              _PhotoPreviewStrip(mediaDrafts: mediaDrafts),
               const SizedBox(height: 14),
-              ...imageCtrlList.asMap().entries.map((e) {
+              ...mediaDrafts.asMap().entries.map((e) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: _MediaTypeToggle(
+                          selectedType: e.value.type,
+                          onSelected: (type) => onTypeChanged(e.key, type),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _Field(
-                          ctrl: e.value,
-                          label: 'תמונה ${e.key + 1} - קישור או נתיב קובץ',
-                          icon: IconsaxPlusLinear.image,
+                          ctrl: e.value.controller,
+                          label:
+                              '${e.value.type.label} ${e.key + 1} - קישור או נתיב קובץ',
+                          icon: e.value.type.icon,
                         ),
                       ),
                       if (e.key > 0) ...[
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () => onRemoveImage(e.key),
+                          onTap: () => onRemoveMedia(e.key),
                           child: Container(
                             width: 36,
                             height: 36,
@@ -838,8 +992,11 @@ class _StepPhotos extends StatelessWidget {
                               color: AppColors.coral.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.close,
-                                size: 18, color: AppColors.coral),
+                            child: const Icon(
+                              Icons.close,
+                              size: 18,
+                              color: AppColors.coral,
+                            ),
                           ),
                         ),
                       ],
@@ -847,9 +1004,9 @@ class _StepPhotos extends StatelessWidget {
                   ),
                 );
               }),
-              if (imageCtrlList.length < 6)
+              if (mediaDrafts.length < SecurityConfig.maxPropertyMediaItems)
                 GestureDetector(
-                  onTap: onAddImage,
+                  onTap: onAddMedia,
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -860,15 +1017,19 @@ class _StepPhotos extends StatelessWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(IconsaxPlusLinear.add,
-                            size: 14, color: AppColors.primary),
+                        Icon(
+                          IconsaxPlusBold.add,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
                         SizedBox(width: 5),
                         Text(
-                          'הוסף תמונה',
+                          'הוסף פריט מדיה',
                           style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13),
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -883,17 +1044,21 @@ class _StepPhotos extends StatelessWidget {
 }
 
 class _PhotoPreviewStrip extends StatelessWidget {
-  const _PhotoPreviewStrip({required this.imageCtrlList});
+  const _PhotoPreviewStrip({required this.mediaDrafts});
 
-  final List<TextEditingController> imageCtrlList;
+  final List<_PropertyMediaDraft> mediaDrafts;
 
   @override
   Widget build(BuildContext context) {
-    final images = imageCtrlList
-        .map((ctrl) => ctrl.text.trim())
-        .where((url) => url.isNotEmpty)
+    final media = mediaDrafts
+        .map((draft) {
+          final url = draft.controller.text.trim();
+          if (url.isEmpty) return null;
+          return PropertyMedia(url: url, type: draft.type);
+        })
+        .whereType<PropertyMedia>()
         .toList();
-    if (images.isEmpty) {
+    if (media.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -904,11 +1069,11 @@ class _PhotoPreviewStrip extends StatelessWidget {
         ),
         child: const Row(
           children: [
-            Icon(IconsaxPlusLinear.image, color: AppColors.textSecondary),
+            Icon(IconsaxPlusBold.gallery, color: AppColors.textSecondary),
             SizedBox(width: 10),
             Expanded(
               child: Text(
-                'תמונה טובה מעלה אמון ומבליטה את הדירה בסוויפים.',
+                'שילוב של תמונות וסרטון קצר מעלה אמון ומבליט את הדירה בסוויפים.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12.5,
@@ -925,14 +1090,14 @@ class _PhotoPreviewStrip extends StatelessWidget {
       height: 92,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: images.length,
+        itemCount: media.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) => ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
             width: 112,
             height: 92,
-            child: _PropertyImagePreview(url: images[i]),
+            child: _PropertyImagePreview(media: media[i]),
           ),
         ),
       ),
@@ -941,24 +1106,17 @@ class _PhotoPreviewStrip extends StatelessWidget {
 }
 
 class _PropertyImagePreview extends StatelessWidget {
-  const _PropertyImagePreview({required this.url});
+  const _PropertyImagePreview({required this.media});
 
-  final String url;
+  final PropertyMedia media;
 
   @override
   Widget build(BuildContext context) {
-    if (url.startsWith('/') || url.startsWith('file://')) {
-      final path = url.startsWith('file://') ? url.substring(7) : url;
-      return Image.file(
-        File(path),
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallback(),
-      );
-    }
-    return Image.network(
-      url,
+    return SafeMedia(
+      media: media,
+      fallback: _fallback(),
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _fallback(),
+      videoMode: SafeVideoDisplayMode.iconOnly,
     );
   }
 
@@ -969,6 +1127,58 @@ class _PropertyImagePreview extends StatelessWidget {
           color: AppColors.primary,
         ),
       );
+}
+
+class _MediaTypeToggle extends StatelessWidget {
+  const _MediaTypeToggle({
+    required this.selectedType,
+    required this.onSelected,
+  });
+
+  final PropertyMediaType selectedType;
+  final ValueChanged<PropertyMediaType> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: PropertyMediaType.values.map((type) {
+        final selected = type == selectedType;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: GestureDetector(
+            onTap: () => onSelected(type),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : AppColors.primaryLight2,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    type.icon,
+                    size: 13,
+                    color: selected ? Colors.white : AppColors.navy,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    type.label,
+                    style: TextStyle(
+                      color: selected ? Colors.white : AppColors.navy,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 }
 
 // ─── Shared widgets ───────────────────────────────────────────────────────────
@@ -1201,12 +1411,27 @@ class EditPropertyScreen extends StatefulWidget {
 }
 
 class _EditPropertyScreenState extends State<EditPropertyScreen> {
-  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'תמונות'];
+  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'מדיה'];
 
   static const _allFeatures = [
-    'מרפסת', 'חניה', 'מחסן', 'מזגן', 'ממ"ד', 'מרפסת שמש', 'גינה', 'מעלית',
-    'ריהוט', 'אינטרנט כלול', 'מטבח מאובזר', 'חיות מחמד מותר', 'כביסה כלולה',
-    'שומר/אבטחה', 'נגישות לנכים', 'גג משותף', 'בריכה', 'חדר כושר',
+    'מרפסת',
+    'חניה',
+    'מחסן',
+    'מזגן',
+    'ממ"ד',
+    'מרפסת שמש',
+    'גינה',
+    'מעלית',
+    'ריהוט',
+    'אינטרנט כלול',
+    'מטבח מאובזר',
+    'חיות מחמד מותר',
+    'כביסה כלולה',
+    'שומר/אבטחה',
+    'נגישות לנכים',
+    'גג משותף',
+    'בריכה',
+    'חדר כושר',
   ];
 
   final _pageCtrl = PageController();
@@ -1220,7 +1445,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late final TextEditingController _totalFloorsCtrl;
   late final TextEditingController _sizeCtrl;
   late final TextEditingController _entryDateCtrl;
-  late final List<TextEditingController> _imageCtrlList;
+  late final List<_PropertyMediaDraft> _mediaDrafts;
   final _picker = ImagePicker();
   final _storageService = StorageService();
 
@@ -1239,15 +1464,20 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _cityCtrl = TextEditingController(text: p.city);
     _neighborhoodCtrl = TextEditingController(text: p.neighborhood);
     _streetCtrl = TextEditingController(text: p.street);
-    _streetNumCtrl =
-        TextEditingController(text: p.streetNumber > 0 ? '${p.streetNumber}' : '');
+    _streetNumCtrl = TextEditingController(
+        text: p.streetNumber > 0 ? '${p.streetNumber}' : '');
     _floorCtrl = TextEditingController(text: p.floor);
     _totalFloorsCtrl = TextEditingController(text: p.totalFloors);
     _sizeCtrl = TextEditingController(text: '${p.sizeM2}');
     _entryDateCtrl = TextEditingController(text: p.entryDate);
-    _imageCtrlList = p.imageUrls.isNotEmpty
-        ? p.imageUrls.map((u) => TextEditingController(text: u)).toList()
-        : [TextEditingController()];
+    _mediaDrafts = p.media.isNotEmpty
+        ? p.media
+            .map((item) => _PropertyMediaDraft(
+                  initialValue: item.url,
+                  type: item.type,
+                ))
+            .toList()
+        : [_PropertyMediaDraft()];
     _price = p.price;
     _rooms = p.rooms;
     _propertyType = p.propertyType;
@@ -1267,8 +1497,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _totalFloorsCtrl.dispose();
     _sizeCtrl.dispose();
     _entryDateCtrl.dispose();
-    for (final c in _imageCtrlList) {
-      c.dispose();
+    for (final item in _mediaDrafts) {
+      item.dispose();
     }
     super.dispose();
   }
@@ -1319,26 +1549,73 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   }
 
   Future<void> _pickPropertyImage(ImageSource source) async {
-    final file = await _picker.pickImage(
-      source: source,
-      imageQuality: 86,
-      maxWidth: 1800,
-    );
-    if (file == null) return;
-    final localPath =
-        await _storageService.saveImageLocally(file, folderName: 'property_photos');
-    final remoteUrl = await _storageService.uploadToCloud(localPath);
-    final imagePath = remoteUrl ?? localPath;
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: 86,
+        maxWidth: 1800,
+      );
+      if (file == null) return;
+      final localPath = await _storageService.saveImageLocally(
+        file,
+        folderName: 'property_photos',
+      );
+      final remoteUrl = await _storageService.uploadToCloud(localPath);
+      _assignPickedMedia(remoteUrl ?? localPath, PropertyMediaType.image);
+    } on StorageException catch (error) {
+      _showMediaError(error.message);
+    }
+  }
+
+  Future<void> _pickPropertyVideo(ImageSource source) async {
+    try {
+      final file = await _picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 90),
+      );
+      if (file == null) return;
+      final localPath = await _storageService.saveVideoLocally(
+        file,
+        folderName: 'property_videos',
+      );
+      final remoteUrl = await _storageService.uploadToCloud(localPath);
+      _assignPickedMedia(remoteUrl ?? localPath, PropertyMediaType.video);
+    } on StorageException catch (error) {
+      _showMediaError(error.message);
+    }
+  }
+
+  void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
+    final emptyIndex = _mediaDrafts.indexWhere(
+      (draft) => draft.controller.text.trim().isEmpty,
+    );
+    if (emptyIndex != -1) {
+      setState(() {
+        _mediaDrafts[emptyIndex].controller.text = path;
+        _mediaDrafts[emptyIndex].type = type;
+      });
+      return;
+    }
+    if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
+      _showMediaError(
+        'אפשר לצרף עד ${SecurityConfig.maxPropertyMediaItems} פריטי מדיה.',
+      );
+      return;
+    }
     setState(() {
-      final emptyIndex =
-          _imageCtrlList.indexWhere((ctrl) => ctrl.text.trim().isEmpty);
-      if (emptyIndex == -1 && _imageCtrlList.length < 6) {
-        _imageCtrlList.add(TextEditingController(text: imagePath));
-      } else if (emptyIndex != -1) {
-        _imageCtrlList[emptyIndex].text = imagePath;
-      }
+      _mediaDrafts.add(_PropertyMediaDraft(initialValue: path, type: type));
     });
+  }
+
+  void _showMediaError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.coral,
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -1349,9 +1626,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
     setState(() => _isSaving = true);
 
-    final imageUrls = _imageCtrlList
-        .map((c) => c.text.trim())
-        .where((u) => u.isNotEmpty)
+    final media = _mediaDrafts
+        .map((draft) {
+          final sanitized =
+              InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
+          if (sanitized == null || sanitized.isEmpty) return null;
+          return PropertyMedia(url: sanitized, type: draft.type);
+        })
+        .whereType<PropertyMedia>()
         .toList();
 
     final updated = RentalProperty(
@@ -1374,7 +1656,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       ownerName: widget.property.ownerName,
       agencyListing: _agencyListing,
       features: _selectedFeatures.toList(),
-      imageUrls: imageUrls,
+      media: media,
     );
 
     await context.read<DatingProvider>().updateLandlordProperty(updated);
@@ -1397,7 +1679,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         backgroundColor: AppColors.navy,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(IconsaxPlusLinear.arrow_right, color: Colors.white),
+          icon: const Icon(IconsaxPlusBold.arrow_right, color: Colors.white),
           onPressed: _prev,
         ),
         title: Text(
@@ -1452,14 +1734,25 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             }),
           ),
           _StepPhotos(
-            imageCtrlList: _imageCtrlList,
-            onPickFromGallery: () => _pickPropertyImage(ImageSource.gallery),
-            onPickFromCamera: () => _pickPropertyImage(ImageSource.camera),
-            onAddImage: () =>
-                setState(() => _imageCtrlList.add(TextEditingController())),
-            onRemoveImage: (i) => setState(() {
-              _imageCtrlList[i].dispose();
-              _imageCtrlList.removeAt(i);
+            mediaDrafts: _mediaDrafts,
+            onPickImageFromGallery: () =>
+                _pickPropertyImage(ImageSource.gallery),
+            onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
+            onPickVideoFromGallery: () =>
+                _pickPropertyVideo(ImageSource.gallery),
+            onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
+            onAddMedia: () => setState(() {
+              if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
+                return;
+              }
+              _mediaDrafts.add(_PropertyMediaDraft());
+            }),
+            onRemoveMedia: (i) => setState(() {
+              _mediaDrafts[i].dispose();
+              _mediaDrafts.removeAt(i);
+            }),
+            onTypeChanged: (i, type) => setState(() {
+              _mediaDrafts[i].type = type;
             }),
           ),
         ],

@@ -1,3 +1,9 @@
+import 'dart:async';
+
+import 'package:dating_app/core/security/input_sanitizer.dart';
+import 'package:dating_app/core/security/rate_limiter.dart'
+    show RateLimiter, WriteDebouncer;
+import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -14,6 +20,10 @@ class DatingProvider extends ChangeNotifier {
   final RentalDataService _rentalDataService;
   final LocalStorageService _localStorageService;
 
+  // Batches rapid successive writes so we don't hammer Appwrite on every swipe.
+  // With 10k concurrent users, unbatched writes would exhaust API rate limits.
+  final _writeDebouncer = WriteDebouncer();
+
   final CardSwiperController propertySwiperController = CardSwiperController();
   final CardSwiperController ownerSwiperController = CardSwiperController();
 
@@ -24,8 +34,8 @@ class DatingProvider extends ChangeNotifier {
   SearchFilters _filters = const SearchFilters(
     query: '',
     maxBudget: 9000,
-    minRooms: 2,
-    areaId: 'gush_dan',
+    minRooms: 1,
+    areaId: 'all_israel',
     requiredFeatures: <String>{},
     minSizeM2: 0,
     maxSizeM2: 400,
@@ -35,6 +45,8 @@ class DatingProvider extends ChangeNotifier {
     minFloor: 0,
     moveInFilter: MoveInFilter.any,
     sortBy: SearchSortOption.bestMatch,
+    city: '',
+    transactionType: TransactionTypeFilter.rent,
   );
   List<RentalProperty> _baseProperties = const [];
   List<RentalProperty> _customProperties = [];
@@ -50,6 +62,7 @@ class DatingProvider extends ChangeNotifier {
   final List<_SwipeRecord> _swipeHistory = [];
   Set<String> _savedPropertyIds = <String>{};
   int _lastSeenMatchCount = 0;
+  int _remainingSuperLikes = 3;
 
   // Combined property list: base (from JSON) + landlord-added
   List<RentalProperty> get _allProperties =>
@@ -65,9 +78,23 @@ class DatingProvider extends ChangeNotifier {
   List<AppReview> get tenantReviews => _tenantReviews;
   List<RentalMatch> get matches => _matches;
   int get likesCount => _likedPropertyIds.length;
+  Set<String> get likedPropertyIds => _likedPropertyIds;
   int get passedCount => _passedPropertyIds.length;
   int get matchesCount => _matches.length;
   bool get canUndo => _swipeHistory.isNotEmpty;
+  int get remainingSuperLikes => _remainingSuperLikes;
+
+  int get trustScore => _tenantProfile == null
+      ? 0
+      : GamificationService.computeTrustScore(_tenantProfile!, _tenantReviews);
+
+  int get profileCompletion => _tenantProfile == null
+      ? 0
+      : GamificationService.computeProfileCompletion(_tenantProfile!);
+
+  String get profileCompletionHint => _tenantProfile == null
+      ? ''
+      : GamificationService.nextCompletionHint(_tenantProfile!);
   RentalProperty? get pendingMatchProperty =>
       propertyById(_pendingMatchPropertyId);
   List<RentalProperty> get myProperties => _customProperties;
@@ -121,11 +148,21 @@ class DatingProvider extends ChangeNotifier {
     return conditions;
   }
 
+  List<String> get availableCities {
+    final cities = _allProperties
+        .map((property) => property.city.trim())
+        .where((city) => city.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return cities;
+  }
+
   int get activeFilterCount {
     var count = 0;
     if (_filters.hasQuery) count++;
     if (_filters.maxBudget != 9000) count++;
-    if (_filters.minRooms != 2) count++;
+    if (_filters.minRooms != 1) count++;
     if (_filters.minSizeM2 > 0) count++;
     if (_filters.maxSizeM2 < 400) count++;
     if (_filters.minFloor > 0) count++;
@@ -135,6 +172,9 @@ class DatingProvider extends ChangeNotifier {
     if (_filters.listingSource != ListingSourceFilter.any) count++;
     if (_filters.moveInFilter != MoveInFilter.any) count++;
     if (_filters.sortBy != SearchSortOption.bestMatch) count++;
+    if (_filters.city.trim().isNotEmpty) count++;
+    if (_filters.transactionType != TransactionTypeFilter.rent) count++;
+    if (_filters.areaId != 'all_israel') count++;
     return count;
   }
 
@@ -166,6 +206,18 @@ class DatingProvider extends ChangeNotifier {
       }
       if (normalizedQuery.isNotEmpty &&
           !property.searchableText.contains(normalizedQuery)) {
+        return false;
+      }
+      if (_filters.city.trim().isNotEmpty &&
+          property.city.trim() != _filters.city.trim()) {
+        return false;
+      }
+      if (_filters.transactionType == TransactionTypeFilter.rent &&
+          property.transactionType != PropertyTransactionType.rent) {
+        return false;
+      }
+      if (_filters.transactionType == TransactionTypeFilter.sale &&
+          property.transactionType != PropertyTransactionType.sale) {
         return false;
       }
       if (property.price > _filters.maxBudget) return false;
@@ -210,6 +262,7 @@ class DatingProvider extends ChangeNotifier {
               entryDate.isAfter(now.add(const Duration(days: 90))))) {
         return false;
       }
+      if (_filters.city.trim().isNotEmpty) return true;
       return selectedArea.contains(property.point);
     }).toList();
 
@@ -251,7 +304,9 @@ class DatingProvider extends ChangeNotifier {
     if (_likedPropertyIds.isNotEmpty) {
       return propertyById(_likedPropertyIds.first);
     }
-    return filteredProperties.isNotEmpty ? filteredProperties.first : _allProperties.first;
+    return filteredProperties.isNotEmpty
+        ? filteredProperties.first
+        : _allProperties.first;
   }
 
   List<RentalProperty> get landlordProxyPortfolio {
@@ -276,7 +331,7 @@ class DatingProvider extends ChangeNotifier {
     _searchAreas = _rentalDataService.createSearchAreas();
 
     final storedState = await _localStorageService.loadAppState();
-    if (storedState == null || storedState['schema'] != 'rental_match_v1') {
+    if (storedState == null || storedState['schema'] != 'rental_match_v2') {
       _seedInitialState();
       await _persist();
     } else {
@@ -311,6 +366,19 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAccount() async {
+    await _localStorageService.clearAppState();
+    _customProperties = [];
+    _tenantProfile = null;
+    _userRole = 'tenant';
+    _isGuestMode = false;
+    _likedPropertyIds.clear();
+    _passedPropertyIds.clear();
+    _swipeHistory.clear();
+    _matches = const [];
+    notifyListeners();
+  }
+
   Future<void> updateTenantProfile(TenantProfile updatedProfile) async {
     _tenantProfile = updatedProfile;
     await _persist();
@@ -321,7 +389,8 @@ class DatingProvider extends ChangeNotifier {
     required String displayName,
     String? photoUrl,
   }) async {
-    final current = _tenantProfile ?? _rentalDataService.createDefaultTenantProfile();
+    final current =
+        _tenantProfile ?? _rentalDataService.createDefaultTenantProfile();
     final nextPhotos = <String>[
       if (photoUrl != null && photoUrl.trim().isNotEmpty) photoUrl.trim(),
       ...current.photoUrls.where((url) => url != photoUrl),
@@ -348,9 +417,8 @@ class DatingProvider extends ChangeNotifier {
   }
 
   Future<void> updateLandlordProperty(RentalProperty updated) async {
-    _customProperties = _customProperties
-        .map((p) => p.id == updated.id ? updated : p)
-        .toList();
+    _customProperties =
+        _customProperties.map((p) => p.id == updated.id ? updated : p).toList();
     await _persist();
     notifyListeners();
   }
@@ -380,8 +448,18 @@ class DatingProvider extends ChangeNotifier {
     propertySwiperController.swipe(CardSwiperDirection.right);
   }
 
-  Future<void> superLikeProperty() async {
+  Future<bool> superLikeProperty() async {
+    final ok = await GamificationService.consumeSuperLike();
+    if (!ok) return false;
+    _remainingSuperLikes = await GamificationService.getRemainingSuperlikes();
+    notifyListeners();
     propertySwiperController.swipe(CardSwiperDirection.top);
+    return true;
+  }
+
+  Future<void> refreshSuperLikes() async {
+    _remainingSuperLikes = await GamificationService.getRemainingSuperlikes();
+    notifyListeners();
   }
 
   Future<void> undoSwipe() async {
@@ -628,28 +706,56 @@ class DatingProvider extends ChangeNotifier {
   int matchScore(RentalProperty p) {
     int score = 0;
     if (p.price <= _filters.maxBudget) {
-      score += 40;
+      score += 30;
     } else if (p.price <= (_filters.maxBudget * 1.15).round()) {
-      score += 20;
+      score += 15;
     }
     if (p.rooms >= _filters.minRooms) {
-      score += 30;
-    } else if (p.rooms >= _filters.minRooms - 0.5) {
       score += 15;
+    } else if (p.rooms >= _filters.minRooms - 0.5) {
+      score += 7;
     }
     if (_searchAreas.isNotEmpty && selectedArea.contains(p.point)) {
       score += 20;
-    } else {
-      score += 10;
     }
+    score += _moveInScore(p);
     if (_filters.requiredFeatures.isEmpty) {
-      score += 10;
+      score += 15;
     } else {
       final matched =
           _filters.requiredFeatures.where(p.features.contains).length;
-      score += (matched / _filters.requiredFeatures.length * 10).round();
+      score += (matched / _filters.requiredFeatures.length * 15).round();
     }
+    score += _listingQualityScore(p);
     return score.clamp(0, 100);
+  }
+
+  int _moveInScore(RentalProperty property) {
+    if (_filters.moveInFilter == MoveInFilter.any) return 10;
+    final entryDate = property.entryDateValue;
+    if (entryDate == null) return 0;
+
+    final now = DateTime.now();
+    switch (_filters.moveInFilter) {
+      case MoveInFilter.any:
+        return 10;
+      case MoveInFilter.immediate:
+        return entryDate.isAfter(now) ? 0 : 10;
+      case MoveInFilter.within30Days:
+        return entryDate.isAfter(now.add(const Duration(days: 30))) ? 0 : 10;
+      case MoveInFilter.within90Days:
+        return entryDate.isAfter(now.add(const Duration(days: 90))) ? 0 : 10;
+    }
+  }
+
+  int _listingQualityScore(RentalProperty property) {
+    var score = 0;
+    if (property.media.isNotEmpty) score += 4;
+    if (property.city.trim().isNotEmpty && property.street.trim().isNotEmpty) {
+      score += 4;
+    }
+    if (property.ownerName.trim().isNotEmpty) score += 2;
+    return score;
   }
 
   PriceContext priceContext(RentalProperty property) {
@@ -677,8 +783,8 @@ class DatingProvider extends ChangeNotifier {
     _filters = const SearchFilters(
       query: '',
       maxBudget: 9000,
-      minRooms: 2,
-      areaId: 'gush_dan',
+      minRooms: 1,
+      areaId: 'all_israel',
       requiredFeatures: <String>{},
       minSizeM2: 0,
       maxSizeM2: 400,
@@ -688,6 +794,8 @@ class DatingProvider extends ChangeNotifier {
       minFloor: 0,
       moveInFilter: MoveInFilter.any,
       sortBy: SearchSortOption.bestMatch,
+      city: '',
+      transactionType: TransactionTypeFilter.rent,
     );
     _likedPropertyIds = <String>{};
     _passedPropertyIds = <String>{};
@@ -745,7 +853,7 @@ class DatingProvider extends ChangeNotifier {
       query: '',
       maxBudget: 12000,
       minRooms: 2,
-      areaId: 'gush_dan',
+      areaId: 'all_israel',
       requiredFeatures: <String>{'מעלית'},
       minSizeM2: 55,
       maxSizeM2: 140,
@@ -755,6 +863,8 @@ class DatingProvider extends ChangeNotifier {
       minFloor: 1,
       moveInFilter: MoveInFilter.within30Days,
       sortBy: SearchSortOption.bestMatch,
+      city: '',
+      transactionType: TransactionTypeFilter.rent,
     );
     _customProperties = [
       _cloneProperty(
@@ -959,8 +1069,9 @@ class DatingProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    await _localStorageService.saveAppState({
-      'schema': 'rental_match_v1',
+    // Snapshot all current state
+    final snapshot = {
+      'schema': 'rental_match_v2',
       'tenantProfile': _tenantProfile?.toJson(),
       'filters': _filters.toJson(),
       'likedPropertyIds': _likedPropertyIds.toList(),
@@ -973,11 +1084,25 @@ class DatingProvider extends ChangeNotifier {
         (key, value) => MapEntry(key, value.map((r) => r.toJson()).toList()),
       ),
       'customProperties': _customProperties.map((p) => p.toJson()).toList(),
-      'userRole': _userRole,
+      'userRole': InputSanitizer.sanitizeRole(_userRole),
       'isGuestMode': _isGuestMode,
       'savedPropertyIds': _savedPropertyIds.toList(),
       'lastSeenMatchCount': _lastSeenMatchCount,
-    });
+    };
+
+    await _localStorageService.saveAppState(snapshot, syncRemote: false);
+
+    // Debounce only the remote write. Local SharedPreferences must update
+    // immediately so state is not lost if Appwrite is slow or rate-limited.
+    unawaited(_writeDebouncer.schedule(() async {
+      if (RateLimiter.instance.allowStateWrite()) {
+        await _localStorageService.syncRemoteAppState(snapshot);
+      } else {
+        if (kDebugMode) {
+          debugPrint('DatingProvider: remote write skipped (rate limit)');
+        }
+      }
+    }));
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
+import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,6 +48,11 @@ class _ProfileCardState extends State<ProfileCard> {
     );
   }
 
+  Future<void> _showSendOptions() async {
+    HapticFeedback.selectionClick();
+    await showPropertyShareSheet(context, p);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DatingProvider>();
@@ -54,12 +60,11 @@ class _ProfileCardState extends State<ProfileCard> {
     final isPassing = widget.horizontalOffsetPercentage < -10;
     final media = p.media;
     final hasMultiple = media.length > 1;
-    final isSaved = provider.isSaved(p.id);
     final score = provider.matchScore(p);
     final priceCtx = provider.priceContext(p);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: Stack(
@@ -143,7 +148,7 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
             ),
 
-            // Top row: agency badge + image dots + save button
+            // Top row: agency badge + image dots + send button
             Positioned(
               top: 16,
               right: 16,
@@ -157,10 +162,7 @@ class _ProfileCardState extends State<ProfileCard> {
                     const SizedBox(width: 8),
                   ],
                   GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      provider.toggleSave(p.id);
-                    },
+                    onTap: _showSendOptions,
                     child: Container(
                       width: 34,
                       height: 34,
@@ -168,11 +170,9 @@ class _ProfileCardState extends State<ProfileCard> {
                         color: Colors.black.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        isSaved
-                            ? IconsaxPlusBold.bookmark
-                            : IconsaxPlusBold.bookmark,
-                        color: isSaved ? AppColors.primary : Colors.white,
+                      child: const Icon(
+                        IconsaxPlusBold.send_2,
+                        color: Colors.white,
                         size: 16,
                       ),
                     ),
@@ -213,7 +213,7 @@ class _ProfileCardState extends State<ProfileCard> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        '${p.priceLabel} לחודש',
+                        '${p.priceLabel} ${p.priceSuffixLabel}',
                         style: const TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w900,

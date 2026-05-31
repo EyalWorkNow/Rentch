@@ -3,18 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-// Order: ♥ Heart (left, largest) | ★ Star (center) | ✕ X (right)
+// Order: ♥ Heart (left, largest) | 3D Tour (center) | ✕ X (right)
 class ActionButtons extends StatelessWidget {
   const ActionButtons({
     super.key,
     required this.onSwipeLeft,
     required this.onSwipeRight,
-    required this.onSuperLike,
+    required this.onVirtualTour,
   });
 
   final VoidCallback onSwipeLeft;
   final VoidCallback onSwipeRight;
-  final VoidCallback onSuperLike;
+  final VoidCallback onVirtualTour;
 
   @override
   Widget build(BuildContext context) {
@@ -38,19 +38,32 @@ class ActionButtons extends StatelessWidget {
             },
             shadowColor: AppColors.primary,
           ),
-          // ★ Star — super like (center)
-          _ActionButton(
-            icon: IconsaxPlusBold.star_1,
-            tooltip: 'סופר לייק',
-            iconColor: Colors.white,
-            backgroundColor: const Color(0xFF4A6CF7),
-            size: 56,
-            iconSize: 24,
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onSuperLike();
-            },
-            shadowColor: const Color(0xFF4A6CF7),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ActionButton(
+                icon: Icons.view_in_ar_rounded,
+                tooltip: 'פתח סיור תלת־ממדי',
+                iconColor: Colors.white,
+                backgroundColor: const Color(0xFF0B567B),
+                size: 56,
+                iconSize: 26,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onVirtualTour();
+                },
+                shadowColor: const Color(0xFF0B567B),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '3D',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
           // ✕ X — pass (right)
           _ActionButton(
