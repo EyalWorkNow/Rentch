@@ -4,6 +4,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
 import 'package:dating_app/presentation/screens/explore_screen.dart';
+import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -90,7 +91,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                       onMatches: () =>
                           _push(context, const MatchesScreen()),
                       onProperties: () => _push(
-                          context, const MatchesScreen()),
+                          context, const LandlordPropertiesScreen()),
                     ),
                     const SizedBox(height: 20),
 
@@ -682,6 +683,7 @@ class _QuickActionsGrid extends StatelessWidget {
               child: _QABtn(
                 label: 'הוסף דירה',
                 icon: IconsaxPlusBold.add_square,
+                color: AppColors.primary,
                 onTap: onAddProperty,
               ),
             ),
@@ -691,6 +693,7 @@ class _QuickActionsGrid extends StatelessWidget {
                 label: 'מועמדים',
                 icon: IconsaxPlusBold.profile_2user,
                 badge: pendingCount,
+                color: AppColors.navy,
                 onTap: onSwipes,
               ),
             ),
@@ -700,6 +703,7 @@ class _QuickActionsGrid extends StatelessWidget {
                 label: "מאצ'ים",
                 icon: IconsaxPlusBold.heart,
                 badge: unseenCount,
+                color: AppColors.coral,
                 onTap: onMatches,
               ),
             ),
@@ -708,6 +712,7 @@ class _QuickActionsGrid extends StatelessWidget {
               child: _QABtn(
                 label: 'הנכסים',
                 icon: IconsaxPlusBold.buildings_2,
+                color: AppColors.success,
                 onTap: onProperties,
               ),
             ),
@@ -724,12 +729,14 @@ class _QABtn extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.badge = 0,
+    this.color = AppColors.primary,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onTap;
   final int badge;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -739,16 +746,16 @@ class _QABtn extends StatelessWidget {
         onTap();
       },
       child: Container(
-        height: 76,
+        height: 80,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: const [
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+          boxShadow: [
             BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 10,
-                offset: Offset(0, 4)),
+                color: color.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
@@ -758,13 +765,13 @@ class _QABtn extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(11),
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: AppColors.primary, size: 16),
+                  child: Icon(icon, color: color, size: 17),
                 ),
                 if (badge > 0)
                   Positioned(
@@ -775,8 +782,10 @@ class _QABtn extends StatelessWidget {
                           minWidth: 16, minHeight: 16),
                       padding:
                           const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: const BoxDecoration(
-                        color: AppColors.coral,
+                      decoration: BoxDecoration(
+                        color: color == AppColors.coral
+                            ? AppColors.navy
+                            : AppColors.coral,
                         shape: BoxShape.circle,
                       ),
                       child: Center(
@@ -793,11 +802,11 @@ class _QABtn extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 6),
             Text(
               label,
-              style: const TextStyle(
-                color: AppColors.navy,
+              style: TextStyle(
+                color: color,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
               ),

@@ -150,7 +150,21 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
           appBar: AppBar(
             automaticallyImplyLeading: false,
             backgroundColor: AppColors.background,
-            title: const Text('הדירות שלי'),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: IconButton(
+              icon: const Icon(IconsaxPlusBold.arrow_right,
+                  color: AppColors.navy),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: const Text(
+              'הדירות שלי',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
           body: provider.isLoading
               ? const Center(
@@ -535,12 +549,31 @@ class _PropertyManageCard extends StatelessWidget {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             child: SizedBox(
-              height: 160,
+              height: 168,
               width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   _PropertyThumb(media: property.primaryMedia),
+                  // Bottom gradient for visual depth
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 56,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            AppColors.navy.withValues(alpha: 0.55),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   // Status badge top-left (physical)
                   Positioned(
                     top: 12,
@@ -551,6 +584,12 @@ class _PropertyManageCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppColors.success,
                         borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2)),
+                        ],
                       ),
                       child: const Text(
                         'פעיל',
@@ -571,8 +610,14 @@ class _PropertyManageCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: AppColors.navy.withValues(alpha: 0.75),
+                          color: AppColors.navy.withValues(alpha: 0.80),
                           borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2)),
+                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -671,7 +716,46 @@ class _PropertyManageCard extends StatelessWidget {
                   children: [
                     // Remove button
                     OutlinedButton.icon(
-                      onPressed: onRemove,
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(22)),
+                            title: const Text(
+                              'הסרת נכס',
+                              style: TextStyle(
+                                  color: AppColors.navy,
+                                  fontWeight: FontWeight.w900),
+                            ),
+                            content: Text(
+                              'להסיר את "${property.address}"?\nהפעולה אינה ניתנת לביטול.',
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  height: 1.4),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('ביטול',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary)),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                    backgroundColor: AppColors.coral,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('הסר'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true) onRemove();
+                      },
                       icon: const Icon(IconsaxPlusBold.trash, size: 15),
                       label: const Text('הסר'),
                       style: OutlinedButton.styleFrom(

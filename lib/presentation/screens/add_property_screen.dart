@@ -1365,25 +1365,39 @@ class _DropdownRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600)),
-        const Spacer(),
-        DropdownButton<String>(
-          value: value,
-          underline: const SizedBox.shrink(),
-          style: const TextStyle(
-              color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
-          items: options
-              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-              .toList(),
-          onChanged: onChanged,
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle:
+            const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        filled: true,
+        fillColor: AppColors.background,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.borderLight),
         ),
-      ],
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.borderLight),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
+      ),
+      style: const TextStyle(
+          color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
+      icon: const Icon(IconsaxPlusBold.arrow_down,
+          size: 16, color: AppColors.textSecondary),
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      items: options
+          .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }
