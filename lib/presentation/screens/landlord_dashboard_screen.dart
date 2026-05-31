@@ -324,7 +324,7 @@ class _InitialsCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white.withValues(alpha: 0.18),
+      color: AppColors.primary,
       child: Center(
         child: Text(
           initials,

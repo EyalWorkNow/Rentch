@@ -1263,6 +1263,7 @@ class _LandlordHero extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(22, 60, 22, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1350,7 +1351,6 @@ class _LandlordHero extends StatelessWidget {
               ),
             ],
           ),
-          const Spacer(),
           // Bottom pill: quick portfolio summary
           Container(
             padding:
@@ -1391,7 +1391,7 @@ class _InitialsBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.primary.withValues(alpha: 0.25),
+      color: AppColors.primary,
       child: Center(
         child: Text(
           initials,
@@ -1451,6 +1451,7 @@ class _LandlordKpiBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 112,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -1460,42 +1461,40 @@ class _LandlordKpiBar extends StatelessWidget {
               color: AppColors.shadow, blurRadius: 18, offset: Offset(0, 6)),
         ],
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            _KpiCell(
-              value: '${stats.propertiesCount}',
-              label: 'דירות',
-              icon: IconsaxPlusBold.buildings_2,
-              color: AppColors.primary,
-              isFirst: true,
-            ),
-            const _KpiDivider(),
-            _KpiCell(
-              value: '${stats.matchesCount}',
-              label: 'שיחות',
-              icon: IconsaxPlusBold.message,
-              color: const Color(0xFF4A6CF7),
-            ),
-            const _KpiDivider(),
-            _KpiCell(
-              value: '${stats.conversionRate.round()}%',
-              label: 'המרה',
-              icon: IconsaxPlusBold.chart_2,
-              color: AppColors.success,
-            ),
-            const _KpiDivider(),
-            _KpiCell(
-              value: '${stats.pendingCount}',
-              label: 'ממתינים',
-              icon: IconsaxPlusBold.profile_2user,
-              color: stats.pendingCount > 0
-                  ? const Color(0xFFE67E22)
-                  : AppColors.textSecondary,
-              isLast: true,
-            ),
-          ],
-        ),
+      child: Row(
+        children: [
+          _KpiCell(
+            value: '${stats.propertiesCount}',
+            label: 'דירות',
+            icon: IconsaxPlusBold.buildings_2,
+            color: AppColors.primary,
+            isFirst: true,
+          ),
+          _KpiSeparator(),
+          _KpiCell(
+            value: '${stats.matchesCount}',
+            label: 'שיחות',
+            icon: IconsaxPlusBold.message,
+            color: const Color(0xFF4A6CF7),
+          ),
+          _KpiSeparator(),
+          _KpiCell(
+            value: '${stats.conversionRate.round()}%',
+            label: 'המרה',
+            icon: IconsaxPlusBold.chart_2,
+            color: AppColors.success,
+          ),
+          _KpiSeparator(),
+          _KpiCell(
+            value: '${stats.pendingCount}',
+            label: 'ממתינים',
+            icon: IconsaxPlusBold.profile_2user,
+            color: stats.pendingCount > 0
+                ? const Color(0xFFE67E22)
+                : AppColors.textSecondary,
+            isLast: true,
+          ),
+        ],
       ),
     );
   }
@@ -1522,7 +1521,6 @@ class _KpiCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.04),
           borderRadius: BorderRadius.horizontal(
@@ -1531,7 +1529,7 @@ class _KpiCell extends StatelessWidget {
           ),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               width: 34,
@@ -1547,7 +1545,7 @@ class _KpiCell extends StatelessWidget {
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: color,
-                    height: 1)),
+                    height: 1.0)),
             const SizedBox(height: 3),
             Text(label,
                 style: const TextStyle(
@@ -1561,12 +1559,13 @@ class _KpiCell extends StatelessWidget {
   }
 }
 
-class _KpiDivider extends StatelessWidget {
-  const _KpiDivider();
-
+class _KpiSeparator extends StatelessWidget {
   @override
-  Widget build(BuildContext context) =>
-      const VerticalDivider(width: 1, thickness: 1, color: AppColors.borderLight);
+  Widget build(BuildContext context) => Container(
+        width: 1,
+        margin: const EdgeInsets.symmetric(vertical: 16),
+        color: AppColors.borderLight,
+      );
 }
 
 // ── Section header ────────────────────────────────────────────────────────────
