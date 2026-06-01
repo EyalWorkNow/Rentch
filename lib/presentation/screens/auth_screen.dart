@@ -853,7 +853,7 @@ class _LoginTabState extends State<_LoginTab> {
       final msg = error.toString().toLowerCase();
       if (msg.contains('canceled') ||
           msg.contains('cancelled') ||
-          msg.contains('sign_in_canceled')) return;
+          msg.contains('sign_in_canceled')) { return; }
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
     } finally {
@@ -875,24 +875,55 @@ class _LoginTabState extends State<_LoginTab> {
       if (!mounted) return;
       widget.onLogin();
     } on AppleAuthCanceledException {
-      // no-op
+      // user dismissed — no-op
     } on AppleAuthUnsupportedException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content:
-              Text('כניסה עם Apple זמינה במכשירי Apple נתמכים בלבד.')));
+      _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
     } on SignInWithAppleAuthorizationException catch (e) {
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('הכניסה עם Apple נכשלה. נסו שוב.')));
-    } catch (_) {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('הכניסה עם Apple נכשלה. נסו שוב.')));
+      _showAppleError('הכניסה עם Apple נכשלה (${e.code.name}). נסו שוב.');
+    } catch (e) {
+      if (!mounted) return;
+      _showAppleError('הכניסה עם Apple נכשלה. נסו שוב.');
     } finally {
       if (mounted) setState(() => _appleLoading = false);
     }
+  }
+
+  void _showAppleError(String message) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'כניסה עם Apple',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+        ),
+        content: Text(message,
+            style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('סגור',
+                style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF13BEC9),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              widget.onGuestLogin();
+            },
+            child: const Text('כניסה כאורח'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
