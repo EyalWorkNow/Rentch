@@ -1280,18 +1280,28 @@ class _LandlordHero extends StatelessWidget {
                       border: Border.all(color: Colors.white, width: 3),
                     ),
                     child: ClipOval(
-                      child: photoUrl.isNotEmpty &&
-                              !photoUrl.startsWith('/')
-                          ? Image.network(photoUrl,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Always-visible initials layer
+                          _InitialsBubble(initials: initials),
+                          // Photo on top — never blank during load
+                          if (photoUrl.isNotEmpty && !photoUrl.startsWith('/'))
+                            Image.network(
+                              photoUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) =>
-                                  _InitialsBubble(initials: initials))
-                          : photoUrl.startsWith('/')
-                              ? Image.file(File(photoUrl),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      _InitialsBubble(initials: initials))
-                              : _InitialsBubble(initials: initials),
+                                  const SizedBox.shrink(),
+                            )
+                          else if (photoUrl.startsWith('/'))
+                            Image.file(
+                              File(photoUrl),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   // "בעל דירה" verified badge
@@ -2113,19 +2123,24 @@ class _PerformanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('יחס המרה',
                   style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w700)),
-              Text(
-                '${stats.conversionRate.round()}% מהמועמדים הפכו לשיחות',
-                style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  '${stats.conversionRate.round()}% מהמועמדים הפכו לשיחות',
+                  textAlign: TextAlign.left,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),

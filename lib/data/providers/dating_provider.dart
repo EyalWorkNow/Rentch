@@ -33,12 +33,12 @@ class DatingProvider extends ChangeNotifier {
   TenantProfile? _tenantProfile;
   SearchFilters _filters = const SearchFilters(
     query: '',
-    maxBudget: 9000,
-    minRooms: 1,
+    maxBudget: 2000000000,
+    minRooms: 0,
     areaId: 'all_israel',
     requiredFeatures: <String>{},
     minSizeM2: 0,
-    maxSizeM2: 400,
+    maxSizeM2: 1000000,
     propertyTypes: <String>{},
     conditions: <String>{},
     listingSource: ListingSourceFilter.any,
@@ -46,7 +46,7 @@ class DatingProvider extends ChangeNotifier {
     moveInFilter: MoveInFilter.any,
     sortBy: SearchSortOption.bestMatch,
     city: '',
-    transactionType: TransactionTypeFilter.rent,
+    transactionType: TransactionTypeFilter.any,
   );
   List<RentalProperty> _baseProperties = const [];
   List<RentalProperty> _customProperties = [];
@@ -64,9 +64,62 @@ class DatingProvider extends ChangeNotifier {
   int _lastSeenMatchCount = 0;
   int _remainingSuperLikes = 3;
 
+  List<RentalProperty>? _allPropertiesCache;
+  Map<String, RentalProperty>? _propertyByIdCache;
+  List<RentalProperty>? _filteredPropertiesCache;
+  List<String>? _availableFeaturesCache;
+  List<String>? _availablePropertyTypesCache;
+  List<String>? _availableConditionsCache;
+  List<String>? _availableCitiesCache;
+  int _catalogRevision = 0;
+  int _filterRevision = 0;
+  int _filterLayoutRevision = 0;
+  int _filteredCatalogRevision = -1;
+  int _filteredFilterRevision = -1;
+
   // Combined property list: base (from JSON) + landlord-added
-  List<RentalProperty> get _allProperties =>
-      [..._baseProperties, ..._customProperties];
+  List<RentalProperty> get _allProperties {
+    final cached = _allPropertiesCache;
+    if (cached != null) return cached;
+    return _allPropertiesCache = [
+      ..._baseProperties,
+      ..._customProperties,
+    ];
+  }
+
+  void _invalidateCatalogCache() {
+    _catalogRevision++;
+    _allPropertiesCache = null;
+    _propertyByIdCache = null;
+    _availableFeaturesCache = null;
+    _availablePropertyTypesCache = null;
+    _availableConditionsCache = null;
+    _availableCitiesCache = null;
+    _invalidateFilterCache();
+  }
+
+  void _invalidateFilterCache() {
+    _filterRevision++;
+    _filterLayoutRevision++;
+    _filteredPropertiesCache = null;
+  }
+
+  void _removeFromFilteredCache(String propertyId) {
+    final cached = _filteredPropertiesCache;
+    _filterRevision++;
+    if (cached == null ||
+        _filteredCatalogRevision != _catalogRevision ||
+        _filteredFilterRevision < 0) {
+      _filteredPropertiesCache = null;
+      return;
+    }
+    _filteredPropertiesCache = [
+      for (final property in cached)
+        if (property.id != propertyId) property,
+    ];
+    _filteredCatalogRevision = _catalogRevision;
+    _filteredFilterRevision = _filterRevision;
+  }
 
   bool get isLoading => _isLoading;
   bool get isLandlord => _userRole == 'landlord';
@@ -120,51 +173,59 @@ class DatingProvider extends ChangeNotifier {
   }
 
   List<String> get availableFeatures {
+    final cached = _availableFeaturesCache;
+    if (cached != null) return cached;
     final features = <String>{};
     for (final property in _allProperties) {
       features.addAll(property.features);
     }
     final sorted = features.toList()..sort();
-    return sorted;
+    return _availableFeaturesCache = sorted;
   }
 
   List<String> get availablePropertyTypes {
+    final cached = _availablePropertyTypesCache;
+    if (cached != null) return cached;
     final types = _allProperties
         .map((property) => property.propertyType.trim())
         .where((type) => type.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
-    return types;
+    return _availablePropertyTypesCache = types;
   }
 
   List<String> get availableConditions {
+    final cached = _availableConditionsCache;
+    if (cached != null) return cached;
     final conditions = _allProperties
         .map((property) => property.condition.trim())
         .where((condition) => condition.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
-    return conditions;
+    return _availableConditionsCache = conditions;
   }
 
   List<String> get availableCities {
+    final cached = _availableCitiesCache;
+    if (cached != null) return cached;
     final cities = _allProperties
         .map((property) => property.city.trim())
         .where((city) => city.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
-    return cities;
+    return _availableCitiesCache = cities;
   }
 
   int get activeFilterCount {
     var count = 0;
     if (_filters.hasQuery) count++;
-    if (_filters.maxBudget != 9000) count++;
-    if (_filters.minRooms != 1) count++;
+    if (_filters.maxBudget != 2000000000) count++;
+    if (_filters.minRooms != 0) count++;
     if (_filters.minSizeM2 > 0) count++;
-    if (_filters.maxSizeM2 < 400) count++;
+    if (_filters.maxSizeM2 < 1000000) count++;
     if (_filters.minFloor > 0) count++;
     if (_filters.requiredFeatures.isNotEmpty) count++;
     if (_filters.propertyTypes.isNotEmpty) count++;
@@ -173,7 +234,7 @@ class DatingProvider extends ChangeNotifier {
     if (_filters.moveInFilter != MoveInFilter.any) count++;
     if (_filters.sortBy != SearchSortOption.bestMatch) count++;
     if (_filters.city.trim().isNotEmpty) count++;
-    if (_filters.transactionType != TransactionTypeFilter.rent) count++;
+    if (_filters.transactionType != TransactionTypeFilter.any) count++;
     if (_filters.areaId != 'all_israel') count++;
     return count;
   }
@@ -195,79 +256,162 @@ class DatingProvider extends ChangeNotifier {
   }
 
   List<RentalProperty> get filteredProperties {
-    if (_searchAreas.isEmpty) return const [];
-    final normalizedQuery = _filters.query.trim().toLowerCase();
+    final cached = _filteredPropertiesCache;
+    if (cached != null &&
+        _filteredCatalogRevision == _catalogRevision &&
+        _filteredFilterRevision == _filterRevision) {
+      return cached;
+    }
+    final filtered = _computeFilteredProperties(_filters, sort: true);
+    _filteredPropertiesCache = filtered;
+    _filteredCatalogRevision = _catalogRevision;
+    _filteredFilterRevision = _filterRevision;
+    return filtered;
+  }
+
+  int get filteredPropertiesRevision => _filterLayoutRevision;
+
+  int filteredCountFor(SearchFilters filters) {
+    if (_searchAreas.isEmpty) return 0;
     final now = DateTime.now();
+    final area = _areaFor(filters);
+    var count = 0;
+    for (final property in _allProperties) {
+      if (_passesFilters(property, filters, now, area)) count++;
+    }
+    return count;
+  }
 
-    final filtered = _allProperties.where((property) {
-      if (_likedPropertyIds.contains(property.id) ||
-          _passedPropertyIds.contains(property.id)) {
-        return false;
+  List<RentalProperty> previewFilteredProperties(
+    SearchFilters filters, {
+    int limit = 18,
+  }) {
+    if (_searchAreas.isEmpty || limit <= 0) return const [];
+    final now = DateTime.now();
+    final area = _areaFor(filters);
+    final preview = <RentalProperty>[];
+    for (final property in _allProperties) {
+      if (_passesFilters(property, filters, now, area)) {
+        preview.add(property);
+        if (preview.length >= limit) break;
       }
-      if (normalizedQuery.isNotEmpty &&
-          !property.searchableText.contains(normalizedQuery)) {
-        return false;
-      }
-      if (_filters.city.trim().isNotEmpty &&
-          property.city.trim() != _filters.city.trim()) {
-        return false;
-      }
-      if (_filters.transactionType == TransactionTypeFilter.rent &&
-          property.transactionType != PropertyTransactionType.rent) {
-        return false;
-      }
-      if (_filters.transactionType == TransactionTypeFilter.sale &&
-          property.transactionType != PropertyTransactionType.sale) {
-        return false;
-      }
-      if (property.price > _filters.maxBudget) return false;
-      if (property.rooms < _filters.minRooms) return false;
-      if (property.sizeM2 < _filters.minSizeM2) return false;
-      if (property.sizeM2 > _filters.maxSizeM2) return false;
-      if (property.floorNumber != null &&
-          property.floorNumber! < _filters.minFloor) {
-        return false;
-      }
-      if (_filters.propertyTypes.isNotEmpty &&
-          !_filters.propertyTypes.contains(property.propertyType)) {
-        return false;
-      }
-      if (_filters.conditions.isNotEmpty &&
-          !_filters.conditions.contains(property.condition)) {
-        return false;
-      }
-      if (_filters.listingSource == ListingSourceFilter.privateOnly &&
-          property.agencyListing) {
-        return false;
-      }
-      if (_filters.listingSource == ListingSourceFilter.agencyOnly &&
-          !property.agencyListing) {
-        return false;
-      }
-      if (!_filters.requiredFeatures.every(property.features.contains)) {
-        return false;
-      }
-      final entryDate = property.entryDateValue;
-      if (_filters.moveInFilter == MoveInFilter.immediate &&
-          (entryDate == null || entryDate.isAfter(now))) {
-        return false;
-      }
-      if (_filters.moveInFilter == MoveInFilter.within30Days &&
-          (entryDate == null ||
-              entryDate.isAfter(now.add(const Duration(days: 30))))) {
-        return false;
-      }
-      if (_filters.moveInFilter == MoveInFilter.within90Days &&
-          (entryDate == null ||
-              entryDate.isAfter(now.add(const Duration(days: 90))))) {
-        return false;
-      }
-      if (_filters.city.trim().isNotEmpty) return true;
-      return selectedArea.contains(property.point);
-    }).toList();
+    }
+    return preview;
+  }
 
-    filtered.sort((a, b) {
-      switch (_filters.sortBy) {
+  List<RentalProperty> _computeFilteredProperties(
+    SearchFilters filters, {
+    required bool sort,
+  }) {
+    if (_searchAreas.isEmpty) return const [];
+    final now = DateTime.now();
+    final area = _areaFor(filters);
+
+    final filtered = _allProperties
+        .where((property) => _passesFilters(property, filters, now, area))
+        .toList();
+
+    if (!sort) return filtered;
+    _sortProperties(filtered, filters, now, area);
+    return filtered;
+  }
+
+  SearchArea _areaFor(SearchFilters filters) {
+    return _searchAreas.firstWhere(
+      (area) => area.id == filters.areaId,
+      orElse: () => _searchAreas.first,
+    );
+  }
+
+  bool _passesFilters(
+    RentalProperty property,
+    SearchFilters filters,
+    DateTime now,
+    SearchArea area,
+  ) {
+    if (_likedPropertyIds.contains(property.id) ||
+        _passedPropertyIds.contains(property.id)) {
+      return false;
+    }
+    final normalizedQuery = filters.query.trim().toLowerCase();
+    if (normalizedQuery.isNotEmpty &&
+        !property.searchableText.contains(normalizedQuery)) {
+      return false;
+    }
+    if (filters.city.trim().isNotEmpty &&
+        property.city.trim() != filters.city.trim()) {
+      return false;
+    }
+    if (filters.transactionType == TransactionTypeFilter.rent &&
+        property.transactionType != PropertyTransactionType.rent) {
+      return false;
+    }
+    if (filters.transactionType == TransactionTypeFilter.sale &&
+        property.transactionType != PropertyTransactionType.sale) {
+      return false;
+    }
+    if (property.price > filters.maxBudget) return false;
+    if (property.rooms < filters.minRooms) return false;
+    if (property.sizeM2 < filters.minSizeM2) return false;
+    if (property.sizeM2 > filters.maxSizeM2) return false;
+    if (property.floorNumber != null &&
+        property.floorNumber! < filters.minFloor) {
+      return false;
+    }
+    if (filters.propertyTypes.isNotEmpty &&
+        !filters.propertyTypes.contains(property.propertyType)) {
+      return false;
+    }
+    if (filters.conditions.isNotEmpty &&
+        !filters.conditions.contains(property.condition)) {
+      return false;
+    }
+    if (filters.listingSource == ListingSourceFilter.privateOnly &&
+        property.agencyListing) {
+      return false;
+    }
+    if (filters.listingSource == ListingSourceFilter.agencyOnly &&
+        !property.agencyListing) {
+      return false;
+    }
+    if (!filters.requiredFeatures.every(property.features.contains)) {
+      return false;
+    }
+    final entryDate = property.entryDateValue;
+    if (filters.moveInFilter == MoveInFilter.immediate &&
+        (entryDate == null || entryDate.isAfter(now))) {
+      return false;
+    }
+    if (filters.moveInFilter == MoveInFilter.within30Days &&
+        (entryDate == null ||
+            entryDate.isAfter(now.add(const Duration(days: 30))))) {
+      return false;
+    }
+    if (filters.moveInFilter == MoveInFilter.within90Days &&
+        (entryDate == null ||
+            entryDate.isAfter(now.add(const Duration(days: 90))))) {
+      return false;
+    }
+    if (filters.city.trim().isNotEmpty) return true;
+    if (filters.areaId == 'all_israel') return true;
+    return area.contains(property.point);
+  }
+
+  void _sortProperties(
+    List<RentalProperty> properties,
+    SearchFilters filters,
+    DateTime now,
+    SearchArea area,
+  ) {
+    final scoreCache = filters.sortBy == SearchSortOption.bestMatch
+        ? <String, int>{
+            for (final property in properties)
+              property.id: _matchScoreFor(property, filters, now, area),
+          }
+        : const <String, int>{};
+
+    properties.sort((a, b) {
+      switch (filters.sortBy) {
         case SearchSortOption.priceLowToHigh:
           return a.price.compareTo(b.price);
         case SearchSortOption.priceHighToLow:
@@ -281,13 +425,12 @@ class DatingProvider extends ChangeNotifier {
         case SearchSortOption.biggestFirst:
           return b.sizeM2.compareTo(a.sizeM2);
         case SearchSortOption.bestMatch:
-          final scoreDelta = matchScore(b).compareTo(matchScore(a));
+          final scoreDelta =
+              (scoreCache[b.id] ?? 0).compareTo(scoreCache[a.id] ?? 0);
           if (scoreDelta != 0) return scoreDelta;
           return a.price.compareTo(b.price);
       }
     });
-
-    return filtered;
   }
 
   List<RentalProperty> get ownerLeads {
@@ -328,11 +471,18 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
 
     _baseProperties = await _rentalDataService.loadListings();
+    _invalidateCatalogCache();
     _searchAreas = _rentalDataService.createSearchAreas();
     if (kDebugMode) {
       debugPrint(
         'DatingProvider.initialize: loaded ${_baseProperties.length} base properties',
       );
+      if (_baseProperties.isNotEmpty) {
+        final first = _baseProperties.first;
+        debugPrint(
+          'DatingProvider.initialize: first property ${first.id} ${first.city} ${first.priceLabel}',
+        );
+      }
     }
 
     final storedState = await _localStorageService.loadAppState();
@@ -342,11 +492,43 @@ class DatingProvider extends ChangeNotifier {
       _hydrateFromState(storedState);
     }
 
+    _useRemoteCatalogDefaults();
     _ensureVisibleListings();
     await _persist();
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  void _useRemoteCatalogDefaults() {
+    if (_baseProperties.length < 1000) return;
+
+    _filters = _filters.copyWith(
+      query: '',
+      maxBudget: 2000000000,
+      minRooms: 0,
+      areaId: 'all_israel',
+      requiredFeatures: <String>{},
+      minSizeM2: 0,
+      maxSizeM2: 1000000,
+      propertyTypes: <String>{},
+      conditions: <String>{},
+      listingSource: ListingSourceFilter.any,
+      minFloor: 0,
+      moveInFilter: MoveInFilter.any,
+      sortBy: SearchSortOption.bestMatch,
+      city: '',
+      transactionType: TransactionTypeFilter.any,
+    );
+    _likedPropertyIds.clear();
+    _passedPropertyIds.clear();
+    _invalidateFilterCache();
+
+    if (kDebugMode) {
+      debugPrint(
+        'DatingProvider.initialize: using open filters for remote catalog',
+      );
+    }
   }
 
   void _ensureVisibleListings() {
@@ -369,6 +551,7 @@ class DatingProvider extends ChangeNotifier {
       city: '',
       transactionType: TransactionTypeFilter.any,
     );
+    _invalidateFilterCache();
 
     if (filteredProperties.isNotEmpty) {
       if (kDebugMode) {
@@ -381,6 +564,7 @@ class DatingProvider extends ChangeNotifier {
 
     _likedPropertyIds.clear();
     _passedPropertyIds.clear();
+    _invalidateFilterCache();
 
     if (kDebugMode) {
       debugPrint(
@@ -405,6 +589,7 @@ class DatingProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _localStorageService.clearAppState();
     _customProperties = [];
+    _invalidateCatalogCache();
     _userRole = 'tenant';
     _isGuestMode = false;
     _seedInitialState();
@@ -415,12 +600,14 @@ class DatingProvider extends ChangeNotifier {
   Future<void> deleteAccount() async {
     await _localStorageService.clearAppState();
     _customProperties = [];
+    _invalidateCatalogCache();
     _tenantProfile = null;
     _userRole = 'tenant';
     _isGuestMode = false;
     _likedPropertyIds.clear();
     _passedPropertyIds.clear();
     _swipeHistory.clear();
+    _invalidateFilterCache();
     _matches = const [];
     notifyListeners();
   }
@@ -452,12 +639,14 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> updateFilters(SearchFilters filters) async {
     _filters = filters;
+    _invalidateFilterCache();
     await _persist();
     notifyListeners();
   }
 
   Future<void> addLandlordProperty(RentalProperty property) async {
     _customProperties = [..._customProperties, property];
+    _invalidateCatalogCache();
     await _persist();
     notifyListeners();
   }
@@ -465,6 +654,7 @@ class DatingProvider extends ChangeNotifier {
   Future<void> updateLandlordProperty(RentalProperty updated) async {
     _customProperties =
         _customProperties.map((p) => p.id == updated.id ? updated : p).toList();
+    _invalidateCatalogCache();
     await _persist();
     notifyListeners();
   }
@@ -472,6 +662,7 @@ class DatingProvider extends ChangeNotifier {
   Future<void> removeLandlordProperty(String propertyId) async {
     _customProperties =
         _customProperties.where((p) => p.id != propertyId).toList();
+    _invalidateCatalogCache();
     await _persist();
     notifyListeners();
   }
@@ -481,6 +672,7 @@ class DatingProvider extends ChangeNotifier {
       _likedPropertyIds.add(propertyId);
       _swipeHistory.add(_SwipeRecord(propertyId: propertyId, liked: true));
       if (_swipeHistory.length > 10) _swipeHistory.removeAt(0);
+      _removeFromFilteredCache(propertyId);
       await _persist();
       notifyListeners();
     }
@@ -517,6 +709,7 @@ class DatingProvider extends ChangeNotifier {
       _passedPropertyIds.remove(last.propertyId);
     }
     propertySwiperController.undo();
+    _invalidateFilterCache();
     await _persist();
     notifyListeners();
   }
@@ -541,6 +734,7 @@ class DatingProvider extends ChangeNotifier {
       return false;
     }
     if (_swipeHistory.length > 10) _swipeHistory.removeAt(0);
+    _removeFromFilteredCache(property.id);
 
     await _persist();
     notifyListeners();
@@ -587,10 +781,13 @@ class DatingProvider extends ChangeNotifier {
 
   RentalProperty? propertyById(String? propertyId) {
     if (propertyId == null) return null;
-    for (final property in _allProperties) {
-      if (property.id == propertyId) return property;
-    }
-    return null;
+    final cached = _propertyByIdCache;
+    if (cached != null) return cached[propertyId];
+    final byId = <String, RentalProperty>{
+      for (final property in _allProperties) property.id: property,
+    };
+    _propertyByIdCache = byId;
+    return byId[propertyId];
   }
 
   RentalMatch? matchById(String matchId) {
@@ -745,44 +942,57 @@ class DatingProvider extends ChangeNotifier {
   Future<void> resetPassed() async {
     _passedPropertyIds.clear();
     _swipeHistory.removeWhere((r) => !r.liked);
+    _invalidateFilterCache();
     await _persist();
     notifyListeners();
   }
 
   int matchScore(RentalProperty p) {
+    if (_searchAreas.isEmpty) return 0;
+    return _matchScoreFor(p, _filters, DateTime.now(), selectedArea);
+  }
+
+  int _matchScoreFor(
+    RentalProperty p,
+    SearchFilters filters,
+    DateTime now,
+    SearchArea area,
+  ) {
     int score = 0;
-    if (p.price <= _filters.maxBudget) {
+    if (p.price <= filters.maxBudget) {
       score += 30;
-    } else if (p.price <= (_filters.maxBudget * 1.15).round()) {
+    } else if (p.price <= (filters.maxBudget * 1.15).round()) {
       score += 15;
     }
-    if (p.rooms >= _filters.minRooms) {
+    if (p.rooms >= filters.minRooms) {
       score += 15;
-    } else if (p.rooms >= _filters.minRooms - 0.5) {
+    } else if (p.rooms >= filters.minRooms - 0.5) {
       score += 7;
     }
-    if (_searchAreas.isNotEmpty && selectedArea.contains(p.point)) {
+    if (filters.areaId == 'all_israel' || area.contains(p.point)) {
       score += 20;
     }
-    score += _moveInScore(p);
-    if (_filters.requiredFeatures.isEmpty) {
+    score += _moveInScore(p, filters, now);
+    if (filters.requiredFeatures.isEmpty) {
       score += 15;
     } else {
-      final matched =
-          _filters.requiredFeatures.where(p.features.contains).length;
-      score += (matched / _filters.requiredFeatures.length * 15).round();
+      final matched = filters.requiredFeatures.where(p.features.contains).length;
+      score += (matched / filters.requiredFeatures.length * 15).round();
     }
     score += _listingQualityScore(p);
     return score.clamp(0, 100);
   }
 
-  int _moveInScore(RentalProperty property) {
-    if (_filters.moveInFilter == MoveInFilter.any) return 10;
+  int _moveInScore(
+    RentalProperty property,
+    SearchFilters filters,
+    DateTime now,
+  ) {
+    if (filters.moveInFilter == MoveInFilter.any) return 10;
     final entryDate = property.entryDateValue;
     if (entryDate == null) return 0;
 
-    final now = DateTime.now();
-    switch (_filters.moveInFilter) {
+    switch (filters.moveInFilter) {
       case MoveInFilter.any:
         return 10;
       case MoveInFilter.immediate:
@@ -828,12 +1038,12 @@ class DatingProvider extends ChangeNotifier {
     };
     _filters = const SearchFilters(
       query: '',
-      maxBudget: 9000,
-      minRooms: 1,
+      maxBudget: 2000000000,
+      minRooms: 0,
       areaId: 'all_israel',
       requiredFeatures: <String>{},
       minSizeM2: 0,
-      maxSizeM2: 400,
+      maxSizeM2: 1000000,
       propertyTypes: <String>{},
       conditions: <String>{},
       listingSource: ListingSourceFilter.any,
@@ -841,7 +1051,7 @@ class DatingProvider extends ChangeNotifier {
       moveInFilter: MoveInFilter.any,
       sortBy: SearchSortOption.bestMatch,
       city: '',
-      transactionType: TransactionTypeFilter.rent,
+      transactionType: TransactionTypeFilter.any,
     );
     _likedPropertyIds = <String>{};
     _passedPropertyIds = <String>{};
@@ -851,28 +1061,41 @@ class DatingProvider extends ChangeNotifier {
     _pendingMatchPropertyId = null;
     _savedPropertyIds = <String>{};
     _lastSeenMatchCount = 0;
+    _invalidateFilterCache();
   }
 
   void _seedGuestDemoState(String role) {
+    // For owner demo: profile = landlord; for tenant demo: profile = tenant
+    final isOwner = role == 'owner' || role == 'landlord';
     final tenant = _rentalDataService.createDefaultTenantProfile().copyWith(
-      name: 'נועה לוי',
-      bio:
-          'מחפשת דירת 2-3 חדרים בצפון תל אביב או רמת גן. כבר כמה שבועות פעילה באפליקציה, עם תגובות מהירות, מסמכים מוכנים והעדפה לבניין מטופח.',
+      name: isOwner ? 'יואב כהן' : 'נועה לוי',
+      photoUrls: isOwner
+          ? const []          // landlord has no photo → show initials
+          : const [
+              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80',
+              'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
+            ],
+      bio: isOwner
+          ? 'בעל נכסים בתל אביב והסביבה. מחפש שוכרים אמינים לטווח ארוך. מגיב תוך 24 שעות ומאמין בתקשורת פתוחה.'
+          : 'מחפשת דירת 2-3 חדרים בצפון תל אביב או רמת גן. כבר כמה שבועות פעילה באפליקציה, עם תגובות מהירות, מסמכים מוכנים והעדפה לבניין מטופח.',
       budgetMax: 11200,
       desiredRooms: 2.5,
       moveInWindow: 'כניסה תוך 30 יום',
-      importantDetails: const [
-        'אישור הכנסה מוכן',
-        'שוכרת כבר 5 שנים רצוף',
-        'זמינה לסיור גם בערב',
-        'מחפשת חוזה לשנה לפחות',
-      ],
+      importantDetails: isOwner
+          ? const ['ניסיון בניהול נכסים', 'חוזה מסודר', 'תגובה מהירה']
+          : const [
+              'אישור הכנסה מוכן',
+              'שוכרת כבר 5 שנים רצוף',
+              'זמינה לסיור גם בערב',
+              'מחפשת חוזה לשנה לפחות',
+            ],
     );
     final propertyPool = _baseProperties.take(6).toList();
     if (propertyPool.length < 4) {
       _seedInitialState();
       _isGuestMode = true;
       _userRole = role;
+      _invalidateFilterCache();
       return;
     }
 
@@ -895,20 +1118,20 @@ class DatingProvider extends ChangeNotifier {
     };
     _filters = const SearchFilters(
       query: '',
-      maxBudget: 12000,
-      minRooms: 2,
+      maxBudget: 2000000000,
+      minRooms: 0,
       areaId: 'all_israel',
-      requiredFeatures: <String>{'מעלית'},
-      minSizeM2: 55,
-      maxSizeM2: 140,
+      requiredFeatures: <String>{},
+      minSizeM2: 0,
+      maxSizeM2: 1000000,
       propertyTypes: <String>{},
       conditions: <String>{},
       listingSource: ListingSourceFilter.any,
-      minFloor: 1,
-      moveInFilter: MoveInFilter.within30Days,
+      minFloor: 0,
+      moveInFilter: MoveInFilter.any,
       sortBy: SearchSortOption.bestMatch,
       city: '',
-      transactionType: TransactionTypeFilter.rent,
+      transactionType: TransactionTypeFilter.any,
     );
     _customProperties = [
       RentalProperty(
@@ -933,15 +1156,18 @@ class DatingProvider extends ChangeNotifier {
         features: ['מעלית', 'מרפסת', 'מזגן', 'חניה', 'אינטרנט כלול'],
         media: const [
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80',
             type: PropertyMediaType.image,
           ),
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1554995207-c18203ef2d6f?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1554995207-c18203ef2d6f?w=900&q=80',
             type: PropertyMediaType.image,
           ),
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=900&q=80',
             type: PropertyMediaType.image,
           ),
         ],
@@ -968,15 +1194,18 @@ class DatingProvider extends ChangeNotifier {
         features: ['חניה', 'מחסן', 'מעלית', 'מזגן', 'חיות מחמד מותר'],
         media: const [
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=900&q=80',
             type: PropertyMediaType.image,
           ),
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=900&q=80',
             type: PropertyMediaType.image,
           ),
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1615873968403-89e068629265?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1615873968403-89e068629265?w=900&q=80',
             type: PropertyMediaType.image,
           ),
         ],
@@ -1003,11 +1232,13 @@ class DatingProvider extends ChangeNotifier {
         features: ['מרפסת שמש', 'מזגן', 'אינטרנט כלול', 'ריהוט', 'גינה'],
         media: const [
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=80',
             type: PropertyMediaType.image,
           ),
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=900&q=80',
             type: PropertyMediaType.image,
           ),
         ],
@@ -1034,11 +1265,13 @@ class DatingProvider extends ChangeNotifier {
         features: ['מעלית', 'מזגן', 'חניה', 'ממ"ד', 'בריכה', 'חדר כושר'],
         media: const [
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1556020685-ae41abfc9365?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1556020685-ae41abfc9365?w=900&q=80',
             type: PropertyMediaType.image,
           ),
           PropertyMedia(
-            url: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=900&q=80',
+            url:
+                'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=900&q=80',
             type: PropertyMediaType.image,
           ),
         ],
@@ -1075,25 +1308,29 @@ class DatingProvider extends ChangeNotifier {
           ChatMessage(
             id: 'd1-2',
             sender: 'יואב כהן',
-            text: 'היי נועה, הדירה עדיין פנויה. נשמח לתאם סיור השבוע — איזה ימים מתאים לך?',
+            text:
+                'היי נועה, הדירה עדיין פנויה. נשמח לתאם סיור השבוע — איזה ימים מתאים לך?',
             createdAt: DateTime.now().subtract(const Duration(days: 17)),
           ),
           ChatMessage(
             id: 'd1-3',
             sender: tenant.name,
-            text: 'יום שלישי או רביעי ב-18:30 מצוין. שלחתי גם תלוש שכר ואישור הכנסה.',
+            text:
+                'יום שלישי או רביעי ב-18:30 מצוין. שלחתי גם תלוש שכר ואישור הכנסה.',
             createdAt: DateTime.now().subtract(const Duration(days: 16)),
           ),
           ChatMessage(
             id: 'd1-4',
             sender: 'יואב כהן',
-            text: 'קיבלתי, נראה מסודר מאוד. שלחתי חוזה לעיון — אפשר לחתום דיגיטלית דרך האפליקציה.',
+            text:
+                'קיבלתי, נראה מסודר מאוד. שלחתי חוזה לעיון — אפשר לחתום דיגיטלית דרך האפליקציה.',
             createdAt: DateTime.now().subtract(const Duration(days: 14)),
           ),
           ChatMessage(
             id: 'd1-5',
             sender: tenant.name,
-            text: 'קראתי את החוזה, הכל נראה טוב. שאלה אחת — מה הסיפור עם ועד הבית, האם זה כלול בשכירות?',
+            text:
+                'קראתי את החוזה, הכל נראה טוב. שאלה אחת — מה הסיפור עם ועד הבית, האם זה כלול בשכירות?',
             createdAt: DateTime.now().subtract(const Duration(hours: 5)),
           ),
         ],
@@ -1115,19 +1352,22 @@ class DatingProvider extends ChangeNotifier {
           ChatMessage(
             id: 'd2-2',
             sender: tenant.name,
-            text: 'שלום! ראיתי את הדירה ברמת גן — ממש מוצאת חן בעיניי. מה הסיפור עם החניה, מוצמדת לדירה?',
+            text:
+                'שלום! ראיתי את הדירה ברמת גן — ממש מוצאת חן בעיניי. מה הסיפור עם החניה, מוצמדת לדירה?',
             createdAt: DateTime.now().subtract(const Duration(days: 8)),
           ),
           ChatMessage(
             id: 'd2-3',
             sender: 'יואב כהן',
-            text: 'כן, חניה מוצמדת לדירה כלולה בשכירות. יש גם מחסן בקומת המרתף.',
+            text:
+                'כן, חניה מוצמדת לדירה כלולה בשכירות. יש גם מחסן בקומת המרתף.',
             createdAt: DateTime.now().subtract(const Duration(days: 7)),
           ),
           ChatMessage(
             id: 'd2-4',
             sender: tenant.name,
-            text: 'מעולה! אפשר לקבוע סיור לשבוע הבא? אנחנו שניים — אני ועוד שותפה.',
+            text:
+                'מעולה! אפשר לקבוע סיור לשבוע הבא? אנחנו שניים — אני ועוד שותפה.',
             createdAt: DateTime.now().subtract(const Duration(hours: 14)),
           ),
         ],
@@ -1149,7 +1389,8 @@ class DatingProvider extends ChangeNotifier {
           ChatMessage(
             id: 'd3-2',
             sender: tenant.name,
-            text: 'היי! האם המרפסת שבתמונה פרטית לגמרי לדירה, או שהיא משותפת עם הקומה?',
+            text:
+                'היי! האם המרפסת שבתמונה פרטית לגמרי לדירה, או שהיא משותפת עם הקומה?',
             createdAt: DateTime.now().subtract(const Duration(days: 2)),
           ),
         ],
@@ -1161,6 +1402,7 @@ class DatingProvider extends ChangeNotifier {
     _lastSeenMatchCount = 2;
     _isGuestMode = true;
     _userRole = role;
+    _invalidateCatalogCache();
   }
 
   void _hydrateFromState(Map<String, dynamic> storedState) {
@@ -1223,6 +1465,7 @@ class DatingProvider extends ChangeNotifier {
     );
     _lastSeenMatchCount = storedState['lastSeenMatchCount'] as int? ?? 0;
     _pendingMatchPropertyId = null;
+    _invalidateCatalogCache();
   }
 
   void _createMatch(RentalProperty property) {

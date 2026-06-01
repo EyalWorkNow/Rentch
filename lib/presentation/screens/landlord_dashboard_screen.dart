@@ -305,13 +305,20 @@ class _ProfileAvatar extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.4), width: 2),
       ),
       child: ClipOval(
-        child: photoUrl.isNotEmpty
-            ? Image.network(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Always-visible initials layer
+            _InitialsCircle(initials: initials),
+            // Photo on top — only when URL is available
+            if (photoUrl.isNotEmpty)
+              Image.network(
                 photoUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _InitialsCircle(initials: initials),
-              )
-            : _InitialsCircle(initials: initials),
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+          ],
+        ),
       ),
     );
   }
