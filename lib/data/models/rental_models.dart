@@ -332,6 +332,10 @@ class SearchArea {
   }
 }
 
+/// Feature tag priority in filters.
+/// [none] = unselected, [preferred] = nice-to-have (blue), [dealBreaker] = must-have (red).
+enum FeatureTagState { none, preferred, dealBreaker }
+
 class SearchFilters {
   const SearchFilters({
     required this.query,
@@ -339,6 +343,7 @@ class SearchFilters {
     required this.minRooms,
     required this.areaId,
     required this.requiredFeatures,
+    required this.preferredFeatures,
     required this.minSizeM2,
     required this.maxSizeM2,
     required this.propertyTypes,
@@ -348,14 +353,17 @@ class SearchFilters {
     required this.moveInFilter,
     required this.sortBy,
     this.city = '',
-    this.transactionType = TransactionTypeFilter.rent,
+    this.transactionType = TransactionTypeFilter.any,
   });
 
   final String query;
   final int maxBudget;
   final double minRooms;
   final String areaId;
+  /// Red tags — deal breakers. Properties missing any of these are excluded entirely.
   final Set<String> requiredFeatures;
+  /// Blue tags — nice-to-have preferences. Boost score proportionally.
+  final Set<String> preferredFeatures;
   final int minSizeM2;
   final int maxSizeM2;
   final Set<String> propertyTypes;
@@ -369,12 +377,37 @@ class SearchFilters {
 
   bool get hasQuery => query.trim().isNotEmpty;
 
+  /// Returns the [FeatureTagState] for a given feature tag.
+  FeatureTagState featureState(String feature) {
+    if (requiredFeatures.contains(feature)) return FeatureTagState.dealBreaker;
+    if (preferredFeatures.contains(feature)) return FeatureTagState.preferred;
+    return FeatureTagState.none;
+  }
+
+  /// Cycles tag through: none → preferred → dealBreaker → none.
+  SearchFilters cycleFeature(String feature) {
+    final state = featureState(feature);
+    final newPreferred = {...preferredFeatures};
+    final newRequired = {...requiredFeatures};
+    switch (state) {
+      case FeatureTagState.none:
+        newPreferred.add(feature);
+      case FeatureTagState.preferred:
+        newPreferred.remove(feature);
+        newRequired.add(feature);
+      case FeatureTagState.dealBreaker:
+        newRequired.remove(feature);
+    }
+    return copyWith(preferredFeatures: newPreferred, requiredFeatures: newRequired);
+  }
+
   SearchFilters copyWith({
     String? query,
     int? maxBudget,
     double? minRooms,
     String? areaId,
     Set<String>? requiredFeatures,
+    Set<String>? preferredFeatures,
     int? minSizeM2,
     int? maxSizeM2,
     Set<String>? propertyTypes,
@@ -392,6 +425,7 @@ class SearchFilters {
       minRooms: minRooms ?? this.minRooms,
       areaId: areaId ?? this.areaId,
       requiredFeatures: requiredFeatures ?? this.requiredFeatures,
+      preferredFeatures: preferredFeatures ?? this.preferredFeatures,
       minSizeM2: minSizeM2 ?? this.minSizeM2,
       maxSizeM2: maxSizeM2 ?? this.maxSizeM2,
       propertyTypes: propertyTypes ?? this.propertyTypes,
@@ -408,14 +442,17 @@ class SearchFilters {
   factory SearchFilters.fromJson(Map<String, dynamic> json) {
     return SearchFilters(
       query: json['query'] as String? ?? '',
-      maxBudget: json['maxBudget'] as int? ?? 9000,
-      minRooms: (json['minRooms'] as num? ?? 1).toDouble(),
+      maxBudget: json['maxBudget'] as int? ?? 2000000000,
+      minRooms: (json['minRooms'] as num? ?? 0).toDouble(),
       areaId: json['areaId'] as String? ?? 'all_israel',
       requiredFeatures: Set<String>.from(
         json['requiredFeatures'] as List<dynamic>? ?? const [],
       ),
+      preferredFeatures: Set<String>.from(
+        json['preferredFeatures'] as List<dynamic>? ?? const [],
+      ),
       minSizeM2: json['minSizeM2'] as int? ?? 0,
-      maxSizeM2: json['maxSizeM2'] as int? ?? 400,
+      maxSizeM2: json['maxSizeM2'] as int? ?? 1000000,
       propertyTypes: Set<String>.from(
         json['propertyTypes'] as List<dynamic>? ?? const [],
       ),
@@ -434,7 +471,7 @@ class SearchFilters {
       ),
       city: json['city'] as String? ?? '',
       transactionType: TransactionTypeFilter.values.byName(
-        json['transactionType'] as String? ?? TransactionTypeFilter.rent.name,
+        json['transactionType'] as String? ?? TransactionTypeFilter.any.name,
       ),
     );
   }
@@ -446,6 +483,7 @@ class SearchFilters {
       'minRooms': minRooms,
       'areaId': areaId,
       'requiredFeatures': requiredFeatures.toList(),
+      'preferredFeatures': preferredFeatures.toList(),
       'minSizeM2': minSizeM2,
       'maxSizeM2': maxSizeM2,
       'propertyTypes': propertyTypes.toList(),

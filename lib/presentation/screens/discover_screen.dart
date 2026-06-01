@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:dating_app/core/constants/app_colors.dart';
@@ -98,7 +99,7 @@ class DiscoverScreen extends StatelessWidget {
                             properties.isNotEmpty
                                 ? CardSwiper(
                                     key: ValueKey(
-                                      properties.map((p) => p.id).join('-'),
+                                      provider.filteredPropertiesRevision,
                                     ),
                                     controller:
                                         provider.propertySwiperController,
@@ -196,8 +197,6 @@ class DiscoverScreen extends StatelessWidget {
     );
   }
 }
-
-
 
 class _MatchCelebrationOverlay extends StatefulWidget {
   const _MatchCelebrationOverlay({required this.property});
@@ -381,44 +380,136 @@ class _FiltersSheet extends StatefulWidget {
 class _FiltersSheetState extends State<_FiltersSheet> {
   late final TextEditingController _queryCtrl;
   late final TextEditingController _locationCtrl;
-  Timer? _queryDebounce;
+  Timer? _previewDebounce;
+  late SearchFilters _draftFilters;
+  late final String _initialFiltersKey;
+  late int _visibleCount;
+  late List<RentalProperty> _markerPreview;
+  bool _didCommit = false;
 
   @override
   void initState() {
     super.initState();
+    _draftFilters = widget.provider.filters;
+    _initialFiltersKey = _filtersKey(_draftFilters);
+    final currentProperties = widget.provider.filteredProperties;
+    _visibleCount = currentProperties.length;
+    _markerPreview = currentProperties.take(18).toList();
     _queryCtrl = TextEditingController(text: widget.provider.filters.query);
     _locationCtrl = TextEditingController(text: widget.provider.filters.city);
   }
 
   @override
   void dispose() {
-    _queryDebounce?.cancel();
+    _commitDraftIfNeeded();
+    _previewDebounce?.cancel();
     _queryCtrl.dispose();
     _locationCtrl.dispose();
     super.dispose();
   }
 
   void _onQueryChanged(String value, DatingProvider provider) {
-    _queryDebounce?.cancel();
-    _queryDebounce = Timer(const Duration(milliseconds: 250), () {
-      provider.updateFilters(provider.filters.copyWith(query: value));
+    _setDraftFilters(_draftFilters.copyWith(query: value), provider);
+  }
+
+  void _setDraftFilters(SearchFilters filters, DatingProvider provider) {
+    setState(() => _draftFilters = filters);
+    _schedulePreviewRefresh(provider);
+  }
+
+  void _schedulePreviewRefresh(DatingProvider provider) {
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(const Duration(milliseconds: 160), () {
+      if (!mounted) return;
+      final count = provider.filteredCountFor(_draftFilters);
+      final markers = provider.previewFilteredProperties(_draftFilters);
+      if (!mounted) return;
+      setState(() {
+        _visibleCount = count;
+        _markerPreview = markers;
+      });
     });
   }
 
-  void _resetFilters(DatingProvider provider) {
-    setState(() {
-      _queryCtrl.clear();
-      _locationCtrl.clear();
+  String _filtersKey(SearchFilters filters) {
+    return jsonEncode({
+      ...filters.toJson(),
+      'requiredFeatures': filters.requiredFeatures.toList()..sort(),
+      'preferredFeatures': filters.preferredFeatures.toList()..sort(),
+      'propertyTypes': filters.propertyTypes.toList()..sort(),
+      'conditions': filters.conditions.toList()..sort(),
     });
-    FocusManager.instance.primaryFocus?.unfocus();
-    provider.updateFilters(const SearchFilters(
+  }
+
+  bool get _hasPendingChanges => _filtersKey(_draftFilters) != _initialFiltersKey;
+
+  void _commitDraftIfNeeded() {
+    if (_didCommit || !_hasPendingChanges) return;
+    _didCommit = true;
+    unawaited(widget.provider.updateFilters(_draftFilters));
+  }
+
+  Future<void> _editSliderValue({
+    required BuildContext context,
+    required String title,
+    required String initialValue,
+    required String suffix,
+    required TextInputType keyboardType,
+    required ValueChanged<String> onSubmitted,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            autofocus: true,
+            textAlign: TextAlign.right,
+            decoration: InputDecoration(
+              suffixText: suffix.isEmpty ? null : suffix,
+              hintText: 'הכנס מספר',
+            ),
+            onSubmitted: (submitted) => Navigator.of(dialogContext).pop(submitted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('ביטול'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: const Text('שמור'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (value == null) return;
+    onSubmitted(value);
+  }
+
+  void _resetFilters(DatingProvider provider) {
+    const resetFilters = SearchFilters(
       query: '',
-      maxBudget: 9000,
-      minRooms: 1,
+      maxBudget: 2000000000,
+      minRooms: 0,
       areaId: 'all_israel',
       requiredFeatures: <String>{},
+      preferredFeatures: <String>{},
       minSizeM2: 0,
-      maxSizeM2: 400,
+      maxSizeM2: 1000000,
       propertyTypes: <String>{},
       conditions: <String>{},
       listingSource: ListingSourceFilter.any,
@@ -426,15 +517,22 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       moveInFilter: MoveInFilter.any,
       sortBy: SearchSortOption.bestMatch,
       city: '',
-      transactionType: TransactionTypeFilter.rent,
-    ));
+      transactionType: TransactionTypeFilter.any,
+    );
+    setState(() {
+      _queryCtrl.clear();
+      _locationCtrl.clear();
+      _draftFilters = resetFilters;
+    });
+    FocusManager.instance.primaryFocus?.unfocus();
+    _schedulePreviewRefresh(provider);
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
-        final f = provider.filters;
+        final f = _draftFilters;
         final area = provider.searchAreas.firstWhere(
           (item) => item.id == f.areaId,
           orElse: () => provider.selectedArea,
@@ -513,7 +611,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          '${provider.filteredProperties.length} דירות',
+                          '$_visibleCount דירות',
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w900,
@@ -554,8 +652,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               icon: const Icon(IconsaxPlusBold.close_circle),
                               onPressed: () {
                                 setState(() => _queryCtrl.clear());
-                                provider.updateFilters(
-                                    provider.filters.copyWith(query: ''));
+                                _setDraftFilters(
+                                  f.copyWith(query: ''),
+                                  provider,
+                                );
                               },
                             )
                           : null,
@@ -563,7 +663,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1),
+                Container(
+                  height: 1,
+                  color: AppColors.borderLight.withValues(alpha: 0.8),
+                ),
                 // Scrollable content
                 Expanded(
                   child: ListView(
@@ -613,12 +716,13 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                         ? AppColors.primary
                                         : AppColors.borderLight),
                                 showCheckmark: false,
-                                onSelected: (_) => provider.updateFilters(
+                                onSelected: (_) => _setDraftFilters(
                                   f.copyWith(
                                     transactionType: type,
                                     maxBudget: _priceResetForTransaction(
                                         type, f.maxBudget),
                                   ),
+                                  provider,
                                 ),
                               ),
                             ),
@@ -628,30 +732,47 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       const SizedBox(height: 20),
                       // ── תקציב ──
                       _SliderField(
-                        label:
-                            f.transactionType == TransactionTypeFilter.sale
-                                ? 'מחיר קנייה מקסימלי'
-                                : 'תקציב שכירות מקסימלי',
+                        label: _priceFilterLabel(f.transactionType),
                         icon: IconsaxPlusBold.money,
                         value: f.maxBudget.toDouble(),
-                        min: f.transactionType == TransactionTypeFilter.sale
-                            ? 500000
-                            : 3000,
-                        max: f.transactionType == TransactionTypeFilter.sale
-                            ? 10000000
-                            : 18000,
-                        divisions:
-                            f.transactionType == TransactionTypeFilter.sale
-                                ? 95
-                                : 150,
+                        min: _priceSliderMin(f.transactionType),
+                        max: _priceSliderMax(f.transactionType),
+                        divisions: _priceSliderDivisions(f.transactionType),
                         displayValue: _formatCurrency(f.maxBudget),
-                        onChanged: (v) => provider.updateFilters(
+                        onValueTap: () => _editSliderValue(
+                          context: context,
+                          title: _priceFilterLabel(f.transactionType),
+                          initialValue: f.maxBudget.toString(),
+                          suffix: '₪',
+                          keyboardType: TextInputType.number,
+                          onSubmitted: (raw) {
+                            final parsed = int.tryParse(
+                              raw.replaceAll(RegExp(r'[^0-9]'), ''),
+                            );
+                            if (parsed == null) return;
+                            final clamped = _roundedPriceForTransaction(
+                              f.transactionType,
+                              parsed
+                                  .clamp(
+                                    _priceSliderMin(f.transactionType).round(),
+                                    _priceSliderMax(f.transactionType).round(),
+                                  )
+                                  .toDouble(),
+                            );
+                            _setDraftFilters(
+                              f.copyWith(maxBudget: clamped),
+                              provider,
+                            );
+                          },
+                        ),
+                        onChanged: (v) => _setDraftFilters(
                           f.copyWith(
-                            maxBudget: f.transactionType ==
-                                    TransactionTypeFilter.sale
-                                ? (v / 50000).round() * 50000
-                                : (v / 100).round() * 100,
+                            maxBudget: _roundedPriceForTransaction(
+                              f.transactionType,
+                              v,
+                            ),
                           ),
+                          provider,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -660,27 +781,54 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         label: 'מינימום חדרים',
                         icon: IconsaxPlusBold.home,
                         value: f.minRooms,
-                        min: 1,
+                        min: 0,
                         max: 6,
-                        divisions: 10,
-                        displayValue: f.minRooms % 1 == 0
-                            ? f.minRooms.toInt().toString()
-                            : '${f.minRooms}',
-                        onChanged: (v) => provider.updateFilters(
-                            f.copyWith(minRooms: (v * 2).round() / 2)),
+                        divisions: 12,
+                        displayValue: f.minRooms == 0
+                            ? 'ללא הגבלה'
+                            : f.minRooms % 1 == 0
+                                ? f.minRooms.toInt().toString()
+                                : '${f.minRooms}',
+                        onValueTap: () => _editSliderValue(
+                          context: context,
+                          title: 'מינימום חדרים',
+                          initialValue: f.minRooms == 0 ? '' : '${f.minRooms}',
+                          suffix: '',
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          onSubmitted: (raw) {
+                            final normalized = raw.trim().replaceAll(',', '.');
+                            final parsed = normalized.isEmpty
+                                ? 0.0
+                                : double.tryParse(normalized);
+                            if (parsed == null) return;
+                            final clamped =
+                                ((parsed.clamp(0, 6) * 2).round() / 2).toDouble();
+                            _setDraftFilters(
+                              f.copyWith(minRooms: clamped),
+                              provider,
+                            );
+                          },
+                        ),
+                        onChanged: (v) => _setDraftFilters(
+                          f.copyWith(minRooms: (v * 2).round() / 2),
+                          provider,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       // ── מיקום (עיר + אזור) ──
                       _FilterSection(
                         title: 'מיקום',
                         icon: IconsaxPlusBold.location,
-                        action: (f.city.isNotEmpty ||
-                                f.areaId != 'all_israel')
+                        action: (f.city.isNotEmpty || f.areaId != 'all_israel')
                             ? TextButton(
                                 onPressed: () {
                                   setState(() => _locationCtrl.clear());
-                                  provider.updateFilters(f.copyWith(
-                                      city: '', areaId: 'all_israel'));
+                                  _setDraftFilters(
+                                    f.copyWith(city: '', areaId: 'all_israel'),
+                                    provider,
+                                  );
                                 },
                                 style: TextButton.styleFrom(
                                   padding: EdgeInsets.zero,
@@ -704,15 +852,18 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                       const Icon(IconsaxPlusBold.close_circle),
                                   onPressed: () {
                                     setState(() => _locationCtrl.clear());
-                                    provider.updateFilters(f.copyWith(
-                                        city: '', areaId: 'all_israel'));
+                                    _setDraftFilters(
+                                      f.copyWith(city: '', areaId: 'all_israel'),
+                                      provider,
+                                    );
                                   },
                                 )
                               : null,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      if (locationQuery.isNotEmpty && locationSuggestions.isEmpty)
+                      if (locationQuery.isNotEmpty &&
+                          locationSuggestions.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 6),
                           child: Text(
@@ -724,7 +875,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             ),
                           ),
                         ),
-                      if (locationQuery.isNotEmpty && locationSuggestions.isNotEmpty)
+                      if (locationQuery.isNotEmpty &&
+                          locationSuggestions.isNotEmpty)
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -740,7 +892,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           ),
                           child: Column(
                             children: [
-                              for (var i = 0; i < locationSuggestions.length; i++)
+                              for (var i = 0;
+                                  i < locationSuggestions.length;
+                                  i++)
                                 _LocationSuggestionTile(
                                   suggestion: locationSuggestions[i],
                                   isSelected: locationSuggestions[i].isCity
@@ -755,16 +909,22 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                       _locationCtrl.text = suggestion.label;
                                     });
                                     if (suggestion.isCity) {
-                                      provider.updateFilters(f.copyWith(
+                                      _setDraftFilters(
+                                        f.copyWith(
                                         city: suggestion.label,
                                         areaId: 'all_israel',
-                                      ));
+                                        ),
+                                        provider,
+                                      );
                                       return;
                                     }
-                                    provider.updateFilters(f.copyWith(
-                                      city: '',
-                                      areaId: suggestion.area!.id,
-                                    ));
+                                    _setDraftFilters(
+                                      f.copyWith(
+                                        city: '',
+                                        areaId: suggestion.area!.id,
+                                      ),
+                                      provider,
+                                    );
                                   },
                                 ),
                             ],
@@ -777,10 +937,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         child: SizedBox(
                           height: 160,
                           child: FlutterMap(
+                            key: ValueKey('${f.areaId}-${f.city}'),
                             options: MapOptions(
                               initialCenter: area.center,
-                              initialZoom:
-                                  area.id == 'all_israel' ? 7.5 : 11,
+                              initialZoom: area.id == 'all_israel' ? 7.5 : 11,
                               interactionOptions: const InteractionOptions(
                                   flags: InteractiveFlag.none),
                             ),
@@ -802,8 +962,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 ],
                               ),
                               MarkerLayer(
-                                markers: provider.filteredProperties
-                                    .take(18)
+                                markers: _markerPreview
                                     .map((p) => Marker(
                                           point: p.point,
                                           width: 28,
@@ -821,8 +980,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       ),
                       const SizedBox(height: 20),
                       // ── מיון ──
-                      _FilterSection(
-                          title: 'מיון', icon: IconsaxPlusBold.sort),
+                      _FilterSection(title: 'מיון', icon: IconsaxPlusBold.sort),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
@@ -855,8 +1013,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     ? AppColors.primary
                                     : AppColors.borderLight),
                             showCheckmark: false,
-                            onSelected: (_) => provider.updateFilters(
-                                f.copyWith(sortBy: option)),
+                            onSelected: (_) => _setDraftFilters(
+                              f.copyWith(sortBy: option),
+                              provider,
+                            ),
                           );
                         }).toList(),
                       ),
@@ -870,12 +1030,40 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         max: 250,
                         divisions: 25,
                         displayValue: '${f.minSizeM2.round()} מ"ר',
+                        onValueTap: () => _editSliderValue(
+                          context: context,
+                          title: 'גודל מינימלי',
+                          initialValue: f.minSizeM2.toString(),
+                          suffix: 'מ"ר',
+                          keyboardType: TextInputType.number,
+                          onSubmitted: (raw) {
+                            final parsed = int.tryParse(
+                              raw.replaceAll(RegExp(r'[^0-9]'), ''),
+                            );
+                            if (parsed == null) return;
+                            final minSize = parsed.clamp(0, 250);
+                            final maxSize =
+                                f.maxSizeM2 < minSize ? minSize : f.maxSizeM2;
+                            _setDraftFilters(
+                              f.copyWith(
+                                minSizeM2: minSize,
+                                maxSizeM2: maxSize,
+                              ),
+                              provider,
+                            );
+                          },
+                        ),
                         onChanged: (value) {
                           final minSize = value.round();
                           final maxSize =
                               f.maxSizeM2 < minSize ? minSize : f.maxSizeM2;
-                          provider.updateFilters(f.copyWith(
-                              minSizeM2: minSize, maxSizeM2: maxSize));
+                          _setDraftFilters(
+                            f.copyWith(
+                              minSizeM2: minSize,
+                              maxSizeM2: maxSize,
+                            ),
+                            provider,
+                          );
                         },
                       ),
                       const SizedBox(height: 16),
@@ -884,15 +1072,49 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         icon: IconsaxPlusBold.maximize_4,
                         value: f.maxSizeM2.toDouble(),
                         min: 20,
-                        max: 400,
-                        divisions: 38,
-                        displayValue: '${f.maxSizeM2.round()} מ"ר',
+                        max: 1000000,
+                        divisions: 100,
+                        displayValue: f.maxSizeM2 >= 1000000
+                            ? 'ללא הגבלה'
+                            : '${f.maxSizeM2.round()} מ"ר',
+                        onValueTap: () => _editSliderValue(
+                          context: context,
+                          title: 'גודל מקסימלי',
+                          initialValue: f.maxSizeM2 >= 1000000
+                              ? ''
+                              : f.maxSizeM2.toString(),
+                          suffix: 'מ"ר',
+                          keyboardType: TextInputType.number,
+                          onSubmitted: (raw) {
+                            final parsed = raw.trim().isEmpty
+                                ? 1000000
+                                : int.tryParse(
+                                    raw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                  );
+                            if (parsed == null) return;
+                            final maxSize = parsed.clamp(20, 1000000);
+                            final minSize =
+                                f.minSizeM2 > maxSize ? maxSize : f.minSizeM2;
+                            _setDraftFilters(
+                              f.copyWith(
+                                minSizeM2: minSize,
+                                maxSizeM2: maxSize,
+                              ),
+                              provider,
+                            );
+                          },
+                        ),
                         onChanged: (value) {
                           final maxSize = value.round();
                           final minSize =
                               f.minSizeM2 > maxSize ? maxSize : f.minSizeM2;
-                          provider.updateFilters(f.copyWith(
-                              minSizeM2: minSize, maxSizeM2: maxSize));
+                          _setDraftFilters(
+                            f.copyWith(
+                              minSizeM2: minSize,
+                              maxSizeM2: maxSize,
+                            ),
+                            provider,
+                          );
                         },
                       ),
                       const SizedBox(height: 16),
@@ -907,8 +1129,29 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         displayValue: f.minFloor == 0
                             ? 'ללא הגבלה'
                             : 'קומה ${f.minFloor}+',
-                        onChanged: (value) => provider.updateFilters(
-                            f.copyWith(minFloor: value.round())),
+                        onValueTap: () => _editSliderValue(
+                          context: context,
+                          title: 'קומה מינימלית',
+                          initialValue: f.minFloor == 0 ? '' : '${f.minFloor}',
+                          suffix: '',
+                          keyboardType: TextInputType.number,
+                          onSubmitted: (raw) {
+                            final parsed = raw.trim().isEmpty
+                                ? 0
+                                : int.tryParse(
+                                    raw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                  );
+                            if (parsed == null) return;
+                            _setDraftFilters(
+                              f.copyWith(minFloor: parsed.clamp(0, 30)),
+                              provider,
+                            );
+                          },
+                        ),
+                        onChanged: (value) => _setDraftFilters(
+                          f.copyWith(minFloor: value.round()),
+                          provider,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       // ── סוג נכס ──
@@ -918,8 +1161,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children:
-                            provider.availablePropertyTypes.map((type) {
+                        children: provider.availablePropertyTypes.map((type) {
                           final selected = f.propertyTypes.contains(type);
                           return FilterChip(
                             selected: selected,
@@ -954,8 +1196,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               } else {
                                 types.remove(type);
                               }
-                              provider.updateFilters(
-                                  f.copyWith(propertyTypes: types));
+                              _setDraftFilters(
+                                f.copyWith(propertyTypes: types),
+                                provider,
+                              );
                             },
                           );
                         }).toList(),
@@ -963,14 +1207,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       const SizedBox(height: 20),
                       // ── מצב הנכס ──
                       _FilterSection(
-                          title: 'מצב הנכס',
-                          icon: IconsaxPlusBold.shield_tick),
+                          title: 'מצב הנכס', icon: IconsaxPlusBold.shield_tick),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children:
-                            provider.availableConditions.map((condition) {
+                        children: provider.availableConditions.map((condition) {
                           final selected = f.conditions.contains(condition);
                           return FilterChip(
                             selected: selected,
@@ -1005,8 +1247,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               } else {
                                 conds.remove(condition);
                               }
-                              provider.updateFilters(
-                                  f.copyWith(conditions: conds));
+                              _setDraftFilters(
+                                f.copyWith(conditions: conds),
+                                provider,
+                              );
                             },
                           );
                         }).toList(),
@@ -1048,8 +1292,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     ? AppColors.primary
                                     : AppColors.borderLight),
                             showCheckmark: false,
-                            onSelected: (_) => provider.updateFilters(
-                                f.copyWith(listingSource: source)),
+                            onSelected: (_) => _setDraftFilters(
+                              f.copyWith(listingSource: source),
+                              provider,
+                            ),
                           );
                         }).toList(),
                       ),
@@ -1090,8 +1336,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     ? AppColors.primary
                                     : AppColors.borderLight),
                             showCheckmark: false,
-                            onSelected: (_) => provider.updateFilters(
-                                f.copyWith(moveInFilter: option)),
+                            onSelected: (_) => _setDraftFilters(
+                              f.copyWith(moveInFilter: option),
+                              provider,
+                            ),
                           );
                         }).toList(),
                       ),
@@ -1099,59 +1347,61 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מאפיינים ──
                       _FilterSection(
                           title: 'מאפיינים חשובים',
-                          icon: IconsaxPlusBold.filter),
-                      const SizedBox(height: 10),
+                          icon: IconsaxPlusBold.filter,
+                          action: _FeatureTagLegend()),
+                      const SizedBox(height: 6),
+                      // Legend hint
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            _TagStateDot(color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text('מועדף',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 12),
+                            _TagStateDot(color: AppColors.coral),
+                            const SizedBox(width: 4),
+                            Text('חייב להיות (deal breaker)',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: provider.availableFeatures
-                            .take(16)
-                            .map((feature) {
-                          final sel = f.requiredFeatures.contains(feature);
-                          return FilterChip(
-                            selected: sel,
-                            label: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_featureIcon(feature),
-                                    size: 13,
-                                    color:
-                                        sel ? Colors.white : AppColors.navy),
-                                const SizedBox(width: 4),
-                                Text(feature),
-                              ],
-                            ),
-                            labelStyle: TextStyle(
-                              color: sel ? Colors.white : AppColors.navy,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.primaryLight2,
-                            side: BorderSide(
-                                color: sel
-                                    ? AppColors.primary
-                                    : AppColors.borderLight),
-                            showCheckmark: false,
-                            onSelected: (v) {
-                              final feats = {...f.requiredFeatures};
-                              if (v) {
-                                feats.add(feature);
-                              } else {
-                                feats.remove(feature);
-                              }
-                              provider.updateFilters(
-                                  f.copyWith(requiredFeatures: feats));
+                        children:
+                            provider.availableFeatures.take(16).map((feature) {
+                          final state = f.featureState(feature);
+                          return _TriStateFeatureChip(
+                            feature: feature,
+                            state: state,
+                            icon: _featureIcon(feature),
+                            onTap: () {
+                              _setDraftFilters(
+                                f.cycleFeature(feature),
+                                provider,
+                              );
                             },
                           );
                         }).toList(),
                       ),
                       const SizedBox(height: 24),
                       FilledButton.icon(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () {
+                          _didCommit = true;
+                          unawaited(provider.updateFilters(_draftFilters));
+                          Navigator.of(context).pop();
+                        },
                         icon: const Icon(IconsaxPlusBold.tick_circle),
                         label: Text(
-                            'הצג ${provider.filteredProperties.length} דירות'),
+                            'הצג $_visibleCount דירות'),
                       ),
                     ],
                   ),
@@ -1196,6 +1446,112 @@ class _FilterSection extends StatelessWidget {
   }
 }
 
+/// Small colored dot used in the legend row.
+class _TagStateDot extends StatelessWidget {
+  const _TagStateDot({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+/// Empty widget placeholder (legend is inline now).
+class _FeatureTagLegend extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
+/// Tri-state feature chip: none → preferred (blue) → dealBreaker (red) → none.
+///
+/// Cycle on tap — each state has its own color, icon, and border.
+class _TriStateFeatureChip extends StatelessWidget {
+  const _TriStateFeatureChip({
+    required this.feature,
+    required this.state,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String feature;
+  final FeatureTagState state;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor;
+    final Color textColor;
+    final Color borderColor;
+    final IconData? trailingIcon;
+
+    switch (state) {
+      case FeatureTagState.none:
+        bgColor     = AppColors.primaryLight2;
+        textColor   = AppColors.navy;
+        borderColor = AppColors.borderLight;
+        trailingIcon = null;
+      case FeatureTagState.preferred:
+        bgColor     = AppColors.primary;
+        textColor   = Colors.white;
+        borderColor = AppColors.primary;
+        trailingIcon = Icons.favorite_rounded; // heart — nice to have
+      case FeatureTagState.dealBreaker:
+        bgColor     = AppColors.coral;
+        textColor   = Colors.white;
+        borderColor = AppColors.coral;
+        trailingIcon = Icons.priority_high_rounded; // exclamation — must have
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: borderColor, width: 1.5),
+          boxShadow: state != FeatureTagState.none
+              ? [
+                  BoxShadow(
+                    color: bgColor.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: textColor),
+            const SizedBox(width: 4),
+            Text(
+              feature,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+            if (trailingIcon != null) ...[
+              const SizedBox(width: 4),
+              Icon(trailingIcon, size: 11, color: textColor.withValues(alpha: 0.85)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SliderField extends StatelessWidget {
   const _SliderField({
     required this.label,
@@ -1205,6 +1561,7 @@ class _SliderField extends StatelessWidget {
     required this.divisions,
     required this.displayValue,
     required this.onChanged,
+    this.onValueTap,
     this.icon,
   });
 
@@ -1215,6 +1572,7 @@ class _SliderField extends StatelessWidget {
   final int divisions;
   final String displayValue;
   final ValueChanged<double> onChanged;
+  final VoidCallback? onValueTap;
   final IconData? icon;
 
   @override
@@ -1236,12 +1594,39 @@ class _SliderField extends StatelessWidget {
                   color: AppColors.navy),
             ),
             const Spacer(),
-            Text(
-              displayValue,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w900,
-                fontSize: 15,
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onValueTap,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        displayValue,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        IconsaxPlusBold.edit_2,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -1678,9 +2063,8 @@ class _LocationSuggestionTile extends StatelessWidget {
                   isSelected
                       ? IconsaxPlusBold.tick_circle
                       : IconsaxPlusBold.arrow_left_2,
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
+                  color:
+                      isSelected ? AppColors.primary : AppColors.textSecondary,
                   size: 18,
                 ),
               ],
@@ -1719,14 +2103,74 @@ IconData _transactionTypeIcon(TransactionTypeFilter type) {
   }
 }
 
+String _priceFilterLabel(TransactionTypeFilter type) {
+  switch (type) {
+    case TransactionTypeFilter.any:
+      return 'מחיר מקסימלי';
+    case TransactionTypeFilter.rent:
+      return 'תקציב שכירות מקסימלי';
+    case TransactionTypeFilter.sale:
+      return 'מחיר קנייה מקסימלי';
+  }
+}
+
 int? _priceResetForTransaction(TransactionTypeFilter type, int currentBudget) {
-  if (type == TransactionTypeFilter.sale && currentBudget <= 100000) {
+  if (type == TransactionTypeFilter.any) {
+    return 2000000000;
+  }
+  if (type == TransactionTypeFilter.sale &&
+      (currentBudget <= 100000 || currentBudget > 10000000)) {
     return 10000000;
   }
-  if (type == TransactionTypeFilter.rent && currentBudget > 100000) {
+  if (type == TransactionTypeFilter.rent &&
+      (currentBudget < 3000 || currentBudget > 18000)) {
     return 9000;
   }
   return null;
+}
+
+double _priceSliderMin(TransactionTypeFilter type) {
+  switch (type) {
+    case TransactionTypeFilter.any:
+      return 0;
+    case TransactionTypeFilter.rent:
+      return 3000;
+    case TransactionTypeFilter.sale:
+      return 500000;
+  }
+}
+
+double _priceSliderMax(TransactionTypeFilter type) {
+  switch (type) {
+    case TransactionTypeFilter.any:
+      return 2000000000;
+    case TransactionTypeFilter.rent:
+      return 18000;
+    case TransactionTypeFilter.sale:
+      return 10000000;
+  }
+}
+
+int _priceSliderDivisions(TransactionTypeFilter type) {
+  switch (type) {
+    case TransactionTypeFilter.any:
+      return 200;
+    case TransactionTypeFilter.rent:
+      return 150;
+    case TransactionTypeFilter.sale:
+      return 95;
+  }
+}
+
+int _roundedPriceForTransaction(TransactionTypeFilter type, double value) {
+  switch (type) {
+    case TransactionTypeFilter.any:
+      return (value / 10000000).round() * 10000000;
+    case TransactionTypeFilter.rent:
+      return (value / 100).round() * 100;
+    case TransactionTypeFilter.sale:
+      return (value / 50000).round() * 50000;
+  }
 }
 
 String _moveInLabel(MoveInFilter option) {
