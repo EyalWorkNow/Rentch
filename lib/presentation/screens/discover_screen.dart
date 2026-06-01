@@ -1469,7 +1469,8 @@ class _FeatureTagLegend extends StatelessWidget {
 
 /// Tri-state feature chip: none → preferred (blue) → dealBreaker (red) → none.
 ///
-/// Cycle on tap — each state has its own color, icon, and border.
+/// Uses [FilterChip] internally so its [InkResponse] always wins the gesture
+/// arena inside scrollable sheets — [GestureDetector] loses to scroll on 2nd tap.
 class _TriStateFeatureChip extends StatelessWidget {
   const _TriStateFeatureChip({
     required this.feature,
@@ -1485,68 +1486,47 @@ class _TriStateFeatureChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color bgColor;
-    final Color textColor;
-    final Color borderColor;
-    final IconData? trailingIcon;
+    final bool isActive = state != FeatureTagState.none;
+    final bool isDeal   = state == FeatureTagState.dealBreaker;
 
-    switch (state) {
-      case FeatureTagState.none:
-        bgColor     = AppColors.primaryLight2;
-        textColor   = AppColors.navy;
-        borderColor = AppColors.borderLight;
-        trailingIcon = null;
-      case FeatureTagState.preferred:
-        bgColor     = AppColors.primary;
-        textColor   = Colors.white;
-        borderColor = AppColors.primary;
-        trailingIcon = Icons.favorite_rounded; // heart — nice to have
-      case FeatureTagState.dealBreaker:
-        bgColor     = AppColors.coral;
-        textColor   = Colors.white;
-        borderColor = AppColors.coral;
-        trailingIcon = Icons.priority_high_rounded; // exclamation — must have
-    }
+    final Color activeColor = isDeal ? AppColors.coral : AppColors.primary;
+    final Color labelColor  = isActive ? Colors.white : AppColors.navy;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: borderColor, width: 1.5),
-          boxShadow: state != FeatureTagState.none
-              ? [
-                  BoxShadow(
-                    color: bgColor.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: textColor),
-            const SizedBox(width: 4),
-            Text(
-              feature,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-            if (trailingIcon != null) ...[
-              const SizedBox(width: 4),
-              Icon(trailingIcon, size: 11, color: textColor.withValues(alpha: 0.85)),
-            ],
+    return FilterChip(
+      selected: isActive,
+      // Ignore the bool — always cycle through our tri-state logic.
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: activeColor,
+      backgroundColor: AppColors.primaryLight2,
+      side: BorderSide(
+        color: isActive ? activeColor : AppColors.borderLight,
+        width: 1.5,
+      ),
+      elevation: isActive ? 2 : 0,
+      shadowColor: isActive ? activeColor.withValues(alpha: 0.4) : Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: labelColor),
+          const SizedBox(width: 4),
+          Text(feature),
+          if (state == FeatureTagState.preferred) ...[
+            const SizedBox(width: 3),
+            Icon(Icons.favorite_rounded, size: 11, color: Colors.white70),
           ],
-        ),
+          if (state == FeatureTagState.dealBreaker) ...[
+            const SizedBox(width: 3),
+            Icon(Icons.priority_high_rounded, size: 11, color: Colors.white70),
+          ],
+        ],
+      ),
+      labelStyle: TextStyle(
+        color: labelColor,
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
       ),
     );
   }
