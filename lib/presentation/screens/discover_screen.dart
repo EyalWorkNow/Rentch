@@ -386,12 +386,8 @@ class _FiltersSheet extends StatefulWidget {
 }
 
 class _FiltersSheetState extends State<_FiltersSheet> {
-  static const Duration _doubleTapWindow = Duration(milliseconds: 240);
-
   late final TextEditingController _locationCtrl;
   Timer? _previewDebounce;
-  Timer? _pendingPriorityTimer;
-  String? _pendingPriorityKey;
   late SearchFilters _draftFilters;
   late final String _initialFiltersKey;
   late int _visibleCount;
@@ -413,7 +409,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   void dispose() {
     _commitDraftIfNeeded();
     _previewDebounce?.cancel();
-    _pendingPriorityTimer?.cancel();
     _locationCtrl.dispose();
     super.dispose();
   }
@@ -458,42 +453,21 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     unawaited(widget.provider.updateFilters(_draftFilters));
   }
 
+  /// Cycles tag priority: none → preferred (blue) → required (red) → none.
+  /// Simple sequential cycling — no timer, no double-tap window.
   void _handlePriorityTap({
     required String key,
     required FilterPriority current,
     required ValueChanged<FilterPriority> onSelected,
   }) {
-    if (current == FilterPriority.required) {
-      _pendingPriorityTimer?.cancel();
-      _pendingPriorityKey = null;
-      onSelected(FilterPriority.none);
-      return;
+    switch (current) {
+      case FilterPriority.none:
+        onSelected(FilterPriority.preferred);
+      case FilterPriority.preferred:
+        onSelected(FilterPriority.required);
+      case FilterPriority.required:
+        onSelected(FilterPriority.none);
     }
-
-    if (current == FilterPriority.preferred && _pendingPriorityKey == key) {
-      _pendingPriorityTimer?.cancel();
-      _pendingPriorityKey = null;
-      onSelected(FilterPriority.required);
-      return;
-    }
-
-    _pendingPriorityTimer?.cancel();
-    _pendingPriorityKey = key;
-
-    if (current == FilterPriority.none) {
-      onSelected(FilterPriority.preferred);
-      _pendingPriorityTimer = Timer(_doubleTapWindow, () {
-        if (!mounted || _pendingPriorityKey != key) return;
-        _pendingPriorityKey = null;
-      });
-      return;
-    }
-
-    _pendingPriorityTimer = Timer(_doubleTapWindow, () {
-      if (!mounted || _pendingPriorityKey != key) return;
-      _pendingPriorityKey = null;
-      onSelected(FilterPriority.none);
-    });
   }
 
   Future<void> _editSliderValue({
@@ -1353,7 +1327,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── סוג נכס ──
                       _FilterSection(
                           title: 'סוג נכס', icon: IconsaxPlusBold.building),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
+                      const _PriorityLegend(),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1378,7 +1353,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מצב הנכס ──
                       _FilterSection(
                           title: 'מצב הנכס', icon: IconsaxPlusBold.shield_tick),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
+                      const _PriorityLegend(),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1491,38 +1467,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מאפיינים ──
                       _FilterSection(
                           title: 'מאפיינים חשובים',
-                          icon: IconsaxPlusBold.filter,
-                          action: _FeatureTagLegend()),
+                          icon: IconsaxPlusBold.filter),
                       const SizedBox(height: 6),
-                      // Legend hint
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            _TagStateDot(color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'טאפ: מועדף',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _TagStateDot(color: AppColors.coral),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'דאבל טאפ: חייב להיות',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      const _PriorityLegend(),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1599,28 +1546,45 @@ class _FilterSection extends StatelessWidget {
   }
 }
 
-/// Small colored dot used in the legend row.
-class _TagStateDot extends StatelessWidget {
-  const _TagStateDot({required this.color});
-  final Color color;
+/// Legend explaining the tri-state tap behaviour, shown below every tag section header.
+class _PriorityLegend extends StatelessWidget {
+  const _PriorityLegend();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    const textStyle = TextStyle(
+      fontSize: 11,
+      color: AppColors.textSecondary,
+      fontWeight: FontWeight.w600,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 10, height: 10,
+            decoration: const BoxDecoration(
+              color: AppColors.primary, shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Text('טאפ: מועדף', style: textStyle),
+          const SizedBox(width: 14),
+          Container(
+            width: 10, height: 10,
+            decoration: const BoxDecoration(
+              color: AppColors.coral, shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Text('טאפ שני: חייב להיות', style: textStyle),
+        ],
+      ),
     );
   }
 }
 
-/// Empty widget placeholder (legend is inline now).
-class _FeatureTagLegend extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-/// Priority chip: preferred on tap, required on double tap.
+/// Priority chip: none → preferred (blue) → required (red) → none.
 ///
 /// Uses [FilterChip] internally so its [InkResponse] always wins the gesture
 /// arena inside scrollable sheets — [GestureDetector] loses to scroll on 2nd tap.
