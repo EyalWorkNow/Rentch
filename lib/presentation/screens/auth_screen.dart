@@ -223,10 +223,10 @@ class _LogoHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 36, bottom: 20),
+      padding: const EdgeInsets.only(top: 14, bottom: 8),
       child: SizedBox(
         width: double.infinity,
-        height: 60,
+        height: 48,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -234,8 +234,8 @@ class _LogoHeader extends StatelessWidget {
               Positioned(
                 right: 0,
                 child: Container(
-                  width: 42,
-                  height: 42,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
@@ -243,20 +243,20 @@ class _LogoHeader extends StatelessWidget {
                   ),
                   child: IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 20, color: AppColors.navy),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.navy),
                     onPressed: onBack,
                   ),
                 ),
               ),
             SvgPicture.asset(
               'assets/images/rentch_logo_with_text.svg',
-              height: 44,
+              height: 34,
               colorFilter:
                   const ColorFilter.mode(AppColors.navy, BlendMode.srcIn),
               placeholderBuilder: (_) => const Text('Rentch',
                   style: TextStyle(
                       color: AppColors.navy,
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -1)),
             ),
@@ -1209,135 +1209,6 @@ class _RegisterFlowState extends State<_RegisterFlow> {
     );
     return agreed ?? false;
   }
-}
-
-// ─── Eula Sheet ───────────────────────────────────────────────────────────────
-
-class _EulaSheet extends StatelessWidget {
-  const _EulaSheet({required this.onAccept, required this.onDecline});
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipPath(
-      clipper: _DomeClipper(),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(24, 60, 24, 28 + MediaQuery.of(context).padding.bottom),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x1F000000),
-              blurRadius: 30,
-              offset: Offset(0, -10),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Title
-            const Text(
-              'תנאי השימוש ב-Rentch',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 14),
-            // Scrollable terms content
-            SizedBox(
-              height: 200,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'ברוך הבא ל-Rentch!\nבשימוש באפליקציה אתה מסכים לתנאים הבאים:',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    _EulaSection(
-                      title: '1. תוכן הולם',
-                      body: 'אין לפרסם תוכן פוגעני, גזעני, מיני, מאיים או כל תוכן שפוגע בזכויות אחרים.',
-                    ),
-                    _EulaSection(
-                      title: '2. ללא אלימות ואיום',
-                      body: 'כל צורה של הטרדה, איום, בריונות או התנהגות פוגענית אסורה לחלוטין.',
-                    ),
-                    _EulaSection(
-                      title: '3. דיווח תוכן',
-                      body: 'משתמשים יכולים לדווח על תוכן שפוגע בהנחיות. נטפל בכל דיווח תוך 24 שעות.',
-                    ),
-                    _EulaSection(
-                      title: '4. חסימת משתמשים',
-                      body: 'ניתן לחסום כל משתמש שמתנהג בצורה לא הולמת.',
-                    ),
-                    _EulaSection(
-                      title: '5. פרטיות',
-                      body: 'אנו מכבדים את פרטיותך. המידע ישמש לצורך התאמת נכסים בלבד.',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Actions
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onDecline,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                    child: const Text(
-                      'ביטול',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: onAccept,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                    child: const Text(
-                      'אני מסכים/ה',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
@@ -1520,15 +1391,131 @@ class _EulaSheet extends StatelessWidget {
         Padding(
           padding: EdgeInsets.fromLTRB(
               22, 4, 22, 14 + MediaQuery.of(context).padding.bottom),
-          child: _NavButtons(
-            nextLabel: _nextLabel,
-            loading: _loading,
-            onPrev: _step > 0 ? _prev : null,
-            onNext: _next,
-            onSkip: isOptionalStep ? _submit : null,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _NavButtons(
+                nextLabel: _nextLabel,
+                loading: _loading,
+                onPrev: _step > 0 ? _prev : null,
+                onNext: _next,
+                onSkip: isOptionalStep ? _submit : null,
+              ),
+              if (_step == 0) ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('כבר יש לך חשבון? ',
+                          style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500)),
+                      GestureDetector(
+                        onTap: widget.onSwitchToLogin,
+                        child: const Text('התחברות',
+                            style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Eula Sheet ───────────────────────────────────────────────────────────────
+
+class _EulaSheet extends StatelessWidget {
+  const _EulaSheet({required this.onAccept, required this.onDecline});
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipPath(
+      clipper: _DomeClipper(),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(24, 60, 24, 28 + MediaQuery.of(context).padding.bottom),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(color: Color(0x1F000000), blurRadius: 30, offset: Offset(0, -10)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'תנאי השימוש ב-Rentch',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 200,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'ברוך הבא ל-Rentch!\nבשימוש באפליקציה אתה מסכים לתנאים הבאים:',
+                      style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800, fontSize: 14, height: 1.4),
+                    ),
+                    SizedBox(height: 12),
+                    _EulaSection(title: '1. תוכן הולם', body: 'אין לפרסם תוכן פוגעני, גזעני, מיני, מאיים או כל תוכן שפוגע בזכויות אחרים.'),
+                    _EulaSection(title: '2. ללא אלימות ואיום', body: 'כל צורה של הטרדה, איום, בריונות או התנהגות פוגענית אסורה לחלוטין.'),
+                    _EulaSection(title: '3. דיווח תוכן', body: 'משתמשים יכולים לדווח על תוכן שפוגע בהנחיות. נטפל בכל דיווח תוך 24 שעות.'),
+                    _EulaSection(title: '4. חסימת משתמשים', body: 'ניתן לחסום כל משתמש שמתנהג בצורה לא הולמת.'),
+                    _EulaSection(title: '5. פרטיות', body: 'אנו מכבדים את פרטיותך. המידע ישמש לצורך התאמת נכסים בלבד.'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onDecline,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    ),
+                    child: const Text('ביטול', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onAccept,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    ),
+                    child: const Text('אני מסכים/ה', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1848,7 +1835,7 @@ class _StepEmailPassword extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1858,21 +1845,21 @@ class _StepEmailPassword extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: AppColors.navy,
-                fontSize: 28,
+                fontSize: 26,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.5),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const Text(
             'מלאו את שמכם המלא, אימייל וסיסמה כדי להירשם ולהתחיל.',
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 14,
-                height: 1.4,
+                fontSize: 13,
+                height: 1.3,
                 fontWeight: FontWeight.w500),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
 
           // Social buttons
           _SocialRow(
@@ -1881,34 +1868,34 @@ class _StepEmailPassword extends StatelessWidget {
             onGoogle: onGoogle,
             onApple: onApple,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           const _OrDivider(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
           // Name
           const _FieldLabel(label: 'שם מלא'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           _CleanTextField(
             controller: nameCtrl,
             hint: 'שם ושם משפחה',
             textCapitalization: TextCapitalization.words,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Email
           const _FieldLabel(label: 'כתובת אימייל'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           _CleanTextField(
             controller: emailCtrl,
             hint: 'name@example.com',
             keyboardType: TextInputType.emailAddress,
             textDirection: TextDirection.ltr,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Password
           const _FieldLabel(label: 'סיסמה'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           _CleanTextField(
             controller: passwordCtrl,
             obscureText: obscure,
@@ -1924,7 +1911,7 @@ class _StepEmailPassword extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
 
           // Terms toggle
           Row(
@@ -1933,8 +1920,8 @@ class _StepEmailPassword extends StatelessWidget {
                 onTap: onToggleTerms,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6),
                     color: agreedToTerms ? AppColors.primary : Colors.white,
@@ -1947,7 +1934,7 @@ class _StepEmailPassword extends StatelessWidget {
                   ),
                   child: agreedToTerms
                       ? const Icon(Icons.check_rounded,
-                          size: 13, color: Colors.white)
+                          size: 12, color: Colors.white)
                       : null,
                 ),
               ),
@@ -1978,29 +1965,6 @@ class _StepEmailPassword extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 24),
-
-          // Switch to login
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('כבר יש לך חשבון? ',
-                    style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500)),
-                GestureDetector(
-                  onTap: onSwitchToLogin,
-                  child: const Text('התחברות',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800)),
-                ),
-              ],
-            ),
           ),
         ],
       ),
