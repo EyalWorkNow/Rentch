@@ -10,21 +10,47 @@ from pathlib import Path
 
 
 FEATURES = {
-    "parking": "חניה",
-    "safe_room": "ממ\"ד",
-    "air_conditioning": "מזגן",
-    "renovated": "משופצת",
-    "bars": "סורגים",
-    "for_roommates": "מתאימה לשותפים",
-    "bomb_shelter": "מקלט",
-    "elevator": "מעלית",
-    "balcony": "מרפסת",
-    "storeroom": "מחסן",
-    "handicapped_access": "גישה לנכים",
-    "furnished": "מרוהטת",
-    "pets_allowed": "חיות מחמד",
-    "floor_level_shelter": "מרחב מוגן קומתי",
+    "parking": ("parking", "חניה"),
+    "safe_room": ("mamad", "ממ\"ד"),
+    "air_conditioning": ("airConditioning", "מזגן"),
+    "renovated": ("renovated", "משופצת"),
+    "bars": ("bars", "סורגים"),
+    "for_roommates": ("roommates", "מתאימה לשותפים"),
+    "bomb_shelter": ("bombShelter", "מקלט"),
+    "elevator": ("elevator", "מעלית"),
+    "balcony": ("balcony", "מרפסת"),
+    "storeroom": ("storage", "מחסן"),
+    "handicapped_access": ("accessible", "נגישות לנכים"),
+    "furnished": ("furnished", "מרוהטת"),
+    "pets_allowed": ("petsAllowed", "חיות מחמד מותר"),
+    "floor_level_shelter": ("safeFloorSpace", "מרחב מוגן קומתי"),
 }
+
+CANONICAL_FEATURES = [
+    "balcony",
+    "parking",
+    "storage",
+    "airConditioning",
+    "mamad",
+    "sunBalcony",
+    "garden",
+    "elevator",
+    "furnished",
+    "internetIncluded",
+    "equippedKitchen",
+    "petsAllowed",
+    "laundryIncluded",
+    "security",
+    "accessible",
+    "sharedRoof",
+    "pool",
+    "gym",
+    "bars",
+    "renovated",
+    "roommates",
+    "bombShelter",
+    "safeFloorSpace",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -129,18 +155,48 @@ def parse_transaction_type(value: str | None) -> str:
     return "sale" if (value or "").strip().lower() == "sale" else "rent"
 
 
+def normalize_entry_date(value: str | None) -> str:
+    value = (value or "").strip()
+    if not value:
+        return ""
+    return value.split(" ")[0]
+
+
+def build_feature_payload(row: dict[str, str]) -> tuple[dict[str, bool], list[str]]:
+    feature_flags = {key: False for key in CANONICAL_FEATURES}
+    feature_labels: list[str] = []
+    for csv_key, (flag_key, label) in FEATURES.items():
+        if not parse_bool(row.get(csv_key)):
+            continue
+        feature_flags[flag_key] = True
+        if label not in feature_labels:
+            feature_labels.append(label)
+    return feature_flags, feature_labels
+
+
 def convert_row(row: dict[str, str]) -> dict[str, object] | None:
     price = parse_int(row.get("price"), default=0)
     if price <= 0:
         return None
 
-    features = [
-        label for key, label in FEATURES.items() if parse_bool(row.get(key))
-    ]
+    feature_flags, feature_labels = build_feature_payload(row)
     media = [
         {"url": image_url, "type": "image"}
         for image_url in parse_images(row.get("image_urls"))
     ]
+    transaction_type = parse_transaction_type(row.get("transaction_type"))
+    entry_date = normalize_entry_date(row.get("entry_date"))
+    price_history = (
+        [
+            {
+                "date": entry_date,
+                "price": price,
+                "transactionType": transaction_type,
+            }
+        ]
+        if entry_date
+        else []
+    )
 
     return {
         "propertyId": row["id"].strip(),
@@ -159,13 +215,49 @@ def convert_row(row: dict[str, str]) -> dict[str, object] | None:
         "propertyType": (row.get("property_type") or "דירה").strip(),
         "entryDate": (row.get("entry_date") or "").strip(),
         "condition": (row.get("condition") or "").strip(),
-        "features": json.dumps(features, ensure_ascii=False),
+        "features": json.dumps(feature_flags, ensure_ascii=False),
+        "featureLabels": json.dumps(feature_labels, ensure_ascii=False),
         "media": json.dumps(media, ensure_ascii=False),
         "status": "active",
         "sourceUrl": (row.get("url") or "").strip(),
         "ownerName": (row.get("contact_name") or "בעל הנכס").strip(),
         "agencyListing": 1 if parse_bool(row.get("agency_listing")) else 0,
-        "transactionType": parse_transaction_type(row.get("transaction_type")),
+        "transactionType": transaction_type,
+        "model3d": json.dumps(
+            {
+                "viewerUrl": "",
+                "glbUrl": "",
+                "objUrl": "",
+                "textureFolder": "",
+                "floorPlanUrl": "",
+                "modelQualityScore": None,
+                "scanDate": None,
+            },
+            ensure_ascii=False,
+        ),
+        "legal": json.dumps(
+            {
+                "thirdPartyTransferAllowed": False,
+                "commercialSaleAllowed": False,
+                "aiTrainingAllowed": False,
+                "consentVersion": "",
+                "consentTimestamp": None,
+                "consentSource": "external_import",
+            },
+            ensure_ascii=False,
+        ),
+        "priceHistory": json.dumps(price_history, ensure_ascii=False),
+        "marketSignals": json.dumps(
+            {
+                "views": 0,
+                "likes": 0,
+                "saves": 0,
+                "skips": 0,
+                "contactRequests": 0,
+                "avgTimeIn3dSeconds": 0,
+            },
+            ensure_ascii=False,
+        ),
     }
 
 

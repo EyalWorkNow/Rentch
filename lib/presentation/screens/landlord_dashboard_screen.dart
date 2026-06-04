@@ -3,9 +3,6 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
-import 'package:dating_app/presentation/screens/explore_screen.dart';
-import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
-import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +11,16 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 
 class LandlordDashboardScreen extends StatelessWidget {
-  const LandlordDashboardScreen({super.key});
+  const LandlordDashboardScreen({
+    super.key,
+    required this.onOpenSwipes,
+    required this.onOpenMatches,
+    required this.onOpenProperties,
+  });
+
+  final VoidCallback onOpenSwipes;
+  final VoidCallback onOpenMatches;
+  final VoidCallback onOpenProperties;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +32,7 @@ class LandlordDashboardScreen extends StatelessWidget {
         final photoUrl = profile?.photoUrl ?? '';
         final matches = provider.matches.take(3).toList();
         final properties = provider.myProperties;
+        final heroMedia = _landlordHeroMedia(properties);
         final pendingCount = stats.pendingCount;
         final unseenCount = provider.unseenMatchCount;
 
@@ -33,8 +40,7 @@ class LandlordDashboardScreen extends StatelessWidget {
           return const Scaffold(
             backgroundColor: AppColors.background,
             body: Center(
-                child:
-                    CircularProgressIndicator(color: AppColors.primary)),
+                child: CircularProgressIndicator(color: AppColors.primary)),
           );
         }
 
@@ -55,6 +61,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                   background: _HeroBackground(
                     name: landlordName,
                     photoUrl: photoUrl,
+                    heroMedia: heroMedia,
                     stats: stats,
                     pendingCount: pendingCount,
                     unseenCount: unseenCount,
@@ -64,8 +71,7 @@ class LandlordDashboardScreen extends StatelessWidget {
 
               // ── Main content ─────────────────────────────────────────
               SliverPadding(
-                padding:
-                    const EdgeInsets.fromLTRB(16, 20, 16, 120),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     // Pipeline visualizer
@@ -73,10 +79,8 @@ class LandlordDashboardScreen extends StatelessWidget {
                       leadsCount: provider.ownerLeads.length,
                       matchesCount: stats.matchesCount,
                       propertiesCount: stats.propertiesCount,
-                      onLeads: () =>
-                          _push(context, const ExploreScreen()),
-                      onMatches: () =>
-                          _push(context, const MatchesScreen()),
+                      onLeads: onOpenSwipes,
+                      onMatches: onOpenMatches,
                     ),
                     const SizedBox(height: 20),
 
@@ -84,14 +88,11 @@ class LandlordDashboardScreen extends StatelessWidget {
                     _QuickActionsGrid(
                       pendingCount: pendingCount,
                       unseenCount: unseenCount,
-                      onAddProperty: () => _push(
-                          context, const AddPropertyScreen()),
-                      onSwipes: () =>
-                          _push(context, const ExploreScreen()),
-                      onMatches: () =>
-                          _push(context, const MatchesScreen()),
-                      onProperties: () => _push(
-                          context, const LandlordPropertiesScreen()),
+                      onAddProperty: () =>
+                          _push(context, const AddPropertyScreen()),
+                      onSwipes: onOpenSwipes,
+                      onMatches: onOpenMatches,
+                      onProperties: onOpenProperties,
                     ),
                     const SizedBox(height: 20),
 
@@ -99,6 +100,8 @@ class LandlordDashboardScreen extends StatelessWidget {
                     _ActivitySection(
                       provider: provider,
                       context: context,
+                      onOpenSwipes: onOpenSwipes,
+                      onOpenMatches: onOpenMatches,
                     ),
                     const SizedBox(height: 20),
 
@@ -107,14 +110,12 @@ class LandlordDashboardScreen extends StatelessWidget {
                       _SectionHeader(
                         title: 'התאמות פעילות',
                         subtitle: 'שיחות שמצפות לטיפול',
-                        onSeeAll: () =>
-                            _push(context, const MatchesScreen()),
+                        onSeeAll: onOpenMatches,
                       ),
                       const SizedBox(height: 12),
                       ...matches.map(
                         (m) => Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 12),
                           child: _MatchRow(
                             match: m,
                             provider: provider,
@@ -129,8 +130,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                       _SectionHeader(
                         title: 'הנכסים שלי',
                         subtitle: '${properties.length} נכסים פעילים',
-                        onSeeAll: () =>
-                            _push(context, const LandlordPropertiesScreen()),
+                        onSeeAll: onOpenProperties,
                       ),
                       const SizedBox(height: 12),
                       _PropertiesScroll(
@@ -140,8 +140,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                       ),
                     ] else ...[
                       _EmptyPropertiesCard(
-                        onAdd: () => _push(
-                            context, const AddPropertyScreen()),
+                        onAdd: () => _push(context, const AddPropertyScreen()),
                       ),
                     ],
                   ]),
@@ -155,8 +154,7 @@ class LandlordDashboardScreen extends StatelessWidget {
   }
 
   void _push(BuildContext context, Widget screen) {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => screen));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 }
 
@@ -166,6 +164,7 @@ class _HeroBackground extends StatelessWidget {
   const _HeroBackground({
     required this.name,
     required this.photoUrl,
+    required this.heroMedia,
     required this.stats,
     required this.pendingCount,
     required this.unseenCount,
@@ -173,9 +172,160 @@ class _HeroBackground extends StatelessWidget {
 
   final String name;
   final String photoUrl;
+  final PropertyMedia? heroMedia;
   final LandlordStats stats;
   final int pendingCount;
   final int unseenCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _LandlordHeroBackdrop(heroMedia: heroMedia),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF06243A).withValues(alpha: 0.46),
+                const Color(0xFF06243A).withValues(alpha: 0.84),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _ProfileAvatar(photoUrl: photoUrl, name: name),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'שלום, $name 👋',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          pendingCount > 0
+                              ? '$pendingCount מועמדים מחכים לאישור'
+                              : 'הכל תחת שליטה',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (unseenCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(IconsaxPlusBold.message,
+                              size: 12, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$unseenCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const Spacer(),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _HeroStatPill(
+                      label: '${stats.propertiesCount} דירות',
+                      icon: IconsaxPlusBold.building,
+                    ),
+                    const SizedBox(width: 8),
+                    _HeroStatPill(
+                      label: '${stats.pendingCount} ממתינים',
+                      icon: IconsaxPlusBold.profile_2user,
+                      highlight: pendingCount > 0,
+                    ),
+                    const SizedBox(width: 8),
+                    _HeroStatPill(
+                      label: '${stats.matchesCount} מאצ\'ים',
+                      icon: IconsaxPlusBold.heart,
+                    ),
+                    const SizedBox(width: 8),
+                    _HeroStatPill(
+                      label: '${stats.conversionRate.round()}% המרה',
+                      icon: IconsaxPlusBold.chart_2,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+PropertyMedia? _landlordHeroMedia(List<RentalProperty> properties) {
+  for (final property in properties) {
+    final media = property.primaryMedia;
+    if (media != null) return media;
+  }
+  return null;
+}
+
+class _LandlordHeroBackdrop extends StatelessWidget {
+  const _LandlordHeroBackdrop({required this.heroMedia});
+
+  final PropertyMedia? heroMedia;
+
+  @override
+  Widget build(BuildContext context) {
+    if (heroMedia != null) {
+      return SafeMedia(
+        media: heroMedia!,
+        fit: BoxFit.cover,
+        fallback: const _HeroBackdropFallback(),
+        videoMode: SafeVideoDisplayMode.playback,
+      );
+    }
+    return const _HeroBackdropFallback();
+  }
+}
+
+class _HeroBackdropFallback extends StatelessWidget {
+  const _HeroBackdropFallback();
 
   @override
   Widget build(BuildContext context) {
@@ -187,97 +337,30 @@ class _HeroBackground extends StatelessWidget {
           end: Alignment.bottomLeft,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              _ProfileAvatar(photoUrl: photoUrl, name: name),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'שלום, $name 👋',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      pendingCount > 0
-                          ? '$pendingCount מועמדים מחכים לאישור'
-                          : 'הכל תחת שליטה',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+          Positioned(
+            top: -24,
+            right: -18,
+            child: Container(
+              width: 170,
+              height: 170,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
               ),
-              if (unseenCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(IconsaxPlusBold.message,
-                          size: 12, color: Colors.white),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$unseenCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+            ),
           ),
-          const Spacer(),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _HeroStatPill(
-                  label: '${stats.propertiesCount} דירות',
-                  icon: IconsaxPlusBold.building,
-                ),
-                const SizedBox(width: 8),
-                _HeroStatPill(
-                  label: '${stats.pendingCount} ממתינים',
-                  icon: IconsaxPlusBold.profile_2user,
-                  highlight: pendingCount > 0,
-                ),
-                const SizedBox(width: 8),
-                _HeroStatPill(
-                  label: '${stats.matchesCount} מאצ\'ים',
-                  icon: IconsaxPlusBold.heart,
-                ),
-                const SizedBox(width: 8),
-                _HeroStatPill(
-                  label: '${stats.conversionRate.round()}% המרה',
-                  icon: IconsaxPlusBold.chart_2,
-                ),
-              ],
+          Positioned(
+            bottom: -40,
+            left: -16,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.10),
+              ),
             ),
           ),
         ],
@@ -294,15 +377,20 @@ class _ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final initials = name.trim().isNotEmpty
-        ? name.trim().split(' ').map((w) => w.isEmpty ? '' : w[0]).take(2).join()
+        ? name
+            .trim()
+            .split(' ')
+            .map((w) => w.isEmpty ? '' : w[0])
+            .take(2)
+            .join()
         : '?';
     return Container(
       width: 48,
       height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-            color: Colors.white.withValues(alpha: 0.4), width: 2),
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
       ),
       child: ClipOval(
         child: Stack(
@@ -367,8 +455,7 @@ class _HeroStatPill extends StatelessWidget {
             : Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
         border: highlight
-            ? Border.all(
-                color: const Color(0xFFFFD166).withValues(alpha: 0.5))
+            ? Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.5))
             : null,
       ),
       child: Row(
@@ -423,9 +510,7 @@ class _PipelineCard extends StatelessWidget {
         border: Border.all(color: AppColors.borderLight),
         boxShadow: const [
           BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 20,
-              offset: Offset(0, 8)),
+              color: AppColors.shadow, blurRadius: 20, offset: Offset(0, 8)),
         ],
       ),
       child: Column(
@@ -433,8 +518,7 @@ class _PipelineCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(IconsaxPlusBold.chart_2,
-                  size: 16, color: AppColors.primary),
+              Icon(IconsaxPlusBold.chart_2, size: 16, color: AppColors.primary),
               SizedBox(width: 7),
               Text(
                 'משפך שכירות',
@@ -526,9 +610,8 @@ class _PipelineStage extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(16),
-        border: tappable
-            ? Border.all(color: color.withValues(alpha: 0.2))
-            : null,
+        border:
+            tappable ? Border.all(color: color.withValues(alpha: 0.2)) : null,
       ),
       child: Column(
         children: [
@@ -574,8 +657,7 @@ class _PipelineStage extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  Icon(IconsaxPlusBold.arrow_left,
-                      size: 10, color: color),
+                  Icon(IconsaxPlusBold.arrow_left, size: 10, color: color),
                 ],
               ),
             ),
@@ -600,8 +682,7 @@ class _PipelineArrow extends StatelessWidget {
 }
 
 class _PipelineProgressBar extends StatelessWidget {
-  const _PipelineProgressBar(
-      {required this.leads, required this.matches});
+  const _PipelineProgressBar({required this.leads, required this.matches});
   final int leads;
   final int matches;
 
@@ -785,10 +866,9 @@ class _QABtn extends StatelessWidget {
                     top: -4,
                     right: -4,
                     child: Container(
-                      constraints: const BoxConstraints(
-                          minWidth: 16, minHeight: 16),
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 3),
+                      constraints:
+                          const BoxConstraints(minWidth: 16, minHeight: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
                       decoration: BoxDecoration(
                         color: color == AppColors.coral
                             ? AppColors.navy
@@ -831,10 +911,16 @@ class _QABtn extends StatelessWidget {
 // ─── Activity Feed ────────────────────────────────────────────────────────────
 
 class _ActivitySection extends StatelessWidget {
-  const _ActivitySection(
-      {required this.provider, required this.context});
+  const _ActivitySection({
+    required this.provider,
+    required this.context,
+    required this.onOpenSwipes,
+    required this.onOpenMatches,
+  });
   final DatingProvider provider;
   final BuildContext context;
+  final VoidCallback onOpenSwipes;
+  final VoidCallback onOpenMatches;
 
   List<_ActivityItem> _buildItems() {
     final items = <_ActivityItem>[];
@@ -850,9 +936,7 @@ class _ActivitySection extends StatelessWidget {
             '${leads.length} ${leads.length == 1 ? 'שוכר מעוניין' : 'שוכרים מעוניינים'} בנכסים שלך',
         subtitle: 'ממתינים לאישור — ככל שתגיב מהר יותר, כך טוב יותר',
         cta: 'לסוויפ',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ExploreScreen()),
-        ),
+        onTap: onOpenSwipes,
       ));
     }
 
@@ -863,9 +947,7 @@ class _ActivitySection extends StatelessWidget {
         title: '$unseen הודעות שלא נקראו',
         subtitle: 'שוכרים שכבר אישרת ממתינים לתגובה שלך',
         cta: 'לשיחות',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const MatchesScreen()),
-        ),
+        onTap: onOpenMatches,
       ));
     }
 
@@ -927,8 +1009,7 @@ class _ActivitySection extends StatelessWidget {
           child: Column(
             children: items.asMap().entries.map((e) {
               final isLast = e.key == items.length - 1;
-              return _ActivityRow(
-                  item: e.value, isLast: isLast);
+              return _ActivityRow(item: e.value, isLast: isLast);
             }).toList(),
           ),
         ),
@@ -967,20 +1048,17 @@ class _ActivityRow extends StatelessWidget {
           onTap: item.onTap,
           borderRadius: BorderRadius.circular(22),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 Container(
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color:
-                        item.color.withValues(alpha: 0.1),
+                    color: item.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(item.icon,
-                      color: item.color, size: 19),
+                  child: Icon(item.icon, color: item.color, size: 19),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1011,13 +1089,11 @@ class _ActivityRow extends StatelessWidget {
                 if (item.cta != null) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: item.color
-                          .withValues(alpha: 0.1),
-                      borderRadius:
-                          BorderRadius.circular(10),
+                      color: item.color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       item.cta!,
@@ -1031,8 +1107,7 @@ class _ActivityRow extends StatelessWidget {
                 ] else
                   Icon(IconsaxPlusBold.arrow_left,
                       size: 14,
-                      color: AppColors.textSecondary
-                          .withValues(alpha: 0.4)),
+                      color: AppColors.textSecondary.withValues(alpha: 0.4)),
               ],
             ),
           ),
@@ -1123,14 +1198,12 @@ class _MatchRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final property = provider.propertyById(match.propertyId);
     if (property == null) return const SizedBox.shrink();
-    final lastMsg =
-        match.messages.isNotEmpty ? match.messages.last.text : null;
+    final lastMsg = match.messages.isNotEmpty ? match.messages.last.text : null;
     final status = _status(match);
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-            builder: (_) => MessageScreen(matchId: match.id)),
+        MaterialPageRoute(builder: (_) => MessageScreen(matchId: match.id)),
       ),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -1188,9 +1261,7 @@ class _MatchRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _StatusBadge(
-                          label: status.label,
-                          color: status.color),
+                      _StatusBadge(label: status.label, color: status.color),
                     ],
                   ),
                   const SizedBox(height: 3),
@@ -1209,8 +1280,7 @@ class _MatchRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -1260,8 +1330,8 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-            color: color, fontSize: 10, fontWeight: FontWeight.w800),
+        style:
+            TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -1282,7 +1352,7 @@ class _PropertiesScroll extends StatelessWidget {
   @override
   Widget build(BuildContext outerContext) {
     return SizedBox(
-      height: 178,
+      height: 188,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1292,8 +1362,7 @@ class _PropertiesScroll extends StatelessWidget {
           property: properties[i],
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) =>
-                  EditPropertyScreen(property: properties[i]),
+              builder: (_) => EditPropertyScreen(property: properties[i]),
             ),
           ),
         ),
@@ -1303,8 +1372,7 @@ class _PropertiesScroll extends StatelessWidget {
 }
 
 class _PropertyMiniCard extends StatelessWidget {
-  const _PropertyMiniCard(
-      {required this.property, required this.onTap});
+  const _PropertyMiniCard({required this.property, required this.onTap});
   final RentalProperty property;
   final VoidCallback onTap;
 
@@ -1328,7 +1396,7 @@ class _PropertyMiniCard extends StatelessWidget {
             children: [
               // Image
               SizedBox(
-                height: 90,
+                height: 86,
                 child: media != null
                     ? SafeMedia(
                         media: media,
@@ -1352,7 +1420,7 @@ class _PropertyMiniCard extends StatelessWidget {
               ),
               // Details
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -1365,7 +1433,7 @@ class _PropertyMiniCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.navy,
-                        fontSize: 12.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1376,7 +1444,7 @@ class _PropertyMiniCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1476,8 +1544,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
           20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
@@ -1509,8 +1576,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) =>
-                    EditPropertyScreen(property: property),
+                builder: (_) => EditPropertyScreen(property: property),
               ));
             },
           ),
@@ -1528,25 +1594,19 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(22)),
                   title: const Text('הסרת נכס',
                       style: TextStyle(
-                          color: AppColors.navy,
-                          fontWeight: FontWeight.w900)),
-                  content: const Text(
-                      'האם אתה בטוח שברצונך להסיר נכס זה?',
-                      style: TextStyle(
-                          color: AppColors.textSecondary)),
+                          color: AppColors.navy, fontWeight: FontWeight.w900)),
+                  content: const Text('האם אתה בטוח שברצונך להסיר נכס זה?',
+                      style: TextStyle(color: AppColors.textSecondary)),
                   actions: [
                     TextButton(
-                      onPressed: () =>
-                          Navigator.pop(ctx, false),
+                      onPressed: () => Navigator.pop(ctx, false),
                       child: const Text('ביטול',
-                          style: TextStyle(
-                              color: AppColors.textSecondary)),
+                          style: TextStyle(color: AppColors.textSecondary)),
                     ),
                     FilledButton(
                       style: FilledButton.styleFrom(
                           backgroundColor: AppColors.coral),
-                      onPressed: () =>
-                          Navigator.pop(ctx, true),
+                      onPressed: () => Navigator.pop(ctx, true),
                       child: const Text('הסר'),
                     ),
                   ],
@@ -1594,8 +1654,7 @@ class _SheetTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         child: Row(
           children: [
             Container(
@@ -1611,9 +1670,8 @@ class _SheetTile extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: color == AppColors.coral
-                    ? AppColors.coral
-                    : AppColors.navy,
+                color:
+                    color == AppColors.coral ? AppColors.coral : AppColors.navy,
                 fontWeight: FontWeight.w700,
                 fontSize: 14.5,
               ),

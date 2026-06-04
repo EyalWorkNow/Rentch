@@ -6,20 +6,46 @@ from pathlib import Path
 
 
 FEATURES = {
-    "parking": "חניה",
-    "safe_room": "ממ״ד",
-    "air_conditioning": "מזגן",
-    "renovated": "משופצת",
-    "bars": "סורגים",
-    "for_roommates": "מתאימה לשותפים",
-    "bomb_shelter": "מקלט",
-    "elevator": "מעלית",
+    "parking": ("parking", "חניה"),
+    "safe_room": ("mamad", "ממ\"ד"),
+    "air_conditioning": ("airConditioning", "מזגן"),
+    "renovated": ("renovated", "משופצת"),
+    "bars": ("bars", "סורגים"),
+    "for_roommates": ("roommates", "מתאימה לשותפים"),
+    "bomb_shelter": ("bombShelter", "מקלט"),
+    "elevator": ("elevator", "מעלית"),
+    "balcony": ("balcony", "מרפסת"),
+    "storeroom": ("storage", "מחסן"),
+    "handicapped_access": ("accessible", "נגישות לנכים"),
+    "furnished": ("furnished", "מרוהטת"),
+    "pets_allowed": ("petsAllowed", "חיות מחמד מותר"),
+    "floor_level_shelter": ("safeFloorSpace", "מרחב מוגן קומתי"),
+}
+
+CANONICAL_FEATURES = {
     "balcony": "מרפסת",
-    "storeroom": "מחסן",
-    "handicapped_access": "גישה לנכים",
-    "furnished": "מרוהטת",
-    "pets_allowed": "חיות מחמד",
-    "floor_level_shelter": "מרחב מוגן קומתי",
+    "parking": "חניה",
+    "storage": "מחסן",
+    "airConditioning": "מזגן",
+    "mamad": "ממ\"ד",
+    "sunBalcony": "מרפסת שמש",
+    "garden": "גינה",
+    "elevator": "מעלית",
+    "furnished": "ריהוט",
+    "internetIncluded": "אינטרנט כלול",
+    "equippedKitchen": "מטבח מאובזר",
+    "petsAllowed": "חיות מחמד מותר",
+    "laundryIncluded": "כביסה כלולה",
+    "security": "שומר/אבטחה",
+    "accessible": "נגישות לנכים",
+    "sharedRoof": "גג משותף",
+    "pool": "בריכה",
+    "gym": "חדר כושר",
+    "bars": "סורגים",
+    "renovated": "משופצת",
+    "roommates": "מתאימה לשותפים",
+    "bombShelter": "מקלט",
+    "safeFloorSpace": "מרחב מוגן קומתי",
 }
 
 
@@ -64,17 +90,49 @@ def normalize_transaction_type(value):
     return "sale" if (value or "").strip().lower() == "sale" else "rent"
 
 
+def normalize_entry_date(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    return value.split(" ")[0]
+
+
+def build_feature_payload(row):
+    feature_flags = {key: False for key in CANONICAL_FEATURES}
+    feature_labels = []
+    for csv_key, (flag_key, label) in FEATURES.items():
+        if not parse_bool(row.get(csv_key)):
+            continue
+        feature_flags[flag_key] = True
+        if label not in feature_labels:
+            feature_labels.append(label)
+    return feature_flags, feature_labels
+
+
 def convert_row(row):
     price = parse_int(row.get("price"), default=0)
     if price <= 0:
         return None
 
-    features = [
-        label for key, label in FEATURES.items() if parse_bool(row.get(key))
-    ]
+    feature_flags, feature_labels = build_feature_payload(row)
     street_number = parse_int(row.get("street_number"), default=-1)
+    images = parse_images(row.get("image_urls"))
+    entry_date = normalize_entry_date(row.get("entry_date"))
+    transaction_type = normalize_transaction_type(row.get("transaction_type"))
+    price_history = (
+        [
+            {
+                "date": entry_date,
+                "price": price,
+                "transactionType": transaction_type,
+            }
+        ]
+        if entry_date
+        else []
+    )
     return {
         "id": row["id"].strip(),
+        "sourceUrl": row.get("url", "").strip(),
         "url": row.get("url", "").strip(),
         "price": price,
         "rooms": parse_float(row.get("rooms")),
@@ -92,11 +150,40 @@ def convert_row(row):
         "condition": (row.get("condition") or "").strip(),
         "ownerName": (row.get("contact_name") or "בעל הנכס").strip(),
         "agencyListing": parse_bool(row.get("agency_listing")),
-        "features": features,
-        "imageUrls": parse_images(row.get("image_urls")),
-        "transactionType": normalize_transaction_type(
-            row.get("transaction_type")
-        ),
+        "features": feature_flags,
+        "featureLabels": feature_labels,
+        "media": [
+            {"url": image_url, "type": "image"}
+            for image_url in images
+        ],
+        "imageUrls": images,
+        "transactionType": transaction_type,
+        "model3d": {
+            "viewerUrl": "",
+            "glbUrl": "",
+            "objUrl": "",
+            "textureFolder": "",
+            "floorPlanUrl": "",
+            "modelQualityScore": None,
+            "scanDate": None,
+        },
+        "legal": {
+            "thirdPartyTransferAllowed": False,
+            "commercialSaleAllowed": False,
+            "aiTrainingAllowed": False,
+            "consentVersion": "",
+            "consentTimestamp": None,
+            "consentSource": "external_import",
+        },
+        "priceHistory": price_history,
+        "marketSignals": {
+            "views": 0,
+            "likes": 0,
+            "saves": 0,
+            "skips": 0,
+            "contactRequests": 0,
+            "avgTimeIn3dSeconds": 0,
+        },
     }
 
 

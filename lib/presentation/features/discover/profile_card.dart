@@ -30,13 +30,31 @@ class _ProfileCardState extends State<ProfileCard> {
 
   RentalProperty get p => widget.property;
 
+  @override
+  void didUpdateWidget(covariant ProfileCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.property.id != widget.property.id) {
+      _currentImage = 0;
+      return;
+    }
+    _currentImage = _safeImageIndex(_currentImage);
+  }
+
+  int _safeImageIndex(int index) {
+    final mediaLength = p.media.length;
+    if (mediaLength <= 0) return 0;
+    return index.clamp(0, mediaLength - 1).toInt();
+  }
+
   void _prevImage() {
-    if (_currentImage > 0) setState(() => _currentImage--);
+    final current = _safeImageIndex(_currentImage);
+    if (current > 0) setState(() => _currentImage = current - 1);
   }
 
   void _nextImage() {
-    if (_currentImage < p.media.length - 1) {
-      setState(() => _currentImage++);
+    final current = _safeImageIndex(_currentImage);
+    if (current < p.media.length - 1) {
+      setState(() => _currentImage = current + 1);
     }
   }
 
@@ -53,6 +71,15 @@ class _ProfileCardState extends State<ProfileCard> {
     await showPropertyShareSheet(context, p);
   }
 
+  Future<void> _showMoreOptions(BuildContext context) async {
+    HapticFeedback.selectionClick();
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MoreOptionsSheet(property: p),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DatingProvider>();
@@ -60,6 +87,8 @@ class _ProfileCardState extends State<ProfileCard> {
     final isPassing = widget.horizontalOffsetPercentage < -10;
     final media = p.media;
     final hasMultiple = media.length > 1;
+    final safeCurrentImage = _safeImageIndex(_currentImage);
+    final currentMedia = media.isNotEmpty ? media[safeCurrentImage] : null;
     final score = provider.matchScore(p);
     final priceCtx = provider.priceContext(p);
 
@@ -81,8 +110,10 @@ class _ProfileCardState extends State<ProfileCard> {
                 ],
               ),
               child: _CardImage(
-                key: ValueKey<int>(_currentImage),
-                media: media.isNotEmpty ? media[_currentImage] : null,
+                key: ValueKey<String>(
+                  '${p.id}:$safeCurrentImage:${currentMedia?.url ?? 'empty'}',
+                ),
+                media: currentMedia,
                 city: p.city,
               ),
             ),
@@ -110,25 +141,28 @@ class _ProfileCardState extends State<ProfileCard> {
                   children: [
                     Expanded(
                       flex: 55,
-                      child: Row(
-                        children: [
-                          // Left tap → prev
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: _prevImage,
-                              behavior: HitTestBehavior.translucent,
-                              child: const SizedBox.expand(),
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Row(
+                          children: [
+                            // Left tap -> prev
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _prevImage,
+                                behavior: HitTestBehavior.translucent,
+                                child: const SizedBox.expand(),
+                              ),
                             ),
-                          ),
-                          // Right tap → next
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: _nextImage,
-                              behavior: HitTestBehavior.translucent,
-                              child: const SizedBox.expand(),
+                            // Right tap -> next
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _nextImage,
+                                behavior: HitTestBehavior.translucent,
+                                child: const SizedBox.expand(),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const Expanded(flex: 45, child: SizedBox.shrink()),
@@ -156,9 +190,13 @@ class _ProfileCardState extends State<ProfileCard> {
               child: Row(
                 children: [
                   _AgencyBadge(agencyListing: p.agencyListing),
+                  if (p.hasReadyVirtualTour) ...[
+                    const SizedBox(width: 8),
+                    const _TourReadyBadge(),
+                  ],
                   const Spacer(),
                   if (hasMultiple) ...[
-                    _ImageDots(count: media.length, current: _currentImage),
+                    _ImageDots(count: media.length, current: safeCurrentImage),
                     const SizedBox(width: 8),
                   ],
                   GestureDetector(
@@ -174,6 +212,23 @@ class _ProfileCardState extends State<ProfileCard> {
                         IconsaxPlusBold.send_2,
                         color: Colors.white,
                         size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _showMoreOptions(context),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.more_vert,
+                        color: Colors.white,
+                        size: 18,
                       ),
                     ),
                   ),
@@ -212,14 +267,21 @@ class _ProfileCardState extends State<ProfileCard> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        '${p.priceLabel} ${p.priceSuffixLabel}',
-                        style: const TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.1,
-                          letterSpacing: -0.5,
+                      Expanded(
+                        child: FittedBox(
+                          alignment: AlignmentDirectional.centerStart,
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${p.priceLabel} ${p.priceSuffixLabel}',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 1.1,
+                              letterSpacing: 0,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -480,6 +542,37 @@ class _AgencyBadge extends StatelessWidget {
   }
 }
 
+class _TourReadyBadge extends StatelessWidget {
+  const _TourReadyBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.navy.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.view_in_ar_rounded, color: Colors.white, size: 13),
+          SizedBox(width: 5),
+          Text(
+            '3D',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SwipeBadge extends StatelessWidget {
   const _SwipeBadge({required this.label, required this.color});
   final String label;
@@ -619,6 +712,160 @@ class _PriceContextBadge extends StatelessWidget {
           fontWeight: FontWeight.w800,
         ),
       ),
+    );
+  }
+}
+
+class _MoreOptionsSheet extends StatelessWidget {
+  const _MoreOptionsSheet({required this.property});
+  final RentalProperty property;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.read<DatingProvider>();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C2B3A),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _OptionTile(
+            icon: Icons.flag_outlined,
+            label: 'דיווח על מודעה',
+            onTap: () {
+              Navigator.pop(context);
+              _showReportDialog(context, provider);
+            },
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          _OptionTile(
+            icon: Icons.block,
+            label: 'חסום משתמש זה',
+            color: const Color(0xFFE74C3C),
+            onTap: () {
+              Navigator.pop(context);
+              _showBlockConfirm(context, provider);
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  void _showReportDialog(BuildContext context, DatingProvider provider) {
+    final reasons = [
+      'מידע שגוי',
+      'תמונות מזויפות',
+      'תוכן פוגעני',
+      'הונאה',
+      'אחר',
+    ];
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1C2B3A),
+          title:
+              const Text('סיבת הדיווח', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: reasons.map((reason) {
+              return ListTile(
+                title:
+                    Text(reason, style: const TextStyle(color: Colors.white70)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await provider.reportProperty(property.id, reason);
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('הדיווח נשלח. תודה.')),
+                    );
+                  }
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBlockConfirm(BuildContext context, DatingProvider provider) {
+    final ownerName = property.ownerName;
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: const Color(0xFF1C2B3A),
+          title:
+              const Text('חסימת משתמש', style: TextStyle(color: Colors.white)),
+          content: Text(
+            'האם לחסום את "$ownerName"? כל המודעות שלהם יוסרו מהעדכון שלך.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child:
+                  const Text('ביטול', style: TextStyle(color: Colors.white54)),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await provider.blockOwner(ownerName);
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('"$ownerName" נחסם בהצלחה.')),
+                  );
+                }
+              },
+              child: const Text('חסום',
+                  style: TextStyle(color: Color(0xFFE74C3C))),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = Colors.white,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(label,
+          style: TextStyle(
+              color: color, fontSize: 15, fontWeight: FontWeight.w600)),
+      onTap: onTap,
     );
   }
 }

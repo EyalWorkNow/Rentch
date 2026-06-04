@@ -85,7 +85,41 @@ Stores landlord-uploaded property photos.
 
 ---
 
-### 1.4 `tenant_verification` collection (future)
+### 1.4 `property_3d_tours` collection
+
+Stores lightweight apartment scan metadata. Raw videos and generated model
+assets should not be loaded into the mobile app until a tenant opens a tour.
+
+| Field | Type | Required | Max Length | Notes |
+|-------|------|----------|------------|-------|
+| `tourId` | String | Yes | 64 | Provider scene/job ID or internal ID |
+| `propertyId` | String | Yes | 64 | Parent property |
+| `ownerUserId` | String | Yes | 64 | Firebase UID |
+| `provider` | String | Yes | 32 | e.g. `splat3d` |
+| `status` | String | Yes | 24 | `captured`, `queued`, `uploading`, `processing`, `ready`, `failed` |
+| `viewerUrl` | String | No | 2048 | Public lightweight viewer link |
+| `downloadUrl` | String | No | 2048 | Protected model download link |
+| `previewImageUrl` | String | No | 2048 | Poster/thumbnail |
+| `format` | String | No | 16 | Prefer web-optimized formats for tenants |
+| `processingProgress` | Integer | No | - | 0-100 |
+| `qualityScore` | Double | No | - | Provider metric |
+| `errorMessage` | String | No | 500 | Sanitized error |
+| `createdAt` | DateTime | Yes | - | UTC ISO-8601 |
+| `updatedAt` | DateTime | Yes | - | UTC ISO-8601 |
+
+**Indexes:**  
+- `propertyId` + `status`  
+- `ownerUserId` + `updatedAt` DESC  
+- `status` + `updatedAt` DESC for monitoring stuck jobs  
+
+**Permissions:**  
+- Ready tours are readable by public users browsing active properties.  
+- Non-ready tours are owner/admin only.  
+- Writes go through an Appwrite Function or backend proxy, not directly from the client.  
+
+---
+
+### 1.5 `tenant_verification` collection (future)
 
 | Field | Type | Notes |
 |-------|------|-------|
@@ -107,6 +141,7 @@ All limits are enforced in `RateLimiter` (token bucket, reset every 60s):
 | Chat messages | 30 / minute | `allowMessage()` |
 | Property adds | 10 / hour | `allowPropertyAdd()` |
 | Image uploads | 20 / hour | `allowImageUpload()` |
+| 3D scan submissions | 3 / hour | Backend/Appwrite Function |
 
 `WriteDebouncer` (800ms window) batches rapid successive `_persist()` calls so a single user action chain (e.g. 5 filter taps in 2 seconds) produces one Appwrite write instead of five.
 
@@ -141,6 +176,8 @@ Rule: Realtime Connections
 | `cleanup-stale-state` | CRON `0 3 * * *` (3am UTC daily) | Delete `app_state` docs not updated in 90 days |
 | `message-retention` | CRON `0 4 * * 0` (weekly) | Archive or delete messages older than 1 year |
 | `validate-message` | `databases.messages.documents.create` | Server-side re-validate: strip XSS, enforce length |
+| `create-3d-scan` | HTTPS callable | Creates provider scene/job and returns a presigned upload URL |
+| `refresh-3d-scan` | CRON every 5 min + HTTPS callable | Polls provider status and updates `property_3d_tours` |
 
 **`validate-message` function (Node.js):**
 ```javascript
@@ -197,6 +234,16 @@ GET /v1/storage/buckets/{bucketId}/files/{fileId}/preview?width=400&height=300&q
 ```
 
 In `StorageService.getImageUrl()`, always request preview endpoint for display, not the raw file.
+
+### 5.3 3D Tour Delivery
+
+Use lazy loading for all spatial assets:
+
+- Cards and property details store only a status, badge, thumbnail, and `viewerUrl`.
+- The app opens a hosted viewer only when the tenant taps the tour button.
+- Prefer web-optimized output or provider-hosted viewers for browsing.
+- Keep raw scan videos private and expire them after the generated tour is ready.
+- Downloadable raw formats should be admin/owner tools, not default tenant payloads.
 
 ---
 

@@ -209,7 +209,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         },
         onReorder: (oldIndex, newIndex) {
           setState(() {
-            if (newIndex > oldIndex) newIndex--;
             final item = _photos.removeAt(oldIndex);
             _photos.insert(newIndex, item);
           });

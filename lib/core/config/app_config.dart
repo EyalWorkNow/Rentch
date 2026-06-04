@@ -26,6 +26,11 @@ class AppConfig {
     defaultValue: launchMode,
   );
 
+  static const bool enable3dScanning = bool.fromEnvironment(
+    'RENTCH_ENABLE_3D_SCANNING',
+    defaultValue: false,
+  );
+
   static const String appwriteEndpoint = String.fromEnvironment(
     'APPWRITE_ENDPOINT',
     defaultValue: 'https://fra.cloud.appwrite.io/v1',
@@ -64,6 +69,66 @@ class AppConfig {
     ),
   );
 
+  static const String appwritePropertiesTableId = String.fromEnvironment(
+    'APPWRITE_PROPERTIES_TABLE_ID',
+    defaultValue: 'properties',
+  );
+
+  // User / tenant profile collection for live user discovery.
+  // Set via: flutter run --dart-define=APPWRITE_USERS_TABLE_ID=your_id
+  static const String appwriteUsersTableId = String.fromEnvironment(
+    'APPWRITE_USERS_TABLE_ID',
+    defaultValue: '',
+  );
+
+  // Structured user-event log table (append-only analytics).
+  // Set via: flutter run --dart-define=APPWRITE_EVENTS_TABLE_ID=your_id
+  static const String appwriteEventsTableId = String.fromEnvironment(
+    'APPWRITE_EVENTS_TABLE_ID',
+    defaultValue: '',
+  );
+
+  // Moderation tables — required for Apple Guideline 1.2 compliance.
+  // Reports and blocks must reach the developer for 24h review.
+  static const String appwriteReportsTableId = String.fromEnvironment(
+    'APPWRITE_REPORTS_TABLE_ID',
+    defaultValue: 'reports',
+  );
+  static const String appwriteBlocksTableId = String.fromEnvironment(
+    'APPWRITE_BLOCKS_TABLE_ID',
+    defaultValue: 'blocks',
+  );
+
+  // Legal consent version. Bump to force re-consent from all property owners.
+  // Set via: flutter run --dart-define=RENTCH_LEGAL_CONSENT_VERSION=v1.1
+  static const String legalConsentVersion = String.fromEnvironment(
+    'RENTCH_LEGAL_CONSENT_VERSION',
+    defaultValue: 'v1.0',
+  );
+
+  // How many properties to load per page. Keep ≤ 200 to cap per-request payload.
+  static const int propertyPageSize = 150;
+
+  static const String scan3dProvider = String.fromEnvironment(
+    'RENTCH_3D_SCAN_PROVIDER',
+    defaultValue: 'splat3d',
+  );
+
+  static const String scan3dProxyUrl = String.fromEnvironment(
+    'RENTCH_3D_SCAN_PROXY_URL',
+    defaultValue: '',
+  );
+
+  static const String scan3dDefaultPreset = String.fromEnvironment(
+    'RENTCH_3D_SCAN_PRESET',
+    defaultValue: 'standard',
+  );
+
+  static const String scan3dOutputFormat = String.fromEnvironment(
+    'RENTCH_3D_SCAN_OUTPUT_FORMAT',
+    defaultValue: 'sog',
+  );
+
   static bool get isProduction => environment == 'production';
 
   static bool get hasAppwriteCoreConfig =>
@@ -78,6 +143,14 @@ class AppConfig {
       hasAppwriteCoreConfig &&
       appwriteDatabaseId.isNotEmpty &&
       appwriteMessagesTableId.isNotEmpty;
+
+  static bool get canUseProperties =>
+      hasAppwriteCoreConfig &&
+      appwriteDatabaseId.isNotEmpty &&
+      appwritePropertiesTableId.isNotEmpty;
+
+  static bool get canUse3dScanBackend =>
+      enable3dScanning && scan3dProxyUrl.trim().isNotEmpty;
 
   static bool get canUseRemoteState =>
       enableRemoteState &&
@@ -104,6 +177,10 @@ class AppConfig {
     if (!enableRemoteState) {
       issues.add(
           'Remote state is disabled; marketplace state remains device-local.');
+    }
+    if (enable3dScanning && !canUse3dScanBackend) {
+      issues.add(
+          '3D scanning is enabled but RENTCH_3D_SCAN_PROXY_URL is missing.');
     }
     if (launchMode) {
       issues.add(

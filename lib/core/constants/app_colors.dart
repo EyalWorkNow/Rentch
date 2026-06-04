@@ -14,7 +14,7 @@ class AppColors {
   static const Color superLike = Color(0xFF4A6CF7);
 
   // Backgrounds
-  static const Color background = Color(0xFFF2F7FA);
+  static const Color background = Color(0xFFFFFFFF);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color cardBackground = Color(0xFFFFFFFF);
 

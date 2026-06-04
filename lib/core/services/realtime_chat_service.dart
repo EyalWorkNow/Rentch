@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
+import 'package:dating_app/core/network/retry_policy.dart';
 import 'package:dating_app/core/services/appwrite_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/foundation.dart';
@@ -13,17 +16,22 @@ import 'package:flutter/foundation.dart';
 //   This is the shared source of truth — no per-user state blob involved.
 //
 // Collection schema (create in Appwrite console):
-//   matchId    : string  (index)
+//   matchId    : string  (indexed)
 //   senderId   : string
 //   senderName : string
 //   text       : string  (max 2000 chars)
 //   createdAt  : string  (ISO-8601, sortable)
 //
-// Collection permissions:
-//   Read  : Users  (any authenticated user — enforce match membership in Functions)
-//   Write : Users
+// Scalability notes:
+//   WebSocket subscriptions use exponential backoff with full jitter on reconnect.
+//   Max reconnect attempts: [_maxReconnectAttempts] — prevents infinite retry loops
+//   that would keep hammering Appwrite during outages.
 //
-// Realtime channel: databases.{dbId}.collections.{collectionId}.documents
+//   Client-side matchId filtering is intentional: Appwrite Realtime does not
+//   support attribute-level filters on collection subscriptions. Each active chat
+//   screen opens one WebSocket and discards irrelevant events locally.
+//   At production scale, migrate to a per-match channel model using Appwrite
+//   Functions that publish to dedicated channels.
 //
 // To enable: ensure APPWRITE_MESSAGES_TABLE_ID is set in --dart-define, OR
 //            set AppConfig.appwriteMessagesTableId default to your collection ID.
@@ -36,6 +44,12 @@ class RealtimeChatService {
   Realtime? _realtime;
   RealtimeSubscription? _subscription;
   final _controller = StreamController<ChatMessage>.broadcast();
+
+  int _reconnectAttempt = 0;
+  static const int _maxReconnectAttempts = 8;
+  static const Duration _reconnectBase = Duration(milliseconds: 500);
+  static const Duration _reconnectCap = Duration(minutes: 2);
+  static final _rng = math.Random.secure();
 
   bool get isConfigured => _collectionId.isNotEmpty;
   bool get isActive => _subscription != null && !_controller.isClosed;
@@ -69,18 +83,23 @@ class RealtimeChatService {
     _subscription!.stream.listen(
       (event) => _handleEvent(event, matchId),
       onError: (Object error) {
-        if (kDebugMode) debugPrint('RealtimeChatService error: $error');
+        if (kDebugMode) debugPrint('RealtimeChatService: WS error: $error');
         _subscription = null;
-        // Auto-reconnect after 3 s
-        Future.delayed(const Duration(seconds: 3), () {
-          if (!_controller.isClosed) subscribe(matchId);
-        });
+        _scheduleReconnect(matchId);
       },
       onDone: () {
         if (kDebugMode) debugPrint('RealtimeChatService: WS closed');
         _subscription = null;
+        // Only reconnect if the controller is still open (not disposed).
+        // Closed = user navigated away; don't reconnect.
+        if (!_controller.isClosed) {
+          _scheduleReconnect(matchId);
+        }
       },
     );
+
+    // Reset backoff on a successful subscribe
+    _reconnectAttempt = 0;
   }
 
   void unsubscribe() => _unsubscribeInternal();
@@ -103,18 +122,18 @@ class RealtimeChatService {
       final now = DateTime.now().toUtc();
       final rowId = 'msg_${now.microsecondsSinceEpoch}';
 
-      await tables.createRow(
-        databaseId: appwriteDatabaseId,
-        tableId: _collectionId,
-        rowId: rowId,
-        data: {
-          'matchId': matchId,
-          'senderId': senderId,
-          'senderName': senderName,
-          'text': text,
-          'createdAt': now.toIso8601String(),
-        },
-      );
+      await RetryPolicy.transient.execute(() => tables.createRow(
+            databaseId: appwriteDatabaseId,
+            tableId: _collectionId,
+            rowId: rowId,
+            data: {
+              'matchId': matchId,
+              'senderId': senderId,
+              'senderName': senderName,
+              'text': text,
+              'createdAt': now.toIso8601String(),
+            },
+          ));
 
       return ChatMessage(
         id: rowId,
@@ -132,7 +151,7 @@ class RealtimeChatService {
 
   Future<List<ChatMessage>> fetchMessages(
     String matchId, {
-    int limit = 200,
+    int limit = 100,
     String? afterId,
   }) async {
     if (!isConfigured) return const [];
@@ -144,11 +163,11 @@ class RealtimeChatService {
         if (afterId != null) Query.cursorAfter(afterId),
       ];
 
-      final result = await tables.listRows(
-        databaseId: appwriteDatabaseId,
-        tableId: _collectionId,
-        queries: queries,
-      );
+      final result = await RetryPolicy.transient.execute(() => tables.listRows(
+            databaseId: appwriteDatabaseId,
+            tableId: _collectionId,
+            queries: queries,
+          ));
 
       return result.rows
           .map((row) => _rowToMessage(row.data))
@@ -158,6 +177,45 @@ class RealtimeChatService {
       if (kDebugMode) debugPrint('RealtimeChatService.fetchMessages error: $e');
       return const [];
     }
+  }
+
+  // ── Reconnect with exponential backoff + full jitter ─────────────────────────
+  //
+  // Full jitter: delay = random(0, min(cap, base * 2^attempt))
+  // This prevents all clients reconnecting simultaneously after an outage,
+  // which would re-create the thundering-herd problem the backoff is meant to solve.
+
+  void _scheduleReconnect(String matchId) {
+    if (_controller.isClosed) return;
+    if (_reconnectAttempt >= _maxReconnectAttempts) {
+      if (kDebugMode) {
+        debugPrint(
+          'RealtimeChatService: gave up reconnecting after '
+          '$_maxReconnectAttempts attempts',
+        );
+      }
+      return;
+    }
+
+    final capMs = _reconnectCap.inMilliseconds;
+    final baseMs = _reconnectBase.inMilliseconds;
+    final ceiling =
+        math.min(capMs.toDouble(), baseMs * math.pow(2, _reconnectAttempt));
+    final delayMs = (_rng.nextDouble() * ceiling).toInt();
+    final delay = Duration(milliseconds: delayMs);
+
+    _reconnectAttempt++;
+
+    if (kDebugMode) {
+      debugPrint(
+        'RealtimeChatService: reconnect attempt $_reconnectAttempt in '
+        '${delay.inMilliseconds}ms',
+      );
+    }
+
+    Future.delayed(delay, () {
+      if (!_controller.isClosed) subscribe(matchId);
+    });
   }
 
   // ── Internal ─────────────────────────────────────────────────────────────────

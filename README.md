@@ -60,262 +60,252 @@ Rentch operates on a dual-sided marketplace model:
 
 ---
 
-## 🧠 Matching Algorithm
+## 🧠 Production Matching Engine
 
-The Rentch matching engine assigns every property a **compatibility score from 0 to 100**, displayed as the "X% התאמה" badge on each swipe card. The algorithm is a **weighted multi-criteria scoring model** inspired by techniques used in large-scale real-estate recommendation systems (Airbnb search ranking, Zillow preference weighting, and academic hedonic pricing models).
+Rentch now uses a two-stage recommendation engine instead of a simple filter-and-sort list. Every candidate property receives a deterministic **compatibility score from 0 to 100**, shown on swipe cards as `"X% התאמה"`. The model is intentionally explainable: every point comes from a product decision that protects tenant trust, landlord lead quality, and marketplace liquidity.
 
----
+The engine lives in `DatingProvider`:
 
-### 🏷️ Tri-State Feature Tag System
-
-Before scoring begins, the tenant marks each amenity tag with one of three priority levels by tapping it repeatedly:
-
-| Tap | Color | Label | Effect on Algorithm |
-|-----|-------|-------|---------------------|
-| Not tapped | Light teal (default) | — | Tag is ignored |
-| **1st tap** | 🔵 **Blue** (`#13BEC9`) | Preferred / Nice-to-have | Boosts score proportionally |
-| **2nd tap** | 🔴 **Red** (`#FF5A67`) | Deal Breaker / Must-have | Hard gate — property is **excluded entirely** if missing |
-| **3rd tap** | Resets to default | — | — |
-
-The red color is intentionally identical to the X/reject button in swipes — it signals the same finality: *"without this, it's a no."*
+- `filteredProperties` builds the candidate deck.
+- `matchScore(property)` computes the score used by the card badge.
+- `priceContext(property)` uses the same market baseline as the ranker, so "above/below average" labels are consistent with ranking.
+- `SearchFilters.toJson/fromJson` remains the persistence boundary; no saved-state migration is required for this algorithm upgrade.
 
 ---
 
-### 📐 Score Breakdown
+### 1. Candidate Eligibility: Hard Gates vs Soft Preferences
 
-The total score is the **sum of eight weighted criteria**, each evaluated independently and clamped to its maximum:
+The first stage separates **true deal-breakers** from **rankable preferences**. This matters because a rental marketplace should not hide a great apartment just because it is 4% over budget, but it also must never show a property missing a must-have such as parking if the tenant marked parking as red.
 
-```
-Score = budget(28) + rooms(14) + location(18) + size(8)
-      + timing(8) + preferred_features(12) + deal_breaker_bonus(6) + quality(6)
-                                                                    ─────────────
-                                                              max = 100 points
-```
+#### Always-hard gates
 
-> **Hard gate rule**: if the property is missing **any red (deal-breaker) tag**, the score is immediately returned as **0** — no further calculation is performed.
+These remove a property before scoring:
+
+| Gate | Reason |
+|---|---|
+| Already liked/passed | Do not recycle cards the user has already acted on |
+| Text query mismatch | Explicit search intent |
+| City mismatch | City is treated as an explicit location commitment |
+| Wrong transaction type | Rent and sale are different jobs-to-be-done |
+| Property type / condition mismatch | User selected a concrete category |
+| Listing source mismatch | Private-only / agency-only is an explicit trust or workflow choice |
+| Red feature missing | Deal-breaker semantics: without this, the property is not viable |
+| Outside selected polygon | Geography is mostly non-negotiable in rental search |
+
+#### Best Match soft-expansion gates
+
+When sorting by `SearchSortOption.bestMatch`, the engine allows controlled near-misses into the candidate pool, then penalizes them in scoring:
+
+| Constraint | Best Match candidate limit | Why |
+|---|---:|---|
+| Budget | up to **22%** above max budget | Allows valuable near-budget properties without flooding the deck |
+| Rooms | down to **0.5 rooms** below requested rooms | Handles Israeli half-room listings and flexible layouts |
+| Minimum size | down to **78%** of requested min m² | Small but efficient layouts can still be relevant |
+| Maximum size | up to **140%** of requested max m² | Bigger is often acceptable if price/value is strong |
+| Minimum floor | one floor below requested floor | Avoids losing near matches because of noisy floor data |
+| Move-in date | grace of **14 / 21 / 30 days** for immediate / 30d / 90d filters | Real rental timelines are negotiable within small windows |
+
+When the user selects an explicit non-recommendation sort such as **price low-to-high**, those same numeric filters become strict again. This preserves user control: Best Match explores intelligently; explicit sorting obeys exact filters.
 
 ---
 
-### 🔍 Criterion Deep-Dive
+### 2. Compatibility Score
 
-#### 1. Budget Fit — 28 points
+The score is a weighted sum capped at 100:
 
-The old algorithm had a hard cliff: full score under budget, half score up to +15%, zero beyond. This creates a jarring discontinuity and misses real-world nuance (a tenant might still love a property that costs 5% more).
-
-The new approach uses a **logistic (sigmoid) decay curve**:
-
+```text
+score =
+  affordability_budget_fit      (22)
+  + local_market_value          (12)
+  + location_fit                (14)
+  + space_fit                   (14)
+  + move_in_timing              (8)
+  + feature_preference_fit      (14)
+  + listing_confidence          (12)
+  + business_readiness          (4)
+  -----------------------------------
+  max                           100
 ```
+
+The weights reflect observed rental-market priorities:
+
+- Tenants care most about affordability, location, and whether the home actually matches their lifestyle.
+- Landlords need qualified leads, not vanity likes from users who cannot move in or cannot afford the unit.
+- The business needs a healthy marketplace: high-quality, complete, actionable listings should outrank thin or stale listings even when both technically match.
+
+---
+
+### 3. Scoring Components
+
+#### Affordability Budget Fit — 22 points
+
+Budget is scored with an asymmetric exponential decay:
+
+```text
 ratio = property_price / max_budget
 
-if ratio ≤ 1.0:
-    score = 28 + value_bonus         # under budget → full 28 + up to +5 cheapness bonus
-    value_bonus = (1 - ratio) × 5   # cheaper = slightly better fit
+if no budget:
+  score = 22
 
-if ratio > 1.0:
-    overage = ratio - 1.0
-    decay   = 1 / (1 + e^(overage × 10))   # logistic — steep past 15%
-    score   = min(28 × decay × 2, 14)       # max 14 pts when slightly over budget
+if ratio <= 1:
+  score = 22 * (0.94 + comfort_discount * 0.06)
+
+if ratio > 1:
+  score = 22 * exp(-((ratio - 1) / 0.18)^1.45)
 ```
 
-**Behaviour:**
-- Exactly at budget → 28 pts
-- 10% cheaper than budget → ~33 pts (value bonus)
-- 5% over budget → ~10 pts (still scores well)
-- 20% over budget → ~2 pts
-- 35%+ over budget → ~0 pts
+Under-budget homes receive almost full credit, with a small comfort bonus for meaningful savings. Over-budget homes decay smoothly: a small overage remains viable, while large overages quickly lose rank. This removes the old hard cliff where a property 1 shekel above budget could disappear despite being otherwise excellent.
 
-This smooth decay means a 5% budget overshoot doesn't catastrophically drop a great property to the bottom of the stack.
+#### Local Market Value — 12 points
 
----
+The engine builds a robust market index from the current catalog:
 
-#### 2. Rooms Fit — 14 points
+1. Compute each listing's `pricePerSquareMeter`.
+2. Bucket comparable listings by `city + transactionType + propertyType`.
+3. Fall back to broader buckets when there are too few samples:
+   `city + transaction`, then `transaction + propertyType`, then transaction-wide, then catalog-wide.
+4. Use **median price/m²** instead of average.
+5. Use **median absolute deviation (MAD)** to understand how volatile that market bucket is.
 
-```
-diff = property_rooms - min_rooms
+Properties below the local median receive high value scores. Properties above the median decay according to the volatility of their comparable market. That means a 10% premium in a noisy luxury segment is treated differently from a 10% premium in a stable commodity segment.
 
-diff ≥  0.0  →  14 pts  (meets or exceeds requirement)
-diff ≥ -0.5  →  14 × (1 + diff × 2)  pts  (e.g. 7 pts at -0.5 rooms)
-diff <  -0.5 →   0 pts
-```
+#### Location Fit — 14 points
 
-A ±0.5 room tolerance (e.g. searching for 3 rooms, finding a 2.5-room) gives half score rather than an outright miss. Israeli listings frequently use half-room increments.
+Location remains explicit:
 
----
+- If a city is selected, only that city passes and gets full location credit.
+- If `all_israel` is selected, every location receives full location credit.
+- If a map area is selected, the property's GPS point must be inside the polygon and then receives full location credit.
 
-#### 3. Location Fit — 18 points
+The point-in-polygon test lives in `SearchArea.contains`, keeping location logic deterministic and easy to test.
 
-The tenant selects a **geographic polygon** (drawn on the map). The algorithm checks whether the property's GPS coordinates fall inside that polygon using a **ray-casting point-in-polygon test**.
+#### Space Fit — 14 points
 
-```
-areaId == 'all_israel'     →  18 pts  (no restriction set)
-property inside polygon    →  18 pts
-property outside polygon   →   0 pts  (hard boundary)
-```
+Space is split into three signals:
 
-Location carries the second-highest weight because geography is largely non-negotiable in real estate.
+| Signal | Weight | Behavior |
+|---|---:|---|
+| Rooms | 8 | Full credit at or above requested rooms; smooth penalty down to half-room shortage |
+| Size | 5 | Full credit inside range; exponential penalty for undersized homes; gentler penalty for oversized homes |
+| Floor | 1 | Full credit at/above requested floor; partial credit for unknown or one-floor near miss |
 
----
+This mirrors real tenant behavior: rooms carry more meaning than exact square meters, and a bigger home is usually less harmful than a smaller one.
 
-#### 4. Size Fit — 8 points
+#### Move-In Timing — 8 points
 
-The tenant may set a minimum and/or maximum size in m². The scoring is **proportional to how well the property fits the desired range**:
+Move-in fit uses the selected deadline:
 
-```
-property inside [minM2, maxM2]  →  8 pts
-property smaller than minM2     →  8 × (1 - deficit/minM2)  pts  (linear deficit)
-property larger than maxM2      →  4 pts  (size grace — bigger is usually acceptable)
-no size preference set          →  8 pts
+```text
+any          -> 8
+immediate    -> full if entryDate <= today, then soft decay during grace
+within30Days -> full if entryDate <= today + 30, then soft decay during grace
+within90Days -> full if entryDate <= today + 90, then soft decay during grace
 ```
 
-Oversized properties (larger than the maximum) receive a grace score of 4 because tenants rarely reject a property purely for being larger than expected.
+Unknown dates receive partial confidence only when the timing filter is otherwise open. When the user asks for a timing window, missing or far-late dates are filtered or heavily penalized.
 
----
+#### Feature Preference Fit — 14 points
 
-#### 5. Move-in Timing — 8 points
+Rentch's tri-state feature tags map directly into ranking:
 
-```
-MoveInFilter.any           →  8 pts  (no timing requirement)
-MoveInFilter.immediate     →  entry date ≤ today   ? 8 : 0
-MoveInFilter.within30Days  →  entry date ≤ +30d    ? 8 : 0
-MoveInFilter.within90Days  →  entry date ≤ +90d    ? 8 : 0
-```
-
-Timing is binary — either the property can be entered in time or it cannot.
-
----
-
-#### 6. Preferred Features (Blue Tags) — 12 points
-
-Blue tags represent amenities the tenant *would like* but can live without. Scoring uses a **concave reward function** that values partial matches:
-
-```
-matched = count of blue tags present in property features
-ratio   = matched / total_blue_tags
-
-f(ratio) = 1 − (1 − ratio)^1.5       # concave — partial credit valued
-score    = 12 × f(ratio)
-```
-
-**Concave vs. linear reward:**
-
-| Blue Tags Matched | Linear | Concave (ours) |
+| Tap state | Meaning | Algorithm effect |
 |---|---|---|
-| 0 / 4 (0%) | 0 pts | 0 pts |
-| 1 / 4 (25%) | 3 pts | **4.5 pts** |
-| 2 / 4 (50%) | 6 pts | **7.8 pts** |
-| 3 / 4 (75%) | 9 pts | **10.4 pts** |
-| 4 / 4 (100%) | 12 pts | 12 pts |
+| Default | Ignored | No scoring effect |
+| Blue | Preferred | Weighted soft boost |
+| Red | Deal breaker | Hard gate; missing property score is 0 |
 
-The concave shape means a property matching 2 out of 3 blue tags is surfaced significantly above one that matches 0 — partial compatibility is meaningful, not binary.
+Blue tags are weighted by rarity using an IDF-style weight:
 
-If the tenant has set **no blue tags**, they receive the full 12 points (preference-neutral).
+```text
+feature_weight = log((catalog_size + 1) / (feature_frequency + 1)) + 1
+```
+
+Rare preferred features such as parking, shelter room, or roof balcony can therefore matter more than commodity features that nearly every listing has. The matched weighted ratio is then passed through a concave reward:
+
+```text
+ratio = matched_preferred_weight / total_preferred_weight
+reward = 1 - (1 - ratio)^1.5
+score = required_feature_score(4) + preferred_feature_score(10 * reward)
+```
+
+The concave curve rewards partial matches without making every blue feature binary. A property matching 2 out of 3 meaningful preferences should outrank one matching none, but a perfect feature match still wins.
+
+#### Listing Confidence — 12 points
+
+The ranker rewards listings that are more likely to convert into a real viewing or signed lease:
+
+- Media richness: at least one photo/video, multiple assets, and video tours.
+- Address completeness: city, street, street number, neighborhood.
+- Property metadata: condition and property type.
+- Owner traceability: owner name, source URL, valid coordinates.
+- Social proof: review count and review average.
+- Source friction: private/direct listings receive a small conversion advantage while agency listings still remain viable.
+
+This is both a customer-quality and business-quality signal. Thin listings waste swipes and create low-intent conversations; complete listings produce better matches.
+
+#### Business Readiness — 4 points
+
+This small score prevents the algorithm from being purely tenant-centric. It gives extra credit to properties that are ready to create marketplace value:
+
+- Clear transaction intent.
+- Valid price and size data.
+- Lower-friction direct ownership path.
+- Entry date that is not too far in the future.
+- Enough media, owner, and address data to support an immediate tour request.
+
+The weight is intentionally small. It nudges tie-breaks toward liquid inventory without overpowering user needs.
 
 ---
 
-#### 7. Deal-Breaker Bonus (Red Tags) — 6 points
+### 4. Final Ranking and Tie-Breaks
 
-Red (deal-breaker) tags are already enforced as a **hard gate** (any missing red tag → score 0). Properties that *survive* the gate receive an additional bonus:
+For `bestMatch`, properties are sorted by:
 
-```
-deal-breakers set and all present  →  6 pts  (bonus for being a strong match)
-no deal-breakers set               →  3 pts  (neutral — no hard requirements)
-```
+1. Compatibility score, descending.
+2. Local market value score, descending.
+3. Listing confidence score, descending.
+4. Price, ascending.
+5. Property id, ascending for deterministic output.
 
-This bonus differentiates two properties that both passed the hard gate — the one that fulfils more requirements is surfaced higher.
-
----
-
-#### 8. Listing Quality — 6 points
-
-Rewards well-maintained, information-rich listings:
-
-```
-has media (photos/video)  →  +4 pts
-full address present      →  +4 pts   (but capped at quality subtotal)
-owner name present        →  +2 pts
-                                ──
-                         max  = 6 pts
-```
-
-A property with photos and a complete address scores full quality points; a listing with no media and no owner name receives 0.
+This keeps the deck stable across renders while still preferring better value and higher-confidence listings when two properties have the same visible score.
 
 ---
 
-### 📊 Worked Example
+### 5. Worked Example
 
-**Tenant preferences:**
-- Budget: ₪6,000/mo  |  Rooms: 3  |  Area: Tel Aviv Centre
-- Blue tags: `מרפסת`, `מעלית`
-- Red tags: `חניה` (deal breaker)
+Tenant filters:
 
-**Property A — ₪5,800, 3 rooms, Tel Aviv, has: `חניה`, `מרפסת`, `מעלית`, photos**
+- Max budget: ₪6,000
+- Minimum rooms: 3
+- City: Tel Aviv
+- Red tag: `parking`
+- Blue tags: `balcony`, `elevator`
+- Move-in: within 30 days
 
-| Criterion | Calculation | Score |
-|---|---|---|
-| Budget | ratio=0.967, under budget + value bonus | **29** |
-| Rooms | diff=0, meets requirement | **14** |
-| Location | inside Tel Aviv polygon | **18** |
-| Size | no preference | **8** |
-| Timing | any | **8** |
-| Preferred (blue) | 2/2 matched → f(1.0)=1.0 → 12×1.0 | **12** |
-| Deal-breaker bonus | `חניה` present, gate passed | **6** |
-| Quality | has media + address | **6** |
-| **Total** | | **✅ 101 → clamped to 100** |
+| Property | Price | Signals | Outcome |
+|---|---:|---|---|
+| A | ₪6,250 | 3 rooms, parking, balcony, elevator, strong media, good owner data | Included by Best Match despite being 4.2% over budget; high feature and confidence scores push it up |
+| B | ₪5,600 | 3 rooms, parking only, weak media, incomplete owner/address data | Included, but ranks below A because price alone is not enough |
+| C | ₪5,200 | 3 rooms, balcony, elevator, **no parking** | Excluded and `matchScore == 0` because it fails the red-tag gate |
 
-**Property B — ₪6,400, 3 rooms, Tel Aviv, has: `מרפסת` only (no `חניה`)**
-
-| Criterion | Calculation | Score |
-|---|---|---|
-| Red gate | `חניה` missing → immediate 0 | **🚫 0** |
-
-**Property C — ₪6,300, 3 rooms, Tel Aviv, has: `חניה`, `מעלית` (no `מרפסת`)**
-
-| Criterion | Calculation | Score |
-|---|---|---|
-| Budget | ratio=1.05, over budget → decay | **~11** |
-| Rooms | 14 | **14** |
-| Location | 18 | **18** |
-| Size | 8 | **8** |
-| Timing | 8 | **8** |
-| Preferred (blue) | 1/2 matched → f(0.5)≈0.65 → 12×0.65 | **~8** |
-| Deal-breaker bonus | `חניה` present | **6** |
-| Quality | has photos | **6** |
-| **Total** | | **~79** |
-
-Property A (100%) ranks above Property C (79%). Property B is excluded entirely.
+If the same user switches from **Best Match** to **price low-to-high**, Property A is filtered out because explicit price sorting uses strict budget semantics.
 
 ---
 
-### 🔄 Algorithm Flow Summary
+### 6. Why This Is Better
 
-```
-START
-  │
-  ▼
-Red tag gate: any deal-breaker missing?
-  ├─ YES → return score = 0  (property excluded from deck)
-  └─ NO  → continue
-           │
-           ▼
-       Calculate 8 criteria in parallel:
-       ┌──────────────────────────────────────────────┐
-       │  1. Budget sigmoid        (0–28 pts)          │
-       │  2. Rooms linear          (0–14 pts)          │
-       │  3. Location polygon      (0–18 pts)          │
-       │  4. Size proportional     (0–8  pts)          │
-       │  5. Timing binary         (0–8  pts)          │
-       │  6. Blue tags concave     (0–12 pts)          │
-       │  7. Red tag bonus         (3–6  pts)          │
-       │  8. Listing quality       (0–6  pts)          │
-       └──────────────────────────────────────────────┘
-           │
-           ▼
-       Sum all criteria → clamp(0, 100)
-           │
-           ▼
-       Return final score → displayed as "X% התאמה"
-END
-```
+The old approach mixed filtering and scoring, which made the algorithm less intelligent than the UI claimed. A property above budget or slightly below room count could be removed before the matching engine evaluated quality, market value, or feature fit.
+
+The current engine fixes that by making the decision architecture explicit:
+
+- **Hard gates** protect trust and user intent.
+- **Soft scoring** captures real-world tradeoffs.
+- **Robust market baselines** prevent misleading value judgments.
+- **Feature rarity** reflects what actually differentiates apartments.
+- **Listing confidence** improves tenant experience and landlord lead quality.
+- **Business readiness** keeps the marketplace focused on inventory that can convert.
+
+The behavior is covered by `test/dating_provider_algorithm_test.dart`, including soft budget inclusion, deal-breaker exclusion, ranking order, and strict-budget behavior for explicit price sorting.
 
 ---
 

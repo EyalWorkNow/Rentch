@@ -23,7 +23,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _currentPage = 0;
 
   RentalProperty get p => widget.property;
-  bool get _hasVirtualTour => p.videoUrls.isNotEmpty;
+  bool get _hasVirtualTour => p.hasReadyVirtualTour || p.videoUrls.isNotEmpty;
 
   @override
   void dispose() {
@@ -62,6 +62,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     children: [
                       _OverviewCard(
                         property: p,
+                        tour: p.virtualTour,
                         hasVirtualTour: _hasVirtualTour,
                         onTourTap: () => openPropertyTour(context, p),
                       ),
@@ -166,6 +167,9 @@ class _ImageGallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final safeCurrentPage =
+        media.isEmpty ? 0 : currentPage.clamp(0, media.length - 1).toInt();
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -187,35 +191,38 @@ class _ImageGallery extends StatelessWidget {
         // Invisible tap zones for gallery navigation
         if (media.length > 1)
           Positioned.fill(
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () {
-                      if (currentPage > 0) {
-                        controller.previousPage(
-                          duration: const Duration(milliseconds: 280),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    },
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        if (safeCurrentPage > 0) {
+                          controller.previousPage(
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () {
-                      if (currentPage < media.length - 1) {
-                        controller.nextPage(
-                          duration: const Duration(milliseconds: 280),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    },
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        if (safeCurrentPage < media.length - 1) {
+                          controller.nextPage(
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -240,7 +247,10 @@ class _ImageGallery extends StatelessWidget {
             left: 0,
             right: 0,
             child: IgnorePointer(
-              child: _CarouselDots(count: media.length, current: currentPage),
+              child: _CarouselDots(
+                count: media.length,
+                current: safeCurrentPage,
+              ),
             ),
           ),
 
@@ -264,7 +274,7 @@ class _ImageGallery extends StatelessWidget {
                         size: 12, color: Colors.white),
                     const SizedBox(width: 4),
                     Text(
-                      '${currentPage + 1} / ${media.length}',
+                      '${safeCurrentPage + 1} / ${media.length}',
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -275,7 +285,7 @@ class _ImageGallery extends StatelessWidget {
               ),
             ),
           ),
-        if (media.isNotEmpty && media[currentPage].isVideo)
+        if (media.isNotEmpty && media[safeCurrentPage].isVideo)
           Positioned(
             top: 60,
             right: 16,
@@ -397,7 +407,7 @@ Future<void> openPropertyTour(
   BuildContext context,
   RentalProperty property,
 ) async {
-  if (property.videoUrls.isEmpty) {
+  if (!property.hasReadyVirtualTour && property.videoUrls.isEmpty) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1243,6 +1253,7 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isProcessing = property.virtualTour?.isProcessing == true;
     return Container(
       padding: EdgeInsets.fromLTRB(
           20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
@@ -1275,7 +1286,13 @@ class _BottomBar extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onTour,
               icon: const Icon(Icons.view_in_ar_rounded),
-              label: Text(hasVirtualTour ? 'סיור תלת־ממדי' : 'בקש סיור תלת־ממדי'),
+              label: Text(
+                hasVirtualTour
+                    ? 'סיור תלת־ממדי'
+                    : isProcessing
+                        ? 'סריקה בהכנה'
+                        : 'בקש סיור תלת־ממדי',
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1293,11 +1310,13 @@ class _BottomBar extends StatelessWidget {
 class _OverviewCard extends StatelessWidget {
   const _OverviewCard({
     required this.property,
+    required this.tour,
     required this.hasVirtualTour,
     required this.onTourTap,
   });
 
   final RentalProperty property;
+  final PropertyVirtualTour? tour;
   final bool hasVirtualTour;
   final VoidCallback onTourTap;
 
@@ -1434,9 +1453,7 @@ class _OverviewCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          hasVirtualTour
-                              ? 'סיור תלת־ממדי זמין עכשיו'
-                              : 'אין עדיין סריקת 3D לנכס הזה',
+                          _tourTitle,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14.5,
@@ -1445,9 +1462,7 @@ class _OverviewCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          hasVirtualTour
-                              ? 'פתח סיור עצמי ועבור בין חללי הדירה'
-                              : 'אפשר לפתוח בקשה לסריקה או לצפות במדיה הקיימת',
+                          _tourSubtitle,
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 11.5,
@@ -1469,6 +1484,27 @@ class _OverviewCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String get _tourTitle {
+    if (tour?.isReady == true) return 'סיור תלת־ממדי זמין עכשיו';
+    if (tour?.isProcessing == true) return 'סריקת 3D בעיבוד';
+    if (property.videoUrls.isNotEmpty) return 'וידאו סיור זמין';
+    return 'אין עדיין סריקת 3D לנכס הזה';
+  }
+
+  String get _tourSubtitle {
+    if (tour?.isReady == true) return 'פתח סיור עצמי ועבור בין חללי הדירה';
+    if (tour?.isProcessing == true) {
+      final progress = tour?.processingProgress;
+      return progress == null
+          ? 'הסיור יופיע כאן כשהעיבוד יסתיים'
+          : 'התקדמות עיבוד: $progress%';
+    }
+    if (property.videoUrls.isNotEmpty) {
+      return 'צפה בוידאו של הדירה בלי להוריד מודל כבד';
+    }
+    return 'אפשר לפתוח בקשה לסריקה או לצפות במדיה הקיימת';
   }
 }
 
@@ -1582,6 +1618,9 @@ class _TourUnavailableSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tour = property.virtualTour;
+    final hasSource = tour?.hasSourceCapture == true;
+    final isProcessing = tour?.isProcessing == true;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1622,8 +1661,12 @@ class _TourUnavailableSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'עדיין אין סיור תלת־ממדי לנכס הזה',
+          Text(
+            isProcessing
+                ? 'סריקת ה־3D עדיין בעיבוד'
+                : hasSource
+                    ? 'הסריקה נשמרה ומחכה לעיבוד'
+                    : 'עדיין אין סיור תלת־ממדי לנכס הזה',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
@@ -1632,7 +1675,11 @@ class _TourUnavailableSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'כדי לפתוח הליכה חופשית בתוך הדירה צריך שתהיה סריקה או וידאו ייעודי של הנכס. כרגע אפשר להמשיך דרך התמונות והמודעה המקורית.',
+            isProcessing
+                ? _processingCopy(tour)
+                : hasSource
+                    ? 'בעל הדירה כבר צילם וידאו סריקה, אבל backend הסריקות עדיין לא מחובר לעיבוד בענן.'
+                    : 'כדי לפתוח הליכה חופשית בתוך הדירה צריך שתהיה סריקה או וידאו ייעודי של הנכס. כרגע אפשר להמשיך דרך התמונות והמודעה המקורית.',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 14,
@@ -1652,13 +1699,15 @@ class _TourUnavailableSheet extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () async {
-                    Navigator.of(context).pop();
-                    await launchUrl(
-                      Uri.parse(property.url),
-                      mode: LaunchMode.externalApplication,
-                    );
-                  },
+                  onPressed: property.url.trim().isEmpty
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          await launchUrl(
+                            Uri.parse(property.url),
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
                   icon: const Icon(IconsaxPlusBold.export_2),
                   label: const Text('פתח מודעה'),
                 ),
@@ -1669,6 +1718,14 @@ class _TourUnavailableSheet extends StatelessWidget {
       ),
     );
   }
+
+  String _processingCopy(PropertyVirtualTour? tour) {
+    final progress = tour?.processingProgress;
+    if (progress != null) {
+      return 'העיבוד בענן הגיע ל־$progress%. כשה־viewer יהיה מוכן, הכפתור יפתח סיור אינטראקטיבי.';
+    }
+    return 'העיבוד בענן פעיל. כשה־viewer יהיה מוכן, הכפתור יפתח סיור אינטראקטיבי בלי להוריד קובץ כבד מראש.';
+  }
 }
 
 class _VirtualTourScreen extends StatelessWidget {
@@ -1678,6 +1735,11 @@ class _VirtualTourScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tour = property.virtualTour;
+    if (tour?.isReady == true) {
+      return _InteractiveTourScreen(property: property, tour: tour!);
+    }
+
     final tourMedia = property.media.where((item) => item.isVideo).toList();
     return Scaffold(
       backgroundColor: Colors.black,
@@ -1773,6 +1835,179 @@ class _VirtualTourScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InteractiveTourScreen extends StatelessWidget {
+  const _InteractiveTourScreen({required this.property, required this.tour});
+
+  final RentalProperty property;
+  final PropertyVirtualTour tour;
+
+  @override
+  Widget build(BuildContext context) {
+    final quality = tour.qualityScore == null
+        ? null
+        : (tour.qualityScore! * 100).clamp(0, 100).round();
+    return Scaffold(
+      backgroundColor: const Color(0xFF061C2D),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _FloatingNavBtn(
+                    icon: IconsaxPlusBold.arrow_right,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      tour.format.trim().isEmpty
+                          ? 'viewer'
+                          : tour.format.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Center(
+                child: Container(
+                  width: 116,
+                  height: 116,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.view_in_ar_rounded,
+                    color: Colors.white,
+                    size: 58,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                property.address,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'הסיור האינטראקטיבי נטען רק כשפותחים אותו, כדי לשמור את האפליקציה קלה ומהירה.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _DarkMetricChip(
+                    icon: IconsaxPlusBold.cloud,
+                    label: tour.provider,
+                  ),
+                  if (quality != null)
+                    _DarkMetricChip(
+                      icon: IconsaxPlusBold.star_1,
+                      label: 'איכות $quality%',
+                    ),
+                  if (tour.downloadUrl.trim().isNotEmpty)
+                    const _DarkMetricChip(
+                      icon: IconsaxPlusBold.document_cloud,
+                      label: 'קובץ זמין',
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _openViewer(context, tour.viewerUrl),
+                  icon: const Icon(IconsaxPlusBold.export_2),
+                  label: const Text('פתח סיור אינטראקטיבי'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openViewer(BuildContext context, String rawUrl) async {
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null) return;
+    final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    if (!launched) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+}
+
+class _DarkMetricChip extends StatelessWidget {
+  const _DarkMetricChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 13),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

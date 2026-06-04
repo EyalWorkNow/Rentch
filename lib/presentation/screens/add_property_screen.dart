@@ -1,13 +1,18 @@
+import 'dart:ui' show PathMetric;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
+import 'package:dating_app/core/services/legal_consent_service.dart';
+import 'package:dating_app/core/services/property_3d_scan_service.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -32,6 +37,38 @@ extension _PropertyMediaTypeUi on PropertyMediaType {
       : IconsaxPlusBold.video;
 }
 
+// Version is resolved from AppConfig so it stays in sync with
+// LegalConsentService across the whole app — never hardcode it here.
+final List<String> _propertyFeatureLabels = PropertyFeatureCatalog.allLabels;
+
+PropertyLegal _buildPropertyLegal({
+  required bool acceptedTerms,
+  required bool thirdPartyTransferAllowed,
+  required bool commercialSaleAllowed,
+  required bool aiTrainingAllowed,
+  PropertyLegal? existing,
+  String source = 'add_property_screen',
+}) {
+  if (!acceptedTerms) {
+    // Preserve whatever was stored before without touching consent fields.
+    return existing ??
+        PropertyLegal(
+          thirdPartyTransferAllowed: thirdPartyTransferAllowed,
+          commercialSaleAllowed: commercialSaleAllowed,
+          aiTrainingAllowed: aiTrainingAllowed,
+        );
+  }
+
+  // User actively checked "I agree" — always stamp a fresh timestamp and the
+  // current config version so LegalConsentService.hasValidConsent() passes.
+  return LegalConsentService.instance.grantConsent(
+    source: source,
+    thirdPartyTransfer: thirdPartyTransferAllowed,
+    commercialSale: commercialSaleAllowed,
+    aiTraining: aiTrainingAllowed,
+  );
+}
+
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
 
@@ -41,27 +78,6 @@ class AddPropertyScreen extends StatefulWidget {
 
 class _AddPropertyScreenState extends State<AddPropertyScreen> {
   static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'מדיה'];
-
-  static const _allFeatures = [
-    'מרפסת',
-    'חניה',
-    'מחסן',
-    'מזגן',
-    'ממ"ד',
-    'מרפסת שמש',
-    'גינה',
-    'מעלית',
-    'ריהוט',
-    'אינטרנט כלול',
-    'מטבח מאובזר',
-    'חיות מחמד מותר',
-    'כביסה כלולה',
-    'שומר/אבטחה',
-    'נגישות לנכים',
-    'גג משותף',
-    'בריכה',
-    'חדר כושר',
-  ];
 
   final _pageCtrl = PageController();
   int _step = 0;
@@ -77,6 +93,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final List<_PropertyMediaDraft> _mediaDrafts = [_PropertyMediaDraft()];
   final _picker = ImagePicker();
   final _storageService = StorageService();
+  final _scanService = Property3dScanService();
+  final String _draftPropertyId =
+      'custom-${DateTime.now().millisecondsSinceEpoch}';
 
   int _price = 5000;
   double _rooms = 3;
@@ -85,6 +104,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   bool _agencyListing = false;
   final Set<String> _selectedFeatures = {};
   bool _isSaving = false;
+  bool _isSubmittingTour = false;
+  PropertyVirtualTour? _virtualTourDraft;
+  bool _acceptedPropertyTerms = false;
+  bool _thirdPartyTransferAllowed = false;
+  bool _commercialSaleAllowed = false;
+  bool _aiTrainingAllowed = false;
 
   @override
   void dispose() {
@@ -193,6 +218,87 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
   }
 
+  Future<void> _pickScanVideo(ImageSource source) async {
+    try {
+      final file = await _picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 75),
+      );
+      if (file == null) return;
+
+      setState(() => _isSubmittingTour = true);
+      final localPath = await _storageService.saveVideoLocally(
+        file,
+        folderName: 'property_scan_videos',
+      );
+      final sizeBytes = await file.length();
+      final captured = _scanService.localCapture(
+        propertyId: _draftPropertyId,
+        localVideoPath: localPath,
+        sizeBytes: sizeBytes,
+      );
+
+      if (!_scanService.isConfigured) {
+        setState(() {
+          _virtualTourDraft = captured;
+          _isSubmittingTour = false;
+        });
+        _showMediaError(
+          'הסריקה נשמרה כטיוטה. כדי לשלוח לעיבוד צריך להגדיר RENTCH_3D_SCAN_PROXY_URL.',
+        );
+        return;
+      }
+
+      setState(() {
+        _virtualTourDraft = captured.copyWith(
+          status: PropertyTourStatus.uploading,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      });
+
+      final submitted = await _scanService.submitScanVideo(
+        propertyId: _draftPropertyId,
+        title: _scanTitle(),
+        localVideoPath: localPath,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = submitted;
+        _isSubmittingTour = false;
+      });
+    } on Property3dScanException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = _virtualTourDraft?.copyWith(
+          status: PropertyTourStatus.failed,
+          errorMessage: error.message,
+          updatedAt: DateTime.now().toUtc(),
+        );
+        _isSubmittingTour = false;
+      });
+      _showMediaError(error.message);
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError('סריקת ה־3D נכשלה: $error');
+    }
+  }
+
+  String _scanTitle() {
+    final city = _cityCtrl.text.trim();
+    final street = _streetCtrl.text.trim();
+    final parts = [
+      if (street.isNotEmpty) street,
+      if (city.isNotEmpty) city,
+    ];
+    return parts.isEmpty ? 'Rentch apartment scan' : parts.join(', ');
+  }
+
   void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
     final emptyIndex = _mediaDrafts.indexWhere(
@@ -238,6 +344,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       return;
     }
 
+    if (!_acceptedPropertyTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('יש לאשר את תנאי השימוש והצהרת הזכויות לפני פרסום נכס.'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+
     // SEC-2: Sanitize all text inputs before persistence
     final city = InputSanitizer.sanitizeAddress(_cityCtrl.text);
     final street = InputSanitizer.sanitizeAddress(_streetCtrl.text);
@@ -257,11 +374,28 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         })
         .whereType<PropertyMedia>()
         .toList();
+    final sanitizedPrice = InputSanitizer.clampPrice(_price);
+    final transactionType = PropertyTransactionType.rent;
+    final priceHistory = sanitizedPrice > 0
+        ? [
+            PropertyPricePoint(
+              date: DateTime.now().toUtc(),
+              price: sanitizedPrice,
+              transactionType: transactionType,
+            ),
+          ]
+        : const <PropertyPricePoint>[];
+    final legal = _buildPropertyLegal(
+      acceptedTerms: _acceptedPropertyTerms,
+      thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+      commercialSaleAllowed: _commercialSaleAllowed,
+      aiTrainingAllowed: _aiTrainingAllowed,
+    );
 
     final property = RentalProperty(
-      id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
-      url: '',
-      price: InputSanitizer.clampPrice(_price),
+      id: _draftPropertyId,
+      sourceUrl: '',
+      price: sanitizedPrice,
       rooms: InputSanitizer.clampRooms(_rooms),
       sizeM2: InputSanitizer.clampSize(size),
       floor: InputSanitizer.sanitizeText(_floorCtrl.text.trim(), maxLength: 10),
@@ -282,6 +416,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       agencyListing: _agencyListing,
       features: _selectedFeatures.toList(),
       media: media,
+      transactionType: transactionType,
+      virtualTour: _virtualTourDraft,
+      legal: legal,
+      priceHistory: priceHistory,
     );
 
     await context.read<DatingProvider>().addLandlordProperty(property);
@@ -292,100 +430,117 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.navy,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(IconsaxPlusBold.arrow_right, color: Colors.white),
-          onPressed: _prev,
-        ),
-        title: Text(
-          _stepLabels[_step],
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.navy,
+          surfaceTintColor: Colors.transparent,
+          leading: IconButton(
+            icon: const Icon(IconsaxPlusBold.arrow_right, color: Colors.white),
+            onPressed: _prev,
+          ),
+          title: Text(
+            _stepLabels[_step],
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(64),
+            child: _StepIndicator(
+              step: _step,
+              total: 4,
+              labels: _stepLabels,
+            ),
           ),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: _StepIndicator(
-            step: _step,
-            total: 4,
-            labels: _stepLabels,
-          ),
+        body: PageView(
+          controller: _pageCtrl,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _StepLocation(
+              cityCtrl: _cityCtrl,
+              neighborhoodCtrl: _neighborhoodCtrl,
+              streetCtrl: _streetCtrl,
+              streetNumCtrl: _streetNumCtrl,
+            ),
+            _StepDetails(
+              price: _price,
+              rooms: _rooms,
+              sizeCtrl: _sizeCtrl,
+              floorCtrl: _floorCtrl,
+              totalFloorsCtrl: _totalFloorsCtrl,
+              entryDateCtrl: _entryDateCtrl,
+              propertyType: _propertyType,
+              condition: _condition,
+              agencyListing: _agencyListing,
+              onPriceChanged: (v) =>
+                  setState(() => _price = (v / 100).round() * 100),
+              onRoomsChanged: (v) =>
+                  setState(() => _rooms = (v * 2).round() / 2),
+              onTypeChanged: (v) => setState(() => _propertyType = v!),
+              onConditionChanged: (v) => setState(() => _condition = v!),
+              onAgencyChanged: (v) => setState(() => _agencyListing = v),
+            ),
+            _StepFeatures(
+              allFeatures: _propertyFeatureLabels,
+              selectedFeatures: _selectedFeatures,
+              onToggle: (f) => setState(() {
+                if (_selectedFeatures.contains(f)) {
+                  _selectedFeatures.remove(f);
+                } else {
+                  _selectedFeatures.add(f);
+                }
+              }),
+            ),
+            _StepPhotos(
+              mediaDrafts: _mediaDrafts,
+              virtualTourDraft: _virtualTourDraft,
+              isSubmittingTour: _isSubmittingTour,
+              isScanBackendConfigured: _scanService.isConfigured,
+              onPickImageFromGallery: () =>
+                  _pickPropertyImage(ImageSource.gallery),
+              onPickImageFromCamera: () =>
+                  _pickPropertyImage(ImageSource.camera),
+              onPickVideoFromGallery: () =>
+                  _pickPropertyVideo(ImageSource.gallery),
+              onPickVideoFromCamera: () =>
+                  _pickPropertyVideo(ImageSource.camera),
+              onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
+              onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
+              onClearVirtualTour: () =>
+                  setState(() => _virtualTourDraft = null),
+              acceptedTerms: _acceptedPropertyTerms,
+              onAcceptedTermsChanged: (value) =>
+                  setState(() => _acceptedPropertyTerms = value),
+              thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+              onThirdPartyTransferChanged: (value) =>
+                  setState(() => _thirdPartyTransferAllowed = value),
+              commercialSaleAllowed: _commercialSaleAllowed,
+              onCommercialSaleChanged: (value) =>
+                  setState(() => _commercialSaleAllowed = value),
+              aiTrainingAllowed: _aiTrainingAllowed,
+              onAiTrainingChanged: (value) =>
+                  setState(() => _aiTrainingAllowed = value),
+              onAddMediaUrl: _assignPickedMedia,
+              onRemoveMedia: (i) => setState(() {
+                _mediaDrafts[i].dispose();
+                _mediaDrafts.removeAt(i);
+              }),
+            ),
+          ],
         ),
-      ),
-      body: PageView(
-        controller: _pageCtrl,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _StepLocation(
-            cityCtrl: _cityCtrl,
-            neighborhoodCtrl: _neighborhoodCtrl,
-            streetCtrl: _streetCtrl,
-            streetNumCtrl: _streetNumCtrl,
-          ),
-          _StepDetails(
-            price: _price,
-            rooms: _rooms,
-            sizeCtrl: _sizeCtrl,
-            floorCtrl: _floorCtrl,
-            totalFloorsCtrl: _totalFloorsCtrl,
-            entryDateCtrl: _entryDateCtrl,
-            propertyType: _propertyType,
-            condition: _condition,
-            agencyListing: _agencyListing,
-            onPriceChanged: (v) =>
-                setState(() => _price = (v / 100).round() * 100),
-            onRoomsChanged: (v) => setState(() => _rooms = (v * 2).round() / 2),
-            onTypeChanged: (v) => setState(() => _propertyType = v!),
-            onConditionChanged: (v) => setState(() => _condition = v!),
-            onAgencyChanged: (v) => setState(() => _agencyListing = v),
-          ),
-          _StepFeatures(
-            allFeatures: _allFeatures,
-            selectedFeatures: _selectedFeatures,
-            onToggle: (f) => setState(() {
-              if (_selectedFeatures.contains(f)) {
-                _selectedFeatures.remove(f);
-              } else {
-                _selectedFeatures.add(f);
-              }
-            }),
-          ),
-          _StepPhotos(
-            mediaDrafts: _mediaDrafts,
-            onPickImageFromGallery: () =>
-                _pickPropertyImage(ImageSource.gallery),
-            onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
-            onPickVideoFromGallery: () =>
-                _pickPropertyVideo(ImageSource.gallery),
-            onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
-            onAddMedia: () => setState(() {
-              if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
-                return;
-              }
-              _mediaDrafts.add(_PropertyMediaDraft());
-            }),
-            onRemoveMedia: (i) => setState(() {
-              _mediaDrafts[i].dispose();
-              _mediaDrafts.removeAt(i);
-            }),
-            onTypeChanged: (i, type) => setState(() {
-              _mediaDrafts[i].type = type;
-            }),
-          ),
-        ],
-      ),
-      bottomSheet: _WizardNavBar(
-        step: _step,
-        total: 4,
-        isLoading: _isSaving,
-        onNext: _next,
-        onPrev: _prev,
+        bottomSheet: _WizardNavBar(
+          step: _step,
+          total: 4,
+          isLoading: _isSaving,
+          onNext: _next,
+          onPrev: _prev,
+        ),
       ),
     );
   }
@@ -559,17 +714,91 @@ class _WizardNavBar extends StatelessWidget {
 
 // ─── Step 1: Location ─────────────────────────────────────────────────────────
 
-class _StepLocation extends StatelessWidget {
+class _StepLocation extends StatefulWidget {
   const _StepLocation({
     required this.cityCtrl,
     required this.neighborhoodCtrl,
     required this.streetCtrl,
     required this.streetNumCtrl,
   });
+
   final TextEditingController cityCtrl;
   final TextEditingController neighborhoodCtrl;
   final TextEditingController streetCtrl;
   final TextEditingController streetNumCtrl;
+
+  @override
+  State<_StepLocation> createState() => _StepLocationState();
+}
+
+class _StepLocationState extends State<_StepLocation> {
+  bool _isLoading = false;
+
+  Future<void> _captureLocation() async {
+    setState(() => _isLoading = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'שירותי המיקום כבויים במכשיר.';
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'הרשאת המיקום נדחתה.';
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw 'הרשאות המיקום חסומות לצמיתות בהגדרות המכשיר.';
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      await setLocaleIdentifier('he_IL');
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        setState(() {
+          widget.cityCtrl.text =
+              place.locality ?? place.subAdministrativeArea ?? '';
+          widget.neighborhoodCtrl.text = place.subLocality ?? '';
+          widget.streetCtrl.text = place.thoroughfare ?? '';
+          widget.streetNumCtrl.text = place.subThoroughfare ?? '';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('המיקום זוהה והוזן בהצלחה!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } else {
+        throw 'לא נמצאו נתוני כתובת עבור הקואורדינטות.';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('שגיאה בזיהוי המיקום: $e'),
+            backgroundColor: AppColors.coral,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -582,14 +811,47 @@ class _StepLocation extends StatelessWidget {
           subtitle: 'מלא עיר ורחוב לפחות',
         ),
         const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _isLoading ? null : _captureLocation,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+            foregroundColor: AppColors.primary,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.primary, width: 1),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                )
+              : const Icon(IconsaxPlusBold.gps, size: 18),
+          label: Text(
+            _isLoading ? 'מזהה מיקום...' : 'זהה מיקום אוטומטית לפי ה-GPS',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         _FormCard(
           child: Column(
             children: [
               _Field(
-                  ctrl: cityCtrl, label: 'עיר *', icon: IconsaxPlusBold.map),
+                  ctrl: widget.cityCtrl,
+                  label: 'עיר *',
+                  icon: IconsaxPlusBold.map),
               const SizedBox(height: 12),
               _Field(
-                  ctrl: neighborhoodCtrl,
+                  ctrl: widget.neighborhoodCtrl,
                   label: 'שכונה (אופציונלי)',
                   icon: IconsaxPlusBold.map_1),
               const SizedBox(height: 12),
@@ -598,14 +860,14 @@ class _StepLocation extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: _Field(
-                        ctrl: streetCtrl,
+                        ctrl: widget.streetCtrl,
                         label: 'רחוב *',
                         icon: IconsaxPlusBold.routing),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Field(
-                      ctrl: streetNumCtrl,
+                      ctrl: widget.streetNumCtrl,
                       label: 'מספר',
                       icon: IconsaxPlusBold.hashtag,
                       numeric: true,
@@ -691,29 +953,29 @@ class _StepDetails extends StatelessWidget {
                 onChanged: onRoomsChanged,
               ),
               const SizedBox(height: 14),
+              _Field(
+                ctrl: sizeCtrl,
+                label: 'גודל הנכס במ"ר *',
+                icon: IconsaxPlusBold.maximize_3,
+                numeric: true,
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: _Field(
-                      ctrl: sizeCtrl,
-                      label: 'גודל (מ"ר) *',
-                      icon: IconsaxPlusBold.maximize_3,
-                      numeric: true,
+                      ctrl: floorCtrl,
+                      label: 'קומה',
+                      icon: IconsaxPlusBold.layer,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Field(
-                        ctrl: floorCtrl,
-                        label: 'קומה',
-                        icon: IconsaxPlusBold.layer),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _Field(
-                        ctrl: totalFloorsCtrl,
-                        label: 'סה"כ קומות',
-                        icon: IconsaxPlusBold.buildings),
+                      ctrl: totalFloorsCtrl,
+                      label: 'סה"כ קומות',
+                      icon: IconsaxPlusBold.buildings,
+                    ),
                   ),
                 ],
               ),
@@ -757,7 +1019,6 @@ class _StepDetails extends StatelessWidget {
                   const Spacer(),
                   Switch.adaptive(
                     value: agencyListing,
-                    activeThumbColor: AppColors.primary,
                     onChanged: onAgencyChanged,
                   ),
                 ],
@@ -855,22 +1116,201 @@ class _StepFeatures extends StatelessWidget {
 class _StepPhotos extends StatelessWidget {
   const _StepPhotos({
     required this.mediaDrafts,
+    required this.virtualTourDraft,
+    required this.isSubmittingTour,
+    required this.isScanBackendConfigured,
     required this.onPickImageFromGallery,
     required this.onPickImageFromCamera,
     required this.onPickVideoFromGallery,
     required this.onPickVideoFromCamera,
-    required this.onAddMedia,
+    required this.onPickScanFromGallery,
+    required this.onPickScanFromCamera,
+    required this.onClearVirtualTour,
+    required this.acceptedTerms,
+    required this.onAcceptedTermsChanged,
+    required this.thirdPartyTransferAllowed,
+    required this.onThirdPartyTransferChanged,
+    required this.commercialSaleAllowed,
+    required this.onCommercialSaleChanged,
+    required this.aiTrainingAllowed,
+    required this.onAiTrainingChanged,
+    required this.onAddMediaUrl,
     required this.onRemoveMedia,
-    required this.onTypeChanged,
   });
   final List<_PropertyMediaDraft> mediaDrafts;
+  final PropertyVirtualTour? virtualTourDraft;
+  final bool isSubmittingTour;
+  final bool isScanBackendConfigured;
   final VoidCallback onPickImageFromGallery;
   final VoidCallback onPickImageFromCamera;
   final VoidCallback onPickVideoFromGallery;
   final VoidCallback onPickVideoFromCamera;
-  final VoidCallback onAddMedia;
+  final VoidCallback onPickScanFromGallery;
+  final VoidCallback onPickScanFromCamera;
+  final VoidCallback onClearVirtualTour;
+  final bool acceptedTerms;
+  final ValueChanged<bool> onAcceptedTermsChanged;
+  final bool thirdPartyTransferAllowed;
+  final ValueChanged<bool> onThirdPartyTransferChanged;
+  final bool commercialSaleAllowed;
+  final ValueChanged<bool> onCommercialSaleChanged;
+  final bool aiTrainingAllowed;
+  final ValueChanged<bool> onAiTrainingChanged;
+  final void Function(String url, PropertyMediaType type) onAddMediaUrl;
   final ValueChanged<int> onRemoveMedia;
-  final void Function(int index, PropertyMediaType type) onTypeChanged;
+
+  void _showMediaPickerSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderLight,
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'הוספת תמונה או סרטון',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 2.2,
+                  children: [
+                    _PickerOptionButton(
+                      icon: IconsaxPlusBold.gallery,
+                      label: 'תמונה מהגלריה',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onPickImageFromGallery();
+                      },
+                    ),
+                    _PickerOptionButton(
+                      icon: IconsaxPlusBold.camera,
+                      label: 'צלם תמונה',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onPickImageFromCamera();
+                      },
+                    ),
+                    _PickerOptionButton(
+                      icon: IconsaxPlusBold.video,
+                      label: 'וידאו מהגלריה',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onPickVideoFromGallery();
+                      },
+                    ),
+                    _PickerOptionButton(
+                      icon: IconsaxPlusBold.video_play,
+                      label: 'צלם וידאו',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onPickVideoFromCamera();
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _PickerOptionButton(
+                  icon: IconsaxPlusBold.link,
+                  label: 'הזן קישור ידנית (URL)',
+                  isFullWidth: true,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showUrlInputDialog(context);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showUrlInputDialog(BuildContext context) {
+    final ctrl = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text(
+            'הוספת קישור למדיה',
+            style: TextStyle(
+              color: AppColors.navy,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'הדבק כתובת URL של תמונה או וידאו',
+              hintStyle:
+                  const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              filled: true,
+              fillColor: AppColors.background,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.borderLight),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('ביטול',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            FilledButton(
+              onPressed: () {
+                final url = ctrl.text.trim();
+                if (url.isNotEmpty) {
+                  final isVideo = url.toLowerCase().contains('.mp4') ||
+                      url.toLowerCase().contains('.mov') ||
+                      url.toLowerCase().contains('.avi') ||
+                      url.toLowerCase().contains('.m3u8');
+                  onAddMediaUrl(
+                    url,
+                    isVideo ? PropertyMediaType.video : PropertyMediaType.image,
+                  );
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('הוסף'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -880,161 +1320,69 @@ class _StepPhotos extends StatelessWidget {
         _SectionHint(
           icon: IconsaxPlusBold.gallery,
           title: 'תמונות וסרטונים',
-          subtitle: 'אפשר להעלות מדיה מהמכשיר או להדביק קישור',
+          subtitle: 'העלה תמונות וסרטונים המראים את הדירה במיטבה',
         ),
         const SizedBox(height: 16),
         _FormCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  SizedBox(
-                    width: 150,
-                    child: FilledButton.icon(
-                      onPressed: onPickImageFromGallery,
-                      icon: const Icon(IconsaxPlusBold.gallery, size: 17),
-                      label: const Text('תמונה מהגלריה'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 150,
-                    child: OutlinedButton.icon(
-                      onPressed: onPickImageFromCamera,
-                      icon: const Icon(IconsaxPlusBold.camera, size: 17),
-                      label: const Text('צלם תמונה'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.navy,
-                        side: const BorderSide(color: AppColors.borderLight),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 150,
-                    child: OutlinedButton.icon(
-                      onPressed: onPickVideoFromGallery,
-                      icon: const Icon(IconsaxPlusBold.video, size: 17),
-                      label: const Text('וידאו מהגלריה'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.navy,
-                        side: const BorderSide(color: AppColors.borderLight),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 150,
-                    child: OutlinedButton.icon(
-                      onPressed: onPickVideoFromCamera,
-                      icon: const Icon(IconsaxPlusBold.video_play, size: 17),
-                      label: const Text('צלם וידאו'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.navy,
-                        side: const BorderSide(color: AppColors.borderLight),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _PhotoPreviewStrip(mediaDrafts: mediaDrafts),
-              const SizedBox(height: 14),
-              ...mediaDrafts.asMap().entries.map((e) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: _MediaTypeToggle(
-                          selectedType: e.value.type,
-                          onSelected: (type) => onTypeChanged(e.key, type),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _Field(
-                          ctrl: e.value.controller,
-                          label:
-                              '${e.value.type.label} ${e.key + 1} - קישור או נתיב קובץ',
-                          icon: e.value.type.icon,
-                        ),
-                      ),
-                      if (e.key > 0) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => onRemoveMedia(e.key),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.coral.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              size: 18,
-                              color: AppColors.coral,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              }),
-              if (mediaDrafts.length < SecurityConfig.maxPropertyMediaItems)
-                GestureDetector(
-                  onTap: onAddMedia,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          IconsaxPlusBold.add,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        SizedBox(width: 5),
-                        Text(
-                          'הוסף פריט מדיה',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 1.1,
                 ),
+                itemCount: mediaDrafts.length +
+                    (mediaDrafts.length < 10 &&
+                            (mediaDrafts.isEmpty ||
+                                mediaDrafts.last.controller.text
+                                    .trim()
+                                    .isNotEmpty)
+                        ? 1
+                        : 0),
+                itemBuilder: (context, i) {
+                  if (i == mediaDrafts.length) {
+                    return _MediaGridItem(
+                      index: i,
+                      draft: _PropertyMediaDraft(),
+                      onRemove: () {},
+                      onTapEmpty: () => _showMediaPickerSheet(context),
+                    );
+                  }
+                  return _MediaGridItem(
+                    index: i,
+                    draft: mediaDrafts[i],
+                    onRemove: () => onRemoveMedia(i),
+                    onTapEmpty: () => _showMediaPickerSheet(context),
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              const Divider(height: 1, color: AppColors.borderLight),
+              const SizedBox(height: 16),
+              _Scan3dPanel(
+                tour: virtualTourDraft,
+                isSubmitting: isSubmittingTour,
+                isBackendConfigured: isScanBackendConfigured,
+                onPickFromCamera: onPickScanFromCamera,
+                onPickFromGallery: onPickScanFromGallery,
+                onClear: onClearVirtualTour,
+              ),
+              const SizedBox(height: 16),
+              _PropertyRightsPanel(
+                acceptedTerms: acceptedTerms,
+                onAcceptedTermsChanged: onAcceptedTermsChanged,
+                thirdPartyTransferAllowed: thirdPartyTransferAllowed,
+                onThirdPartyTransferChanged: onThirdPartyTransferChanged,
+                commercialSaleAllowed: commercialSaleAllowed,
+                onCommercialSaleChanged: onCommercialSaleChanged,
+                aiTrainingAllowed: aiTrainingAllowed,
+                onAiTrainingChanged: onAiTrainingChanged,
+              ),
             ],
           ),
         ),
@@ -1043,61 +1391,283 @@ class _StepPhotos extends StatelessWidget {
   }
 }
 
-class _PhotoPreviewStrip extends StatelessWidget {
-  const _PhotoPreviewStrip({required this.mediaDrafts});
+class _PropertyRightsPanel extends StatelessWidget {
+  const _PropertyRightsPanel({
+    required this.acceptedTerms,
+    required this.onAcceptedTermsChanged,
+    required this.thirdPartyTransferAllowed,
+    required this.onThirdPartyTransferChanged,
+    required this.commercialSaleAllowed,
+    required this.onCommercialSaleChanged,
+    required this.aiTrainingAllowed,
+    required this.onAiTrainingChanged,
+  });
 
-  final List<_PropertyMediaDraft> mediaDrafts;
+  final bool acceptedTerms;
+  final ValueChanged<bool> onAcceptedTermsChanged;
+  final bool thirdPartyTransferAllowed;
+  final ValueChanged<bool> onThirdPartyTransferChanged;
+  final bool commercialSaleAllowed;
+  final ValueChanged<bool> onCommercialSaleChanged;
+  final bool aiTrainingAllowed;
+  final ValueChanged<bool> onAiTrainingChanged;
 
   @override
   Widget build(BuildContext context) {
-    final media = mediaDrafts
-        .map((draft) {
-          final url = draft.controller.text.trim();
-          if (url.isEmpty) return null;
-          return PropertyMedia(url: url, type: draft.type);
-        })
-        .whereType<PropertyMedia>()
-        .toList();
-    if (media.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderLight),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'זכויות שימוש והסכמה',
+          style: TextStyle(
+            color: AppColors.navy,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        child: const Row(
-          children: [
-            Icon(IconsaxPlusBold.gallery, color: AppColors.textSecondary),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'שילוב של תמונות וסרטון קצר מעלה אמון ומבליט את הדירה בסוויפים.',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12.5,
-                  height: 1.35,
+        const SizedBox(height: 6),
+        const Text(
+          'אשר/י שהמדיה והמודל שייכים לך או הועלו ברשות, ובחר/י אילו שימושים מותרים.',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Column(
+            children: [
+              CheckboxListTile(
+                value: acceptedTerms,
+                onChanged: (value) => onAcceptedTermsChanged(value ?? false),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text(
+                  'אני מאשר/ת תנאי שימוש, זכויות העלאה וחתימה דיגיטלית לנכס זה',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
+              const Divider(height: 1, color: AppColors.borderLight),
+              SwitchListTile(
+                value: thirdPartyTransferAllowed,
+                onChanged: onThirdPartyTransferChanged,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                title: const Text('מותר להעביר את המידע לצד שלישי'),
+              ),
+              SwitchListTile(
+                value: commercialSaleAllowed,
+                onChanged: onCommercialSaleChanged,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                title: const Text('מותר שימוש מסחרי ומכירה עסקית של המידע'),
+              ),
+              SwitchListTile(
+                value: aiTrainingAllowed,
+                onChanged: onAiTrainingChanged,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                title: const Text('מותר שימוש לאימון מודלים ו-AI'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MediaGridItem extends StatelessWidget {
+  const _MediaGridItem({
+    required this.index,
+    required this.draft,
+    required this.onRemove,
+    required this.onTapEmpty,
+  });
+
+  final int index;
+  final _PropertyMediaDraft draft;
+  final VoidCallback onRemove;
+  final VoidCallback onTapEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = draft.controller.text.trim();
+    final isEmpty = value.isEmpty;
+
+    if (isEmpty) {
+      return GestureDetector(
+        onTap: onTapEmpty,
+        child: CustomPaint(
+          painter: _DashedRectPainter(
+            color: AppColors.primary.withValues(alpha: 0.45),
+            strokeWidth: 1.5,
+            gap: 4.0,
+            dashLength: 6.0,
+            borderRadius: 16.0,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(16),
             ),
-          ],
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  IconsaxPlusBold.add_square,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'הוסף מדיה',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
 
-    return SizedBox(
-      height: 92,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: media.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: SizedBox(
-            width: 112,
-            height: 92,
-            child: _PropertyImagePreview(media: media[i]),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeMedia(
+            media: PropertyMedia(url: value, type: draft.type),
+            fit: BoxFit.cover,
+            videoMode: SafeVideoDisplayMode.iconOnly,
+            fallback: Container(
+              color: AppColors.primaryLight2,
+              child: Icon(draft.type.icon, color: AppColors.primary),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 28,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 6,
+            left: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.navy.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                draft.type.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickerOptionButton extends StatelessWidget {
+  const _PickerOptionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isFullWidth = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isFullWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.background,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: isFullWidth ? 14 : 12,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Row(
+            mainAxisAlignment: isFullWidth
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1105,79 +1675,451 @@ class _PhotoPreviewStrip extends StatelessWidget {
   }
 }
 
-class _PropertyImagePreview extends StatelessWidget {
-  const _PropertyImagePreview({required this.media});
-
-  final PropertyMedia media;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeMedia(
-      media: media,
-      fallback: _fallback(),
-      fit: BoxFit.cover,
-      videoMode: SafeVideoDisplayMode.iconOnly,
-    );
-  }
-
-  Widget _fallback() => Container(
-        color: AppColors.primaryLight2,
-        child: const Icon(
-          IconsaxPlusBold.building,
-          color: AppColors.primary,
-        ),
-      );
-}
-
-class _MediaTypeToggle extends StatelessWidget {
-  const _MediaTypeToggle({
-    required this.selectedType,
-    required this.onSelected,
+class _DashedRectPainter extends CustomPainter {
+  _DashedRectPainter({
+    required this.color,
+    required this.strokeWidth,
+    required this.gap,
+    required this.dashLength,
+    required this.borderRadius,
   });
 
-  final PropertyMediaType selectedType;
-  final ValueChanged<PropertyMediaType> onSelected;
+  final Color color;
+  final double strokeWidth;
+  final double gap;
+  final double dashLength;
+  final double borderRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Radius.circular(borderRadius),
+      ));
+
+    final dashPath = Path();
+    double distance = 0.0;
+    for (final PathMetric measurePath in path.computeMetrics()) {
+      while (distance < measurePath.length) {
+        dashPath.addPath(
+          measurePath.extractPath(distance, distance + dashLength),
+          Offset.zero,
+        );
+        distance += dashLength + gap;
+      }
+      distance = 0.0;
+    }
+
+    canvas.drawPath(dashPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRectPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.gap != gap ||
+        oldDelegate.dashLength != dashLength ||
+        oldDelegate.borderRadius != borderRadius;
+  }
+}
+
+class _Scan3dPanel extends StatelessWidget {
+  const _Scan3dPanel({
+    required this.tour,
+    required this.isSubmitting,
+    required this.isBackendConfigured,
+    required this.onPickFromCamera,
+    required this.onPickFromGallery,
+    required this.onClear,
+  });
+
+  final PropertyVirtualTour? tour;
+  final bool isSubmitting;
+  final bool isBackendConfigured;
+  final VoidCallback onPickFromCamera;
+  final VoidCallback onPickFromGallery;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
+    final currentTour = tour;
     return Column(
-      children: PropertyMediaType.values.map((type) {
-        final selected = type == selectedType;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: GestureDetector(
-            onTap: () => onSelected(type),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: selected ? AppColors.primary : AppColors.primaryLight2,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    type.icon,
-                    size: 13,
-                    color: selected ? Colors.white : AppColors.navy,
+                gradient: const LinearGradient(
+                  colors: [AppColors.navy, Color(0xFF1E3A8A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                  const SizedBox(width: 5),
+                ],
+              ),
+              child: const Icon(
+                Icons.view_in_ar_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    type.label,
+                    'סריקת 3D לדירה',
                     style: TextStyle(
-                      color: selected ? Colors.white : AppColors.navy,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'וידאו קצר ויציב הופך לסיור אינטראקטיבי קל לטעינה.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12.5,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: const [
+            _ScanTip(
+              icon: Icons.access_time_filled_rounded,
+              label: '45-75 שניות',
+            ),
+            _ScanTip(
+              icon: Icons.wb_sunny_rounded,
+              label: 'אור חזק',
+            ),
+            _ScanTip(
+              icon: Icons.slow_motion_video_rounded,
+              label: 'תנועה איטית',
+            ),
+            _ScanTip(
+              icon: Icons.home_work_rounded,
+              label: 'מעבר בכל חדר',
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        if (currentTour == null)
+          _ScanActions(
+            isSubmitting: isSubmitting,
+            onPickFromCamera: onPickFromCamera,
+            onPickFromGallery: onPickFromGallery,
+          )
+        else
+          _ScanStatusCard(
+            tour: currentTour,
+            isSubmitting: isSubmitting,
+            isBackendConfigured: isBackendConfigured,
+            onReplace: onPickFromCamera,
+            onClear: onClear,
           ),
-        );
-      }).toList(),
+      ],
     );
+  }
+}
+
+class _ScanTip extends StatelessWidget {
+  const _ScanTip({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.navy,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanActions extends StatelessWidget {
+  const _ScanActions({
+    required this.isSubmitting,
+    required this.onPickFromCamera,
+    required this.onPickFromGallery,
+  });
+
+  final bool isSubmitting;
+  final VoidCallback onPickFromCamera;
+  final VoidCallback onPickFromGallery;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.navy, Color(0xFF1E3A8A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: isSubmitting ? null : onPickFromCamera,
+                borderRadius: BorderRadius.circular(14),
+                child: Center(
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(IconsaxPlusBold.video_play,
+                                color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'צלם סריקה',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderLight),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: isSubmitting ? null : onPickFromGallery,
+                borderRadius: BorderRadius.circular(14),
+                child: const Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(IconsaxPlusBold.video,
+                          color: AppColors.navy, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'בחר וידאו',
+                        style: TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScanStatusCard extends StatelessWidget {
+  const _ScanStatusCard({
+    required this.tour,
+    required this.isSubmitting,
+    required this.isBackendConfigured,
+    required this.onReplace,
+    required this.onClear,
+  });
+
+  final PropertyVirtualTour tour;
+  final bool isSubmitting;
+  final bool isBackendConfigured;
+  final VoidCallback onReplace;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0EBF2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_statusIcon, color: _statusColor, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _statusLabel,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (tour.processingProgress != null)
+                Text(
+                  '${tour.processingProgress}%',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _detailLabel,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12.5,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isSubmitting ? null : onReplace,
+                  icon: const Icon(IconsaxPlusBold.refresh, size: 16),
+                  label: const Text('החלף סריקה'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    side: const BorderSide(color: AppColors.borderLight),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                onPressed: isSubmitting ? null : onClear,
+                icon: const Icon(Icons.close, color: AppColors.coral),
+                tooltip: 'הסר סריקה',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData get _statusIcon {
+    if (tour.isReady) return IconsaxPlusBold.tick_circle;
+    if (tour.hasFailed) return IconsaxPlusBold.close_circle;
+    if (tour.needsBackendUpload) return IconsaxPlusBold.document_upload;
+    return IconsaxPlusBold.cloud_change;
+  }
+
+  Color get _statusColor {
+    if (tour.isReady) return AppColors.success;
+    if (tour.hasFailed) return AppColors.coral;
+    return AppColors.primary;
+  }
+
+  String get _statusLabel {
+    if (tour.isReady) return 'סיור 3D מוכן לפרסום';
+    if (tour.hasFailed) return 'העיבוד נכשל';
+    if (tour.needsBackendUpload) return 'סריקה נשמרה וממתינה לעיבוד';
+    if (tour.status == PropertyTourStatus.uploading) return 'מעלה וידאו לסריקה';
+    return 'הסיור בעיבוד';
+  }
+
+  String get _detailLabel {
+    if (tour.hasFailed && tour.errorMessage.isNotEmpty) {
+      return tour.errorMessage;
+    }
+    if (tour.needsBackendUpload && !isBackendConfigured) {
+      return 'הווידאו נשמר במכשיר. אחרי חיבור proxy עם API key, הוא יישלח לעיבוד בענן.';
+    }
+    if (tour.processingStage.isNotEmpty) {
+      return 'שלב נוכחי: ${tour.processingStage}';
+    }
+    return 'הלקוחות יראו כפתור סיור רק כשה־viewer יהיה מוכן.';
   }
 }
 
@@ -1427,27 +2369,6 @@ class EditPropertyScreen extends StatefulWidget {
 class _EditPropertyScreenState extends State<EditPropertyScreen> {
   static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'מדיה'];
 
-  static const _allFeatures = [
-    'מרפסת',
-    'חניה',
-    'מחסן',
-    'מזגן',
-    'ממ"ד',
-    'מרפסת שמש',
-    'גינה',
-    'מעלית',
-    'ריהוט',
-    'אינטרנט כלול',
-    'מטבח מאובזר',
-    'חיות מחמד מותר',
-    'כביסה כלולה',
-    'שומר/אבטחה',
-    'נגישות לנכים',
-    'גג משותף',
-    'בריכה',
-    'חדר כושר',
-  ];
-
   final _pageCtrl = PageController();
   int _step = 0;
 
@@ -1462,6 +2383,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late final List<_PropertyMediaDraft> _mediaDrafts;
   final _picker = ImagePicker();
   final _storageService = StorageService();
+  final _scanService = Property3dScanService();
 
   late int _price;
   late double _rooms;
@@ -1470,6 +2392,12 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late bool _agencyListing;
   late final Set<String> _selectedFeatures;
   bool _isSaving = false;
+  bool _isSubmittingTour = false;
+  PropertyVirtualTour? _virtualTourDraft;
+  late bool _acceptedPropertyTerms;
+  late bool _thirdPartyTransferAllowed;
+  late bool _commercialSaleAllowed;
+  late bool _aiTrainingAllowed;
 
   @override
   void initState() {
@@ -1498,6 +2426,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _condition = p.condition.isNotEmpty ? p.condition : 'תקין';
     _agencyListing = p.agencyListing;
     _selectedFeatures = Set<String>.from(p.features);
+    _virtualTourDraft = p.virtualTour;
+    // Show checkbox as checked only when consent exists AND version is current.
+    // Stale consent (version mismatch) requires re-acceptance.
+    _acceptedPropertyTerms =
+        LegalConsentService.instance.hasValidConsent(p.legal);
+    _thirdPartyTransferAllowed = p.legal.thirdPartyTransferAllowed;
+    _commercialSaleAllowed = p.legal.commercialSaleAllowed;
+    _aiTrainingAllowed = p.legal.aiTrainingAllowed;
   }
 
   @override
@@ -1599,6 +2535,87 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     }
   }
 
+  Future<void> _pickScanVideo(ImageSource source) async {
+    try {
+      final file = await _picker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 75),
+      );
+      if (file == null) return;
+
+      setState(() => _isSubmittingTour = true);
+      final localPath = await _storageService.saveVideoLocally(
+        file,
+        folderName: 'property_scan_videos',
+      );
+      final sizeBytes = await file.length();
+      final captured = _scanService.localCapture(
+        propertyId: widget.property.id,
+        localVideoPath: localPath,
+        sizeBytes: sizeBytes,
+      );
+
+      if (!_scanService.isConfigured) {
+        setState(() {
+          _virtualTourDraft = captured;
+          _isSubmittingTour = false;
+        });
+        _showMediaError(
+          'הסריקה נשמרה כטיוטה. כדי לשלוח לעיבוד צריך להגדיר RENTCH_3D_SCAN_PROXY_URL.',
+        );
+        return;
+      }
+
+      setState(() {
+        _virtualTourDraft = captured.copyWith(
+          status: PropertyTourStatus.uploading,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      });
+
+      final submitted = await _scanService.submitScanVideo(
+        propertyId: widget.property.id,
+        title: _scanTitle(),
+        localVideoPath: localPath,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = submitted;
+        _isSubmittingTour = false;
+      });
+    } on Property3dScanException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = _virtualTourDraft?.copyWith(
+          status: PropertyTourStatus.failed,
+          errorMessage: error.message,
+          updatedAt: DateTime.now().toUtc(),
+        );
+        _isSubmittingTour = false;
+      });
+      _showMediaError(error.message);
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError('סריקת ה־3D נכשלה: $error');
+    }
+  }
+
+  String _scanTitle() {
+    final city = _cityCtrl.text.trim();
+    final street = _streetCtrl.text.trim();
+    final parts = [
+      if (street.isNotEmpty) street,
+      if (city.isNotEmpty) city,
+    ];
+    return parts.isEmpty ? 'Rentch apartment scan' : parts.join(', ');
+  }
+
   void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
     final emptyIndex = _mediaDrafts.indexWhere(
@@ -1638,6 +2655,17 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     final size = int.tryParse(_sizeCtrl.text.trim()) ?? 0;
     if (city.isEmpty || street.isEmpty || size == 0) return;
 
+    if (!_acceptedPropertyTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('יש לאשר את תנאי השימוש והצהרת הזכויות לפני שמירת הנכס.'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     final media = _mediaDrafts
@@ -1649,11 +2677,33 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         })
         .whereType<PropertyMedia>()
         .toList();
+    final sanitizedPrice = InputSanitizer.clampPrice(_price);
+    final transactionType = widget.property.transactionType;
+    final nextHistory = [
+      ...widget.property.priceHistory,
+      if (sanitizedPrice > 0 &&
+          (widget.property.priceHistory.isEmpty ||
+              widget.property.priceHistory.last.price != sanitizedPrice ||
+              widget.property.priceHistory.last.transactionType !=
+                  transactionType))
+        PropertyPricePoint(
+          date: DateTime.now().toUtc(),
+          price: sanitizedPrice,
+          transactionType: transactionType,
+        ),
+    ];
+    final legal = _buildPropertyLegal(
+      acceptedTerms: _acceptedPropertyTerms,
+      thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+      commercialSaleAllowed: _commercialSaleAllowed,
+      aiTrainingAllowed: _aiTrainingAllowed,
+      existing: widget.property.legal,
+    );
 
     final updated = RentalProperty(
       id: widget.property.id,
-      url: widget.property.url,
-      price: _price,
+      sourceUrl: widget.property.sourceUrl,
+      price: sanitizedPrice,
       rooms: _rooms,
       sizeM2: size,
       floor: _floorCtrl.text.trim(),
@@ -1671,6 +2721,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       agencyListing: _agencyListing,
       features: _selectedFeatures.toList(),
       media: media,
+      transactionType: transactionType,
+      virtualTour: _virtualTourDraft,
+      legal: legal,
+      priceHistory: nextHistory,
+      marketSignals: widget.property.marketSignals,
     );
 
     await context.read<DatingProvider>().updateLandlordProperty(updated);
@@ -1737,7 +2792,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             onAgencyChanged: (v) => setState(() => _agencyListing = v),
           ),
           _StepFeatures(
-            allFeatures: _allFeatures,
+            allFeatures: _propertyFeatureLabels,
             selectedFeatures: _selectedFeatures,
             onToggle: (f) => setState(() {
               if (_selectedFeatures.contains(f)) {
@@ -1749,24 +2804,34 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           ),
           _StepPhotos(
             mediaDrafts: _mediaDrafts,
+            virtualTourDraft: _virtualTourDraft,
+            isSubmittingTour: _isSubmittingTour,
+            isScanBackendConfigured: _scanService.isConfigured,
             onPickImageFromGallery: () =>
                 _pickPropertyImage(ImageSource.gallery),
             onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
             onPickVideoFromGallery: () =>
                 _pickPropertyVideo(ImageSource.gallery),
             onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
-            onAddMedia: () => setState(() {
-              if (_mediaDrafts.length >= SecurityConfig.maxPropertyMediaItems) {
-                return;
-              }
-              _mediaDrafts.add(_PropertyMediaDraft());
-            }),
+            onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
+            onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
+            onClearVirtualTour: () => setState(() => _virtualTourDraft = null),
+            acceptedTerms: _acceptedPropertyTerms,
+            onAcceptedTermsChanged: (value) =>
+                setState(() => _acceptedPropertyTerms = value),
+            thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+            onThirdPartyTransferChanged: (value) =>
+                setState(() => _thirdPartyTransferAllowed = value),
+            commercialSaleAllowed: _commercialSaleAllowed,
+            onCommercialSaleChanged: (value) =>
+                setState(() => _commercialSaleAllowed = value),
+            aiTrainingAllowed: _aiTrainingAllowed,
+            onAiTrainingChanged: (value) =>
+                setState(() => _aiTrainingAllowed = value),
+            onAddMediaUrl: _assignPickedMedia,
             onRemoveMedia: (i) => setState(() {
               _mediaDrafts[i].dispose();
               _mediaDrafts.removeAt(i);
-            }),
-            onTypeChanged: (i, type) => setState(() {
-              _mediaDrafts[i].type = type;
             }),
           ),
         ],

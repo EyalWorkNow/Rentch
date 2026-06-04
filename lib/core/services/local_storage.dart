@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -28,7 +29,7 @@ class LocalStorageService {
     }
 
     if (localState != null && rawLocalState != null) {
-      await _saveRemoteState(preferences, localState);
+      unawaited(_saveRemoteState(preferences, localState));
     }
 
     return localState;
@@ -146,6 +147,8 @@ class LocalStorageService {
           item['media'] = _remoteMediaItems(item['media']);
           item['imageUrls'] = _remoteUrls(item['imageUrls']);
           item['videoUrls'] = _remoteUrls(item['videoUrls']);
+          item['virtualTour'] = _remoteVirtualTour(item['virtualTour']);
+          item['model3d'] = _remoteModel3d(item['model3d']);
         }
       }
     }
@@ -195,6 +198,14 @@ class LocalStorageService {
           item['videoUrls'] = _mergeUrls(
             item['videoUrls'],
             localItem['videoUrls'],
+          );
+          item['virtualTour'] = _mergeVirtualTour(
+            item['virtualTour'],
+            localItem['virtualTour'],
+          );
+          item['model3d'] = _mergeModel3d(
+            item['model3d'],
+            localItem['model3d'],
           );
         }
       }
@@ -271,6 +282,99 @@ class LocalStorageService {
         return url is String && !existingUrls.contains(url);
       }),
     ];
+  }
+
+  Map<String, dynamic>? _remoteVirtualTour(Object? value) {
+    if (value is! Map) return null;
+    final tour = Map<String, dynamic>.from(value);
+    for (final field in [
+      'sourceVideoUrl',
+      'viewerUrl',
+      'downloadUrl',
+      'previewImageUrl',
+    ]) {
+      final raw = tour[field];
+      if (raw is! String) {
+        tour[field] = '';
+        continue;
+      }
+      final uri = Uri.tryParse(raw.trim());
+      final isRemote =
+          uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+      tour[field] = isRemote ? raw.trim() : '';
+    }
+    return tour;
+  }
+
+  Map<String, dynamic>? _mergeVirtualTour(
+    Object? remoteValue,
+    Object? localValue,
+  ) {
+    final remote = remoteValue is Map
+        ? Map<String, dynamic>.from(remoteValue)
+        : <String, dynamic>{};
+    if (localValue is! Map) return remote.isEmpty ? null : remote;
+
+    final local = Map<String, dynamic>.from(localValue);
+    final localSource = local['sourceVideoUrl'];
+    if ((remote['sourceVideoUrl'] as String? ?? '').isEmpty &&
+        localSource is String &&
+        (localSource.startsWith('/') || localSource.startsWith('file://'))) {
+      remote['sourceVideoUrl'] = localSource;
+    }
+
+    return remote.isEmpty ? null : remote;
+  }
+
+  Map<String, dynamic>? _remoteModel3d(Object? value) {
+    if (value is! Map) return null;
+    final model = Map<String, dynamic>.from(value);
+    for (final field in [
+      'viewerUrl',
+      'glbUrl',
+      'objUrl',
+      'textureFolder',
+      'floorPlanUrl',
+    ]) {
+      final raw = model[field];
+      if (raw is! String) {
+        model[field] = '';
+        continue;
+      }
+      final uri = Uri.tryParse(raw.trim());
+      final isRemote =
+          uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+      model[field] = isRemote ? raw.trim() : '';
+    }
+    return model;
+  }
+
+  Map<String, dynamic>? _mergeModel3d(
+    Object? remoteValue,
+    Object? localValue,
+  ) {
+    final remote = remoteValue is Map
+        ? Map<String, dynamic>.from(remoteValue)
+        : <String, dynamic>{};
+    if (localValue is! Map) return remote.isEmpty ? null : remote;
+
+    final local = Map<String, dynamic>.from(localValue);
+    for (final field in [
+      'viewerUrl',
+      'glbUrl',
+      'objUrl',
+      'textureFolder',
+      'floorPlanUrl',
+    ]) {
+      final remoteValue = remote[field] as String? ?? '';
+      final localValue = local[field];
+      if (remoteValue.isNotEmpty || localValue is! String) continue;
+      if (localValue.startsWith('/') || localValue.startsWith('file://')) {
+        remote[field] = localValue;
+      }
+    }
+
+    return remote.isEmpty ? null : remote;
   }
 
   void _logRemoteError(String action, Object error) {

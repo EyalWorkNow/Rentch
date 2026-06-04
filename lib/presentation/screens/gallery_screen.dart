@@ -32,8 +32,8 @@ class _GalleryScreenState extends State<GalleryScreen>
   @override
   void initState() {
     super.initState();
-    _current = widget.initialIndex;
-    _pageCtrl = PageController(initialPage: widget.initialIndex);
+    _current = _safeMediaIndex(widget.initialIndex);
+    _pageCtrl = PageController(initialPage: _current);
     _entryCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -41,6 +41,11 @@ class _GalleryScreenState extends State<GalleryScreen>
     _fade = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut);
     _entryCtrl.forward();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  int _safeMediaIndex(int index) {
+    if (widget.media.isEmpty) return 0;
+    return index.clamp(0, widget.media.length - 1).toInt();
   }
 
   @override
@@ -58,6 +63,8 @@ class _GalleryScreenState extends State<GalleryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final safeCurrent = _safeMediaIndex(_current);
+
     return FadeTransition(
       opacity: _fade,
       child: Scaffold(
@@ -91,7 +98,9 @@ class _GalleryScreenState extends State<GalleryScreen>
                   ),
                 ),
               Text(
-                '${_current + 1} / ${widget.media.length}',
+                widget.media.isEmpty
+                    ? '0 / 0'
+                    : '${safeCurrent + 1} / ${widget.media.length}',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
@@ -121,12 +130,21 @@ class _GalleryScreenState extends State<GalleryScreen>
                 fit: StackFit.expand,
                 children: [
                   // Main gallery
-                  PageView.builder(
-                    controller: _pageCtrl,
-                    onPageChanged: (i) => setState(() => _current = i),
-                    itemCount: widget.media.length,
-                    itemBuilder: (_, i) => _GalleryPage(media: widget.media[i]),
-                  ),
+                  widget.media.isEmpty
+                      ? const Center(
+                          child: Icon(
+                            IconsaxPlusBold.gallery,
+                            color: Colors.white38,
+                            size: 64,
+                          ),
+                        )
+                      : PageView.builder(
+                          controller: _pageCtrl,
+                          onPageChanged: (i) => setState(() => _current = i),
+                          itemCount: widget.media.length,
+                          itemBuilder: (_, i) =>
+                              _GalleryPage(media: widget.media[i]),
+                        ),
 
                   // Dot indicator bottom
                   if (widget.media.length > 1)
@@ -137,7 +155,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(widget.media.length, (i) {
-                          final active = i == _current;
+                          final active = i == safeCurrent;
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             margin: const EdgeInsets.symmetric(horizontal: 3),

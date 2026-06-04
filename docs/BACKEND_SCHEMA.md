@@ -37,6 +37,7 @@ The current `RENTCH_LAUNCH_MODE=true` path can run a controlled MVP against the 
 
 - `propertyId`: string.
 - `ownerUserId`: string.
+- `sourceUrl`: string, optional external import/source link. Empty for owner-uploaded properties.
 - `price`: integer.
 - `rooms`: double.
 - `sizeM2`: integer.
@@ -51,9 +52,50 @@ The current `RENTCH_LAUNCH_MODE=true` path can run a controlled MVP against the 
 - `propertyType`: string.
 - `entryDate`: datetime or string.
 - `condition`: string.
-- `features`: JSON text.
+- `features`: JSON text object with canonical boolean keys such as `balcony`, `parking`, `storage`, `airConditioning`, `mamad`, `accessible`, `petsAllowed`, `renovated`, and the rest of the supported catalog.
+- `featureLabels`: JSON text array for display/search compatibility with legacy clients.
 - `media`: JSON text array with objects like `{ "url": "...", "type": "image" | "video" }`.
+- `model3d`: JSON text object with `viewerUrl`, `glbUrl`, `objUrl`, `textureFolder`, `floorPlanUrl`, `modelQualityScore`, and `scanDate`.
+- `legal`: JSON text object with `thirdPartyTransferAllowed`, `commercialSaleAllowed`, `aiTrainingAllowed`, `consentVersion`, `consentTimestamp`, and `consentSource`.
+- `priceHistory`: JSON text array with `{ "date": "YYYY-MM-DD", "price": 123, "transactionType": "rent" | "sale" }`.
+- `marketSignals`: JSON text object with `views`, `likes`, `saves`, `skips`, `contactRequests`, and `avgTimeIn3dSeconds`.
+- `virtualTour`: JSON text, optional current 3D tour snapshot.
+- `tourStatus`: enum string, `none`, `captured`, `queued`, `uploading`, `processing`, `ready`, `failed`.
+- `tourViewerUrl`: string, optional lightweight hosted viewer URL.
+- `tourProvider`: string, optional provider key, e.g. `splat3d`.
 - `status`: enum string, `draft`, `active`, `paused`, `rented`.
+- `createdAt`: datetime.
+- `updatedAt`: datetime.
+
+For owner-created properties, require a fresh property-level consent capture before first publish or re-publish with new media/model assets. That consent is stored under `legal` and should not depend only on sign-up acceptance.
+
+`property_3d_tours`
+
+- `tourId`: string.
+- `propertyId`: string.
+- `ownerUserId`: string.
+- `provider`: string, e.g. `splat3d`, `openstrate`, or another video-to-3D backend.
+- `status`: enum string, `captured`, `queued`, `uploading`, `processing`, `ready`, `failed`.
+- `sourceVideoFileId`: string, optional storage file ID for the raw capture.
+- `sourceVideoUrl`: string, optional internal URL. Do not expose publicly by default.
+- `viewerUrl`: string, optional public lightweight viewer URL.
+- `downloadUrl`: string, optional short-lived or protected model download URL.
+- `previewImageUrl`: string, optional thumbnail/poster image.
+- `format`: string, e.g. `sog`, `ply`, `glb`, `gltf`.
+- `processingStage`: string, optional provider stage.
+- `processingProgress`: integer, optional 0-100.
+- `qualityScore`: double, optional provider metric.
+- `errorMessage`: string, optional sanitized failure reason.
+- `createdAt`: datetime.
+- `updatedAt`: datetime.
+
+`scan_requests`
+
+- `requestId`: string.
+- `propertyId`: string.
+- `tenantUserId`: string.
+- `ownerUserId`: string.
+- `status`: enum string, `requested`, `accepted`, `captured`, `declined`, `expired`.
 - `createdAt`: datetime.
 - `updatedAt`: datetime.
 
@@ -98,6 +140,9 @@ The current `RENTCH_LAUNCH_MODE=true` path can run a controlled MVP against the 
 - Public users can read only `properties` where `status=active`.
 - A tenant can create swipes only for their own `tenantUserId`.
 - A landlord can manage only properties where `ownerUserId` matches their user ID.
+- A landlord can create/update 3D tours only for properties they own.
+- Public users can read only 3D tours where the parent property is `active` and the tour status is `ready`.
+- Raw scan videos are private to the owner and backend processing service; tenants receive only `viewerUrl`/preview assets.
 - A match is readable only by its tenant and landlord.
 - Messages are readable and writable only by users on the match.
 - Storage files must be owned by the uploading user; property images and videos must be writable only by the property owner.

@@ -1,8 +1,9 @@
+import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/security/security_config.dart';
 
 // In-memory token-bucket rate limiter.
 //
-// Why this matters at scale: with 10,000 concurrent users all writing to Appwrite,
+// Why this matters at scale: with 1M concurrent users all writing to Appwrite,
 // even small bursts of rapid writes (rapid swipes, message spam) will:
 //   - Exhaust Appwrite's per-project API rate limits
 //   - Create write conflicts on state documents
@@ -11,6 +12,10 @@ import 'package:dating_app/core/security/security_config.dart';
 // This limiter runs on the CLIENT — it is NOT a replacement for server-side
 // rate limiting (which must be set in Appwrite's Functions or API Rules).
 // It reduces wasted API calls before they leave the device.
+//
+// Circuit breakers (CircuitBreaker instances on each service) are the
+// complementary server-side guard: they trip when Appwrite is degraded and
+// fast-fail calls device-side until the backend recovers.
 
 class RateLimiter {
   RateLimiter._();
@@ -32,8 +37,18 @@ class RateLimiter {
   int remainingSwipes() => _remaining(_LimitKey.swipe);
   int remainingMessages() => _remaining(_LimitKey.message);
 
-  // Reset all buckets (call on logout)
-  void reset() => _buckets.clear();
+  // Shared circuit breakers — referenced here so logout resets them all.
+  static final appwriteProperties = CircuitBreaker(name: 'appwrite-properties');
+  static final appwriteUsers = CircuitBreaker(name: 'appwrite-users');
+  static final appwriteMessages = CircuitBreaker(name: 'appwrite-messages');
+
+  // Reset all buckets and breakers (call on logout)
+  void reset() {
+    _buckets.clear();
+    appwriteProperties.reset();
+    appwriteUsers.reset();
+    appwriteMessages.reset();
+  }
 
   // ── Internal ───────────────────────────────────────────────────────────────
 

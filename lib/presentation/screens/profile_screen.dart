@@ -328,9 +328,34 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
   final _pageCtrl = PageController();
 
   @override
+  void didUpdateWidget(covariant _ProfileSliverHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextPage = oldWidget.profile.id == widget.profile.id
+        ? _safePhotoIndex(_currentPage)
+        : 0;
+    if (nextPage != _currentPage || oldWidget.profile.id != widget.profile.id) {
+      _currentPage = nextPage;
+      _jumpToCurrentPageAfterBuild();
+    }
+  }
+
+  @override
   void dispose() {
     _pageCtrl.dispose();
     super.dispose();
+  }
+
+  int _safePhotoIndex(int index) {
+    final photoCount = widget.profile.photoUrls.length;
+    if (photoCount <= 0) return 0;
+    return index.clamp(0, photoCount - 1).toInt();
+  }
+
+  void _jumpToCurrentPageAfterBuild() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pageCtrl.hasClients) return;
+      _pageCtrl.jumpToPage(_safePhotoIndex(_currentPage));
+    });
   }
 
   /// Pick the first meaningful badge detail from importantDetails.
@@ -344,6 +369,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
     final profile = widget.profile;
     final photos = profile.photoUrls;
     final badge = _badgeDetail(profile.importantDetails);
+    final safeCurrentPage = _safePhotoIndex(_currentPage);
 
     return SliverAppBar(
       expandedHeight: 340,
@@ -360,8 +386,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
       actions: [
         TextButton.icon(
           onPressed: widget.onEdit,
-          icon:
-              const Icon(IconsaxPlusBold.edit, color: Colors.white, size: 16),
+          icon: const Icon(IconsaxPlusBold.edit, color: Colors.white, size: 16),
           label: const Text(
             'עריכה',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
@@ -401,35 +426,38 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
             // Invisible tap zones for gallery navigation
             if (photos.length > 1)
               Positioned.fill(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTap: () {
-                          if (_currentPage > 0) {
-                            _pageCtrl.previousPage(
-                              duration: const Duration(milliseconds: 280),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        },
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onTap: () {
+                            if (safeCurrentPage > 0) {
+                              _pageCtrl.previousPage(
+                                duration: const Duration(milliseconds: 280),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTap: () {
-                          if (_currentPage < photos.length - 1) {
-                            _pageCtrl.nextPage(
-                              duration: const Duration(milliseconds: 280),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        },
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onTap: () {
+                            if (safeCurrentPage < photos.length - 1) {
+                              _pageCtrl.nextPage(
+                                duration: const Duration(milliseconds: 280),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -460,10 +488,10 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                       return AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: _currentPage == i ? 18 : 6,
+                        width: safeCurrentPage == i ? 18 : 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: _currentPage == i
+                          color: safeCurrentPage == i
                               ? AppColors.primary
                               : Colors.white.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(999),
@@ -1076,6 +1104,7 @@ class _LandlordProfileScreen extends StatelessWidget {
     final stats = provider.landlordStats;
     final properties = provider.myProperties;
     final matches = provider.matches;
+    final heroMedia = _landlordHeroMedia(properties);
     final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
     final initials = _initials(tenantName);
     final cities = properties.map((p) => p.city).toSet().take(2).join(', ');
@@ -1108,8 +1137,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                           color: Colors.white, fontWeight: FontWeight.w700)),
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.white.withValues(alpha: 0.15),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(999)),
                   ),
@@ -1123,6 +1152,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                 initials: initials,
                 cities: cities,
                 propertiesCount: stats.propertiesCount,
+                heroMedia: heroMedia,
               ),
             ),
           ),
@@ -1149,9 +1179,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 _PropertiesHorizontalScroll(
                   properties: properties,
-                  onAdd: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const AddPropertyScreen())),
+                  onAdd: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const AddPropertyScreen())),
                   onTap: (p) => Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => EditPropertyScreen(property: p))),
                 ),
@@ -1212,9 +1241,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                         onTap: onLogout,
                       ),
                       const Divider(
-                          height: 1,
-                          indent: 74,
-                          color: AppColors.borderLight),
+                          height: 1, indent: 74, color: AppColors.borderLight),
                       _ActionTile(
                         icon: IconsaxPlusBold.trash,
                         label: 'מחיקת חשבון',
@@ -1241,17 +1268,189 @@ class _LandlordHero extends StatelessWidget {
     required this.initials,
     required this.cities,
     required this.propertiesCount,
+    required this.heroMedia,
   });
 
   final TenantProfile profile;
   final String initials;
   final String cities;
   final int propertiesCount;
+  final PropertyMedia? heroMedia;
 
   @override
   Widget build(BuildContext context) {
     final photoUrl = profile.photoUrl;
+    final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
 
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _LandlordProfileHeroBackdrop(heroMedia: heroMedia),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF06243A).withValues(alpha: 0.42),
+                const Color(0xFF06243A).withValues(alpha: 0.84),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 60, 22, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: ClipOval(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _InitialsBubble(initials: initials),
+                              if (photoUrl.isNotEmpty &&
+                                  !photoUrl.startsWith('/'))
+                                Image.network(
+                                  photoUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                )
+                              else if (photoUrl.startsWith('/'))
+                                Image.file(
+                                  File(photoUrl),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(IconsaxPlusBold.verify,
+                              size: 13, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              tenantName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                height: 1.1,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _HeroPill(
+                              icon: IconsaxPlusBold.buildings_2,
+                              label: 'בעל דירה',
+                              color: AppColors.primary,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (cities.isNotEmpty)
+                              _HeroPill(
+                                icon: IconsaxPlusBold.location,
+                                label: cities,
+                                color: Colors.white.withValues(alpha: 0.85),
+                                bg: Colors.white.withValues(alpha: 0.12),
+                              ),
+                            _HeroPill(
+                              icon: IconsaxPlusBold.building,
+                              label: '$propertiesCount נכסים פעילים בתיק',
+                              color: Colors.white.withValues(alpha: 0.85),
+                              bg: Colors.white.withValues(alpha: 0.12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+PropertyMedia? _landlordHeroMedia(List<RentalProperty> properties) {
+  for (final property in properties) {
+    final media = property.primaryMedia;
+    if (media != null) return media;
+  }
+  return null;
+}
+
+class _LandlordProfileHeroBackdrop extends StatelessWidget {
+  const _LandlordProfileHeroBackdrop({required this.heroMedia});
+
+  final PropertyMedia? heroMedia;
+
+  @override
+  Widget build(BuildContext context) {
+    if (heroMedia != null) {
+      return SafeMedia(
+        media: heroMedia!,
+        fit: BoxFit.cover,
+        fallback: const _LandlordProfileHeroFallback(),
+        videoMode: SafeVideoDisplayMode.playback,
+      );
+    }
+    return const _LandlordProfileHeroFallback();
+  }
+}
+
+class _LandlordProfileHeroFallback extends StatelessWidget {
+  const _LandlordProfileHeroFallback();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -1260,132 +1459,30 @@ class _LandlordHero extends StatelessWidget {
           end: Alignment.bottomLeft,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(22, 60, 22, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Avatar
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: ClipOval(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Always-visible initials layer
-                          _InitialsBubble(initials: initials),
-                          // Photo on top — never blank during load
-                          if (photoUrl.isNotEmpty && !photoUrl.startsWith('/'))
-                            Image.network(
-                              photoUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
-                            )
-                          else if (photoUrl.startsWith('/'))
-                            Image.file(
-                              File(photoUrl),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // "בעל דירה" verified badge
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    child: Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(IconsaxPlusBold.verify,
-                          size: 13, color: Colors.white),
-                    ),
-                  ),
-                ],
+          Positioned(
+            top: -28,
+            right: -12,
+            child: Container(
+              width: 170,
+              height: 170,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.name.isNotEmpty ? profile.name : 'בעל דירה',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        _HeroPill(
-                          icon: IconsaxPlusBold.buildings_2,
-                          label: 'בעל דירה',
-                          color: AppColors.primary,
-                        ),
-                        if (cities.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          _HeroPill(
-                            icon: IconsaxPlusBold.location,
-                            label: cities,
-                            color: Colors.white.withValues(alpha: 0.85),
-                            bg: Colors.white.withValues(alpha: 0.12),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // Bottom pill: quick portfolio summary
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.14)),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(IconsaxPlusBold.building,
-                    size: 14, color: Colors.white70),
-                const SizedBox(width: 6),
-                Text(
-                  '$propertiesCount נכסים פעילים בתיק',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+          ),
+          Positioned(
+            bottom: -44,
+            left: -18,
+            child: Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.10),
+              ),
             ),
           ),
         ],
@@ -1545,8 +1642,7 @@ class _KpiCell extends StatelessWidget {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  shape: BoxShape.circle),
+                  color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 16),
             ),
             const SizedBox(height: 7),
@@ -1662,7 +1758,7 @@ class _PropertiesHorizontalScroll extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 172,
+      height: 188,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1690,8 +1786,7 @@ class _PropertyMiniTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final media =
-        property.media.isNotEmpty ? property.media.first : null;
+    final media = property.media.isNotEmpty ? property.media.first : null;
 
     return GestureDetector(
       onTap: onTap,
@@ -1703,9 +1798,7 @@ class _PropertyMiniTile extends StatelessWidget {
           border: Border.all(color: AppColors.borderLight),
           boxShadow: const [
             BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 10,
-                offset: Offset(0, 4)),
+                color: AppColors.shadow, blurRadius: 10, offset: Offset(0, 4)),
           ],
         ),
         child: ClipRRect(
@@ -1715,7 +1808,7 @@ class _PropertyMiniTile extends StatelessWidget {
             children: [
               // Image
               SizedBox(
-                height: 96,
+                height: 88,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -1757,7 +1850,7 @@ class _PropertyMiniTile extends StatelessWidget {
               ),
               // Details
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 7, 10, 9),
+                padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -1768,7 +1861,7 @@ class _PropertyMiniTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.navy,
-                        fontSize: 12.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1779,11 +1872,11 @@ class _PropertyMiniTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 10.5,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 3),
@@ -1918,8 +2011,7 @@ class _ConversationRow extends StatelessWidget {
     final property = provider.propertyById(match.propertyId);
     if (property == null) return const SizedBox.shrink();
 
-    final lastMsg =
-        match.messages.isNotEmpty ? match.messages.last : null;
+    final lastMsg = match.messages.isNotEmpty ? match.messages.last : null;
     final awaitingReply = lastMsg != null && lastMsg.sender == tenantName;
     final media = property.media.isNotEmpty ? property.media.first : null;
 
@@ -1991,8 +2083,7 @@ class _ConversationRow extends StatelessWidget {
                               color: stageColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                  color:
-                                      stageColor.withValues(alpha: 0.25)),
+                                  color: stageColor.withValues(alpha: 0.25)),
                             ),
                             child: Text(stageLabel,
                                 style: TextStyle(
@@ -2055,8 +2146,7 @@ class _ConversationRow extends StatelessWidget {
           ),
         ),
         if (!isLast)
-          const Divider(
-              height: 1, indent: 80, color: AppColors.borderLight),
+          const Divider(height: 1, indent: 80, color: AppColors.borderLight),
       ],
     );
   }
@@ -2070,8 +2160,7 @@ class _PerformanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final convRate =
-        (stats.conversionRate / 100).clamp(0.0, 1.0);
+    final convRate = (stats.conversionRate / 100).clamp(0.0, 1.0);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -2187,9 +2276,7 @@ class _PerformanceRow extends StatelessWidget {
         const Spacer(),
         Text(value,
             style: TextStyle(
-                color: color,
-                fontSize: 15,
-                fontWeight: FontWeight.w900)),
+                color: color, fontSize: 15, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -2222,8 +2309,7 @@ class _SettingsCard extends StatelessWidget {
             color: AppColors.primary,
             onTap: onEditProfile,
           ),
-          const Divider(
-              height: 1, indent: 74, color: AppColors.borderLight),
+          const Divider(height: 1, indent: 74, color: AppColors.borderLight),
           _SettingsTile(
             icon: IconsaxPlusBold.notification,
             label: 'הגדרות התראות',
@@ -2231,8 +2317,7 @@ class _SettingsCard extends StatelessWidget {
             color: AppColors.navy,
             onTap: () {},
           ),
-          const Divider(
-              height: 1, indent: 74, color: AppColors.borderLight),
+          const Divider(height: 1, indent: 74, color: AppColors.borderLight),
           _SettingsTile(
             icon: IconsaxPlusBold.shield_tick,
             label: 'פרטיות ואבטחה',
@@ -2270,8 +2355,7 @@ class _SettingsTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           child: Row(
             children: [
               Container(

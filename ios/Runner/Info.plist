@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -24,10 +22,37 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.116035400248-8vr9h6b5nq73k8fihunjbes1kuufkr8p</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>GIDClientID</key>
+	<string>116035400248-8vr9h6b5nq73k8fihunjbes1kuufkr8p.apps.googleusercontent.com</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>נדרשת גישה למצלמה כדי לצלם תמונת פרופיל</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>נדרשת גישה לשמירה בגלריה</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>נדרשת גישה לגלריה כדי לעדכן תמונות פרופיל</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -42,7 +67,7 @@
 					<key>UISceneConfigurationName</key>
 					<string>flutter</string>
 					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<string>FlutterSceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
 				</dict>

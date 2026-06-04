@@ -386,8 +386,11 @@ class _FiltersSheet extends StatefulWidget {
 }
 
 class _FiltersSheetState extends State<_FiltersSheet> {
+  static const Duration _doubleTapWindow = Duration(milliseconds: 260);
   late final TextEditingController _locationCtrl;
   Timer? _previewDebounce;
+  Timer? _pendingPriorityTimer;
+  String? _pendingPriorityKey;
   late SearchFilters _draftFilters;
   late final String _initialFiltersKey;
   late int _visibleCount;
@@ -409,6 +412,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   void dispose() {
     _commitDraftIfNeeded();
     _previewDebounce?.cancel();
+    _pendingPriorityTimer?.cancel();
     _locationCtrl.dispose();
     super.dispose();
   }
@@ -441,6 +445,18 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       'preferredPropertyTypes': filters.preferredPropertyTypes.toList()..sort(),
       'conditions': filters.conditions.toList()..sort(),
       'preferredConditions': filters.preferredConditions.toList()..sort(),
+      'requiredListingSources':
+          filters.requiredListingSources.map((source) => source.name).toList()
+            ..sort(),
+      'preferredListingSources':
+          filters.preferredListingSources.map((source) => source.name).toList()
+            ..sort(),
+      'requiredMoveInFilters':
+          filters.requiredMoveInFilters.map((filter) => filter.name).toList()
+            ..sort(),
+      'preferredMoveInFilters':
+          filters.preferredMoveInFilters.map((filter) => filter.name).toList()
+            ..sort(),
     });
   }
 
@@ -453,21 +469,36 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     unawaited(widget.provider.updateFilters(_draftFilters));
   }
 
-  /// Cycles tag priority: none → preferred (blue) → required (red) → none.
-  /// Simple sequential cycling — no timer, no double-tap window.
+  /// One tap marks preferred, a second quick tap upgrades to required.
+  /// Tapping an already-selected chip clears it.
   void _handlePriorityTap({
     required String key,
     required FilterPriority current,
     required ValueChanged<FilterPriority> onSelected,
   }) {
-    switch (current) {
-      case FilterPriority.none:
-        onSelected(FilterPriority.preferred);
-      case FilterPriority.preferred:
-        onSelected(FilterPriority.required);
-      case FilterPriority.required:
-        onSelected(FilterPriority.none);
+    if (current == FilterPriority.required ||
+        (current == FilterPriority.preferred && _pendingPriorityKey != key)) {
+      _pendingPriorityTimer?.cancel();
+      _pendingPriorityKey = null;
+      onSelected(FilterPriority.none);
+      return;
     }
+
+    if (_pendingPriorityKey == key) {
+      _pendingPriorityTimer?.cancel();
+      _pendingPriorityKey = null;
+      onSelected(FilterPriority.required);
+      return;
+    }
+
+    _pendingPriorityTimer?.cancel();
+    _pendingPriorityKey = key;
+    onSelected(FilterPriority.preferred);
+    _pendingPriorityTimer = Timer(_doubleTapWindow, () {
+      if (_pendingPriorityKey == key) {
+        _pendingPriorityKey = null;
+      }
+    });
   }
 
   Future<void> _editSliderValue({
@@ -790,8 +821,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                         : AppColors.borderLight),
                                 showCheckmark: false,
                                 onSelected: (_) {
-                                  final minBudget =
-                                      _roundedPriceForTransaction(
+                                  final minBudget = _roundedPriceForTransaction(
                                     type,
                                     f.minBudget
                                         .clamp(
@@ -800,8 +830,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                         )
                                         .toDouble(),
                                   );
-                                  final maxBudget =
-                                      _roundedPriceForTransaction(
+                                  final maxBudget = _roundedPriceForTransaction(
                                     type,
                                     f.maxBudget
                                         .clamp(
@@ -896,9 +925,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       SwitchListTile.adaptive(
                         value: f.includeUnknownPriceListings,
                         contentPadding: EdgeInsets.zero,
-                        activeThumbColor: AppColors.primary,
-                        activeTrackColor:
-                            AppColors.primary.withValues(alpha: 0.35),
                         title: const Text(
                           'לכלול דירות בלי מחיר',
                           style: TextStyle(
@@ -1086,7 +1112,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                       );
                                       return;
                                     }
-                                      _setDraftFilters(
+                                    _setDraftFilters(
                                       f.copyWith(
                                         city: '',
                                         areaId: suggestion.area!.id,
@@ -1116,8 +1142,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 flags: InteractiveFlag.all,
                               ),
                               onTap: (_, __) async {
-                                final polygon = await Navigator.of(context).push<
-                                    List<LatLng>>(
+                                final polygon = await Navigator.of(context)
+                                    .push<List<LatLng>>(
                                   MaterialPageRoute(
                                     fullscreenDialog: true,
                                     builder: (_) => _AreaLassoScreen(
@@ -1239,7 +1265,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         min: 0,
                         max: 2000,
                         divisions: 200,
-                        displayValue: _sizeDisplayValue(f.minSizeM2, f.maxSizeM2),
+                        displayValue:
+                            _sizeDisplayValue(f.minSizeM2, f.maxSizeM2),
                         onValueTap: () => _editRangeValues(
                           context: context,
                           title: 'טווח גודל',
@@ -1380,88 +1407,77 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       _FilterSection(
                           title: 'מקור מודעה',
                           icon: IconsaxPlusBold.profile_2user),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
+                      const _PriorityLegend(),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: ListingSourceFilter.values.map((source) {
-                          final selected = f.listingSource == source;
-                          return ChoiceChip(
-                            selected: selected,
-                            label: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_listingSourceIcon(source),
-                                    size: 13,
-                                    color: selected
-                                        ? Colors.white
-                                        : AppColors.navy),
-                                const SizedBox(width: 4),
-                                Text(_listingSourceLabel(source)),
-                              ],
-                            ),
-                            labelStyle: TextStyle(
-                              color: selected ? Colors.white : AppColors.navy,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.primaryLight2,
-                            side: BorderSide(
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.borderLight),
-                            showCheckmark: false,
-                            onSelected: (_) => _setDraftFilters(
-                              f.copyWith(listingSource: source),
-                              provider,
+                        children: ListingSourceFilter.values
+                            .where(
+                                (source) => source != ListingSourceFilter.any)
+                            .map((source) {
+                          final state = f.listingSourceState(source);
+                          return _PriorityFilterChip(
+                            label: _listingSourceLabel(source),
+                            state: state,
+                            icon: _listingSourceIcon(source),
+                            onTap: () => _handlePriorityTap(
+                              key: 'listing-source:${source.name}',
+                              current: state,
+                              onSelected: (priority) => _setDraftFilters(
+                                f.setListingSourceState(source, priority),
+                                provider,
+                              ),
                             ),
                           );
                         }).toList(),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'ללא בחירה: יוצגו גם פרטיות וגם מתיווך',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       // ── מועד כניסה ──
                       _FilterSection(
                           title: 'מועד כניסה',
                           icon: IconsaxPlusBold.calendar_1),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
+                      const _PriorityLegend(),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: MoveInFilter.values.map((option) {
-                          final selected = f.moveInFilter == option;
-                          return ChoiceChip(
-                            selected: selected,
-                            label: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(IconsaxPlusBold.calendar_1,
-                                    size: 13,
-                                    color: selected
-                                        ? Colors.white
-                                        : AppColors.navy),
-                                const SizedBox(width: 4),
-                                Text(_moveInLabel(option)),
-                              ],
-                            ),
-                            labelStyle: TextStyle(
-                              color: selected ? Colors.white : AppColors.navy,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.primaryLight2,
-                            side: BorderSide(
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.borderLight),
-                            showCheckmark: false,
-                            onSelected: (_) => _setDraftFilters(
-                              f.copyWith(moveInFilter: option),
-                              provider,
+                        children: MoveInFilter.values
+                            .where((option) => option != MoveInFilter.any)
+                            .map((option) {
+                          final state = f.moveInState(option);
+                          return _PriorityFilterChip(
+                            label: _moveInLabel(option),
+                            state: state,
+                            icon: IconsaxPlusBold.calendar_1,
+                            onTap: () => _handlePriorityTap(
+                              key: 'move-in:${option.name}',
+                              current: state,
+                              onSelected: (priority) => _setDraftFilters(
+                                f.setMoveInState(option, priority),
+                                provider,
+                              ),
                             ),
                           );
                         }).toList(),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'ללא בחירה: כל מועדי הכניסה רלוונטיים',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       // ── מאפיינים ──
@@ -1562,32 +1578,35 @@ class _PriorityLegend extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 10, height: 10,
+            width: 10,
+            height: 10,
             decoration: const BoxDecoration(
-              color: AppColors.primary, shape: BoxShape.circle,
+              color: AppColors.primary,
+              shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 4),
           const Text('טאפ: מועדף', style: textStyle),
           const SizedBox(width: 14),
           Container(
-            width: 10, height: 10,
+            width: 10,
+            height: 10,
             decoration: const BoxDecoration(
-              color: AppColors.coral, shape: BoxShape.circle,
+              color: AppColors.coral,
+              shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 4),
-          const Text('טאפ שני: חייב להיות', style: textStyle),
+          const Text('דאבל טאפ: חייב להיות', style: textStyle),
         ],
       ),
     );
   }
 }
 
-/// Priority chip: none → preferred (blue) → required (red) → none.
-///
-/// Uses [FilterChip] internally so its [InkResponse] always wins the gesture
-/// arena inside scrollable sheets — [GestureDetector] loses to scroll on 2nd tap.
+/// Uses a chip surface, while tap interpretation is handled by the sheet state
+/// so single tap can mean "preferred" and a quick second tap can upgrade it to
+/// "required".
 class _PriorityFilterChip extends StatelessWidget {
   const _PriorityFilterChip({
     required this.label,
@@ -1606,8 +1625,7 @@ class _PriorityFilterChip extends StatelessWidget {
     final bool isActive = state != FilterPriority.none;
     final bool isRequired = state == FilterPriority.required;
 
-    final Color activeColor =
-        isRequired ? AppColors.coral : AppColors.primary;
+    final Color activeColor = isRequired ? AppColors.coral : AppColors.primary;
     final Color labelColor = isActive ? Colors.white : AppColors.navy;
 
     return FilterChip(
@@ -1862,7 +1880,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
 
   void _startLasso(PointerDownEvent event) {
     if (!_drawMode) return;
-    final point = _mapController.camera.screenOffsetToLatLng(event.localPosition);
+    final point =
+        _mapController.camera.screenOffsetToLatLng(event.localPosition);
     setState(() {
       _lassoPoints
         ..clear()
@@ -1874,7 +1893,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
   void _updateLasso(PointerMoveEvent event) {
     if (!_drawMode || _lastDrawOffset == null) return;
     if ((event.localPosition - _lastDrawOffset!).distance < 10) return;
-    final point = _mapController.camera.screenOffsetToLatLng(event.localPosition);
+    final point =
+        _mapController.camera.screenOffsetToLatLng(event.localPosition);
     setState(() {
       _lassoPoints.add(point);
       _lastDrawOffset = event.localPosition;
@@ -1983,8 +2003,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
               children: [
                 Expanded(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.94),
                       borderRadius: BorderRadius.circular(18),
@@ -2032,7 +2052,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: canSave
-                        ? () => Navigator.of(context).pop(List<LatLng>.from(polygon))
+                        ? () => Navigator.of(context)
+                            .pop(List<LatLng>.from(polygon))
                         : null,
                     icon: const Icon(IconsaxPlusBold.tick_circle),
                     label: const Text('שמור אזור'),

@@ -22,6 +22,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   bool? _cachedIsLandlord;
 
+  static const int _landlordSwipesTabIndex = 1;
+  static const int _landlordMatchesTabIndex = 2;
+  static const int _landlordPropertiesTabIndex = 3;
+
   void _onTabTap(int index, DatingProvider provider) {
     HapticFeedback.selectionClick();
     setState(() => _currentIndex = index);
@@ -36,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final isLandlord = provider.isLandlord;
+        void openLandlordTab(int index) => _onTabTap(index, provider);
 
         if (_cachedIsLandlord != null && _cachedIsLandlord != isLandlord) {
           _currentIndex = 0;
@@ -43,12 +48,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _cachedIsLandlord = isLandlord;
 
         final screens = isLandlord
-            ? const <Widget>[
-                LandlordDashboardScreen(),
-                ExploreScreen(),
-                MatchesScreen(),
-                LandlordPropertiesScreen(),
-                ProfileScreen(),
+            ? <Widget>[
+                LandlordDashboardScreen(
+                  onOpenSwipes: () => openLandlordTab(_landlordSwipesTabIndex),
+                  onOpenMatches: () =>
+                      openLandlordTab(_landlordMatchesTabIndex),
+                  onOpenProperties: () =>
+                      openLandlordTab(_landlordPropertiesTabIndex),
+                ),
+                const ExploreScreen(),
+                const MatchesScreen(),
+                const LandlordPropertiesScreen(),
+                const ProfileScreen(),
               ]
             : const <Widget>[
                 DiscoverScreen(),
@@ -92,8 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   final isCompact = items.length >= 5;
                   return Expanded(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: isCompact ? 1 : 4),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: isCompact ? 1 : 4),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
                         onTap: () => _onTabTap(index, provider),
@@ -101,8 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           duration: const Duration(milliseconds: 220),
                           curve: Curves.easeOutCubic,
                           padding: EdgeInsets.symmetric(
-                              horizontal: isCompact ? 4 : 12,
-                              vertical: 10),
+                              horizontal: isCompact ? 4 : 12, vertical: 10),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
                             color: isSelected

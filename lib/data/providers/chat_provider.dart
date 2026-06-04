@@ -10,7 +10,12 @@ import 'package:flutter/foundation.dart';
 //   1. Seed with local messages from DatingProvider (shown instantly, offline-safe).
 //   2. Fetch remote messages from Appwrite → merge + de-duplicate.
 //   3. Subscribe to Appwrite Realtime for incoming messages.
-//   4. Poll every 15 s as a fallback when the WebSocket drops.
+//   4. Reconnect is handled by RealtimeChatService with exponential backoff + jitter.
+//
+// Scalability: The previous implementation polled every 15 s as a fallback.
+//   At 1M concurrent users that produces ~66K req/s from polling alone.
+//   Polling is removed entirely; reconnect-with-backoff in RealtimeChatService
+//   handles recovery without generating a request storm.
 //
 // Usage:
 //   final chat = ChatProvider(
@@ -44,7 +49,6 @@ class ChatProvider extends ChangeNotifier {
   String? _pendingTempId;
 
   StreamSubscription<ChatMessage>? _sub;
-  Timer? _pollTimer;
 
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
@@ -64,7 +68,7 @@ class ChatProvider extends ChangeNotifier {
     _isLoading = true;
     _safeNotify();
 
-    final remote = await _service.fetchMessages(matchId, limit: 300);
+    final remote = await _service.fetchMessages(matchId, limit: 100);
     if (_disposed) return;
 
     // Remote is the source of truth. If Appwrite has messages, use them
@@ -79,14 +83,16 @@ class ChatProvider extends ChangeNotifier {
     _service.subscribe(matchId);
     _sub = _service.messages.listen(
       _onRemoteMessage,
-      onError: (_) {
-        if (!_disposed) _realtimeConnected = false;
+      onError: (Object e) {
+        if (kDebugMode) debugPrint('ChatProvider: stream error: $e');
+        if (!_disposed) {
+          _realtimeConnected = false;
+          _safeNotify();
+        }
       },
     );
     _realtimeConnected = true;
     _safeNotify();
-
-    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _poll());
   }
 
   // ── Sending ──────────────────────────────────────────────────────────────────
@@ -146,19 +152,6 @@ class ChatProvider extends ChangeNotifier {
     _safeNotify();
   }
 
-  Future<void> _poll() async {
-    if (_disposed || !_service.isConfigured) return;
-    final fresh = await _service.fetchMessages(matchId, limit: 300);
-    if (_disposed || fresh.isEmpty) return;
-    // Keep in-flight optimistic messages; replace confirmed ones from server.
-    final inFlight = _messages.where((m) => m.id.startsWith('temp_')).toList();
-    final updated = [...fresh, ...inFlight];
-    if (updated.length != _messages.length) {
-      _messages = updated;
-      _safeNotify();
-    }
-  }
-
   void _safeNotify() {
     if (!_disposed) notifyListeners();
   }
@@ -166,7 +159,6 @@ class ChatProvider extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _pollTimer?.cancel();
     _sub?.cancel();
     _service.dispose();
     super.dispose();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
@@ -10,6 +12,15 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const _bg = Color(0xFFF6FAFC);
+const _surface = Colors.white;
+const _border = Color(0xFFDCE8EF);
+const _outgoing = Color(0xFF12AEB8); // teal bubble
+const _incoming = Color(0xFFF0F5F8); // light-grey bubble
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 class MessageScreen extends StatefulWidget {
   const MessageScreen({super.key, required this.matchId});
   final String matchId;
@@ -19,8 +30,8 @@ class MessageScreen extends StatefulWidget {
 }
 
 class _MessageScreenState extends State<MessageScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final _msgCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
 
   ChatProvider? _chatProvider;
   bool _chatInitialized = false;
@@ -52,355 +63,138 @@ class _MessageScreenState extends State<MessageScreen> {
   void _onChatUpdate() {
     if (!mounted) return;
     setState(() {});
-    _scrollToBottom();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    if (_scrollCtrl.hasClients) {
+      _scrollCtrl.animateTo(
+        _scrollCtrl.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   void dispose() {
     _chatProvider?.removeListener(_onChatUpdate);
     _chatProvider?.dispose();
-    _messageController.dispose();
-    _scrollController.dispose();
+    _msgCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<DatingProvider>(
-      builder: (context, provider, _) {
-        final match = provider.matchById(widget.matchId);
-        final property = provider.propertyById(match?.propertyId);
+  // ── Sending ──────────────────────────────────────────────────────────────
 
-        if (match == null || property == null) {
-          return const Scaffold(
-            backgroundColor: AppColors.background,
-            body: Center(child: Text('ההתאמה לא נמצאה')),
-          );
-        }
-
-        final messages = _chatProvider?.messages ?? match.messages;
-        final isRemote = _chatProvider?.isRemoteEnabled ?? false;
-        final isConnected = _chatProvider?.realtimeConnected ?? false;
-        final isSending = _chatProvider?.isSending ?? false;
-        final isLoading = _chatProvider?.isLoading ?? false;
-
-        final imageUrl =
-            property.imageUrls.isNotEmpty ? property.imageUrls.first : '';
-        final tenantName = provider.tenantProfile?.name ?? 'השוכר';
-
-        return Scaffold(
-          backgroundColor: const Color(0xFFF2F7FA),
-          appBar: AppBar(
-            toolbarHeight: 82,
-            backgroundColor: AppColors.navy,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.white),
-            title: Row(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.16),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12.5),
-                        child: SafeImage(
-                          source: imageUrl,
-                          fallback: Container(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            child: const Icon(
-                              IconsaxPlusBold.building,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -2,
-                      right: -2,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: isRemote
-                              ? (isConnected
-                                  ? const Color(0xFF27AE60)
-                                  : const Color(0xFFE67E22))
-                              : const Color(0xFF95A5A6),
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: AppColors.navy, width: 2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        property.address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        property.priceLabel,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          _HeaderTag(
-                            icon: IconsaxPlusBold.message,
-                            label: '${messages.length} הודעות',
-                            isAccent: false,
-                          ),
-                          const SizedBox(width: 6),
-                          _HeaderTag(
-                            icon: isRemote
-                                ? (isConnected
-                                    ? IconsaxPlusBold.wifi
-                                    : IconsaxPlusBold.wifi_square)
-                                : IconsaxPlusBold.tick_circle,
-                            label: isRemote
-                                ? (isConnected ? 'בשידור חי' : 'מתחבר...')
-                                : (match.contractSent
-                                    ? 'תהליך פעיל'
-                                    : 'צ׳אט מקומי'),
-                            isAccent: isRemote && isConnected,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          body: SafeArea(
-            child: Column(
-              children: [
-                _PropertyContractHeader(match: match, property: property),
-                _QuickActions(
-                  match: match,
-                  onSendContract: match.contractSent
-                      ? null
-                      : () => provider.sendContract(match.id),
-                  onOwnerSign: !match.contractSent || match.ownerSigned
-                      ? null
-                      : () => provider.signContract(match.id, asOwner: true),
-                  onTenantSign: !match.contractSent || match.tenantSigned
-                      ? null
-                      : () =>
-                          provider.signContract(match.id, asOwner: false),
-                  onPropertyReview: () => _showReviewDialog(
-                    title: 'ביקורת על הדירה',
-                    onSubmit: (rating, text) => provider.addPropertyReview(
-                      propertyId: property.id,
-                      rating: rating,
-                      text: text,
-                    ),
-                  ),
-                  onTenantReview: () => _showReviewDialog(
-                    title: 'ביקורת על השוכר',
-                    onSubmit: (rating, text) =>
-                        provider.addTenantReview(rating: rating, text: text),
-                  ),
-                ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0xFFF2F7FA),
-                              Color(0xFFE5EEF3),
-                            ],
-                          ),
-                        ),
-                        child: messages.isEmpty
-                            ? const _EmptyChat()
-                            : ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.fromLTRB(
-                                    16, 12, 16, 24),
-                                itemCount: messages.length,
-                                itemBuilder: (context, index) {
-                                  final message = messages[index];
-                                  final previous = index == 0
-                                      ? null
-                                      : messages[index - 1];
-                                  final isTenant =
-                                      message.sender == tenantName;
-                                  final showDateDivider = previous == null ||
-                                      !_isSameDay(previous.createdAt,
-                                          message.createdAt);
-                                  final isPending =
-                                      message.id.startsWith('temp_');
-                                  return Column(
-                                    children: [
-                                      if (showDateDivider)
-                                        _DateDivider(date: message.createdAt),
-                                      _MessageBubble(
-                                        message: message,
-                                        isTenant: isTenant,
-                                        isPending: isPending,
-                                        showAvatar: !isTenant &&
-                                            (previous == null ||
-                                                previous.sender !=
-                                                    message.sender),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                      ),
-                      if (isLoading)
-                        Positioned(
-                          top: 8,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(
-                                color:
-                                    AppColors.navy.withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'טוען הודעות...',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                _MessageInput(
-                  controller: _messageController,
-                  isSending: isSending,
-                  onSend: () => _handleSend(provider, tenantName),
-                  onTemplates: () => _showTemplates(tenantName),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _handleSend(DatingProvider provider, String tenantName) async {
-    final raw = _messageController.text.trim();
+  Future<void> _handleSend(DatingProvider provider, String senderName) async {
+    final raw = _msgCtrl.text.trim();
     if (raw.isEmpty) return;
 
     if (InputSanitizer.isMessageTooLong(raw)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'הודעה ארוכה מדי (מקסימום ${SecurityConfig.maxMessageLength} תווים)',
-          ),
-          backgroundColor: AppColors.coral,
-        ),
-      );
+      _snack(
+          'הודעה ארוכה מדי (מקסימום ${SecurityConfig.maxMessageLength} תווים)',
+          error: true);
       return;
     }
-
     if (!RateLimiter.instance.allowMessage()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('שלחת יותר מדי הודעות. המתן רגע.'),
-          backgroundColor: AppColors.coral,
-        ),
-      );
+      _snack('שלחת יותר מדי הודעות. המתן רגע.', error: true);
       return;
     }
 
     final text = InputSanitizer.sanitizeMessage(raw);
-    _messageController.clear();
+    _msgCtrl.clear();
 
     if (_chatProvider != null) {
       await _chatProvider!.sendMessage(text);
     } else {
       await provider.sendMessage(
         matchId: widget.matchId,
-        sender: tenantName,
+        sender: senderName,
         text: text,
       );
       _scrollToBottom();
     }
   }
 
-  void _showTemplates(String senderName) {
+  void _snack(String msg, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? AppColors.coral : AppColors.primary,
+    ));
+  }
+
+  // ── Bottom sheets ─────────────────────────────────────────────────────────
+
+  void _showTemplates() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _TemplateLibrarySheet(
         onSelect: (text) {
-          _messageController.text = text;
-          _messageController.selection =
-              TextSelection.collapsed(offset: text.length);
+          _msgCtrl.text = text;
+          _msgCtrl.selection = TextSelection.collapsed(offset: text.length);
+        },
+      ),
+    );
+  }
+
+  void _showActions(DatingProvider provider, RentalMatch match) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ActionsSheet(
+        match: match,
+        onQuickMessage: () {
+          Navigator.pop(context);
+          _showTemplates();
+        },
+        onAttachFile: () {
+          Navigator.pop(context);
+          _snack('צירוף קובץ יתווסף בהמשך');
+        },
+        onAttachMedia: () {
+          Navigator.pop(context);
+          _snack('צירוף תמונה או וידאו יתווסף בהמשך');
+        },
+        onSendContract: match.contractSent
+            ? null
+            : () {
+                Navigator.pop(context);
+                provider.sendContract(match.id);
+              },
+        onOwnerSign: (!match.contractSent || match.ownerSigned)
+            ? null
+            : () {
+                Navigator.pop(context);
+                provider.signContract(match.id, asOwner: true);
+              },
+        onTenantSign: (!match.contractSent || match.tenantSigned)
+            ? null
+            : () {
+                Navigator.pop(context);
+                provider.signContract(match.id, asOwner: false);
+              },
+        onPropertyReview: () {
+          Navigator.pop(context);
+          _showReviewDialog(
+            title: 'ביקורת על הדירה',
+            onSubmit: (rating, text) => provider.addPropertyReview(
+              propertyId: provider.matchById(widget.matchId)!.propertyId,
+              rating: rating,
+              text: text,
+            ),
+          );
+        },
+        onTenantReview: () {
+          Navigator.pop(context);
+          _showReviewDialog(
+            title: 'ביקורת על השוכר',
+            onSubmit: (rating, text) =>
+                provider.addTenantReview(rating: rating, text: text),
+          );
         },
       ),
     );
@@ -415,311 +209,377 @@ class _MessageScreenState extends State<MessageScreen> {
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24)),
-              title: Text(
-                title,
-                style: const TextStyle(
-                    color: AppColors.navy, fontWeight: FontWeight.w900),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text('דירוג',
-                          style: TextStyle(
-                              color: AppColors.navy,
-                              fontWeight: FontWeight.w700)),
-                      Expanded(
-                        child: Slider(
-                          value: rating.toDouble(),
-                          min: 1,
-                          max: 5,
-                          divisions: 4,
-                          label: '$rating',
-                          activeColor: AppColors.primary,
-                          onChanged: (v) =>
-                              setDialogState(() => rating = v.round()),
-                        ),
-                      ),
-                      Text('$rating/5',
-                          style: const TextStyle(
-                              color: AppColors.navy,
-                              fontWeight: FontWeight.w800)),
-                    ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text(title,
+              style: const TextStyle(
+                  color: AppColors.navy, fontWeight: FontWeight.w900)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                const Text('דירוג',
+                    style: TextStyle(
+                        color: AppColors.navy, fontWeight: FontWeight.w700)),
+                Expanded(
+                  child: Slider(
+                    value: rating.toDouble(),
+                    min: 1,
+                    max: 5,
+                    divisions: 4,
+                    label: '$rating',
+                    activeColor: AppColors.primary,
+                    onChanged: (v) => setS(() => rating = v.round()),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: controller,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'תוכן הביקורת...',
-                      filled: true,
-                      fillColor: AppColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide:
-                            const BorderSide(color: AppColors.borderLight),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide:
-                            const BorderSide(color: AppColors.borderLight),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(
-                            color: AppColors.primary, width: 2),
-                      ),
+                ),
+                Text('$rating / 5',
+                    style: const TextStyle(
+                        color: AppColors.navy, fontWeight: FontWeight.w800)),
+              ]),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                textAlign: TextAlign.right,
+                decoration: const InputDecoration(
+                  hintText: 'כתוב ביקורת קצרה...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('ביטול')),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await onSubmit(rating, controller.text.trim());
+              },
+              child: const Text('שלח ביקורת'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<DatingProvider>(
+      builder: (context, provider, _) {
+        final match = provider.matchById(widget.matchId);
+        if (match == null) {
+          return const Scaffold(
+            backgroundColor: _bg,
+            body: Center(child: Text('ההתאמה לא נמצאה')),
+          );
+        }
+
+        final property = provider.propertyById(match.propertyId);
+        if (property == null) {
+          return const Scaffold(
+            backgroundColor: _bg,
+            body: Center(child: Text('הנכס לא נמצא')),
+          );
+        }
+
+        final messages = _chatProvider?.messages ?? match.messages;
+        final isSending = _chatProvider?.isSending ?? false;
+        final isLoading = _chatProvider?.isLoading ?? false;
+        final isRemote = _chatProvider?.isRemoteEnabled ?? false;
+        final isConnected = _chatProvider?.realtimeConnected ?? false;
+        final tenantName = provider.tenantProfile?.name ?? 'השוכר';
+        final imageUrl =
+            property.imageUrls.isNotEmpty ? property.imageUrls.first : '';
+
+        return Scaffold(
+          backgroundColor: _bg,
+          resizeToAvoidBottomInset: true,
+
+          // ── AppBar ──────────────────────────────────────────────────────
+          appBar: AppBar(
+            backgroundColor: _surface,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0.5,
+            shadowColor: _border,
+            iconTheme: const IconThemeData(color: AppColors.navy),
+            titleSpacing: 0,
+            title: Row(children: [
+              // Property thumbnail
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _border),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SafeImage(
+                    source: imageUrl,
+                    fallback: Container(
+                      color: AppColors.primaryLight2,
+                      child: const Icon(IconsaxPlusBold.building,
+                          color: AppColors.primary, size: 18),
                     ),
                   ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('ביטול',
-                      style:
-                          TextStyle(color: AppColors.textSecondary)),
                 ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
-                  onPressed: () async {
-                    final text = controller.text.trim();
-                    if (text.isEmpty) return;
-                    await onSubmit(rating, text);
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop();
-                    }
-                  },
-                  child: const Text('שמירה'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(property.address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.navy,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${property.priceLabel} · ${property.city}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              // Connection dot
+              if (isRemote)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color:
+                          isConnected ? AppColors.success : AppColors.warning,
+                    ),
+                  ),
+                ),
+            ]),
+            // Actions menu icon
+            actions: [
+              IconButton(
+                icon: const Icon(IconsaxPlusBold.more_circle,
+                    color: AppColors.navy, size: 22),
+                tooltip: 'פעולות',
+                onPressed: () => _showActions(provider, match),
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(height: 1, color: _border),
+            ),
+          ),
+
+          // ── Body ────────────────────────────────────────────────────────
+          body: SafeArea(
+            top: false,
+            bottom: false,
+            child: Column(
+              children: [
+                // Contract progress bar (compact strip, only when started)
+                if (match.contractSent)
+                  _ContractBar(
+                    match: match,
+                    onOwnerSign: (!match.ownerSigned)
+                        ? () => provider.signContract(match.id, asOwner: true)
+                        : null,
+                    onTenantSign: (!match.tenantSigned)
+                        ? () => provider.signContract(match.id, asOwner: false)
+                        : null,
+                  ),
+
+                // Message list
+                Expanded(
+                  child: _buildMessageList(messages, tenantName, isLoading),
+                ),
+
+                // Input bar
+                _MessageInput(
+                  controller: _msgCtrl,
+                  isSending: isSending,
+                  onSend: () => _handleSend(provider, tenantName),
+                  onActions: () => _showActions(provider, match),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMessageList(
+    List<ChatMessage> messages,
+    String tenantName,
+    bool isLoading,
+  ) {
+    if (messages.isEmpty && !isLoading) return const _EmptyChat();
+
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final msg = messages[index];
+            final prev = index == 0 ? null : messages[index - 1];
+            final isTenant = msg.sender == tenantName;
+            final showDate =
+                prev == null || !_isSameDay(prev.createdAt, msg.createdAt);
+            final showAvatar =
+                !isTenant && (prev == null || prev.sender != msg.sender);
+            final isPending = msg.id.startsWith('temp_');
+
+            return Column(
+              children: [
+                if (showDate) _DateDivider(date: msg.createdAt),
+                _MessageBubble(
+                  message: msg,
+                  isTenant: isTenant,
+                  showAvatar: showAvatar,
+                  isPending: isPending,
                 ),
               ],
             );
           },
-        );
-      },
+        ),
+        if (isLoading)
+          Positioned(
+            top: 10,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.navy,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    ),
+                    SizedBox(width: 8),
+                    Text('טוען הודעות...',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
-
-    controller.dispose();
   }
 }
 
-// ─── Header tag ───────────────────────────────────────────────────────────────
+// ─── Compact contract strip ───────────────────────────────────────────────────
 
-class _HeaderTag extends StatelessWidget {
-  const _HeaderTag({
-    required this.icon,
-    required this.label,
-    required this.isAccent,
+class _ContractBar extends StatelessWidget {
+  const _ContractBar({
+    required this.match,
+    required this.onOwnerSign,
+    required this.onTenantSign,
   });
 
-  final IconData icon;
-  final String label;
-  final bool isAccent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
-      decoration: BoxDecoration(
-        color: isAccent
-            ? AppColors.primary.withValues(alpha: 0.18)
-            : Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: isAccent
-              ? AppColors.primary.withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.12),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 11,
-            color: isAccent
-                ? AppColors.primaryLight
-                : Colors.white.withValues(alpha: 0.9),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: isAccent
-                  ? AppColors.primaryLight
-                  : Colors.white.withValues(alpha: 0.9),
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Contract progress header ─────────────────────────────────────────────────
-
-class _PropertyContractHeader extends StatelessWidget {
-  const _PropertyContractHeader(
-      {required this.match, required this.property});
   final RentalMatch match;
-  final RentalProperty property;
+  final VoidCallback? onOwnerSign;
+  final VoidCallback? onTenantSign;
+
+  String get _label {
+    if (!match.ownerSigned && !match.tenantSigned) {
+      return 'חוזה נשלח · ממתין לחתימות';
+    }
+    if (!match.ownerSigned) return 'ממתין לחתימת בעלים';
+    if (!match.tenantSigned) return 'ממתין לחתימת שוכר';
+    return 'חוזה חתום על-ידי שני הצדדים ✓';
+  }
+
+  bool get _done => match.ownerSigned && match.tenantSigned;
+
+  VoidCallback? get _primaryAction => onOwnerSign ?? onTenantSign;
 
   @override
   Widget build(BuildContext context) {
-    final steps = [
-      _StepInfo(label: 'צ׳אט', active: true, icon: IconsaxPlusBold.message),
-      _StepInfo(
-          label: 'חוזה נשלח',
-          active: match.contractSent,
-          icon: IconsaxPlusBold.document_text),
-      _StepInfo(
-          label: 'בעלים חתם',
-          active: match.ownerSigned,
-          icon: IconsaxPlusBold.pen_tool),
-      _StepInfo(
-          label: 'שוכר חתם',
-          active: match.tenantSigned,
-          icon: IconsaxPlusBold.edit),
-    ];
-
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08072946),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(steps.length, (index) {
-          final step = steps[index];
-          return Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: step.active
-                              ? const LinearGradient(
-                                  colors: [
-                                    AppColors.primary,
-                                    AppColors.primaryDark
-                                  ],
-                                )
-                              : null,
-                          color:
-                              step.active ? null : const Color(0xFFF2F7FA),
-                          border: Border.all(
-                            color: step.active
-                                ? Colors.transparent
-                                : AppColors.borderLight,
-                            width: 1.5,
-                          ),
-                          boxShadow: step.active
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.25),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: Icon(
-                          step.icon,
-                          size: 13,
-                          color: step.active
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        step.label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: step.active
-                              ? AppColors.navy
-                              : AppColors.textSecondary,
-                          fontSize: 10.5,
-                          fontWeight: step.active
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (index < steps.length - 1)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 18),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        height: 2.5,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          color: steps[index + 1].active
-                              ? AppColors.primary
-                              : const Color(0xFFE2ECF1),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+      color: _done ? const Color(0xFFE9F9F1) : const Color(0xFFEBF7FA),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Icon(
+          _done ? IconsaxPlusBold.tick_circle : IconsaxPlusBold.document_text,
+          size: 16,
+          color: _done ? AppColors.success : AppColors.primary,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            _label,
+            style: TextStyle(
+              color: _done ? AppColors.success : AppColors.navy,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
             ),
-          );
-        }),
-      ),
+          ),
+        ),
+        if (_primaryAction != null)
+          GestureDetector(
+            onTap: _primaryAction,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text(
+                'חתום',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+      ]),
     );
   }
 }
 
-class _StepInfo {
-  final String label;
-  final bool active;
-  final IconData icon;
+// ─── Actions bottom sheet ─────────────────────────────────────────────────────
 
-  const _StepInfo(
-      {required this.label, required this.active, required this.icon});
-}
-
-// ─── Quick action buttons ─────────────────────────────────────────────────────
-
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({
+class _ActionsSheet extends StatelessWidget {
+  const _ActionsSheet({
     required this.match,
+    required this.onQuickMessage,
+    required this.onAttachFile,
+    required this.onAttachMedia,
     required this.onSendContract,
     required this.onOwnerSign,
     required this.onTenantSign,
@@ -728,6 +588,9 @@ class _QuickActions extends StatelessWidget {
   });
 
   final RentalMatch match;
+  final VoidCallback onQuickMessage;
+  final VoidCallback onAttachFile;
+  final VoidCallback onAttachMedia;
   final VoidCallback? onSendContract;
   final VoidCallback? onOwnerSign;
   final VoidCallback? onTenantSign;
@@ -736,125 +599,230 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-      scrollDirection: Axis.horizontal,
-      child: Row(
+    final actions = [
+      _ActionItem(
+        icon: IconsaxPlusBold.document_text,
+        label: 'שליחת חוזה',
+        subtitle: match.contractSent ? 'החוזה כבר נשלח' : 'שלח טיוטה לשוכר',
+        enabled: !match.contractSent,
+        onTap: onSendContract,
+      ),
+      _ActionItem(
+        icon: IconsaxPlusBold.pen_tool,
+        label: 'חתימת בעלים',
+        subtitle: !match.contractSent
+            ? 'זמין אחרי שליחת חוזה'
+            : match.ownerSigned
+                ? 'הושלם ✓'
+                : 'חתום על החוזה',
+        enabled: match.contractSent && !match.ownerSigned,
+        onTap: onOwnerSign,
+      ),
+      _ActionItem(
+        icon: IconsaxPlusBold.edit,
+        label: 'חתימת שוכר',
+        subtitle: !match.contractSent
+            ? 'זמין אחרי שליחת חוזה'
+            : match.tenantSigned
+                ? 'הושלם ✓'
+                : 'אשר חתימת שוכר',
+        enabled: match.contractSent && !match.tenantSigned,
+        onTap: onTenantSign,
+      ),
+      _ActionItem(
+        icon: IconsaxPlusBold.star,
+        label: 'ביקורת על הדירה',
+        subtitle: 'הוסף משוב על הנכס',
+        enabled: true,
+        onTap: onPropertyReview,
+      ),
+      _ActionItem(
+        icon: IconsaxPlusBold.profile_circle,
+        label: 'ביקורת על השוכר',
+        subtitle: 'הוסף משוב על השוכר',
+        enabled: true,
+        onTap: onTenantReview,
+      ),
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ShortcutButton(
-            icon: IconsaxPlusBold.document_text,
-            label: 'שליחת חוזה',
-            onPressed: onSendContract,
+          // Handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.borderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          _ShortcutButton(
-            icon: IconsaxPlusBold.pen_tool,
-            label: 'חתימת בעלים',
-            onPressed: onOwnerSign,
+          const SizedBox(height: 16),
+          const Text('פעולות שיחה',
+              style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionButton(
+                  icon: IconsaxPlusBold.message_text,
+                  label: 'הודעה מהירה',
+                  onTap: onQuickMessage,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _QuickActionButton(
+                  icon: IconsaxPlusBold.document_upload,
+                  label: 'קובץ',
+                  onTap: onAttachFile,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _QuickActionButton(
+                  icon: IconsaxPlusBold.gallery,
+                  label: 'מדיה',
+                  onTap: onAttachMedia,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          _ShortcutButton(
-            icon: IconsaxPlusBold.edit,
-            label: 'חתימת שוכר',
-            onPressed: onTenantSign,
-          ),
-          const SizedBox(width: 8),
-          _ShortcutButton(
-            icon: IconsaxPlusBold.star,
-            label: 'ביקורת דירה',
-            onPressed: onPropertyReview,
-          ),
-          const SizedBox(width: 8),
-          _ShortcutButton(
-            icon: IconsaxPlusBold.profile_circle,
-            label: 'ביקורת שוכר',
-            onPressed: onTenantReview,
-          ),
+          const SizedBox(height: 18),
+          ...actions.map((a) => _ActionTile(item: a)),
         ],
       ),
     );
   }
 }
 
-class _ShortcutButton extends StatelessWidget {
-  const _ShortcutButton({
+class _QuickActionButton extends StatelessWidget {
+  const _QuickActionButton({
     required this.icon,
     required this.label,
-    required this.onPressed,
+    required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback? onPressed;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isEnabled = onPressed != null;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onPressed,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: isEnabled
-              ? const LinearGradient(
-                  colors: [Colors.white, Color(0xFFF5FCFD)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                )
-              : null,
-          color: isEnabled
-              ? null
-              : const Color(0xFFE9F1F5).withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isEnabled
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : const Color(0xFFD4E3EB),
-            width: 1.2,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          height: 76,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F8FB),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFDDEAF1)),
           ),
-          boxShadow: isEnabled
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      ),
+    );
+  }
+}
+
+class _ActionItem {
+  const _ActionItem({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.enabled,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool enabled;
+  final VoidCallback? onTap;
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({required this.item});
+  final _ActionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.enabled ? AppColors.primary : AppColors.textSecondary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: isEnabled
-                    ? AppColors.primary.withValues(alpha: 0.08)
-                    : Colors.transparent,
-                shape: BoxShape.circle,
+                color: item.enabled
+                    ? AppColors.primaryLight2
+                    : const Color(0xFFF0F5F8),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                icon,
-                size: 14,
-                color: isEnabled
-                    ? AppColors.primary
-                    : AppColors.textSecondary.withValues(alpha: 0.6),
+              child: Icon(item.icon, size: 18, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.label,
+                      style: TextStyle(
+                          color: item.enabled
+                              ? AppColors.navy
+                              : AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800)),
+                  Text(item.subtitle,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                color: isEnabled
-                    ? AppColors.navy
-                    : AppColors.textSecondary.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
+            if (item.enabled)
+              const Icon(IconsaxPlusBold.arrow_left,
+                  size: 14, color: AppColors.textSecondary),
+          ]),
         ),
       ),
     );
@@ -869,42 +837,39 @@ class _EmptyChat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withValues(alpha: 0.18),
-                  AppColors.primaryLight.withValues(alpha: 0.12),
-                ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: AppColors.primaryLight2,
+                shape: BoxShape.circle,
               ),
-              shape: BoxShape.circle,
+              child: const Icon(IconsaxPlusBold.message,
+                  color: AppColors.primary, size: 26),
             ),
-            child: const Icon(IconsaxPlusBold.message,
-                color: AppColors.primary, size: 34),
-          ),
-          const SizedBox(height: 18),
-          const Text(
-            'התחל שיחה',
-            style: TextStyle(
-                color: AppColors.navy,
-                fontWeight: FontWeight.w900,
-                fontSize: 18),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'שלח הודעה ראשונה לבעל הדירה',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 16),
+            const Text('הצ׳אט מוכן',
+                style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text(
+              'שלח הודעה כדי להתחיל את השיחה.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13.5,
+                  height: 1.55,
+                  fontWeight: FontWeight.w500),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -919,6 +884,7 @@ class _MessageBubble extends StatelessWidget {
     required this.showAvatar,
     required this.isPending,
   });
+
   final ChatMessage message;
   final bool isTenant;
   final bool showAvatar;
@@ -926,93 +892,70 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bubbleColor = isTenant ? _outgoing : _incoming;
+    final textColor = isTenant ? Colors.white : AppColors.navy;
+    final metaColor = isTenant
+        ? Colors.white.withValues(alpha: 0.75)
+        : AppColors.textSecondary;
+
     final bubble = AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: isPending ? 0.65 : 1.0,
+      duration: const Duration(milliseconds: 180),
+      opacity: isPending ? 0.6 : 1.0,
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.74,
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.74),
+        margin: EdgeInsets.only(
+          top: showAvatar || isTenant ? 8 : 3,
+          bottom: 3,
         ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
         decoration: BoxDecoration(
-          gradient: isTenant
-              ? const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                )
-              : null,
-          color: isTenant ? null : Colors.white,
+          color: bubbleColor,
           borderRadius: BorderRadius.only(
             topRight: const Radius.circular(20),
             topLeft: const Radius.circular(20),
-            bottomRight: isTenant
-                ? const Radius.circular(4)
-                : const Radius.circular(20),
-            bottomLeft: isTenant
-                ? const Radius.circular(20)
-                : const Radius.circular(4),
+            bottomRight:
+                isTenant ? const Radius.circular(6) : const Radius.circular(20),
+            bottomLeft:
+                isTenant ? const Radius.circular(20) : const Radius.circular(6),
           ),
-          border:
-              isTenant ? null : Border.all(color: const Color(0xFFE5EFF4)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x06072946),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          border: isTenant ? null : Border.all(color: _border),
         ),
         child: Column(
           crossAxisAlignment:
               isTenant ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(
-              message.sender,
-              style: TextStyle(
-                color: isTenant
-                    ? Colors.white.withValues(alpha: 0.8)
-                    : AppColors.primary,
-                fontWeight: FontWeight.w800,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 14.5,
-                color: isTenant ? Colors.white : AppColors.navy,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
+            if (!isTenant && showAvatar) ...[
+              Text(message.sender,
+                  style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11)),
+              const SizedBox(height: 4),
+            ],
+            Text(message.text,
+                style: TextStyle(
+                    fontSize: 14.5,
+                    color: textColor,
+                    height: 1.48,
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 5),
             Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  _formatTime(message.createdAt),
-                  style: TextStyle(
-                    color: isTenant
-                        ? Colors.white.withValues(alpha: 0.7)
-                        : AppColors.textSecondary.withValues(alpha: 0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text(_formatTime(message.createdAt),
+                    style: TextStyle(
+                        color: metaColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600)),
                 if (isTenant) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   Icon(
-                    isPending
-                        ? Icons.done_rounded
-                        : Icons.done_all_rounded,
-                    size: 13,
-                    color: isPending
-                        ? Colors.white.withValues(alpha: 0.5)
-                        : Colors.white.withValues(alpha: 0.85),
+                    isPending ? Icons.done_rounded : Icons.done_all_rounded,
+                    size: 12,
+                    color:
+                        Colors.white.withValues(alpha: isPending ? 0.5 : 0.85),
                   ),
                 ],
               ],
@@ -1030,8 +973,8 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isTenant) ...[
-            _SenderAvatar(showAvatar: showAvatar),
-            const SizedBox(width: 8),
+            _SenderAvatar(show: showAvatar),
+            const SizedBox(width: 6),
           ],
           bubble,
         ],
@@ -1041,35 +984,21 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _SenderAvatar extends StatelessWidget {
-  const _SenderAvatar({required this.showAvatar});
-
-  final bool showAvatar;
+  const _SenderAvatar({required this.show});
+  final bool show;
 
   @override
   Widget build(BuildContext context) {
-    if (!showAvatar) return const SizedBox(width: 32);
+    if (!show) return const SizedBox(width: 28);
     return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: Colors.white,
+      width: 28,
+      height: 28,
+      decoration: const BoxDecoration(
+        color: AppColors.primaryLight2,
         shape: BoxShape.circle,
-        border: Border.all(color: AppColors.borderLight, width: 1.5),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06072946),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          )
-        ],
       ),
-      child: const Center(
-        child: Icon(
-          IconsaxPlusBold.building,
-          size: 13,
-          color: AppColors.primary,
-        ),
-      ),
+      child: const Icon(IconsaxPlusBold.building,
+          color: AppColors.primary, size: 12),
     );
   }
 }
@@ -1078,365 +1007,113 @@ class _SenderAvatar extends StatelessWidget {
 
 class _DateDivider extends StatelessWidget {
   const _DateDivider({required this.date});
-
   final DateTime date;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Divider(
-              color: AppColors.borderLight.withValues(alpha: 0.7),
-              thickness: 1,
-            ),
+      child: Row(children: [
+        const Expanded(child: Divider(color: _border, thickness: 1)),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _border),
           ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: AppColors.borderLight),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x04072946),
-                  blurRadius: 6,
-                  offset: Offset(0, 2),
-                )
-              ],
-            ),
-            child: Text(
-              _formatDay(date),
+          child: Text(_formatDay(date),
               style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Divider(
-              color: AppColors.borderLight.withValues(alpha: 0.7),
-              thickness: 1,
-            ),
-          ),
-        ],
-      ),
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700)),
+        ),
+        const Expanded(child: Divider(color: _border, thickness: 1)),
+      ]),
     );
   }
 }
 
-// ─── Composer ─────────────────────────────────────────────────────────────────
-
-class _ComposerShell extends StatelessWidget {
-  const _ComposerShell({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.only(top: 8, bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
+// ─── Message input bar ────────────────────────────────────────────────────────
 
 class _MessageInput extends StatelessWidget {
   const _MessageInput({
     required this.controller,
     required this.isSending,
     required this.onSend,
-    required this.onTemplates,
+    required this.onActions,
   });
+
   final TextEditingController controller;
   final bool isSending;
   final VoidCallback onSend;
-  final VoidCallback onTemplates;
+  final VoidCallback onActions;
 
   @override
   Widget build(BuildContext context) {
-    return _ComposerShell(
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-            16, 8, 16, 8 + MediaQuery.of(context).padding.bottom),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _AddActionsButton(onTemplates: onTemplates),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 46),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F7FA),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFFE2ECF1)),
-                  ),
-                  child: TextField(
-                    controller: controller,
-                    minLines: 1,
-                    maxLines: 4,
-                    style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'כתיבת הודעה...',
-                      hintStyle: TextStyle(
-                        color:
-                            AppColors.textSecondary.withValues(alpha: 0.65),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 11),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: isSending ? null : onSend,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: isSending
-                      ? null
-                      : const LinearGradient(
-                          colors: [AppColors.primary, AppColors.primaryDark],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                  color: isSending ? const Color(0xFFCBD9E0) : null,
-                  shape: BoxShape.circle,
-                  boxShadow: isSending
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                ),
-                child: Center(
-                  child: isSending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(
-                          IconsaxPlusBold.send_1,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    final bottom = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        border: const Border(top: BorderSide(color: _border)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.navy.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
-    );
-  }
-}
-
-class _AddActionsButton extends StatefulWidget {
-  const _AddActionsButton({required this.onTemplates});
-
-  final VoidCallback onTemplates;
-
-  @override
-  State<_AddActionsButton> createState() => _AddActionsButtonState();
-}
-
-class _AddActionsButtonState extends State<_AddActionsButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _expandAnimation;
-  bool _isOpen = false;
-
-  static const List<_ComposerAction> _actions = [
-    _ComposerAction(
-      label: 'קבצים',
-      icon: IconsaxPlusBold.document_upload,
-      kind: _ComposerActionKind.files,
-    ),
-    _ComposerAction(
-      label: 'תמונות',
-      icon: IconsaxPlusBold.gallery,
-      kind: _ComposerActionKind.gallery,
-    ),
-    _ComposerAction(
-      label: 'מצלמה',
-      icon: IconsaxPlusBold.camera,
-      kind: _ComposerActionKind.camera,
-    ),
-    _ComposerAction(
-      label: 'תבניות',
-      icon: IconsaxPlusBold.message_text,
-      kind: _ComposerActionKind.templates,
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 240),
-      reverseDuration: const Duration(milliseconds: 180),
-    );
-    _expandAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutBack,
-      reverseCurve: Curves.easeIn,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _toggleMenu() async {
-    if (_isOpen) {
-      await _controller.reverse();
-      if (mounted) setState(() => _isOpen = false);
-      return;
-    }
-
-    setState(() => _isOpen = true);
-    await _controller.forward();
-  }
-
-  Future<void> _handleAction(_ComposerAction action) async {
-    await _toggleMenu();
-    if (!mounted) return;
-
-    switch (action.kind) {
-      case _ComposerActionKind.templates:
-        widget.onTemplates();
-      case _ComposerActionKind.files:
-        _showComingSoon('חיבור קבצים לצ׳אט יתווסף בקרוב');
-      case _ComposerActionKind.gallery:
-        _showComingSoon('שליחת תמונות מהגלריה תתווסף בקרוב');
-      case _ComposerActionKind.camera:
-        _showComingSoon('צילום ושליחה ישירה יתווספו בקרוב');
-    }
-  }
-
-  void _showComingSoon(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 52,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
+      padding: EdgeInsets.fromLTRB(14, 10, 14, 8 + bottom),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Positioned(
-            bottom: 58,
-            child: IgnorePointer(
-              ignoring: !_isOpen,
-              child: AnimatedBuilder(
-                animation: _expandAnimation,
-                builder: (context, child) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < _actions.length; i++) ...[
-                        Transform.translate(
-                          offset: Offset(
-                            0,
-                            (1 - _expandAnimation.value) * (18 + (i * 10)),
-                          ),
-                          child: Opacity(
-                            opacity: _expandAnimation.value.clamp(0, 1),
-                            child: Transform.scale(
-                              scale: 0.82 + (_expandAnimation.value * 0.18),
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _ComposerMiniActionButton(
-                                  action: _actions[i],
-                                  onTap: () => _handleAction(_actions[i]),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                },
+          // Send on the right in RTL layouts.
+          _SendBtn(isSending: isSending, onTap: onSend),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 118),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD3E2EA)),
+              ),
+              child: TextField(
+                controller: controller,
+                minLines: 1,
+                maxLines: 5,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'כתיבת הודעה...',
+                  hintStyle: TextStyle(
+                    color: AppColors.textSecondary.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
               ),
             ),
           ),
-          GestureDetector(
-            onTap: _toggleMenu,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: _isOpen ? AppColors.navy : const Color(0xFFF2F7FA),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _isOpen
-                      ? AppColors.navy
-                      : const Color(0xFFE2ECF1),
-                ),
-                boxShadow: _isOpen
-                    ? [
-                        BoxShadow(
-                          color: AppColors.navy.withValues(alpha: 0.18),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: AnimatedRotation(
-                duration: const Duration(milliseconds: 220),
-                turns: _isOpen ? 0.125 : 0,
-                child: Icon(
-                  Icons.add,
-                  size: 24,
-                  color: _isOpen ? Colors.white : AppColors.primary,
-                ),
-              ),
-            ),
+          const SizedBox(width: 10),
+          // Plus on the left in RTL layouts.
+          _IconBtn(
+            icon: Icons.add_rounded,
+            color: AppColors.navy,
+            bg: const Color(0xFFF0F5F8),
+            onTap: onActions,
           ),
         ],
       ),
@@ -1444,13 +1121,17 @@ class _AddActionsButtonState extends State<_AddActionsButton>
   }
 }
 
-class _ComposerMiniActionButton extends StatelessWidget {
-  const _ComposerMiniActionButton({
-    required this.action,
+class _IconBtn extends StatelessWidget {
+  const _IconBtn({
+    required this.icon,
+    required this.color,
+    required this.bg,
     required this.onTap,
   });
 
-  final _ComposerAction action;
+  final IconData icon;
+  final Color color;
+  final Color bg;
   final VoidCallback onTap;
 
   @override
@@ -1461,24 +1142,75 @@ class _ComposerMiniActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Ink(
-          width: 46,
-          height: 46,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: bg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2ECF1)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.navy.withValues(alpha: 0.08),
-                blurRadius: 14,
-                offset: const Offset(0, 5),
-              ),
-            ],
           ),
-          child: Icon(
-            action.icon,
-            size: 19,
-            color: AppColors.primary,
+          child: Icon(icon, size: 20, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+class _SendBtn extends StatelessWidget {
+  const _SendBtn({required this.isSending, required this.onTap});
+
+  final bool isSending;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isSending ? null : onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 48,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: isSending
+                ? LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.45),
+                      AppColors.primary.withValues(alpha: 0.3),
+                    ],
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFF1BC7D5), Color(0xFF0EA5B2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: isSending
+                ? const []
+                : [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.26),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+          ),
+          child: Center(
+            child: isSending
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(
+                    IconsaxPlusBold.send_1,
+                    color: Colors.white,
+                    size: 18,
+                  ),
           ),
         ),
       ),
@@ -1486,26 +1218,7 @@ class _ComposerMiniActionButton extends StatelessWidget {
   }
 }
 
-class _ComposerAction {
-  const _ComposerAction({
-    required this.label,
-    required this.icon,
-    required this.kind,
-  });
-
-  final String label;
-  final IconData icon;
-  final _ComposerActionKind kind;
-}
-
-enum _ComposerActionKind {
-  files,
-  gallery,
-  camera,
-  templates,
-}
-
-// ─── Feature #17: Template Message Library ────────────────────────────────────
+// ─── Template library ─────────────────────────────────────────────────────────
 
 class _TemplateMessage {
   const _TemplateMessage({
@@ -1522,69 +1235,62 @@ class _TemplateMessage {
 
 class _TemplateLibrarySheet extends StatelessWidget {
   const _TemplateLibrarySheet({required this.onSelect});
-
   final ValueChanged<String> onSelect;
 
   static const _templates = [
     _TemplateMessage(
-      category: 'ברוך הבא',
-      label: 'הודעת פתיחה',
+      category: 'פתיחה',
+      label: 'הודעת ברכה',
       text:
-          'שלום! קיבלתי את הבקשה שלך לגבי הדירה. אשמח לענות על שאלות ולתאם ביקור. מתי נוח לך?',
+          'שלום! קיבלתי את הבקשה שלך. אשמח לענות על שאלות ולתאם ביקור. מתי נוח לך?',
       icon: IconsaxPlusBold.home_2,
     ),
     _TemplateMessage(
-      category: 'ברוך הבא',
+      category: 'פתיחה',
       label: 'אישור עניין',
       text:
-          'תודה על התעניינותך! הדירה עדיין פנויה. מחיר השכירות הוא כפי שפורסם. אשמח לתאם ביקור בשבוע הקרוב.',
+          'תודה על ההתעניינות! הדירה עדיין פנויה. אשמח לתאם ביקור בשבוע הקרוב.',
       icon: IconsaxPlusBold.tick_circle,
     ),
     _TemplateMessage(
       category: 'ביקור',
       label: 'תיאום ביקור',
-      text:
-          'אני זמין לביקור ביום __ בשעה __. האם מתאים לך? אם לא, נסו להציע מועד נוח מצידך.',
+      text: 'אני זמין לביקור ביום __ בשעה __. האם מתאים לך?',
       icon: IconsaxPlusBold.calendar,
     ),
     _TemplateMessage(
       category: 'ביקור',
       label: 'אישור ביקור',
-      text:
-          'מעולה! מאשר את הביקור ביום __ בשעה __. הכתובת: ___. אתקשר אם יהיה שינוי.',
+      text: 'מעולה! מאשר ביקור ביום __ בשעה __. הכתובת: ___.',
       icon: IconsaxPlusBold.location,
     ),
     _TemplateMessage(
       category: 'חוזה',
       label: 'שליחת חוזה',
-      text:
-          'שלחתי לך את טיוטת החוזה לעיון. אנא קרא בעיון ותחזור אליי עם הערות אם יש. אשמח לענות על כל שאלה.',
+      text: 'שלחתי את טיוטת החוזה. אנא קרא ותחזור אליי עם הערות.',
       icon: IconsaxPlusBold.document_text,
     ),
     _TemplateMessage(
       category: 'חוזה',
       label: 'בקשה לחתימה',
-      text:
-          'הכל נראה מסודר מצידי. אנא חתום על החוזה ונסיים את התהליך. מחפש שוכר רציני לטווח ארוך.',
+      text: 'הכל מסודר מצידי — אנא חתום על החוזה כדי לסיים את התהליך.',
       icon: IconsaxPlusBold.pen_tool,
     ),
     _TemplateMessage(
       category: 'סיום',
       label: 'דחייה עדינה',
-      text:
-          'תודה על ההתעניינות. לצערי מצאנו שוכר מתאים. מאחל לך הצלחה במציאת דירה. בהצלחה!',
+      text: 'תודה על ההתעניינות. לצערי מצאנו שוכר מתאים. בהצלחה!',
       icon: IconsaxPlusBold.close_circle,
     ),
     _TemplateMessage(
       category: 'סיום',
       label: 'ברכות כניסה',
-      text:
-          'ברוך הבא לדירה! אני כאן לכל שאלה. יש כמה דברים שחשוב לדעת על הדירה — נדבר בביקור הראשון.',
+      text: 'ברוך הבא לדירה! אני כאן לכל שאלה.',
       icon: IconsaxPlusBold.house,
     ),
   ];
 
-  Map<String, List<_TemplateMessage>> get _byCategory {
+  Map<String, List<_TemplateMessage>> get _grouped {
     final map = <String, List<_TemplateMessage>>{};
     for (final t in _templates) {
       map.putIfAbsent(t.category, () => []).add(t);
@@ -1594,91 +1300,83 @@ class _TemplateLibrarySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final grouped = _byCategory;
+    final grouped = _grouped;
     return DraggableScrollableSheet(
-      initialChildSize: 0.62,
+      initialChildSize: 0.6,
       minChildSize: 0.4,
       maxChildSize: 0.9,
       builder: (_, scrollCtrl) => Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          color: _surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
             const SizedBox(height: 12),
             Container(
-              width: 40,
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.borderLight,
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Icon(IconsaxPlusBold.message_text,
-                      color: AppColors.primary, size: 20),
-                  SizedBox(width: 10),
-                  Text(
-                    'תבניות הודעה מוכנות',
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                      color: AppColors.primaryLight2,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(IconsaxPlusBold.message_text,
+                      color: AppColors.primary, size: 16),
+                ),
+                const SizedBox(width: 10),
+                const Text('תבניות הודעה',
                     style: TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
+                        color: AppColors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900)),
+              ]),
             ),
             const SizedBox(height: 4),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'בחר תבנית — תוכל לערוך לפני שליחה',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12.5,
-                ),
-              ),
+              child: Text('בחר תבנית — ניתן לערוך לפני שליחה',
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Expanded(
               child: ListView(
                 controller: scrollCtrl,
                 padding: EdgeInsets.fromLTRB(
                     16, 0, 16, 16 + MediaQuery.of(context).padding.bottom),
-                children: grouped.entries.map((entry) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          entry.key,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      ...entry.value.map(
-                        (t) => _TemplateTile(
-                          template: t,
-                          onTap: () {
-                            Navigator.pop(context);
-                            onSelect(t.text);
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                children: grouped.entries
+                    .map((entry) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(entry.key,
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5)),
+                            ),
+                            ...entry.value.map((t) => _TemplateTile(
+                                  template: t,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    onSelect(t.text);
+                                  },
+                                )),
+                          ],
+                        ))
+                    .toList(),
               ),
             ),
           ],
@@ -1697,70 +1395,49 @@ class _TemplateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F7FA).withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.borderLight, width: 1),
-      ),
+          color: _surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _border)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Icon(template.icon,
-                      size: 16, color: AppColors.primary),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      template.label,
+          padding: const EdgeInsets.all(12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                  color: AppColors.primaryLight2,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Icon(template.icon, size: 15, color: AppColors.primary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(template.label,
                       style: const TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      template.text,
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13)),
+                  const SizedBox(height: 3),
+                  Text(template.text,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        height: 1.4,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          height: 1.4)),
+                ],
               ),
-              const SizedBox(width: 8),
-              const Center(
-                child: Icon(
-                  IconsaxPlusBold.arrow_left,
-                  size: 15,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const Icon(IconsaxPlusBold.arrow_left,
+                size: 14, color: AppColors.textSecondary),
+          ]),
         ),
       ),
     );
@@ -1769,22 +1446,19 @@ class _TemplateTile extends StatelessWidget {
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-String _formatTime(DateTime value) {
-  final hour = value.hour.toString().padLeft(2, '0');
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
+String _formatTime(DateTime v) {
+  return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
 }
 
-String _formatDay(DateTime value) {
+String _formatDay(DateTime v) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final target = DateTime(value.year, value.month, value.day);
+  final target = DateTime(v.year, v.month, v.day);
   final diff = today.difference(target).inDays;
   if (diff == 0) return 'היום';
   if (diff == 1) return 'אתמול';
-  return '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
+  return '${v.day.toString().padLeft(2, '0')}.${v.month.toString().padLeft(2, '0')}.${v.year}';
 }
 
-bool _isSameDay(DateTime a, DateTime b) {
-  return a.year == b.year && a.month == b.month && a.day == b.day;
-}
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;

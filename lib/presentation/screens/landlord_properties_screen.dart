@@ -44,10 +44,14 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
 
     // Chip filter
     switch (_activeFilter) {
-      case 'expensive':
-        list = list.where((p) => p.price >= 8000).toList();
-      case 'rooms3':
-        list = list.where((p) => p.rooms >= 3).toList();
+      case 'high_priority':
+        list = list.where((p) => p.price < 6000).toList();
+      case 'luxury':
+        list = list.where((p) => p.price >= 10000).toList();
+      case 'immediate':
+        list = list.where((p) => p.entryDate.isEmpty || p.entryDate.toLowerCase().contains('מיידי') || p.entryDate.toLowerCase().contains('immediate') || p.entryDate.toLowerCase().contains('now')).toList();
+      case 'large':
+        list = list.where((p) => p.rooms >= 4).toList();
       case 'agency':
         list = list.where((p) => p.agencyListing).toList();
       case 'private':
@@ -75,63 +79,144 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
   void _showSortSheet() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        final options = [
-          ('recent', 'ברירת מחדל'),
-          ('price_asc', 'לפי מחיר עולה'),
-          ('price_desc', 'לפי מחיר יורד'),
-          ('rooms', 'לפי חדרים'),
-        ];
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'מיון נכסים',
-                  style: TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ...options.map((opt) {
-                  final isSelected = _sortBy == opt.$1;
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    leading: Icon(
-                      isSelected
-                          ? IconsaxPlusBold.tick_circle
-                          : IconsaxPlusBold.record_circle,
-                      color: isSelected
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                      size: 20,
-                    ),
-                    title: Text(
-                      opt.$2,
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final sortOptions = [
+              ('recent', 'ברירת מחדל'),
+              ('price_asc', 'לפי מחיר עולה'),
+              ('price_desc', 'לפי מחיר יורד'),
+              ('rooms', 'לפי חדרים'),
+            ];
+
+            final filterOptions = [
+              ('all', 'הכל'),
+              ('high_priority', 'עדיפות שיווקית (עד 6K)'),
+              ('luxury', 'נכסי יוקרה (10K+)'),
+              ('immediate', 'כניסה מיידית'),
+              ('large', 'דירות גדולות (4+ חדרים)'),
+              ('agency', 'בלעדיות (סוכנות)'),
+              ('private', 'פרטי (ללא תיווך)'),
+            ];
+
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'סינון ומיון נכסים',
                       style: TextStyle(
-                        color: isSelected ? AppColors.primary : AppColors.navy,
-                        fontWeight:
-                            isSelected ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 14.5,
+                        color: AppColors.navy,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                    onTap: () {
-                      setState(() => _sortBy = opt.$1);
-                      Navigator.of(ctx).pop();
-                    },
-                  );
-                }),
-              ],
-            ),
-          ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'סינון לפי תגיות',
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: filterOptions.map((opt) {
+                        final isSelected = _activeFilter == opt.$1;
+                        return GestureDetector(
+                          onTap: () {
+                            setSheetState(() {
+                              _activeFilter = opt.$1;
+                            });
+                            setState(() {});
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.borderLight,
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              opt.$2,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.navy,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'מיון לפי',
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...sortOptions.map((opt) {
+                      final isSelected = _sortBy == opt.$1;
+                      return ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 4),
+                        leading: Icon(
+                          isSelected
+                              ? IconsaxPlusBold.tick_circle
+                              : IconsaxPlusBold.record_circle,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                          size: 20,
+                        ),
+                        title: Text(
+                          opt.$2,
+                          style: TextStyle(
+                            color: isSelected ? AppColors.primary : AppColors.navy,
+                            fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                        onTap: () {
+                          setSheetState(() {
+                            _sortBy = opt.$1;
+                          });
+                          setState(() {});
+                          Navigator.of(ctx).pop();
+                        },
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -144,6 +229,9 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
         final allProperties = provider.myProperties;
         final filtered = _applyFiltersAndSort(allProperties);
         final isFiltered = _query.isNotEmpty || _activeFilter != 'all';
+        final canPop = Navigator.of(context).canPop();
+
+        final hasActiveFilterOrSort = _sortBy != 'recent' || _activeFilter != 'all';
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -152,20 +240,82 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
             backgroundColor: AppColors.background,
             elevation: 0,
             scrolledUnderElevation: 0,
-            leading: IconButton(
-              icon: const Icon(IconsaxPlusBold.arrow_right,
-                  color: AppColors.navy),
-              onPressed: () => Navigator.of(context).pop(),
+            toolbarHeight: 64,
+            leading: canPop
+                ? IconButton(
+                    icon: const Icon(IconsaxPlusBold.arrow_right,
+                        color: AppColors.navy),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : null,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'הדירות שלי',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '${allProperties.length} דירות פעילות',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            title: const Text(
-              'הדירות שלי',
-              style: TextStyle(
-                color: AppColors.navy,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
+          ),
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: 96),
+            child: InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AddPropertyScreen(),
+                ),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      IconsaxPlusBold.add,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'הוספה',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
           body: provider.isLoading
               ? const Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
@@ -173,19 +323,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
               : SafeArea(
                   child: Column(
                     children: [
-                      // Properties header with add button
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                        child: _PropertiesHeader(
-                          count: allProperties.length,
-                          onAdd: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const AddPropertyScreen(),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Search row + sort button
+                      const SizedBox(height: 12),
+                      // Search row + sort/filter button
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                         child: Row(
@@ -255,12 +394,12 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: _sortBy != 'recent'
+                                  color: hasActiveFilterOrSort
                                       ? AppColors.primary.withValues(alpha: 0.1)
                                       : Colors.white,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: _sortBy != 'recent'
+                                    color: hasActiveFilterOrSort
                                         ? AppColors.primary
                                             .withValues(alpha: 0.4)
                                         : AppColors.borderLight,
@@ -268,57 +407,13 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                   ),
                                 ),
                                 child: Icon(
-                                  IconsaxPlusBold.sort,
+                                  IconsaxPlusBold.filter,
                                   size: 20,
-                                  color: _sortBy != 'recent'
+                                  color: hasActiveFilterOrSort
                                       ? AppColors.primary
                                       : AppColors.textSecondary,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Filter chips
-                      SizedBox(
-                        height: 38,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          children: [
-                            _FilterChip(
-                              label: 'הכל',
-                              isActive: _activeFilter == 'all',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'all'),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: 'יקר מ-8K',
-                              isActive: _activeFilter == 'expensive',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'expensive'),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: '3+ חדרים',
-                              isActive: _activeFilter == 'rooms3',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'rooms3'),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: 'סוכנות',
-                              isActive: _activeFilter == 'agency',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'agency'),
-                            ),
-                            const SizedBox(width: 8),
-                            _FilterChip(
-                              label: 'פרטי',
-                              isActive: _activeFilter == 'private',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'private'),
                             ),
                           ],
                         ),
@@ -393,131 +488,9 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
   }
 }
 
-// ─── Filter chip ─────────────────────────────────────────────────────────────
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
 
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: isActive ? AppColors.primary : AppColors.borderLight,
-            width: 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? Colors.white : AppColors.navy,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Header ──────────────────────────────────────────────────────────────────
-
-class _PropertiesHeader extends StatelessWidget {
-  const _PropertiesHeader({
-    required this.count,
-    required this.onAdd,
-  });
-
-  final int count;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  IconsaxPlusBold.buildings_2,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ניהול דירות',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '$count נכסים פעילים בחשבון שלך',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(IconsaxPlusBold.add_square, size: 16),
-              label: const Text('הוסף דירה'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Property card ───────────────────────────────────────────────────────────
 
@@ -732,8 +705,7 @@ class _PropertyManageCard extends StatelessWidget {
                             content: Text(
                               'להסיר את "${property.address}"?\nהפעולה אינה ניתנת לביטול.',
                               style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  height: 1.4),
+                                  color: AppColors.textSecondary, height: 1.4),
                             ),
                             actions: [
                               TextButton(

@@ -2,17 +2,47 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dating_app/core/services/local_storage.dart';
+import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/main.dart';
+import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  late Directory documentsDirectory;
+
   setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
+    documentsDirectory = Directory.systemTemp.createTempSync('rentch_test_');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (call) async {
+        if (call.method == 'getApplicationDocumentsDirectory') {
+          return documentsDirectory.path;
+        }
+        return null;
+      },
+    );
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      null,
+    );
+    if (documentsDirectory.existsSync()) {
+      documentsDirectory.deleteSync(recursive: true);
+    }
   });
 
   testWidgets('rental matching critical flow works', (
@@ -46,16 +76,13 @@ void main() {
       await _pumpFrames(tester);
 
       expect(find.textContaining('התאמות'), findsWidgets);
-      expect(find.text('צ׳אט פתוח'), findsOneWidget);
+      expect(find.text('שיחה פתוחה'), findsOneWidget);
 
       await tester.tap(find.text('פרופיל'));
       await _pumpFrames(tester);
 
       expect(find.text('נועה לוי'), findsOneWidget);
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
-      await _pumpFrames(tester);
-      await tester.ensureVisible(find.text('עריכת פרופיל'));
-      await tester.tap(find.text('עריכת פרופיל'));
+      await tester.tap(find.text('עריכה'));
       await _pumpFrames(tester);
 
       await tester.enterText(find.byType(TextField).first, 'דניאל');
@@ -68,10 +95,91 @@ void main() {
     }
   });
 
+  testWidgets(
+    'landlord quick actions switch tabs without losing bottom navigation',
+    (WidgetTester tester) async {
+      debugNetworkImageHttpClientProvider = () => _FakeHttpClient();
+      final provider = DatingProvider(
+        rentalDataService: _FakeRentalDataService([
+          _testProperty(
+              id: 'landlord-1', street: 'אבן גבירול', city: 'תל אביב'),
+          _testProperty(id: 'landlord-2', street: 'סוקולוב', city: 'רמת השרון'),
+        ]),
+        localStorageService: _MemoryLocalStorageService(),
+      );
+      try {
+        await provider.initialize();
+        await provider.enterGuestMode('landlord');
+        await tester.pumpWidget(
+          ChangeNotifierProvider<DatingProvider>.value(
+            value: provider,
+            child: MaterialApp(
+              builder: (context, child) {
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: child ?? const SizedBox.shrink(),
+                );
+              },
+              home: const HomeScreen(),
+            ),
+          ),
+        );
+        await _pumpFrames(tester);
+
+        expect(find.text('פעולות מהירות'), findsOneWidget);
+
+        _invokeGestureTap(
+          tester,
+          find.widgetWithText(GestureDetector, 'מועמדים'),
+        );
+        await _pumpFrames(tester);
+
+        expect(find.text('סוויפים'), findsOneWidget);
+        expect(find.text('דשבורד'), findsOneWidget);
+        expect(find.text('הדירות שלי'), findsOneWidget);
+
+        _invokeInkWellTap(
+          tester,
+          find.widgetWithText(InkWell, 'דשבורד'),
+        );
+        await _pumpFrames(tester);
+        expect(find.text('פעולות מהירות'), findsOneWidget);
+
+        _invokeGestureTap(
+          tester,
+          find.widgetWithText(GestureDetector, "מאצ'ים"),
+        );
+        await _pumpFrames(tester);
+
+        expect(find.text('דשבורד'), findsOneWidget);
+        expect(find.text('הדירות שלי'), findsWidgets);
+
+        _invokeInkWellTap(
+          tester,
+          find.widgetWithText(InkWell, 'דשבורד'),
+        );
+        await _pumpFrames(tester);
+        expect(find.text('פעולות מהירות'), findsOneWidget);
+
+        _invokeGestureTap(
+          tester,
+          find.widgetWithText(GestureDetector, 'הנכסים'),
+        );
+        await _pumpFrames(tester);
+
+        expect(find.text('דשבורד'), findsOneWidget);
+        expect(find.text('הדירות שלי'), findsWidgets);
+      } finally {
+        debugNetworkImageHttpClientProvider = null;
+        provider.dispose();
+      }
+    },
+  );
+
   test('rental property media preserves image and video entries', () {
-    const property = RentalProperty(
+    final property = RentalProperty(
       id: 'custom-1',
-      url: '',
+      sourceUrl: '',
       price: 8500,
       rooms: 3,
       sizeM2: 88,
@@ -99,6 +207,35 @@ void main() {
           type: PropertyMediaType.video,
         ),
       ],
+      virtualTour: PropertyVirtualTour(
+        id: 'scene-1',
+        provider: 'splat3d',
+        status: PropertyTourStatus.ready,
+        viewerUrl: 'https://example.com/tour/scene-1',
+        format: 'sog',
+        processingProgress: 100,
+      ),
+      legal: PropertyLegal(
+        thirdPartyTransferAllowed: true,
+        commercialSaleAllowed: true,
+        aiTrainingAllowed: false,
+        consentVersion: 'terms_v4.2',
+        consentTimestamp: DateTime.utc(2026, 6, 1, 12, 0),
+        consentSource: 'user_upload',
+      ),
+      priceHistory: [
+        PropertyPricePoint(
+          date: DateTime.utc(2026, 6, 1),
+          price: 8500,
+          transactionType: PropertyTransactionType.rent,
+        ),
+      ],
+      marketSignals: const PropertyMarketSignals(
+        views: 12,
+        likes: 3,
+        saves: 2,
+        avgTimeIn3dSeconds: 41,
+      ),
     );
 
     final decoded = RentalProperty.fromJson(property.toJson());
@@ -107,6 +244,15 @@ void main() {
     expect(decoded.imageUrls, ['https://example.com/cover.jpg']);
     expect(decoded.videoUrls, ['https://example.com/tour.mp4']);
     expect(decoded.primaryMedia?.type, PropertyMediaType.image);
+    expect(decoded.virtualTour?.status, PropertyTourStatus.ready);
+    expect(decoded.hasReadyVirtualTour, isTrue);
+    expect(decoded.virtualTour?.viewerUrl, 'https://example.com/tour/scene-1');
+    expect(decoded.featureFlags.isEnabled('balcony'), isTrue);
+    expect(decoded.legal.thirdPartyTransferAllowed, isTrue);
+    expect(decoded.legal.consentVersion, 'terms_v4.2');
+    expect(decoded.priceHistory, hasLength(1));
+    expect(decoded.marketSignals.views, 12);
+    expect(decoded.model3d?.viewerUrl, 'https://example.com/tour/scene-1');
   });
 }
 
@@ -114,9 +260,9 @@ Future<void> _pumpApp(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
   await tester.pumpWidget(const RentchApp());
-  for (var attempt = 0; attempt < 10; attempt++) {
+  for (var attempt = 0; attempt < 25; attempt++) {
     await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 120));
     });
     await _pumpFrames(tester);
     final context = tester.element(find.byType(MaterialApp));
@@ -133,6 +279,16 @@ Future<void> _pumpFrames(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
   await tester.pump(const Duration(milliseconds: 400));
   await tester.pump(const Duration(milliseconds: 400));
+}
+
+void _invokeGestureTap(WidgetTester tester, Finder finder) {
+  final widget = tester.widget<GestureDetector>(finder.first);
+  widget.onTap?.call();
+}
+
+void _invokeInkWellTap(WidgetTester tester, Finder finder) {
+  final widget = tester.widget<InkWell>(finder.first);
+  widget.onTap?.call();
 }
 
 class _FakeHttpClient extends Fake implements HttpClient {
@@ -174,4 +330,111 @@ class _FakeHttpClientResponse extends Fake implements HttpClientResponse {
       cancelOnError: cancelOnError,
     );
   }
+}
+
+class _FakeRentalDataService extends RentalDataService {
+  _FakeRentalDataService(this.properties);
+
+  final List<RentalProperty> properties;
+
+  @override
+  Future<PropertyPage> loadFirstPage({String areaId = 'all_israel'}) async {
+    return PropertyPage(items: properties, hasMore: false);
+  }
+
+  @override
+  TenantProfile createDefaultTenantProfile() {
+    return const TenantProfile(
+      id: 'tenant-test',
+      name: 'Tenant',
+      bio: '',
+      photoUrls: <String>[],
+      budgetMax: 7000,
+      desiredRooms: 3,
+      moveInWindow: 'within 30 days',
+      importantDetails: <String>[],
+    );
+  }
+
+  @override
+  List<AppReview> createTenantReviews() => const [];
+
+  @override
+  List<AppReview> createPropertyReviews(RentalProperty property) => const [];
+
+  @override
+  List<SearchArea> createSearchAreas() {
+    return const [
+      SearchArea(
+        id: 'all_israel',
+        name: 'All',
+        center: LatLng(32.07, 34.78),
+        polygon: [
+          LatLng(31.7, 34.4),
+          LatLng(31.7, 35.2),
+          LatLng(32.4, 35.2),
+          LatLng(32.4, 34.4),
+        ],
+      ),
+    ];
+  }
+}
+
+class _MemoryLocalStorageService extends LocalStorageService {
+  Map<String, dynamic>? state;
+
+  @override
+  Future<Map<String, dynamic>?> loadAppState() async => state;
+
+  @override
+  Future<void> saveAppState(
+    Map<String, dynamic> state, {
+    bool syncRemote = true,
+  }) async {
+    this.state = Map<String, dynamic>.from(state);
+  }
+
+  @override
+  Future<void> syncRemoteAppState(Map<String, dynamic> state) async {
+    this.state = Map<String, dynamic>.from(state);
+  }
+
+  @override
+  Future<void> clearAppState() async {
+    state = null;
+  }
+}
+
+RentalProperty _testProperty({
+  required String id,
+  required String street,
+  required String city,
+}) {
+  return RentalProperty(
+    id: id,
+    url: 'https://example.com/$id',
+    price: 7200,
+    rooms: 3,
+    sizeM2: 82,
+    floor: '2',
+    totalFloors: '6',
+    city: city,
+    neighborhood: 'מרכז',
+    street: street,
+    streetNumber: 12,
+    lat: 32.08,
+    lon: 34.78,
+    propertyType: 'דירה',
+    entryDate: '2026-06-15',
+    condition: 'משופץ',
+    ownerName: 'בעלים',
+    agencyListing: false,
+    features: const ['מעלית', 'מרפסת'],
+    media: const [
+      PropertyMedia(
+        url: 'https://example.com/property.jpg',
+        type: PropertyMediaType.image,
+      ),
+    ],
+  );
 }

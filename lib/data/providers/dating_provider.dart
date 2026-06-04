@@ -4,22 +4,37 @@ import 'dart:math' as math;
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart'
     show RateLimiter, WriteDebouncer;
+import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/repositories/moderation_repository.dart';
+import 'package:dating_app/data/repositories/property_repository.dart';
+import 'package:dating_app/data/repositories/user_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
+import 'package:latlong2/latlong.dart';
 
 class DatingProvider extends ChangeNotifier {
   DatingProvider({
     RentalDataService? rentalDataService,
     LocalStorageService? localStorageService,
+    PropertyRepository? propertyRepository,
+    UserRepository? userRepository,
+    ModerationRepository? moderationRepository,
   })  : _rentalDataService = rentalDataService ?? RentalDataService(),
-        _localStorageService = localStorageService ?? LocalStorageService();
+        _localStorageService = localStorageService ?? LocalStorageService(),
+        _propertyRepository = propertyRepository ?? PropertyRepository(),
+        _userRepository = userRepository ?? UserRepository(),
+        _moderationRepository =
+            moderationRepository ?? ModerationRepository();
 
   final RentalDataService _rentalDataService;
   final LocalStorageService _localStorageService;
+  final PropertyRepository _propertyRepository;
+  final UserRepository _userRepository;
+  final ModerationRepository _moderationRepository;
 
   // Batches rapid successive writes so we don't hammer Appwrite on every swipe.
   // With 10k concurrent users, unbatched writes would exhaust API rate limits.
@@ -31,25 +46,9 @@ class DatingProvider extends ChangeNotifier {
   bool _isLoading = true;
   String _userRole = 'tenant';
   bool _isGuestMode = false;
+  bool _hasActiveSession = false;
   TenantProfile? _tenantProfile;
-  SearchFilters _filters = const SearchFilters(
-    query: '',
-    maxBudget: 2000000000,
-    minRooms: 0,
-    areaId: 'all_israel',
-    requiredFeatures: <String>{},
-      preferredFeatures: <String>{},
-    minSizeM2: 0,
-    maxSizeM2: 1000000,
-    propertyTypes: <String>{},
-    conditions: <String>{},
-    listingSource: ListingSourceFilter.any,
-    minFloor: 0,
-    moveInFilter: MoveInFilter.any,
-    sortBy: SearchSortOption.bestMatch,
-    city: '',
-    transactionType: TransactionTypeFilter.any,
-  );
+  SearchFilters _filters = _defaultFilters;
   List<RentalProperty> _baseProperties = const [];
   List<RentalProperty> _customProperties = [];
   List<SearchArea> _searchAreas = const [];
@@ -65,6 +64,14 @@ class DatingProvider extends ChangeNotifier {
   Set<String> _savedPropertyIds = <String>{};
   int _lastSeenMatchCount = 0;
   int _remainingSuperLikes = 3;
+  Set<String> _blockedOwnerNames = <String>{};
+  Set<String> _reportedPropertyIds = <String>{};
+
+  // Pagination state — properties are loaded in pages to avoid loading the
+  // entire catalog upfront (which would be prohibitive at scale).
+  bool _hasMoreProperties = false;
+  bool _isLoadingMoreProperties = false;
+  int _propertiesOffset = 0;
 
   List<RentalProperty>? _allPropertiesCache;
   Map<String, RentalProperty>? _propertyByIdCache;
@@ -73,11 +80,63 @@ class DatingProvider extends ChangeNotifier {
   List<String>? _availablePropertyTypesCache;
   List<String>? _availableConditionsCache;
   List<String>? _availableCitiesCache;
+  Map<String, double>? _featureWeightCache;
+  _MarketIndex? _marketIndexCache;
   int _catalogRevision = 0;
   int _filterRevision = 0;
   int _filterLayoutRevision = 0;
   int _filteredCatalogRevision = -1;
   int _filteredFilterRevision = -1;
+  int _featureWeightCatalogRevision = -1;
+  int _marketIndexCatalogRevision = -1;
+
+  static const int _missingPriceThreshold = 600;
+  static const int _defaultMinBudget = 600;
+  static const int _defaultMaxBudget = 40000;
+  static const int _saleMinBudget = 100000;
+  static const int _saleMaxBudget = 10000000;
+  static const int _unsetBudget = 2000000000;
+  static const double _unsetMaxRooms = 10;
+  static const int _unsetMaxSizeM2 = 1000000;
+  static const SearchFilters _defaultFilters = SearchFilters(
+    query: '',
+    minBudget: _defaultMinBudget,
+    maxBudget: _unsetBudget,
+    minRooms: 0,
+    maxRooms: _unsetMaxRooms,
+    areaId: 'all_israel',
+    requiredFeatures: <String>{},
+    preferredFeatures: <String>{},
+    minSizeM2: 0,
+    maxSizeM2: _unsetMaxSizeM2,
+    propertyTypes: <String>{},
+    preferredPropertyTypes: <String>{},
+    conditions: <String>{},
+    preferredConditions: <String>{},
+    listingSource: ListingSourceFilter.any,
+    minFloor: 0,
+    moveInFilter: MoveInFilter.any,
+    sortBy: SearchSortOption.bestMatch,
+    includeUnknownPriceListings: false,
+    customAreaPolygon: <LatLng>[],
+    city: '',
+    transactionType: TransactionTypeFilter.any,
+  );
+
+  static const double _budgetWeight = 22;
+  static const double _marketValueWeight = 12;
+  static const double _locationWeight = 14;
+  static const double _roomsWeight = 8;
+  static const double _sizeWeight = 5;
+  static const double _floorWeight = 1;
+  static const double _timingWeight = 8;
+  static const double _preferredFeatureWeight = 10;
+  static const double _preferredPropertyTypeWeight = 4;
+  static const double _preferredConditionWeight = 3;
+  static const double _preferredListingSourceWeight = 2;
+  static const double _requiredFeatureWeight = 4;
+  static const double _listingConfidenceWeight = 12;
+  static const double _businessReadinessWeight = 4;
 
   // Combined property list: base (from JSON) + landlord-added
   List<RentalProperty> get _allProperties {
@@ -97,6 +156,10 @@ class DatingProvider extends ChangeNotifier {
     _availablePropertyTypesCache = null;
     _availableConditionsCache = null;
     _availableCitiesCache = null;
+    _featureWeightCache = null;
+    _marketIndexCache = null;
+    _featureWeightCatalogRevision = -1;
+    _marketIndexCatalogRevision = -1;
     _invalidateFilterCache();
   }
 
@@ -109,6 +172,7 @@ class DatingProvider extends ChangeNotifier {
   void _removeFromFilteredCache(String propertyId) {
     final cached = _filteredPropertiesCache;
     _filterRevision++;
+    _filterLayoutRevision++;
     if (cached == null ||
         _filteredCatalogRevision != _catalogRevision ||
         _filteredFilterRevision < 0) {
@@ -127,6 +191,7 @@ class DatingProvider extends ChangeNotifier {
   bool get isLandlord => _userRole == 'landlord';
   String get userRole => _userRole;
   bool get isGuestMode => _isGuestMode;
+  bool get hasActiveSession => _hasActiveSession;
   TenantProfile? get tenantProfile => _tenantProfile;
   SearchFilters get filters => _filters;
   List<SearchArea> get searchAreas => _searchAreas;
@@ -138,6 +203,11 @@ class DatingProvider extends ChangeNotifier {
   int get matchesCount => _matches.length;
   bool get canUndo => _swipeHistory.isNotEmpty;
   int get remainingSuperLikes => _remainingSuperLikes;
+  String get _currentOwnerUserId {
+    final profileId = _tenantProfile?.id.trim();
+    if (profileId != null && profileId.isNotEmpty) return profileId;
+    return _isGuestMode ? 'guest_landlord' : 'local_landlord';
+  }
 
   int get trustScore => _tenantProfile == null
       ? 0
@@ -168,6 +238,9 @@ class DatingProvider extends ChangeNotifier {
       );
 
   SearchArea get selectedArea {
+    if (_filters.hasCustomArea) {
+      return SearchArea.custom(polygon: _filters.customAreaPolygon);
+    }
     return _searchAreas.firstWhere(
       (area) => area.id == _filters.areaId,
       orElse: () => _searchAreas.first,
@@ -221,24 +294,145 @@ class DatingProvider extends ChangeNotifier {
     return _availableCitiesCache = cities;
   }
 
+  Map<String, double> get _featureWeights {
+    final cached = _featureWeightCache;
+    if (cached != null && _featureWeightCatalogRevision == _catalogRevision) {
+      return cached;
+    }
+
+    final frequency = <String, int>{};
+    for (final property in _allProperties) {
+      for (final feature in property.features.toSet()) {
+        frequency[feature] = (frequency[feature] ?? 0) + 1;
+      }
+    }
+
+    final total = math.max(_allProperties.length, 1);
+    final weights = <String, double>{};
+    for (final entry in frequency.entries) {
+      final idf = math.log((total + 1) / (entry.value + 1)) + 1;
+      weights[entry.key] = _clampDouble(idf, 1, 2.4);
+    }
+
+    _featureWeightCache = weights;
+    _featureWeightCatalogRevision = _catalogRevision;
+    return weights;
+  }
+
+  _MarketIndex get _marketIndex {
+    final cached = _marketIndexCache;
+    if (cached != null && _marketIndexCatalogRevision == _catalogRevision) {
+      return cached;
+    }
+
+    final index = _MarketIndex.fromProperties(_allProperties);
+    _marketIndexCache = index;
+    _marketIndexCatalogRevision = _catalogRevision;
+    return index;
+  }
+
   int get activeFilterCount {
     var count = 0;
-    if (_filters.hasQuery) count++;
-    if (_filters.maxBudget != 2000000000) count++;
+    if (_filters.minBudget > _defaultMinBudgetFor(_filters.transactionType)) {
+      count++;
+    }
+    if (_filters.maxBudget < _defaultMaxBudgetFor(_filters.transactionType)) {
+      count++;
+    }
     if (_filters.minRooms != 0) count++;
+    if (_filters.maxRooms < _unsetMaxRooms) count++;
     if (_filters.minSizeM2 > 0) count++;
-    if (_filters.maxSizeM2 < 1000000) count++;
+    if (_filters.maxSizeM2 < _unsetMaxSizeM2) count++;
     if (_filters.minFloor > 0) count++;
-    if (_filters.requiredFeatures.isNotEmpty || _filters.preferredFeatures.isNotEmpty) count++;
-    if (_filters.propertyTypes.isNotEmpty) count++;
-    if (_filters.conditions.isNotEmpty) count++;
-    if (_filters.listingSource != ListingSourceFilter.any) count++;
-    if (_filters.moveInFilter != MoveInFilter.any) count++;
+    if (_filters.requiredFeatures.isNotEmpty ||
+        _filters.preferredFeatures.isNotEmpty) {
+      count++;
+    }
+    if (_filters.propertyTypes.isNotEmpty ||
+        _filters.preferredPropertyTypes.isNotEmpty) {
+      count++;
+    }
+    if (_filters.conditions.isNotEmpty ||
+        _filters.preferredConditions.isNotEmpty) {
+      count++;
+    }
+    if (_filters.requiredListingSources.isNotEmpty ||
+        _filters.preferredListingSources.isNotEmpty ||
+        _filters.listingSource != ListingSourceFilter.any) {
+      count++;
+    }
+    if (_filters.requiredMoveInFilters.isNotEmpty ||
+        _filters.preferredMoveInFilters.isNotEmpty ||
+        _filters.moveInFilter != MoveInFilter.any) {
+      count++;
+    }
     if (_filters.sortBy != SearchSortOption.bestMatch) count++;
     if (_filters.city.trim().isNotEmpty) count++;
     if (_filters.transactionType != TransactionTypeFilter.any) count++;
-    if (_filters.areaId != 'all_israel') count++;
+    if (_filters.areaId != 'all_israel' || _filters.hasCustomArea) count++;
+    if (_filters.includeUnknownPriceListings) count++;
     return count;
+  }
+
+  int _defaultMinBudgetFor(TransactionTypeFilter type) {
+    switch (type) {
+      case TransactionTypeFilter.sale:
+        return _saleMinBudget;
+      case TransactionTypeFilter.any:
+      case TransactionTypeFilter.rent:
+        return _defaultMinBudget;
+    }
+  }
+
+  int _defaultMaxBudgetFor(TransactionTypeFilter type) {
+    switch (type) {
+      case TransactionTypeFilter.sale:
+        return _saleMaxBudget;
+      case TransactionTypeFilter.any:
+      case TransactionTypeFilter.rent:
+        return _defaultMaxBudget;
+    }
+  }
+
+  SearchFilters _normalizeFilters(SearchFilters filters) {
+    final minBudgetFloor = _defaultMinBudgetFor(filters.transactionType);
+    final maxBudgetCeiling = _defaultMaxBudgetFor(filters.transactionType);
+    final normalizedMinBudget =
+        filters.minBudget.clamp(minBudgetFloor, maxBudgetCeiling);
+    final rawMaxBudget = filters.maxBudget == _unsetBudget
+        ? maxBudgetCeiling
+        : filters.maxBudget;
+    final normalizedMaxBudget =
+        rawMaxBudget.clamp(normalizedMinBudget, maxBudgetCeiling);
+    final normalizedMinRooms =
+        _clampDouble(filters.minRooms, 0, _unsetMaxRooms);
+    final normalizedMaxRooms =
+        _clampDouble(filters.maxRooms, normalizedMinRooms, _unsetMaxRooms);
+    final normalizedMinSize = filters.minSizeM2.clamp(0, _unsetMaxSizeM2);
+    final normalizedMaxSize =
+        filters.maxSizeM2.clamp(normalizedMinSize, _unsetMaxSizeM2);
+
+    return filters.copyWith(
+      query: '',
+      minBudget: normalizedMinBudget,
+      maxBudget: normalizedMaxBudget,
+      minRooms: normalizedMinRooms,
+      maxRooms: normalizedMaxRooms,
+      minSizeM2: normalizedMinSize,
+      maxSizeM2: normalizedMaxSize,
+      preferredFeatures:
+          filters.preferredFeatures.difference(filters.requiredFeatures),
+      preferredPropertyTypes:
+          filters.preferredPropertyTypes.difference(filters.propertyTypes),
+      preferredConditions:
+          filters.preferredConditions.difference(filters.conditions),
+      requiredListingSources: _normalizedListingSourceRequired(filters),
+      preferredListingSources: _normalizedListingSourcePreferred(filters),
+      listingSource: ListingSourceFilter.any,
+      requiredMoveInFilters: _normalizedMoveInRequired(filters),
+      preferredMoveInFilters: _normalizedMoveInPreferred(filters),
+      moveInFilter: MoveInFilter.any,
+    );
   }
 
   double get averageFilteredPrice {
@@ -310,7 +504,10 @@ class DatingProvider extends ChangeNotifier {
     final area = _areaFor(filters);
 
     final filtered = _allProperties
-        .where((property) => _passesFilters(property, filters, now, area))
+        .where((property) =>
+            !_blockedOwnerNames.contains(property.ownerName) &&
+            !_reportedPropertyIds.contains(property.id) &&
+            _passesFilters(property, filters, now, area))
         .toList();
 
     if (!sort) return filtered;
@@ -319,6 +516,9 @@ class DatingProvider extends ChangeNotifier {
   }
 
   SearchArea _areaFor(SearchFilters filters) {
+    if (filters.hasCustomArea) {
+      return SearchArea.custom(polygon: filters.customAreaPolygon);
+    }
     return _searchAreas.firstWhere(
       (area) => area.id == filters.areaId,
       orElse: () => _searchAreas.first,
@@ -331,73 +531,209 @@ class DatingProvider extends ChangeNotifier {
     DateTime now,
     SearchArea area,
   ) {
+    if (!_passesStructuralFilters(property, filters, area)) return false;
+
+    if (filters.sortBy == SearchSortOption.bestMatch) {
+      return _passesBestMatchCandidateGate(property, filters, now);
+    }
+
+    return _passesStrictFitFilters(property, filters, now);
+  }
+
+  bool _passesStructuralFilters(
+    RentalProperty property,
+    SearchFilters filters,
+    SearchArea area,
+  ) {
     if (_likedPropertyIds.contains(property.id) ||
         _passedPropertyIds.contains(property.id)) {
       return false;
     }
-    final normalizedQuery = filters.query.trim().toLowerCase();
-    if (normalizedQuery.isNotEmpty &&
-        !property.searchableText.contains(normalizedQuery)) {
-      return false;
-    }
+
     if (filters.city.trim().isNotEmpty &&
         property.city.trim() != filters.city.trim()) {
       return false;
     }
+
     if (filters.transactionType == TransactionTypeFilter.rent &&
         property.transactionType != PropertyTransactionType.rent) {
       return false;
     }
+
     if (filters.transactionType == TransactionTypeFilter.sale &&
         property.transactionType != PropertyTransactionType.sale) {
       return false;
     }
-    if (property.price > filters.maxBudget) return false;
+
+    if (filters.propertyTypes.isNotEmpty &&
+        !filters.propertyTypes.contains(property.propertyType)) {
+      return false;
+    }
+
+    if (filters.conditions.isNotEmpty &&
+        !filters.conditions.contains(property.condition)) {
+      return false;
+    }
+
+    final listingSource = _listingSourceFor(property);
+    if (filters.requiredListingSources.isNotEmpty &&
+        !filters.requiredListingSources.contains(listingSource)) {
+      return false;
+    }
+
+    if (!filters.requiredFeatures.every(property.features.contains)) {
+      return false;
+    }
+
+    if (filters.city.trim().isNotEmpty) return true;
+    if (filters.areaId == 'all_israel') return true;
+    return area.contains(property.point);
+  }
+
+  bool _passesStrictFitFilters(
+    RentalProperty property,
+    SearchFilters filters,
+    DateTime now,
+  ) {
+    final hasKnownPrice = _hasKnownPrice(property);
+    if (!hasKnownPrice && !filters.includeUnknownPriceListings) return false;
+    if (hasKnownPrice) {
+      if (property.price < filters.minBudget) return false;
+      if (property.price > filters.maxBudget) return false;
+    }
     if (property.rooms < filters.minRooms) return false;
+    if (property.rooms > filters.maxRooms) return false;
     if (property.sizeM2 < filters.minSizeM2) return false;
     if (property.sizeM2 > filters.maxSizeM2) return false;
     if (property.floorNumber != null &&
         property.floorNumber! < filters.minFloor) {
       return false;
     }
-    if (filters.propertyTypes.isNotEmpty &&
-        !filters.propertyTypes.contains(property.propertyType)) {
+
+    return _passesRequiredMoveInFilters(property, filters, now);
+  }
+
+  bool _passesBestMatchCandidateGate(
+    RentalProperty property,
+    SearchFilters filters,
+    DateTime now,
+  ) {
+    final hasKnownPrice = _hasKnownPrice(property);
+    if (!hasKnownPrice) {
+      if (!filters.includeUnknownPriceListings) return false;
+    } else {
+      if (filters.minBudget > _defaultMinBudgetFor(filters.transactionType) &&
+          property.price < (filters.minBudget * 0.82).round()) {
+        return false;
+      }
+      if (filters.maxBudget < _defaultMaxBudgetFor(filters.transactionType) &&
+          property.price > (filters.maxBudget * 1.22).round()) {
+        return false;
+      }
+    }
+
+    if (filters.minRooms > 0 && property.rooms < filters.minRooms - 0.5) {
       return false;
     }
-    if (filters.conditions.isNotEmpty &&
-        !filters.conditions.contains(property.condition)) {
+    if (filters.maxRooms < _unsetMaxRooms &&
+        property.rooms > filters.maxRooms + 0.5) {
       return false;
     }
-    if (filters.listingSource == ListingSourceFilter.privateOnly &&
-        property.agencyListing) {
+
+    if (filters.minSizeM2 > 0 &&
+        property.sizeM2 < (filters.minSizeM2 * 0.78).round()) {
       return false;
     }
-    if (filters.listingSource == ListingSourceFilter.agencyOnly &&
-        !property.agencyListing) {
+
+    if (filters.maxSizeM2 < _unsetMaxSizeM2 &&
+        property.sizeM2 > (filters.maxSizeM2 * 1.4).round()) {
       return false;
     }
-    // Deal-breaker gate: red tags must ALL be present.
-    if (!filters.requiredFeatures.every(property.features.contains)) {
+
+    final floorNumber = property.floorNumber;
+    if (floorNumber != null &&
+        filters.minFloor > 0 &&
+        floorNumber < filters.minFloor - 1) {
       return false;
     }
+
+    if (!_passesPreferredMoveInCandidateGate(property, filters, now)) {
+      return false;
+    }
+    return _passesRequiredMoveInFilters(property, filters, now);
+  }
+
+  bool _passesRequiredMoveInFilters(
+    RentalProperty property,
+    SearchFilters filters,
+    DateTime now,
+  ) {
+    if (filters.requiredMoveInFilters.isEmpty) return true;
+    return filters.requiredMoveInFilters.any(
+      (option) => _matchesMoveInOption(property, option, now),
+    );
+  }
+
+  bool _passesPreferredMoveInCandidateGate(
+    RentalProperty property,
+    SearchFilters filters,
+    DateTime now,
+  ) {
+    if (filters.preferredMoveInFilters.isEmpty) return true;
+    final deadlines = filters.preferredMoveInFilters
+        .map((option) => _moveInDeadlineFor(option, now))
+        .whereType<DateTime>()
+        .toList();
+    if (deadlines.isEmpty) return true;
+
     final entryDate = property.entryDateValue;
-    if (filters.moveInFilter == MoveInFilter.immediate &&
-        (entryDate == null || entryDate.isAfter(now))) {
-      return false;
+    if (entryDate == null) return false;
+
+    final latestUsefulDate = deadlines
+        .map((deadline) => deadline.add(Duration(
+            days: _moveInGraceDaysForDeadline(deadline, filters, now))))
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    return !entryDate.isAfter(latestUsefulDate);
+  }
+
+  DateTime? _moveInDeadlineFor(MoveInFilter option, DateTime now) {
+    switch (option) {
+      case MoveInFilter.any:
+        return null;
+      case MoveInFilter.immediate:
+        return now;
+      case MoveInFilter.within30Days:
+        return now.add(const Duration(days: 30));
+      case MoveInFilter.within90Days:
+        return now.add(const Duration(days: 90));
     }
-    if (filters.moveInFilter == MoveInFilter.within30Days &&
-        (entryDate == null ||
-            entryDate.isAfter(now.add(const Duration(days: 30))))) {
-      return false;
+  }
+
+  int _moveInGraceDaysFor(MoveInFilter option) {
+    switch (option) {
+      case MoveInFilter.any:
+        return 0;
+      case MoveInFilter.immediate:
+        return 14;
+      case MoveInFilter.within30Days:
+        return 21;
+      case MoveInFilter.within90Days:
+        return 30;
     }
-    if (filters.moveInFilter == MoveInFilter.within90Days &&
-        (entryDate == null ||
-            entryDate.isAfter(now.add(const Duration(days: 90))))) {
-      return false;
+  }
+
+  int _moveInGraceDaysForDeadline(
+    DateTime deadline,
+    SearchFilters filters,
+    DateTime now,
+  ) {
+    for (final option in filters.preferredMoveInFilters) {
+      final optionDeadline = _moveInDeadlineFor(option, now);
+      if (optionDeadline == deadline) {
+        return _moveInGraceDaysFor(option);
+      }
     }
-    if (filters.city.trim().isNotEmpty) return true;
-    if (filters.areaId == 'all_israel') return true;
-    return area.contains(property.point);
+    return 0;
   }
 
   void _sortProperties(
@@ -406,10 +742,17 @@ class DatingProvider extends ChangeNotifier {
     DateTime now,
     SearchArea area,
   ) {
+    final matchContext = _MatchContext(
+      filters: filters,
+      now: now,
+      area: area,
+      featureWeights: _featureWeights,
+      marketIndex: _marketIndex,
+    );
     final scoreCache = filters.sortBy == SearchSortOption.bestMatch
         ? <String, int>{
             for (final property in properties)
-              property.id: _matchScoreFor(property, filters, now, area),
+              property.id: _matchScoreForContext(property, matchContext),
           }
         : const <String, int>{};
 
@@ -431,7 +774,15 @@ class DatingProvider extends ChangeNotifier {
           final scoreDelta =
               (scoreCache[b.id] ?? 0).compareTo(scoreCache[a.id] ?? 0);
           if (scoreDelta != 0) return scoreDelta;
-          return a.price.compareTo(b.price);
+          final valueDelta = _marketValueScore(b, matchContext)
+              .compareTo(_marketValueScore(a, matchContext));
+          if (valueDelta != 0) return valueDelta;
+          final confidenceDelta =
+              _listingConfidenceScore(b).compareTo(_listingConfidenceScore(a));
+          if (confidenceDelta != 0) return confidenceDelta;
+          final priceDelta = a.price.compareTo(b.price);
+          if (priceDelta != 0) return priceDelta;
+          return a.id.compareTo(b.id);
       }
     });
   }
@@ -473,12 +824,18 @@ class DatingProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    _baseProperties = await _rentalDataService.loadListings();
+    final firstPage = await _rentalDataService.loadFirstPage(
+      areaId: _filters.areaId,
+    );
+    _baseProperties = firstPage.items;
+    _hasMoreProperties = firstPage.hasMore;
+    _propertiesOffset = firstPage.items.length;
     _invalidateCatalogCache();
     _searchAreas = _rentalDataService.createSearchAreas();
     if (kDebugMode) {
       debugPrint(
-        'DatingProvider.initialize: loaded ${_baseProperties.length} base properties',
+        'DatingProvider.initialize: loaded ${_baseProperties.length} base properties'
+        ' (hasMore: $_hasMoreProperties)',
       );
       if (_baseProperties.isNotEmpty) {
         final first = _baseProperties.first;
@@ -491,39 +848,72 @@ class DatingProvider extends ChangeNotifier {
     final storedState = await _localStorageService.loadAppState();
     if (storedState == null || storedState['schema'] != 'rental_match_v2') {
       _seedInitialState();
+      _hasActiveSession = false;
     } else {
       _hydrateFromState(storedState);
     }
 
     _useRemoteCatalogDefaults();
+    _filters = _normalizeFilters(_filters);
     _ensureVisibleListings();
     await _persist();
 
     _isLoading = false;
     notifyListeners();
+
+    // Log session start after state is ready; set userId if profile exists.
+    final profileId = _tenantProfile?.id ?? '';
+    if (profileId.isNotEmpty) AppEvents.instance.setUserId(profileId);
+    AppEvents.instance.log(UserEventType.sessionStarted, metadata: {
+      'role': _userRole,
+      'propertiesLoaded': _baseProperties.length,
+    });
+  }
+
+  bool get hasMoreProperties => _hasMoreProperties;
+  bool get isLoadingMoreProperties => _isLoadingMoreProperties;
+
+  // Loads the next property page from Appwrite when the swipe deck runs low.
+  // Call from handlePropertySwipe() or when the user scrolls near the end.
+  Future<void> loadMorePropertiesIfNeeded() async {
+    if (!_hasMoreProperties || _isLoadingMoreProperties) return;
+    // Only fetch when the visible deck is running low.
+    if (filteredProperties.length > 30) return;
+
+    _isLoadingMoreProperties = true;
+    notifyListeners();
+
+    try {
+      final page = await _rentalDataService.loadPage(
+        offset: _propertiesOffset,
+        areaId: _filters.areaId,
+      );
+      if (page.items.isNotEmpty) {
+        _baseProperties = [..._baseProperties, ...page.items];
+        _propertiesOffset += page.items.length;
+        _hasMoreProperties = page.hasMore;
+        _invalidateCatalogCache();
+        if (kDebugMode) {
+          debugPrint(
+            'DatingProvider.loadMore: +${page.items.length} properties '
+            '(total: ${_baseProperties.length}, hasMore: $_hasMoreProperties)',
+          );
+        }
+      } else {
+        _hasMoreProperties = false;
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('DatingProvider.loadMore error: $e');
+    } finally {
+      _isLoadingMoreProperties = false;
+      notifyListeners();
+    }
   }
 
   void _useRemoteCatalogDefaults() {
     if (_baseProperties.length < 1000) return;
 
-    _filters = _filters.copyWith(
-      query: '',
-      maxBudget: 2000000000,
-      minRooms: 0,
-      areaId: 'all_israel',
-      requiredFeatures: <String>{},
-      preferredFeatures: <String>{},
-      minSizeM2: 0,
-      maxSizeM2: 1000000,
-      propertyTypes: <String>{},
-      conditions: <String>{},
-      listingSource: ListingSourceFilter.any,
-      minFloor: 0,
-      moveInFilter: MoveInFilter.any,
-      sortBy: SearchSortOption.bestMatch,
-      city: '',
-      transactionType: TransactionTypeFilter.any,
-    );
+    _filters = _normalizeFilters(_defaultFilters);
     _likedPropertyIds.clear();
     _passedPropertyIds.clear();
     _invalidateFilterCache();
@@ -581,34 +971,49 @@ class DatingProvider extends ChangeNotifier {
   Future<void> setUserRole(String role) async {
     _userRole = role;
     _isGuestMode = false;
+    _hasActiveSession = true;
     await _persist();
+    AppEvents.instance.log(UserEventType.roleChanged,
+        metadata: {'role': role});
     notifyListeners();
   }
 
   Future<void> enterGuestMode(String role) async {
     _seedGuestDemoState(role);
+    _hasActiveSession = true;
     await _persist();
     notifyListeners();
   }
 
   Future<void> logout() async {
+    AppEvents.instance.log(UserEventType.sessionEnded);
     await _localStorageService.clearAppState();
     _customProperties = [];
     _invalidateCatalogCache();
     _userRole = 'tenant';
     _isGuestMode = false;
+    _hasActiveSession = false;
     _seedInitialState();
     await _persist();
+    // Clear circuit breakers and rate-limit buckets on logout.
+    RateLimiter.instance.reset();
     notifyListeners();
   }
 
   Future<void> deleteAccount() async {
+    final userId = _tenantProfile?.id ?? '';
+    AppEvents.instance.log(UserEventType.sessionEnded,
+        metadata: {'reason': 'account_deleted'});
     await _localStorageService.clearAppState();
+    if (userId.isNotEmpty) {
+      unawaited(_userRepository.deleteProfile(userId));
+    }
     _customProperties = [];
     _invalidateCatalogCache();
     _tenantProfile = null;
     _userRole = 'tenant';
     _isGuestMode = false;
+    _hasActiveSession = false;
     _likedPropertyIds.clear();
     _passedPropertyIds.clear();
     _swipeHistory.clear();
@@ -620,6 +1025,15 @@ class DatingProvider extends ChangeNotifier {
   Future<void> updateTenantProfile(TenantProfile updatedProfile) async {
     _tenantProfile = updatedProfile;
     await _persist();
+    // Sync to discovery table so this user appears in other users' feeds.
+    unawaited(_userRepository.upsertProfile(
+      updatedProfile,
+      role: _userRole,
+      discoverable: !_isGuestMode,
+    ));
+    AppEvents.instance
+      ..setUserId(updatedProfile.id)
+      ..log(UserEventType.profileUpdated);
     notifyListeners();
   }
 
@@ -639,20 +1053,54 @@ class DatingProvider extends ChangeNotifier {
     );
     _isGuestMode = false;
     await _persist();
+    unawaited(_userRepository.upsertProfile(
+      _tenantProfile!,
+      role: _userRole,
+      discoverable: true,
+    ));
+    AppEvents.instance
+      ..setUserId(_tenantProfile!.id)
+      ..log(UserEventType.profileUpdated, metadata: {'source': 'google'});
     notifyListeners();
   }
 
   Future<void> updateFilters(SearchFilters filters) async {
-    _filters = filters;
+    _filters = _normalizeFilters(filters);
     _invalidateFilterCache();
     await _persist();
     notifyListeners();
   }
 
-  Future<void> addLandlordProperty(RentalProperty property) async {
+  // [status] defaults to active. Pass [PropertyRecordStatus.draft] when
+  // creating an incomplete property (e.g. during registration) so consent
+  // enforcement is skipped for drafts and applied only on active listings.
+  Future<void> addLandlordProperty(
+    RentalProperty property, {
+    PropertyRecordStatus status = PropertyRecordStatus.active,
+  }) async {
     _customProperties = [..._customProperties, property];
     _invalidateCatalogCache();
     await _persist();
+    unawaited(
+      _propertyRepository
+          .saveProperty(property,
+              ownerUserId: _currentOwnerUserId, status: status)
+          .then((result) {
+        if (!result.isOk && kDebugMode) {
+          debugPrint(
+              'addLandlordProperty: remote rejected — ${result.userMessage}');
+        }
+      }),
+    );
+    AppEvents.instance.log(
+      UserEventType.propertyAdded,
+      propertyId: property.id,
+      metadata: {
+        'city': property.city,
+        'type': property.propertyType,
+        'status': status.name,
+      },
+    );
     notifyListeners();
   }
 
@@ -661,6 +1109,18 @@ class DatingProvider extends ChangeNotifier {
         _customProperties.map((p) => p.id == updated.id ? updated : p).toList();
     _invalidateCatalogCache();
     await _persist();
+    unawaited(
+      _propertyRepository
+          .saveProperty(updated, ownerUserId: _currentOwnerUserId)
+          .then((result) {
+        if (!result.isOk && kDebugMode) {
+          debugPrint(
+              'updateLandlordProperty: remote rejected — ${result.userMessage}');
+        }
+      }),
+    );
+    AppEvents.instance.log(UserEventType.propertyUpdated,
+        propertyId: updated.id);
     notifyListeners();
   }
 
@@ -669,6 +1129,36 @@ class DatingProvider extends ChangeNotifier {
         _customProperties.where((p) => p.id != propertyId).toList();
     _invalidateCatalogCache();
     await _persist();
+    unawaited(_propertyRepository.deleteProperty(propertyId));
+    notifyListeners();
+  }
+
+  Future<void> attachPropertyVirtualTour({
+    required String propertyId,
+    required PropertyVirtualTour tour,
+  }) async {
+    var changed = false;
+    final updated = _customProperties.map((property) {
+      if (property.id != propertyId) return property;
+      changed = true;
+      return property.copyWith(virtualTour: tour);
+    }).toList();
+    if (!changed) return;
+    _customProperties = updated;
+    _invalidateCatalogCache();
+    await _persist();
+    final property = propertyById(propertyId);
+    if (property != null) {
+      unawaited(_propertyRepository
+          .saveProperty(property, ownerUserId: _currentOwnerUserId)
+          .then((result) {
+        if (!result.isOk && kDebugMode) {
+          debugPrint(
+              'attachPropertyVirtualTour: remote rejected — ${result.userMessage}');
+        }
+      }));
+      AppEvents.instance.log(UserEventType.tourUploaded, propertyId: propertyId);
+    }
     notifyListeners();
   }
 
@@ -731,10 +1221,15 @@ class DatingProvider extends ChangeNotifier {
     if (direction == CardSwiperDirection.left) {
       _passedPropertyIds.add(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: false));
+      AppEvents.instance.log(UserEventType.swipeLeft, propertyId: property.id);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       _likedPropertyIds.add(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: true));
+      final eventType = direction == CardSwiperDirection.top
+          ? UserEventType.superLike
+          : UserEventType.swipeRight;
+      AppEvents.instance.log(eventType, propertyId: property.id);
     } else {
       return false;
     }
@@ -743,6 +1238,9 @@ class DatingProvider extends ChangeNotifier {
 
     await _persist();
     notifyListeners();
+
+    // Proactively fetch next page when the deck is getting short.
+    unawaited(loadMorePropertiesIfNeeded());
     return true;
   }
 
@@ -938,6 +1436,48 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool isOwnerBlocked(String ownerName) =>
+      _blockedOwnerNames.contains(ownerName);
+
+  bool isPropertyReported(String propertyId) =>
+      _reportedPropertyIds.contains(propertyId);
+
+  Future<void> reportProperty(String propertyId, String reason) async {
+    // 1. Remove from local feed immediately.
+    _reportedPropertyIds.add(propertyId);
+    _removeFromFilteredCache(propertyId);
+    await _persist();
+    notifyListeners();
+
+    // 2. Notify developer via Appwrite so the report can be reviewed within 24h.
+    //    Apple Guideline 1.2 requires reports reach the developer.
+    final property = propertyById(propertyId);
+    unawaited(_moderationRepository.reportContent(
+      reporterUserId: _tenantProfile?.id ?? 'anonymous',
+      propertyId: propertyId,
+      ownerName: property?.ownerName ?? '',
+      reason: reason,
+    ));
+    AppEvents.instance.log(UserEventType.propertyReported,
+        propertyId: propertyId, metadata: {'reason': reason});
+  }
+
+  Future<void> blockOwner(String ownerName) async {
+    // 1. Hide all their listings instantly.
+    _blockedOwnerNames.add(ownerName);
+    _invalidateFilterCache();
+    await _persist();
+    notifyListeners();
+
+    // 2. Notify developer — Apple requires blocks notify the developer.
+    unawaited(_moderationRepository.reportBlock(
+      reporterUserId: _tenantProfile?.id ?? 'anonymous',
+      blockedOwnerName: ownerName,
+    ));
+    AppEvents.instance.log(UserEventType.propertyReported,
+        metadata: {'action': 'block_owner', 'owner': ownerName});
+  }
+
   void markMatchesSeen() {
     if (_lastSeenMatchCount >= _matches.length) return;
     _lastSeenMatchCount = _matches.length;
@@ -957,177 +1497,437 @@ class DatingProvider extends ChangeNotifier {
     return _matchScoreFor(p, _filters, DateTime.now(), selectedArea);
   }
 
-  /// Smart multi-criteria matching algorithm.
-  ///
-  /// Inspired by weighted scoring models used in real-estate recommendation
-  /// systems (Airbnb search ranking, Zillow preference weighting, academic
-  /// papers on hedonic pricing models).
-  ///
-  /// Score breakdown (max 100):
-  ///   • Budget fit   — 28 pts  (sigmoid soft curve, no hard cliff)
-  ///   • Rooms fit    — 14 pts  (linear tolerance ±0.5 rooms)
-  ///   • Location     — 18 pts  (exact area match + neighbourhood bonus)
-  ///   • Size fit     —  8 pts  (proportional to how well sizeM2 fits)
-  ///   • Move-in      —  8 pts  (urgency-weighted)
-  ///   • Preferred    — 12 pts  (blue tags — TF-weighted ratio bonus)
-  ///   • Deal-breaker —  6 pts  (all red tags present → full bonus)
-  ///   • Quality      —  6 pts  (media richness + owner info completeness)
-  ///
-  /// Hard gate: if any red (deal-breaker) tag is missing → returns 0.
   int _matchScoreFor(
     RentalProperty p,
     SearchFilters filters,
     DateTime now,
     SearchArea area,
   ) {
-    // ── Hard gate: deal-breakers (red) must ALL be present ──────────────────
-    if (filters.requiredFeatures.isNotEmpty &&
-        !filters.requiredFeatures.every(p.features.contains)) {
+    return _matchScoreForContext(
+      p,
+      _MatchContext(
+        filters: filters,
+        now: now,
+        area: area,
+        featureWeights: _featureWeights,
+        marketIndex: _marketIndex,
+      ),
+    );
+  }
+
+  int _matchScoreForContext(RentalProperty p, _MatchContext context) {
+    final filters = context.filters;
+    if (!filters.requiredFeatures.every(p.features.contains)) {
+      return 0;
+    }
+    if (filters.propertyTypes.isNotEmpty &&
+        !filters.propertyTypes.contains(p.propertyType)) {
+      return 0;
+    }
+    if (filters.conditions.isNotEmpty &&
+        !filters.conditions.contains(p.condition)) {
+      return 0;
+    }
+    if (filters.requiredListingSources.isNotEmpty &&
+        !filters.requiredListingSources.contains(_listingSourceFor(p))) {
+      return 0;
+    }
+    if (filters.requiredMoveInFilters.isNotEmpty &&
+        !filters.requiredMoveInFilters.any(
+          (option) => _matchesMoveInOption(p, option, context.now),
+        )) {
       return 0;
     }
 
-    double score = 0;
+    final score = _budgetFitScore(p, filters) +
+        _marketValueScore(p, context) +
+        _locationScore(p, context) +
+        _spaceFitScore(p, filters) +
+        _moveInScore(p, filters, context.now) +
+        _featureFitScore(p, context) +
+        _listingConfidenceScore(p) +
+        _businessReadinessScore(p, context);
 
-    // ── 1. Budget fit (28 pts) — smooth sigmoid decay ───────────────────────
-    // Inspired by logistic preference curves in hedonic pricing literature.
-    // Full points if under budget; soft decay up to +30% overage.
-    if (filters.maxBudget < 2000000000) {
-      final ratio = p.price / filters.maxBudget; // 1.0 = exactly on budget
-      if (ratio <= 1.0) {
-        // Under budget — full points + small bonus for value properties
-        final valueBonus = (1.0 - ratio).clamp(0.0, 0.3) * 5; // up to +5 for cheapness
-        score += 28 + valueBonus;
-      } else {
-        // Over budget — sigmoid decay: steep past 15%, zero at 35%+
-        final overage = ratio - 1.0; // 0..∞
-        final decay = 1.0 / (1.0 + math.exp(overage * 10)); // logistic
-        score += (28 * decay * 2).clamp(0, 14); // max 14 when slightly over
+    return _clampDouble(score, 0, 100).round();
+  }
+
+  double _budgetFitScore(RentalProperty property, SearchFilters filters) {
+    if (!_hasKnownPrice(property)) {
+      return filters.includeUnknownPriceListings ? _budgetWeight * 0.2 : 0;
+    }
+
+    final hasMin =
+        filters.minBudget > _defaultMinBudgetFor(filters.transactionType);
+    final hasMax =
+        filters.maxBudget < _defaultMaxBudgetFor(filters.transactionType);
+    if (!hasMin && !hasMax) return _budgetWeight;
+
+    final price = property.price.toDouble();
+    if ((!hasMin || price >= filters.minBudget) &&
+        (!hasMax || price <= filters.maxBudget)) {
+      return _budgetWeight;
+    }
+
+    if (hasMin && price < filters.minBudget) {
+      final gap = (filters.minBudget - price) / filters.minBudget;
+      return _budgetWeight * _expDecay(gap / 0.3, 1.2);
+    }
+
+    final overage = (price - filters.maxBudget) / filters.maxBudget;
+    return _budgetWeight * _expDecay(overage / 0.18, 1.45);
+  }
+
+  double _marketValueScore(RentalProperty property, _MatchContext context) {
+    final pricePerM2 = property.pricePerSquareMeter;
+    final stats = context.marketIndex.resolve(property);
+    if (pricePerM2 == null || pricePerM2 <= 0 || stats == null) {
+      return _marketValueWeight * 0.68;
+    }
+
+    final median = stats.medianPricePerM2;
+    if (median <= 0) return _marketValueWeight * 0.68;
+
+    if (pricePerM2 <= median) {
+      final discount =
+          _clampDouble((median - pricePerM2) / median / 0.18, 0, 1);
+      return _marketValueWeight * (0.9 + discount * 0.1);
+    }
+
+    final overMarket = (pricePerM2 - median) / median;
+    final scale = math.max(stats.relativeMad * 1.4, 0.18);
+    return _marketValueWeight * _expDecay(overMarket / scale, 1.35);
+  }
+
+  double _locationScore(RentalProperty property, _MatchContext context) {
+    final filters = context.filters;
+    final selectedCity = filters.city.trim();
+    if (selectedCity.isNotEmpty) {
+      return property.city.trim() == selectedCity ? _locationWeight : 0;
+    }
+
+    if (filters.hasCustomArea) {
+      return context.area.contains(property.point) ? _locationWeight : 0;
+    }
+    if (filters.areaId == 'all_israel') return _locationWeight;
+    return context.area.contains(property.point) ? _locationWeight : 0;
+  }
+
+  double _spaceFitScore(RentalProperty property, SearchFilters filters) {
+    return _roomsFitScore(property, filters) +
+        _sizeFitScore(property, filters) +
+        _floorFitScore(property, filters);
+  }
+
+  double _roomsFitScore(RentalProperty property, SearchFilters filters) {
+    final hasMin = filters.minRooms > 0;
+    final hasMax = filters.maxRooms < _unsetMaxRooms;
+    if (!hasMin && !hasMax) return _roomsWeight;
+
+    if ((!hasMin || property.rooms >= filters.minRooms) &&
+        (!hasMax || property.rooms <= filters.maxRooms)) {
+      return _roomsWeight;
+    }
+
+    final shortage = filters.minRooms - property.rooms;
+    if (hasMin && shortage > 0) {
+      if (shortage <= 0.5) {
+        return _roomsWeight * (1 - shortage * 0.9);
       }
-    } else {
-      score += 28; // no budget set → full points
+      return _roomsWeight * _expDecay(shortage / 0.5, 1.25) * 0.35;
     }
 
-    // ── 2. Rooms fit (14 pts) — linear with tolerance ───────────────────────
-    if (filters.minRooms <= 0) {
-      score += 14;
-    } else {
-      final diff = p.rooms - filters.minRooms;
-      if (diff >= 0) {
-        score += 14; // meets or exceeds requirement
-      } else if (diff >= -0.5) {
-        score += 14 * (1 + diff * 2); // 7 pts at -0.5 rooms
-      }
-      // below -0.5: 0 pts
+    final excess = property.rooms - filters.maxRooms;
+    if (hasMax && excess <= 0.5) {
+      return _roomsWeight * (1 - excess * 0.4);
+    }
+    return _roomsWeight * _expDecay(excess / 0.75, 1.2) * 0.55;
+  }
+
+  double _sizeFitScore(RentalProperty property, SearchFilters filters) {
+    final hasMin = filters.minSizeM2 > 0;
+    final hasMax = filters.maxSizeM2 < _unsetMaxSizeM2;
+    if (!hasMin && !hasMax) return _sizeWeight;
+    if (property.sizeM2 <= 0) return _sizeWeight * 0.45;
+
+    final size = property.sizeM2.toDouble();
+    final minSize = filters.minSizeM2.toDouble();
+    final maxSize = filters.maxSizeM2.toDouble();
+
+    if ((!hasMin || size >= minSize) && (!hasMax || size <= maxSize)) {
+      return _sizeWeight;
     }
 
-    // ── 3. Location fit (18 pts) ─────────────────────────────────────────────
-    if (filters.areaId == 'all_israel') {
-      score += 18;
-    } else if (area.contains(p.point)) {
-      score += 18;
+    if (hasMin && size < minSize) {
+      final deficit = (minSize - size) / minSize;
+      return _sizeWeight * _expDecay(deficit / 0.24, 1.3);
     }
 
-    // ── 4. Size fit (8 pts) — proportional to overlap with desired range ─────
-    final targetMin = filters.minSizeM2.toDouble();
-    final targetMax = (filters.maxSizeM2 < 1000000)
-        ? filters.maxSizeM2.toDouble()
-        : double.infinity;
-    if (targetMin <= 0 && targetMax == double.infinity) {
-      score += 8; // no size preference
-    } else {
-      final sz = p.sizeM2.toDouble();
-      if (sz >= targetMin && sz <= targetMax) {
-        score += 8;
-      } else if (sz < targetMin) {
-        final deficit = (targetMin - sz) / targetMin;
-        score += 8 * (1 - deficit).clamp(0, 1);
-      }
-      // sz > targetMax: property may be bigger than preferred, 4 pts grace
-      else {
-        score += 4;
-      }
-    }
+    final oversize = (size - maxSize) / maxSize;
+    return _sizeWeight * _expDecay(oversize / 0.75, 1.15);
+  }
 
-    // ── 5. Move-in timing (8 pts) ────────────────────────────────────────────
-    score += _moveInScore(p, filters, now).toDouble();
+  double _floorFitScore(RentalProperty property, SearchFilters filters) {
+    if (filters.minFloor <= 0) return _floorWeight;
 
-    // ── 6. Preferred features — blue tags (12 pts) ───────────────────────────
-    // Uses a TF-inspired weight: each matched feature contributes, but
-    // rarer features (present in fewer properties) get a slight bonus.
-    if (filters.preferredFeatures.isEmpty) {
-      score += 12; // no preference → neutral
-    } else {
-      final matched =
-          filters.preferredFeatures.where(p.features.contains).length;
-      final ratio = matched / filters.preferredFeatures.length;
-      // Concave reward: partial matches still valuable
-      score += 12 * _concaveReward(ratio);
-    }
+    final floorNumber = property.floorNumber;
+    if (floorNumber == null) return _floorWeight * 0.45;
+    if (floorNumber >= filters.minFloor) return _floorWeight;
+    if (floorNumber == filters.minFloor - 1) return _floorWeight * 0.45;
+    return 0;
+  }
 
-    // ── 7. Deal-breaker satisfaction bonus (6 pts) ───────────────────────────
-    // Extra points when ALL red tags are met (already passed the gate above).
-    if (filters.requiredFeatures.isNotEmpty) {
-      score += 6; // bonus for surviving the gate
-    } else {
-      score += 3; // no deal-breakers set → partial bonus
-    }
+  double _featureFitScore(RentalProperty property, _MatchContext context) {
+    final filters = context.filters;
+    final requiredScore = _requiredFeatureWeight;
+    final featureScore = filters.preferredFeatures.isEmpty
+        ? _preferredFeatureWeight
+        : _weightedSetPreferenceScore(
+            actualValues: property.features.toSet(),
+            preferredValues: filters.preferredFeatures,
+            totalWeight: _preferredFeatureWeight,
+            weightLookup: (feature) => context.featureWeights[feature] ?? 1,
+          );
 
-    // ── 8. Listing quality (6 pts) ───────────────────────────────────────────
-    score += _listingQualityScore(p).toDouble();
-
-    return score.round().clamp(0, 100);
+    return requiredScore +
+        featureScore +
+        _setPreferenceScore(
+          actualValue: property.propertyType,
+          preferredValues: filters.preferredPropertyTypes,
+          totalWeight: _preferredPropertyTypeWeight,
+        ) +
+        _setPreferenceScore(
+          actualValue: property.condition,
+          preferredValues: filters.preferredConditions,
+          totalWeight: _preferredConditionWeight,
+        ) +
+        _setPreferenceScore(
+          actualValue: _listingSourceFor(property),
+          preferredValues: filters.preferredListingSources,
+          totalWeight: _preferredListingSourceWeight,
+        );
   }
 
   /// Concave reward: f(x) = 1 − (1−x)^1.5
   /// Partial tag matches are still rewarded, but full match is best.
   double _concaveReward(double ratio) {
-    final clamped = ratio.clamp(0.0, 1.0);
-    return 1.0 - math.pow(1.0 - clamped, 1.5);
+    final clamped = _clampDouble(ratio, 0, 1);
+    return 1.0 - math.pow(1.0 - clamped, 1.5).toDouble();
   }
 
-  int _moveInScore(
+  double _setPreferenceScore<T>({
+    required T actualValue,
+    required Set<T> preferredValues,
+    required double totalWeight,
+  }) {
+    if (preferredValues.isEmpty) return totalWeight;
+    return preferredValues.contains(actualValue) ? totalWeight : 0;
+  }
+
+  double _weightedSetPreferenceScore({
+    required Set<String> actualValues,
+    required Set<String> preferredValues,
+    required double totalWeight,
+    required double Function(String value) weightLookup,
+  }) {
+    if (preferredValues.isEmpty) return totalWeight;
+
+    var matchedWeight = 0.0;
+    var availableWeight = 0.0;
+    for (final value in preferredValues) {
+      final weight = weightLookup(value);
+      availableWeight += weight;
+      if (actualValues.contains(value)) {
+        matchedWeight += weight;
+      }
+    }
+
+    if (availableWeight <= 0) return totalWeight;
+    return totalWeight * _concaveReward(matchedWeight / availableWeight);
+  }
+
+  double _moveInScore(
     RentalProperty property,
     SearchFilters filters,
     DateTime now,
   ) {
-    if (filters.moveInFilter == MoveInFilter.any) return 10;
+    final prioritizedOptions = filters.requiredMoveInFilters.isNotEmpty
+        ? filters.requiredMoveInFilters
+        : filters.preferredMoveInFilters;
+    if (prioritizedOptions.isEmpty) return _timingWeight;
+
     final entryDate = property.entryDateValue;
-    if (entryDate == null) return 0;
+    if (entryDate == null) return _timingWeight * 0.35;
 
-    switch (filters.moveInFilter) {
-      case MoveInFilter.any:
-        return 10;
-      case MoveInFilter.immediate:
-        return entryDate.isAfter(now) ? 0 : 10;
-      case MoveInFilter.within30Days:
-        return entryDate.isAfter(now.add(const Duration(days: 30))) ? 0 : 10;
-      case MoveInFilter.within90Days:
-        return entryDate.isAfter(now.add(const Duration(days: 90))) ? 0 : 10;
+    double bestScore = 0;
+    for (final option in prioritizedOptions) {
+      final deadline = _moveInDeadlineFor(option, now);
+      if (deadline == null) {
+        bestScore = math.max(bestScore, _timingWeight);
+        continue;
+      }
+      if (!entryDate.isAfter(deadline)) {
+        bestScore = math.max(bestScore, _timingWeight);
+        continue;
+      }
+
+      final lateDays = math.max(entryDate.difference(deadline).inDays, 1);
+      final graceDays = math.max(_moveInGraceDaysFor(option), 1);
+      final candidate = _timingWeight * _expDecay(lateDays / graceDays, 1.25);
+      bestScore = math.max(bestScore, candidate);
     }
+    return bestScore;
   }
 
-  int _listingQualityScore(RentalProperty property) {
-    var score = 0;
-    if (property.media.isNotEmpty) score += 4;
+  ListingSourceFilter _listingSourceFor(RentalProperty property) {
+    return property.agencyListing
+        ? ListingSourceFilter.agencyOnly
+        : ListingSourceFilter.privateOnly;
+  }
+
+  bool _matchesMoveInOption(
+    RentalProperty property,
+    MoveInFilter option,
+    DateTime now,
+  ) {
+    final deadline = _moveInDeadlineFor(option, now);
+    if (deadline == null) return true;
+    final entryDate = property.entryDateValue;
+    return entryDate != null && !entryDate.isAfter(deadline);
+  }
+
+  Set<ListingSourceFilter> _normalizedListingSourceRequired(
+    SearchFilters filters,
+  ) {
+    final required = <ListingSourceFilter>{
+      ...filters.requiredListingSources,
+    };
+    if (required.isEmpty && filters.listingSource != ListingSourceFilter.any) {
+      required.add(filters.listingSource);
+    }
+    return required;
+  }
+
+  Set<ListingSourceFilter> _normalizedListingSourcePreferred(
+    SearchFilters filters,
+  ) {
+    return filters.preferredListingSources.difference(
+      _normalizedListingSourceRequired(filters),
+    );
+  }
+
+  Set<MoveInFilter> _normalizedMoveInRequired(SearchFilters filters) {
+    final required = <MoveInFilter>{
+      ...filters.requiredMoveInFilters,
+    };
+    if (required.isEmpty && filters.moveInFilter != MoveInFilter.any) {
+      required.add(filters.moveInFilter);
+    }
+    return required;
+  }
+
+  Set<MoveInFilter> _normalizedMoveInPreferred(SearchFilters filters) {
+    return filters.preferredMoveInFilters.difference(
+      _normalizedMoveInRequired(filters),
+    );
+  }
+
+  double _listingConfidenceScore(RentalProperty property) {
+    var score = 0.0;
+
+    if (property.media.isNotEmpty) score += 2;
+    if (property.media.length >= 2) score += 1;
+    if (property.media.length >= 4) score += 0.5;
+    if (property.videoUrls.isNotEmpty) score += 0.5;
+    if (property.hasReadyVirtualTour) {
+      score += 1.2;
+    } else if (property.virtualTour?.isProcessing == true) {
+      score += 0.3;
+    }
+
     if (property.city.trim().isNotEmpty && property.street.trim().isNotEmpty) {
-      score += 4;
+      score += 1.2;
     }
-    if (property.ownerName.trim().isNotEmpty) score += 2;
-    return score;
+    if (property.streetNumber > 0) score += 0.6;
+    if (property.neighborhood.trim().isNotEmpty) score += 0.5;
+    if (property.condition.trim().isNotEmpty) score += 0.4;
+    if (property.propertyType.trim().isNotEmpty) score += 0.3;
+
+    if (property.ownerName.trim().isNotEmpty) score += 1;
+    if (property.url.trim().isNotEmpty) score += 0.6;
+    if (_hasUsableCoordinates(property)) score += 0.4;
+
+    final reviews = propertyReviews(property.id);
+    if (reviews.isEmpty) {
+      score += 0.4;
+    } else {
+      final avg = reviewAverage(reviews);
+      score += _clampDouble(avg / 5, 0, 1) * 1.5;
+      score += _clampDouble(reviews.length / 3, 0, 1) * 0.5;
+    }
+
+    score += property.agencyListing ? 0.7 : 1;
+    return _clampDouble(score, 0, _listingConfidenceWeight);
   }
+
+  double _businessReadinessScore(
+    RentalProperty property,
+    _MatchContext context,
+  ) {
+    var score = 0.0;
+
+    if (context.filters.transactionType == TransactionTypeFilter.any) {
+      score += 0.7;
+    } else {
+      score += 1;
+    }
+
+    if (_hasKnownPrice(property) && property.sizeM2 > 0) score += 1;
+    if (!property.agencyListing) score += 0.8;
+
+    final entryDate = property.entryDateValue;
+    if (entryDate == null) {
+      if (property.entryDate.trim().isNotEmpty) score += 0.4;
+    } else {
+      final daysUntilEntry = entryDate.difference(context.now).inDays;
+      if (daysUntilEntry <= 90) {
+        score += 1;
+      } else if (daysUntilEntry <= 180) {
+        score += 0.6;
+      } else {
+        score += 0.3;
+      }
+    }
+
+    if (property.media.length >= 2 &&
+        property.ownerName.trim().isNotEmpty &&
+        property.street.trim().isNotEmpty) {
+      score += 0.2;
+    }
+
+    return _clampDouble(score, 0, _businessReadinessWeight);
+  }
+
+  bool _hasUsableCoordinates(RentalProperty property) {
+    return property.lat.abs() > 0.01 && property.lon.abs() > 0.01;
+  }
+
+  double _expDecay(double value, double exponent) {
+    final normalized = math.max(value, 0.0);
+    return math.exp(-math.pow(normalized, exponent).toDouble());
+  }
+
+  bool _hasKnownPrice(RentalProperty property) =>
+      property.price >= _missingPriceThreshold;
 
   PriceContext priceContext(RentalProperty property) {
-    if (property.sizeM2 == 0) return PriceContext.average;
-    final cityProps = _allProperties
-        .where((p) => p.city == property.city && p.sizeM2 > 0)
-        .toList();
-    if (cityProps.length < 3) return PriceContext.average;
-    final avgPpm2 =
-        cityProps.fold<double>(0, (s, p) => s + p.price / p.sizeM2) /
-            cityProps.length;
-    final thisPpm2 = property.price / property.sizeM2;
-    if (thisPpm2 < avgPpm2 * 0.92) return PriceContext.belowAverage;
-    if (thisPpm2 > avgPpm2 * 1.08) return PriceContext.aboveAverage;
+    if (!_hasKnownPrice(property)) return PriceContext.average;
+    final pricePerM2 = property.pricePerSquareMeter;
+    final stats = _marketIndex.resolve(property);
+    if (pricePerM2 == null || stats == null) return PriceContext.average;
+
+    final median = stats.medianPricePerM2;
+    if (pricePerM2 < median * 0.92) return PriceContext.belowAverage;
+    if (pricePerM2 > median * 1.08) return PriceContext.aboveAverage;
     return PriceContext.average;
   }
 
@@ -1138,24 +1938,7 @@ class DatingProvider extends ChangeNotifier {
       for (final property in _baseProperties.take(12))
         property.id: _rentalDataService.createPropertyReviews(property),
     };
-    _filters = const SearchFilters(
-      query: '',
-      maxBudget: 2000000000,
-      minRooms: 0,
-      areaId: 'all_israel',
-      requiredFeatures: <String>{},
-      preferredFeatures: <String>{},
-      minSizeM2: 0,
-      maxSizeM2: 1000000,
-      propertyTypes: <String>{},
-      conditions: <String>{},
-      listingSource: ListingSourceFilter.any,
-      minFloor: 0,
-      moveInFilter: MoveInFilter.any,
-      sortBy: SearchSortOption.bestMatch,
-      city: '',
-      transactionType: TransactionTypeFilter.any,
-    );
+    _filters = _normalizeFilters(_defaultFilters);
     _likedPropertyIds = <String>{};
     _passedPropertyIds = <String>{};
     _ownerAcceptedPropertyIds = <String>{};
@@ -1171,28 +1954,28 @@ class DatingProvider extends ChangeNotifier {
     // For owner demo: profile = landlord; for tenant demo: profile = tenant
     final isOwner = role == 'owner' || role == 'landlord';
     final tenant = _rentalDataService.createDefaultTenantProfile().copyWith(
-      name: isOwner ? 'יואב כהן' : 'נועה לוי',
-      photoUrls: isOwner
-          ? const []          // landlord has no photo → show initials
-          : const [
-              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80',
-              'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
-            ],
-      bio: isOwner
-          ? 'בעל נכסים בתל אביב והסביבה. מחפש שוכרים אמינים לטווח ארוך. מגיב תוך 24 שעות ומאמין בתקשורת פתוחה.'
-          : 'מחפשת דירת 2-3 חדרים בצפון תל אביב או רמת גן. כבר כמה שבועות פעילה באפליקציה, עם תגובות מהירות, מסמכים מוכנים והעדפה לבניין מטופח.',
-      budgetMax: 11200,
-      desiredRooms: 2.5,
-      moveInWindow: 'כניסה תוך 30 יום',
-      importantDetails: isOwner
-          ? const ['ניסיון בניהול נכסים', 'חוזה מסודר', 'תגובה מהירה']
-          : const [
-              'אישור הכנסה מוכן',
-              'שוכרת כבר 5 שנים רצוף',
-              'זמינה לסיור גם בערב',
-              'מחפשת חוזה לשנה לפחות',
-            ],
-    );
+          name: isOwner ? 'יואב כהן' : 'נועה לוי',
+          photoUrls: isOwner
+              ? const [] // landlord has no photo → show initials
+              : const [
+                  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80',
+                  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
+                ],
+          bio: isOwner
+              ? 'בעל נכסים בתל אביב והסביבה. מחפש שוכרים אמינים לטווח ארוך. מגיב תוך 24 שעות ומאמין בתקשורת פתוחה.'
+              : 'מחפשת דירת 2-3 חדרים בצפון תל אביב או רמת גן. כבר כמה שבועות פעילה באפליקציה, עם תגובות מהירות, מסמכים מוכנים והעדפה לבניין מטופח.',
+          budgetMax: 11200,
+          desiredRooms: 2.5,
+          moveInWindow: 'כניסה תוך 30 יום',
+          importantDetails: isOwner
+              ? const ['ניסיון בניהול נכסים', 'חוזה מסודר', 'תגובה מהירה']
+              : const [
+                  'אישור הכנסה מוכן',
+                  'שוכרת כבר 5 שנים רצוף',
+                  'זמינה לסיור גם בערב',
+                  'מחפשת חוזה לשנה לפחות',
+                ],
+        );
     final propertyPool = _baseProperties.take(6).toList();
     if (propertyPool.length < 4) {
       _seedInitialState();
@@ -1219,24 +2002,7 @@ class DatingProvider extends ChangeNotifier {
       for (final property in propertyPool)
         property.id: _rentalDataService.createPropertyReviews(property),
     };
-    _filters = const SearchFilters(
-      query: '',
-      maxBudget: 2000000000,
-      minRooms: 0,
-      areaId: 'all_israel',
-      requiredFeatures: <String>{},
-      preferredFeatures: <String>{},
-      minSizeM2: 0,
-      maxSizeM2: 1000000,
-      propertyTypes: <String>{},
-      conditions: <String>{},
-      listingSource: ListingSourceFilter.any,
-      minFloor: 0,
-      moveInFilter: MoveInFilter.any,
-      sortBy: SearchSortOption.bestMatch,
-      city: '',
-      transactionType: TransactionTypeFilter.any,
-    );
+    _filters = _normalizeFilters(_defaultFilters);
     _customProperties = [
       RentalProperty(
         id: 'demo-prop-1',
@@ -1560,12 +2326,20 @@ class DatingProvider extends ChangeNotifier {
 
     _userRole = storedState['userRole'] as String? ?? 'tenant';
     _isGuestMode = storedState['isGuestMode'] as bool? ?? false;
+    _hasActiveSession =
+        storedState['hasActiveSession'] as bool? ?? _isGuestMode;
 
     if (_tenantReviews.isEmpty) {
       _tenantReviews = _rentalDataService.createTenantReviews();
     }
     _savedPropertyIds = Set<String>.from(
       storedState['savedPropertyIds'] as List<dynamic>? ?? const [],
+    );
+    _blockedOwnerNames = Set<String>.from(
+      storedState['blockedOwnerNames'] as List<dynamic>? ?? const [],
+    );
+    _reportedPropertyIds = Set<String>.from(
+      storedState['reportedPropertyIds'] as List<dynamic>? ?? const [],
     );
     _lastSeenMatchCount = storedState['lastSeenMatchCount'] as int? ?? 0;
     _pendingMatchPropertyId = null;
@@ -1621,7 +2395,10 @@ class DatingProvider extends ChangeNotifier {
       'customProperties': _customProperties.map((p) => p.toJson()).toList(),
       'userRole': InputSanitizer.sanitizeRole(_userRole),
       'isGuestMode': _isGuestMode,
+      'hasActiveSession': _hasActiveSession,
       'savedPropertyIds': _savedPropertyIds.toList(),
+      'blockedOwnerNames': _blockedOwnerNames.toList(),
+      'reportedPropertyIds': _reportedPropertyIds.toList(),
       'lastSeenMatchCount': _lastSeenMatchCount,
     };
 
@@ -1638,6 +2415,119 @@ class DatingProvider extends ChangeNotifier {
         }
       }
     }));
+  }
+}
+
+class _MatchContext {
+  const _MatchContext({
+    required this.filters,
+    required this.now,
+    required this.area,
+    required this.featureWeights,
+    required this.marketIndex,
+  });
+
+  final SearchFilters filters;
+  final DateTime now;
+  final SearchArea area;
+  final Map<String, double> featureWeights;
+  final _MarketIndex marketIndex;
+}
+
+class _MarketIndex {
+  const _MarketIndex(this._statsByKey);
+
+  final Map<String, _MarketStats> _statsByKey;
+
+  static _MarketIndex fromProperties(List<RentalProperty> properties) {
+    final buckets = <String, List<double>>{};
+
+    for (final property in properties) {
+      final pricePerM2 = property.pricePerSquareMeter;
+      if (pricePerM2 == null || pricePerM2 <= 0) continue;
+
+      final city = _marketToken(property.city);
+      final type = _marketToken(property.propertyType);
+      final transaction = property.transactionType.name;
+      final sample = pricePerM2.toDouble();
+
+      _addSample(buckets, _key(city, transaction, type), sample);
+      _addSample(buckets, _key(city, transaction, '*'), sample);
+      _addSample(buckets, _key('*', transaction, type), sample);
+      _addSample(buckets, _key('*', transaction, '*'), sample);
+      _addSample(buckets, _key('*', '*', '*'), sample);
+    }
+
+    return _MarketIndex({
+      for (final entry in buckets.entries)
+        entry.key: _MarketStats.fromSamples(entry.value),
+    });
+  }
+
+  _MarketStats? resolve(RentalProperty property) {
+    final city = _marketToken(property.city);
+    final type = _marketToken(property.propertyType);
+    final transaction = property.transactionType.name;
+    final keys = [
+      _key(city, transaction, type),
+      _key(city, transaction, '*'),
+      _key('*', transaction, type),
+      _key('*', transaction, '*'),
+      _key('*', '*', '*'),
+    ];
+
+    _MarketStats? fallback;
+    for (final key in keys) {
+      final stats = _statsByKey[key];
+      if (stats == null) continue;
+      fallback ??= stats;
+      if (stats.sampleCount >= 4) return stats;
+    }
+    return fallback;
+  }
+
+  static void _addSample(
+    Map<String, List<double>> buckets,
+    String key,
+    double value,
+  ) {
+    buckets.putIfAbsent(key, () => <double>[]).add(value);
+  }
+
+  static String _key(String city, String transaction, String type) {
+    return '$city|$transaction|$type';
+  }
+
+  static String _marketToken(String value) {
+    final normalized = value.trim().toLowerCase();
+    return normalized.isEmpty ? '*' : normalized;
+  }
+}
+
+class _MarketStats {
+  const _MarketStats({
+    required this.sampleCount,
+    required this.medianPricePerM2,
+    required this.relativeMad,
+  });
+
+  final int sampleCount;
+  final double medianPricePerM2;
+  final double relativeMad;
+
+  static _MarketStats fromSamples(List<double> samples) {
+    final sorted = [...samples]..sort();
+    final median = _median(sorted);
+    final deviations = sorted.map((value) => (value - median).abs()).toList()
+      ..sort();
+    final mad = _median(deviations);
+    final relativeMad = median <= 0 ? 0.18 : math.max(mad / median, 0.08);
+
+    return _MarketStats(
+      sampleCount: sorted.length,
+      medianPricePerM2: median,
+      relativeMad: relativeMad,
+    );
   }
 }
 
@@ -1664,4 +2554,15 @@ class LandlordStats {
 
   double get conversionRate =>
       totalCandidatesSeen == 0 ? 0 : matchesCount / totalCandidatesSeen * 100;
+}
+
+double _median(List<double> sortedValues) {
+  if (sortedValues.isEmpty) return 0;
+  final middle = sortedValues.length ~/ 2;
+  if (sortedValues.length.isOdd) return sortedValues[middle];
+  return (sortedValues[middle - 1] + sortedValues[middle]) / 2;
+}
+
+double _clampDouble(num value, num min, num max) {
+  return value.clamp(min, max).toDouble();
 }

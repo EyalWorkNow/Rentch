@@ -5,6 +5,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
+import 'package:dating_app/presentation/screens/tenant_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,13 +49,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         child: leads.isEmpty
                             ? const _EmptyOwnerQueue()
                             : CardSwiper(
-                                key: ValueKey(
-                                    leads.map((p) => p.id).join('-')),
-                                controller:
-                                    provider.ownerSwiperController,
+                                key: ValueKey(leads.map((p) => p.id).join('-')),
+                                controller: provider.ownerSwiperController,
                                 cardsCount: leads.length,
-                                padding: const EdgeInsets.fromLTRB(
-                                    12, 0, 12, 0),
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 0, 12, 0),
                                 scale: 0.93,
                                 threshold: 32,
                                 maxAngle: 14,
@@ -68,8 +67,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 ),
                                 onSwipe: (prev, current, dir) {
                                   if (current != null && mounted) {
-                                    setState(() =>
-                                        _currentIndex = current);
+                                    setState(() => _currentIndex = current);
                                   }
                                   return provider.handleOwnerSwipe(
                                       prev, current, dir);
@@ -80,6 +78,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   hOffset,
                                   vOffset,
                                 ) {
+                                  if (index < 0 || index >= leads.length) {
+                                    return const SizedBox.shrink();
+                                  }
                                   return _LeadCard(
                                     tenant: tenant,
                                     property: leads[index],
@@ -178,8 +179,7 @@ class _TopBar extends StatelessWidget {
           // Trust score badge
           if (trustScore > 0)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: _trustColor(trustScore).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
@@ -269,11 +269,29 @@ class _LeadCardState extends State<_LeadCard> {
   int _photoIndex = 0;
 
   @override
+  void didUpdateWidget(covariant _LeadCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tenant.id != widget.tenant.id) {
+      _photoIndex = 0;
+      return;
+    }
+    _photoIndex = _safePhotoIndex(_photoIndex);
+  }
+
+  int _safePhotoIndex(int index) {
+    final photoCount = widget.tenant.photoUrls.length;
+    if (photoCount <= 0) return 0;
+    return index.clamp(0, photoCount - 1).toInt();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isAccepting = widget.hOffset > 10;
     final isRejecting = widget.hOffset < -10;
     final photos = widget.tenant.photoUrls;
     final hasMultiplePhotos = photos.length > 1;
+    final safePhotoIndex = _safePhotoIndex(_photoIndex);
+    final currentPhoto = photos.isNotEmpty ? photos[safePhotoIndex] : '';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -304,13 +322,12 @@ class _LeadCardState extends State<_LeadCard> {
                       children: [
                         // Photo
                         AnimatedSwitcher(
-                          duration:
-                              const Duration(milliseconds: 200),
+                          duration: const Duration(milliseconds: 200),
                           child: SafeImage(
-                            key: ValueKey(_photoIndex),
-                            source: photos.isNotEmpty
-                                ? photos[_photoIndex]
-                                : '',
+                            key: ValueKey(
+                              '${widget.tenant.id}:$safePhotoIndex:$currentPhoto',
+                            ),
+                            source: currentPhoto,
                             fallback: Container(
                               color: AppColors.navy,
                               child: const Center(
@@ -343,32 +360,39 @@ class _LeadCardState extends State<_LeadCard> {
                         // Photo navigation tap zones
                         if (hasMultiplePhotos)
                           Positioned.fill(
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (_photoIndex > 0) {
-                                        setState(() => _photoIndex--);
-                                      }
-                                    },
-                                    behavior:
-                                        HitTestBehavior.translucent,
+                            child: Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        if (safePhotoIndex > 0) {
+                                          setState(
+                                            () => _photoIndex =
+                                                safePhotoIndex - 1,
+                                          );
+                                        }
+                                      },
+                                      behavior: HitTestBehavior.translucent,
+                                    ),
                                   ),
-                                ),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (_photoIndex <
-                                          photos.length - 1) {
-                                        setState(() => _photoIndex++);
-                                      }
-                                    },
-                                    behavior:
-                                        HitTestBehavior.translucent,
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        if (safePhotoIndex <
+                                            photos.length - 1) {
+                                          setState(
+                                            () => _photoIndex =
+                                                safePhotoIndex + 1,
+                                          );
+                                        }
+                                      },
+                                      behavior: HitTestBehavior.translucent,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         // Photo dots
@@ -379,7 +403,7 @@ class _LeadCardState extends State<_LeadCard> {
                             right: 0,
                             child: _PhotoDots(
                               count: photos.length,
-                              current: _photoIndex,
+                              current: safePhotoIndex,
                             ),
                           ),
                         // Name + chips overlay
@@ -388,8 +412,7 @@ class _LeadCardState extends State<_LeadCard> {
                           right: 18,
                           left: 18,
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
@@ -408,8 +431,7 @@ class _LeadCardState extends State<_LeadCard> {
                                 children: [
                                   _TenantChip(
                                     icon: IconsaxPlusBold.wallet,
-                                    label: _fmt(
-                                        widget.tenant.budgetMax),
+                                    label: _fmt(widget.tenant.budgetMax),
                                   ),
                                   _TenantChip(
                                     icon: IconsaxPlusBold.building,
@@ -418,8 +440,7 @@ class _LeadCardState extends State<_LeadCard> {
                                   ),
                                   _TenantChip(
                                     icon: IconsaxPlusBold.calendar,
-                                    label:
-                                        widget.tenant.moveInWindow,
+                                    label: widget.tenant.moveInWindow,
                                   ),
                                 ],
                               ),
@@ -432,79 +453,67 @@ class _LeadCardState extends State<_LeadCard> {
 
                   // ── Scrollable details ──────────────────────────────────
                   Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Liked property
-                          _LikedPropertyBox(
-                              property: widget.property),
-                          const SizedBox(height: 14),
-                          // Key detail cells
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _DetailCell(
-                                  icon: IconsaxPlusBold.calendar,
-                                  label: 'כניסה',
-                                  value:
-                                      widget.tenant.moveInWindow,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _DetailCell(
-                                  icon: IconsaxPlusBold.wallet,
-                                  label: 'תקציב',
-                                  value: _fmt(
-                                      widget.tenant.budgetMax),
-                                ),
-                              ),
-                            ],
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => TenantDetailScreen(
+                              tenant: widget.tenant,
+                              property: widget.property,
+                              reviews: widget.reviews,
+                            ),
                           ),
-                          // Important details chips
-                          if (widget.tenant.importantDetails
-                              .isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: widget.tenant.importantDetails
-                                  .take(4)
-                                  .map((d) => _DetailTag(d))
-                                  .toList(),
-                            ),
-                          ],
-                          // Bio
-                          if (widget.tenant.bio.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            const Divider(
-                                height: 1,
-                                color: Color(0xFFEAF2F7)),
-                            const SizedBox(height: 12),
-                            Text(
-                              widget.tenant.bio,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
-                                height: 1.6,
-                                fontWeight: FontWeight.w500,
+                        );
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Liked property
+                            _LikedPropertyBox(property: widget.property),
+                            const SizedBox(height: 24),
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.15),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'הצג פרופיל מלא והעדפות',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Icon(
+                                      IconsaxPlusBold.arrow_left_1,
+                                      color: AppColors.primary,
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                            const SizedBox(height: 4),
                           ],
-                          // Reviews
-                          if (widget.reviews.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            const Divider(
-                                height: 1,
-                                color: Color(0xFFEAF2F7)),
-                            const SizedBox(height: 12),
-                            _ReviewSection(
-                                reviews: widget.reviews),
-                          ],
-                          const SizedBox(height: 4),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -525,22 +534,19 @@ class _LeadCardState extends State<_LeadCard> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isAccepting
-                              ? AppColors.primary
-                              : AppColors.coral,
+                          color:
+                              isAccepting ? AppColors.primary : AppColors.coral,
                           width: 3,
                         ),
-                        color: (isAccepting
-                                ? AppColors.primary
-                                : AppColors.coral)
-                            .withValues(alpha: 0.1),
+                        color:
+                            (isAccepting ? AppColors.primary : AppColors.coral)
+                                .withValues(alpha: 0.1),
                       ),
                       child: Text(
                         isAccepting ? '✓ מאשר' : '✕ דוחה',
                         style: TextStyle(
-                          color: isAccepting
-                              ? AppColors.primary
-                              : AppColors.coral,
+                          color:
+                              isAccepting ? AppColors.primary : AppColors.coral,
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
@@ -575,9 +581,8 @@ class _PhotoDots extends StatelessWidget {
           width: isActive ? 18 : 6,
           height: 6,
           decoration: BoxDecoration(
-            color: isActive
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.45),
+            color:
+                isActive ? Colors.white : Colors.white.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(3),
           ),
         );
@@ -595,31 +600,42 @@ class _LikedPropertyBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.08),
-            AppColors.primary.withValues(alpha: 0.04),
-          ],
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF3FBFB), Color(0xFFE8F7F8)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.2), width: 1),
+          color: AppColors.primary.withValues(alpha: 0.18),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
+              color: AppColors.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
             ),
-            child: const Icon(IconsaxPlusBold.heart,
-                size: 16, color: AppColors.primary),
+            child: const Icon(
+              IconsaxPlusBold.heart,
+              size: 18,
+              color: AppColors.primary,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,36 +644,42 @@ class _LikedPropertyBox extends StatelessWidget {
                   'אהב/ה את הנכס',
                   style: TextStyle(
                     color: AppColors.primary,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
                   property.address,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.navy,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
             child: Text(
               property.priceLabel,
               style: const TextStyle(
                 color: AppColors.navy,
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -668,94 +690,6 @@ class _LikedPropertyBox extends StatelessWidget {
   }
 }
 
-// ─── Detail cell ──────────────────────────────────────────────────────────────
-
-class _DetailCell extends StatelessWidget {
-  const _DetailCell(
-      {required this.icon, required this.label, required this.value});
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child:
-                Icon(icon, size: 14, color: AppColors.primary),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Detail tag chip ──────────────────────────────────────────────────────────
-
-class _DetailTag extends StatelessWidget {
-  const _DetailTag(this.label);
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD8E8F0)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.navy,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
 
 // ─── Tenant chip (on photo) ───────────────────────────────────────────────────
 
@@ -767,100 +701,26 @@ class _TenantChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2), width: 0.8),
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 1,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: Colors.white),
-          const SizedBox(width: 5),
+          Icon(icon, size: 12, color: Colors.white),
+          const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 10.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Review section ───────────────────────────────────────────────────────────
-
-class _ReviewSection extends StatelessWidget {
-  const _ReviewSection({required this.reviews});
-  final List<AppReview> reviews;
-
-  @override
-  Widget build(BuildContext context) {
-    final r = reviews.first;
-    final avg = reviews.fold(0, (s, x) => s + x.rating) /
-        reviews.length;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFDF9),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFBEFD8), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(IconsaxPlusBold.star_1,
-                  color: Color(0xFFE8A84A), size: 14),
-              const SizedBox(width: 5),
-              Text(
-                '${avg.toStringAsFixed(1)} מתוך 5',
-                style: const TextStyle(
-                  color: Color(0xFFB07D1A),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '(${reviews.length} ביקורות)',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              _StarRating(rating: r.rating),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '"${r.text}"',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              fontStyle: FontStyle.italic,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '— ${r.authorName}',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w900,
               fontSize: 11,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -869,28 +729,6 @@ class _ReviewSection extends StatelessWidget {
   }
 }
 
-class _StarRating extends StatelessWidget {
-  const _StarRating({required this.rating});
-  final int rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (i) {
-        return Icon(
-          i < rating
-              ? IconsaxPlusBold.star_1
-              : IconsaxPlusBold.star,
-          color: i < rating
-              ? const Color(0xFFE8A84A)
-              : const Color(0xFFD9C8A0),
-          size: 12,
-        );
-      }),
-    );
-  }
-}
 
 // ─── Action bar ───────────────────────────────────────────────────────────────
 
@@ -970,8 +808,8 @@ class _ActionBtn extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(
-                  color: color.withValues(alpha: 0.18), width: 1.5),
+              border:
+                  Border.all(color: color.withValues(alpha: 0.18), width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: color.withValues(alpha: 0.15),
