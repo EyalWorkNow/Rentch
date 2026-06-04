@@ -522,6 +522,7 @@ class RentalProperty {
     PropertyLegal? legal,
     List<PropertyPricePoint>? priceHistory,
     PropertyMarketSignals? marketSignals,
+    this.isActive = true,
   })  : sourceUrl = sourceUrl.isNotEmpty ? sourceUrl : (url ?? ''),
         featureFlags = featureFlags ?? PropertyFeatureSet.fromJson(features),
         model3d = _resolveModel3d(model3d, virtualTour),
@@ -566,6 +567,7 @@ class RentalProperty {
   final PropertyLegal legal;
   final List<PropertyPricePoint> priceHistory;
   final PropertyMarketSignals marketSignals;
+  final bool isActive;
 
   String get url => sourceUrl;
   PropertyMedia? get primaryMedia => media.isEmpty ? null : media.first;
@@ -640,6 +642,7 @@ class RentalProperty {
     PropertyLegal? legal,
     List<PropertyPricePoint>? priceHistory,
     PropertyMarketSignals? marketSignals,
+    bool? isActive,
   }) {
     return RentalProperty(
       id: id ?? this.id,
@@ -669,6 +672,7 @@ class RentalProperty {
       legal: legal ?? this.legal,
       priceHistory: priceHistory ?? this.priceHistory,
       marketSignals: marketSignals ?? this.marketSignals,
+      isActive: isActive ?? this.isActive,
     );
   }
 
@@ -748,6 +752,7 @@ class RentalProperty {
       ),
       marketSignals: _parseMarketSignals(json['marketSignals']) ??
           const PropertyMarketSignals(),
+      isActive: json['isActive'] as bool? ?? true,
     );
   }
 
@@ -783,6 +788,7 @@ class RentalProperty {
       'legal': legal.toJson(),
       'priceHistory': priceHistory.map((item) => item.toJson()).toList(),
       'marketSignals': marketSignals.toJson(),
+      'isActive': isActive,
     };
   }
 }

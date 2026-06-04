@@ -2398,6 +2398,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late bool _thirdPartyTransferAllowed;
   late bool _commercialSaleAllowed;
   late bool _aiTrainingAllowed;
+  late bool _isActive;
 
   @override
   void initState() {
@@ -2434,6 +2435,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _thirdPartyTransferAllowed = p.legal.thirdPartyTransferAllowed;
     _commercialSaleAllowed = p.legal.commercialSaleAllowed;
     _aiTrainingAllowed = p.legal.aiTrainingAllowed;
+    _isActive = p.isActive;
   }
 
   @override
@@ -2726,6 +2728,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       legal: legal,
       priceHistory: nextHistory,
       marketSignals: widget.property.marketSignals,
+      isActive: _isActive,
     );
 
     await context.read<DatingProvider>().updateLandlordProperty(updated);
@@ -2764,76 +2767,164 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           child: _StepIndicator(step: _step, total: 4, labels: _stepLabels),
         ),
       ),
-      body: PageView(
-        controller: _pageCtrl,
-        physics: const NeverScrollableScrollPhysics(),
+      body: Column(
         children: [
-          _StepLocation(
-            cityCtrl: _cityCtrl,
-            neighborhoodCtrl: _neighborhoodCtrl,
-            streetCtrl: _streetCtrl,
-            streetNumCtrl: _streetNumCtrl,
+          Expanded(
+            child: PageView(
+              controller: _pageCtrl,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _StepLocation(
+                  cityCtrl: _cityCtrl,
+                  neighborhoodCtrl: _neighborhoodCtrl,
+                  streetCtrl: _streetCtrl,
+                  streetNumCtrl: _streetNumCtrl,
+                ),
+                _StepDetails(
+                  price: _price,
+                  rooms: _rooms,
+                  sizeCtrl: _sizeCtrl,
+                  floorCtrl: _floorCtrl,
+                  totalFloorsCtrl: _totalFloorsCtrl,
+                  entryDateCtrl: _entryDateCtrl,
+                  propertyType: _propertyType,
+                  condition: _condition,
+                  agencyListing: _agencyListing,
+                  onPriceChanged: (v) =>
+                      setState(() => _price = (v / 100).round() * 100),
+                  onRoomsChanged: (v) => setState(() => _rooms = (v * 2).round() / 2),
+                  onTypeChanged: (v) => setState(() => _propertyType = v!),
+                  onConditionChanged: (v) => setState(() => _condition = v!),
+                  onAgencyChanged: (v) => setState(() => _agencyListing = v),
+                ),
+                _StepFeatures(
+                  allFeatures: _propertyFeatureLabels,
+                  selectedFeatures: _selectedFeatures,
+                  onToggle: (f) => setState(() {
+                    if (_selectedFeatures.contains(f)) {
+                      _selectedFeatures.remove(f);
+                    } else {
+                      _selectedFeatures.add(f);
+                    }
+                  }),
+                ),
+                _StepPhotos(
+                  mediaDrafts: _mediaDrafts,
+                  virtualTourDraft: _virtualTourDraft,
+                  isSubmittingTour: _isSubmittingTour,
+                  isScanBackendConfigured: _scanService.isConfigured,
+                  onPickImageFromGallery: () =>
+                      _pickPropertyImage(ImageSource.gallery),
+                  onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
+                  onPickVideoFromGallery: () =>
+                      _pickPropertyVideo(ImageSource.gallery),
+                  onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
+                  onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
+                  onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
+                  onClearVirtualTour: () => setState(() => _virtualTourDraft = null),
+                  acceptedTerms: _acceptedPropertyTerms,
+                  onAcceptedTermsChanged: (value) =>
+                      setState(() => _acceptedPropertyTerms = value),
+                  thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+                  onThirdPartyTransferChanged: (value) =>
+                      setState(() => _thirdPartyTransferAllowed = value),
+                  commercialSaleAllowed: _commercialSaleAllowed,
+                  onCommercialSaleChanged: (value) =>
+                      setState(() => _commercialSaleAllowed = value),
+                  aiTrainingAllowed: _aiTrainingAllowed,
+                  onAiTrainingChanged: (value) =>
+                      setState(() => _aiTrainingAllowed = value),
+                  onAddMediaUrl: _assignPickedMedia,
+                  onRemoveMedia: (i) => setState(() {
+                    _mediaDrafts[i].dispose();
+                    _mediaDrafts.removeAt(i);
+                  }),
+                ),
+              ],
+            ),
           ),
-          _StepDetails(
-            price: _price,
-            rooms: _rooms,
-            sizeCtrl: _sizeCtrl,
-            floorCtrl: _floorCtrl,
-            totalFloorsCtrl: _totalFloorsCtrl,
-            entryDateCtrl: _entryDateCtrl,
-            propertyType: _propertyType,
-            condition: _condition,
-            agencyListing: _agencyListing,
-            onPriceChanged: (v) =>
-                setState(() => _price = (v / 100).round() * 100),
-            onRoomsChanged: (v) => setState(() => _rooms = (v * 2).round() / 2),
-            onTypeChanged: (v) => setState(() => _propertyType = v!),
-            onConditionChanged: (v) => setState(() => _condition = v!),
-            onAgencyChanged: (v) => setState(() => _agencyListing = v),
+          // Action bar at bottom: active status toggle and delete button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: AppColors.borderLight, width: 1)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isActive ? Icons.check_circle_outline_rounded : Icons.pause_circle_outline_rounded,
+                  color: _isActive ? AppColors.success : AppColors.textSecondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _isActive ? 'סטטוס: פעיל' : 'סטטוס: לא פעיל',
+                  style: TextStyle(
+                    color: _isActive ? AppColors.success : AppColors.textSecondary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Switch(
+                  value: _isActive,
+                  onChanged: (value) => setState(() => _isActive = value),
+                  activeColor: AppColors.success,
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                        title: const Text(
+                          'הסרת נכס',
+                          style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900),
+                        ),
+                        content: Text(
+                          'להסיר את "${widget.property.address}"?\nהפעולה אינה ניתנת לביטול.',
+                          style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('ביטול', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.coral,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('הסר'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      await context.read<DatingProvider>().removeLandlordProperty(widget.property.id);
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    }
+                  },
+                  icon: const Icon(IconsaxPlusBold.trash, color: AppColors.coral, size: 16),
+                  label: const Text(
+                    'מחיקת נכס',
+                    style: TextStyle(
+                      color: AppColors.coral,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          _StepFeatures(
-            allFeatures: _propertyFeatureLabels,
-            selectedFeatures: _selectedFeatures,
-            onToggle: (f) => setState(() {
-              if (_selectedFeatures.contains(f)) {
-                _selectedFeatures.remove(f);
-              } else {
-                _selectedFeatures.add(f);
-              }
-            }),
-          ),
-          _StepPhotos(
-            mediaDrafts: _mediaDrafts,
-            virtualTourDraft: _virtualTourDraft,
-            isSubmittingTour: _isSubmittingTour,
-            isScanBackendConfigured: _scanService.isConfigured,
-            onPickImageFromGallery: () =>
-                _pickPropertyImage(ImageSource.gallery),
-            onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
-            onPickVideoFromGallery: () =>
-                _pickPropertyVideo(ImageSource.gallery),
-            onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
-            onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
-            onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
-            onClearVirtualTour: () => setState(() => _virtualTourDraft = null),
-            acceptedTerms: _acceptedPropertyTerms,
-            onAcceptedTermsChanged: (value) =>
-                setState(() => _acceptedPropertyTerms = value),
-            thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
-            onThirdPartyTransferChanged: (value) =>
-                setState(() => _thirdPartyTransferAllowed = value),
-            commercialSaleAllowed: _commercialSaleAllowed,
-            onCommercialSaleChanged: (value) =>
-                setState(() => _commercialSaleAllowed = value),
-            aiTrainingAllowed: _aiTrainingAllowed,
-            onAiTrainingChanged: (value) =>
-                setState(() => _aiTrainingAllowed = value),
-            onAddMediaUrl: _assignPickedMedia,
-            onRemoveMedia: (i) => setState(() {
-              _mediaDrafts[i].dispose();
-              _mediaDrafts.removeAt(i);
-            }),
-          ),
+          SizedBox(height: 72 + MediaQuery.of(context).padding.bottom),
         ],
       ),
       bottomSheet: _WizardNavBar(

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -330,60 +331,68 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: SizedBox(
-                                height: 48,
-                                child: TextField(
-                                  controller: _searchCtrl,
-                                  onChanged: (v) =>
-                                      setState(() => _query = v.trim()),
-                                  textDirection: TextDirection.rtl,
-                                  decoration: InputDecoration(
-                                    hintText: 'חיפוש לפי כתובת, עיר...',
-                                    hintStyle: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w500,
+                              child: Container(
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(26),
+                                  border: Border.all(color: const Color(0xFFE2ECF1)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
                                     ),
-                                    prefixIcon: const Icon(
+                                  ],
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 10),
+                                    const Icon(
                                       IconsaxPlusBold.search_normal,
                                       size: 18,
-                                      color: AppColors.textSecondary,
+                                      color: Colors.grey,
                                     ),
-                                    suffixIcon: _query.isNotEmpty
-                                        ? IconButton(
-                                            icon: const Icon(
-                                              IconsaxPlusBold.close_circle,
-                                              size: 18,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            onPressed: () {
-                                              _searchCtrl.clear();
-                                              setState(() => _query = '');
-                                            },
-                                          )
-                                        : null,
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 0),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                          color: AppColors.borderLight,
-                                          width: 1),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _searchCtrl,
+                                        onChanged: (v) =>
+                                            setState(() => _query = v.trim()),
+                                        textDirection: TextDirection.rtl,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.navy,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'חיפוש לפי כתובת, עיר...',
+                                          hintStyle: TextStyle(
+                                            fontSize: 14,
+                                            color: AppColors.textSecondary.withValues(alpha: 0.72),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
                                     ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                          color: AppColors.borderLight,
-                                          width: 1),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                          color: AppColors.primary, width: 1.5),
-                                    ),
-                                  ),
+                                    if (_query.isNotEmpty)
+                                      IconButton(
+                                        icon: const Icon(
+                                          IconsaxPlusBold.close_circle,
+                                          size: 18,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        onPressed: () {
+                                          _searchCtrl.clear();
+                                          setState(() => _query = '');
+                                        },
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -395,27 +404,81 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   color: hasActiveFilterOrSort
-                                      ? AppColors.primary.withValues(alpha: 0.1)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: hasActiveFilterOrSort
-                                        ? AppColors.primary
-                                            .withValues(alpha: 0.4)
-                                        : AppColors.borderLight,
-                                    width: 1,
-                                  ),
+                                      ? AppColors.primary
+                                      : const Color(0xFFF2F4F5),
+                                  shape: BoxShape.circle,
+                                  boxShadow: hasActiveFilterOrSort ? [
+                                    BoxShadow(
+                                      color: AppColors.primary.withValues(alpha: 0.24),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ] : null,
                                 ),
                                 child: Icon(
                                   IconsaxPlusBold.filter,
                                   size: 20,
                                   color: hasActiveFilterOrSort
-                                      ? AppColors.primary
-                                      : AppColors.textSecondary,
+                                      ? Colors.white
+                                      : AppColors.navy,
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      // Scrollable Filter Pills under Search Bar
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: Row(
+                            textDirection: TextDirection.rtl,
+                            children: [
+                              _FilterPill(
+                                label: 'הכל',
+                                isSelected: _activeFilter == 'all',
+                                onTap: () => setState(() => _activeFilter = 'all'),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterPill(
+                                label: 'כניסה מיידית',
+                                isSelected: _activeFilter == 'immediate',
+                                onTap: () => setState(() => _activeFilter = 'immediate'),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterPill(
+                                label: 'דירות גדולות',
+                                isSelected: _activeFilter == 'large',
+                                onTap: () => setState(() => _activeFilter = 'large'),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterPill(
+                                label: 'פרטי',
+                                isSelected: _activeFilter == 'private',
+                                onTap: () => setState(() => _activeFilter = 'private'),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterPill(
+                                label: 'בלעדיות',
+                                isSelected: _activeFilter == 'agency',
+                                onTap: () => setState(() => _activeFilter = 'agency'),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterPill(
+                                label: 'יוקרה',
+                                isSelected: _activeFilter == 'luxury',
+                                onTap: () => setState(() => _activeFilter = 'luxury'),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterPill(
+                                label: 'עד 6K',
+                                isSelected: _activeFilter == 'high_priority',
+                                onTap: () => setState(() => _activeFilter = 'high_priority'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       // Results count when filtered
@@ -511,277 +574,191 @@ class _PropertyManageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image with status badge
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: SizedBox(
-              height: 168,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _PropertyThumb(media: property.primaryMedia),
-                  // Bottom gradient for visual depth
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 56,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            AppColors.navy.withValues(alpha: 0.55),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Status badge top-left (physical)
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        borderRadius: BorderRadius.circular(999),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2)),
-                        ],
-                      ),
-                      child: const Text(
-                        'פעיל',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Match count badge top-right (physical)
-                  if (matchCount > 0)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppColors.navy.withValues(alpha: 0.80),
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2)),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(IconsaxPlusBold.heart,
-                                size: 11, color: AppColors.coral),
-                            const SizedBox(width: 4),
-                            Text(
-                              '$matchCount התאמות',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Address + price
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: AspectRatio(
+        aspectRatio: 0.92,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _PropertyThumb(media: property.primaryMedia),
+              // Linear gradient overlay (smooth dark bottom)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.3),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.85),
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              // Top Row for Glass Tags (Beds, Floor/Type, Size)
+              Positioned(
+                top: 16,
+                left: 16,
+                right: 16,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _GlassTag(
+                        icon: Icons.king_bed_outlined,
+                        label: '${property.roomsLabel} חדרים',
+                      ),
+                      const SizedBox(width: 8),
+                      _GlassTag(
+                        icon: Icons.layers_outlined,
+                        label: property.floor.isEmpty ? 'דירה' : 'קומה ${property.floor}',
+                      ),
+                      const SizedBox(width: 8),
+                      _GlassTag(
+                        icon: Icons.space_dashboard_outlined,
+                        label: '${property.sizeM2} מ״ר',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Price, Address, and Action Buttons at the bottom
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // Price and Address Column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Price
                           Text(
-                            property.address,
+                            property.priceLabel,
                             style: const TextStyle(
-                              color: AppColors.navy,
-                              fontSize: 15,
+                              color: Colors.white,
+                              fontSize: 28,
                               fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
                             ),
                           ),
-                          if (property.city.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              property.city,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
+                          const SizedBox(height: 4),
+                          // Location Address
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_rounded,
+                                color: Colors.white,
+                                size: 16,
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        property.priceLabel,
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _PropertyMeta(label: '${property.roomsLabel} חדרים'),
-                    _PropertyMeta(label: '${property.sizeM2} מ"ר'),
-                    _PropertyMeta(
-                      label: property.entryDate.isEmpty
-                          ? 'כניסה גמישה'
-                          : property.entryDate,
-                    ),
-                    if (property.agencyListing)
-                      const _PropertyMeta(label: 'סוכנות'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    // Remove button
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(22)),
-                            title: const Text(
-                              'הסרת נכס',
-                              style: TextStyle(
-                                  color: AppColors.navy,
-                                  fontWeight: FontWeight.w900),
-                            ),
-                            content: Text(
-                              'להסיר את "${property.address}"?\nהפעולה אינה ניתנת לביטול.',
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary, height: 1.4),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('ביטול',
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary)),
-                              ),
-                              FilledButton(
-                                style: FilledButton.styleFrom(
-                                    backgroundColor: AppColors.coral,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12))),
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('הסר'),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  property.address,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
-                        );
-                        if (confirmed == true) onRemove();
-                      },
-                      icon: const Icon(IconsaxPlusBold.trash, size: 15),
-                      label: const Text('הסר'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.coral,
-                        side: const BorderSide(color: AppColors.coral),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Edit button
-                    FilledButton.icon(
-                      onPressed: onEdit,
-                      icon: const Icon(IconsaxPlusBold.edit_2, size: 15),
-                      label: const Text('ערוך'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.navy.withValues(alpha: 0.08),
-                        foregroundColor: AppColors.navy,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        elevation: 0,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 11),
-                        decoration: BoxDecoration(
-                          color: AppColors.navy.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Text(
-                          'מופיע בדשבורד ובסוויפים',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.navy,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
+                    const SizedBox(width: 12),
+                    // Actions Row (Circular Edit and Status Indicator)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Edit Button (Glassmorphic White Circle)
+                        ClipOval(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withValues(alpha: 0.18),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.20),
+                                  width: 1,
+                                ),
+                              ),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: onEdit,
+                                icon: const Icon(
+                                  IconsaxPlusBold.edit_2,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        // Status Indicator Circle (Glassmorphic Green/Grey Circle)
+                        ClipOval(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: property.isActive
+                                    ? AppColors.success.withValues(alpha: 0.25)
+                                    : Colors.white.withValues(alpha: 0.1),
+                                border: Border.all(
+                                  color: property.isActive
+                                      ? AppColors.success.withValues(alpha: 0.40)
+                                      : Colors.white.withValues(alpha: 0.15),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: property.isActive ? AppColors.success : Colors.white60,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -814,27 +791,52 @@ class _PropertyThumb extends StatelessWidget {
       );
 }
 
-// ─── Meta pill ───────────────────────────────────────────────────────────────
+// ─── Glassmorphism Tag ────────────────────────────────────────────────────────
 
-class _PropertyMeta extends StatelessWidget {
-  const _PropertyMeta({required this.label});
+class _GlassTag extends StatelessWidget {
+  const _GlassTag({
+    required this.icon,
+    required this.label,
+  });
 
+  final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight2,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.navy,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.20),
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -959,6 +961,45 @@ class _EmptyFilteredState extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.navy : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.navy,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

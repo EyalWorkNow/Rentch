@@ -3,6 +3,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
@@ -24,16 +25,7 @@ const _kFilterNew = 'new';
 const _kFilterOld = 'old';
 const _kFilterTomorrow = 'tomorrow';
 
-const _kAgeFilterLabels = <String, String>{
-  _kFilterAll: 'הכל',
-  _kFilterNew: 'חדש',
-  _kFilterOld: 'ישן',
-};
 
-const _kScheduleFilterLabels = <String, String>{
-  _kFilterAll: 'הכל',
-  _kFilterTomorrow: 'מחר',
-};
 
 const _kNewMatchWindow = Duration(days: 7);
 
@@ -55,6 +47,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   String _query = '';
   String _ageFilter = _kFilterAll;
   String _scheduleFilter = _kFilterAll;
+  bool _showFilters = true;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -193,6 +186,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                           query: _query,
                           ageFilter: _ageFilter,
                           scheduleFilter: _scheduleFilter,
+                          showFilters: _showFilters,
+                          onFilterTap: () =>
+                              setState(() => _showFilters = !_showFilters),
                           onQueryChanged: (value) =>
                               setState(() => _query = value),
                           onClearQuery: () => setState(() {
@@ -242,6 +238,8 @@ class _MatchesToolbar extends StatelessWidget {
     required this.query,
     required this.ageFilter,
     required this.scheduleFilter,
+    required this.showFilters,
+    required this.onFilterTap,
     required this.onQueryChanged,
     required this.onClearQuery,
     required this.onAgeFilterChanged,
@@ -252,6 +250,8 @@ class _MatchesToolbar extends StatelessWidget {
   final String query;
   final String ageFilter;
   final String scheduleFilter;
+  final bool showFilters;
+  final VoidCallback onFilterTap;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
   final ValueChanged<String> onAgeFilterChanged;
@@ -277,80 +277,136 @@ class _MatchesToolbar extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            height: 48,
+            height: 52,
             decoration: BoxDecoration(
-              color: const Color(0xFFF5FAFD),
-              borderRadius: BorderRadius.circular(18),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
               border: Border.all(color: const Color(0xFFE2ECF1)),
-            ),
-            child: TextField(
-              controller: controller,
-              textDirection: TextDirection.rtl,
-              onChanged: onQueryChanged,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.navy,
-                fontWeight: FontWeight.w700,
-              ),
-              decoration: InputDecoration(
-                hintText: 'חיפוש כתובת, עיר או הודעה...',
-                hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary.withValues(alpha: 0.72),
-                  fontWeight: FontWeight.w600,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-                prefixIcon: const Icon(
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(
+              children: [
+                const SizedBox(width: 10),
+                const Icon(
                   IconsaxPlusBold.search_normal,
                   size: 18,
-                  color: AppColors.textSecondary,
+                  color: Colors.grey,
                 ),
-                suffixIcon: query.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(
-                          IconsaxPlusBold.close_circle,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        onPressed: onClearQuery,
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Padding(
-                padding: EdgeInsetsDirectional.only(end: 10),
-                child: Text(
-                  'מיין:',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    textDirection: TextDirection.rtl,
+                    onChanged: onQueryChanged,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'חיפוש כתובת, עיר או הודעה...',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary.withValues(alpha: 0.72),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: _FilterDropdown(
-                  label: 'סטטוס',
-                  value: ageFilter,
-                  items: _kAgeFilterLabels,
-                  onChanged: onAgeFilterChanged,
+                if (query.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(
+                      IconsaxPlusBold.close_circle,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: onClearQuery,
+                  ),
+                GestureDetector(
+                  onTap: onFilterTap,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: showFilters ? AppColors.navy : const Color(0xFFF2F4F5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      IconsaxPlusBold.setting_4,
+                      size: 18,
+                      color: showFilters ? Colors.white : AppColors.navy,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                reverse: true,
+                child: Row(
+                  textDirection: TextDirection.rtl,
+                  children: [
+                    _FilterPill(
+                      label: 'הכל',
+                      isSelected: ageFilter == _kFilterAll &&
+                          scheduleFilter == _kFilterAll,
+                      onTap: () {
+                        onAgeFilterChanged(_kFilterAll);
+                        onScheduleFilterChanged(_kFilterAll);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterPill(
+                      label: 'חדש',
+                      isSelected: ageFilter == _kFilterNew,
+                      onTap: () {
+                        onAgeFilterChanged(_kFilterNew);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterPill(
+                      label: 'ישן',
+                      isSelected: ageFilter == _kFilterOld,
+                      onTap: () {
+                        onAgeFilterChanged(_kFilterOld);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _FilterPill(
+                      label: 'תואם למחר',
+                      isSelected: scheduleFilter == _kFilterTomorrow,
+                      onTap: () {
+                        onScheduleFilterChanged(
+                          scheduleFilter == _kFilterTomorrow
+                              ? _kFilterAll
+                              : _kFilterTomorrow,
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _FilterDropdown(
-                  label: 'תיאום',
-                  value: scheduleFilter,
-                  items: _kScheduleFilterLabels,
-                  onChanged: onScheduleFilterChanged,
-                ),
-              ),
-            ],
+            ),
+            crossFadeState:
+                showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
           ),
         ],
       ),
@@ -358,100 +414,45 @@ class _MatchesToolbar extends StatelessWidget {
   }
 }
 
-class _FilterDropdown extends StatelessWidget {
-  const _FilterDropdown({
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
     required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
+    required this.isSelected,
+    required this.onTap,
   });
 
   final String label;
-  final String value;
-  final Map<String, String> items;
-  final ValueChanged<String> onChanged;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsetsDirectional.only(start: 12, end: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5FAFD),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          borderRadius: BorderRadius.circular(18),
-          icon: const Icon(
-            IconsaxPlusBold.arrow_down_1,
-            size: 16,
-            color: AppColors.textSecondary,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.navy : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
+            width: 1,
           ),
-          style: const TextStyle(
-            color: AppColors.navy,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.navy,
             fontSize: 13,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
-          dropdownColor: Colors.white,
-          onChanged: (next) {
-            if (next != null) onChanged(next);
-          },
-          selectedItemBuilder: (context) {
-            return items.entries
-                .map(
-                  (entry) => Align(
-                    alignment: Alignment.centerRight,
-                    child: RichText(
-                      textDirection: TextDirection.rtl,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '$label: ',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextSpan(
-                            text: entry.value,
-                            style: const TextStyle(
-                              color: AppColors.navy,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-                .toList();
-          },
-          items: items.entries
-              .map(
-                (entry) => DropdownMenuItem<String>(
-                  value: entry.key,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      entry.value,
-                      textDirection: TextDirection.rtl,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
         ),
       ),
     );
   }
 }
+
 
 // ─── Empty filter results ─────────────────────────────────────────────────────
 
@@ -522,7 +523,7 @@ class _EmptyFilterResults extends StatelessWidget {
 
 // ─── Match card ───────────────────────────────────────────────────────────────
 
-class _MatchCard extends StatelessWidget {
+class _MatchCard extends StatefulWidget {
   const _MatchCard({
     required this.match,
     required this.property,
@@ -534,196 +535,11 @@ class _MatchCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final media = property.primaryMedia;
-    final lastMessage = match.messages.isEmpty ? null : match.messages.last;
-    final stage = _matchStage(match);
-    final provider = context.read<DatingProvider>();
-    final isLandlord = provider.isLandlord;
-    final tenantName = provider.tenantProfile?.name ?? '';
-    // Tenant sent the last message and landlord hasn't replied yet
-    final awaitingReply = isLandlord &&
-        lastMessage != null &&
-        tenantName.isNotEmpty &&
-        lastMessage.sender == tenantName;
+  State<_MatchCard> createState() => _MatchCardState();
+}
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: const Color(0xFFE2ECF1), width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.navy.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            )
-          ],
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 104,
-                    height: 104,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: const Color(0xFFE2ECF1),
-                        width: 1,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(21),
-                      child: SafeMedia(
-                        media: media,
-                        fallback: Container(
-                          color: AppColors.primaryLight2,
-                          child: const Icon(
-                            IconsaxPlusBold.building,
-                            color: AppColors.primary,
-                            size: 30,
-                          ),
-                        ),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                property.address,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.navy,
-                                  height: 1.25,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _FreshnessBadge(match: match),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _MetaChip(
-                              icon: IconsaxPlusBold.money,
-                              label: property.priceLabel,
-                            ),
-                            _MetaChip(
-                              icon: IconsaxPlusBold.home,
-                              label: '${property.roomsLabel} חדרים',
-                            ),
-                            _MetaChip(
-                              icon: IconsaxPlusBold.location,
-                              label: property.city,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _LastMessagePreview(message: lastMessage),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF8FCFE),
-                border: Border(
-                  top: BorderSide(color: Color(0xFFE2ECF1), width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (awaitingReply)
-                          const _StatusChip(
-                            label: 'ממתין לתגובתך',
-                            color: Color(0xFFE67E22),
-                            icon: IconsaxPlusBold.message_notif,
-                          ),
-                        _StatusChip(
-                          label: stage.label,
-                          color: stage.color,
-                          icon: stage.icon,
-                        ),
-                        if (match.ownerSigned)
-                          const _StatusChip(
-                            label: 'בעלים חתם',
-                            color: Color(0xFF27AE60),
-                            icon: IconsaxPlusBold.pen_tool,
-                          ),
-                        if (match.tenantSigned)
-                          const _StatusChip(
-                            label: 'שוכר חתם',
-                            color: Color(0xFF27AE60),
-                            icon: IconsaxPlusBold.edit,
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'פתח שיחה',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        SizedBox(width: 6),
-                        Icon(
-                          IconsaxPlusBold.arrow_left,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _MatchCardState extends State<_MatchCard> {
+  bool _isExpanded = false;
 
   ({String label, Color color, IconData icon}) _matchStage(RentalMatch match) {
     if (match.ownerSigned && match.tenantSigned) {
@@ -746,10 +562,331 @@ class _MatchCard extends StatelessWidget {
       icon: IconsaxPlusBold.message,
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = widget.property.primaryMedia;
+    final lastMessage = widget.match.messages.isEmpty ? null : widget.match.messages.last;
+    final stage = _matchStage(widget.match);
+    final provider = context.read<DatingProvider>();
+    final isLandlord = provider.isLandlord;
+    final tenantName = provider.tenantProfile?.name ?? '';
+    final awaitingReply = isLandlord &&
+        lastMessage != null &&
+        tenantName.isNotEmpty &&
+        lastMessage.sender == tenantName;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: const Color(0xFFE2ECF1), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.navy.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            )
+          ],
+        ),
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                child: AspectRatio(
+                  aspectRatio: 1.45,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        SafeMedia(
+                        media: media,
+                        fallback: Container(
+                          color: AppColors.primaryLight2,
+                          child: const Icon(
+                            IconsaxPlusBold.building,
+                            color: AppColors.primary,
+                            size: 48,
+                          ),
+                        ),
+                        fit: BoxFit.cover,
+                      ),
+                      // Floating Badge (Property Type) on top-right (RTL)
+                      Positioned(
+                        top: 14,
+                        right: 14,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            widget.property.propertyType,
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Floating Share Button on top-left (RTL) - Replacing the heart icon
+                      Positioned(
+                        top: 14,
+                        left: 14,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(
+                              IconsaxPlusBold.send_2,
+                              color: AppColors.navy,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              showPropertyShareSheet(context, widget.property);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Info Section
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.property.street.isNotEmpty ? '${widget.property.street} ${widget.property.streetNumber}' : widget.property.address,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.navy,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          widget.property.priceLabel,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.navy,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          IconsaxPlusBold.location,
+                          size: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${widget.property.city}, ${widget.property.neighborhood}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _FreshnessBadge(match: widget.match),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Row containing Chips & Expand Button
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _MockupChip(
+                                  icon: IconsaxPlusBold.home,
+                                  label: '${widget.property.roomsLabel} חדרים',
+                                ),
+                                const SizedBox(width: 8),
+                                _MockupChip(
+                                  icon: IconsaxPlusBold.maximize_3,
+                                  label: '${widget.property.sizeM2} מ״ר',
+                                ),
+                                const SizedBox(width: 8),
+                                _MockupChip(
+                                  icon: IconsaxPlusBold.routing,
+                                  label: widget.property.features.firstOrNull ?? 'מעלית',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Premium Expansion Toggle Button
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _isExpanded = !_isExpanded;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF2F7FA),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFE2ECF1)),
+                            ),
+                            child: AnimatedRotation(
+                              turns: _isExpanded ? 0.5 : 0.0,
+                              duration: const Duration(milliseconds: 300),
+                              child: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: AppColors.navy,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Conditionally animated expanded data
+                    if (_isExpanded) ...[
+                      const SizedBox(height: 16),
+                      _LastMessagePreview(message: lastMessage),
+                    ],
+                  ],
+                ),
+              ),
+              if (_isExpanded) ...[
+                const Divider(height: 1, color: Color(0xFFE2ECF1)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  color: const Color(0xFFF8FCFE),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (awaitingReply)
+                              const _StatusChip(
+                                label: 'ממתין לתגובתך',
+                                color: Color(0xFFE67E22),
+                                icon: IconsaxPlusBold.message_notif,
+                              ),
+                            _StatusChip(
+                              label: stage.label,
+                              color: stage.color,
+                              icon: stage.icon,
+                            ),
+                            if (widget.match.ownerSigned)
+                              const _StatusChip(
+                                label: 'בעלים חתם',
+                                color: Color(0xFF27AE60),
+                                icon: IconsaxPlusBold.pen_tool,
+                              ),
+                            if (widget.match.tenantSigned)
+                              const _StatusChip(
+                                label: 'שוכר חתם',
+                                color: Color(0xFF27AE60),
+                                icon: IconsaxPlusBold.edit,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'פתח שיחה',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(
+                              IconsaxPlusBold.arrow_left,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.icon, required this.label});
+class _MockupChip extends StatelessWidget {
+  const _MockupChip({
+    required this.icon,
+    required this.label,
+  });
 
   final IconData icon;
   final String label;
@@ -757,22 +894,26 @@ class _MetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF2F7FA),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AppColors.textSecondary),
-          const SizedBox(width: 4),
+          Icon(
+            icon,
+            size: 14,
+            color: AppColors.navy,
+          ),
+          const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.navy,
             ),
           ),
         ],
@@ -780,6 +921,8 @@ class _MetaChip extends StatelessWidget {
     );
   }
 }
+
+
 
 class _FreshnessBadge extends StatelessWidget {
   const _FreshnessBadge({required this.match});

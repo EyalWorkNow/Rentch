@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -16,7 +17,7 @@ import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 
 class DiscoverScreen extends StatelessWidget {
@@ -396,6 +397,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   late int _visibleCount;
   late List<RentalProperty> _markerPreview;
   bool _didCommit = false;
+  bool _showAllFeatures = false;
 
   @override
   void initState() {
@@ -718,55 +720,38 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
                 // Header
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      const Icon(IconsaxPlusBold.setting_4,
-                          size: 22, color: AppColors.navy),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'סינון',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.navy,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '$_visibleCount דירות',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF2F4F5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, size: 18, color: AppColors.navy),
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () => _resetFilters(provider),
-                        icon: const Icon(IconsaxPlusBold.refresh, size: 15),
-                        label: const Text('אפס'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.coral,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                      const Text(
+                        'סינון ומיון',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.navy,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
                 Container(
                   height: 1,
                   color: AppColors.borderLight.withValues(alpha: 0.8),
@@ -778,148 +763,174 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     children: [
                       // ── מטרה ──
                       _FilterSection(
-                          title: 'מטרה', icon: IconsaxPlusBold.category),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: TransactionTypeFilter.values.map((type) {
-                          final selected = f.transactionType == type;
-                          return Expanded(
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 3),
-                              child: ChoiceChip(
-                                selected: selected,
-                                label: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(_transactionTypeIcon(type),
-                                        size: 15,
-                                        color: selected
-                                            ? Colors.white
-                                            : AppColors.navy),
-                                    const SizedBox(width: 5),
-                                    Flexible(
-                                      child: Text(
-                                        _transactionTypeLabel(type),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                labelStyle: TextStyle(
-                                  color:
-                                      selected ? Colors.white : AppColors.navy,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13,
-                                ),
-                                selectedColor: AppColors.primary,
-                                backgroundColor: AppColors.primaryLight2,
-                                side: BorderSide(
-                                    color: selected
-                                        ? AppColors.primary
-                                        : AppColors.borderLight),
-                                showCheckmark: false,
-                                onSelected: (_) {
-                                  final minBudget = _roundedPriceForTransaction(
-                                    type,
-                                    f.minBudget
-                                        .clamp(
-                                          _priceSliderMin(type).round(),
-                                          _priceSliderMax(type).round(),
-                                        )
-                                        .toDouble(),
-                                  );
-                                  final maxBudget = _roundedPriceForTransaction(
-                                    type,
-                                    f.maxBudget
-                                        .clamp(
-                                          minBudget,
-                                          _priceSliderMax(type).round(),
-                                        )
-                                        .toDouble(),
-                                  );
-                                  _setDraftFilters(
-                                    f.copyWith(
-                                      transactionType: type,
-                                      minBudget: minBudget,
-                                      maxBudget: math.max(
-                                        minBudget,
-                                        maxBudget,
-                                      ),
-                                    ),
-                                    provider,
-                                  );
-                                },
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                        title: 'מטרה',
+                        icon: IconsaxPlusBold.category,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _TransactionCard(
+                            label: 'הכל',
+                            price: '₪8,250',
+                            isSelected: f.transactionType == TransactionTypeFilter.any,
+                            onTap: () {
+                              _setDraftFilters(
+                                f.copyWith(transactionType: TransactionTypeFilter.any),
+                                provider,
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _TransactionCard(
+                            label: 'שכירות',
+                            price: '₪5,900',
+                            isSelected: f.transactionType == TransactionTypeFilter.rent,
+                            onTap: () {
+                              _setDraftFilters(
+                                f.copyWith(transactionType: TransactionTypeFilter.rent),
+                                provider,
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _TransactionCard(
+                            label: 'קנייה',
+                            price: '₪2.3M',
+                            isSelected: f.transactionType == TransactionTypeFilter.sale,
+                            onTap: () {
+                              _setDraftFilters(
+                                f.copyWith(transactionType: TransactionTypeFilter.sale),
+                                provider,
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
                       // ── תקציב ──
-                      _RangeSliderField(
-                        label: _priceFilterLabel(),
+                      _FilterSection(
+                        title: 'טווח מחירים',
                         icon: IconsaxPlusBold.money,
-                        values: RangeValues(
-                          f.minBudget.toDouble(),
-                          f.maxBudget.toDouble(),
+                      ),
+                      const SizedBox(height: 12),
+                      const _PriceHistogram(),
+                      const SizedBox(height: 4),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          rangeThumbShape: const _CustomRangeSliderThumbShape(),
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor: const Color(0xFFE2ECF1),
                         ),
-                        min: _priceSliderMin(f.transactionType),
-                        max: _priceSliderMax(f.transactionType),
-                        divisions: _priceSliderDivisions(f.transactionType),
-                        displayValue:
-                            '${_formatCurrency(f.minBudget)} - ${_formatCurrency(f.maxBudget)}',
-                        onValueTap: () => _editRangeValues(
-                          context: context,
-                          title: _priceFilterLabel(),
-                          initialMinValue: f.minBudget.toString(),
-                          initialMaxValue: f.maxBudget.toString(),
-                          suffix: '₪',
-                          keyboardType: TextInputType.number,
-                          onSubmitted: (minRaw, maxRaw) {
-                            final minParsed = int.tryParse(
-                              minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-                            );
-                            final maxParsed = maxRaw.trim().isEmpty
-                                ? 2000000000
-                                : int.tryParse(
-                                    maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-                                  );
-                            if (minParsed == null || maxParsed == null) return;
-                            final sliderMin =
-                                _priceSliderMin(f.transactionType).round();
-                            // No upper clamp — user can type any value they want
-                            final clampedMin = _roundedPriceForTransaction(
-                              f.transactionType,
-                              math.max(sliderMin, minParsed).toDouble(),
-                            );
-                            final clampedMax = _roundedPriceForTransaction(
-                              f.transactionType,
-                              math.max(clampedMin, maxParsed).toDouble(),
-                            );
-                            _setDraftFilters(
-                              f.copyWith(
-                                minBudget: clampedMin,
-                                maxBudget: clampedMax,
+                        child: RangeSlider(
+                          values: RangeValues(
+                            f.minBudget.toDouble().clamp(_priceSliderMin(f.transactionType), _priceSliderMax(f.transactionType)),
+                            f.maxBudget.toDouble().clamp(_priceSliderMin(f.transactionType), _priceSliderMax(f.transactionType)),
+                          ),
+                          min: _priceSliderMin(f.transactionType),
+                          max: _priceSliderMax(f.transactionType),
+                          divisions: _priceSliderDivisions(f.transactionType),
+                          onChanged: (values) => _setDraftFilters(
+                            f.copyWith(
+                              minBudget: _roundedPriceForTransaction(
+                                f.transactionType,
+                                values.start,
                               ),
-                              provider,
-                            );
-                          },
-                        ),
-                        onChanged: (values) => _setDraftFilters(
-                          f.copyWith(
-                            minBudget: _roundedPriceForTransaction(
-                              f.transactionType,
-                              values.start,
+                              maxBudget: _roundedPriceForTransaction(
+                                f.transactionType,
+                                values.end,
+                              ),
                             ),
-                            maxBudget: _roundedPriceForTransaction(
-                              f.transactionType,
-                              values.end,
+                            provider,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _PriceInputCard(
+                            label: 'מינימום',
+                            value: _formatCurrency(f.minBudget.round()),
+                            onTap: () => _editRangeValues(
+                              context: context,
+                              title: _priceFilterLabel(),
+                              initialMinValue: f.minBudget.toString(),
+                              initialMaxValue: f.maxBudget.toString(),
+                              suffix: '₪',
+                              keyboardType: TextInputType.number,
+                              onSubmitted: (minRaw, maxRaw) {
+                                final minParsed = int.tryParse(
+                                  minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                );
+                                final maxParsed = maxRaw.trim().isEmpty
+                                    ? 2000000000
+                                    : int.tryParse(
+                                        maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                      );
+                                if (minParsed == null || maxParsed == null) return;
+                                final sliderMin =
+                                    _priceSliderMin(f.transactionType).round();
+                                final clampedMin = _roundedPriceForTransaction(
+                                  f.transactionType,
+                                  math.max(sliderMin, minParsed).toDouble(),
+                                );
+                                final clampedMax = _roundedPriceForTransaction(
+                                  f.transactionType,
+                                  math.max(clampedMin, maxParsed).toDouble(),
+                                );
+                                _setDraftFilters(
+                                  f.copyWith(
+                                    minBudget: clampedMin,
+                                    maxBudget: clampedMax,
+                                  ),
+                                  provider,
+                                );
+                              },
                             ),
                           ),
-                          provider,
-                        ),
+                          const SizedBox(width: 12),
+                          _PriceInputCard(
+                            label: 'מקסימום',
+                            value: f.maxBudget >= 2000000000
+                                ? 'ללא הגבלה'
+                                : _formatCurrency(f.maxBudget.round()),
+                            onTap: () => _editRangeValues(
+                              context: context,
+                              title: _priceFilterLabel(),
+                              initialMinValue: f.minBudget.toString(),
+                              initialMaxValue: f.maxBudget.toString(),
+                              suffix: '₪',
+                              keyboardType: TextInputType.number,
+                              onSubmitted: (minRaw, maxRaw) {
+                                final minParsed = int.tryParse(
+                                  minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                );
+                                final maxParsed = maxRaw.trim().isEmpty
+                                    ? 2000000000
+                                    : int.tryParse(
+                                        maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                      );
+                                if (minParsed == null || maxParsed == null) return;
+                                final sliderMin =
+                                    _priceSliderMin(f.transactionType).round();
+                                final clampedMin = _roundedPriceForTransaction(
+                                  f.transactionType,
+                                  math.max(sliderMin, minParsed).toDouble(),
+                                );
+                                final clampedMax = _roundedPriceForTransaction(
+                                  f.transactionType,
+                                  math.max(clampedMin, maxParsed).toDouble(),
+                                );
+                                _setDraftFilters(
+                                  f.copyWith(
+                                    minBudget: clampedMin,
+                                    maxBudget: clampedMax,
+                                  ),
+                                  provider,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       SwitchListTile.adaptive(
@@ -944,62 +955,40 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           provider,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       // ── חדרים ──
-                      _RangeSliderField(
-                        label: 'טווח חדרים',
+                      _FilterSection(
+                        title: 'חדרים',
                         icon: IconsaxPlusBold.home,
-                        values: RangeValues(f.minRooms, f.maxRooms),
-                        min: 0,
-                        max: 10,
-                        divisions: 20,
-                        displayValue:
-                            '${_formatRooms(f.minRooms)} - ${_formatRooms(f.maxRooms)}',
-                        onValueTap: () => _editRangeValues(
-                          context: context,
-                          title: 'טווח חדרים',
-                          initialMinValue: '${f.minRooms}',
-                          initialMaxValue: '${f.maxRooms}',
-                          suffix: '',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          onSubmitted: (minRaw, maxRaw) {
-                            final minParsed = double.tryParse(
-                              minRaw.trim().replaceAll(',', '.'),
-                            );
-                            final maxParsed = maxRaw.trim().isEmpty
-                                ? 30.0
-                                : double.tryParse(
-                                    maxRaw.trim().replaceAll(',', '.'),
-                                  );
-                            if (minParsed == null || maxParsed == null) return;
-                            // Round to nearest 0.5, no artificial upper cap
-                            final clampedMin =
-                                ((minParsed.clamp(0, 99) * 2).round() / 2)
-                                    .toDouble();
-                            final clampedMax =
-                                ((math.max(clampedMin, maxParsed) * 2).round() /
-                                        2)
-                                    .toDouble();
-                            _setDraftFilters(
-                              f.copyWith(
-                                minRooms: clampedMin,
-                                maxRooms: clampedMax,
-                              ),
-                              provider,
-                            );
-                          },
-                        ),
-                        onChanged: (values) => _setDraftFilters(
-                          f.copyWith(
-                            minRooms: (values.start * 2).round() / 2,
-                            maxRooms: (values.end * 2).round() / 2,
-                          ),
-                          provider,
-                        ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          for (int i = 0; i <= 5; i++) ...[
+                            _CircleSelectorButton(
+                              label: i == 0 ? 'הכל' : '$i+',
+                              isSelected: i == 0
+                                  ? (f.minRooms == 0 && f.maxRooms == 10)
+                                  : (f.minRooms == i.toDouble()),
+                              onTap: () {
+                                if (i == 0) {
+                                  _setDraftFilters(
+                                    f.copyWith(minRooms: 0, maxRooms: 10),
+                                    provider,
+                                  );
+                                } else {
+                                  _setDraftFilters(
+                                    f.copyWith(minRooms: i.toDouble(), maxRooms: 10),
+                                    provider,
+                                  );
+                                }
+                              },
+                            ),
+                          ]
+                        ],
+                      ),
+                      const SizedBox(height: 24),
                       // ── מיקום (עיר + אזור) ──
                       _FilterSection(
                         title: 'מיקום',
@@ -1028,30 +1017,129 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             : null,
                       ),
                       const SizedBox(height: 10),
-                      TextField(
-                        controller: _locationCtrl,
-                        textDirection: TextDirection.rtl,
-                        onChanged: (v) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'חפש עיר או אזור',
-                          prefixIcon: const Icon(IconsaxPlusBold.search_normal),
-                          suffixIcon: _locationCtrl.text.isNotEmpty
-                              ? IconButton(
-                                  icon:
-                                      const Icon(IconsaxPlusBold.close_circle),
-                                  onPressed: () {
-                                    setState(() => _locationCtrl.clear());
+                      Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(color: const Color(0xFFE2ECF1)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 10),
+                            const Icon(
+                              IconsaxPlusBold.search_normal,
+                              size: 18,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _locationCtrl,
+                                textDirection: TextDirection.rtl,
+                                onChanged: (v) => setState(() {}),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.navy,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'חפש עיר או אזור',
+                                  hintStyle: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary.withValues(alpha: 0.72),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                            if (_locationCtrl.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(
+                                  IconsaxPlusBold.close_circle,
+                                  size: 18,
+                                  color: AppColors.textSecondary,
+                                ),
+                                onPressed: () {
+                                  setState(() => _locationCtrl.clear());
+                                  _setDraftFilters(
+                                    f.copyWith(
+                                      city: '',
+                                      areaId: 'all_israel',
+                                      customAreaPolygon: const <LatLng>[],
+                                    ),
+                                    provider,
+                                  );
+                                },
+                              ),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF2F4F5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                IconsaxPlusBold.location,
+                                size: 18,
+                                color: AppColors.navy,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: Row(
+                            textDirection: TextDirection.rtl,
+                            children: [
+                              for (final city in [
+                                'תל אביב',
+                                'ירושלים',
+                                'חיפה',
+                                'גבעתיים',
+                                'רמת גן',
+                                'הרצליה',
+                                'ראשון לציון',
+                              ]) ...[
+                                _FilterLocationPill(
+                                  label: city,
+                                  isSelected: f.city == city,
+                                  onTap: () {
+                                    final nextCity = f.city == city ? '' : city;
+                                    setState(() {
+                                      _locationCtrl.text = nextCity;
+                                    });
                                     _setDraftFilters(
                                       f.copyWith(
-                                        city: '',
+                                        city: nextCity,
                                         areaId: 'all_israel',
                                         customAreaPolygon: const <LatLng>[],
                                       ),
                                       provider,
                                     );
                                   },
-                                )
-                              : null,
+                                ),
+                                const SizedBox(width: 8),
+                              ]
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -1209,7 +1297,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       // ── מיון ──
                       _FilterSection(title: 'מיון', icon: IconsaxPlusBold.sort),
                       const SizedBox(height: 10),
@@ -1251,13 +1339,11 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       // ── גודל ──
                       _RangeSliderField(
                         label: 'טווח גודל',
                         icon: IconsaxPlusBold.maximize_4,
-                        // Clamp stored value to slider bounds for display only.
-                        // Values beyond 2000 are set via the edit dialog.
                         values: RangeValues(
                           f.minSizeM2.toDouble().clamp(0, 2000),
                           f.maxSizeM2.toDouble().clamp(0, 2000),
@@ -1271,7 +1357,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           context: context,
                           title: 'טווח גודל',
                           initialMinValue: f.minSizeM2.toString(),
-                          // Show actual stored value so user can edit it freely
                           initialMaxValue: f.maxSizeM2 >= 1000000
                               ? ''
                               : f.maxSizeM2.toString(),
@@ -1300,7 +1385,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         ),
                         onChanged: (values) {
                           final minSize = values.start.round();
-                          // When thumb reaches 2000 treat as "no upper limit"
                           final maxSize = values.end.round() >= 2000
                               ? 1000000
                               : values.end.round();
@@ -1313,7 +1397,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           );
                         },
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       // ── קומה ──
                       _SliderField(
                         label: 'קומה מינימלית',
@@ -1338,7 +1422,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     raw.replaceAll(RegExp(r'[^0-9]'), ''),
                                   );
                             if (parsed == null) return;
-                            // No artificial cap — user decides the floor
                             _setDraftFilters(
                               f.copyWith(minFloor: math.max(0, parsed)),
                               provider,
@@ -1350,36 +1433,45 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           provider,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       // ── סוג נכס ──
                       _FilterSection(
-                          title: 'סוג נכס', icon: IconsaxPlusBold.building),
-                      const SizedBox(height: 6),
-                      const _PriorityLegend(),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: provider.availablePropertyTypes.map((type) {
-                          final state = f.propertyTypeState(type);
-                          return _PriorityFilterChip(
-                            label: type,
-                            state: state,
-                            icon: _propertyTypeIcon(type),
-                            onTap: () => _handlePriorityTap(
-                              key: 'type:$type',
-                              current: state,
-                              onSelected: (priority) => _setDraftFilters(
-                                f.setPropertyTypeState(type, priority),
-                                provider,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                        title: 'סוג נכס',
+                        icon: IconsaxPlusBold.building,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        reverse: true,
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          children: provider.availablePropertyTypes.map((type) {
+                            final state = f.propertyTypeState(type);
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: _PropertyTypeCard(
+                                label: type,
+                                state: state,
+                                icon: _propertyTypeIcon(type),
+                                onTap: () => _handlePriorityTap(
+                                  key: 'type:$type',
+                                  current: state,
+                                  onSelected: (priority) => _setDraftFilters(
+                                    f.setPropertyTypeState(type, priority),
+                                    provider,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       // ── מצב הנכס ──
                       _FilterSection(
-                          title: 'מצב הנכס', icon: IconsaxPlusBold.shield_tick),
+                        title: 'מצב הנכס',
+                        icon: IconsaxPlusBold.shield_tick,
+                      ),
                       const SizedBox(height: 6),
                       const _PriorityLegend(),
                       Wrap(
@@ -1402,19 +1494,19 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       // ── מקור מודעה ──
                       _FilterSection(
-                          title: 'מקור מודעה',
-                          icon: IconsaxPlusBold.profile_2user),
+                        title: 'מקור מודעה',
+                        icon: IconsaxPlusBold.profile_2user,
+                      ),
                       const SizedBox(height: 6),
                       const _PriorityLegend(),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: ListingSourceFilter.values
-                            .where(
-                                (source) => source != ListingSourceFilter.any)
+                            .where((source) => source != ListingSourceFilter.any)
                             .map((source) {
                           final state = f.listingSourceState(source);
                           return _PriorityFilterChip(
@@ -1441,11 +1533,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       // ── מועד כניסה ──
                       _FilterSection(
-                          title: 'מועד כניסה',
-                          icon: IconsaxPlusBold.calendar_1),
+                        title: 'מועד כניסה',
+                        icon: IconsaxPlusBold.calendar_1,
+                      ),
                       const SizedBox(height: 6),
                       const _PriorityLegend(),
                       Wrap(
@@ -1479,45 +1572,165 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       // ── מאפיינים ──
                       _FilterSection(
-                          title: 'מאפיינים חשובים',
-                          icon: IconsaxPlusBold.filter),
-                      const SizedBox(height: 6),
-                      const _PriorityLegend(),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children:
-                            provider.availableFeatures.take(16).map((feature) {
-                          final state = f.featureState(feature);
-                          return _PriorityFilterChip(
-                            label: feature,
-                            state: state,
-                            icon: _featureIcon(feature),
-                            onTap: () {
-                              _handlePriorityTap(
-                                key: 'feature:$feature',
-                                current: state,
-                                onSelected: (priority) => _setDraftFilters(
-                                  f.setFeatureState(feature, priority),
-                                  provider,
+                        title: 'מאפיינים חשובים',
+                        icon: IconsaxPlusBold.filter,
+                        action: !_showAllFeatures
+                            ? GestureDetector(
+                                onTap: () => setState(() => _showAllFeatures = true),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFF2F4F5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.add, size: 16, color: AppColors.navy),
+                                ),
+                              )
+                            : GestureDetector(
+                                onTap: () => setState(() => _showAllFeatures = false),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFF2F4F5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.keyboard_arrow_up, size: 16, color: AppColors.navy),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (!_showAllFeatures) ...[
+                        Builder(
+                          builder: (context) {
+                            final selectedFeatures = provider.availableFeatures
+                                .map((feature) => (feature, f.featureState(feature)))
+                                .where((pair) => pair.$2 != FilterPriority.none)
+                                .toList();
+                            if (selectedFeatures.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'לא נבחרו מאפיינים. לחץ על + כדי להוסיף.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               );
-                            },
-                          );
-                        }).toList(),
+                            }
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: selectedFeatures.map((pair) {
+                                return _FeatureTag(
+                                  label: pair.$1,
+                                  state: pair.$2,
+                                  onClear: () {
+                                    _setDraftFilters(
+                                      f.setFeatureState(pair.$1, FilterPriority.none),
+                                      provider,
+                                    );
+                                  },
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ] else ...[
+                        const _PriorityLegend(),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: provider.availableFeatures.take(24).map((feature) {
+                            final state = f.featureState(feature);
+                            return _PriorityFilterChip(
+                              label: feature,
+                              state: state,
+                              icon: _featureIcon(feature),
+                              onTap: () {
+                                _handlePriorityTap(
+                                  key: 'feature:$feature',
+                                  current: state,
+                                  onSelected: (priority) => _setDraftFilters(
+                                    f.setFeatureState(feature, priority),
+                                    provider,
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // Footer
+                Container(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
                       ),
-                      const SizedBox(height: 24),
-                      FilledButton.icon(
-                        onPressed: () {
-                          _didCommit = true;
-                          unawaited(provider.updateFilters(_draftFilters));
-                          Navigator.of(context).pop();
-                        },
-                        icon: const Icon(IconsaxPlusBold.tick_circle),
-                        label: Text('הצג $_visibleCount דירות'),
+                    ],
+                    border: const Border(
+                      top: BorderSide(color: Color(0xFFE2ECF1)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            _resetFilters(provider);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text(
+                            'נקה הכל',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          onPressed: () {
+                            _didCommit = true;
+                            unawaited(provider.updateFilters(_draftFilters));
+                            Navigator.of(context).pop();
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            'הצג $_visibleCount דירות',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1873,13 +2086,31 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
   final MapController _mapController = MapController();
   final List<LatLng> _lassoPoints = <LatLng>[];
   Offset? _lastDrawOffset;
-  bool _drawMode = false;
+  bool _drawMode = true; // Lasso mode active by default
+  RentalProperty? _selectedProperty;
 
   List<LatLng> get _activePolygon =>
       _lassoPoints.isNotEmpty ? _lassoPoints : widget.initialPolygon;
 
+  @override
+  void initState() {
+    super.initState();
+    // Default select the first property marker to show the bottom card initially
+    _selectedProperty = widget.previewMarkers.firstOrNull;
+  }
+
+  int _activePointers = 0;
+
   void _startLasso(PointerDownEvent event) {
-    if (!_drawMode) return;
+    _activePointers++;
+    if (!_drawMode || _activePointers > 1) {
+      if (_activePointers > 1) {
+        setState(() {
+          _lassoPoints.clear();
+        });
+      }
+      return;
+    }
     final point =
         _mapController.camera.screenOffsetToLatLng(event.localPosition);
     setState(() {
@@ -1891,7 +2122,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
   }
 
   void _updateLasso(PointerMoveEvent event) {
-    if (!_drawMode || _lastDrawOffset == null) return;
+    if (!_drawMode || _activePointers > 1 || _lastDrawOffset == null) return;
     if ((event.localPosition - _lastDrawOffset!).distance < 10) return;
     final point =
         _mapController.camera.screenOffsetToLatLng(event.localPosition);
@@ -1902,8 +2133,22 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
   }
 
   void _finishLasso(PointerUpEvent event) {
+    _activePointers = math.max(0, _activePointers - 1);
     if (!_drawMode) return;
     setState(() => _lastDrawOffset = null);
+  }
+
+  void _cancelLasso(PointerCancelEvent event) {
+    _activePointers = math.max(0, _activePointers - 1);
+    setState(() => _lastDrawOffset = null);
+  }
+
+  void _locateUser() {
+    if (widget.previewMarkers.isNotEmpty) {
+      _mapController.move(widget.previewMarkers.first.point, 13);
+    } else {
+      _mapController.move(widget.initialArea.center, 12);
+    }
   }
 
   @override
@@ -1913,34 +2158,14 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        title: const Text(
-          'בחירת אזור במפה',
-          style: TextStyle(
-            color: AppColors.navy,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(IconsaxPlusBold.close_circle, color: AppColors.navy),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => setState(() => _lassoPoints.clear()),
-            child: const Text('נקה'),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
       body: Stack(
         children: [
+          // Flutter Map
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: widget.initialArea.center,
-              initialZoom: widget.initialArea.id == 'all_israel' ? 7.5 : 12,
+              initialZoom: widget.initialArea.id == 'all_israel' ? 7.5 : 12.5,
               interactionOptions: InteractionOptions(
                 flags: _drawMode
                     ? InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom
@@ -1956,30 +2181,59 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                 polygons: [
                   Polygon(
                     points: widget.initialArea.polygon,
-                    color: AppColors.navy.withValues(alpha: 0.08),
-                    borderColor: AppColors.navy.withValues(alpha: 0.22),
-                    borderStrokeWidth: 2,
+                    color: AppColors.navy.withValues(alpha: 0.05),
+                    borderColor: AppColors.navy.withValues(alpha: 0.15),
+                    borderStrokeWidth: 1.5,
                   ),
                   if (polygon.length >= 3)
                     Polygon(
                       points: polygon,
-                      color: AppColors.primary.withValues(alpha: 0.22),
+                      color: AppColors.primary.withValues(alpha: 0.20),
                       borderColor: AppColors.primary,
                       borderStrokeWidth: 3,
                     ),
                 ],
               ),
+              // Markers Layer: Custom Yellow Pins
               MarkerLayer(
                 markers: widget.previewMarkers
                     .map(
                       (property) => Marker(
                         point: property.point,
-                        width: 24,
-                        height: 24,
-                        child: const Icon(
-                          IconsaxPlusBold.building,
-                          color: AppColors.primary,
-                          size: 18,
+                        width: 44,
+                        height: 52,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedProperty = property;
+                            });
+                          },
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const Icon(
+                                Icons.location_on_rounded,
+                                color: AppColors.primary,
+                                size: 48,
+                              ),
+                              Positioned(
+                                top: 8,
+                                child: Container(
+                                  width: 18,
+                                  height: 18,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF1E2830),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.home_filled,
+                                    color: Colors.white,
+                                    size: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -1987,82 +2241,441 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
               ),
             ],
           ),
+
+          // Lasso draw listener
           if (_drawMode)
             Positioned.fill(
               child: Listener(
+                behavior: HitTestBehavior.opaque,
                 onPointerDown: _startLasso,
                 onPointerMove: _updateLasso,
                 onPointerUp: _finishLasso,
+                onPointerCancel: _cancelLasso,
               ),
             ),
+
+          // Top Search Bar & Circular Control Buttons
           Positioned(
-            top: 16,
-            right: 16,
+            top: 16 + MediaQuery.of(context).padding.top,
             left: 16,
+            right: 16,
             child: Row(
               children: [
+                // Back Button
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFE2ECF1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.navy),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Search Bar
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                    height: 52,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.94),
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: const [
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(color: const Color(0xFFE2ECF1)),
+                      boxShadow: [
                         BoxShadow(
-                          color: AppColors.shadow,
-                          blurRadius: 16,
-                          offset: Offset(0, 8),
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: Text(
-                      _drawMode
-                          ? 'גרור אצבע על המפה כדי לצייר לאסו. אפשר לעשות זום גם בזמן ציור.'
-                          : 'הזז את המפה ואז לחץ על "מצב לאסו" כדי לסמן ידנית את האזור.',
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 10),
+                        const Icon(
+                          IconsaxPlusBold.search_normal,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.initialArea.id == 'all_israel' ? 'חיפוש...' : widget.initialArea.name,
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF2F4F5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            IconsaxPlusBold.map,
+                            size: 18,
+                            color: AppColors.navy,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Locate User Button
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFE2ECF1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.gps_fixed_rounded, color: AppColors.navy),
+                    onPressed: _locateUser,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Lasso toggle Button
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _drawMode ? AppColors.primary : Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      _drawMode ? Icons.gesture_rounded : Icons.gesture_outlined,
+                      color: _drawMode ? Colors.white : AppColors.navy,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _drawMode = !_drawMode;
+                      });
+                    },
                   ),
                 ),
               ],
             ),
           ),
+
+          // Bottom Area: Floating Card and Save buttons
           Positioned(
-            right: 16,
             left: 16,
-            bottom: 24,
-            child: Row(
+            right: 16,
+            bottom: 16 + MediaQuery.of(context).padding.bottom,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => setState(() => _drawMode = !_drawMode),
-                    icon: Icon(
-                      _drawMode
-                          ? IconsaxPlusBold.pen_close
-                          : IconsaxPlusBold.pen_add,
+                // Floating Property Detail Card (Mockup Style)
+                if (_selectedProperty != null) ...[
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PropertyDetailScreen(property: _selectedProperty!),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 16,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 1.45,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _PropertyThumb(media: _selectedProperty!.primaryMedia),
+                              // Bottom linear gradient
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.2),
+                                        Colors.transparent,
+                                        Colors.black.withValues(alpha: 0.85),
+                                      ],
+                                      stops: const [0.0, 0.45, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Top Glassmorphic Tags
+                              Positioned(
+                                top: 12,
+                                left: 12,
+                                right: 12,
+                                child: Row(
+                                  children: [
+                                    _GlassTagLasso(
+                                      icon: Icons.king_bed_outlined,
+                                      label: '${_selectedProperty!.roomsLabel} חדרים',
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _GlassTagLasso(
+                                      icon: Icons.layers_outlined,
+                                      label: _selectedProperty!.floor.isEmpty ? 'דירה' : 'קומה ${_selectedProperty!.floor}',
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _GlassTagLasso(
+                                      icon: Icons.space_dashboard_outlined,
+                                      label: '${_selectedProperty!.sizeM2} מ״ר',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Price and Address at the bottom
+                              Positioned(
+                                bottom: 16,
+                                left: 16,
+                                right: 16,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _selectedProperty!.priceLabel,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on_rounded,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            _selectedProperty!.address,
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(alpha: 0.9),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    label: Text(_drawMode ? 'עצור ציור' : 'מצב לאסו'),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: canSave
-                        ? () => Navigator.of(context)
-                            .pop(List<LatLng>.from(polygon))
-                        : null,
-                    icon: const Icon(IconsaxPlusBold.tick_circle),
-                    label: const Text('שמור אזור'),
-                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Action buttons floating row
+                Row(
+                  children: [
+                    // Clear Lasso Button
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: TextButton.icon(
+                          onPressed: () => setState(() => _lassoPoints.clear()),
+                          icon: const Icon(Icons.refresh_rounded, color: AppColors.navy, size: 18),
+                          label: const Text(
+                            'נקה',
+                            style: TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Save Lasso Button
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: FilledButton.icon(
+                          onPressed: canSave
+                              ? () => Navigator.of(context).pop(List<LatLng>.from(polygon))
+                              : null,
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: const Text(
+                            'שמור אזור',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Thumbnail ───────────────────────────────────────────────────────────────
+
+class _PropertyThumb extends StatelessWidget {
+  const _PropertyThumb({required this.media});
+
+  final PropertyMedia? media;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeMedia(
+      media: media,
+      fallback: _fallback(),
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+    );
+  }
+
+  Widget _fallback() => Container(
+        color: AppColors.primaryLight2,
+        child: const Icon(
+          IconsaxPlusBold.building,
+          size: 42,
+          color: AppColors.primary,
+        ),
+      );
+}
+
+// ─── Glassmorphism Tag for Lasso Card ────────────────────────────────────────
+
+
+class _GlassTagLasso extends StatelessWidget {
+  const _GlassTagLasso({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.20),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 13,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2506,27 +3119,6 @@ class _LocationSuggestionTile extends StatelessWidget {
   }
 }
 
-String _transactionTypeLabel(TransactionTypeFilter type) {
-  switch (type) {
-    case TransactionTypeFilter.any:
-      return 'הכל';
-    case TransactionTypeFilter.rent:
-      return 'השכרה';
-    case TransactionTypeFilter.sale:
-      return 'מכירה';
-  }
-}
-
-IconData _transactionTypeIcon(TransactionTypeFilter type) {
-  switch (type) {
-    case TransactionTypeFilter.any:
-      return IconsaxPlusBold.category;
-    case TransactionTypeFilter.rent:
-      return IconsaxPlusBold.key;
-    case TransactionTypeFilter.sale:
-      return IconsaxPlusBold.receipt_2;
-  }
-}
 
 String _priceFilterLabel() => 'טווח מחיר';
 
@@ -2588,10 +3180,6 @@ int _roundedPriceForTransaction(TransactionTypeFilter type, double value) {
   }
 }
 
-String _formatRooms(double value) {
-  if (value == 0) return '0';
-  return value % 1 == 0 ? value.toInt().toString() : value.toString();
-}
 
 String _moveInLabel(MoveInFilter option) {
   switch (option) {
@@ -2679,4 +3267,415 @@ IconData _featureIcon(String feature) {
     return IconsaxPlusBold.setting_4;
   }
   return IconsaxPlusBold.hashtag;
+}
+
+class _FilterLocationPill extends StatelessWidget {
+  const _FilterLocationPill({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.navy : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.navy,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomRangeSliderThumbShape extends RangeSliderThumbShape {
+  const _CustomRangeSliderThumbShape();
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isPressed) {
+    return const Size(28, 28);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    bool isDiscrete = false,
+    bool isEnabled = true,
+    bool isOnTop = false,
+    bool isPressed = false,
+    required SliderThemeData sliderTheme,
+    TextDirection? textDirection,
+    Thumb? thumb,
+  }) {
+    final Canvas canvas = context.canvas;
+    
+    final Path shadowPath = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: 14));
+    canvas.drawShadow(shadowPath, Colors.black, 4, true);
+
+    final Paint fillPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 13, fillPaint);
+
+    final Paint borderPaint = Paint()
+      ..color = AppColors.navy
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(center, 13, borderPaint);
+
+    final Paint linePaint = Paint()
+      ..color = AppColors.navy
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(Offset(center.dx - 5, center.dy - 2), Offset(center.dx + 5, center.dy - 2), linePaint);
+    canvas.drawLine(Offset(center.dx - 5, center.dy + 2), Offset(center.dx + 5, center.dy + 2), linePaint);
+  }
+}
+
+class _TransactionCard extends StatelessWidget {
+  const _TransactionCard({
+    required this.label,
+    required this.price,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String price;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.navy : const Color(0xFFF7F9FA),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? Colors.white70 : AppColors.textSecondary,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white24 : const Color(0xFFE2ECF1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'ממוצע',
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                price,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? Colors.white : AppColors.navy,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PriceHistogram extends StatelessWidget {
+  const _PriceHistogram();
+
+  @override
+  Widget build(BuildContext context) {
+    final heights = [10, 15, 25, 30, 20, 35, 50, 45, 60, 55, 40, 30, 25, 18, 12, 8];
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: heights.map((h) {
+          return Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              height: h.toDouble(),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2ECF1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _PriceInputCard extends StatelessWidget {
+  const _PriceInputCard({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2ECF1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleSelectorButton extends StatelessWidget {
+  const _CircleSelectorButton({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? AppColors.primary : const Color(0xFFE2ECF1),
+            width: 1,
+          ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.24),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ] : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.navy,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PropertyTypeCard extends StatelessWidget {
+  const _PropertyTypeCard({
+    required this.label,
+    required this.state,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final FilterPriority state;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isPreferred = state == FilterPriority.preferred;
+    final bool isRequired = state == FilterPriority.required;
+    final bool isActive = isPreferred || isRequired;
+
+    final Color bgColor = isRequired 
+        ? AppColors.primary 
+        : (isPreferred ? AppColors.navy : const Color(0xFFF7F9FA));
+    final Color iconBgColor = isActive ? Colors.white24 : const Color(0xFFE2ECF1);
+    final Color labelColor = isActive ? Colors.white : AppColors.navy;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 110,
+        height: 110,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isActive ? bgColor : const Color(0xFFE2ECF1),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 16,
+                color: labelColor,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: labelColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeatureTag extends StatelessWidget {
+  const _FeatureTag({
+    required this.label,
+    required this.state,
+    required this.onClear,
+  });
+
+  final String label;
+  final FilterPriority state;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isRequired = state == FilterPriority.required;
+    final Color color = isRequired ? AppColors.primary : AppColors.navy;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: onClear,
+            child: Icon(Icons.close, size: 14, color: color),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
