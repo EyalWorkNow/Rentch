@@ -9,6 +9,7 @@ import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 class ProfileCard extends StatefulWidget {
@@ -118,18 +119,19 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
             ),
 
-            // Dark gradient
+            // Dark gradient — deeper at bottom for better text contrast
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Color(0xF0072946),
-                    Color(0x44072946),
+                    Color(0xFF040F1C),
+                    Color(0xE0051E34),
+                    Color(0x66072946),
                     Colors.transparent,
                   ],
-                  stops: [0.0, 0.42, 0.72],
+                  stops: [0.0, 0.32, 0.60, 0.82],
                 ),
               ),
             ),
@@ -182,9 +184,21 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
             ),
 
-            // Top row: agency badge + image dots + send button
+            // Progress bars — Stories-style image counter at very top
+            if (hasMultiple)
+              Positioned(
+                top: 12,
+                left: 14,
+                right: 14,
+                child: _ImageProgressBars(
+                  count: media.length,
+                  current: safeCurrentImage,
+                ),
+              ),
+
+            // Top row: agency badge + send/more buttons
             Positioned(
-              top: 16,
+              top: hasMultiple ? 26 : 16,
               right: 16,
               left: 16,
               child: Row(
@@ -195,21 +209,20 @@ class _ProfileCardState extends State<ProfileCard> {
                     const _TourReadyBadge(),
                   ],
                   const Spacer(),
-                  if (hasMultiple) ...[
-                    _ImageDots(count: media.length, current: safeCurrentImage),
-                    const SizedBox(width: 8),
-                  ],
                   GestureDetector(
                     onTap: _showSendOptions,
                     child: Container(
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
+                        color: Colors.black.withValues(alpha: 0.42),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
                       ),
-                      child: const Icon(
-                        IconsaxPlusBold.send_2,
+                      child: const RentchIcon(
+                        IconsaxPlusLinear.send_2,
                         color: Colors.white,
                         size: 16,
                       ),
@@ -222,8 +235,11 @@ class _ProfileCardState extends State<ProfileCard> {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
+                        color: Colors.black.withValues(alpha: 0.42),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
                       ),
                       child: const Icon(
                         Icons.more_vert,
@@ -252,124 +268,263 @@ class _ProfileCardState extends State<ProfileCard> {
               ),
 
             // Content overlay (bottom)
+            // Content overlay (bottom glass card)
             Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (score > 0) ...[
-                    _MatchScoreBadge(score: score),
-                    const SizedBox(height: 6),
-                  ],
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: FittedBox(
-                          alignment: AlignmentDirectional.centerStart,
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            '${p.priceLabel} ${p.priceSuffixLabel}',
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              height: 1.1,
-                              letterSpacing: 0,
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (score > 0)
+                              _MatchScoreBadge(score: score)
+                            else
+                              const SizedBox.shrink(),
+                            if (priceCtx != PriceContext.average)
+                              _PriceContextBadge(ctx: priceCtx),
+                          ],
+                        ),
+                        if (score > 0 || priceCtx != PriceContext.average)
+                          const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              p.priceLabel,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              p.priceSuffixLabel,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const RentchIcon(
+                              IconsaxPlusLinear.location,
+                              size: 14,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                p.address,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              _StatPill(
+                                  icon: IconsaxPlusLinear.building,
+                                  label: '${p.roomsLabel} חדרים'),
+                              const SizedBox(width: 6),
+                              _StatPill(
+                                  icon: IconsaxPlusLinear.maximize_3,
+                                  label: '${p.sizeM2} מ"ר'),
+                              if (p.floor.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                _StatPill(
+                                    icon: IconsaxPlusLinear.layer,
+                                    label: 'קומה ${p.floor}'),
+                              ],
+                              if (p.sizeM2 > 0) ...[
+                                const SizedBox(width: 6),
+                                _StatPill(
+                                  icon: IconsaxPlusLinear.moneys,
+                                  label:
+                                      '₪${(p.price / p.sizeM2).round()}/מ"ר',
+                                ),
+                              ],
+                              if (p.entryDate.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                _StatPill(
+                                  icon: IconsaxPlusLinear.calendar_1,
+                                  label: 'כניסה ${p.entryDate}',
+                                  highlight: true,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (p.features.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: p.features.take(4).map((f) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: _FeatureTag(label: f),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        const Divider(
+                          color: Colors.white10,
+                          height: 1,
+                          thickness: 1,
+                        ),
+                        const SizedBox(height: 10),
+                        // Owner row
+                        if (p.ownerName.isNotEmpty) ...[
+                          Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary
+                                      .withValues(alpha: 0.22),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.45),
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    p.ownerName[0],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                p.ownerName,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.32),
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 10,
+                                      color: Colors.white70,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'שלח הודעה',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        // CTA button
+                        GestureDetector(
+                          onTap: () => _openDetail(context),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.30),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'פרטים מלאים',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                RentchIcon(
+                                  IconsaxPlusLinear.arrow_left,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _PriceContextBadge(ctx: priceCtx),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(IconsaxPlusBold.location,
-                          size: 14, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          p.address,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: [
-                        _StatPill(
-                            icon: IconsaxPlusBold.building,
-                            label: '${p.roomsLabel} חדרים'),
-                        const SizedBox(width: 6),
-                        _StatPill(
-                            icon: IconsaxPlusBold.maximize_3,
-                            label: '${p.sizeM2} מ"ר'),
-                        if (p.floor.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          _StatPill(
-                              icon: IconsaxPlusBold.layer,
-                              label: 'קומה ${p.floor}'),
-                        ],
-                        // Price per m²
-                        if (p.sizeM2 > 0) ...[
-                          const SizedBox(width: 6),
-                          _StatPill(
-                            icon: IconsaxPlusBold.moneys,
-                            label: '₪${(p.price / p.sizeM2).round()}/מ"ר',
-                          ),
-                        ],
                       ],
                     ),
                   ),
-                  if (p.features.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: p.features.take(3).map((f) {
-                        return _FeatureTag(label: f);
-                      }).toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: () => _openDetail(context),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'פרטים מלאים',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primary.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Icon(IconsaxPlusBold.arrow_left,
-                            size: 12,
-                            color: AppColors.primary.withValues(alpha: 0.9)),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
@@ -389,54 +544,12 @@ class _CardImage extends StatelessWidget {
     final item = media;
     final fallback = _ImageFallback(city: city);
     if (item == null || item.url.trim().isEmpty) return fallback;
-    if (!item.isImage) {
-      return SafeMedia(
-        media: item,
-        fallback: fallback,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-      );
-    }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Transform.scale(
-          scale: 1.08,
-          child: ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: SafeMedia(
-              media: item,
-              fallback: fallback,
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-            ),
-          ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.18),
-                Colors.black.withValues(alpha: 0.05),
-                Colors.black.withValues(alpha: 0.28),
-              ],
-              stops: const [0, 0.45, 1],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: SafeMedia(
-            media: item,
-            fallback: fallback,
-            fit: BoxFit.contain,
-            alignment: Alignment.topCenter,
-          ),
-        ),
-      ],
+    return SafeMedia(
+      media: item,
+      fallback: fallback,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
     );
   }
 }
@@ -453,8 +566,8 @@ class _ImageFallback extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              IconsaxPlusBold.building,
+            RentchIcon(
+              IconsaxPlusLinear.building,
               size: 64,
               color: AppColors.primary.withValues(alpha: 0.5),
             ),
@@ -492,7 +605,8 @@ class _ImageDots extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(IconsaxPlusBold.gallery, size: 12, color: Colors.white),
+          const RentchIcon(IconsaxPlusLinear.gallery,
+              size: 12, color: Colors.white),
           const SizedBox(width: 4),
           Text(
             '${current + 1}/$count',
@@ -522,8 +636,8 @@ class _AgencyBadge extends StatelessWidget {
         children: [
           Icon(
             agencyListing
-                ? IconsaxPlusBold.verify
-                : IconsaxPlusBold.profile_circle,
+                ? IconsaxPlusLinear.verify
+                : IconsaxPlusLinear.profile_circle,
             color: AppColors.primary,
             size: 13,
           ),
@@ -597,34 +711,73 @@ class _SwipeBadge extends StatelessWidget {
 }
 
 class _StatPill extends StatelessWidget {
-  const _StatPill({required this.icon, required this.label});
+  const _StatPill({
+    required this.icon,
+    required this.label,
+    this.highlight = false,
+  });
   final IconData icon;
   final String label;
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
+    final bg = highlight
+        ? AppColors.primary.withValues(alpha: 0.22)
+        : Colors.white.withValues(alpha: 0.12);
+    final border = highlight
+        ? AppColors.primary.withValues(alpha: 0.35)
+        : Colors.white.withValues(alpha: 0.15);
+    final iconColor = highlight ? AppColors.primary : Colors.white;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: Colors.white),
-          const SizedBox(width: 4),
+          Icon(icon, size: 13, color: iconColor),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: highlight ? AppColors.primary : Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 11,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ImageProgressBars extends StatelessWidget {
+  const _ImageProgressBars({required this.count, required this.current});
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(count, (i) {
+        return Expanded(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 3,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: i <= current
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        );
+      }),
     );
   }
 }
@@ -636,15 +789,16 @@ class _FeatureTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(999),
+        color: AppColors.primary.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.primaryLight,
           fontWeight: FontWeight.w700,
           fontSize: 11,
         ),
@@ -660,25 +814,27 @@ class _MatchScoreBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = score >= 80
-        ? const Color(0xFF27AE60)
+        ? const Color(0xFF10B981) // emerald
         : score >= 60
-            ? const Color(0xFFE67E22)
+            ? const Color(0xFFF59E0B) // amber
             : AppColors.coral;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.88),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.4), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(IconsaxPlusBold.star_1, size: 11, color: Colors.white),
+          RentchIcon(IconsaxPlusLinear.star_1,
+              size: 11, color: color),
           const SizedBox(width: 4),
           Text(
             '$score% התאמה',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: color,
               fontSize: 11,
               fontWeight: FontWeight.w800,
             ),
@@ -697,17 +853,18 @@ class _PriceContextBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (ctx == PriceContext.average) return const SizedBox.shrink();
     final isBelow = ctx == PriceContext.belowAverage;
+    final color = isBelow ? const Color(0xFF10B981) : AppColors.coral;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (isBelow ? const Color(0xFF27AE60) : AppColors.coral)
-            .withValues(alpha: 0.88),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.4), width: 1),
       ),
       child: Text(
-        isBelow ? 'מחיר טוב' : 'מחיר גבוה',
-        style: const TextStyle(
-          color: Colors.white,
+        isBelow ? 'מחיר מעולה' : 'מחיר מעל הממוצע',
+        style: TextStyle(
+          color: color,
           fontSize: 10,
           fontWeight: FontWeight.w800,
         ),

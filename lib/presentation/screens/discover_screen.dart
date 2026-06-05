@@ -12,11 +12,11 @@ import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 
@@ -27,67 +27,105 @@ class DiscoverScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
-        final pendingMatch = provider.pendingMatchProperty;
-        if (pendingMatch != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!context.mounted) return;
-            _showMatchDialog(context, pendingMatch);
-            provider.clearPendingMatch();
-          });
-        }
-
         final properties = provider.filteredProperties;
 
         return Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
             backgroundColor: AppColors.background,
-            centerTitle: false,
-            title: SvgPicture.asset(
-              'assets/images/rentch_logo.svg',
-              height: 40,
-              width: 40,
-              fit: BoxFit.contain,
-            ),
-            actions: [
-              IconButton(
-                tooltip: 'סינון',
-                onPressed: provider.isLoading
-                    ? null
-                    : () => _showFilters(context, provider),
-                icon: Stack(
-                  clipBehavior: Clip.none,
+            elevation: 0,
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/images/rentch_logo.svg',
+                  height: 32,
+                  width: 32,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(IconsaxPlusBold.setting_4,
-                        color: AppColors.navy),
-                    if (provider.activeFilterCount > 0)
-                      Positioned(
-                        top: -7,
-                        right: -9,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
-                          ),
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(999)),
-                          ),
-                          child: Text(
-                            '${provider.activeFilterCount}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
+                    const Text(
+                      'Rentch',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.navy,
+                        letterSpacing: -0.4,
                       ),
+                    ),
+                    Text(
+                      provider.filters.city.isNotEmpty
+                          ? provider.filters.city
+                          : '${properties.length} דירות',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
+              ],
+            ),
+            actions: [
+              GestureDetector(
+                onTap: provider.isLoading
+                    ? null
+                    : () => _showFilters(context, provider),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: provider.activeFilterCount > 0
+                        ? AppColors.navy
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: provider.activeFilterCount > 0
+                          ? AppColors.navy
+                          : AppColors.borderLight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RentchIcon(
+                        IconsaxPlusLinear.setting_4,
+                        size: 14,
+                        color: provider.activeFilterCount > 0
+                            ? Colors.white
+                            : AppColors.navy,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        provider.activeFilterCount > 0
+                            ? 'סינון (${provider.activeFilterCount})'
+                            : 'סינון',
+                        style: TextStyle(
+                          color: provider.activeFilterCount > 0
+                              ? Colors.white
+                              : AppColors.navy,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(width: 4),
             ],
           ),
           body: provider.isLoading
@@ -192,31 +230,18 @@ class DiscoverScreen extends StatelessWidget {
       builder: (_) => _FiltersSheet(provider: provider),
     );
   }
-
-  void _showMatchDialog(BuildContext context, RentalProperty property) {
-    HapticFeedback.heavyImpact();
-    Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: false,
-        barrierDismissible: true,
-        barrierColor: Colors.transparent,
-        pageBuilder: (_, __, ___) =>
-            _MatchCelebrationOverlay(property: property),
-      ),
-    );
-  }
 }
 
-class _MatchCelebrationOverlay extends StatefulWidget {
-  const _MatchCelebrationOverlay({required this.property});
+class MatchCelebrationOverlay extends StatefulWidget {
+  const MatchCelebrationOverlay({super.key, required this.property});
   final RentalProperty property;
 
   @override
-  State<_MatchCelebrationOverlay> createState() =>
+  State<MatchCelebrationOverlay> createState() =>
       _MatchCelebrationOverlayState();
 }
 
-class _MatchCelebrationOverlayState extends State<_MatchCelebrationOverlay>
+class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _scale;
@@ -265,8 +290,8 @@ class _MatchCelebrationOverlayState extends State<_MatchCelebrationOverlay>
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.primary, width: 3),
                       ),
-                      child: const Icon(
-                        IconsaxPlusBold.heart,
+                      child: const RentchIcon(
+                        IconsaxPlusLinear.heart,
                         color: AppColors.primary,
                         size: 48,
                       ),
@@ -314,7 +339,7 @@ class _MatchCelebrationOverlayState extends State<_MatchCelebrationOverlay>
                       width: double.infinity,
                       child: FilledButton.icon(
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(IconsaxPlusBold.message),
+                        icon: const RentchIcon(IconsaxPlusLinear.message),
                         label: const Text('פתח צ׳אט'),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -367,8 +392,8 @@ class _MatchPropertyImage extends StatelessWidget {
   Widget _fallback() => Container(
         color: AppColors.navy,
         child: const Center(
-          child: Icon(
-            IconsaxPlusBold.building,
+          child: RentchIcon(
+            IconsaxPlusLinear.building,
             color: Colors.white30,
             size: 40,
           ),
@@ -389,7 +414,6 @@ class _FiltersSheet extends StatefulWidget {
 class _FiltersSheetState extends State<_FiltersSheet> {
   static const Duration _doubleTapWindow = Duration(milliseconds: 260);
   late final TextEditingController _locationCtrl;
-  Timer? _previewDebounce;
   Timer? _pendingPriorityTimer;
   String? _pendingPriorityKey;
   late SearchFilters _draftFilters;
@@ -404,38 +428,54 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     super.initState();
     _draftFilters = widget.provider.filters;
     _initialFiltersKey = _filtersKey(_draftFilters);
-    final currentProperties = widget.provider.filteredProperties;
-    _visibleCount = currentProperties.length;
-    _markerPreview = currentProperties.take(18).toList();
+    _visibleCount = widget.provider.filteredCountFor(_draftFilters);
+    _markerPreview = widget.provider.previewFilteredProperties(_draftFilters);
     _locationCtrl = TextEditingController(text: widget.provider.filters.city);
   }
 
   @override
   void dispose() {
     _commitDraftIfNeeded();
-    _previewDebounce?.cancel();
     _pendingPriorityTimer?.cancel();
     _locationCtrl.dispose();
     super.dispose();
   }
 
   void _setDraftFilters(SearchFilters filters, DatingProvider provider) {
-    setState(() => _draftFilters = filters);
-    _schedulePreviewRefresh(provider);
+    final count = provider.filteredCountFor(filters);
+    final markers = provider.previewFilteredProperties(filters);
+    setState(() {
+      _draftFilters = filters;
+      _visibleCount = count;
+      _markerPreview = markers;
+    });
   }
 
-  void _schedulePreviewRefresh(DatingProvider provider) {
-    _previewDebounce?.cancel();
-    _previewDebounce = Timer(const Duration(milliseconds: 160), () {
-      if (!mounted) return;
-      final count = provider.filteredCountFor(_draftFilters);
-      final markers = provider.previewFilteredProperties(_draftFilters);
-      if (!mounted) return;
-      setState(() {
-        _visibleCount = count;
-        _markerPreview = markers;
-      });
-    });
+  SearchFilters _filtersForTransaction(
+    SearchFilters filters,
+    TransactionTypeFilter type,
+  ) {
+    final sliderMin = _priceSliderMin(type).round();
+    final sliderMax = _priceSliderMax(type).round();
+    return filters.copyWith(
+      transactionType: type,
+      minBudget: sliderMin,
+      maxBudget: sliderMax,
+    );
+  }
+
+  String _transactionMetric(
+    DatingProvider provider,
+    SearchFilters filters,
+    TransactionTypeFilter type,
+  ) {
+    final scopedFilters = _filtersForTransaction(filters, type);
+    final count = provider.filteredCountFor(scopedFilters);
+    final averagePrice = provider.averagePriceFor(scopedFilters);
+    final price = averagePrice <= 0
+        ? 'אין מחיר'
+        : _compactPriceLabel(averagePrice.round());
+    return '$count דירות · $price';
   }
 
   String _filtersKey(SearchFilters filters) {
@@ -656,9 +696,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     setState(() {
       _locationCtrl.clear();
       _draftFilters = resetFilters;
+      _visibleCount = provider.filteredCountFor(resetFilters);
+      _markerPreview = provider.previewFilteredProperties(resetFilters);
     });
     FocusManager.instance.primaryFocus?.unfocus();
-    _schedulePreviewRefresh(provider);
   }
 
   @override
@@ -722,7 +763,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 ),
                 // Header
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -737,7 +779,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               color: Color(0xFFF2F4F5),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close, size: 18, color: AppColors.navy),
+                            child: const Icon(Icons.close,
+                                size: 18, color: AppColors.navy),
                           ),
                         ),
                       ),
@@ -764,18 +807,26 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מטרה ──
                       _FilterSection(
                         title: 'מטרה',
-                        icon: IconsaxPlusBold.category,
+                        icon: IconsaxPlusLinear.category,
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           _TransactionCard(
                             label: 'הכל',
-                            price: '₪8,250',
-                            isSelected: f.transactionType == TransactionTypeFilter.any,
+                            price: _transactionMetric(
+                              provider,
+                              f,
+                              TransactionTypeFilter.any,
+                            ),
+                            isSelected:
+                                f.transactionType == TransactionTypeFilter.any,
                             onTap: () {
                               _setDraftFilters(
-                                f.copyWith(transactionType: TransactionTypeFilter.any),
+                                _filtersForTransaction(
+                                  f,
+                                  TransactionTypeFilter.any,
+                                ),
                                 provider,
                               );
                             },
@@ -783,11 +834,19 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           const SizedBox(width: 8),
                           _TransactionCard(
                             label: 'שכירות',
-                            price: '₪5,900',
-                            isSelected: f.transactionType == TransactionTypeFilter.rent,
+                            price: _transactionMetric(
+                              provider,
+                              f,
+                              TransactionTypeFilter.rent,
+                            ),
+                            isSelected:
+                                f.transactionType == TransactionTypeFilter.rent,
                             onTap: () {
                               _setDraftFilters(
-                                f.copyWith(transactionType: TransactionTypeFilter.rent),
+                                _filtersForTransaction(
+                                  f,
+                                  TransactionTypeFilter.rent,
+                                ),
                                 provider,
                               );
                             },
@@ -795,11 +854,19 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           const SizedBox(width: 8),
                           _TransactionCard(
                             label: 'קנייה',
-                            price: '₪2.3M',
-                            isSelected: f.transactionType == TransactionTypeFilter.sale,
+                            price: _transactionMetric(
+                              provider,
+                              f,
+                              TransactionTypeFilter.sale,
+                            ),
+                            isSelected:
+                                f.transactionType == TransactionTypeFilter.sale,
                             onTap: () {
                               _setDraftFilters(
-                                f.copyWith(transactionType: TransactionTypeFilter.sale),
+                                _filtersForTransaction(
+                                  f,
+                                  TransactionTypeFilter.sale,
+                                ),
                                 provider,
                               );
                             },
@@ -810,10 +877,21 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── תקציב ──
                       _FilterSection(
                         title: 'טווח מחירים',
-                        icon: IconsaxPlusBold.money,
+                        icon: IconsaxPlusLinear.money,
                       ),
                       const SizedBox(height: 12),
-                      const _PriceHistogram(),
+                      _PriceHistogram(
+                        minBudget: f.minBudget.toDouble().clamp(
+                              _priceSliderMin(f.transactionType),
+                              _priceSliderMax(f.transactionType),
+                            ),
+                        maxBudget: f.maxBudget.toDouble().clamp(
+                              _priceSliderMin(f.transactionType),
+                              _priceSliderMax(f.transactionType),
+                            ),
+                        sliderMin: _priceSliderMin(f.transactionType),
+                        sliderMax: _priceSliderMax(f.transactionType),
+                      ),
                       const SizedBox(height: 4),
                       SliderTheme(
                         data: SliderTheme.of(context).copyWith(
@@ -823,8 +901,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         ),
                         child: RangeSlider(
                           values: RangeValues(
-                            f.minBudget.toDouble().clamp(_priceSliderMin(f.transactionType), _priceSliderMax(f.transactionType)),
-                            f.maxBudget.toDouble().clamp(_priceSliderMin(f.transactionType), _priceSliderMax(f.transactionType)),
+                            f.minBudget.toDouble().clamp(
+                                _priceSliderMin(f.transactionType),
+                                _priceSliderMax(f.transactionType)),
+                            f.maxBudget.toDouble().clamp(
+                                _priceSliderMin(f.transactionType),
+                                _priceSliderMax(f.transactionType)),
                           ),
                           min: _priceSliderMin(f.transactionType),
                           max: _priceSliderMax(f.transactionType),
@@ -864,9 +946,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 final maxParsed = maxRaw.trim().isEmpty
                                     ? 2000000000
                                     : int.tryParse(
-                                        maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                        maxRaw.replaceAll(
+                                            RegExp(r'[^0-9]'), ''),
                                       );
-                                if (minParsed == null || maxParsed == null) return;
+                                if (minParsed == null || maxParsed == null) {
+                                  return;
+                                }
                                 final sliderMin =
                                     _priceSliderMin(f.transactionType).round();
                                 final clampedMin = _roundedPriceForTransaction(
@@ -907,9 +992,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 final maxParsed = maxRaw.trim().isEmpty
                                     ? 2000000000
                                     : int.tryParse(
-                                        maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                        maxRaw.replaceAll(
+                                            RegExp(r'[^0-9]'), ''),
                                       );
-                                if (minParsed == null || maxParsed == null) return;
+                                if (minParsed == null || maxParsed == null) {
+                                  return;
+                                }
                                 final sliderMin =
                                     _priceSliderMin(f.transactionType).round();
                                 final clampedMin = _roundedPriceForTransaction(
@@ -959,7 +1047,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── חדרים ──
                       _FilterSection(
                         title: 'חדרים',
-                        icon: IconsaxPlusBold.home,
+                        icon: IconsaxPlusLinear.home,
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -979,7 +1067,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                   );
                                 } else {
                                   _setDraftFilters(
-                                    f.copyWith(minRooms: i.toDouble(), maxRooms: 10),
+                                    f.copyWith(
+                                        minRooms: i.toDouble(), maxRooms: 10),
                                     provider,
                                   );
                                 }
@@ -992,7 +1081,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מיקום (עיר + אזור) ──
                       _FilterSection(
                         title: 'מיקום',
-                        icon: IconsaxPlusBold.location,
+                        icon: IconsaxPlusLinear.location,
                         action: (f.city.isNotEmpty ||
                                 f.areaId != 'all_israel' ||
                                 f.hasCustomArea)
@@ -1035,8 +1124,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         child: Row(
                           children: [
                             const SizedBox(width: 10),
-                            const Icon(
-                              IconsaxPlusBold.search_normal,
+                            const RentchIcon(
+                              IconsaxPlusLinear.search_normal,
                               size: 18,
                               color: Colors.grey,
                             ),
@@ -1055,20 +1144,22 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                   hintText: 'חפש עיר או אזור',
                                   hintStyle: TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.textSecondary.withValues(alpha: 0.72),
+                                    color: AppColors.textSecondary
+                                        .withValues(alpha: 0.72),
                                     fontWeight: FontWeight.w600,
                                   ),
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
                                   focusedBorder: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                 ),
                               ),
                             ),
                             if (_locationCtrl.text.isNotEmpty)
                               IconButton(
-                                icon: const Icon(
-                                  IconsaxPlusBold.close_circle,
+                                icon: const RentchIcon(
+                                  IconsaxPlusLinear.close_circle,
                                   size: 18,
                                   color: AppColors.textSecondary,
                                 ),
@@ -1091,8 +1182,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 color: Color(0xFFF2F4F5),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                IconsaxPlusBold.location,
+                              child: const RentchIcon(
+                                IconsaxPlusLinear.location,
                                 size: 18,
                                 color: AppColors.navy,
                               ),
@@ -1275,8 +1366,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                           point: p.point,
                                           width: 28,
                                           height: 28,
-                                          child: const Icon(
-                                              IconsaxPlusBold.building,
+                                          child: const RentchIcon(
+                                              IconsaxPlusLinear.building,
                                               color: AppColors.primary,
                                               size: 22),
                                         ))
@@ -1299,51 +1390,85 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       ),
                       const SizedBox(height: 24),
                       // ── מיון ──
-                      _FilterSection(title: 'מיון', icon: IconsaxPlusBold.sort),
+                      _FilterSection(
+                          title: 'מיון', icon: IconsaxPlusLinear.sort),
                       const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: SearchSortOption.values.map((option) {
-                          final selected = f.sortBy == option;
-                          return ChoiceChip(
-                            selected: selected,
-                            label: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_sortIcon(option),
-                                    size: 13,
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        reverse: true,
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          children: SearchSortOption.values.map((option) {
+                            final selected = f.sortBy == option;
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              child: GestureDetector(
+                                onTap: () => _setDraftFilters(
+                                  f.copyWith(sortBy: option),
+                                  provider,
+                                ),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
                                     color: selected
-                                        ? Colors.white
-                                        : AppColors.navy),
-                                const SizedBox(width: 4),
-                                Text(_sortLabel(option)),
-                              ],
-                            ),
-                            labelStyle: TextStyle(
-                              color: selected ? Colors.white : AppColors.navy,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.primaryLight2,
-                            side: BorderSide(
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.borderLight),
-                            showCheckmark: false,
-                            onSelected: (_) => _setDraftFilters(
-                              f.copyWith(sortBy: option),
-                              provider,
-                            ),
-                          );
-                        }).toList(),
+                                        ? AppColors.primary
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                    boxShadow: selected
+                                        ? [
+                                            BoxShadow(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.22),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _sortIcon(option),
+                                        size: 13,
+                                        color: selected
+                                            ? Colors.white
+                                            : AppColors.navy,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _sortLabel(option),
+                                        style: TextStyle(
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.navy,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       // ── גודל ──
                       _RangeSliderField(
                         label: 'טווח גודל',
-                        icon: IconsaxPlusBold.maximize_4,
+                        icon: IconsaxPlusLinear.maximize_4,
                         values: RangeValues(
                           f.minSizeM2.toDouble().clamp(0, 2000),
                           f.maxSizeM2.toDouble().clamp(0, 2000),
@@ -1401,7 +1526,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── קומה ──
                       _SliderField(
                         label: 'קומה מינימלית',
-                        icon: IconsaxPlusBold.building,
+                        icon: IconsaxPlusLinear.building,
                         value: f.minFloor.toDouble(),
                         min: 0,
                         max: 30,
@@ -1437,7 +1562,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── סוג נכס ──
                       _FilterSection(
                         title: 'סוג נכס',
-                        icon: IconsaxPlusBold.building,
+                        icon: IconsaxPlusLinear.building,
                       ),
                       const SizedBox(height: 12),
                       SingleChildScrollView(
@@ -1448,7 +1573,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           children: provider.availablePropertyTypes.map((type) {
                             final state = f.propertyTypeState(type);
                             return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
                               child: _PropertyTypeCard(
                                 label: type,
                                 state: state,
@@ -1470,7 +1596,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מצב הנכס ──
                       _FilterSection(
                         title: 'מצב הנכס',
-                        icon: IconsaxPlusBold.shield_tick,
+                        icon: IconsaxPlusLinear.shield_tick,
                       ),
                       const SizedBox(height: 6),
                       const _PriorityLegend(),
@@ -1482,7 +1608,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           return _PriorityFilterChip(
                             label: condition,
                             state: state,
-                            icon: IconsaxPlusBold.shield_tick,
+                            icon: IconsaxPlusLinear.shield_tick,
                             onTap: () => _handlePriorityTap(
                               key: 'condition:$condition',
                               current: state,
@@ -1498,7 +1624,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מקור מודעה ──
                       _FilterSection(
                         title: 'מקור מודעה',
-                        icon: IconsaxPlusBold.profile_2user,
+                        icon: IconsaxPlusLinear.profile_2user,
                       ),
                       const SizedBox(height: 6),
                       const _PriorityLegend(),
@@ -1506,7 +1632,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         spacing: 8,
                         runSpacing: 8,
                         children: ListingSourceFilter.values
-                            .where((source) => source != ListingSourceFilter.any)
+                            .where(
+                                (source) => source != ListingSourceFilter.any)
                             .map((source) {
                           final state = f.listingSourceState(source);
                           return _PriorityFilterChip(
@@ -1537,7 +1664,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       // ── מועד כניסה ──
                       _FilterSection(
                         title: 'מועד כניסה',
-                        icon: IconsaxPlusBold.calendar_1,
+                        icon: IconsaxPlusLinear.calendar_1,
                       ),
                       const SizedBox(height: 6),
                       const _PriorityLegend(),
@@ -1551,7 +1678,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           return _PriorityFilterChip(
                             label: _moveInLabel(option),
                             state: state,
-                            icon: IconsaxPlusBold.calendar_1,
+                            icon: IconsaxPlusLinear.calendar_1,
                             onTap: () => _handlePriorityTap(
                               key: 'move-in:${option.name}',
                               current: state,
@@ -1574,41 +1701,52 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       ),
                       const SizedBox(height: 24),
                       // ── מאפיינים ──
-                      _FilterSection(
-                        title: 'מאפיינים חשובים',
-                        icon: IconsaxPlusBold.filter,
-                        action: !_showAllFeatures
-                            ? GestureDetector(
-                                onTap: () => setState(() => _showAllFeatures = true),
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFF2F4F5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.add, size: 16, color: AppColors.navy),
+                      Builder(
+                        builder: (context) {
+                          final selectedCount = provider.availableFeatures
+                              .where((f2) =>
+                                  f.featureState(f2) != FilterPriority.none)
+                              .length;
+                          return _FilterSection(
+                            title: 'מאפיינים חשובים',
+                            icon: IconsaxPlusLinear.filter,
+                            badge: selectedCount > 0 ? '$selectedCount' : null,
+                            action: GestureDetector(
+                              onTap: () => setState(
+                                () => _showAllFeatures = !_showAllFeatures,
+                              ),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: _showAllFeatures
+                                      ? AppColors.primary
+                                          .withValues(alpha: 0.12)
+                                      : const Color(0xFFF2F4F5),
+                                  shape: BoxShape.circle,
                                 ),
-                              )
-                            : GestureDetector(
-                                onTap: () => setState(() => _showAllFeatures = false),
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFF2F4F5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.keyboard_arrow_up, size: 16, color: AppColors.navy),
+                                child: Icon(
+                                  _showAllFeatures
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.add,
+                                  size: 16,
+                                  color: _showAllFeatures
+                                      ? AppColors.primary
+                                      : AppColors.navy,
                                 ),
                               ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 10),
                       if (!_showAllFeatures) ...[
                         Builder(
                           builder: (context) {
                             final selectedFeatures = provider.availableFeatures
-                                .map((feature) => (feature, f.featureState(feature)))
+                                .map((feature) =>
+                                    (feature, f.featureState(feature)))
                                 .where((pair) => pair.$2 != FilterPriority.none)
                                 .toList();
                             if (selectedFeatures.isEmpty) {
@@ -1633,7 +1771,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                   state: pair.$2,
                                   onClear: () {
                                     _setDraftFilters(
-                                      f.setFeatureState(pair.$1, FilterPriority.none),
+                                      f.setFeatureState(
+                                          pair.$1, FilterPriority.none),
                                       provider,
                                     );
                                   },
@@ -1647,7 +1786,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: provider.availableFeatures.take(24).map((feature) {
+                          children: provider.availableFeatures
+                              .take(24)
+                              .map((feature) {
                             final state = f.featureState(feature);
                             return _PriorityFilterChip(
                               label: feature,
@@ -1672,7 +1813,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 ),
                 // Footer
                 Container(
-                  padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
+                  padding: EdgeInsets.fromLTRB(
+                      20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -1722,12 +1864,26 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: Text(
-                            'הצג $_visibleCount דירות',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            transitionBuilder: (child, anim) => FadeTransition(
+                              opacity: anim,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.3),
+                                  end: Offset.zero,
+                                ).animate(anim),
+                                child: child,
+                              ),
+                            ),
+                            child: Text(
+                              'הצג $_visibleCount דירות',
+                              key: ValueKey(_visibleCount),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -1745,27 +1901,55 @@ class _FiltersSheetState extends State<_FiltersSheet> {
 }
 
 class _FilterSection extends StatelessWidget {
-  const _FilterSection({required this.title, this.icon, this.action});
+  const _FilterSection(
+      {required this.title, this.icon, this.action, this.badge});
   final String title;
   final IconData? icon;
   final Widget? action;
+  final String? badge;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 18, color: AppColors.navy),
-          const SizedBox(width: 8),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 15, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
         ],
         Text(
           title,
           style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
             color: AppColors.navy,
           ),
         ),
+        if (badge != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              badge!,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
         if (action != null) ...[
           const Spacer(),
           action!,
@@ -1781,36 +1965,68 @@ class _PriorityLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textStyle = TextStyle(
-      fontSize: 11,
-      color: AppColors.textSecondary,
-      fontWeight: FontWeight.w600,
-    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
+          _LegendChip(
+            label: 'מועדף',
+            color: AppColors.primary,
+            icon: Icons.favorite_rounded,
+          ),
+          const SizedBox(width: 8),
+          _LegendChip(
+            label: 'חייב להיות',
+            color: AppColors.coral,
+            icon: Icons.priority_high_rounded,
+          ),
+          const Spacer(),
+          const Text(
+            'טאפ / דאבל טאפ',
+            style: TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegendChip extends StatelessWidget {
+  const _LegendChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: Colors.white),
           const SizedBox(width: 4),
-          const Text('טאפ: מועדף', style: textStyle),
-          const SizedBox(width: 14),
-          Container(
-            width: 10,
-            height: 10,
-            decoration: const BoxDecoration(
-              color: AppColors.coral,
-              shape: BoxShape.circle,
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(width: 4),
-          const Text('דאבל טאפ: חייב להיות', style: textStyle),
         ],
       ),
     );
@@ -1851,9 +2067,10 @@ class _PriorityFilterChip extends StatelessWidget {
         color: isActive ? activeColor : AppColors.borderLight,
         width: 1.5,
       ),
-      elevation: isActive ? 2 : 0,
+      elevation: isActive ? 3 : 0,
+      pressElevation: 4,
       shadowColor:
-          isActive ? activeColor.withValues(alpha: 0.4) : Colors.transparent,
+          isActive ? activeColor.withValues(alpha: 0.35) : Colors.transparent,
       padding: const EdgeInsets.symmetric(horizontal: 2),
       labelPadding: const EdgeInsets.symmetric(horizontal: 4),
       label: Row(
@@ -1863,12 +2080,30 @@ class _PriorityFilterChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(label),
           if (state == FilterPriority.preferred) ...[
-            const SizedBox(width: 3),
-            Icon(Icons.favorite_rounded, size: 11, color: Colors.white70),
+            const SizedBox(width: 4),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.favorite_rounded,
+                  size: 8, color: Colors.white),
+            ),
           ],
           if (state == FilterPriority.required) ...[
-            const SizedBox(width: 3),
-            Icon(Icons.priority_high_rounded, size: 11, color: Colors.white70),
+            const SizedBox(width: 4),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.priority_high_rounded,
+                  size: 8, color: Colors.white),
+            ),
           ],
         ],
       ),
@@ -1948,8 +2183,8 @@ class _SliderField extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(
-                        IconsaxPlusBold.edit_2,
+                      const RentchIcon(
+                        IconsaxPlusLinear.edit_2,
                         size: 14,
                         color: AppColors.primary,
                       ),
@@ -2043,8 +2278,8 @@ class _RangeSliderField extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(
-                        IconsaxPlusBold.edit_2,
+                      const RentchIcon(
+                        IconsaxPlusLinear.edit_2,
                         size: 14,
                         color: AppColors.primary,
                       ),
@@ -2082,21 +2317,82 @@ class _AreaLassoScreen extends StatefulWidget {
   State<_AreaLassoScreen> createState() => _AreaLassoScreenState();
 }
 
-class _AreaLassoScreenState extends State<_AreaLassoScreen> {
+class _AreaLassoScreenState extends State<_AreaLassoScreen>
+    with TickerProviderStateMixin {
   final MapController _mapController = MapController();
-  final List<LatLng> _lassoPoints = <LatLng>[];
+  final List<LatLng> _currentPolygon = <LatLng>[];
   Offset? _lastDrawOffset;
-  bool _drawMode = true; // Lasso mode active by default
+  bool _drawMode = false; // Lasso mode active by default
   RentalProperty? _selectedProperty;
+  final ScrollController _scrollController = ScrollController();
 
-  List<LatLng> get _activePolygon =>
-      _lassoPoints.isNotEmpty ? _lassoPoints : widget.initialPolygon;
+  List<LatLng> get _activePolygon => _currentPolygon;
 
   @override
   void initState() {
     super.initState();
     // Default select the first property marker to show the bottom card initially
     _selectedProperty = widget.previewMarkers.firstOrNull;
+    _currentPolygon.addAll(widget.initialPolygon);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _animatedMapMove(LatLng destLocation, double destZoom) {
+    final camera = _mapController.camera;
+    final latTween = Tween<double>(
+        begin: camera.center.latitude, end: destLocation.latitude);
+    final lngTween = Tween<double>(
+        begin: camera.center.longitude, end: destLocation.longitude);
+    final zoomTween = Tween<double>(begin: camera.zoom, end: destZoom);
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    final animation =
+        CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn);
+
+    controller.addListener(() {
+      if (!mounted) return;
+      _mapController.move(
+        LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    animation.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        controller.dispose();
+      } else if (status == AnimationStatus.dismissed) {
+        controller.dispose();
+      }
+    });
+
+    controller.forward();
+  }
+
+  void _selectProperty(RentalProperty property) {
+    setState(() {
+      _selectedProperty = property;
+    });
+    _animatedMapMove(property.point, 13.5);
+
+    // Scroll horizontal card slider to the selected card
+    final index = widget.previewMarkers.indexWhere((p) => p.id == property.id);
+    if (index != -1 && _scrollController.hasClients) {
+      // 280 is card width + 12 is separation
+      _scrollController.animateTo(
+        index * (280.0 + 12.0),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   int _activePointers = 0;
@@ -2106,7 +2402,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
     if (!_drawMode || _activePointers > 1) {
       if (_activePointers > 1) {
         setState(() {
-          _lassoPoints.clear();
+          _currentPolygon.clear();
         });
       }
       return;
@@ -2114,7 +2410,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
     final point =
         _mapController.camera.screenOffsetToLatLng(event.localPosition);
     setState(() {
-      _lassoPoints
+      _currentPolygon
         ..clear()
         ..add(point);
       _lastDrawOffset = event.localPosition;
@@ -2127,7 +2423,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
     final point =
         _mapController.camera.screenOffsetToLatLng(event.localPosition);
     setState(() {
-      _lassoPoints.add(point);
+      _currentPolygon.add(point);
       _lastDrawOffset = event.localPosition;
     });
   }
@@ -2145,9 +2441,9 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
 
   void _locateUser() {
     if (widget.previewMarkers.isNotEmpty) {
-      _mapController.move(widget.previewMarkers.first.point, 13);
+      _animatedMapMove(widget.previewMarkers.first.point, 13.5);
     } else {
-      _mapController.move(widget.initialArea.center, 12);
+      _animatedMapMove(widget.initialArea.center, 12.5);
     }
   }
 
@@ -2155,6 +2451,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
   Widget build(BuildContext context) {
     final polygon = _activePolygon;
     final canSave = polygon.length >= 3;
+    final hasProperties = widget.previewMarkers.isNotEmpty;
+    final hasPolygon = polygon.length >= 3;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -2181,63 +2479,79 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                 polygons: [
                   Polygon(
                     points: widget.initialArea.polygon,
-                    color: AppColors.navy.withValues(alpha: 0.05),
-                    borderColor: AppColors.navy.withValues(alpha: 0.15),
-                    borderStrokeWidth: 1.5,
+                    color: AppColors.navy.withValues(alpha: 0.04),
+                    borderColor: AppColors.navy.withValues(alpha: 0.12),
+                    borderStrokeWidth: 1.4,
                   ),
-                  if (polygon.length >= 3)
+                  if (hasPolygon)
                     Polygon(
                       points: polygon,
-                      color: AppColors.primary.withValues(alpha: 0.20),
+                      color: AppColors.primary.withValues(alpha: 0.18),
                       borderColor: AppColors.primary,
-                      borderStrokeWidth: 3,
+                      borderStrokeWidth: 2.8,
                     ),
                 ],
               ),
-              // Markers Layer: Custom Yellow Pins
+              // Markers Layer: Circular Image Thumbnails inspired by mockup
               MarkerLayer(
-                markers: widget.previewMarkers
-                    .map(
-                      (property) => Marker(
-                        point: property.point,
-                        width: 44,
-                        height: 52,
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedProperty = property;
-                            });
-                          },
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const Icon(
-                                Icons.location_on_rounded,
-                                color: AppColors.primary,
-                                size: 48,
+                markers: widget.previewMarkers.map(
+                  (property) {
+                    final isSelected = property.id == _selectedProperty?.id;
+                    return Marker(
+                      point: property.point,
+                      width: isSelected ? 66 : 46,
+                      height: isSelected ? 74 : 54,
+                      child: GestureDetector(
+                        onTap: () => _selectProperty(property),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: isSelected ? 60 : 40,
+                              height: isSelected ? 60 : 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF2C64E3)
+                                      : Colors.white,
+                                  width: isSelected ? 3.0 : 2.0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.16),
+                                    blurRadius: isSelected ? 8 : 4,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                              Positioned(
-                                top: 8,
-                                child: Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF1E2830),
-                                    shape: BoxShape.circle,
+                              child: ClipOval(
+                                child: SafeMedia(
+                                  media: property.primaryMedia,
+                                  fallback: Container(
+                                    color: AppColors.primaryLight2,
+                                    child: RentchIcon(
+                                      IconsaxPlusLinear.building,
+                                      size: isSelected ? 22 : 14,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
-                                  child: const Icon(
-                                    Icons.home_filled,
-                                    color: Colors.white,
-                                    size: 10,
-                                  ),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            if (isSelected)
+                              CustomPaint(
+                                size: const Size(10, 6),
+                                painter: _TrianglePainter(
+                                    color: const Color(0xFF2C64E3)),
+                              ),
+                          ],
                         ),
                       ),
-                    )
-                    .toList(),
+                    );
+                  },
+                ).toList(),
               ),
             ],
           ),
@@ -2278,61 +2592,162 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                     ],
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.navy),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: AppColors.navy),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Search Bar
+                // Filter Dropdown Button replacing Search Bar
                 Expanded(
-                  child: Container(
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: const Color(0xFFE2ECF1)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      cardColor: Colors.white,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 10),
-                        const Icon(
-                          IconsaxPlusBold.search_normal,
-                          size: 18,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.initialArea.id == 'all_israel' ? 'חיפוש...' : widget.initialArea.name,
-                            style: const TextStyle(
-                              color: AppColors.navy,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    child: PopupMenuButton<String>(
+                      tooltip: 'סוגי סינון',
+                      onSelected: (value) {
+                        final provider =
+                            Provider.of<DatingProvider>(context, listen: false);
+                        showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => _FiltersSheet(provider: provider),
+                        );
+                      },
+                      offset: const Offset(0, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Color(0xFFE2ECF1)),
+                      ),
+                      itemBuilder: (BuildContext context) => [
+                        const PopupMenuItem<String>(
+                          value: 'price',
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text('תקציב',
+                                  style: TextStyle(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5)),
+                              SizedBox(width: 8),
+                              Icon(Icons.monetization_on_outlined,
+                                  color: AppColors.navy, size: 18),
+                            ],
                           ),
                         ),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF2F4F5),
-                            shape: BoxShape.circle,
+                        const PopupMenuItem<String>(
+                          value: 'rooms',
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text('חדרים',
+                                  style: TextStyle(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5)),
+                              SizedBox(width: 8),
+                              Icon(Icons.meeting_room_outlined,
+                                  color: AppColors.navy, size: 18),
+                            ],
                           ),
-                          child: const Icon(
-                            IconsaxPlusBold.map,
-                            size: 18,
-                            color: AppColors.navy,
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'type',
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text('סוג נכס',
+                                  style: TextStyle(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5)),
+                              SizedBox(width: 8),
+                              Icon(Icons.home_work_outlined,
+                                  color: AppColors.navy, size: 18),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'features',
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text('מאפיינים',
+                                  style: TextStyle(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.5)),
+                              SizedBox(width: 8),
+                              Icon(Icons.star_border_rounded,
+                                  color: AppColors.navy, size: 18),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem<String>(
+                          value: 'all',
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text('הצג את כל המסננים',
+                                  style: TextStyle(
+                                      color: AppColors.navy,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13.5)),
+                              SizedBox(width: 8),
+                              Icon(Icons.tune_rounded,
+                                  color: AppColors.navy, size: 18),
+                            ],
                           ),
                         ),
                       ],
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(color: const Color(0xFFE2ECF1)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            const RentchIcon(
+                              IconsaxPlusLinear.setting_4,
+                              size: 18,
+                              color: AppColors.navy,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                widget.initialArea.id == 'all_israel'
+                                    ? 'סנן לפי...'
+                                    : 'סינון באזור ${widget.initialArea.name}',
+                                style: const TextStyle(
+                                  color: AppColors.navy,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.navy,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -2354,7 +2769,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                     ],
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.gps_fixed_rounded, color: AppColors.navy),
+                    icon: const Icon(Icons.gps_fixed_rounded,
+                        color: AppColors.navy),
                     onPressed: _locateUser,
                   ),
                 ),
@@ -2376,7 +2792,9 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                   ),
                   child: IconButton(
                     icon: Icon(
-                      _drawMode ? Icons.gesture_rounded : Icons.gesture_outlined,
+                      _drawMode
+                          ? Icons.gesture_rounded
+                          : Icons.gesture_outlined,
                       color: _drawMode ? Colors.white : AppColors.navy,
                     ),
                     onPressed: () {
@@ -2391,161 +2809,142 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
           ),
 
           // Bottom Area: Floating Card and Save buttons
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16 + MediaQuery.of(context).padding.bottom,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Floating Property Detail Card (Mockup Style)
-                if (_selectedProperty != null) ...[
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PropertyDetailScreen(property: _selectedProperty!),
+          // 1. Bottom Headers: Styled as tags/chips
+          // 1. Bottom Headers: Styled as premium tags/chips with liquid glass
+          if (hasProperties)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 368 + MediaQuery.of(context).padding.bottom,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.38),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08)),
                         ),
-                      );
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 16,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: AspectRatio(
-                        aspectRatio: 1.45,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(28),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              _PropertyThumb(media: _selectedProperty!.primaryMedia),
-                              // Bottom linear gradient
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.black.withValues(alpha: 0.2),
-                                        Colors.transparent,
-                                        Colors.black.withValues(alpha: 0.85),
-                                      ],
-                                      stops: const [0.0, 0.45, 1.0],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Top Glassmorphic Tags
-                              Positioned(
-                                top: 12,
-                                left: 12,
-                                right: 12,
-                                child: Row(
-                                  children: [
-                                    _GlassTagLasso(
-                                      icon: Icons.king_bed_outlined,
-                                      label: '${_selectedProperty!.roomsLabel} חדרים',
-                                    ),
-                                    const SizedBox(width: 6),
-                                    _GlassTagLasso(
-                                      icon: Icons.layers_outlined,
-                                      label: _selectedProperty!.floor.isEmpty ? 'דירה' : 'קומה ${_selectedProperty!.floor}',
-                                    ),
-                                    const SizedBox(width: 6),
-                                    _GlassTagLasso(
-                                      icon: Icons.space_dashboard_outlined,
-                                      label: '${_selectedProperty!.sizeM2} מ״ר',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Price and Address at the bottom
-                              Positioned(
-                                bottom: 16,
-                                left: 16,
-                                right: 16,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _selectedProperty!.priceLabel,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.location_on_rounded,
-                                          color: Colors.white,
-                                          size: 14,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            _selectedProperty!.address,
-                                            style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.9),
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                        child: const Text(
+                          'דירות באזור המסומן',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.26),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: Text(
+                          '${widget.previewMarkers.length} תוצאות',
+                          style: const TextStyle(
+                            color: Colors.white, // Solid white text
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
+              ),
+            ),
 
-                // Action buttons floating row
-                Row(
-                  children: [
-                    // Clear Lasso Button
-                    Expanded(
-                      flex: 1,
+          // 2. Carousel: Spans 100% edge-to-edge of the screen
+          if (hasProperties)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 60 + MediaQuery.of(context).padding.bottom,
+              child: SizedBox(
+                height: 300,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: widget.previewMarkers.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final property = widget.previewMarkers[index];
+                    final isSelected = property.id == _selectedProperty?.id;
+                    return _PropertyPreviewCard(
+                      property: property,
+                      isSelected: isSelected,
+                      onTap: () => _selectProperty(property),
+                      onOpenDetails: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PropertyDetailScreen(property: property),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+
+          // 3. Action buttons (Clear & Save) positioned at the bottom
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 4 + MediaQuery.of(context).padding.bottom,
+            child: Row(
+              children: [
+                // Clear Lasso Button (Liquid Glass)
+                Expanded(
+                  flex: 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
+                          color: Colors.black.withValues(alpha: 0.24),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.12)),
                         ),
                         child: TextButton.icon(
-                          onPressed: () => setState(() => _lassoPoints.clear()),
-                          icon: const Icon(Icons.refresh_rounded, color: AppColors.navy, size: 18),
+                          onPressed: () {
+                            setState(() {
+                              _currentPolygon.clear();
+                              _lastDrawOffset = null;
+                              _selectedProperty =
+                                  widget.previewMarkers.firstOrNull;
+                            });
+                          },
+                          icon: const Icon(Icons.refresh_rounded,
+                              color: Colors.white, size: 18),
                           label: const Text(
                             'נקה',
                             style: TextStyle(
-                              color: AppColors.navy,
+                              color: Colors.white,
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
                             ),
@@ -2553,44 +2952,56 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    // Save Lasso Button
-                    Expanded(
-                      flex: 2,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Save Lasso Button (Vibrant sky blue/cyan when canSave is true)
+                Expanded(
+                  flex: 2,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          color: canSave
+                              ? const Color(0xFF38B6FF)
+                                  .withValues(alpha: 0.85) // Sky Blue / Cyan
+                              : Colors.black.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: canSave
+                                ? const Color(0xFF38B6FF).withValues(alpha: 0.4)
+                                : Colors.white.withValues(alpha: 0.08),
+                          ),
                         ),
-                        child: FilledButton.icon(
+                        child: TextButton.icon(
                           onPressed: canSave
-                              ? () => Navigator.of(context).pop(List<LatLng>.from(polygon))
+                              ? () => Navigator.of(context)
+                                  .pop(List<LatLng>.from(polygon))
                               : null,
-                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                          label: const Text(
+                          icon: Icon(
+                            Icons.check_circle_outline_rounded,
+                            color: canSave
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.4),
+                            size: 18,
+                          ),
+                          label: Text(
                             'שמור אזור',
                             style: TextStyle(
+                              color: canSave
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.4),
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -2620,62 +3031,277 @@ class _PropertyThumb extends StatelessWidget {
 
   Widget _fallback() => Container(
         color: AppColors.primaryLight2,
-        child: const Icon(
-          IconsaxPlusBold.building,
+        child: const RentchIcon(
+          IconsaxPlusLinear.building,
           size: 42,
           color: AppColors.primary,
         ),
       );
 }
 
-// ─── Glassmorphism Tag for Lasso Card ────────────────────────────────────────
-
-
-class _GlassTagLasso extends StatelessWidget {
-  const _GlassTagLasso({
-    required this.icon,
-    required this.label,
+class _PropertyPreviewCard extends StatelessWidget {
+  const _PropertyPreviewCard({
+    required this.property,
+    required this.isSelected,
+    required this.onTap,
+    required this.onOpenDetails,
   });
 
-  final IconData icon;
-  final String label;
+  final RentalProperty property;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onOpenDetails;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.20),
-              width: 1,
-            ),
+    final isRent = property.transactionType != PropertyTransactionType.sale;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: 280,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: isSelected
+                ? Colors.white.withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.08),
+            width: isSelected ? 2.0 : 1.0,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          boxShadow: [
+            BoxShadow(
+              color: isSelected
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.1),
+              blurRadius: isSelected ? 16 : 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(25),
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Icon(
-                icon,
-                color: Colors.white,
-                size: 13,
+              // Full background property image
+              _PropertyThumb(media: property.primaryMedia),
+
+              // Top-Left transaction type glassmorphic pill
+              Positioned(
+                top: 12,
+                left: 12,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      color: Colors.black.withValues(alpha: 0.45),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF00FF66),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isRent ? 'להשכרה' : 'למכירה',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+
+              // Top-Right details open icon button
+              Positioned(
+                top: 12,
+                right: 12,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: GestureDetector(
+                      onTap: onOpenDetails,
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.black.withValues(alpha: 0.4),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.12)),
+                        ),
+                        child: const Icon(
+                          Icons.favorite_border_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Bottom Glassmorphic Panel
+              Positioned(
+                bottom: 10,
+                left: 10,
+                right: 10,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      color: Colors.black
+                          .withValues(alpha: 0.17), // 17% opacity base
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Price row with arrow
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    property.priceLabel,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    property.priceSuffixLabel,
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.6),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              GestureDetector(
+                                onTap: onOpenDetails,
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                    border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.2)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Address row
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  property.address,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          // Spec pills
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildSpecPill(
+                                icon: Icons.meeting_room_outlined,
+                                label: '${property.roomsLabel} חדרים',
+                              ),
+                              _buildSpecPill(
+                                icon: Icons.crop_free_rounded,
+                                label: '${property.sizeM2} מ״ר',
+                              ),
+                              _buildSpecPill(
+                                icon: Icons.layers_outlined,
+                                label: property.floor.isEmpty
+                                    ? 'קרקע'
+                                    : 'קומה ${property.floor}',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSpecPill({required IconData icon, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withValues(alpha: 0.08),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 11),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2706,7 +3332,7 @@ class _UndoButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(IconsaxPlusBold.undo,
+            RentchIcon(IconsaxPlusLinear.undo,
                 size: 16, color: AppColors.textSecondary),
             SizedBox(width: 5),
             Text(
@@ -2744,8 +3370,8 @@ class _NoMorePropertiesState extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                IconsaxPlusBold.search_normal,
+              child: const RentchIcon(
+                IconsaxPlusLinear.search_normal,
                 color: AppColors.primary,
                 size: 40,
               ),
@@ -2772,7 +3398,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             _QuickActionBtn(
-              icon: IconsaxPlusBold.money,
+              icon: IconsaxPlusLinear.money,
               label: 'הרחב תקציב ב-₪500',
               onTap: () => provider.updateFilters(
                 provider.filters.copyWith(
@@ -2782,7 +3408,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _QuickActionBtn(
-              icon: IconsaxPlusBold.home,
+              icon: IconsaxPlusLinear.home,
               label: 'הפחת דרישת חדרים ב-0.5',
               onTap: () {
                 if (provider.filters.minRooms > 1) {
@@ -2796,7 +3422,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _QuickActionBtn(
-              icon: IconsaxPlusBold.maximize_4,
+              icon: IconsaxPlusLinear.maximize_4,
               label: 'פתח גודל מ-20 מ"ר',
               onTap: () => provider.updateFilters(
                 provider.filters.copyWith(
@@ -2808,7 +3434,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _QuickActionBtn(
-              icon: IconsaxPlusBold.undo,
+              icon: IconsaxPlusLinear.undo,
               label: 'אפס דירות שדילגתי',
               onTap: () => provider.resetPassed(),
               isHighlighted: true,
@@ -2967,6 +3593,20 @@ String _formatCurrency(int value) {
   return '₪$buffer';
 }
 
+String _compactPriceLabel(int value) {
+  if (value >= 1000000) {
+    final millions = value / 1000000;
+    final formatted = millions >= 10
+        ? millions.toStringAsFixed(0)
+        : millions.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+    return '₪${formatted}M';
+  }
+  if (value >= 100000) {
+    return '₪${(value / 1000).round()}K';
+  }
+  return _formatCurrency(value);
+}
+
 String _sortLabel(SearchSortOption option) {
   switch (option) {
     case SearchSortOption.bestMatch:
@@ -3005,7 +3645,7 @@ class _LocationSuggestion {
   factory _LocationSuggestion.city(String city) {
     return _LocationSuggestion._(
       label: city,
-      icon: IconsaxPlusBold.building,
+      icon: IconsaxPlusLinear.building,
       caption: 'עיר',
       isCity: true,
     );
@@ -3014,7 +3654,7 @@ class _LocationSuggestion {
   factory _LocationSuggestion.area(SearchArea area) {
     return _LocationSuggestion._(
       label: area.name,
-      icon: IconsaxPlusBold.location,
+      icon: IconsaxPlusLinear.location,
       caption: 'אזור',
       isCity: false,
       area: area,
@@ -3099,8 +3739,8 @@ class _LocationSuggestionTile extends StatelessWidget {
                 ),
                 Icon(
                   isSelected
-                      ? IconsaxPlusBold.tick_circle
-                      : IconsaxPlusBold.arrow_left_2,
+                      ? IconsaxPlusLinear.tick_circle
+                      : IconsaxPlusLinear.arrow_left_2,
                   color:
                       isSelected ? AppColors.primary : AppColors.textSecondary,
                   size: 18,
@@ -3118,7 +3758,6 @@ class _LocationSuggestionTile extends StatelessWidget {
     );
   }
 }
-
 
 String _priceFilterLabel() => 'טווח מחיר';
 
@@ -3180,7 +3819,6 @@ int _roundedPriceForTransaction(TransactionTypeFilter type, double value) {
   }
 }
 
-
 String _moveInLabel(MoveInFilter option) {
   switch (option) {
     case MoveInFilter.any:
@@ -3197,15 +3835,15 @@ String _moveInLabel(MoveInFilter option) {
 IconData _sortIcon(SearchSortOption option) {
   switch (option) {
     case SearchSortOption.priceLowToHigh:
-      return IconsaxPlusBold.sort;
+      return IconsaxPlusLinear.sort;
     case SearchSortOption.priceHighToLow:
-      return IconsaxPlusBold.sort;
+      return IconsaxPlusLinear.sort;
     case SearchSortOption.newestEntry:
-      return IconsaxPlusBold.calendar;
+      return IconsaxPlusLinear.calendar;
     case SearchSortOption.biggestFirst:
-      return IconsaxPlusBold.maximize_3;
+      return IconsaxPlusLinear.maximize_3;
     case SearchSortOption.bestMatch:
-      return IconsaxPlusBold.star;
+      return IconsaxPlusLinear.star;
   }
 }
 
@@ -3214,59 +3852,59 @@ IconData _propertyTypeIcon(String type) {
   if (lower.contains('גג') ||
       lower.contains('פנטהאוז') ||
       lower.contains('דופלקס')) {
-    return IconsaxPlusBold.buildings;
+    return IconsaxPlusLinear.buildings;
   }
   if (lower.contains('גן') || lower.contains('חצר') || lower.contains('גינה')) {
-    return IconsaxPlusBold.map_1;
+    return IconsaxPlusLinear.map_1;
   }
   if (lower.contains('בית') ||
       lower.contains('קוטג') ||
       lower.contains('יחידת') ||
       lower.contains('סטודיו')) {
-    return IconsaxPlusBold.home;
+    return IconsaxPlusLinear.home;
   }
-  return IconsaxPlusBold.building;
+  return IconsaxPlusLinear.building;
 }
 
 IconData _listingSourceIcon(ListingSourceFilter source) {
   switch (source) {
     case ListingSourceFilter.any:
-      return IconsaxPlusBold.profile_2user;
+      return IconsaxPlusLinear.profile_2user;
     case ListingSourceFilter.privateOnly:
-      return IconsaxPlusBold.user;
+      return IconsaxPlusLinear.user;
     case ListingSourceFilter.agencyOnly:
-      return IconsaxPlusBold.buildings;
+      return IconsaxPlusLinear.buildings;
   }
 }
 
 IconData _featureIcon(String feature) {
   final lower = feature.trim().toLowerCase();
-  if (lower.contains('חניה')) return IconsaxPlusBold.routing;
-  if (lower.contains('מעלית')) return IconsaxPlusBold.buildings;
+  if (lower.contains('חניה')) return IconsaxPlusLinear.routing;
+  if (lower.contains('מעלית')) return IconsaxPlusLinear.buildings;
   if (lower.contains('ממ"ד') || lower.contains('ממד')) {
-    return IconsaxPlusBold.shield_tick;
+    return IconsaxPlusLinear.shield_tick;
   }
   if (lower.contains('מזגן') || lower.contains('מיזוג')) {
-    return IconsaxPlusBold.layer;
+    return IconsaxPlusLinear.layer;
   }
-  if (lower.contains('מרפסת')) return IconsaxPlusBold.layer;
-  if (lower.contains('מחסן')) return IconsaxPlusBold.lock;
+  if (lower.contains('מרפסת')) return IconsaxPlusLinear.layer;
+  if (lower.contains('מחסן')) return IconsaxPlusLinear.lock;
   if (lower.contains('ריהוט') || lower.contains('מרוהטת')) {
-    return IconsaxPlusBold.home;
+    return IconsaxPlusLinear.home;
   }
-  if (lower.contains('חיות')) return IconsaxPlusBold.heart;
-  if (lower.contains('סורגים')) return IconsaxPlusBold.lock;
-  if (lower.contains('נגישות')) return IconsaxPlusBold.profile_circle;
+  if (lower.contains('חיות')) return IconsaxPlusLinear.heart;
+  if (lower.contains('סורגים')) return IconsaxPlusLinear.lock;
+  if (lower.contains('נגישות')) return IconsaxPlusLinear.profile_circle;
   if (lower.contains('גינה') || lower.contains('חצר')) {
-    return IconsaxPlusBold.map;
+    return IconsaxPlusLinear.map;
   }
   if (lower.contains('שומר') || lower.contains('אבטחה')) {
-    return IconsaxPlusBold.shield_tick;
+    return IconsaxPlusLinear.shield_tick;
   }
   if (lower.contains('משופצת') || lower.contains('משופץ')) {
-    return IconsaxPlusBold.setting_4;
+    return IconsaxPlusLinear.setting_4;
   }
-  return IconsaxPlusBold.hashtag;
+  return IconsaxPlusLinear.hashtag;
 }
 
 class _FilterLocationPill extends StatelessWidget {
@@ -3331,7 +3969,7 @@ class _CustomRangeSliderThumbShape extends RangeSliderThumbShape {
     Thumb? thumb,
   }) {
     final Canvas canvas = context.canvas;
-    
+
     final Path shadowPath = Path()
       ..addOval(Rect.fromCircle(center: center, radius: 14));
     canvas.drawShadow(shadowPath, Colors.black, 4, true);
@@ -3353,8 +3991,10 @@ class _CustomRangeSliderThumbShape extends RangeSliderThumbShape {
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    canvas.drawLine(Offset(center.dx - 5, center.dy - 2), Offset(center.dx + 5, center.dy - 2), linePaint);
-    canvas.drawLine(Offset(center.dx - 5, center.dy + 2), Offset(center.dx + 5, center.dy + 2), linePaint);
+    canvas.drawLine(Offset(center.dx - 5, center.dy - 2),
+        Offset(center.dx + 5, center.dy - 2), linePaint);
+    canvas.drawLine(Offset(center.dx - 5, center.dy + 2),
+        Offset(center.dx + 5, center.dy + 2), linePaint);
   }
 }
 
@@ -3378,14 +4018,23 @@ class _TransactionCard extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.navy : const Color(0xFFF7F9FA),
+            color: isSelected ? AppColors.navy : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
-              width: 1,
+              color: isSelected ? AppColors.navy : AppColors.borderLight,
+              width: isSelected ? 1.5 : 1,
             ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.navy.withValues(alpha: 0.22),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3393,39 +4042,67 @@ class _TransactionCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: isSelected ? Colors.white70 : AppColors.textSecondary,
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.white24 : const Color(0xFFE2ECF1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'ממוצע',
-                      style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.grey,
+                  const SizedBox(width: 6),
+                  if (isSelected)
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        size: 11,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight2,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'חי',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 price,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 12.5,
+                  height: 1.2,
                   fontWeight: FontWeight.w900,
                   color: isSelected ? Colors.white : AppColors.navy,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -3436,29 +4113,62 @@ class _TransactionCard extends StatelessWidget {
 }
 
 class _PriceHistogram extends StatelessWidget {
-  const _PriceHistogram();
+  const _PriceHistogram({
+    required this.minBudget,
+    required this.maxBudget,
+    required this.sliderMin,
+    required this.sliderMax,
+  });
+
+  final double minBudget;
+  final double maxBudget;
+  final double sliderMin;
+  final double sliderMax;
 
   @override
   Widget build(BuildContext context) {
-    final heights = [10, 15, 25, 30, 20, 35, 50, 45, 60, 55, 40, 30, 25, 18, 12, 8];
+    const heights = [
+      10,
+      15,
+      25,
+      30,
+      20,
+      35,
+      50,
+      45,
+      60,
+      55,
+      40,
+      30,
+      25,
+      18,
+      12,
+      8
+    ];
+    final n = heights.length;
+    final range = sliderMax - sliderMin;
+
     return Container(
-      height: 60,
+      height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: heights.map((h) {
+        children: List.generate(n, (i) {
+          final price = sliderMin + (i / (n - 1)) * range;
+          final inRange = price >= minBudget && price <= maxBudget;
           return Expanded(
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              height: h.toDouble(),
+              height: heights[i].toDouble(),
               decoration: BoxDecoration(
-                color: const Color(0xFFE2ECF1),
-                borderRadius: BorderRadius.circular(2),
+                color: inRange ? AppColors.primary : const Color(0xFFE2ECF1),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           );
-        }).toList(),
+        }),
       ),
     );
   }
@@ -3541,13 +4251,15 @@ class _CircleSelectorButton extends StatelessWidget {
             color: isSelected ? AppColors.primary : const Color(0xFFE2ECF1),
             width: 1,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.24),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
-          ] : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.24),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: Text(
@@ -3582,52 +4294,92 @@ class _PropertyTypeCard extends StatelessWidget {
     final bool isRequired = state == FilterPriority.required;
     final bool isActive = isPreferred || isRequired;
 
-    final Color bgColor = isRequired 
-        ? AppColors.primary 
+    final Color bgColor = isRequired
+        ? AppColors.primary
         : (isPreferred ? AppColors.navy : const Color(0xFFF7F9FA));
-    final Color iconBgColor = isActive ? Colors.white24 : const Color(0xFFE2ECF1);
+    final Color iconBgColor =
+        isActive ? Colors.white24 : const Color(0xFFE2ECF1);
     final Color labelColor = isActive ? Colors.white : AppColors.navy;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 110,
-        height: 110,
-        padding: const EdgeInsets.all(14),
+        width: 108,
+        height: 108,
+        padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isActive ? bgColor : const Color(0xFFE2ECF1),
             width: 1.5,
           ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: bgColor.withValues(alpha: 0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Stack(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 16,
-                color: labelColor,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 16,
+                    color: labelColor,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: labelColor,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: labelColor,
+            if (isActive)
+              Positioned(
+                top: 0,
+                left: 0,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isRequired ? AppColors.coral : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isRequired
+                          ? AppColors.coral
+                          : Colors.white.withValues(alpha: 0.6),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    isRequired
+                        ? Icons.priority_high_rounded
+                        : Icons.check_rounded,
+                    size: 12,
+                    color: isRequired ? Colors.white : AppColors.primary,
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -3649,33 +4401,64 @@ class _FeatureTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isRequired = state == FilterPriority.required;
-    final Color color = isRequired ? AppColors.primary : AppColors.navy;
+    final Color accent = isRequired ? AppColors.coral : AppColors.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color, width: 1.5),
+        border: Border.all(color: accent.withValues(alpha: 0.30), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
-            onTap: onClear,
-            child: Icon(Icons.close, size: 14, color: color),
+          Icon(
+            isRequired ? Icons.priority_high_rounded : Icons.favorite_rounded,
+            size: 11,
+            color: accent,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: color,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 5),
+          GestureDetector(
+            onTap: onClear,
+            child: Icon(
+              Icons.close,
+              size: 13,
+              color: accent.withValues(alpha: 0.65),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _TrianglePainter extends CustomPainter {
+  _TrianglePainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

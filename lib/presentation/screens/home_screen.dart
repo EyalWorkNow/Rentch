@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
@@ -6,6 +8,7 @@ import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -25,6 +28,19 @@ class _HomeScreenState extends State<HomeScreen> {
   static const int _landlordSwipesTabIndex = 1;
   static const int _landlordMatchesTabIndex = 2;
   static const int _landlordPropertiesTabIndex = 3;
+
+  void _showMatchOverlay(BuildContext context, RentalProperty property) {
+    HapticFeedback.heavyImpact();
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.transparent,
+        pageBuilder: (_, __, ___) =>
+            MatchCelebrationOverlay(property: property),
+      ),
+    );
+  }
 
   void _onTabTap(int index, DatingProvider provider) {
     HapticFeedback.selectionClick();
@@ -46,6 +62,16 @@ class _HomeScreenState extends State<HomeScreen> {
           _currentIndex = 0;
         }
         _cachedIsLandlord = isLandlord;
+
+        // Global match detection — works regardless of which tab is active.
+        final pendingMatch = provider.pendingMatchProperty;
+        if (pendingMatch != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            _showMatchOverlay(context, pendingMatch);
+            provider.clearPendingMatch();
+          });
+        }
 
         final screens = isLandlord
             ? <Widget>[
@@ -71,6 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final safeIndex = _currentIndex.clamp(0, screens.length - 1);
         final unseenCount = provider.unseenMatchCount;
 
+        const bool useGlass = true;
+
         return Scaffold(
           extendBody: true,
           body: IndexedStack(
@@ -78,112 +106,157 @@ class _HomeScreenState extends State<HomeScreen> {
             index: safeIndex,
             children: screens,
           ),
-          bottomNavigationBar: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 28,
-                    offset: Offset(0, 10),
-                  ),
-                ],
-              ),
+          bottomNavigationBar: Theme(
+            data: Theme.of(context).copyWith(
+              canvasColor: Colors.transparent,
+            ),
+            child: SafeArea(
+              minimum: const EdgeInsets.only(bottom: 24),
               child: Row(
-                children: List.generate(items.length, (index) {
-                  final item = items[index];
-                  final isSelected = index == safeIndex;
-                  final showBadge =
-                      index == (isLandlord ? 2 : 1) && unseenCount > 0;
-
-                  final isCompact = items.length >= 5;
-                  return Expanded(
-                    child: Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: isCompact ? 1 : 4),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () => _onTabTap(index, provider),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: isCompact ? 4 : 12, vertical: 10),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(useGlass ? 0.15 : 0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                          sigmaX: useGlass ? 40 : 0.001,
+                          sigmaY: useGlass ? 40 : 0.001,
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: isSelected
-                                ? AppColors.primary.withValues(alpha: 0.12)
-                                : Colors.transparent,
+                            color: useGlass
+                                ? Colors.black.withOpacity(0.80)
+                                : Colors.black,
+                            borderRadius: BorderRadius.circular(100),
+                            border: useGlass
+                                ? Border.all(
+                                    color: Colors.white.withOpacity(0.12),
+                                    width: 1.2)
+                                : null,
                           ),
-                          child: Column(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Icon(
-                                    isSelected ? item.activeIcon : item.icon,
+                            children: List.generate(items.length, (index) {
+                              final item = items[index];
+                              final isSelected = index == safeIndex;
+                              final showBadge = index == (isLandlord ? 2 : 1) &&
+                                  unseenCount > 0;
+                              final isCompact = items.length >= 5;
+
+                              final double circleSize = isCompact ? 67.0 : 76.0;
+
+                              return GestureDetector(
+                                onTap: () => _onTabTap(index, provider),
+                                behavior: HitTestBehavior.opaque,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOutCubic,
+                                  width: circleSize,
+                                  height: circleSize,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 1.0),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
                                     color: isSelected
                                         ? AppColors.primary
-                                        : AppColors.textSecondary,
-                                    size: isCompact ? 20 : 22,
+                                        : const Color(0xFF1A1A1A),
                                   ),
-                                  if (showBadge)
-                                    Positioned(
-                                      top: -5,
-                                      right: -6,
-                                      child: Container(
-                                        constraints: const BoxConstraints(
-                                            minWidth: 16, minHeight: 16),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 4),
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.coral,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            unseenCount > 9
-                                                ? '9+'
-                                                : '$unseenCount',
-                                            style: const TextStyle(
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            RentchIcon(
+                                              isSelected
+                                                  ? item.activeIcon
+                                                  : item.icon,
                                               color: Colors.white,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w900,
+                                              size: isCompact ? 26 : 31,
                                             ),
-                                          ),
+                                            if (showBadge)
+                                              Positioned(
+                                                top: -4,
+                                                right: -4,
+                                                child: Container(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                          minWidth: 16,
+                                                          minHeight: 16),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 4),
+                                                  decoration: const BoxDecoration(
+                                                    color: AppColors.coral,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      unseenCount > 9
+                                                          ? '9+'
+                                                          : '$unseenCount',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.w900,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                      ),
+                                        AnimatedSize(
+                                          duration:
+                                              const Duration(milliseconds: 250),
+                                          curve: Curves.easeOutBack,
+                                          child: isSelected
+                                              ? Padding(
+                                                  padding: const EdgeInsets.only(
+                                                      top: 2.0),
+                                                  child: Text(
+                                                    item.label,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize:
+                                                          isCompact ? 11 : 12,
+                                                      fontWeight: FontWeight.w700,
+                                                      height: 1.1,
+                                                    ),
+                                                  ),
+                                                )
+                                              : const SizedBox.shrink(),
+                                        ),
+                                      ],
                                     ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: false,
-                                style: TextStyle(
-                                  fontSize: isCompact ? 9.5 : 11,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w800
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.textSecondary,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              );
+                            }),
                           ),
                         ),
                       ),
                     ),
-                  );
-                }),
+                  ),
+                ],
               ),
             ),
           ),
@@ -196,46 +269,46 @@ class _HomeScreenState extends State<HomeScreen> {
 const _tenantItems = [
   _NavItem(
     label: 'גלה דירות',
-    icon: IconsaxPlusBold.building,
-    activeIcon: IconsaxPlusBold.building,
+    icon: IconsaxPlusLinear.building,
+    activeIcon: IconsaxPlusLinear.building,
   ),
   _NavItem(
     label: 'התאמות',
-    icon: IconsaxPlusBold.message,
-    activeIcon: IconsaxPlusBold.message,
+    icon: IconsaxPlusLinear.message,
+    activeIcon: IconsaxPlusLinear.message,
   ),
   _NavItem(
     label: 'פרופיל',
-    icon: IconsaxPlusBold.profile_circle,
-    activeIcon: IconsaxPlusBold.profile_circle,
+    icon: IconsaxPlusLinear.profile_circle,
+    activeIcon: IconsaxPlusLinear.profile_circle,
   ),
 ];
 
 const _landlordItems = [
   _NavItem(
     label: 'דשבורד',
-    icon: IconsaxPlusBold.category,
-    activeIcon: IconsaxPlusBold.category,
+    icon: IconsaxPlusLinear.category,
+    activeIcon: IconsaxPlusLinear.category,
   ),
   _NavItem(
     label: 'סוויפים',
-    icon: IconsaxPlusBold.profile_2user,
-    activeIcon: IconsaxPlusBold.profile_2user,
+    icon: IconsaxPlusLinear.profile_2user,
+    activeIcon: IconsaxPlusLinear.profile_2user,
   ),
   _NavItem(
     label: 'התאמות',
-    icon: IconsaxPlusBold.message,
-    activeIcon: IconsaxPlusBold.message,
+    icon: IconsaxPlusLinear.message,
+    activeIcon: IconsaxPlusLinear.message,
   ),
   _NavItem(
     label: 'הדירות שלי',
-    icon: IconsaxPlusBold.buildings_2,
-    activeIcon: IconsaxPlusBold.buildings_2,
+    icon: IconsaxPlusLinear.buildings_2,
+    activeIcon: IconsaxPlusLinear.buildings_2,
   ),
   _NavItem(
     label: 'פרופיל',
-    icon: IconsaxPlusBold.profile_circle,
-    activeIcon: IconsaxPlusBold.profile_circle,
+    icon: IconsaxPlusLinear.profile_circle,
+    activeIcon: IconsaxPlusLinear.profile_circle,
   ),
 ];
 

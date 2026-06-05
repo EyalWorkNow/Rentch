@@ -27,8 +27,7 @@ class DatingProvider extends ChangeNotifier {
         _localStorageService = localStorageService ?? LocalStorageService(),
         _propertyRepository = propertyRepository ?? PropertyRepository(),
         _userRepository = userRepository ?? UserRepository(),
-        _moderationRepository =
-            moderationRepository ?? ModerationRepository();
+        _moderationRepository = moderationRepository ?? ModerationRepository();
 
   final RentalDataService _rentalDataService;
   final LocalStorageService _localStorageService;
@@ -397,11 +396,16 @@ class DatingProvider extends ChangeNotifier {
   SearchFilters _normalizeFilters(SearchFilters filters) {
     final minBudgetFloor = _defaultMinBudgetFor(filters.transactionType);
     final maxBudgetCeiling = _defaultMaxBudgetFor(filters.transactionType);
+    final budgetLooksCrossMode = filters.minBudget > maxBudgetCeiling ||
+        filters.maxBudget < minBudgetFloor;
+    final rawMinBudget =
+        budgetLooksCrossMode ? minBudgetFloor : filters.minBudget;
+    final rawMaxBudget =
+        budgetLooksCrossMode || filters.maxBudget == _unsetBudget
+            ? maxBudgetCeiling
+            : filters.maxBudget;
     final normalizedMinBudget =
-        filters.minBudget.clamp(minBudgetFloor, maxBudgetCeiling);
-    final rawMaxBudget = filters.maxBudget == _unsetBudget
-        ? maxBudgetCeiling
-        : filters.maxBudget;
+        rawMinBudget.clamp(minBudgetFloor, maxBudgetCeiling);
     final normalizedMaxBudget =
         rawMaxBudget.clamp(normalizedMinBudget, maxBudgetCeiling);
     final normalizedMinRooms =
@@ -476,6 +480,22 @@ class DatingProvider extends ChangeNotifier {
       if (_passesFilters(property, filters, now, area)) count++;
     }
     return count;
+  }
+
+  double averagePriceFor(SearchFilters filters) {
+    if (_searchAreas.isEmpty) return 0;
+    final now = DateTime.now();
+    final area = _areaFor(filters);
+    var count = 0;
+    var total = 0;
+    for (final property in _allProperties) {
+      if (!_hasKnownPrice(property)) continue;
+      if (_passesFilters(property, filters, now, area)) {
+        count++;
+        total += property.price;
+      }
+    }
+    return count == 0 ? 0 : total / count;
   }
 
   List<RentalProperty> previewFilteredProperties(
@@ -973,8 +993,7 @@ class DatingProvider extends ChangeNotifier {
     _isGuestMode = false;
     _hasActiveSession = true;
     await _persist();
-    AppEvents.instance.log(UserEventType.roleChanged,
-        metadata: {'role': role});
+    AppEvents.instance.log(UserEventType.roleChanged, metadata: {'role': role});
     notifyListeners();
   }
 
@@ -1119,8 +1138,8 @@ class DatingProvider extends ChangeNotifier {
         }
       }),
     );
-    AppEvents.instance.log(UserEventType.propertyUpdated,
-        propertyId: updated.id);
+    AppEvents.instance
+        .log(UserEventType.propertyUpdated, propertyId: updated.id);
     notifyListeners();
   }
 
@@ -1157,7 +1176,8 @@ class DatingProvider extends ChangeNotifier {
               'attachPropertyVirtualTour: remote rejected — ${result.userMessage}');
         }
       }));
-      AppEvents.instance.log(UserEventType.tourUploaded, propertyId: propertyId);
+      AppEvents.instance
+          .log(UserEventType.tourUploaded, propertyId: propertyId);
     }
     notifyListeners();
   }
@@ -1230,6 +1250,14 @@ class DatingProvider extends ChangeNotifier {
           ? UserEventType.superLike
           : UserEventType.swipeRight;
       AppEvents.instance.log(eventType, propertyId: property.id);
+
+      // Simulate owner acceptance: ~40% chance for regular swipe, 100% for super-like.
+      // In production this would be replaced by a real server-side mutual match signal.
+      final matchChance = direction == CardSwiperDirection.top ? 1.0 : 0.40;
+      if (math.Random().nextDouble() < matchChance) {
+        _ownerAcceptedPropertyIds.add(property.id);
+        _createMatch(property);
+      }
     } else {
       return false;
     }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
-// Order: ♥ Heart (left, largest) | 3D Tour (center) | ✕ X (right)
+// Order: ✕ X (left) | 3D Tour (center) | ♥ Heart (right, largest)
 class ActionButtons extends StatelessWidget {
   const ActionButtons({
     super.key,
@@ -24,35 +24,37 @@ class ActionButtons extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ♥ Heart — like (left, largest)
+          // ✕ X — pass (left, matches swipe left direction)
           _ActionButton(
-            icon: IconsaxPlusBold.heart,
-            tooltip: 'אהבתי דירה',
-            iconColor: Colors.white,
-            backgroundColor: AppColors.primary,
-            size: 72,
+            icon: Icons.close_rounded,
+            tooltip: 'דלג על דירה',
+            iconColor: AppColors.coral,
+            backgroundColor: Colors.white,
+            size: 62,
             iconSize: 30,
             onPressed: () {
-              HapticFeedback.mediumImpact();
-              onSwipeRight();
+              HapticFeedback.lightImpact();
+              onSwipeLeft();
             },
-            shadowColor: AppColors.primary,
+            shadowColor: AppColors.coral,
           ),
+          
+          // 3D Tour (center)
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _ActionButton(
                 icon: Icons.view_in_ar_rounded,
                 tooltip: 'פתח סיור תלת־ממדי',
-                iconColor: Colors.white,
-                backgroundColor: const Color(0xFF0B567B),
+                iconColor: const Color(0xFF072946),
+                backgroundColor: Colors.white,
                 size: 56,
                 iconSize: 26,
                 onPressed: () {
                   HapticFeedback.lightImpact();
                   onVirtualTour();
                 },
-                shadowColor: const Color(0xFF0B567B),
+                shadowColor: const Color(0xFF072946),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -65,19 +67,20 @@ class ActionButtons extends StatelessWidget {
               ),
             ],
           ),
-          // ✕ X — pass (right)
+
+          // ♥ Heart — like (right, largest, matches swipe right direction)
           _ActionButton(
-            icon: IconsaxPlusBold.close_circle,
-            tooltip: 'דלג על דירה',
-            iconColor: Colors.white,
-            backgroundColor: AppColors.coral,
-            size: 62,
-            iconSize: 26,
+            icon: IconsaxPlusBold.heart,
+            tooltip: 'אהבתי דירה',
+            iconColor: AppColors.primary,
+            backgroundColor: Colors.white,
+            size: 72,
+            iconSize: 34,
             onPressed: () {
-              HapticFeedback.lightImpact();
-              onSwipeLeft();
+              HapticFeedback.mediumImpact();
+              onSwipeRight();
             },
-            shadowColor: AppColors.coral,
+            shadowColor: AppColors.primary,
           ),
         ],
       ),
@@ -153,16 +156,18 @@ class _ActionButtonState extends State<_ActionButton>
             decoration: BoxDecoration(
               color: widget.backgroundColor,
               shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color:
-                      (widget.shadowColor ?? widget.backgroundColor).withValues(alpha: 0.38),
+                  color: (widget.shadowColor ?? widget.backgroundColor)
+                      .withOpacity(0.12),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Icon(widget.icon, size: widget.iconSize, color: widget.iconColor),
+            child: Icon(widget.icon,
+                size: widget.iconSize, color: widget.iconColor),
           ),
         ),
       ),
