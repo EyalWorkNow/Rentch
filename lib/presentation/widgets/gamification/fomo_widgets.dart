@@ -289,7 +289,7 @@ class FomoCardOverlay extends StatelessWidget {
       children: [
         // Below the top icon row (agency badge + dots + save button ends ~50px)
         Positioned(
-          top: 62,
+          top: 92,
           left: 12,
           child: isNew
               ? const NewPropertyBadge()
@@ -299,7 +299,7 @@ class FomoCardOverlay extends StatelessWidget {
         ),
         // Live viewers counter — below the badge when shown
         Positioned(
-          top: (isNew || isHot) ? 94 : 62,
+          top: (isNew || isHot) ? 124 : 92,
           left: 12,
           child: LiveViewersPill(count: viewers),
         ),

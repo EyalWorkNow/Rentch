@@ -6,6 +6,7 @@ import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 String _relativeTime(DateTime dt) {
@@ -24,8 +25,6 @@ const _kFilterAll = 'all';
 const _kFilterNew = 'new';
 const _kFilterOld = 'old';
 const _kFilterTomorrow = 'tomorrow';
-
-
 
 const _kNewMatchWindow = Duration(days: 7);
 
@@ -146,86 +145,61 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF2F7FA),
-          appBar: AppBar(
-            backgroundColor: AppColors.navy,
-            surfaceTintColor: Colors.transparent,
-            automaticallyImplyLeading: true,
-            iconTheme: const IconThemeData(color: Colors.white),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'התאמות',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (allMatches.isNotEmpty)
-                  Text(
-                    subtitleText,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          body: provider.isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary))
-              : allMatches.isEmpty
-                  ? _EmptyMatches(isLandlord: provider.isLandlord)
-                  : Column(
-                      children: [
-                        _MatchesToolbar(
-                          controller: _searchCtrl,
-                          query: _query,
-                          ageFilter: _ageFilter,
-                          scheduleFilter: _scheduleFilter,
-                          showFilters: _showFilters,
-                          onFilterTap: () =>
-                              setState(() => _showFilters = !_showFilters),
-                          onQueryChanged: (value) =>
-                              setState(() => _query = value),
-                          onClearQuery: () => setState(() {
-                            _query = '';
-                            _searchCtrl.clear();
-                          }),
-                          onAgeFilterChanged: (value) =>
-                              setState(() => _ageFilter = value),
-                          onScheduleFilterChanged: (value) =>
-                              setState(() => _scheduleFilter = value),
-                        ),
-                        Expanded(
-                          child: filtered.isEmpty
-                              ? _EmptyFilterResults(onClear: _clearFilters)
-                              : ListView.separated(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      16, 12, 16, 120),
-                                  itemCount: filtered.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 14),
-                                  itemBuilder: (context, index) {
-                                    final pair = filtered[index];
-                                    return _MatchCard(
-                                      match: pair.match,
-                                      property: pair.property,
-                                      onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => MessageScreen(
-                                              matchId: pair.match.id),
+          body: SafeArea(
+            bottom: false,
+            child: provider.isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary))
+                : allMatches.isEmpty
+                    ? _EmptyMatches(isLandlord: provider.isLandlord)
+                    : Column(
+                        children: [
+                          _MatchesToolbar(
+                            controller: _searchCtrl,
+                            query: _query,
+                            ageFilter: _ageFilter,
+                            scheduleFilter: _scheduleFilter,
+                            showFilters: _showFilters,
+                            onFilterTap: () =>
+                                setState(() => _showFilters = !_showFilters),
+                            onQueryChanged: (value) =>
+                                setState(() => _query = value),
+                            onClearQuery: () => setState(() {
+                              _query = '';
+                              _searchCtrl.clear();
+                            }),
+                            onAgeFilterChanged: (value) =>
+                                setState(() => _ageFilter = value),
+                            onScheduleFilterChanged: (value) =>
+                                setState(() => _scheduleFilter = value),
+                          ),
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? _EmptyFilterResults(onClear: _clearFilters)
+                                : ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 12, 16, 120),
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 14),
+                                    itemBuilder: (context, index) {
+                                      final pair = filtered[index];
+                                      return _MatchCard(
+                                        match: pair.match,
+                                        property: pair.property,
+                                        onTap: () => Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => MessageScreen(
+                                                matchId: pair.match.id),
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
-                    ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ],
+                      ),
+          ),
         );
       },
     );
@@ -294,8 +268,8 @@ class _MatchesToolbar extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(width: 10),
-                const Icon(
-                  IconsaxPlusBold.search_normal,
+                const RentchIcon(
+                  IconsaxPlusLinear.search_normal,
                   size: 18,
                   color: Colors.grey,
                 ),
@@ -326,8 +300,8 @@ class _MatchesToolbar extends StatelessWidget {
                 ),
                 if (query.isNotEmpty)
                   IconButton(
-                    icon: const Icon(
-                      IconsaxPlusBold.close_circle,
+                    icon: const RentchIcon(
+                      IconsaxPlusLinear.close_circle,
                       size: 18,
                       color: AppColors.textSecondary,
                     ),
@@ -340,11 +314,13 @@ class _MatchesToolbar extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: showFilters ? AppColors.navy : const Color(0xFFF2F4F5),
+                      color: showFilters
+                          ? AppColors.navy
+                          : const Color(0xFFF2F4F5),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      IconsaxPlusBold.setting_4,
+                    child: RentchIcon(
+                      IconsaxPlusLinear.setting_4,
                       size: 18,
                       color: showFilters ? Colors.white : AppColors.navy,
                     ),
@@ -404,8 +380,9 @@ class _MatchesToolbar extends StatelessWidget {
                 ),
               ),
             ),
-            crossFadeState:
-                showFilters ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            crossFadeState: showFilters
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 200),
           ),
         ],
@@ -453,7 +430,6 @@ class _FilterPill extends StatelessWidget {
   }
 }
 
-
 // ─── Empty filter results ─────────────────────────────────────────────────────
 
 class _EmptyFilterResults extends StatelessWidget {
@@ -475,8 +451,8 @@ class _EmptyFilterResults extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                IconsaxPlusBold.search_normal,
+              child: const RentchIcon(
+                IconsaxPlusLinear.search_normal,
                 color: AppColors.primary,
                 size: 36,
               ),
@@ -503,7 +479,7 @@ class _EmptyFilterResults extends StatelessWidget {
             const SizedBox(height: 22),
             OutlinedButton.icon(
               onPressed: onClear,
-              icon: const Icon(IconsaxPlusBold.close_circle, size: 16),
+              icon: const RentchIcon(IconsaxPlusLinear.close_circle, size: 16),
               label: const Text('נקה סינון'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
@@ -546,27 +522,28 @@ class _MatchCardState extends State<_MatchCard> {
       return (
         label: 'חתום',
         color: const Color(0xFF27AE60),
-        icon: IconsaxPlusBold.tick_circle,
+        icon: IconsaxPlusLinear.tick_circle,
       );
     }
     if (match.contractSent) {
       return (
         label: 'חוזה נשלח',
         color: const Color(0xFF27AE60),
-        icon: IconsaxPlusBold.document_text,
+        icon: IconsaxPlusLinear.document_text,
       );
     }
     return (
       label: 'שיחה פתוחה',
       color: AppColors.primary,
-      icon: IconsaxPlusBold.message,
+      icon: IconsaxPlusLinear.message,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final media = widget.property.primaryMedia;
-    final lastMessage = widget.match.messages.isEmpty ? null : widget.match.messages.last;
+    final lastMessage =
+        widget.match.messages.isEmpty ? null : widget.match.messages.last;
     final stage = _matchStage(widget.match);
     final provider = context.read<DatingProvider>();
     final isLandlord = provider.isLandlord;
@@ -608,81 +585,83 @@ class _MatchCardState extends State<_MatchCard> {
                       fit: StackFit.expand,
                       children: [
                         SafeMedia(
-                        media: media,
-                        fallback: Container(
-                          color: AppColors.primaryLight2,
-                          child: const Icon(
-                            IconsaxPlusBold.building,
-                            color: AppColors.primary,
-                            size: 48,
+                          media: media,
+                          fallback: Container(
+                            color: AppColors.primaryLight2,
+                            child: const RentchIcon(
+                              IconsaxPlusLinear.building,
+                              color: AppColors.primary,
+                              size: 48,
+                            ),
                           ),
+                          fit: BoxFit.cover,
                         ),
-                        fit: BoxFit.cover,
-                      ),
-                      // Floating Badge (Property Type) on top-right (RTL)
-                      Positioned(
-                        top: 14,
-                        right: 14,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
+                        // Floating Badge (Property Type) on top-right (RTL)
+                        Positioned(
+                          top: 14,
+                          right: 14,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              widget.property.propertyType,
+                              style: const TextStyle(
+                                color: AppColors.navy,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
                               ),
-                            ],
-                          ),
-                          child: Text(
-                            widget.property.propertyType,
-                            style: const TextStyle(
-                              color: AppColors.navy,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
                             ),
                           ),
                         ),
-                      ),
-                      // Floating Share Button on top-left (RTL) - Replacing the heart icon
-                      Positioned(
-                        top: 14,
-                        left: 14,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 6,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(
-                              IconsaxPlusBold.send_2,
-                              color: AppColors.navy,
-                              size: 18,
+                        // Floating Share Button on top-left (RTL) - Replacing the heart icon
+                        Positioned(
+                          top: 14,
+                          left: 14,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            onPressed: () {
-                              showPropertyShareSheet(context, widget.property);
-                            },
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              icon: const RentchIcon(
+                                IconsaxPlusLinear.send_2,
+                                color: AppColors.navy,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                showPropertyShareSheet(
+                                    context, widget.property);
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            // Info Section
+              // Info Section
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -693,7 +672,9 @@ class _MatchCardState extends State<_MatchCard> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.property.street.isNotEmpty ? '${widget.property.street} ${widget.property.streetNumber}' : widget.property.address,
+                            widget.property.street.isNotEmpty
+                                ? '${widget.property.street} ${widget.property.streetNumber}'
+                                : widget.property.address,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -717,8 +698,8 @@ class _MatchCardState extends State<_MatchCard> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(
-                          IconsaxPlusBold.location,
+                        const RentchIcon(
+                          IconsaxPlusLinear.location,
                           size: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -749,18 +730,19 @@ class _MatchCardState extends State<_MatchCard> {
                             child: Row(
                               children: [
                                 _MockupChip(
-                                  icon: IconsaxPlusBold.home,
+                                  icon: IconsaxPlusLinear.home,
                                   label: '${widget.property.roomsLabel} חדרים',
                                 ),
                                 const SizedBox(width: 8),
                                 _MockupChip(
-                                  icon: IconsaxPlusBold.maximize_3,
+                                  icon: IconsaxPlusLinear.maximize_3,
                                   label: '${widget.property.sizeM2} מ״ר',
                                 ),
                                 const SizedBox(width: 8),
                                 _MockupChip(
-                                  icon: IconsaxPlusBold.routing,
-                                  label: widget.property.features.firstOrNull ?? 'מעלית',
+                                  icon: IconsaxPlusLinear.routing,
+                                  label: widget.property.features.firstOrNull ??
+                                      'מעלית',
                                 ),
                               ],
                             ),
@@ -781,7 +763,8 @@ class _MatchCardState extends State<_MatchCard> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF2F7FA),
                               shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFE2ECF1)),
+                              border:
+                                  Border.all(color: const Color(0xFFE2ECF1)),
                             ),
                             child: AnimatedRotation(
                               turns: _isExpanded ? 0.5 : 0.0,
@@ -796,7 +779,7 @@ class _MatchCardState extends State<_MatchCard> {
                         ),
                       ],
                     ),
-                    
+
                     // Conditionally animated expanded data
                     if (_isExpanded) ...[
                       const SizedBox(height: 16),
@@ -808,7 +791,8 @@ class _MatchCardState extends State<_MatchCard> {
               if (_isExpanded) ...[
                 const Divider(height: 1, color: Color(0xFFE2ECF1)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   color: const Color(0xFFF8FCFE),
                   child: Row(
                     children: [
@@ -821,7 +805,7 @@ class _MatchCardState extends State<_MatchCard> {
                               const _StatusChip(
                                 label: 'ממתין לתגובתך',
                                 color: Color(0xFFE67E22),
-                                icon: IconsaxPlusBold.message_notif,
+                                icon: IconsaxPlusLinear.message_notif,
                               ),
                             _StatusChip(
                               label: stage.label,
@@ -832,20 +816,21 @@ class _MatchCardState extends State<_MatchCard> {
                               const _StatusChip(
                                 label: 'בעלים חתם',
                                 color: Color(0xFF27AE60),
-                                icon: IconsaxPlusBold.pen_tool,
+                                icon: IconsaxPlusLinear.pen_tool,
                               ),
                             if (widget.match.tenantSigned)
                               const _StatusChip(
                                 label: 'שוכר חתם',
                                 color: Color(0xFF27AE60),
-                                icon: IconsaxPlusBold.edit,
+                                icon: IconsaxPlusLinear.edit,
                               ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 10),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
@@ -862,8 +847,8 @@ class _MatchCardState extends State<_MatchCard> {
                               ),
                             ),
                             SizedBox(width: 6),
-                            Icon(
-                              IconsaxPlusBold.arrow_left,
+                            RentchIcon(
+                              IconsaxPlusLinear.arrow_left,
                               size: 14,
                               color: AppColors.primary,
                             ),
@@ -922,8 +907,6 @@ class _MockupChip extends StatelessWidget {
   }
 }
 
-
-
 class _FreshnessBadge extends StatelessWidget {
   const _FreshnessBadge({required this.match});
 
@@ -934,7 +917,8 @@ class _FreshnessBadge extends StatelessWidget {
     final lastActivity = match.messages.isNotEmpty
         ? match.messages.last.createdAt
         : match.createdAt;
-    final isNew = DateTime.now().difference(match.createdAt) <= _kNewMatchWindow;
+    final isNew =
+        DateTime.now().difference(match.createdAt) <= _kNewMatchWindow;
     final timeLabel = _relativeTime(lastActivity);
 
     return Container(
@@ -973,8 +957,8 @@ class _LastMessagePreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            IconsaxPlusBold.message,
+          const RentchIcon(
+            IconsaxPlusLinear.message,
             size: 14,
             color: AppColors.primary,
           ),
@@ -1058,8 +1042,8 @@ class _EmptyMatches extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                IconsaxPlusBold.heart_tick,
+              child: const RentchIcon(
+                IconsaxPlusLinear.heart_tick,
                 color: AppColors.primary,
                 size: 40,
               ),

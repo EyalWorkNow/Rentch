@@ -2,7 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:dating_app/presentation/screens/auth_screen.dart';
+import 'package:dating_app/presentation/screens/onboarding_screen.dart';
 import 'package:dating_app/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,7 +47,7 @@ class RentchApp extends StatelessWidget {
             child: child ?? const SizedBox.shrink(),
           );
         },
-        home: const AuthScreen(),
+        home: const OnboardingScreen(),
       ),
     );
   }

@@ -10,6 +10,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -327,7 +328,7 @@ class _MessageScreenState extends State<MessageScreen> {
                     source: imageUrl,
                     fallback: Container(
                       color: AppColors.primaryLight2,
-                      child: const Icon(IconsaxPlusBold.building,
+                      child: const RentchIcon(IconsaxPlusLinear.building,
                           color: AppColors.primary, size: 18),
                     ),
                   ),
@@ -377,7 +378,7 @@ class _MessageScreenState extends State<MessageScreen> {
             // Actions menu icon
             actions: [
               IconButton(
-                icon: const Icon(IconsaxPlusBold.more_circle,
+                icon: const RentchIcon(IconsaxPlusLinear.more_circle,
                     color: AppColors.navy, size: 22),
                 tooltip: 'פעולות',
                 onPressed: () => _showActions(provider, match),
@@ -534,7 +535,9 @@ class _ContractBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(children: [
         Icon(
-          _done ? IconsaxPlusBold.tick_circle : IconsaxPlusBold.document_text,
+          _done
+              ? IconsaxPlusLinear.tick_circle
+              : IconsaxPlusLinear.document_text,
           size: 16,
           color: _done ? AppColors.success : AppColors.primary,
         ),
@@ -601,14 +604,14 @@ class _ActionsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       _ActionItem(
-        icon: IconsaxPlusBold.document_text,
+        icon: IconsaxPlusLinear.document_text,
         label: 'שליחת חוזה',
         subtitle: match.contractSent ? 'החוזה כבר נשלח' : 'שלח טיוטה לשוכר',
         enabled: !match.contractSent,
         onTap: onSendContract,
       ),
       _ActionItem(
-        icon: IconsaxPlusBold.pen_tool,
+        icon: IconsaxPlusLinear.pen_tool,
         label: 'חתימת בעלים',
         subtitle: !match.contractSent
             ? 'זמין אחרי שליחת חוזה'
@@ -619,7 +622,7 @@ class _ActionsSheet extends StatelessWidget {
         onTap: onOwnerSign,
       ),
       _ActionItem(
-        icon: IconsaxPlusBold.edit,
+        icon: IconsaxPlusLinear.edit,
         label: 'חתימת שוכר',
         subtitle: !match.contractSent
             ? 'זמין אחרי שליחת חוזה'
@@ -630,14 +633,14 @@ class _ActionsSheet extends StatelessWidget {
         onTap: onTenantSign,
       ),
       _ActionItem(
-        icon: IconsaxPlusBold.star,
+        icon: IconsaxPlusLinear.star,
         label: 'ביקורת על הדירה',
         subtitle: 'הוסף משוב על הנכס',
         enabled: true,
         onTap: onPropertyReview,
       ),
       _ActionItem(
-        icon: IconsaxPlusBold.profile_circle,
+        icon: IconsaxPlusLinear.profile_circle,
         label: 'ביקורת על השוכר',
         subtitle: 'הוסף משוב על השוכר',
         enabled: true,
@@ -678,7 +681,7 @@ class _ActionsSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: _QuickActionButton(
-                  icon: IconsaxPlusBold.message_text,
+                  icon: IconsaxPlusLinear.message_text,
                   label: 'הודעה מהירה',
                   onTap: onQuickMessage,
                 ),
@@ -686,7 +689,7 @@ class _ActionsSheet extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _QuickActionButton(
-                  icon: IconsaxPlusBold.document_upload,
+                  icon: IconsaxPlusLinear.document_upload,
                   label: 'קובץ',
                   onTap: onAttachFile,
                 ),
@@ -694,7 +697,7 @@ class _ActionsSheet extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _QuickActionButton(
-                  icon: IconsaxPlusBold.gallery,
+                  icon: IconsaxPlusLinear.gallery,
                   label: 'מדיה',
                   onTap: onAttachMedia,
                 ),
@@ -820,7 +823,7 @@ class _ActionTile extends StatelessWidget {
               ),
             ),
             if (item.enabled)
-              const Icon(IconsaxPlusBold.arrow_left,
+              const RentchIcon(IconsaxPlusLinear.arrow_left,
                   size: 14, color: AppColors.textSecondary),
           ]),
         ),
@@ -849,7 +852,7 @@ class _EmptyChat extends StatelessWidget {
                 color: AppColors.primaryLight2,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(IconsaxPlusBold.message,
+              child: const RentchIcon(IconsaxPlusLinear.message,
                   color: AppColors.primary, size: 26),
             ),
             const SizedBox(height: 16),
@@ -997,7 +1000,7 @@ class _SenderAvatar extends StatelessWidget {
         color: AppColors.primaryLight2,
         shape: BoxShape.circle,
       ),
-      child: const Icon(IconsaxPlusBold.building,
+      child: const RentchIcon(IconsaxPlusLinear.building,
           color: AppColors.primary, size: 12),
     );
   }
@@ -1206,8 +1209,8 @@ class _SendBtn extends StatelessWidget {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    IconsaxPlusBold.send_1,
+                : const RentchIcon(
+                    IconsaxPlusLinear.send_1,
                     color: Colors.white,
                     size: 18,
                   ),
@@ -1243,50 +1246,50 @@ class _TemplateLibrarySheet extends StatelessWidget {
       label: 'הודעת ברכה',
       text:
           'שלום! קיבלתי את הבקשה שלך. אשמח לענות על שאלות ולתאם ביקור. מתי נוח לך?',
-      icon: IconsaxPlusBold.home_2,
+      icon: IconsaxPlusLinear.home_2,
     ),
     _TemplateMessage(
       category: 'פתיחה',
       label: 'אישור עניין',
       text:
           'תודה על ההתעניינות! הדירה עדיין פנויה. אשמח לתאם ביקור בשבוע הקרוב.',
-      icon: IconsaxPlusBold.tick_circle,
+      icon: IconsaxPlusLinear.tick_circle,
     ),
     _TemplateMessage(
       category: 'ביקור',
       label: 'תיאום ביקור',
       text: 'אני זמין לביקור ביום __ בשעה __. האם מתאים לך?',
-      icon: IconsaxPlusBold.calendar,
+      icon: IconsaxPlusLinear.calendar,
     ),
     _TemplateMessage(
       category: 'ביקור',
       label: 'אישור ביקור',
       text: 'מעולה! מאשר ביקור ביום __ בשעה __. הכתובת: ___.',
-      icon: IconsaxPlusBold.location,
+      icon: IconsaxPlusLinear.location,
     ),
     _TemplateMessage(
       category: 'חוזה',
       label: 'שליחת חוזה',
       text: 'שלחתי את טיוטת החוזה. אנא קרא ותחזור אליי עם הערות.',
-      icon: IconsaxPlusBold.document_text,
+      icon: IconsaxPlusLinear.document_text,
     ),
     _TemplateMessage(
       category: 'חוזה',
       label: 'בקשה לחתימה',
       text: 'הכל מסודר מצידי — אנא חתום על החוזה כדי לסיים את התהליך.',
-      icon: IconsaxPlusBold.pen_tool,
+      icon: IconsaxPlusLinear.pen_tool,
     ),
     _TemplateMessage(
       category: 'סיום',
       label: 'דחייה עדינה',
       text: 'תודה על ההתעניינות. לצערי מצאנו שוכר מתאים. בהצלחה!',
-      icon: IconsaxPlusBold.close_circle,
+      icon: IconsaxPlusLinear.close_circle,
     ),
     _TemplateMessage(
       category: 'סיום',
       label: 'ברכות כניסה',
       text: 'ברוך הבא לדירה! אני כאן לכל שאלה.',
-      icon: IconsaxPlusBold.house,
+      icon: IconsaxPlusLinear.house,
     ),
   ];
 
@@ -1330,7 +1333,7 @@ class _TemplateLibrarySheet extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: AppColors.primaryLight2,
                       borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(IconsaxPlusBold.message_text,
+                  child: const RentchIcon(IconsaxPlusLinear.message_text,
                       color: AppColors.primary, size: 16),
                 ),
                 const SizedBox(width: 10),
@@ -1435,7 +1438,7 @@ class _TemplateTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(IconsaxPlusBold.arrow_left,
+            const RentchIcon(IconsaxPlusLinear.arrow_left,
                 size: 14, color: AppColors.textSecondary),
           ]),
         ),

@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -243,7 +244,8 @@ class _LogoHeader extends StatelessWidget {
                   ),
                   child: IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.navy),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        size: 18, color: AppColors.navy),
                     onPressed: onBack,
                   ),
                 ),
@@ -279,8 +281,7 @@ class _WideHero extends StatelessWidget {
         SvgPicture.asset(
           'assets/images/rentch_logo_with_text.svg',
           height: 48,
-          colorFilter:
-              const ColorFilter.mode(AppColors.navy, BlendMode.srcIn),
+          colorFilter: const ColorFilter.mode(AppColors.navy, BlendMode.srcIn),
           placeholderBuilder: (_) => const Text('Rentch',
               style: TextStyle(
                   color: AppColors.navy,
@@ -318,17 +319,17 @@ class _WideFeatureList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(children: const [
       _WideFeatureItem(
-          icon: IconsaxPlusBold.building,
+          icon: IconsaxPlusLinear.building,
           title: 'גלילת דירות חכמה',
           subtitle: 'מציג רק את מה שמתאים לפרופיל שלך'),
       SizedBox(height: 12),
       _WideFeatureItem(
-          icon: IconsaxPlusBold.heart,
+          icon: IconsaxPlusLinear.heart,
           title: 'התאמה דו-כיוונית',
           subtitle: 'שוכרים ומשכירים מאשרים זה את זה'),
       SizedBox(height: 12),
       _WideFeatureItem(
-          icon: IconsaxPlusBold.message,
+          icon: IconsaxPlusLinear.message,
           title: 'צ׳אט ישיר',
           subtitle: 'תקשורת ממוקדת בין הצדדים'),
     ]);
@@ -389,8 +390,7 @@ class _SimpleTabBar extends StatelessWidget {
       dividerColor: _kInputBorder,
       labelColor: AppColors.navy,
       unselectedLabelColor: AppColors.textSecondary,
-      labelStyle:
-          const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
       unselectedLabelStyle:
           const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
       tabs: const [
@@ -503,9 +503,7 @@ class _SocialBtn extends StatelessWidget {
           border: Border.all(color: _kInputBorder, width: 1.5),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x0A072946),
-                blurRadius: 8,
-                offset: Offset(0, 2))
+                color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
           ],
         ),
         child: loading
@@ -584,7 +582,7 @@ class _GuestModeDialog extends StatelessWidget {
               _GuestRoleOption(
                 title: 'אורח כדייר מחפש דירה',
                 subtitle: 'דירות פעילות ומאצ׳ים פתוחים.',
-                icon: IconsaxPlusBold.profile_circle,
+                icon: IconsaxPlusLinear.profile_circle,
                 color: AppColors.primary,
                 onTap: () => Navigator.of(context).pop('tenant'),
               ),
@@ -592,7 +590,7 @@ class _GuestModeDialog extends StatelessWidget {
               _GuestRoleOption(
                 title: 'אורח כבעל דירה',
                 subtitle: 'נכסים פעילים ומועמדים בתהליך.',
-                icon: IconsaxPlusBold.home,
+                icon: IconsaxPlusLinear.home,
                 color: AppColors.navy,
                 onTap: () => Navigator.of(context).pop('landlord'),
               ),
@@ -662,7 +660,7 @@ class _GuestRoleOption extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(IconsaxPlusBold.arrow_left_2, color: color, size: 16),
+            RentchIcon(IconsaxPlusLinear.arrow_left_2, color: color, size: 16),
           ]),
         ),
       ),
@@ -937,9 +935,8 @@ class _LoginTabState extends State<_LoginTab> {
                         borderRadius: BorderRadius.circular(5),
                         color: _rememberMe ? AppColors.primary : Colors.white,
                         border: Border.all(
-                          color: _rememberMe
-                              ? AppColors.primary
-                              : _kInputBorder,
+                          color:
+                              _rememberMe ? AppColors.primary : _kInputBorder,
                           width: 1.5,
                         ),
                       ),
@@ -998,14 +995,14 @@ class _LoginTabState extends State<_LoginTab> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(IconsaxPlusBold.eye, size: 14),
+                  const RentchIcon(IconsaxPlusLinear.eye, size: 14),
                   const SizedBox(width: 6),
                   Text('המשך כאורח',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary
-                              .withValues(alpha: 0.85))),
+                          color:
+                              AppColors.textSecondary.withValues(alpha: 0.85))),
                 ],
               ),
             ),
@@ -1088,8 +1085,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       final email = _emailCtrl.text.trim();
       final password = _passwordCtrl.text;
       if (name.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('יש להזין שם מלא')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('יש להזין שם מלא')));
         return;
       }
       if (email.isEmpty || !email.contains('@')) {
@@ -1103,8 +1100,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
         return;
       }
       if (!_agreedToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('יש לאשר את תנאי השימוש ומדיניות הפרטיות')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('יש לאשר את תנאי השימוש ומדיניות הפרטיות')));
         return;
       }
     }
@@ -1194,7 +1191,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
               position: Tween<Offset>(
                 begin: const Offset(0, 1),
                 end: Offset.zero,
-              ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+              ).animate(
+                  CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
               child: Material(
                 color: Colors.transparent,
                 child: _EulaSheet(
@@ -1307,7 +1305,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
               position: Tween<Offset>(
                 begin: const Offset(0, 1),
                 end: Offset.zero,
-              ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+              ).animate(
+                  CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
               child: Material(
                 color: Colors.transparent,
                 child: _AnimatedSuccessSheet(onContinue: widget.onDone),
@@ -1445,11 +1444,15 @@ class _EulaSheet extends StatelessWidget {
       clipper: _DomeClipper(),
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.fromLTRB(24, 60, 24, 28 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+            24, 60, 24, 28 + MediaQuery.of(context).padding.bottom),
         decoration: const BoxDecoration(
           color: Colors.white,
           boxShadow: [
-            BoxShadow(color: Color(0x1F000000), blurRadius: 30, offset: Offset(0, -10)),
+            BoxShadow(
+                color: Color(0x1F000000),
+                blurRadius: 30,
+                offset: Offset(0, -10)),
           ],
         ),
         child: Column(
@@ -1459,7 +1462,10 @@ class _EulaSheet extends StatelessWidget {
             const Text(
               'תנאי השימוש ב-Rentch',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -1470,14 +1476,32 @@ class _EulaSheet extends StatelessWidget {
                   children: const [
                     Text(
                       'ברוך הבא ל-Rentch!\nבשימוש באפליקציה אתה מסכים לתנאים הבאים:',
-                      style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800, fontSize: 14, height: 1.4),
+                      style: TextStyle(
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          height: 1.4),
                     ),
                     SizedBox(height: 12),
-                    _EulaSection(title: '1. תוכן הולם', body: 'אין לפרסם תוכן פוגעני, גזעני, מיני, מאיים או כל תוכן שפוגע בזכויות אחרים.'),
-                    _EulaSection(title: '2. ללא אלימות ואיום', body: 'כל צורה של הטרדה, איום, בריונות או התנהגות פוגענית אסורה לחלוטין.'),
-                    _EulaSection(title: '3. דיווח תוכן', body: 'משתמשים יכולים לדווח על תוכן שפוגע בהנחיות. נטפל בכל דיווח תוך 24 שעות.'),
-                    _EulaSection(title: '4. חסימת משתמשים', body: 'ניתן לחסום כל משתמש שמתנהג בצורה לא הולמת.'),
-                    _EulaSection(title: '5. פרטיות', body: 'אנו מכבדים את פרטיותך. המידע ישמש לצורך התאמת נכסים בלבד.'),
+                    _EulaSection(
+                        title: '1. תוכן הולם',
+                        body:
+                            'אין לפרסם תוכן פוגעני, גזעני, מיני, מאיים או כל תוכן שפוגע בזכויות אחרים.'),
+                    _EulaSection(
+                        title: '2. ללא אלימות ואיום',
+                        body:
+                            'כל צורה של הטרדה, איום, בריונות או התנהגות פוגענית אסורה לחלוטין.'),
+                    _EulaSection(
+                        title: '3. דיווח תוכן',
+                        body:
+                            'משתמשים יכולים לדווח על תוכן שפוגע בהנחיות. נטפל בכל דיווח תוך 24 שעות.'),
+                    _EulaSection(
+                        title: '4. חסימת משתמשים',
+                        body: 'ניתן לחסום כל משתמש שמתנהג בצורה לא הולמת.'),
+                    _EulaSection(
+                        title: '5. פרטיות',
+                        body:
+                            'אנו מכבדים את פרטיותך. המידע ישמש לצורך התאמת נכסים בלבד.'),
                   ],
                 ),
               ),
@@ -1492,9 +1516,12 @@ class _EulaSheet extends StatelessWidget {
                       foregroundColor: AppColors.textSecondary,
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999)),
                     ),
-                    child: const Text('ביטול', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    child: const Text('ביטול',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1506,9 +1533,12 @@ class _EulaSheet extends StatelessWidget {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999)),
                     ),
-                    child: const Text('אני מסכים/ה', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    child: const Text('אני מסכים/ה',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
@@ -1589,7 +1619,8 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
       clipper: _DomeClipper(),
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.fromLTRB(24, 60, 24, 28 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+            24, 60, 24, 28 + MediaQuery.of(context).padding.bottom),
         decoration: const BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -1608,10 +1639,20 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  for (final angle in [0.0, 0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2, 4.8, 5.4])
+                  for (final angle in [
+                    0.0,
+                    0.6,
+                    1.2,
+                    1.8,
+                    2.4,
+                    3.0,
+                    3.6,
+                    4.2,
+                    4.8,
+                    5.4
+                  ])
                     Transform.translate(
-                      offset: Offset(
-                          68 * (0.5 - (angle * 1.618 % 1.0)),
+                      offset: Offset(68 * (0.5 - (angle * 1.618 % 1.0)),
                           68 * (0.5 - (angle * 2.414 % 1.0))),
                       child: Container(
                         width: 7,
@@ -1636,7 +1677,8 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                       color: const Color(0xFF2ECC71),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2ECC71).withValues(alpha: 0.35),
+                          color:
+                              const Color(0xFF2ECC71).withValues(alpha: 0.35),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
@@ -1783,8 +1825,7 @@ class _StepBubble extends StatelessWidget {
                 ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
                 : Text('${index + 1}',
                     style: TextStyle(
-                        color:
-                            isActive ? Colors.white : AppColors.textDisabled,
+                        color: isActive ? Colors.white : AppColors.textDisabled,
                         fontSize: 12,
                         fontWeight: FontWeight.w800)),
           ),
@@ -1792,8 +1833,7 @@ class _StepBubble extends StatelessWidget {
         const SizedBox(height: 3),
         Text(label,
             style: TextStyle(
-                color:
-                    isActive ? AppColors.primary : AppColors.textDisabled,
+                color: isActive ? AppColors.primary : AppColors.textDisabled,
                 fontSize: 10,
                 fontWeight: FontWeight.w700)),
       ],
@@ -1926,9 +1966,7 @@ class _StepEmailPassword extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                     color: agreedToTerms ? AppColors.primary : Colors.white,
                     border: Border.all(
-                      color: agreedToTerms
-                          ? AppColors.primary
-                          : _kInputBorder,
+                      color: agreedToTerms ? AppColors.primary : _kInputBorder,
                       width: 1.5,
                     ),
                   ),
@@ -1943,8 +1981,7 @@ class _StepEmailPassword extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary),
+                        fontSize: 13, color: AppColors.textSecondary),
                     children: const [
                       TextSpan(text: 'אני מסכים/ה ל'),
                       TextSpan(
@@ -2000,7 +2037,7 @@ class _StepRole extends StatelessWidget {
                   fontWeight: FontWeight.w500)),
           const SizedBox(height: 22),
           _RoleCard(
-            icon: IconsaxPlusBold.house_2,
+            icon: IconsaxPlusLinear.house_2,
             title: 'אני מחפש/ת דירה',
             subtitle: 'שוכר / שוכרת',
             accent: AppColors.primary,
@@ -2009,7 +2046,7 @@ class _StepRole extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _RoleCard(
-            icon: IconsaxPlusBold.building,
+            icon: IconsaxPlusLinear.building,
             title: 'יש לי דירה להשכרה',
             subtitle: 'משכיר / משכירה',
             accent: AppColors.navy,
@@ -2274,8 +2311,7 @@ class _NavButtons extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color:
-                        AppColors.textSecondary.withValues(alpha: 0.75))),
+                    color: AppColors.textSecondary.withValues(alpha: 0.75))),
           ),
         ],
       ],
@@ -2306,8 +2342,8 @@ class _PillButton extends StatelessWidget {
           backgroundColor: _kPillBtn,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         child: loading
             ? const SizedBox(
@@ -2316,8 +2352,8 @@ class _PillButton extends StatelessWidget {
                 child: CircularProgressIndicator(
                     strokeWidth: 2.4, color: Colors.white))
             : Text(label,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800)),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
       ),
     );
   }
@@ -2333,9 +2369,7 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(label,
         style: const TextStyle(
-            color: AppColors.navy,
-            fontSize: 13,
-            fontWeight: FontWeight.w700));
+            color: AppColors.navy, fontSize: 13, fontWeight: FontWeight.w700));
   }
 }
 
@@ -2464,8 +2498,16 @@ class _StepPropertyDetails extends StatelessWidget {
   final ValueChanged<String> onToggleFeature;
 
   static const _featureTags = [
-    'מרפסת', 'חניה', 'מעלית', 'מיזוג', 'ממ"ד',
-    'מחסן', 'גינה', 'ריהוט', 'מחמדים', 'אינטרנט',
+    'מרפסת',
+    'חניה',
+    'מעלית',
+    'מיזוג',
+    'ממ"ד',
+    'מחסן',
+    'גינה',
+    'ריהוט',
+    'מחמדים',
+    'אינטרנט',
   ];
 
   @override
@@ -2486,8 +2528,7 @@ class _StepPropertyDetails extends StatelessWidget {
                       letterSpacing: -0.5)),
               const SizedBox(width: 10),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
@@ -2510,7 +2551,7 @@ class _StepPropertyDetails extends StatelessWidget {
           _AuthTextField(
             controller: cityCtrl,
             label: 'עיר / שכונה',
-            icon: IconsaxPlusBold.location,
+            icon: IconsaxPlusLinear.location,
           ),
           const SizedBox(height: 12),
           _RoomsStepper(rooms: rooms, onRooms: onRooms),
@@ -2602,9 +2643,8 @@ class _StepperBtn extends StatelessWidget {
         height: 32,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: filled
-              ? AppColors.primary
-              : _kInputBorder.withValues(alpha: 0.6),
+          color:
+              filled ? AppColors.primary : _kInputBorder.withValues(alpha: 0.6),
         ),
         child: Icon(icon,
             size: 16, color: filled ? Colors.white : AppColors.textSecondary),
@@ -2632,8 +2672,8 @@ class _FeatureChip extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           color: selected ? AppColors.primary : Colors.white,
-          border: Border.all(
-              color: selected ? AppColors.primary : _kInputBorder),
+          border:
+              Border.all(color: selected ? AppColors.primary : _kInputBorder),
           boxShadow: selected
               ? [
                   BoxShadow(

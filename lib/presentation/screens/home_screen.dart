@@ -130,20 +130,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(100),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(
-                          sigmaX: useGlass ? 40 : 0.001,
-                          sigmaY: useGlass ? 40 : 0.001,
+                          sigmaX: useGlass ? 60 : 0.001,
+                          sigmaY: useGlass ? 60 : 0.001,
                         ),
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: useGlass
-                                ? Colors.black.withOpacity(0.80)
+                                ? Colors.black.withValues(alpha: 0.35)
                                 : Colors.black,
                             borderRadius: BorderRadius.circular(100),
                             border: useGlass
                                 ? Border.all(
-                                    color: Colors.white.withOpacity(0.12),
-                                    width: 1.2)
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                    width: 1.5)
                                 : null,
                           ),
                           child: Row(
@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   unseenCount > 0;
                               final isCompact = items.length >= 5;
 
-                              final double circleSize = isCompact ? 67.0 : 76.0;
+                              final double circleSize = isCompact ? 62.0 : 70.0;
 
                               return GestureDetector(
                                 onTap: () => _onTabTap(index, provider),
@@ -186,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   ? item.activeIcon
                                                   : item.icon,
                                               color: Colors.white,
-                                              size: isCompact ? 26 : 31,
+                                              size: isCompact ? 24 : 28,
                                             ),
                                             if (showBadge)
                                               Positioned(
@@ -237,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     style: TextStyle(
                                                       color: Colors.white,
                                                       fontSize:
-                                                          isCompact ? 11 : 12,
+                                                          isCompact ? 9 : 10.5,
                                                       fontWeight: FontWeight.w700,
                                                       height: 1.1,
                                                     ),

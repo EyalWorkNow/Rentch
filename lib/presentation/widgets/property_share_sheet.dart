@@ -3,6 +3,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Future<void> showPropertyShareSheet(
@@ -136,7 +137,7 @@ class _PropertyShareSheet extends StatelessWidget {
                         runSpacing: 12,
                         children: [
                           _ShareActionCard(
-                            icon: IconsaxPlusBold.message_text,
+                            icon: IconsaxPlusLinear.message_text,
                             label: 'WhatsApp',
                             subtitle: 'שליחה ישירה',
                             onTap: () async {
@@ -151,7 +152,7 @@ class _PropertyShareSheet extends StatelessWidget {
                             },
                           ),
                           _ShareActionCard(
-                            icon: IconsaxPlusBold.sms,
+                            icon: IconsaxPlusLinear.sms,
                             label: 'SMS',
                             subtitle: 'הודעת טקסט',
                             onTap: () async {
@@ -169,7 +170,7 @@ class _PropertyShareSheet extends StatelessWidget {
                             },
                           ),
                           _ShareActionCard(
-                            icon: IconsaxPlusBold.sms_edit,
+                            icon: IconsaxPlusLinear.sms_edit,
                             label: 'Email',
                             subtitle: 'שליחה במייל',
                             onTap: () async {
@@ -188,7 +189,7 @@ class _PropertyShareSheet extends StatelessWidget {
                             },
                           ),
                           _ShareActionCard(
-                            icon: IconsaxPlusBold.copy,
+                            icon: IconsaxPlusLinear.copy,
                             label: 'העתק פרטים',
                             subtitle: 'טקסט מלא לשיתוף',
                             onTap: () async {
@@ -293,8 +294,8 @@ class _PropertyPreviewCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(
-              IconsaxPlusBold.send_2,
+            child: const RentchIcon(
+              IconsaxPlusLinear.send_2,
               color: Colors.white,
               size: 24,
             ),
@@ -406,7 +407,7 @@ class _ShareLinkButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: const Icon(IconsaxPlusBold.link_1, size: 18),
+        icon: const RentchIcon(IconsaxPlusLinear.link_1, size: 18),
         label: const Text('העתק קישור לשיתוף'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.navy,

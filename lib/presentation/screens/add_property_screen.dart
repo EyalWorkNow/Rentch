@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -33,8 +34,8 @@ extension _PropertyMediaTypeUi on PropertyMediaType {
   String get label => this == PropertyMediaType.image ? 'תמונה' : 'וידאו';
 
   IconData get icon => this == PropertyMediaType.image
-      ? IconsaxPlusBold.image
-      : IconsaxPlusBold.video;
+      ? IconsaxPlusLinear.image
+      : IconsaxPlusLinear.video;
 }
 
 // Version is resolved from AppConfig so it stays in sync with
@@ -438,7 +439,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           backgroundColor: AppColors.navy,
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
-            icon: const Icon(IconsaxPlusBold.arrow_right, color: Colors.white),
+            icon: const RentchIcon(IconsaxPlusLinear.arrow_right,
+                color: Colors.white),
             onPressed: _prev,
           ),
           title: Text(
@@ -669,7 +671,7 @@ class _WizardNavBar extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: onPrev,
-                icon: const Icon(IconsaxPlusBold.arrow_right, size: 16),
+                icon: const RentchIcon(IconsaxPlusLinear.arrow_right, size: 16),
                 label: const Text('חזרה'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.navy,
@@ -692,7 +694,8 @@ class _WizardNavBar extends StatelessWidget {
                       width: 18,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : Icon(isLast ? IconsaxPlusBold.add_square : null, size: 16),
+                  : Icon(isLast ? IconsaxPlusLinear.add_square : null,
+                      size: 16),
               label: Text(isLoading
                   ? 'שומר...'
                   : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
@@ -806,7 +809,7 @@ class _StepLocationState extends State<_StepLocation> {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
         _SectionHint(
-          icon: IconsaxPlusBold.location,
+          icon: IconsaxPlusLinear.location,
           title: 'איפה נמצאת הדירה?',
           subtitle: 'מלא עיר ורחוב לפחות',
         ),
@@ -832,7 +835,7 @@ class _StepLocationState extends State<_StepLocation> {
                     color: AppColors.primary,
                   ),
                 )
-              : const Icon(IconsaxPlusBold.gps, size: 18),
+              : const RentchIcon(IconsaxPlusLinear.gps, size: 18),
           label: Text(
             _isLoading ? 'מזהה מיקום...' : 'זהה מיקום אוטומטית לפי ה-GPS',
             style: const TextStyle(
@@ -848,12 +851,12 @@ class _StepLocationState extends State<_StepLocation> {
               _Field(
                   ctrl: widget.cityCtrl,
                   label: 'עיר *',
-                  icon: IconsaxPlusBold.map),
+                  icon: IconsaxPlusLinear.map),
               const SizedBox(height: 12),
               _Field(
                   ctrl: widget.neighborhoodCtrl,
                   label: 'שכונה (אופציונלי)',
-                  icon: IconsaxPlusBold.map_1),
+                  icon: IconsaxPlusLinear.map_1),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -862,14 +865,14 @@ class _StepLocationState extends State<_StepLocation> {
                     child: _Field(
                         ctrl: widget.streetCtrl,
                         label: 'רחוב *',
-                        icon: IconsaxPlusBold.routing),
+                        icon: IconsaxPlusLinear.routing),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _Field(
                       ctrl: widget.streetNumCtrl,
                       label: 'מספר',
-                      icon: IconsaxPlusBold.hashtag,
+                      icon: IconsaxPlusLinear.hashtag,
                       numeric: true,
                     ),
                   ),
@@ -925,7 +928,7 @@ class _StepDetails extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
         _SectionHint(
-          icon: IconsaxPlusBold.building,
+          icon: IconsaxPlusLinear.building,
           title: 'פרטי הנכס',
           subtitle: 'גודל הדירה הוא שדה חובה',
         ),
@@ -956,7 +959,7 @@ class _StepDetails extends StatelessWidget {
               _Field(
                 ctrl: sizeCtrl,
                 label: 'גודל הנכס במ"ר *',
-                icon: IconsaxPlusBold.maximize_3,
+                icon: IconsaxPlusLinear.maximize_3,
                 numeric: true,
               ),
               const SizedBox(height: 12),
@@ -966,7 +969,7 @@ class _StepDetails extends StatelessWidget {
                     child: _Field(
                       ctrl: floorCtrl,
                       label: 'קומה',
-                      icon: IconsaxPlusBold.layer,
+                      icon: IconsaxPlusLinear.layer,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -974,7 +977,7 @@ class _StepDetails extends StatelessWidget {
                     child: _Field(
                       ctrl: totalFloorsCtrl,
                       label: 'סה"כ קומות',
-                      icon: IconsaxPlusBold.buildings,
+                      icon: IconsaxPlusLinear.buildings,
                     ),
                   ),
                 ],
@@ -1004,7 +1007,7 @@ class _StepDetails extends StatelessWidget {
               _Field(
                 ctrl: entryDateCtrl,
                 label: 'תאריך כניסה (לדוגמה: 01/09)',
-                icon: IconsaxPlusBold.calendar,
+                icon: IconsaxPlusLinear.calendar,
               ),
               const SizedBox(height: 12),
               Row(
@@ -1049,7 +1052,7 @@ class _StepFeatures extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
         _SectionHint(
-          icon: IconsaxPlusBold.star,
+          icon: IconsaxPlusLinear.star,
           title: 'מאפיינים ויתרונות',
           subtitle: 'בחר את כל המאפיינים הרלוונטיים',
         ),
@@ -1200,7 +1203,7 @@ class _StepPhotos extends StatelessWidget {
                   childAspectRatio: 2.2,
                   children: [
                     _PickerOptionButton(
-                      icon: IconsaxPlusBold.gallery,
+                      icon: IconsaxPlusLinear.gallery,
                       label: 'תמונה מהגלריה',
                       onTap: () {
                         Navigator.pop(ctx);
@@ -1208,7 +1211,7 @@ class _StepPhotos extends StatelessWidget {
                       },
                     ),
                     _PickerOptionButton(
-                      icon: IconsaxPlusBold.camera,
+                      icon: IconsaxPlusLinear.camera,
                       label: 'צלם תמונה',
                       onTap: () {
                         Navigator.pop(ctx);
@@ -1216,7 +1219,7 @@ class _StepPhotos extends StatelessWidget {
                       },
                     ),
                     _PickerOptionButton(
-                      icon: IconsaxPlusBold.video,
+                      icon: IconsaxPlusLinear.video,
                       label: 'וידאו מהגלריה',
                       onTap: () {
                         Navigator.pop(ctx);
@@ -1224,7 +1227,7 @@ class _StepPhotos extends StatelessWidget {
                       },
                     ),
                     _PickerOptionButton(
-                      icon: IconsaxPlusBold.video_play,
+                      icon: IconsaxPlusLinear.video_play,
                       label: 'צלם וידאו',
                       onTap: () {
                         Navigator.pop(ctx);
@@ -1235,7 +1238,7 @@ class _StepPhotos extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _PickerOptionButton(
-                  icon: IconsaxPlusBold.link,
+                  icon: IconsaxPlusLinear.link,
                   label: 'הזן קישור ידנית (URL)',
                   isFullWidth: true,
                   onTap: () {
@@ -1318,7 +1321,7 @@ class _StepPhotos extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
         _SectionHint(
-          icon: IconsaxPlusBold.gallery,
+          icon: IconsaxPlusLinear.gallery,
           title: 'תמונות וסרטונים',
           subtitle: 'העלה תמונות וסרטונים המראים את הדירה במיטבה',
         ),
@@ -1525,8 +1528,8 @@ class _MediaGridItem extends StatelessWidget {
             child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  IconsaxPlusBold.add_square,
+                RentchIcon(
+                  IconsaxPlusLinear.add_square,
                   color: AppColors.primary,
                   size: 26,
                 ),
@@ -1933,7 +1936,7 @@ class _ScanActions extends StatelessWidget {
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(IconsaxPlusBold.video_play,
+                            RentchIcon(IconsaxPlusLinear.video_play,
                                 color: Colors.white, size: 18),
                             SizedBox(width: 8),
                             Text(
@@ -1976,7 +1979,7 @@ class _ScanActions extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(IconsaxPlusBold.video,
+                      RentchIcon(IconsaxPlusLinear.video,
                           color: AppColors.navy, size: 18),
                       SizedBox(width: 8),
                       Text(
@@ -2067,7 +2070,7 @@ class _ScanStatusCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: isSubmitting ? null : onReplace,
-                  icon: const Icon(IconsaxPlusBold.refresh, size: 16),
+                  icon: const RentchIcon(IconsaxPlusLinear.refresh, size: 16),
                   label: const Text('החלף סריקה'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,
@@ -2089,10 +2092,10 @@ class _ScanStatusCard extends StatelessWidget {
   }
 
   IconData get _statusIcon {
-    if (tour.isReady) return IconsaxPlusBold.tick_circle;
-    if (tour.hasFailed) return IconsaxPlusBold.close_circle;
-    if (tour.needsBackendUpload) return IconsaxPlusBold.document_upload;
-    return IconsaxPlusBold.cloud_change;
+    if (tour.isReady) return IconsaxPlusLinear.tick_circle;
+    if (tour.hasFailed) return IconsaxPlusLinear.close_circle;
+    if (tour.needsBackendUpload) return IconsaxPlusLinear.document_upload;
+    return IconsaxPlusLinear.cloud_change;
   }
 
   Color get _statusColor {
@@ -2332,7 +2335,7 @@ class _DropdownRow extends StatelessWidget {
       ),
       style: const TextStyle(
           color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
-      icon: const Icon(IconsaxPlusBold.arrow_down,
+      icon: const RentchIcon(IconsaxPlusLinear.arrow_down,
           size: 16, color: AppColors.textSecondary),
       dropdownColor: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -2751,7 +2754,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         backgroundColor: AppColors.navy,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(IconsaxPlusBold.arrow_right, color: Colors.white),
+          icon: const RentchIcon(IconsaxPlusLinear.arrow_right,
+              color: Colors.white),
           onPressed: _prev,
         ),
         title: Text(
@@ -2792,7 +2796,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   agencyListing: _agencyListing,
                   onPriceChanged: (v) =>
                       setState(() => _price = (v / 100).round() * 100),
-                  onRoomsChanged: (v) => setState(() => _rooms = (v * 2).round() / 2),
+                  onRoomsChanged: (v) =>
+                      setState(() => _rooms = (v * 2).round() / 2),
                   onTypeChanged: (v) => setState(() => _propertyType = v!),
                   onConditionChanged: (v) => setState(() => _condition = v!),
                   onAgencyChanged: (v) => setState(() => _agencyListing = v),
@@ -2815,13 +2820,18 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   isScanBackendConfigured: _scanService.isConfigured,
                   onPickImageFromGallery: () =>
                       _pickPropertyImage(ImageSource.gallery),
-                  onPickImageFromCamera: () => _pickPropertyImage(ImageSource.camera),
+                  onPickImageFromCamera: () =>
+                      _pickPropertyImage(ImageSource.camera),
                   onPickVideoFromGallery: () =>
                       _pickPropertyVideo(ImageSource.gallery),
-                  onPickVideoFromCamera: () => _pickPropertyVideo(ImageSource.camera),
-                  onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
-                  onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
-                  onClearVirtualTour: () => setState(() => _virtualTourDraft = null),
+                  onPickVideoFromCamera: () =>
+                      _pickPropertyVideo(ImageSource.camera),
+                  onPickScanFromGallery: () =>
+                      _pickScanVideo(ImageSource.gallery),
+                  onPickScanFromCamera: () =>
+                      _pickScanVideo(ImageSource.camera),
+                  onClearVirtualTour: () =>
+                      setState(() => _virtualTourDraft = null),
                   acceptedTerms: _acceptedPropertyTerms,
                   onAcceptedTermsChanged: (value) =>
                       setState(() => _acceptedPropertyTerms = value),
@@ -2848,20 +2858,25 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(top: BorderSide(color: AppColors.borderLight, width: 1)),
+              border: Border(
+                  top: BorderSide(color: AppColors.borderLight, width: 1)),
             ),
             child: Row(
               children: [
                 Icon(
-                  _isActive ? Icons.check_circle_outline_rounded : Icons.pause_circle_outline_rounded,
-                  color: _isActive ? AppColors.success : AppColors.textSecondary,
+                  _isActive
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.pause_circle_outline_rounded,
+                  color:
+                      _isActive ? AppColors.success : AppColors.textSecondary,
                   size: 20,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   _isActive ? 'סטטוס: פעיל' : 'סטטוס: לא פעיל',
                   style: TextStyle(
-                    color: _isActive ? AppColors.success : AppColors.textSecondary,
+                    color:
+                        _isActive ? AppColors.success : AppColors.textSecondary,
                     fontWeight: FontWeight.w800,
                     fontSize: 13.5,
                   ),
@@ -2879,24 +2894,31 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       context: context,
                       builder: (ctx) => AlertDialog(
                         backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22)),
                         title: const Text(
                           'הסרת נכס',
-                          style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900),
+                          style: TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w900),
                         ),
                         content: Text(
                           'להסיר את "${widget.property.address}"?\nהפעולה אינה ניתנת לביטול.',
-                          style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, height: 1.4),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('ביטול', style: TextStyle(color: AppColors.textSecondary)),
+                            child: const Text('ביטול',
+                                style:
+                                    TextStyle(color: AppColors.textSecondary)),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.coral,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () => Navigator.pop(ctx, true),
                             child: const Text('הסר'),
@@ -2905,13 +2927,16 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       ),
                     );
                     if (confirmed == true) {
-                      await context.read<DatingProvider>().removeLandlordProperty(widget.property.id);
+                      await context
+                          .read<DatingProvider>()
+                          .removeLandlordProperty(widget.property.id);
                       if (mounted) {
                         Navigator.of(context).pop();
                       }
                     }
                   },
-                  icon: const Icon(IconsaxPlusBold.trash, color: AppColors.coral, size: 16),
+                  icon: const RentchIcon(IconsaxPlusLinear.trash,
+                      color: AppColors.coral, size: 16),
                   label: const Text(
                     'מחיקת נכס',
                     style: TextStyle(

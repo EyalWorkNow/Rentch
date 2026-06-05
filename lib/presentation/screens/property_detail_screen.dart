@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -6,6 +7,7 @@ import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,116 +36,334 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final media = p.media;
+    final title = p.street.isNotEmpty
+        ? '${p.propertyType} ב${p.street} ${p.streetNumber}'
+        : '${p.propertyType} ב${p.city}';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F8FB),
-      body: Stack(
-        children: [
-          CustomScrollView(
-            slivers: [
-              // Image gallery as a plain SliverToBoxAdapter (no SliverAppBar conflict)
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 390,
-                  child: _ImageGallery(
-                    media: media,
-                    controller: _pageController,
-                    currentPage: _currentPage,
-                    onPageChanged: (i) => setState(() => _currentPage = i),
-                    city: p.city,
+    return Consumer<DatingProvider>(
+      builder: (context, provider, _) {
+        final reviews = provider.propertyReviews(p.id);
+        final avgRating = provider.reviewAverage(reviews);
+        final isLiked = provider.isSaved(p.id);
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  // Image Gallery wrapped in a padded rounded card (Mockup Style)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(32),
+                        child: SizedBox(
+                          height: 380,
+                          child: _ImageGallery(
+                            property: p,
+                            controller: _pageController,
+                            currentPage: _currentPage,
+                            onPageChanged: (i) =>
+                                setState(() => _currentPage = i),
+                            avgRating: avgRating,
+                            onBackTap: () => Navigator.of(context).pop(),
+                            onShareTap: () =>
+                                showPropertyShareSheet(context, p),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 140),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title & Location & Favorite Heart Icon Row (Mockup Style)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        const RentchIcon(
+                                            IconsaxPlusLinear.location,
+                                            size: 16,
+                                            color: Color(0xFF64748B)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            p.address,
+                                            style: const TextStyle(
+                                              color: Color(0xFF64748B),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Photos / Gallery Carousel (Mockup Style)
+                          if (media.isNotEmpty) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'גלריה',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  '${media.length} תמונות',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 105,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: media.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 12),
+                                itemBuilder: (context, index) {
+                                  final item = media[index];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      _pageController.animateToPage(
+                                        index,
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
+                                    child: Column(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: SizedBox(
+                                            width: 100,
+                                            height: 70,
+                                            child: SafeMedia(
+                                              media: item,
+                                              fit: BoxFit.cover,
+                                              fallback:
+                                                  _ImageFallback(city: p.city),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          item.isVideo
+                                              ? 'סרטון'
+                                              : 'תמונה ${index + 1}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // Property Facts Grid Card (Mockup Style)
+                          const Text(
+                            'פרטי הנכס',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _PropertyFactsCard(p),
+                          const SizedBox(height: 24),
+
+                          // Description / Website URL Section
+                          if (p.url.isNotEmpty) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'אתר מקור',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () async {
+                                    await launchUrl(Uri.parse(p.url),
+                                        mode: LaunchMode.externalApplication);
+                                  },
+                                  child: const Text(
+                                    'צפה במקור',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF13BEC9),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'נכס זה פורסם במקור באתר ${Uri.parse(p.url).host}. באפשרותך לפתוח את המודעה המקורית לצפייה בפרטים המלאים.',
+                              style: const TextStyle(
+                                color: Color(0xFF475569),
+                                fontSize: 13.5,
+                                height: 1.45,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // Owners Section
+                          _SectionCardShell(
+                            title: 'בעל הנכס',
+                            icon: IconsaxPlusLinear.profile_2user,
+                            child: _OwnerCard(property: p),
+                          ),
+
+                          // Features Section
+                          if (p.features.isNotEmpty) ...[
+                            _SectionCardShell(
+                              title: 'מאפיינים חשובים',
+                              icon: IconsaxPlusLinear.flash_1,
+                              child: _FeatureWrap(features: p.features),
+                            ),
+                          ],
+
+                          // Reviews Section (Mockup Style)
+                          if (reviews.isNotEmpty) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'חוות דעת',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  '${reviews.length} ביקורות',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _HorizontalReviewsList(reviews),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // Location Map Section
+                          _SectionCardShell(
+                            title: 'מיקום',
+                            icon: IconsaxPlusLinear.location,
+                            child: _MapSection(property: p),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Floating share button at bottom left
+              Positioned(
+                bottom: MediaQuery.of(context).padding.bottom + 85,
+                left: 20,
+                child: GestureDetector(
+                  onTap: () => showPropertyShareSheet(context, p),
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const RentchIcon(
+                      IconsaxPlusLinear.export_2,
+                      color: Colors.black,
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _OverviewCard(
-                        property: p,
-                        tour: p.virtualTour,
-                        hasVirtualTour: _hasVirtualTour,
-                        onTourTap: () => openPropertyTour(context, p),
-                      ),
-                      const SizedBox(height: 16),
-                      _SectionCardShell(
-                        title: 'פרטי הדירה',
-                        icon: IconsaxPlusBold.building_4,
-                        child: Column(
-                          children: [
-                            _PrimaryFactsGrid(property: p),
-                            const SizedBox(height: 14),
-                            _DetailsList(property: p),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _SectionCardShell(
-                        title: 'בעל הנכס',
-                        icon: IconsaxPlusBold.profile_2user,
-                        child: _OwnerCard(property: p),
-                      ),
-                      if (p.features.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        _SectionCardShell(
-                          title: 'מאפיינים חשובים',
-                          icon: IconsaxPlusBold.flash_1,
-                          child: _FeatureWrap(features: p.features),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      _SectionCardShell(
-                        title: 'מיקום',
-                        icon: IconsaxPlusBold.location,
-                        child: _MapSection(property: p),
-                      ),
-                    ],
-                  ),
+
+              // Bottom action bar
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _BottomBar(
+                  property: p,
+                  hasVirtualTour: _hasVirtualTour,
+                  onLike: () {
+                    context.read<DatingProvider>().likeProperty(p.id);
+                    Navigator.of(context).pop();
+                  },
+                  onTour: () => openPropertyTour(context, p),
                 ),
               ),
             ],
           ),
-
-          // Floating top bar (back + share buttons)
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  _FloatingNavBtn(
-                    icon: IconsaxPlusBold.arrow_right,
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                  const Spacer(),
-                  _FloatingNavBtn(
-                    icon: IconsaxPlusBold.send_2,
-                    onTap: () => showPropertyShareSheet(context, p),
-                    tint: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ),
-            ),
-          ),
-
-          // Bottom action bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _BottomBar(
-              property: p,
-              hasVirtualTour: _hasVirtualTour,
-              onLike: () {
-                context.read<DatingProvider>().likeProperty(p.id);
-                Navigator.of(context).pop();
-              },
-              onTour: () => openPropertyTour(context, p),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -152,21 +372,26 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
 class _ImageGallery extends StatelessWidget {
   const _ImageGallery({
-    required this.media,
+    required this.property,
     required this.controller,
     required this.currentPage,
     required this.onPageChanged,
-    required this.city,
+    required this.avgRating,
+    required this.onBackTap,
+    required this.onShareTap,
   });
 
-  final List<PropertyMedia> media;
+  final RentalProperty property;
   final PageController controller;
   final int currentPage;
   final ValueChanged<int> onPageChanged;
-  final String city;
+  final double avgRating;
+  final VoidCallback onBackTap;
+  final VoidCallback onShareTap;
 
   @override
   Widget build(BuildContext context) {
+    final media = property.media;
     final safeCurrentPage =
         media.isEmpty ? 0 : currentPage.clamp(0, media.length - 1).toInt();
 
@@ -174,7 +399,7 @@ class _ImageGallery extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         media.isEmpty
-            ? _ImageFallback(city: city)
+            ? _ImageFallback(city: property.city)
             : PageView.builder(
                 controller: controller,
                 onPageChanged: onPageChanged,
@@ -183,7 +408,7 @@ class _ImageGallery extends StatelessWidget {
                   media: media[i],
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
-                  fallback: _ImageFallback(city: city),
+                  fallback: _ImageFallback(city: property.city),
                   videoMode: SafeVideoDisplayMode.playback,
                 ),
               ),
@@ -226,92 +451,138 @@ class _ImageGallery extends StatelessWidget {
             ),
           ),
 
-        // Bottom gradient
-        const IgnorePointer(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Color(0xCC072946), Colors.transparent],
-                stops: [0.0, 0.55],
+        // Bottom dark gradient overlay for text readability
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 140,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.7),
+                    Colors.black.withOpacity(0.4),
+                    Colors.black.withOpacity(0.0),
+                  ],
+                ),
               ),
             ),
           ),
         ),
 
-        // Carousel indicator at bottom
+        // Navigation controls overlay
+        Positioned(
+          top: 16,
+          left: 16,
+          right: 16,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Back Button (Mockup style circular white)
+              GestureDetector(
+                onTap: onBackTap,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const RentchIcon(
+                    IconsaxPlusLinear.arrow_right_3,
+                    color: Color(0xFF0F172A),
+                    size: 20,
+                  ),
+                ),
+              ),
+              // Share Button (Mockup style circular white)
+              GestureDetector(
+                onTap: onShareTap,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const RentchIcon(
+                    IconsaxPlusLinear.export_2,
+                    color: Color(0xFF0F172A),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Bottom text and badge overlays (Mockup style)
+        Positioned(
+          bottom: 20,
+          right: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF13BEC9).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: const Color(0xFF13BEC9).withOpacity(0.3)),
+                ),
+                child: Text(
+                  property.transactionLabel,
+                  style: const TextStyle(
+                    color: Color(0xFF13BEC9),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${property.priceLabel} ${property.priceSuffixLabel}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Carousel indicator dots
         if (media.length > 1)
           Positioned(
-            bottom: 18,
+            bottom: 8,
             left: 0,
             right: 0,
             child: IgnorePointer(
               child: _CarouselDots(
                 count: media.length,
                 current: safeCurrentPage,
-              ),
-            ),
-          ),
-
-        // Image counter badge (top right)
-        if (media.length > 1)
-          Positioned(
-            top: 60,
-            left: 16,
-            child: IgnorePointer(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(IconsaxPlusBold.gallery,
-                        size: 12, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${safeCurrentPage + 1} / ${media.length}',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        if (media.isNotEmpty && media[safeCurrentPage].isVideo)
-          Positioned(
-            top: 60,
-            right: 16,
-            child: IgnorePointer(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(IconsaxPlusBold.video, size: 12, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text(
-                      'וידאו',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -361,7 +632,7 @@ class _ImageFallback extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(IconsaxPlusBold.building,
+            const RentchIcon(IconsaxPlusLinear.building,
                 size: 64, color: Colors.white30),
             if (city.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -390,14 +661,97 @@ class _FloatingNavBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.38),
-          shape: BoxShape.circle,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 1,
+              ),
+            ),
+            child: Icon(icon, color: tint ?? Colors.white, size: 20),
+          ),
         ),
-        child: Icon(icon, color: tint ?? Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+class _DarkCapsuleTag extends StatelessWidget {
+  const _DarkCapsuleTag({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF475569),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _MetadataGrid extends StatelessWidget {
+  const _MetadataGrid({required this.property});
+  final RentalProperty property;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildColumn(context, 'שטח כולל', '${property.sizeM2} מ"ר'),
+        _buildColumn(context, 'מספר חדרים', property.roomsLabel),
+        _buildColumn(
+            context, 'תאריך כניסה', _formatEntryDate(property.entryDate)),
+      ],
+    );
+  }
+
+  Widget _buildColumn(BuildContext context, String label, String value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -439,163 +793,225 @@ class _OwnerCard extends StatelessWidget {
             : '?';
         final isAgency = property.agencyListing;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                // Avatar
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: isAgency ? AppColors.primary : AppColors.navy,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      initial,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Avatar with Verified Badge Overlay
+                  Stack(
                     children: [
-                      Text(
-                        property.ownerName,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.navy,
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isAgency
+                                ? [
+                                    const Color(0xFF13BEC9),
+                                    const Color(0xFF0D9BA4)
+                                  ]
+                                : [
+                                    const Color(0xFF475569),
+                                    const Color(0xFF1E293B)
+                                  ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isAgency
-                                  ? AppColors.primaryLight2
-                                  : const Color(0xFFFFF3E0),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isAgency
-                                      ? IconsaxPlusBold.verify
-                                      : IconsaxPlusBold.home_2,
-                                  size: 11,
-                                  color: isAgency
-                                      ? AppColors.primary
-                                      : const Color(0xFFE67E22),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isAgency ? 'מתווך מאומת' : 'בעל דירה',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: isAgency
-                                        ? AppColors.primary
-                                        : const Color(0xFFE67E22),
-                                  ),
-                                ),
-                              ],
+                        child: Center(
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                          if (reviews.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            const Icon(
-                              IconsaxPlusBold.star_1,
-                              size: 13,
-                              color: Color(0xFFE8A84A),
+                        ),
+                      ),
+                      if (isAgency)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2.0),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              avgRating.toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.navy,
-                              ),
+                            child: const RentchIcon(
+                              IconsaxPlusLinear.verify,
+                              size: 16,
+                              color: Color(0xFF13BEC9),
                             ),
-                            Text(
-                              ' (${reviews.length})',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          property.ownerName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          isAgency ? 'מתווך נדל"ן מאומת' : 'בעל נכס פרטי',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isAgency
+                                ? const Color(0xFF13BEC9)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (reviews.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF08A).withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const RentchIcon(
+                            IconsaxPlusLinear.star_1,
+                            size: 14,
+                            color: Color(0xFFCA8A04),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            avgRating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF854D0E),
                             ),
-                          ],
+                          ),
                         ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'פרטי בעל הנכס, הדירוגים והערות השוכרים הקודמים זמינים כאן בשקיפות מלאה.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: Color(0xFF475569),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+
+              // Real review quote bubble if available
+              if (reviews.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.format_quote_rounded,
+                        size: 18,
+                        color: Color(0xFF13BEC9),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '"${reviews.first.text}"',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF475569),
+                            height: 1.45,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-            if (reviews.isNotEmpty) ...[
+
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
               const SizedBox(height: 12),
-              const Divider(height: 1, color: AppColors.borderLight),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () => _showOwnerSheet(context, property, reviews),
-                child: Row(
-                  children: [
-                    const Icon(IconsaxPlusBold.star,
-                        size: 15, color: AppColors.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'ביקורות על ${property.ownerName}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const Spacer(),
-                    const Icon(IconsaxPlusBold.arrow_left,
-                        size: 14, color: AppColors.primary),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () => _showOwnerSheet(context, property, reviews),
-              child: Row(
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(IconsaxPlusBold.profile_circle,
-                      size: 15, color: AppColors.textSecondary),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'צפה בפרופיל המלא',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                  GestureDetector(
+                    onTap: () => _showOwnerSheet(context, property, reviews),
+                    child: Row(
+                      children: [
+                        const RentchIcon(IconsaxPlusLinear.profile_circle,
+                            size: 16, color: Color(0xFF13BEC9)),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'פרופיל משכיר וביקורות',
+                          style: TextStyle(
+                            color: Color(0xFF13BEC9),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '(${reviews.length} חוות דעת)',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  const Icon(IconsaxPlusBold.arrow_left,
-                      size: 14, color: AppColors.textSecondary),
+                  const RentchIcon(
+                    IconsaxPlusLinear.arrow_left,
+                    size: 14,
+                    color: Color(0xFF13BEC9),
+                  ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -699,7 +1115,7 @@ class _OwnerProfileSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(IconsaxPlusBold.star_1,
+                            const RentchIcon(IconsaxPlusLinear.star_1,
                                 size: 14, color: Color(0xFFE8A84A)),
                             const SizedBox(width: 4),
                             Text(
@@ -784,8 +1200,8 @@ class _ReviewTile extends StatelessWidget {
                   5,
                   (i) => Icon(
                         i < review.rating
-                            ? IconsaxPlusBold.star_1
-                            : IconsaxPlusBold.star,
+                            ? IconsaxPlusLinear.star_1
+                            : IconsaxPlusLinear.star,
                         size: 13,
                         color: i < review.rating
                             ? const Color(0xFFE8A84A)
@@ -824,24 +1240,24 @@ class _PrimaryFactsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = <_FactDetailItem>[
       _FactDetailItem(
-        icon: IconsaxPlusBold.building,
+        icon: IconsaxPlusLinear.building,
         value: property.roomsLabel,
         label: 'חדרים',
       ),
       _FactDetailItem(
-        icon: IconsaxPlusBold.maximize_3,
+        icon: IconsaxPlusLinear.maximize_3,
         value: property.sizeM2.toString(),
         label: 'מ"ר',
       ),
       if (property.floor.isNotEmpty)
         _FactDetailItem(
-          icon: IconsaxPlusBold.layer,
+          icon: IconsaxPlusLinear.layer,
           value: property.floor,
           label: 'קומה',
         ),
       if (property.entryDate.isNotEmpty)
         _FactDetailItem(
-          icon: IconsaxPlusBold.calendar,
+          icon: IconsaxPlusLinear.calendar,
           value: _formatEntryDate(property.entryDate),
           label: 'כניסה',
         ),
@@ -951,51 +1367,54 @@ class _SectionCardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight2,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 18),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Icon(icon, color: const Color(0xFF13BEC9), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.3,
               ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.navy,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        child,
+        const SizedBox(height: 18),
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+      ],
     );
   }
+}
+
+IconData _getFeatureIcon(String feature) {
+  final f = feature.toLowerCase();
+  if (f.contains('חני') || f.contains('חניה')) return IconsaxPlusLinear.car;
+  if (f.contains('מעלי') || f.contains('מעלית')) return Icons.elevator_outlined;
+  if (f.contains('ממ"ד') || f.contains('ממד') || f.contains('מרחב מוגן'))
+    return IconsaxPlusLinear.shield_security;
+  if (f.contains('מרפס') || f.contains('מרפסת')) return Icons.balcony_outlined;
+  if (f.contains('מיזוג') || f.contains('מזגן') || f.contains('ac'))
+    return IconsaxPlusLinear.wind_2;
+  if (f.contains('ריהוט') || f.contains('מרוהט') || f.contains('מרוהטת'))
+    return IconsaxPlusLinear.lamp_1;
+  if (f.contains('סורג')) return Icons.grid_3x3_outlined;
+  if (f.contains('גינ') || f.contains('חצר'))
+    return Icons.local_florist_outlined;
+  if (f.contains('דוד')) return Icons.wb_sunny_outlined;
+  if (f.contains('חיות') || f.contains('כלב') || f.contains('חתול'))
+    return Icons.pets_outlined;
+  if (f.contains('משופץ') || f.contains('חדש'))
+    return IconsaxPlusLinear.magicpen;
+  return IconsaxPlusLinear.tick_circle;
 }
 
 class _FeatureWrap extends StatelessWidget {
@@ -1005,23 +1424,24 @@ class _FeatureWrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 8,
+      runSpacing: 8,
       children: features.map((f) {
+        final icon = _getFeatureIcon(f);
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FBFD),
+            color: const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE0EBF2)),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                IconsaxPlusBold.tick_circle,
-                size: 14,
-                color: AppColors.primary,
+              Icon(
+                icon,
+                size: 15,
+                color: const Color(0xFF13BEC9),
               ),
               const SizedBox(width: 8),
               Text(
@@ -1029,7 +1449,7 @@ class _FeatureWrap extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.navy,
+                  color: Color(0xFF334155),
                 ),
               ),
             ],
@@ -1049,12 +1469,12 @@ class _DetailsList extends StatelessWidget {
     final items = [
       if (property.condition.isNotEmpty)
         _DetailItem(
-            icon: IconsaxPlusBold.star,
+            icon: IconsaxPlusLinear.star,
             label: 'מצב הנכס',
             value: property.condition),
       if (property.totalFloors.isNotEmpty)
         _DetailItem(
-            icon: IconsaxPlusBold.layer,
+            icon: IconsaxPlusLinear.layer,
             label: 'קומות בבניין',
             value: property.totalFloors),
     ];
@@ -1066,9 +1486,10 @@ class _DetailsList extends StatelessWidget {
         for (var i = 0; i < items.length; i++) ...[
           _SecondaryDetailRow(item: items[i]),
           if (i != items.length - 1)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10),
-              child: Divider(height: 1, color: AppColors.borderLight),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Divider(
+                  height: 1, color: Colors.white.withValues(alpha: 0.08)),
             ),
         ],
       ],
@@ -1097,10 +1518,10 @@ class _SecondaryDetailRow extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.10),
+            color: Colors.white.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Icon(item.icon, size: 18, color: AppColors.primary),
+          child: Icon(item.icon, size: 18, color: const Color(0xFF13BEC9)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1112,16 +1533,16 @@ class _SecondaryDetailRow extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.navy,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 item.label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -1187,7 +1608,7 @@ class _MapSection extends StatelessWidget {
                                   offset: Offset(0, 4)),
                             ],
                           ),
-                          child: const Icon(IconsaxPlusBold.building,
+                          child: const RentchIcon(IconsaxPlusLinear.building,
                               color: Colors.white, size: 20),
                         ),
                       ),
@@ -1209,7 +1630,7 @@ class _MapSection extends StatelessWidget {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(IconsaxPlusBold.export_2,
+                      RentchIcon(IconsaxPlusLinear.export_2,
                           size: 13, color: Colors.white),
                       SizedBox(width: 5),
                       Text(
@@ -1254,54 +1675,64 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isProcessing = property.virtualTour?.isProcessing == true;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 20, offset: Offset(0, -6)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: onLike,
-              icon: const Icon(IconsaxPlusBold.heart),
-              label: const Text('אהבתי'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.navy,
-                side: const BorderSide(color: AppColors.borderLight),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(
+              20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.85),
+            border: const Border(
+              top: BorderSide(
+                color: Color(0xFFE2E8F0),
+                width: 1,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: FilledButton.icon(
-              onPressed: onTour,
-              icon: const Icon(Icons.view_in_ar_rounded),
-              label: Text(
-                hasVirtualTour
-                    ? 'סיור תלת־ממדי'
-                    : isProcessing
-                        ? 'סריקה בהכנה'
-                        : 'בקש סיור תלת־ממדי',
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onLike,
+                  icon: const RentchIcon(IconsaxPlusLinear.heart, size: 18),
+                  label: const Text('אהבתי',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F172A),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
               ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  onPressed: onTour,
+                  icon: const Icon(Icons.view_in_ar_rounded, size: 18),
+                  label: Text(
+                    hasVirtualTour
+                        ? 'סיור תלת־ממדי'
+                        : isProcessing
+                            ? 'סריקה בהכנה'
+                            : 'בקש סיור תלת־ממדי',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF13BEC9),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1353,13 +1784,13 @@ class _OverviewCard extends StatelessWidget {
                         _MetaPill(
                           icon: property.transactionType ==
                                   PropertyTransactionType.sale
-                              ? IconsaxPlusBold.tag
-                              : IconsaxPlusBold.key,
+                              ? IconsaxPlusLinear.tag
+                              : IconsaxPlusLinear.key,
                           label: property.transactionLabel,
                         ),
                         if (property.propertyType.trim().isNotEmpty)
                           _MetaPill(
-                            icon: IconsaxPlusBold.building_4,
+                            icon: IconsaxPlusLinear.building_4,
                             label: property.propertyType,
                           ),
                       ],
@@ -1394,8 +1825,8 @@ class _OverviewCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(
-                          IconsaxPlusBold.location,
+                        const RentchIcon(
+                          IconsaxPlusLinear.location,
                           size: 16,
                           color: AppColors.primary,
                         ),
@@ -1472,8 +1903,8 @@ class _OverviewCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(
-                    IconsaxPlusBold.arrow_left_2,
+                  const RentchIcon(
+                    IconsaxPlusLinear.arrow_left_2,
                     color: Colors.white,
                     size: 18,
                   ),
@@ -1557,16 +1988,16 @@ class _CompactFactsRow extends StatelessWidget {
       runSpacing: 8,
       children: [
         _FactChip(
-          icon: IconsaxPlusBold.building,
+          icon: IconsaxPlusLinear.building,
           label: '${property.roomsLabel} חדרים',
         ),
         _FactChip(
-          icon: IconsaxPlusBold.maximize_3,
+          icon: IconsaxPlusLinear.maximize_3,
           label: '${property.sizeM2} מ"ר',
         ),
         if (property.floor.isNotEmpty)
           _FactChip(
-            icon: IconsaxPlusBold.layer,
+            icon: IconsaxPlusLinear.layer,
             label: 'קומה ${property.floor}',
           ),
       ],
@@ -1692,7 +2123,7 @@ class _TourUnavailableSheet extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(IconsaxPlusBold.close_circle),
+                  icon: const RentchIcon(IconsaxPlusLinear.close_circle),
                   label: const Text('סגור'),
                 ),
               ),
@@ -1708,7 +2139,7 @@ class _TourUnavailableSheet extends StatelessWidget {
                             mode: LaunchMode.externalApplication,
                           );
                         },
-                  icon: const Icon(IconsaxPlusBold.export_2),
+                  icon: const RentchIcon(IconsaxPlusLinear.export_2),
                   label: const Text('פתח מודעה'),
                 ),
               ),
@@ -1768,7 +2199,7 @@ class _VirtualTourScreen extends StatelessWidget {
               child: Row(
                 children: [
                   _FloatingNavBtn(
-                    icon: IconsaxPlusBold.arrow_right,
+                    icon: IconsaxPlusLinear.arrow_right,
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
@@ -1862,7 +2293,7 @@ class _InteractiveTourScreen extends StatelessWidget {
               Row(
                 children: [
                   _FloatingNavBtn(
-                    icon: IconsaxPlusBold.arrow_right,
+                    icon: IconsaxPlusLinear.arrow_right,
                     onTap: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
@@ -1931,17 +2362,17 @@ class _InteractiveTourScreen extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   _DarkMetricChip(
-                    icon: IconsaxPlusBold.cloud,
+                    icon: IconsaxPlusLinear.cloud,
                     label: tour.provider,
                   ),
                   if (quality != null)
                     _DarkMetricChip(
-                      icon: IconsaxPlusBold.star_1,
+                      icon: IconsaxPlusLinear.star_1,
                       label: 'איכות $quality%',
                     ),
                   if (tour.downloadUrl.trim().isNotEmpty)
                     const _DarkMetricChip(
-                      icon: IconsaxPlusBold.document_cloud,
+                      icon: IconsaxPlusLinear.document_cloud,
                       label: 'קובץ זמין',
                     ),
                 ],
@@ -1951,7 +2382,7 @@ class _InteractiveTourScreen extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () => _openViewer(context, tour.viewerUrl),
-                  icon: const Icon(IconsaxPlusBold.export_2),
+                  icon: const RentchIcon(IconsaxPlusLinear.export_2),
                   label: const Text('פתח סיור אינטראקטיבי'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -2008,6 +2439,259 @@ class _DarkMetricChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PropertyFactsCard extends StatelessWidget {
+  final RentalProperty property;
+
+  _PropertyFactsCard(this.property, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final hasParking =
+        property.features.any((f) => f.contains('חני') || f.contains('חניה'));
+    final hasElevator =
+        property.features.any((f) => f.contains('מעלי') || f.contains('מעלית'));
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _FactItemCard(
+                IconsaxPlusLinear.building,
+                property.roomsLabel,
+                'חדרים',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _FactItemCard(
+                IconsaxPlusLinear.maximize_3,
+                '${property.sizeM2}',
+                'שטח במ"ר',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _FactItemCard(
+                IconsaxPlusLinear.layer,
+                property.floor.isNotEmpty ? property.floor : '-',
+                'קומה',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: _FactItemCard(
+                IconsaxPlusLinear.magicpen,
+                property.condition.isNotEmpty ? property.condition : 'רגיל',
+                'מצב הנכס',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: _FactItemCard(
+                IconsaxPlusLinear.car,
+                hasParking ? 'יש' : 'אין',
+                'חנייה',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: _FactItemCard(
+                Icons.elevator_outlined,
+                hasElevator ? 'יש' : 'אין',
+                'מעלית',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FactItemCard extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+
+  _FactItemCard(this.icon, this.value, this.label, {Key? key})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: const Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HorizontalReviewsList extends StatelessWidget {
+  final List<AppReview> reviews;
+
+  _HorizontalReviewsList(this.reviews, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 140,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: reviews.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          final review = reviews[index];
+          final initial = review.authorName.isNotEmpty
+              ? review.authorName[0].toUpperCase()
+              : '?';
+          return Container(
+            width: 290,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            review.authorName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const Text(
+                            'שוכר לשעבר',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF08A).withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const RentchIcon(
+                            IconsaxPlusLinear.star_1,
+                            size: 12,
+                            color: Color(0xFFCA8A04),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            review.rating.toString(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF854D0E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: Text(
+                    review.text,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: Color(0xFF475569),
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

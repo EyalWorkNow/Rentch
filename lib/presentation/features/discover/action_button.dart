@@ -24,21 +24,21 @@ class ActionButtons extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ✕ X — pass (left, matches swipe left direction)
+          // ♥ Heart — like (right in RTL, matches swipe right direction)
           _ActionButton(
-            icon: Icons.close_rounded,
-            tooltip: 'דלג על דירה',
-            iconColor: AppColors.coral,
+            icon: IconsaxPlusBold.heart,
+            tooltip: 'אהבתי דירה',
+            iconColor: AppColors.primary,
             backgroundColor: Colors.white,
-            size: 62,
-            iconSize: 30,
+            size: 72,
+            iconSize: 34,
             onPressed: () {
-              HapticFeedback.lightImpact();
-              onSwipeLeft();
+              HapticFeedback.mediumImpact();
+              onSwipeRight();
             },
-            shadowColor: AppColors.coral,
+            shadowColor: AppColors.primary,
           ),
-          
+
           // 3D Tour (center)
           Column(
             mainAxisSize: MainAxisSize.min,
@@ -68,19 +68,19 @@ class ActionButtons extends StatelessWidget {
             ],
           ),
 
-          // ♥ Heart — like (right, largest, matches swipe right direction)
+          // ✕ X — pass (left in RTL, matches swipe left direction)
           _ActionButton(
-            icon: IconsaxPlusBold.heart,
-            tooltip: 'אהבתי דירה',
-            iconColor: AppColors.primary,
+            icon: Icons.close_rounded,
+            tooltip: 'דלג על דירה',
+            iconColor: AppColors.coral,
             backgroundColor: Colors.white,
-            size: 72,
-            iconSize: 34,
+            size: 62,
+            iconSize: 30,
             onPressed: () {
-              HapticFeedback.mediumImpact();
-              onSwipeRight();
+              HapticFeedback.lightImpact();
+              onSwipeLeft();
             },
-            shadowColor: AppColors.primary,
+            shadowColor: AppColors.coral,
           ),
         ],
       ),

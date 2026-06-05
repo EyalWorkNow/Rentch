@@ -3,13 +3,54 @@ import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-class OnboardingScreen extends StatelessWidget {
+class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
-  static const _heroImageUrl =
-      'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85';
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
 
-  void _openAuth(BuildContext context) {
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  late final PageController _pageController;
+  int _page = 0;
+
+  static const _slides = [
+    _OnboardingSlide(
+      imageUrl:
+          'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85',
+      title: 'למצוא נכס שמתאים באמת',
+      body:
+          'חיפוש חכם לפי תקציב, אזור, מאפיינים וסגנון חיים, כדי להגיע מהר לדירות שרלוונטיות לך.',
+    ),
+    _OnboardingSlide(
+      imageUrl:
+          'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85',
+      title: 'לפרסם דירה בצורה פשוטה',
+      body:
+          'בעלי נכסים יכולים להעלות דירה, לנהל פרטים ותמונות, ולקבל מועמדים שמתאימים למה שהם מחפשים.',
+    ),
+    _OnboardingSlide(
+      imageUrl:
+          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=85',
+      title: 'לנהל התאמות ושיחות במקום אחד',
+      body:
+          'מעקב אחר התאמות, הודעות, ביקורות ושלבים חשובים בתהליך, בלי לקפוץ בין אפליקציות.',
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _openAuth() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         pageBuilder: (_, animation, __) => const AuthScreen(),
@@ -35,10 +76,22 @@ class OnboardingScreen extends StatelessWidget {
     );
   }
 
+  void _next() {
+    if (_page == _slides.length - 1) {
+      _openAuth();
+      return;
+    }
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final maxWidth = size.width >= 600 ? 430.0 : double.infinity;
+    final slide = _slides[_page];
 
     return Scaffold(
       backgroundColor: const Color(0xFFE7ECF8),
@@ -48,92 +101,82 @@ class OnboardingScreen extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Positioned.fill(
-                child: Image.network(
-                  _heroImageUrl,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.center,
-                  errorBuilder: (_, __, ___) => const _OnboardingFallback(),
-                ),
+              PageView.builder(
+                controller: _pageController,
+                itemCount: _slides.length,
+                onPageChanged: (value) => setState(() => _page = value),
+                itemBuilder: (context, index) {
+                  return Image.network(
+                    _slides[index].imageUrl,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                    errorBuilder: (_, __, ___) => const _OnboardingFallback(),
+                  );
+                },
               ),
               const Positioned.fill(child: _OnboardingScrim()),
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
                   child: Column(
                     children: [
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: SvgPicture.asset(
-                          'assets/images/rentch_logo.svg',
-                          height: 42,
-                          colorFilter: const ColorFilter.mode(
-                            Colors.white,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
                       const Spacer(),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 720),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) {
-                          return Opacity(
-                            opacity: value,
-                            child: Transform.translate(
-                              offset: Offset(0, 18 * (1 - value)),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 320),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.08),
+                                end: Offset.zero,
+                              ).animate(animation),
                               child: child,
                             ),
                           );
                         },
-                        child: Column(
-                          children: [
-                            const Text(
-                              'למצוא, לפרסם ולנהל נכס בקלות',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 30,
-                                height: 1.18,
-                                fontWeight: FontWeight.w900,
-                              ),
+                        child: _SlideCopy(
+                          key: ValueKey(slide.title),
+                          slide: slide,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _PageDots(
+                        count: _slides.length,
+                        activeIndex: _page,
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 62,
+                        child: FilledButton(
+                          onPressed: _next,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.navy,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'כל הדירות, ההתאמות והשיחות במקום אחד, עם חיפוש חכם וחוויה שנבנתה לשוק הישראלי.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.82),
-                                fontSize: 15.5,
-                                height: 1.45,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            textStyle: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
                             ),
-                            const SizedBox(height: 26),
-                            const _PageDots(),
-                            const SizedBox(height: 34),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 62,
-                              child: FilledButton(
-                                onPressed: () => _openAuth(context),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: AppColors.navy,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                child: const Text('מתחילים'),
-                              ),
-                            ),
-                          ],
+                          ),
+                          child: Text(
+                            _page == _slides.length - 1 ? 'מתחילים' : 'הבא',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SvgPicture.asset(
+                        'assets/images/rentch_logo.svg',
+                        height: 42,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.white,
+                          BlendMode.srcIn,
                         ),
                       ),
                     ],
@@ -148,61 +191,157 @@ class OnboardingScreen extends StatelessWidget {
   }
 }
 
+class _OnboardingSlide {
+  const _OnboardingSlide({
+    required this.imageUrl,
+    required this.title,
+    required this.body,
+  });
+
+  final String imageUrl;
+  final String title;
+  final String body;
+}
+
+class _SlideCopy extends StatelessWidget {
+  const _SlideCopy({
+    super.key,
+    required this.slide,
+  });
+
+  final _OnboardingSlide slide;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          slide.title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 30,
+            height: 1.18,
+            fontWeight: FontWeight.w900,
+            shadows: [
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 22,
+                offset: Offset(0, 4),
+              ),
+              Shadow(
+                color: Color(0x66000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          slide.body,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.84),
+            fontSize: 15.5,
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+            shadows: const [
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 16,
+                offset: Offset(0, 3),
+              ),
+              Shadow(
+                color: Color(0x66000000),
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _OnboardingScrim extends StatelessWidget {
   const _OnboardingScrim();
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0.04),
-            Colors.transparent,
-            Colors.black.withValues(alpha: 0.22),
-            Colors.black.withValues(alpha: 0.62),
-          ],
-          stops: const [0.0, 0.42, 0.68, 1.0],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.05),
+                Colors.transparent,
+                Colors.black.withValues(alpha: 0.16),
+              ],
+              stops: const [0.0, 0.48, 1.0],
+            ),
+          ),
         ),
-      ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.62,
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.0),
+                    Colors.black.withValues(alpha: 0.18),
+                    Colors.black.withValues(alpha: 0.52),
+                    Colors.black.withValues(alpha: 0.82),
+                    Colors.black.withValues(alpha: 0.94),
+                  ],
+                  stops: const [0.0, 0.28, 0.56, 0.82, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _PageDots extends StatelessWidget {
-  const _PageDots();
+  const _PageDots({
+    required this.count,
+    required this.activeIndex,
+  });
+
+  final int count;
+  final int activeIndex;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 34,
+      children: List.generate(count, (index) {
+        final isActive = index == activeIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          width: isActive ? 34 : 7,
           height: 7,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Colors.white.withValues(alpha: isActive ? 1 : 0.48),
             borderRadius: BorderRadius.circular(999),
           ),
-        ),
-        const SizedBox(width: 5),
-        _dot(Colors.white.withValues(alpha: 0.82)),
-        const SizedBox(width: 5),
-        _dot(Colors.white.withValues(alpha: 0.42)),
-      ],
-    );
-  }
-
-  Widget _dot(Color color) {
-    return Container(
-      width: 7,
-      height: 7,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+        );
+      }),
     );
   }
 }

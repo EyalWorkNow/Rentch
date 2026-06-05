@@ -34,94 +34,72 @@ class DiscoverScreen extends StatelessWidget {
             automaticallyImplyLeading: false,
             backgroundColor: AppColors.background,
             elevation: 0,
-            titleSpacing: 16,
-            title: Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/images/rentch_logo.svg',
-                  height: 32,
-                  width: 32,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Rentch',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.navy,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    Text(
-                      provider.filters.city.isNotEmpty
-                          ? provider.filters.city
-                          : '${properties.length} דירות',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            centerTitle: true,
+            title: Text(
+              '${properties.length} דירות באזור',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.navy,
+              ),
             ),
             actions: [
-              GestureDetector(
-                onTap: provider.isLoading
-                    ? null
-                    : () => _showFilters(context, provider),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    color: provider.activeFilterCount > 0
-                        ? AppColors.navy
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: provider.activeFilterCount > 0
-                          ? AppColors.navy
-                          : AppColors.borderLight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: GestureDetector(
+                  onTap: provider.isLoading
+                      ? null
+                      : () => _showFilters(context, provider),
+                  child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      RentchIcon(
-                        IconsaxPlusLinear.setting_4,
-                        size: 14,
-                        color: provider.activeFilterCount > 0
-                            ? Colors.white
-                            : AppColors.navy,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        provider.activeFilterCount > 0
-                            ? 'סינון (${provider.activeFilterCount})'
-                            : 'סינון',
-                        style: TextStyle(
-                          color: provider.activeFilterCount > 0
-                              ? Colors.white
-                              : AppColors.navy,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        height: 42,
+                        width: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFE2E8F0),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: RentchIcon(
+                            IconsaxPlusLinear.setting_4,
+                            size: 20,
+                            color: AppColors.navy,
+                          ),
                         ),
                       ),
+                      if (provider.activeFilterCount > 0)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${provider.activeFilterCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1306,72 +1284,129 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         ),
                       const SizedBox(height: 14),
                       // Mini map
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: SizedBox(
-                          height: 160,
-                          child: FlutterMap(
-                            key: ValueKey(
-                              '${f.areaId}-${f.city}-${f.customAreaPolygon.length}',
+                      Container(
+                        height: 160,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFE2E8F0),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                            options: MapOptions(
-                              initialCenter: area.center,
-                              initialZoom: area.id == 'all_israel' ? 7.5 : 11,
-                              interactionOptions: const InteractionOptions(
-                                flags: InteractiveFlag.all,
-                              ),
-                              onTap: (_, __) async {
-                                final polygon = await Navigator.of(context)
-                                    .push<List<LatLng>>(
-                                  MaterialPageRoute(
-                                    fullscreenDialog: true,
-                                    builder: (_) => _AreaLassoScreen(
-                                      initialArea: area,
-                                      initialPolygon: f.customAreaPolygon,
-                                      previewMarkers: _markerPreview,
-                                    ),
-                                  ),
-                                );
-                                if (!mounted || polygon == null) return;
-                                _setDraftFilters(
-                                  f.copyWith(
-                                    city: '',
-                                    areaId: 'all_israel',
-                                    customAreaPolygon: polygon,
-                                  ),
-                                  provider,
-                                );
-                              },
-                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Stack(
                             children: [
-                              TileLayer(
-                                urlTemplate:
-                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                userAgentPackageName: 'com.rentch.app',
-                              ),
-                              PolygonLayer(
-                                polygons: [
-                                  Polygon(
-                                    points: area.polygon,
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.2),
-                                    borderColor: AppColors.primary,
-                                    borderStrokeWidth: 3,
+                              FlutterMap(
+                                key: ValueKey(
+                                  '${f.areaId}-${f.city}-${f.customAreaPolygon.length}',
+                                ),
+                                options: MapOptions(
+                                  initialCenter: area.center,
+                                  initialZoom: area.id == 'all_israel' ? 7.5 : 11,
+                                  interactionOptions: const InteractionOptions(
+                                    flags: InteractiveFlag.all,
+                                  ),
+                                  onTap: (_, __) async {
+                                    final polygon = await Navigator.of(context)
+                                        .push<List<LatLng>>(
+                                      MaterialPageRoute(
+                                        fullscreenDialog: true,
+                                        builder: (_) => _AreaLassoScreen(
+                                          initialArea: area,
+                                          initialPolygon: f.customAreaPolygon,
+                                          previewMarkers: _markerPreview,
+                                        ),
+                                      ),
+                                    );
+                                    if (!mounted || polygon == null) return;
+                                    _setDraftFilters(
+                                      f.copyWith(
+                                        city: '',
+                                        areaId: 'all_israel',
+                                        customAreaPolygon: polygon,
+                                      ),
+                                      provider,
+                                    );
+                                  },
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate:
+                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    userAgentPackageName: 'com.rentch.app',
+                                  ),
+                                  PolygonLayer(
+                                    polygons: [
+                                      Polygon(
+                                        points: area.polygon,
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.2),
+                                        borderColor: AppColors.primary,
+                                        borderStrokeWidth: 3,
+                                      ),
+                                    ],
+                                  ),
+                                  MarkerLayer(
+                                    markers: _markerPreview
+                                        .map((p) => Marker(
+                                              point: p.point,
+                                              width: 28,
+                                              height: 28,
+                                              child: const RentchIcon(
+                                                  IconsaxPlusLinear.building,
+                                                  color: AppColors.primary,
+                                                  size: 22),
+                                            ))
+                                        .toList(),
                                   ),
                                 ],
                               ),
-                              MarkerLayer(
-                                markers: _markerPreview
-                                    .map((p) => Marker(
-                                          point: p.point,
-                                          width: 28,
-                                          height: 28,
-                                          child: const RentchIcon(
-                                              IconsaxPlusLinear.building,
-                                              color: AppColors.primary,
-                                              size: 22),
-                                        ))
-                                    .toList(),
+                              // Interactive overlay hint
+                              Positioned(
+                                top: 12,
+                                right: 12,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.edit_location_alt_rounded,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        f.hasCustomArea ? 'ערוך אזור' : 'סמן אזור',
+                                        style: const TextStyle(
+                                          color: AppColors.navy,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -1597,9 +1632,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                       _FilterSection(
                         title: 'מצב הנכס',
                         icon: IconsaxPlusLinear.shield_tick,
+                        action: const _PriorityLegend(),
                       ),
-                      const SizedBox(height: 6),
-                      const _PriorityLegend(),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1626,8 +1661,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         title: 'מקור מודעה',
                         icon: IconsaxPlusLinear.profile_2user,
                       ),
-                      const SizedBox(height: 6),
-                      const _PriorityLegend(),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1666,8 +1700,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         title: 'מועד כניסה',
                         icon: IconsaxPlusLinear.calendar_1,
                       ),
-                      const SizedBox(height: 6),
-                      const _PriorityLegend(),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1782,7 +1815,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           },
                         ),
                       ] else ...[
-                        const _PriorityLegend(),
+                        const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -1959,38 +1992,35 @@ class _FilterSection extends StatelessWidget {
   }
 }
 
-/// Legend explaining the tri-state tap behaviour, shown below every tag section header.
 class _PriorityLegend extends StatelessWidget {
   const _PriorityLegend();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          _LegendChip(
-            label: 'מועדף',
-            color: AppColors.primary,
-            icon: Icons.favorite_rounded,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _LegendChip(
+          label: 'מועדף',
+          color: AppColors.primary,
+          icon: Icons.favorite_rounded,
+        ),
+        const SizedBox(width: 8),
+        _LegendChip(
+          label: 'חייב להיות',
+          color: AppColors.coral,
+          icon: Icons.priority_high_rounded,
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'טאפ / דאבל טאפ',
+          style: TextStyle(
+            fontSize: 10,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(width: 8),
-          _LegendChip(
-            label: 'חייב להיות',
-            color: AppColors.coral,
-            icon: Icons.priority_high_rounded,
-          ),
-          const Spacer(),
-          const Text(
-            'טאפ / דאבל טאפ',
-            style: TextStyle(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -2809,65 +2839,69 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
           ),
 
           // Bottom Area: Floating Card and Save buttons
-          // 1. Bottom Headers: Styled as tags/chips
           // 1. Bottom Headers: Styled as premium tags/chips with liquid glass
           if (hasProperties)
             Positioned(
               left: 16,
               right: 16,
               bottom: 368 + MediaQuery.of(context).padding.bottom,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.38),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08)),
-                        ),
-                        child: const Text(
-                          'דירות באזור המסומן',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
+              child: GestureDetector(
+                onTap: canSave
+                    ? () => Navigator.of(context).pop(List<LatLng>.from(polygon))
+                    : null,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.38),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08)),
+                          ),
+                          child: const Text(
+                            'דירות באזור המסומן',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.26),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08)),
-                        ),
-                        child: Text(
-                          '${widget.previewMarkers.length} תוצאות',
-                          style: const TextStyle(
-                            color: Colors.white, // Solid white text
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.26),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08)),
+                          ),
+                          child: Text(
+                            '${widget.previewMarkers.length} תוצאות',
+                            style: const TextStyle(
+                              color: Colors.white, // Solid white text
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 

@@ -13,6 +13,7 @@ import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -139,164 +140,421 @@ class ProfileScreen extends StatelessWidget {
         }
 
         return Scaffold(
-          backgroundColor: AppColors.background,
-          body: CustomScrollView(
-            slivers: [
-              _ProfileSliverHeader(
-                profile: profile,
-                profileCompletion: provider.profileCompletion,
-                onEdit: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => EditProfileScreen(profile: profile),
-                  ),
-                ),
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFFF1F5F9),
+                  Color(0xFFF8FAFC),
+                  Color(0xFFE6F9FB), // light teal instead of pink
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      // Stats bar
-                      _StatsBar(
-                        likes: provider.likesCount,
-                        matches: provider.matchesCount,
-                        passed: provider.passedCount,
-                      ),
-                      const SizedBox(height: 16),
-                      // Search preferences
-                      _SectionCard(
-                        title: 'העדפות חיפוש',
-                        icon: IconsaxPlusBold.search_normal,
-                        child: Column(
-                          children: [
-                            _PreferenceRow(
-                              icon: IconsaxPlusBold.money,
-                              label: 'תקציב מקסימלי',
-                              value: _fmt(profile.budgetMax),
-                            ),
-                            const _Divider(),
-                            _PreferenceRow(
-                              icon: IconsaxPlusBold.building,
-                              label: 'מספר חדרים',
-                              value: '${profile.desiredRooms} חדרים',
-                            ),
-                            const _Divider(),
-                            _PreferenceRow(
-                              icon: IconsaxPlusBold.calendar,
-                              label: 'מועד כניסה',
-                              value: profile.moveInWindow,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // About me
-                      if (profile.bio.isNotEmpty)
-                        _SectionCard(
-                          title: 'עליי',
-                          icon: IconsaxPlusBold.user,
-                          child: Text(
-                            profile.bio,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                              height: 1.6,
-                            ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 130),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Bar Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'הפרופיל שלי',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
-                      if (profile.bio.isNotEmpty) const SizedBox(height: 16),
-                      // Important details
-                      if (profile.importantDetails.isNotEmpty)
-                        _SectionCard(
-                          title: 'פרטים לבעלי דירות',
-                          icon: IconsaxPlusBold.info_circle,
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: profile.importantDetails.map((d) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 7),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const RentchIcon(
+                                IconsaxPlusLinear.notification,
+                                color: Color(0xFF0F172A),
+                                size: 20,
+                              ),
+                              Positioned(
+                                top: 12,
+                                right: 12,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primary, // App primary color instead of pink
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Avatar area (Mockup Style)
+                    Center(
+                      child: Column(
+                        children: [
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Teal outer circle ring
+                              Container(
+                                width: 253,
+                                height: 253,
                                 decoration: BoxDecoration(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.25),
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.primary,
+                                      AppColors.primary.withValues(alpha: 0.3),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
                                 ),
-                                child: Text(
-                                  d,
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
+                              ),
+                              // White inner ring
+                              Container(
+                                width: 239,
+                                height: 239,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              // Actual profile picture
+                              ClipOval(
+                                child: SizedBox(
+                                  width: 220,
+                                  height: 220,
+                                  child: profile.photoUrl.isNotEmpty
+                                      ? (profile.photoUrl.startsWith('/')
+                                          ? Image.file(File(profile.photoUrl),
+                                              fit: BoxFit.cover)
+                                          : Image.network(profile.photoUrl,
+                                              fit: BoxFit.cover))
+                                      : Container(
+                                          color: const Color(0xFFE2E8F0),
+                                          child: const RentchIcon(
+                                            IconsaxPlusLinear.user,
+                                            size: 100,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              // Checked teal badge overlay
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary, // App primary color instead of pink
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 28,
                                   ),
                                 ),
-                              );
-                            }).toList(),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                profile.name,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        EditProfileScreen(profile: profile),
+                                  ),
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: const RentchIcon(
+                                    IconsaxPlusLinear.edit_2,
+                                    size: 14,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'שוכר',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Profile Completion progress card (Mockup Style)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'שלמות הפרופיל שלי',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              Text(
+                                '${provider.profileCompletion}%',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: provider.profileCompletion / 100,
+                              minHeight: 10,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Stats bar (Mockup Style individual boxes)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MockupStatBox(
+                            count: provider.likesCount.toString(),
+                            label: 'אהבתי',
+                            icon: IconsaxPlusBold.heart,
+                            color: AppColors.primary,
                           ),
                         ),
-                      if (profile.importantDetails.isNotEmpty)
-                        const SizedBox(height: 16),
-                      // Reviews
-                      if (provider.tenantReviews.isNotEmpty)
-                        _SectionCard(
-                          title: 'ביקורות',
-                          icon: IconsaxPlusBold.star_1,
-                          child: Column(
-                            children: provider.tenantReviews
-                                .take(3)
-                                .map((r) => _ReviewCard(review: r))
-                                .toList(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _MockupStatBox(
+                            count: provider.matchesCount.toString(),
+                            label: 'התאמות',
+                            icon: IconsaxPlusBold.messages_2,
+                            color: AppColors.coral,
                           ),
                         ),
-                      if (provider.tenantReviews.isNotEmpty)
-                        const SizedBox(height: 16),
-                      // Actions grouped in a single card
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _MockupStatBox(
+                            count: provider.passedCount.toString(),
+                            label: 'דילגתי',
+                            icon: Icons.close_rounded,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Search Preferences Grouped Container
+                    const Text(
+                      'הגדרות',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _PreferenceTile(
+                            icon: IconsaxPlusLinear.money,
+                            label: 'תקציב מקסימלי',
+                            value: _fmt(profile.budgetMax),
+                          ),
+                          const _SettingsDivider(),
+                          _PreferenceTile(
+                            icon: IconsaxPlusLinear.building,
+                            label: 'מספר חדרים',
+                            value: '${profile.desiredRooms} חדרים',
+                          ),
+                          const _SettingsDivider(),
+                          _PreferenceTile(
+                            icon: IconsaxPlusLinear.calendar,
+                            label: 'מועד כניסה',
+                            value: profile.moveInWindow,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // About me
+                    if (profile.bio.isNotEmpty) ...[
                       Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.borderLight),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: AppColors.shadow,
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _ActionTile(
-                              icon: IconsaxPlusBold.logout,
-                              label: 'יציאה מהחשבון',
-                              isDestructive: true,
-                              onTap: () => _confirmLogout(context),
+                            const Row(
+                              children: [
+                                RentchIcon(IconsaxPlusLinear.user,
+                                    size: 18, color: Color(0xFF64748B)),
+                                SizedBox(width: 8),
+                                Text(
+                                  'עליי',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Divider(
-                              height: 1,
-                              indent: 74,
-                              color: AppColors.borderLight,
-                            ),
-                            _ActionTile(
-                              icon: IconsaxPlusBold.trash,
-                              label: 'מחיקת חשבון',
-                              isDestructive: true,
-                              onTap: () => _confirmDeleteAccount(context),
+                            const SizedBox(height: 10),
+                            Text(
+                              profile.bio,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF475569),
+                                height: 1.5,
+                              ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
+
+                    // Actions Container
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          _ActionRow(
+                            icon: IconsaxPlusLinear.logout,
+                            label: 'יציאה מהחשבון',
+                            onTap: () => _confirmLogout(context),
+                            isDestructive: true,
+                          ),
+                          const _SettingsDivider(),
+                          _ActionRow(
+                            icon: IconsaxPlusLinear.trash,
+                            label: 'מחיקת חשבון',
+                            onTap: () => _confirmDeleteAccount(context),
+                            isDestructive: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         );
       },
@@ -373,9 +631,10 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
 
     return SliverAppBar(
       expandedHeight: 340,
-      pinned: true,
+      pinned: false,
       automaticallyImplyLeading: false,
-      backgroundColor: AppColors.navy,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       surfaceTintColor: Colors.transparent,
       titleTextStyle: const TextStyle(
         color: Colors.white,
@@ -386,7 +645,8 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
       actions: [
         TextButton.icon(
           onPressed: widget.onEdit,
-          icon: const Icon(IconsaxPlusBold.edit, color: Colors.white, size: 16),
+          icon: const RentchIcon(IconsaxPlusLinear.edit,
+              color: Colors.white, size: 16),
           label: const Text(
             'עריכה',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
@@ -531,8 +791,10 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                                 ? FileImage(File(profile.photoUrl))
                                 : null,
                             child: profile.photoUrl.isEmpty
-                                ? const Icon(IconsaxPlusBold.profile_circle,
-                                    color: Colors.white, size: 34)
+                                ? const RentchIcon(
+                                    IconsaxPlusLinear.profile_circle,
+                                    color: Colors.white,
+                                    size: 34)
                                 : null,
                           ),
                         ),
@@ -580,7 +842,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(IconsaxPlusBold.money,
+                        const RentchIcon(IconsaxPlusLinear.money,
                             size: 14, color: Colors.white60),
                         const SizedBox(width: 5),
                         Text(
@@ -666,7 +928,7 @@ class _StatsBar extends StatelessWidget {
         child: Row(
           children: [
             _StatBarItem(
-              icon: IconsaxPlusBold.heart,
+              icon: IconsaxPlusLinear.heart,
               color: AppColors.primary,
               value: likes.toString(),
               label: 'אהבתי',
@@ -678,7 +940,7 @@ class _StatsBar extends StatelessWidget {
               color: AppColors.borderLight,
             ),
             _StatBarItem(
-              icon: IconsaxPlusBold.message,
+              icon: IconsaxPlusLinear.message,
               color: const Color(0xFF4A6CF7),
               value: matches.toString(),
               label: 'התאמות',
@@ -689,7 +951,7 @@ class _StatsBar extends StatelessWidget {
               color: AppColors.borderLight,
             ),
             _StatBarItem(
-              icon: IconsaxPlusBold.close_circle,
+              icon: IconsaxPlusLinear.close_circle,
               color: AppColors.coral,
               value: passed.toString(),
               label: 'דילגתי',
@@ -912,7 +1174,7 @@ class _ReviewCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(IconsaxPlusBold.star_1,
+              const RentchIcon(IconsaxPlusLinear.star_1,
                   color: Color(0xFFE8A84A), size: 15),
               const SizedBox(width: 5),
               Text(
@@ -991,8 +1253,8 @@ class _ActionTile extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(
-                IconsaxPlusBold.arrow_left,
+              RentchIcon(
+                IconsaxPlusLinear.arrow_left,
                 size: 16,
                 color: AppColors.textSecondary.withValues(alpha: 0.5),
               ),
@@ -1130,7 +1392,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => EditProfileScreen(profile: profile)),
                   ),
-                  icon: const Icon(IconsaxPlusBold.edit_2,
+                  icon: const RentchIcon(IconsaxPlusLinear.edit_2,
                       color: Colors.white, size: 15),
                   label: const Text('עריכה',
                       style: TextStyle(
@@ -1169,7 +1431,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                 _LandlordSectionHeader(
                   title: 'הנכסים שלי',
                   subtitle: '${properties.length} נכסים פעילים',
-                  icon: IconsaxPlusBold.buildings_2,
+                  icon: IconsaxPlusLinear.buildings_2,
                   actionLabel: properties.isNotEmpty ? 'ניהול' : null,
                   onAction: properties.isNotEmpty
                       ? () => Navigator.of(context).push(MaterialPageRoute(
@@ -1191,7 +1453,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                   _LandlordSectionHeader(
                     title: 'שיחות פעילות',
                     subtitle: '${matches.length} שיחות פתוחות',
-                    icon: IconsaxPlusBold.message,
+                    icon: IconsaxPlusLinear.message,
                     actionLabel: 'הכל',
                     onAction: () => Navigator.of(context).push(
                         MaterialPageRoute(
@@ -1235,7 +1497,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _ActionTile(
-                        icon: IconsaxPlusBold.logout,
+                        icon: IconsaxPlusLinear.logout,
                         label: 'יציאה מהחשבון',
                         isDestructive: true,
                         onTap: onLogout,
@@ -1243,7 +1505,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                       const Divider(
                           height: 1, indent: 74, color: AppColors.borderLight),
                       _ActionTile(
-                        icon: IconsaxPlusBold.trash,
+                        icon: IconsaxPlusLinear.trash,
                         label: 'מחיקת חשבון',
                         isDestructive: true,
                         onTap: onDeleteAccount,
@@ -1352,7 +1614,7 @@ class _LandlordHero extends StatelessWidget {
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Icon(IconsaxPlusBold.verify,
+                          child: const RentchIcon(IconsaxPlusLinear.verify,
                               size: 13, color: Colors.white),
                         ),
                       ),
@@ -1379,7 +1641,7 @@ class _LandlordHero extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             _HeroPill(
-                              icon: IconsaxPlusBold.buildings_2,
+                              icon: IconsaxPlusLinear.buildings_2,
                               label: 'בעל דירה',
                               color: AppColors.primary,
                             ),
@@ -1393,13 +1655,13 @@ class _LandlordHero extends StatelessWidget {
                           children: [
                             if (cities.isNotEmpty)
                               _HeroPill(
-                                icon: IconsaxPlusBold.location,
+                                icon: IconsaxPlusLinear.location,
                                 label: cities,
                                 color: Colors.white.withValues(alpha: 0.85),
                                 bg: Colors.white.withValues(alpha: 0.12),
                               ),
                             _HeroPill(
-                              icon: IconsaxPlusBold.building,
+                              icon: IconsaxPlusLinear.building,
                               label: '$propertiesCount נכסים פעילים בתיק',
                               color: Colors.white.withValues(alpha: 0.85),
                               bg: Colors.white.withValues(alpha: 0.12),
@@ -1573,7 +1835,7 @@ class _LandlordKpiBar extends StatelessWidget {
           _KpiCell(
             value: '${stats.propertiesCount}',
             label: 'דירות',
-            icon: IconsaxPlusBold.buildings_2,
+            icon: IconsaxPlusLinear.buildings_2,
             color: AppColors.primary,
             isFirst: true,
           ),
@@ -1581,21 +1843,21 @@ class _LandlordKpiBar extends StatelessWidget {
           _KpiCell(
             value: '${stats.matchesCount}',
             label: 'שיחות',
-            icon: IconsaxPlusBold.message,
+            icon: IconsaxPlusLinear.message,
             color: const Color(0xFF4A6CF7),
           ),
           _KpiSeparator(),
           _KpiCell(
             value: '${stats.conversionRate.round()}%',
             label: 'המרה',
-            icon: IconsaxPlusBold.chart_2,
+            icon: IconsaxPlusLinear.chart_2,
             color: AppColors.success,
           ),
           _KpiSeparator(),
           _KpiCell(
             value: '${stats.pendingCount}',
             label: 'ממתינים',
-            icon: IconsaxPlusBold.profile_2user,
+            icon: IconsaxPlusLinear.profile_2user,
             color: stats.pendingCount > 0
                 ? const Color(0xFFE67E22)
                 : AppColors.textSecondary,
@@ -1732,7 +1994,7 @@ class _LandlordSectionHeader extends StatelessWidget {
                         color: AppColors.primary,
                         fontSize: 13,
                         fontWeight: FontWeight.w800)),
-                const Icon(IconsaxPlusBold.arrow_left,
+                const RentchIcon(IconsaxPlusLinear.arrow_left,
                     size: 13, color: AppColors.primary),
               ],
             ),
@@ -1817,7 +2079,7 @@ class _PropertyMiniTile extends StatelessWidget {
                       fallback: Container(
                         color: AppColors.navy.withValues(alpha: 0.8),
                         child: const Center(
-                          child: Icon(IconsaxPlusBold.building,
+                          child: RentchIcon(IconsaxPlusLinear.building,
                               color: Colors.white30, size: 30),
                         ),
                       ),
@@ -1928,7 +2190,7 @@ class _AddPropertyCard extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(IconsaxPlusBold.add_square,
+              child: const RentchIcon(IconsaxPlusLinear.add_square,
                   color: AppColors.primary, size: 22),
             ),
             const SizedBox(height: 10),
@@ -2048,7 +2310,7 @@ class _ConversationRow extends StatelessWidget {
                       fallback: Container(
                         color: AppColors.primaryLight2,
                         child: const Center(
-                            child: Icon(IconsaxPlusBold.building,
+                            child: RentchIcon(IconsaxPlusLinear.building,
                                 color: AppColors.primary, size: 22)),
                       ),
                       fit: BoxFit.cover,
@@ -2138,7 +2400,7 @@ class _ConversationRow extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Icon(IconsaxPlusBold.arrow_left,
+                  child: const RentchIcon(IconsaxPlusLinear.arrow_left,
                       size: 15, color: AppColors.primary),
                 ),
               ],
@@ -2185,7 +2447,7 @@ class _PerformanceCard extends StatelessWidget {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(11),
                 ),
-                child: const Icon(IconsaxPlusBold.chart_2,
+                child: const RentchIcon(IconsaxPlusLinear.chart_2,
                     size: 17, color: AppColors.primary),
               ),
               const SizedBox(width: 10),
@@ -2200,14 +2462,14 @@ class _PerformanceCard extends StatelessWidget {
           _PerformanceRow(
             label: 'מועמדים סה"כ',
             value: '${stats.totalCandidatesSeen}',
-            icon: IconsaxPlusBold.profile_2user,
+            icon: IconsaxPlusLinear.profile_2user,
             color: AppColors.navy,
           ),
           const SizedBox(height: 10),
           _PerformanceRow(
             label: 'שיחות פעילות',
             value: '${stats.matchesCount}',
-            icon: IconsaxPlusBold.message,
+            icon: IconsaxPlusLinear.message,
             color: const Color(0xFF4A6CF7),
           ),
           const SizedBox(height: 14),
@@ -2303,7 +2565,7 @@ class _SettingsCard extends StatelessWidget {
       child: Column(
         children: [
           _SettingsTile(
-            icon: IconsaxPlusBold.user_edit,
+            icon: IconsaxPlusLinear.user_edit,
             label: 'עריכת פרופיל',
             subtitle: 'שם, תמונה, פרטי קשר',
             color: AppColors.primary,
@@ -2311,7 +2573,7 @@ class _SettingsCard extends StatelessWidget {
           ),
           const Divider(height: 1, indent: 74, color: AppColors.borderLight),
           _SettingsTile(
-            icon: IconsaxPlusBold.notification,
+            icon: IconsaxPlusLinear.notification,
             label: 'הגדרות התראות',
             subtitle: 'לידים, שיחות, התאמות',
             color: AppColors.navy,
@@ -2319,7 +2581,7 @@ class _SettingsCard extends StatelessWidget {
           ),
           const Divider(height: 1, indent: 74, color: AppColors.borderLight),
           _SettingsTile(
-            icon: IconsaxPlusBold.shield_tick,
+            icon: IconsaxPlusLinear.shield_tick,
             label: 'פרטיות ואבטחה',
             subtitle: 'ניהול הרשאות',
             color: const Color(0xFF4A6CF7),
@@ -2386,11 +2648,226 @@ class _SettingsTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(IconsaxPlusBold.arrow_left,
+              RentchIcon(IconsaxPlusLinear.arrow_left,
                   size: 16,
                   color: AppColors.textSecondary.withValues(alpha: 0.5)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Redesigned helper widgets for Tenant Profile Screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MockupStatBox extends StatelessWidget {
+  const _MockupStatBox({
+    required this.count,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String count;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: RentchIcon(
+              icon,
+              size: 20,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            count,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreferenceTile extends StatelessWidget {
+  const _PreferenceTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: RentchIcon(
+              icon,
+              size: 20,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF475569),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const RentchIcon(
+            IconsaxPlusLinear.arrow_left,
+            size: 16,
+            color: Color(0xFF94A3B8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsDivider extends StatelessWidget {
+  const _SettingsDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(
+      height: 1,
+      thickness: 1,
+      color: Color(0xFFE2E8F0),
+      indent: 20,
+      endIndent: 20,
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        isDestructive ? AppColors.coral : const Color(0xFF0F172A);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDestructive
+                    ? AppColors.coral.withValues(alpha: 0.1)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+            RentchIcon(
+              IconsaxPlusLinear.arrow_left,
+              size: 16,
+              color: isDestructive
+                  ? AppColors.coral.withValues(alpha: 0.5)
+                  : const Color(0xFF94A3B8),
+            ),
+          ],
         ),
       ),
     );

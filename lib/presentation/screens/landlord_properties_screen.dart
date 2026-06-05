@@ -7,6 +7,7 @@ import 'package:dating_app/presentation/screens/add_property_screen.dart'
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 class LandlordPropertiesScreen extends StatefulWidget {
@@ -50,7 +51,13 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
       case 'luxury':
         list = list.where((p) => p.price >= 10000).toList();
       case 'immediate':
-        list = list.where((p) => p.entryDate.isEmpty || p.entryDate.toLowerCase().contains('מיידי') || p.entryDate.toLowerCase().contains('immediate') || p.entryDate.toLowerCase().contains('now')).toList();
+        list = list
+            .where((p) =>
+                p.entryDate.isEmpty ||
+                p.entryDate.toLowerCase().contains('מיידי') ||
+                p.entryDate.toLowerCase().contains('immediate') ||
+                p.entryDate.toLowerCase().contains('now'))
+            .toList();
       case 'large':
         list = list.where((p) => p.rooms >= 4).toList();
       case 'agency':
@@ -146,9 +153,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 7),
                             decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : Colors.white,
+                              color:
+                                  isSelected ? AppColors.primary : Colors.white,
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
                                 color: isSelected
@@ -160,9 +166,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                             child: Text(
                               opt.$2,
                               style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.navy,
+                                color:
+                                    isSelected ? Colors.white : AppColors.navy,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -188,8 +193,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                             const EdgeInsets.symmetric(horizontal: 4),
                         leading: Icon(
                           isSelected
-                              ? IconsaxPlusBold.tick_circle
-                              : IconsaxPlusBold.record_circle,
+                              ? IconsaxPlusLinear.tick_circle
+                              : IconsaxPlusLinear.record_circle,
                           color: isSelected
                               ? AppColors.primary
                               : AppColors.textSecondary,
@@ -198,7 +203,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                         title: Text(
                           opt.$2,
                           style: TextStyle(
-                            color: isSelected ? AppColors.primary : AppColors.navy,
+                            color:
+                                isSelected ? AppColors.primary : AppColors.navy,
                             fontWeight:
                                 isSelected ? FontWeight.w800 : FontWeight.w600,
                             fontSize: 14.5,
@@ -232,7 +238,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
         final isFiltered = _query.isNotEmpty || _activeFilter != 'all';
         final canPop = Navigator.of(context).canPop();
 
-        final hasActiveFilterOrSort = _sortBy != 'recent' || _activeFilter != 'all';
+        final hasActiveFilterOrSort =
+            _sortBy != 'recent' || _activeFilter != 'all';
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -244,7 +251,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
             toolbarHeight: 64,
             leading: canPop
                 ? IconButton(
-                    icon: const Icon(IconsaxPlusBold.arrow_right,
+                    icon: const RentchIcon(IconsaxPlusLinear.arrow_right,
                         color: AppColors.navy),
                     onPressed: () => Navigator.of(context).pop(),
                   )
@@ -297,8 +304,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      IconsaxPlusBold.add,
+                    RentchIcon(
+                      IconsaxPlusLinear.add,
                       color: Colors.white,
                       size: 16,
                     ),
@@ -336,21 +343,24 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(26),
-                                  border: Border.all(color: const Color(0xFFE2ECF1)),
+                                  border: Border.all(
+                                      color: const Color(0xFFE2ECF1)),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.04),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
                                 child: Row(
                                   children: [
                                     const SizedBox(width: 10),
-                                    const Icon(
-                                      IconsaxPlusBold.search_normal,
+                                    const RentchIcon(
+                                      IconsaxPlusLinear.search_normal,
                                       size: 18,
                                       color: Colors.grey,
                                     ),
@@ -370,20 +380,23 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                           hintText: 'חיפוש לפי כתובת, עיר...',
                                           hintStyle: TextStyle(
                                             fontSize: 14,
-                                            color: AppColors.textSecondary.withValues(alpha: 0.72),
+                                            color: AppColors.textSecondary
+                                                .withValues(alpha: 0.72),
                                             fontWeight: FontWeight.w600,
                                           ),
                                           border: InputBorder.none,
                                           enabledBorder: InputBorder.none,
                                           focusedBorder: InputBorder.none,
-                                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 12),
                                         ),
                                       ),
                                     ),
                                     if (_query.isNotEmpty)
                                       IconButton(
-                                        icon: const Icon(
-                                          IconsaxPlusBold.close_circle,
+                                        icon: const RentchIcon(
+                                          IconsaxPlusLinear.close_circle,
                                           size: 18,
                                           color: AppColors.textSecondary,
                                         ),
@@ -407,16 +420,19 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                       ? AppColors.primary
                                       : const Color(0xFFF2F4F5),
                                   shape: BoxShape.circle,
-                                  boxShadow: hasActiveFilterOrSort ? [
-                                    BoxShadow(
-                                      color: AppColors.primary.withValues(alpha: 0.24),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    )
-                                  ] : null,
+                                  boxShadow: hasActiveFilterOrSort
+                                      ? [
+                                          BoxShadow(
+                                            color: AppColors.primary
+                                                .withValues(alpha: 0.24),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          )
+                                        ]
+                                      : null,
                                 ),
-                                child: Icon(
-                                  IconsaxPlusBold.filter,
+                                child: RentchIcon(
+                                  IconsaxPlusLinear.filter,
                                   size: 20,
                                   color: hasActiveFilterOrSort
                                       ? Colors.white
@@ -439,43 +455,50 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                               _FilterPill(
                                 label: 'הכל',
                                 isSelected: _activeFilter == 'all',
-                                onTap: () => setState(() => _activeFilter = 'all'),
+                                onTap: () =>
+                                    setState(() => _activeFilter = 'all'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'כניסה מיידית',
                                 isSelected: _activeFilter == 'immediate',
-                                onTap: () => setState(() => _activeFilter = 'immediate'),
+                                onTap: () =>
+                                    setState(() => _activeFilter = 'immediate'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'דירות גדולות',
                                 isSelected: _activeFilter == 'large',
-                                onTap: () => setState(() => _activeFilter = 'large'),
+                                onTap: () =>
+                                    setState(() => _activeFilter = 'large'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'פרטי',
                                 isSelected: _activeFilter == 'private',
-                                onTap: () => setState(() => _activeFilter = 'private'),
+                                onTap: () =>
+                                    setState(() => _activeFilter = 'private'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'בלעדיות',
                                 isSelected: _activeFilter == 'agency',
-                                onTap: () => setState(() => _activeFilter = 'agency'),
+                                onTap: () =>
+                                    setState(() => _activeFilter = 'agency'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'יוקרה',
                                 isSelected: _activeFilter == 'luxury',
-                                onTap: () => setState(() => _activeFilter = 'luxury'),
+                                onTap: () =>
+                                    setState(() => _activeFilter = 'luxury'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'עד 6K',
                                 isSelected: _activeFilter == 'high_priority',
-                                onTap: () => setState(() => _activeFilter = 'high_priority'),
+                                onTap: () => setState(
+                                    () => _activeFilter = 'high_priority'),
                               ),
                             ],
                           ),
@@ -551,10 +574,6 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
   }
 }
 
-
-
-
-
 // ─── Property card ───────────────────────────────────────────────────────────
 
 class _PropertyManageCard extends StatelessWidget {
@@ -624,7 +643,9 @@ class _PropertyManageCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       _GlassTag(
                         icon: Icons.layers_outlined,
-                        label: property.floor.isEmpty ? 'דירה' : 'קומה ${property.floor}',
+                        label: property.floor.isEmpty
+                            ? 'דירה'
+                            : 'קומה ${property.floor}',
                       ),
                       const SizedBox(width: 8),
                       _GlassTag(
@@ -709,8 +730,8 @@ class _PropertyManageCard extends StatelessWidget {
                               child: IconButton(
                                 padding: EdgeInsets.zero,
                                 onPressed: onEdit,
-                                icon: const Icon(
-                                  IconsaxPlusBold.edit_2,
+                                icon: const RentchIcon(
+                                  IconsaxPlusLinear.edit_2,
                                   color: Colors.white,
                                   size: 18,
                                 ),
@@ -733,7 +754,8 @@ class _PropertyManageCard extends StatelessWidget {
                                     : Colors.white.withValues(alpha: 0.1),
                                 border: Border.all(
                                   color: property.isActive
-                                      ? AppColors.success.withValues(alpha: 0.40)
+                                      ? AppColors.success
+                                          .withValues(alpha: 0.40)
                                       : Colors.white.withValues(alpha: 0.15),
                                   width: 1,
                                 ),
@@ -744,7 +766,9 @@ class _PropertyManageCard extends StatelessWidget {
                                   height: 12,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: property.isActive ? AppColors.success : Colors.white60,
+                                    color: property.isActive
+                                        ? AppColors.success
+                                        : Colors.white60,
                                   ),
                                 ),
                               ),
@@ -783,8 +807,8 @@ class _PropertyThumb extends StatelessWidget {
 
   Widget _fallback() => Container(
         color: AppColors.primaryLight2,
-        child: const Icon(
-          IconsaxPlusBold.building,
+        child: const RentchIcon(
+          IconsaxPlusLinear.building,
           size: 42,
           color: AppColors.primary,
         ),
@@ -863,8 +887,8 @@ class _EmptyPropertiesState extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                IconsaxPlusBold.buildings,
+              child: const RentchIcon(
+                IconsaxPlusLinear.buildings,
                 size: 36,
                 color: AppColors.primary,
               ),
@@ -915,8 +939,8 @@ class _EmptyFilteredState extends StatelessWidget {
                 color: AppColors.textSecondary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                IconsaxPlusBold.search_normal,
+              child: const RentchIcon(
+                IconsaxPlusLinear.search_normal,
                 size: 30,
                 color: AppColors.textSecondary,
               ),

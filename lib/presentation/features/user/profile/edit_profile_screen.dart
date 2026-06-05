@@ -7,6 +7,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -159,7 +160,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   Expanded(
                     child: _SourceButton(
-                      icon: IconsaxPlusBold.camera,
+                      icon: IconsaxPlusLinear.camera,
                       label: 'מצלמה',
                       onTap: () => _pickPhoto(ImageSource.camera),
                     ),
@@ -167,7 +168,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _SourceButton(
-                      icon: IconsaxPlusBold.gallery,
+                      icon: IconsaxPlusLinear.gallery,
                       label: 'גלריה',
                       onTap: () => _pickPhoto(ImageSource.gallery),
                     ),
@@ -344,40 +345,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         child: CustomScrollView(
           slivers: [
-            // ── Pinned SliverAppBar ──────────────────────────────────────
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: AppColors.navy,
-              foregroundColor: Colors.white,
-              title: const Text(
-                'עריכת פרופיל',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              actions: [
-                if (!_isSaving)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12),
-                    child: TextButton(
-                      onPressed: _save,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text(
-                        'שמור',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 14),
+            // ── Photo header with floating buttons ──────────────────────
+            SliverToBoxAdapter(
+              child: Stack(
+                children: [
+                  _buildPhotoHeader(),
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8.0, vertical: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          if (!_isSaving)
+                            TextButton(
+                              onPressed: _save,
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text(
+                                'שמור',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w800, fontSize: 14),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
-
-            // ── Photo header ─────────────────────────────────────────────
-            SliverToBoxAdapter(child: _buildPhotoHeader()),
 
             // ── Form sections ────────────────────────────────────────────
             SliverToBoxAdapter(
@@ -390,7 +393,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     // 1. Personal details
                     _FormSection(
                       title: 'פרטים אישיים',
-                      icon: IconsaxPlusBold.profile_circle,
+                      icon: IconsaxPlusLinear.profile_circle,
                       child: Column(
                         children: [
                           // Name field
@@ -405,8 +408,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               labelStyle: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w600),
-                              suffixIcon: const Icon(
-                                  IconsaxPlusBold.profile_circle,
+                              suffixIcon: const RentchIcon(
+                                  IconsaxPlusLinear.profile_circle,
                                   size: 18,
                                   color: AppColors.primary),
                               filled: true,
@@ -474,7 +477,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     // 2. Apartment preferences
                     _FormSection(
                       title: 'העדפות דירה',
-                      icon: IconsaxPlusBold.building,
+                      icon: IconsaxPlusLinear.building,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -652,7 +655,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     // 3. Important details for landlords
                     _FormSection(
                       title: 'פרטים לבעלי דירות',
-                      icon: IconsaxPlusBold.info_circle,
+                      icon: IconsaxPlusLinear.info_circle,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -686,7 +689,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 9),
                             ),
-                            icon: const Icon(IconsaxPlusBold.add, size: 14),
+                            icon: const RentchIcon(IconsaxPlusLinear.add,
+                                size: 14),
                             label: const Text(
                               'הוסף פרט',
                               style: TextStyle(
@@ -761,8 +765,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 56),
-                      Icon(
-                        IconsaxPlusBold.profile_circle,
+                      RentchIcon(
+                        IconsaxPlusLinear.profile_circle,
                         size: 72,
                         color: AppColors.primary.withValues(alpha: 0.6),
                       ),
@@ -840,7 +844,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(IconsaxPlusBold.gallery,
+                        const RentchIcon(IconsaxPlusLinear.gallery,
                             size: 13, color: Colors.white),
                         const SizedBox(width: 5),
                         Text(
@@ -875,7 +879,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(IconsaxPlusBold.edit_2,
+                        RentchIcon(IconsaxPlusLinear.edit_2,
                             size: 14, color: Colors.white),
                         SizedBox(width: 6),
                         Text(
@@ -1210,7 +1214,8 @@ class _AddPhotoCell extends StatelessWidget {
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(IconsaxPlusBold.add, color: AppColors.primary, size: 20),
+            RentchIcon(IconsaxPlusLinear.add,
+                color: AppColors.primary, size: 20),
             SizedBox(width: 8),
             Text(
               'הוספת תמונה',
@@ -1254,8 +1259,8 @@ class _ProfilePhotoWidget extends StatelessWidget {
   Widget _fallback() {
     return Container(
       color: AppColors.navy,
-      child: Icon(
-        IconsaxPlusBold.profile_circle,
+      child: RentchIcon(
+        IconsaxPlusLinear.profile_circle,
         color: AppColors.primary.withValues(alpha: 0.5),
         size: 40,
       ),

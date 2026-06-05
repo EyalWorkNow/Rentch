@@ -3,6 +3,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 
 class TenantDetailScreen extends StatefulWidget {
   const TenantDetailScreen({
@@ -88,8 +89,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                           fallback: Container(
                             color: AppColors.navy,
                             child: const Center(
-                              child: Icon(
-                                IconsaxPlusBold.profile_circle,
+                              child: RentchIcon(
+                                IconsaxPlusLinear.profile_circle,
                                 size: 80,
                                 color: Colors.white24,
                               ),
@@ -127,8 +128,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                     Container(
                       color: AppColors.navy,
                       child: const Center(
-                        child: Icon(
-                          IconsaxPlusBold.profile_circle,
+                        child: RentchIcon(
+                          IconsaxPlusLinear.profile_circle,
                           size: 100,
                           color: Colors.white24,
                         ),
@@ -190,8 +191,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                               const SizedBox(height: 6),
                               const Row(
                                 children: [
-                                  Icon(
-                                    IconsaxPlusBold.verify,
+                                  RentchIcon(
+                                    IconsaxPlusLinear.verify,
                                     size: 16,
                                     color: AppColors.primary,
                                   ),
@@ -218,7 +219,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                       children: [
                         Expanded(
                           child: _DetailCardItem(
-                            icon: IconsaxPlusBold.wallet,
+                            icon: IconsaxPlusLinear.wallet,
                             title: 'תקציב מקסימלי',
                             value: _fmt(widget.tenant.budgetMax),
                           ),
@@ -226,9 +227,10 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _DetailCardItem(
-                            icon: IconsaxPlusBold.building_3,
+                            icon: IconsaxPlusLinear.building_3,
                             title: 'חדרים מבוקשים',
-                            value: '${widget.tenant.desiredRooms.toStringAsFixed(widget.tenant.desiredRooms % 1 == 0 ? 0 : 1)} חדרים',
+                            value:
+                                '${widget.tenant.desiredRooms.toStringAsFixed(widget.tenant.desiredRooms % 1 == 0 ? 0 : 1)} חדרים',
                           ),
                         ),
                       ],
@@ -238,7 +240,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                       children: [
                         Expanded(
                           child: _DetailCardItem(
-                            icon: IconsaxPlusBold.calendar,
+                            icon: IconsaxPlusLinear.calendar,
                             title: 'מועד כניסה',
                             value: widget.tenant.moveInWindow,
                           ),
@@ -246,9 +248,10 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _DetailCardItem(
-                            icon: IconsaxPlusBold.shield_security,
+                            icon: IconsaxPlusLinear.shield_security,
                             title: 'נקודות אמון',
-                            value: '85 נקודות', // Mock or trust score if available
+                            value:
+                                '85 נקודות', // Mock or trust score if available
                           ),
                         ),
                       ],
@@ -366,8 +369,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(
-                                  IconsaxPlusBold.star_1,
+                                const RentchIcon(
+                                  IconsaxPlusLinear.star_1,
                                   color: Color(0xFFF39C12),
                                   size: 14,
                                 ),
@@ -426,8 +429,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                                       children: List.generate(5, (i) {
                                         return Icon(
                                           i < review.rating
-                                              ? IconsaxPlusBold.star_1
-                                              : IconsaxPlusBold.star,
+                                              ? IconsaxPlusLinear.star_1
+                                              : IconsaxPlusLinear.star,
                                           color: const Color(0xFFF39C12),
                                           size: 13,
                                         );
@@ -587,8 +590,8 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                   fallback: Container(
                     color: AppColors.navy,
                     child: const Center(
-                      child: Icon(
-                        IconsaxPlusBold.building,
+                      child: RentchIcon(
+                        IconsaxPlusLinear.building,
                         size: 40,
                         color: Colors.white24,
                       ),
@@ -626,8 +629,8 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(
-                              IconsaxPlusBold.building,
+                            const RentchIcon(
+                              IconsaxPlusLinear.building,
                               size: 13,
                               color: AppColors.textSecondary,
                             ),
@@ -641,8 +644,8 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Icon(
-                              IconsaxPlusBold.maximize_3,
+                            const RentchIcon(
+                              IconsaxPlusLinear.maximize_3,
                               size: 13,
                               color: AppColors.textSecondary,
                             ),
@@ -662,8 +665,8 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppColors.primaryLight2,
                       borderRadius: BorderRadius.circular(12),

@@ -4,6 +4,7 @@ import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({
@@ -81,7 +82,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                 color: Colors.black.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(IconsaxPlusBold.arrow_right,
+              child: const RentchIcon(IconsaxPlusLinear.arrow_right,
                   color: Colors.white, size: 18),
             ),
             onPressed: _close,
@@ -132,8 +133,8 @@ class _GalleryScreenState extends State<GalleryScreen>
                   // Main gallery
                   widget.media.isEmpty
                       ? const Center(
-                          child: Icon(
-                            IconsaxPlusBold.gallery,
+                          child: RentchIcon(
+                            IconsaxPlusLinear.gallery,
                             color: Colors.white38,
                             size: 64,
                           ),
@@ -184,7 +185,7 @@ class _GalleryScreenState extends State<GalleryScreen>
                         child: const Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(IconsaxPlusBold.arrow_up,
+                            RentchIcon(IconsaxPlusLinear.arrow_up,
                                 color: Colors.white54, size: 18),
                             SizedBox(height: 3),
                             Text(
@@ -223,7 +224,7 @@ class _GalleryPage extends StatelessWidget {
             ? Container(
                 color: AppColors.navy,
                 child: const Center(
-                  child: Icon(IconsaxPlusBold.gallery,
+                  child: RentchIcon(IconsaxPlusLinear.gallery,
                       color: Colors.white30, size: 64),
                 ),
               )
@@ -234,8 +235,8 @@ class _GalleryPage extends StatelessWidget {
                 fallback: Container(
                   color: AppColors.navy,
                   child: const Center(
-                    child: Icon(
-                      IconsaxPlusBold.gallery,
+                    child: RentchIcon(
+                      IconsaxPlusLinear.gallery,
                       color: Colors.white30,
                       size: 64,
                     ),

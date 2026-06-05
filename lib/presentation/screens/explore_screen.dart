@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -187,7 +188,7 @@ class _TopBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(IconsaxPlusBold.shield_tick,
+                  RentchIcon(IconsaxPlusLinear.shield_tick,
                       size: 13, color: _trustColor(trustScore)),
                   const SizedBox(width: 5),
                   Text(
@@ -229,7 +230,7 @@ class _ProgressPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(IconsaxPlusBold.profile_2user,
+          RentchIcon(IconsaxPlusLinear.profile_2user,
               size: 12, color: AppColors.primary),
           const SizedBox(width: 5),
           Text(
@@ -331,8 +332,8 @@ class _LeadCardState extends State<_LeadCard> {
                             fallback: Container(
                               color: AppColors.navy,
                               child: const Center(
-                                child: Icon(
-                                  IconsaxPlusBold.profile_circle,
+                                child: RentchIcon(
+                                  IconsaxPlusLinear.profile_circle,
                                   size: 80,
                                   color: Colors.white24,
                                 ),
@@ -430,16 +431,16 @@ class _LeadCardState extends State<_LeadCard> {
                                 runSpacing: 6,
                                 children: [
                                   _TenantChip(
-                                    icon: IconsaxPlusBold.wallet,
+                                    icon: IconsaxPlusLinear.wallet,
                                     label: _fmt(widget.tenant.budgetMax),
                                   ),
                                   _TenantChip(
-                                    icon: IconsaxPlusBold.building,
+                                    icon: IconsaxPlusLinear.building,
                                     label:
                                         '${widget.tenant.desiredRooms.toStringAsFixed(widget.tenant.desiredRooms % 1 == 0 ? 0 : 1)} חדרים',
                                   ),
                                   _TenantChip(
-                                    icon: IconsaxPlusBold.calendar,
+                                    icon: IconsaxPlusLinear.calendar,
                                     label: widget.tenant.moveInWindow,
                                   ),
                                 ],
@@ -502,8 +503,8 @@ class _LeadCardState extends State<_LeadCard> {
                                       ),
                                     ),
                                     SizedBox(width: 8),
-                                    Icon(
-                                      IconsaxPlusBold.arrow_left_1,
+                                    RentchIcon(
+                                      IconsaxPlusLinear.arrow_left_1,
                                       color: AppColors.primary,
                                       size: 16,
                                     ),
@@ -629,8 +630,8 @@ class _LikedPropertyBox extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              IconsaxPlusBold.heart,
+            child: const RentchIcon(
+              IconsaxPlusLinear.heart,
               size: 18,
               color: AppColors.primary,
             ),
@@ -690,7 +691,6 @@ class _LikedPropertyBox extends StatelessWidget {
   }
 }
 
-
 // ─── Tenant chip (on photo) ───────────────────────────────────────────────────
 
 class _TenantChip extends StatelessWidget {
@@ -729,7 +729,6 @@ class _TenantChip extends StatelessWidget {
   }
 }
 
-
 // ─── Action bar ───────────────────────────────────────────────────────────────
 
 class _ActionBar extends StatelessWidget {
@@ -753,21 +752,21 @@ class _ActionBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _ActionBtn(
-              icon: IconsaxPlusBold.forward,
+              icon: IconsaxPlusLinear.forward,
               label: 'דלג',
               color: AppColors.textSecondary,
               size: 54,
               onPressed: onSkip,
             ),
             _ActionBtn(
-              icon: IconsaxPlusBold.close_circle,
+              icon: IconsaxPlusLinear.close_circle,
               label: 'דחיה',
               color: AppColors.coral,
               size: 66,
               onPressed: onReject,
             ),
             _ActionBtn(
-              icon: IconsaxPlusBold.tick_circle,
+              icon: IconsaxPlusLinear.tick_circle,
               label: 'אישור',
               color: AppColors.primary,
               size: 72,
@@ -861,8 +860,8 @@ class _EmptyOwnerQueue extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                IconsaxPlusBold.profile_2user,
+              child: const RentchIcon(
+                IconsaxPlusLinear.profile_2user,
                 color: AppColors.primary,
                 size: 42,
               ),
@@ -899,7 +898,8 @@ class _EmptyOwnerQueue extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => const AddPropertyScreen()),
                   ),
-                  icon: const Icon(IconsaxPlusBold.add_square, size: 17),
+                  icon:
+                      const RentchIcon(IconsaxPlusLinear.add_square, size: 17),
                   label: const Text('הוסף נכס עכשיו'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -916,7 +916,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const MatchesScreen()),
                   ),
-                  icon: const Icon(IconsaxPlusBold.message, size: 17),
+                  icon: const RentchIcon(IconsaxPlusLinear.message, size: 17),
                   label: const Text('עבור לשיחות'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,

@@ -8,6 +8,7 @@ import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
 class LandlordDashboardScreen extends StatelessWidget {
@@ -244,7 +245,7 @@ class _HeroBackground extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(IconsaxPlusBold.message,
+                          const RentchIcon(IconsaxPlusLinear.message,
                               size: 12, color: Colors.white),
                           const SizedBox(width: 4),
                           Text(
@@ -268,23 +269,23 @@ class _HeroBackground extends StatelessWidget {
                   children: [
                     _HeroStatPill(
                       label: '${stats.propertiesCount} דירות',
-                      icon: IconsaxPlusBold.building,
+                      icon: IconsaxPlusLinear.building,
                     ),
                     const SizedBox(width: 8),
                     _HeroStatPill(
                       label: '${stats.pendingCount} ממתינים',
-                      icon: IconsaxPlusBold.profile_2user,
+                      icon: IconsaxPlusLinear.profile_2user,
                       highlight: pendingCount > 0,
                     ),
                     const SizedBox(width: 8),
                     _HeroStatPill(
                       label: '${stats.matchesCount} מאצ\'ים',
-                      icon: IconsaxPlusBold.heart,
+                      icon: IconsaxPlusLinear.heart,
                     ),
                     const SizedBox(width: 8),
                     _HeroStatPill(
                       label: '${stats.conversionRate.round()}% המרה',
-                      icon: IconsaxPlusBold.chart_2,
+                      icon: IconsaxPlusLinear.chart_2,
                     ),
                   ],
                 ),
@@ -518,7 +519,8 @@ class _PipelineCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(IconsaxPlusBold.chart_2, size: 16, color: AppColors.primary),
+              RentchIcon(IconsaxPlusLinear.chart_2,
+                  size: 16, color: AppColors.primary),
               SizedBox(width: 7),
               Text(
                 'משפך שכירות',
@@ -542,7 +544,7 @@ class _PipelineCard extends StatelessWidget {
                     child: _PipelineStage(
                       label: 'נכסים',
                       count: propertiesCount,
-                      icon: IconsaxPlusBold.building,
+                      icon: IconsaxPlusLinear.building,
                       color: AppColors.navy,
                     ),
                   ),
@@ -554,7 +556,7 @@ class _PipelineCard extends StatelessWidget {
                     child: _PipelineStage(
                       label: 'לידים',
                       count: leadsCount,
-                      icon: IconsaxPlusBold.profile_2user,
+                      icon: IconsaxPlusLinear.profile_2user,
                       color: AppColors.primary,
                       tappable: true,
                     ),
@@ -567,7 +569,7 @@ class _PipelineCard extends StatelessWidget {
                     child: _PipelineStage(
                       label: "מאצ'ים",
                       count: matchesCount,
-                      icon: IconsaxPlusBold.heart,
+                      icon: IconsaxPlusLinear.heart,
                       color: AppColors.coral,
                       tappable: true,
                     ),
@@ -657,7 +659,8 @@ class _PipelineStage extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  Icon(IconsaxPlusBold.arrow_left, size: 10, color: color),
+                  RentchIcon(IconsaxPlusLinear.arrow_left,
+                      size: 10, color: color),
                 ],
               ),
             ),
@@ -672,8 +675,8 @@ class _PipelineArrow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
-      child: Icon(
-        IconsaxPlusBold.arrow_left,
+      child: RentchIcon(
+        IconsaxPlusLinear.arrow_left,
         size: 18,
         color: AppColors.borderLight,
       ),
@@ -770,7 +773,7 @@ class _QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _QABtn(
                 label: 'הוסף דירה',
-                icon: IconsaxPlusBold.add_square,
+                icon: IconsaxPlusLinear.add_square,
                 color: AppColors.primary,
                 onTap: onAddProperty,
               ),
@@ -779,7 +782,7 @@ class _QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _QABtn(
                 label: 'מועמדים',
-                icon: IconsaxPlusBold.profile_2user,
+                icon: IconsaxPlusLinear.profile_2user,
                 badge: pendingCount,
                 color: AppColors.navy,
                 onTap: onSwipes,
@@ -789,7 +792,7 @@ class _QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _QABtn(
                 label: "מאצ'ים",
-                icon: IconsaxPlusBold.heart,
+                icon: IconsaxPlusLinear.heart,
                 badge: unseenCount,
                 color: AppColors.coral,
                 onTap: onMatches,
@@ -799,7 +802,7 @@ class _QuickActionsGrid extends StatelessWidget {
             Expanded(
               child: _QABtn(
                 label: 'הנכסים',
-                icon: IconsaxPlusBold.buildings_2,
+                icon: IconsaxPlusLinear.buildings_2,
                 color: AppColors.success,
                 onTap: onProperties,
               ),
@@ -930,7 +933,7 @@ class _ActivitySection extends StatelessWidget {
 
     if (leads.isNotEmpty) {
       items.add(_ActivityItem(
-        icon: IconsaxPlusBold.profile_2user,
+        icon: IconsaxPlusLinear.profile_2user,
         color: AppColors.primary,
         title:
             '${leads.length} ${leads.length == 1 ? 'שוכר מעוניין' : 'שוכרים מעוניינים'} בנכסים שלך',
@@ -942,7 +945,7 @@ class _ActivitySection extends StatelessWidget {
 
     if (unseen > 0) {
       items.add(_ActivityItem(
-        icon: IconsaxPlusBold.message,
+        icon: IconsaxPlusLinear.message,
         color: AppColors.coral,
         title: '$unseen הודעות שלא נקראו',
         subtitle: 'שוכרים שכבר אישרת ממתינים לתגובה שלך',
@@ -953,7 +956,7 @@ class _ActivitySection extends StatelessWidget {
 
     if (props.isEmpty) {
       items.add(_ActivityItem(
-        icon: IconsaxPlusBold.add_square,
+        icon: IconsaxPlusLinear.add_square,
         color: AppColors.primary,
         title: 'הוסף את הנכס הראשון שלך',
         subtitle: 'נכסים עם תמונות מקבלים פי 3 יותר פניות',
@@ -964,7 +967,7 @@ class _ActivitySection extends StatelessWidget {
       ));
     } else {
       items.add(_ActivityItem(
-        icon: IconsaxPlusBold.chart_2,
+        icon: IconsaxPlusLinear.chart_2,
         color: AppColors.navy,
         title: 'פרופיל הנכסים שלך פעיל ומוצג לשוכרים',
         subtitle:
@@ -1105,7 +1108,7 @@ class _ActivityRow extends StatelessWidget {
                     ),
                   ),
                 ] else
-                  Icon(IconsaxPlusBold.arrow_left,
+                  RentchIcon(IconsaxPlusLinear.arrow_left,
                       size: 14,
                       color: AppColors.textSecondary.withValues(alpha: 0.4)),
               ],
@@ -1177,7 +1180,7 @@ class _SectionHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const Icon(IconsaxPlusBold.arrow_left,
+                const RentchIcon(IconsaxPlusLinear.arrow_left,
                     size: 13, color: AppColors.primary),
               ],
             ),
@@ -1225,7 +1228,7 @@ class _MatchRow extends StatelessWidget {
                         fallback: Container(
                           color: AppColors.primaryLight2,
                           child: const Center(
-                            child: Icon(IconsaxPlusBold.building,
+                            child: RentchIcon(IconsaxPlusLinear.building,
                                 color: AppColors.primary, size: 22),
                           ),
                         ),
@@ -1235,7 +1238,7 @@ class _MatchRow extends StatelessWidget {
                     : Container(
                         color: AppColors.primaryLight2,
                         child: const Center(
-                          child: Icon(IconsaxPlusBold.building,
+                          child: RentchIcon(IconsaxPlusLinear.building,
                               color: AppColors.primary, size: 22),
                         ),
                       ),
@@ -1403,7 +1406,7 @@ class _PropertyMiniCard extends StatelessWidget {
                         fallback: Container(
                           color: AppColors.navy,
                           child: const Center(
-                            child: Icon(IconsaxPlusBold.building,
+                            child: RentchIcon(IconsaxPlusLinear.building,
                                 color: Colors.white30, size: 32),
                           ),
                         ),
@@ -1413,7 +1416,7 @@ class _PropertyMiniCard extends StatelessWidget {
                     : Container(
                         color: AppColors.navy.withValues(alpha: 0.8),
                         child: const Center(
-                          child: Icon(IconsaxPlusBold.building,
+                          child: RentchIcon(IconsaxPlusLinear.building,
                               color: Colors.white30, size: 32),
                         ),
                       ),
@@ -1504,7 +1507,7 @@ class _EmptyPropertiesCard extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(IconsaxPlusBold.add_square,
+              child: const RentchIcon(IconsaxPlusLinear.add_square,
                   color: AppColors.primary, size: 26),
             ),
             const SizedBox(height: 12),
@@ -1570,7 +1573,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           _SheetTile(
-            icon: IconsaxPlusBold.edit,
+            icon: IconsaxPlusLinear.edit,
             label: 'ערוך פרטי הנכס',
             color: AppColors.primary,
             onTap: () {
@@ -1581,7 +1584,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
             },
           ),
           _SheetTile(
-            icon: IconsaxPlusBold.trash,
+            icon: IconsaxPlusLinear.trash,
             label: 'הסר נכס מהרשימה',
             color: AppColors.coral,
             onTap: () async {
@@ -1620,7 +1623,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
             },
           ),
           _SheetTile(
-            icon: IconsaxPlusBold.share,
+            icon: IconsaxPlusLinear.share,
             label: 'שתף קישור לנכס',
             color: AppColors.navy,
             onTap: () {
@@ -1677,7 +1680,7 @@ class _SheetTile extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            const Icon(IconsaxPlusBold.arrow_left,
+            const RentchIcon(IconsaxPlusLinear.arrow_left,
                 size: 16, color: AppColors.textSecondary),
           ],
         ),
