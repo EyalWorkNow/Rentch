@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -57,12 +58,12 @@ class ActionButtons extends StatelessWidget {
                 shadowColor: const Color(0xFF072946),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '3D',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.textSecondary,
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -139,6 +140,9 @@ class _ActionButtonState extends State<_ActionButton>
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark3d = widget.iconColor == const Color(0xFF072946);
+    final actualIconColor = isDark3d ? Colors.white : widget.iconColor;
+
     return Tooltip(
       message: widget.tooltip,
       child: GestureDetector(
@@ -154,20 +158,38 @@ class _ActionButtonState extends State<_ActionButton>
             width: widget.size,
             height: widget.size,
             decoration: BoxDecoration(
-              color: widget.backgroundColor,
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: (widget.shadowColor ?? widget.backgroundColor)
-                      .withOpacity(0.12),
+                  color: (widget.shadowColor ?? Colors.black)
+                      .withValues(alpha: 0.16),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Icon(widget.icon,
-                size: widget.iconSize, color: widget.iconColor),
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      widget.icon,
+                      size: widget.iconSize,
+                      color: actualIconColor,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

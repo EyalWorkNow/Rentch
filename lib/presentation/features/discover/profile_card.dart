@@ -91,14 +91,15 @@ class _ProfileCardState extends State<ProfileCard> {
     final score = provider.matchScore(p);
     final priceCtx = provider.priceContext(p);
     final properties = provider.filteredProperties;
-    final isFirst = properties.isNotEmpty && p.id == properties.first.id;
-    final isSecond = properties.length > 1 && p.id == properties[1].id;
+    final isGuest = provider.isGuestMode;
+    final isFirst = isGuest && properties.isNotEmpty && p.id == properties.first.id;
+    final isSecond = isGuest && properties.length > 1 && p.id == properties[1].id;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.16),
             width: 1.5,
@@ -119,7 +120,7 @@ class _ProfileCardState extends State<ProfileCard> {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(26.5),
+          borderRadius: BorderRadius.circular(16.5),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -142,19 +143,18 @@ class _ProfileCardState extends State<ProfileCard> {
                 ),
               ),
 
-              // Dark gradient — deeper at bottom for better text contrast
-              const DecoratedBox(
+              DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      Color(0xFF040F1C),
-                      Color(0xE0051E34),
-                      Color(0x66072946),
+                      Colors.black.withValues(alpha: 0.92),
+                      Colors.black.withValues(alpha: 0.65),
+                      Colors.black.withValues(alpha: 0.28),
                       Colors.transparent,
                     ],
-                    stops: [0.0, 0.32, 0.60, 0.82],
+                    stops: const [0.0, 0.32, 0.60, 0.82],
                   ),
                 ),
               ),
@@ -346,10 +346,10 @@ class _ProfileCardState extends State<ProfileCard> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const RentchIcon(
+                          RentchIcon(
                             IconsaxPlusLinear.location,
                             size: 14,
-                            color: Colors.white70,
+                            color: Colors.white.withValues(alpha: 0.5),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -367,65 +367,6 @@ class _ProfileCardState extends State<ProfileCard> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      if (isFirst) ...[
-                        Row(
-                          children: [
-                            _StatPill(
-                              icon: IconsaxPlusLinear.eye,
-                              label: '245 צפו',
-                              highlight: true,
-                            ),
-                            const SizedBox(width: 6),
-                            _StatPill(
-                              icon: IconsaxPlusLinear.heart,
-                              label: '84 אהבו',
-                              highlight: true,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                      ] else if (isSecond) ...[
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEF4444).withOpacity(0.25),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4), width: 1),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(Icons.flash_on_rounded, size: 13, color: Color(0xFFFCA5A5)),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    'דירה חדשה!',
-                                    style: TextStyle(
-                                      color: Color(0xFFFCA5A5),
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            _StatPill(
-                              icon: IconsaxPlusLinear.heart,
-                              label: '47 אהבו',
-                              highlight: true,
-                            ),
-                            const SizedBox(width: 6),
-                            _StatPill(
-                              icon: IconsaxPlusLinear.people,
-                              label: '3 צופים עכשיו',
-                              highlight: true,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                      ],
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
@@ -702,7 +643,7 @@ class _StatPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: iconColor),
+          Icon(icon, size: 13, color: iconColor.withValues(alpha: 0.5)),
           const SizedBox(width: 5),
           Text(
             label,

@@ -38,8 +38,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       height: 42,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.navy,
+        color: const Color(0xFFEDF1F5),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withOpacity(0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -69,7 +77,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     size: 15,
                     color: _selectedTab == DiscoverTab.discover
                         ? Colors.white
-                        : Colors.white.withOpacity(0.6),
+                        : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -79,7 +87,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       fontWeight: FontWeight.w700,
                       color: _selectedTab == DiscoverTab.discover
                           ? Colors.white
-                          : Colors.white.withOpacity(0.6),
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -112,7 +120,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     size: 15,
                     color: _selectedTab == DiscoverTab.forYou
                         ? Colors.white
-                        : Colors.white.withOpacity(0.6),
+                        : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -122,7 +130,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       fontWeight: FontWeight.w700,
                       color: _selectedTab == DiscoverTab.forYou
                           ? Colors.white
-                          : Colors.white.withOpacity(0.6),
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -153,8 +161,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       itemBuilder: (context, index) {
         final p = properties[index];
         final media = p.primaryMedia;
-        final isFirst = index == 0;
-        final isSecond = index == 1;
+        final isGuest = provider.isGuestMode;
+        final isFirst = isGuest && index == 0;
+        final isSecond = isGuest && index == 1;
         return GestureDetector(
           onTap: () {
             Navigator.of(context).push(
@@ -410,6 +419,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       child: _buildDiscoverGrid(properties, provider),
                     )
                   : SafeArea(
+                      bottom: false,
                       child: Stack(
                           children: [
                             // Full-height card swiper extending almost to the bottom navbar
@@ -426,7 +436,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                         10,
                                         6,
                                         10,
-                                        12,
+                                        150,
                                       ),
                                       scale: 0.93,
                                       threshold: 38,
@@ -476,7 +486,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
                             // Floating centered action buttons row
                             Positioned(
-                              bottom: 28,
+                              bottom: 165,
                               left: 0,
                               right: 0,
                               child: ActionButtons(
@@ -492,7 +502,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             // Floating Undo button independently positioned on the bottom-left corner
                             if (provider.canUndo)
                               Positioned(
-                                bottom: 36,
+                                bottom: 173,
                                 left: 24,
                                 child: Tooltip(
                                   message: 'חזור לפריט הקודם',

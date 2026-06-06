@@ -19,6 +19,9 @@ class LandlordPropertiesScreen extends StatefulWidget {
 }
 
 class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
+  static const double _floatingActionBottomInset = 92;
+  static const double _listBottomInset = 132;
+
   String _query = '';
   String _activeFilter =
       'all'; // 'all', 'expensive', 'rooms3', 'agency', 'private'
@@ -31,51 +34,78 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
     super.dispose();
   }
 
-  List<RentalProperty> _applyFiltersAndSort(List<RentalProperty> properties) {
-    var list = properties.toList();
+  bool _matchesQuery(RentalProperty property) {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    return property.address.toLowerCase().contains(query) ||
+        property.searchableText.contains(query);
+  }
 
-    // Search filter
-    if (_query.isNotEmpty) {
-      final q = _query.toLowerCase();
-      list = list.where((p) {
-        return p.address.toLowerCase().contains(q) ||
-            p.city.toLowerCase().contains(q) ||
-            p.neighborhood.toLowerCase().contains(q);
-      }).toList();
-    }
-
-    // Chip filter
+  bool _matchesActiveFilter(RentalProperty property) {
     switch (_activeFilter) {
       case 'high_priority':
-        list = list.where((p) => p.price < 6000).toList();
+        return property.price < 6000;
       case 'luxury':
-        list = list.where((p) => p.price >= 10000).toList();
+        return property.price >= 10000;
       case 'immediate':
-        list = list
-            .where((p) =>
-                p.entryDate.isEmpty ||
-                p.entryDate.toLowerCase().contains('מיידי') ||
-                p.entryDate.toLowerCase().contains('immediate') ||
-                p.entryDate.toLowerCase().contains('now'))
-            .toList();
+        final entryDate = property.entryDate.trim().toLowerCase();
+        return entryDate.isEmpty ||
+            entryDate.contains('מיידי') ||
+            entryDate.contains('immediate') ||
+            entryDate.contains('now') ||
+            entryDate.contains('today');
       case 'large':
-        list = list.where((p) => p.rooms >= 4).toList();
+        return property.rooms >= 4;
       case 'agency':
-        list = list.where((p) => p.agencyListing).toList();
+        return property.agencyListing;
       case 'private':
-        list = list.where((p) => !p.agencyListing).toList();
+        return !property.agencyListing;
+      case 'all':
       default:
-        break;
+        return true;
     }
+  }
+
+  void _setActiveFilter(String filter) {
+    if (_activeFilter == filter) return;
+    setState(() => _activeFilter = filter);
+  }
+
+  void _setSortBy(String sortBy) {
+    if (_sortBy == sortBy) return;
+    setState(() => _sortBy = sortBy);
+  }
+
+  void _clearSearchAndFilters() {
+    setState(() {
+      _query = '';
+      _activeFilter = 'all';
+      _searchCtrl.clear();
+    });
+  }
+
+  void _resetSheetControls() {
+    setState(() {
+      _activeFilter = 'all';
+      _sortBy = 'recent';
+    });
+  }
+
+  List<RentalProperty> _applyFiltersAndSort(List<RentalProperty> properties) {
+    final list =
+        properties.where(_matchesQuery).where(_matchesActiveFilter).toList();
 
     // Sort
     switch (_sortBy) {
       case 'price_asc':
         list.sort((a, b) => a.price.compareTo(b.price));
+        break;
       case 'price_desc':
         list.sort((a, b) => b.price.compareTo(a.price));
+        break;
       case 'rooms':
         list.sort((a, b) => b.rooms.compareTo(a.rooms));
+        break;
       default:
         // 'recent' — keep original order
         break;
@@ -85,6 +115,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
   }
 
   void _showSortSheet() {
+    final hasActiveFilterOrSort = _activeFilter != 'all' || _sortBy != 'recent';
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -92,138 +124,141 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final sortOptions = [
-              ('recent', 'ברירת מחדל'),
-              ('price_asc', 'לפי מחיר עולה'),
-              ('price_desc', 'לפי מחיר יורד'),
-              ('rooms', 'לפי חדרים'),
-            ];
+        final sortOptions = [
+          ('recent', 'ברירת מחדל'),
+          ('price_asc', 'לפי מחיר עולה'),
+          ('price_desc', 'לפי מחיר יורד'),
+          ('rooms', 'לפי חדרים'),
+        ];
 
-            final filterOptions = [
-              ('all', 'הכל'),
-              ('high_priority', 'עדיפות שיווקית (עד 6K)'),
-              ('luxury', 'נכסי יוקרה (10K+)'),
-              ('immediate', 'כניסה מיידית'),
-              ('large', 'דירות גדולות (4+ חדרים)'),
-              ('agency', 'בלעדיות (סוכנות)'),
-              ('private', 'פרטי (ללא תיווך)'),
-            ];
+        final filterOptions = [
+          ('all', 'הכל'),
+          ('high_priority', 'עדיפות שיווקית (עד 6K)'),
+          ('luxury', 'נכסי יוקרה (10K+)'),
+          ('immediate', 'כניסה מיידית'),
+          ('large', 'דירות גדולות (4+ חדרים)'),
+          ('agency', 'בלעדיות (סוכנות)'),
+          ('private', 'פרטי (ללא תיווך)'),
+        ];
 
-            return SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    const Text(
-                      'סינון ומיון נכסים',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'סינון לפי תגיות',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: filterOptions.map((opt) {
-                        final isSelected = _activeFilter == opt.$1;
-                        return GestureDetector(
-                          onTap: () {
-                            setSheetState(() {
-                              _activeFilter = opt.$1;
-                            });
-                            setState(() {});
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 7),
-                            decoration: BoxDecoration(
-                              color:
-                                  isSelected ? AppColors.primary : Colors.white,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.borderLight,
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              opt.$2,
-                              style: TextStyle(
-                                color:
-                                    isSelected ? Colors.white : AppColors.navy,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'מיון לפי',
-                      style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...sortOptions.map((opt) {
-                      final isSelected = _sortBy == opt.$1;
-                      return ListTile(
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 4),
-                        leading: Icon(
-                          isSelected
-                              ? IconsaxPlusLinear.tick_circle
-                              : IconsaxPlusLinear.record_circle,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                          size: 20,
+                    const Expanded(
+                      child: Text(
+                        'סינון ומיון נכסים',
+                        style: TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
                         ),
-                        title: Text(
-                          opt.$2,
-                          style: TextStyle(
-                            color:
-                                isSelected ? AppColors.primary : AppColors.navy,
-                            fontWeight:
-                                isSelected ? FontWeight.w800 : FontWeight.w600,
-                            fontSize: 14.5,
-                          ),
-                        ),
-                        onTap: () {
-                          setSheetState(() {
-                            _sortBy = opt.$1;
-                          });
-                          setState(() {});
+                      ),
+                    ),
+                    if (hasActiveFilterOrSort)
+                      TextButton(
+                        onPressed: () {
                           Navigator.of(ctx).pop();
+                          _resetSheetControls();
                         },
-                      );
-                    }),
+                        child: const Text('איפוס'),
+                      ),
                   ],
                 ),
-              ),
-            );
-          },
+                const SizedBox(height: 18),
+                const Text(
+                  'סינון לפי תגיות',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: filterOptions.map((opt) {
+                    final isSelected = _activeFilter == opt.$1;
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        _setActiveFilter(opt.$1);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary : Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.borderLight,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          opt.$2,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.navy,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'מיון לפי',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...sortOptions.map((opt) {
+                  final isSelected = _sortBy == opt.$1;
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    leading: Icon(
+                      isSelected
+                          ? IconsaxPlusLinear.tick_circle
+                          : IconsaxPlusLinear.record_circle,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                      size: 20,
+                    ),
+                    title: Text(
+                      opt.$2,
+                      style: TextStyle(
+                        color: isSelected ? AppColors.primary : AppColors.navy,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w600,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _setSortBy(opt.$1);
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -279,7 +314,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
             ),
           ),
           floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 96),
+            padding: const EdgeInsets.only(bottom: _floatingActionBottomInset),
             child: InkWell(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -329,6 +364,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
               : SafeArea(
+                  bottom: false,
                   child: Column(
                     children: [
                       const SizedBox(height: 12),
@@ -411,6 +447,9 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                             ),
                             const SizedBox(width: 10),
                             GestureDetector(
+                              key: const ValueKey(
+                                'landlord-properties-filter-button',
+                              ),
                               onTap: _showSortSheet,
                               child: Container(
                                 width: 48,
@@ -455,50 +494,43 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                               _FilterPill(
                                 label: 'הכל',
                                 isSelected: _activeFilter == 'all',
-                                onTap: () =>
-                                    setState(() => _activeFilter = 'all'),
+                                onTap: () => _setActiveFilter('all'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'כניסה מיידית',
                                 isSelected: _activeFilter == 'immediate',
-                                onTap: () =>
-                                    setState(() => _activeFilter = 'immediate'),
+                                onTap: () => _setActiveFilter('immediate'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'דירות גדולות',
                                 isSelected: _activeFilter == 'large',
-                                onTap: () =>
-                                    setState(() => _activeFilter = 'large'),
+                                onTap: () => _setActiveFilter('large'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'פרטי',
                                 isSelected: _activeFilter == 'private',
-                                onTap: () =>
-                                    setState(() => _activeFilter = 'private'),
+                                onTap: () => _setActiveFilter('private'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'בלעדיות',
                                 isSelected: _activeFilter == 'agency',
-                                onTap: () =>
-                                    setState(() => _activeFilter = 'agency'),
+                                onTap: () => _setActiveFilter('agency'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'יוקרה',
                                 isSelected: _activeFilter == 'luxury',
-                                onTap: () =>
-                                    setState(() => _activeFilter = 'luxury'),
+                                onTap: () => _setActiveFilter('luxury'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
                                 label: 'עד 6K',
                                 isSelected: _activeFilter == 'high_priority',
-                                onTap: () => setState(
-                                    () => _activeFilter = 'high_priority'),
+                                onTap: () => _setActiveFilter('high_priority'),
                               ),
                             ],
                           ),
@@ -529,15 +561,11 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                             ? const _EmptyPropertiesState()
                             : filtered.isEmpty
                                 ? _EmptyFilteredState(
-                                    onClear: () => setState(() {
-                                      _query = '';
-                                      _activeFilter = 'all';
-                                      _searchCtrl.clear();
-                                    }),
+                                    onClear: _clearSearchAndFilters,
                                   )
                                 : ListView.separated(
                                     padding: const EdgeInsets.fromLTRB(
-                                        16, 0, 16, 120),
+                                        16, 0, 16, _listBottomInset),
                                     itemBuilder: (context, index) {
                                       final property = filtered[index];
                                       final matchCount = provider.matches

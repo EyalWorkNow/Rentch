@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:flutter/material.dart';
@@ -148,25 +149,61 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         activeIndex: _page,
                       ),
                       const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 62,
-                        child: FilledButton(
-                          onPressed: _next,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: AppColors.navy,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                          child: GestureDetector(
+                            onTap: _next,
+                            child: Container(
+                              width: double.infinity,
+                              height: 62,
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: AppColors.primary.withValues(alpha: 0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  if (_page == _slides.length - 1)
+                                    const SizedBox(width: 56) // spacer to offset the circle on opposite side
+                                  else
+                                    const SizedBox(width: 24),
+                                  Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        _page == _slides.length - 1 ? 'מתחילים' : 'הבא',
+                                        style: const TextStyle(
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (_page == _slides.length - 1)
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_outward_rounded,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                    )
+                                  else
+                                    const SizedBox(width: 24),
+                                ],
+                              ),
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          child: Text(
-                            _page == _slides.length - 1 ? 'מתחילים' : 'הבא',
                           ),
                         ),
                       ),
@@ -225,13 +262,8 @@ class _SlideCopy extends StatelessWidget {
             fontWeight: FontWeight.w900,
             shadows: [
               Shadow(
-                color: Color(0x99000000),
-                blurRadius: 22,
-                offset: Offset(0, 4),
-              ),
-              Shadow(
-                color: Color(0x66000000),
-                blurRadius: 6,
+                color: Color(0x33000000),
+                blurRadius: 10,
                 offset: Offset(0, 2),
               ),
             ],
@@ -248,13 +280,8 @@ class _SlideCopy extends StatelessWidget {
             fontWeight: FontWeight.w600,
             shadows: const [
               Shadow(
-                color: Color(0x99000000),
-                blurRadius: 16,
-                offset: Offset(0, 3),
-              ),
-              Shadow(
-                color: Color(0x66000000),
-                blurRadius: 4,
+                color: Color(0x22000000),
+                blurRadius: 8,
                 offset: Offset(0, 1),
               ),
             ],

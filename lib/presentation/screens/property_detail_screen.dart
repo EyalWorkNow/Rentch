@@ -147,7 +147,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
-                          if (_PropertySignalStrip.shouldShow(p)) ...[
+                          if (_PropertySignalStrip.shouldShow(context, p)) ...[
                             _PropertySignalStrip(property: p),
                             const SizedBox(height: 24),
                           ],
@@ -2475,7 +2475,15 @@ class _PropertySignalStrip extends StatelessWidget {
 
   final RentalProperty property;
 
-  static bool shouldShow(RentalProperty property) {
+  static bool shouldShow(BuildContext context, RentalProperty property) {
+    final provider = context.read<DatingProvider>();
+    final isGuest = provider.isGuestMode;
+    final properties = provider.filteredProperties;
+    final isFirst = isGuest && properties.isNotEmpty && property.id == properties.first.id;
+    final isSecond = isGuest && properties.length > 1 && property.id == properties[1].id;
+
+    if (isFirst || isSecond) return true;
+
     final signals = property.marketSignals;
     return property.isVerifiedListing ||
         property.isNewListing ||
@@ -2485,6 +2493,55 @@ class _PropertySignalStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<DatingProvider>();
+    final isGuest = provider.isGuestMode;
+    final properties = provider.filteredProperties;
+    final isFirst = isGuest && properties.isNotEmpty && property.id == properties.first.id;
+    final isSecond = isGuest && properties.length > 1 && property.id == properties[1].id;
+
+    if (isFirst) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: const [
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.eye,
+            label: '245 צפו',
+            color: Color(0xFF22C55E),
+          ),
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.heart,
+            label: '84 אהבו',
+            color: Color(0xFFFF5A67),
+          ),
+        ],
+      );
+    }
+
+    if (isSecond) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: const [
+          _PropertySignalChip(
+            icon: Icons.flash_on_rounded,
+            label: 'דירה חדשה!',
+            color: Color(0xFFEF4444),
+          ),
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.heart,
+            label: '47 אהבו',
+            color: Color(0xFFFF5A67),
+          ),
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.people,
+            label: '3 צופים עכשיו',
+            color: Color(0xFF22C55E),
+          ),
+        ],
+      );
+    }
+
     final signals = property.marketSignals;
     final likesToday = signals.likesTodayFor(DateTime.now());
 

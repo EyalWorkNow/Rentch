@@ -1361,1078 +1361,134 @@ class _LandlordProfileScreen extends StatelessWidget {
     return name.isNotEmpty ? name[0] : '?';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final stats = provider.landlordStats;
-    final properties = provider.myProperties;
-    final matches = provider.matches;
-    final heroMedia = _landlordHeroMedia(properties);
-    final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
-    final initials = _initials(tenantName);
-    final cities = properties.map((p) => p.city).toSet().take(2).join(', ');
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // ── Hero ────────────────────────────────────────────────────────
-          SliverAppBar(
-            automaticallyImplyLeading: false,
-            expandedHeight: 260,
-            pinned: true,
-            stretch: true,
-            backgroundColor: const Color(0xFF06243A),
-            surfaceTintColor: Colors.transparent,
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(left: 12),
-                child: TextButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => EditProfileScreen(profile: profile)),
-                  ),
-                  icon: const RentchIcon(IconsaxPlusLinear.edit_2,
-                      color: Colors.white, size: 15),
-                  label: const Text('עריכה',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w700)),
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999)),
-                  ),
-                ),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.parallax,
-              background: _LandlordHero(
-                profile: profile,
-                initials: initials,
-                cities: cities,
-                propertiesCount: stats.propertiesCount,
-                heroMedia: heroMedia,
-              ),
-            ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── KPI bar ────────────────────────────────────────────
-                _LandlordKpiBar(stats: stats),
-                const SizedBox(height: 20),
-
-                // ── Properties ─────────────────────────────────────────
-                _LandlordSectionHeader(
-                  title: 'הנכסים שלי',
-                  subtitle: '${properties.length} נכסים פעילים',
-                  icon: IconsaxPlusLinear.buildings_2,
-                  actionLabel: properties.isNotEmpty ? 'ניהול' : null,
-                  onAction: properties.isNotEmpty
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => const LandlordPropertiesScreen()))
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                _PropertiesHorizontalScroll(
-                  properties: properties,
-                  onAdd: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const AddPropertyScreen())),
-                  onTap: (p) => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => EditPropertyScreen(property: p))),
-                ),
-                const SizedBox(height: 20),
-
-                // ── Active conversations ────────────────────────────────
-                if (matches.isNotEmpty) ...[
-                  _LandlordSectionHeader(
-                    title: 'שיחות פעילות',
-                    subtitle: '${matches.length} שיחות פתוחות',
-                    icon: IconsaxPlusLinear.message,
-                    actionLabel: 'הכל',
-                    onAction: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const MatchesScreen())),
-                  ),
-                  const SizedBox(height: 12),
-                  _MatchConversationList(
-                    matches: matches.take(3).toList(),
-                    provider: provider,
-                    tenantName: tenantName,
-                  ),
-                  const SizedBox(height: 20),
-                ],
-
-                // ── Performance card ────────────────────────────────────
-                _PerformanceCard(stats: stats),
-                const SizedBox(height: 20),
-
-                // ── Settings ────────────────────────────────────────────
-                _SettingsCard(
-                  onEditProfile: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => EditProfileScreen(profile: profile)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Account actions ─────────────────────────────────────
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.borderLight),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: AppColors.shadow,
-                          blurRadius: 12,
-                          offset: Offset(0, 4)),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      _ActionTile(
-                        icon: IconsaxPlusLinear.logout,
-                        label: 'יציאה מהחשבון',
-                        isDestructive: true,
-                        onTap: onLogout,
-                      ),
-                      const Divider(
-                          height: 1, indent: 74, color: AppColors.borderLight),
-                      _ActionTile(
-                        icon: IconsaxPlusLinear.trash,
-                        label: 'מחיקת חשבון',
-                        isDestructive: true,
-                        onTap: onDeleteAccount,
-                      ),
-                    ],
-                  ),
-                ),
-              ]),
-            ),
-          ),
-        ],
+  Widget _buildHeader(BuildContext context) {
+    return const Center(
+      child: Text(
+        'פרופיל',
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
-}
 
-// ── Hero background ──────────────────────────────────────────────────────────
-
-class _LandlordHero extends StatelessWidget {
-  const _LandlordHero({
-    required this.profile,
-    required this.initials,
-    required this.cities,
-    required this.propertiesCount,
-    required this.heroMedia,
-  });
-
-  final TenantProfile profile;
-  final String initials;
-  final String cities;
-  final int propertiesCount;
-  final PropertyMedia? heroMedia;
-
-  @override
-  Widget build(BuildContext context) {
-    final photoUrl = profile.photoUrl;
-    final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        _LandlordProfileHeroBackdrop(heroMedia: heroMedia),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFF06243A).withValues(alpha: 0.42),
-                const Color(0xFF06243A).withValues(alpha: 0.84),
-              ],
-            ),
+  Widget _buildProfileCard(
+      BuildContext context, String tenantName, String email, String photoUrl) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(22, 60, 22, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2), width: 2),
+            ),
+            child: ClipOval(
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 76,
-                        height: 76,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                        ),
-                        child: ClipOval(
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              _InitialsBubble(initials: initials),
-                              if (photoUrl.isNotEmpty &&
-                                  !photoUrl.startsWith('/'))
-                                Image.network(
-                                  photoUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const SizedBox.shrink(),
-                                )
-                              else if (photoUrl.startsWith('/'))
-                                Image.file(
-                                  File(photoUrl),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const SizedBox.shrink(),
-                                ),
-                            ],
-                          ),
+                  Container(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    child: Center(
+                      child: Text(
+                        _initials(tenantName),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const RentchIcon(IconsaxPlusLinear.verify,
-                              size: 13, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              tenantName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                height: 1.1,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _HeroPill(
-                              icon: IconsaxPlusLinear.buildings_2,
-                              label: 'בעל דירה',
-                              color: AppColors.primary,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            if (cities.isNotEmpty)
-                              _HeroPill(
-                                icon: IconsaxPlusLinear.location,
-                                label: cities,
-                                color: Colors.white.withValues(alpha: 0.85),
-                                bg: Colors.white.withValues(alpha: 0.12),
-                              ),
-                            _HeroPill(
-                              icon: IconsaxPlusLinear.building,
-                              label: '$propertiesCount נכסים פעילים בתיק',
-                              color: Colors.white.withValues(alpha: 0.85),
-                              bg: Colors.white.withValues(alpha: 0.12),
-                            ),
-                          ],
-                        ),
-                      ],
                     ),
                   ),
+                  if (photoUrl.isNotEmpty)
+                    (photoUrl.startsWith('/')
+                        ? Image.file(File(photoUrl), fit: BoxFit.cover)
+                        : Image.network(photoUrl, fit: BoxFit.cover)),
                 ],
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-PropertyMedia? _landlordHeroMedia(List<RentalProperty> properties) {
-  for (final property in properties) {
-    final media = property.primaryMedia;
-    if (media != null) return media;
-  }
-  return null;
-}
-
-class _LandlordProfileHeroBackdrop extends StatelessWidget {
-  const _LandlordProfileHeroBackdrop({required this.heroMedia});
-
-  final PropertyMedia? heroMedia;
-
-  @override
-  Widget build(BuildContext context) {
-    if (heroMedia != null) {
-      return SafeMedia(
-        media: heroMedia!,
-        fit: BoxFit.cover,
-        fallback: const _LandlordProfileHeroFallback(),
-        videoMode: SafeVideoDisplayMode.playback,
-      );
-    }
-    return const _LandlordProfileHeroFallback();
-  }
-}
-
-class _LandlordProfileHeroFallback extends StatelessWidget {
-  const _LandlordProfileHeroFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF06243A), Color(0xFF0D3554)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -28,
-            right: -12,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
-              ),
             ),
           ),
-          Positioned(
-            bottom: -44,
-            left: -18,
-            child: Container(
-              width: 190,
-              height: 190,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.10),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InitialsBubble extends StatelessWidget {
-  const _InitialsBubble({required this.initials});
-  final String initials;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.primary,
-      child: Center(
-        child: Text(
-          initials,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroPill extends StatelessWidget {
-  const _HeroPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-    this.bg,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color? bg;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg ?? color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 11, fontWeight: FontWeight.w800)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── KPI bar ──────────────────────────────────────────────────────────────────
-
-class _LandlordKpiBar extends StatelessWidget {
-  const _LandlordKpiBar({required this.stats});
-  final LandlordStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 112,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 18, offset: Offset(0, 6)),
-        ],
-      ),
-      child: Row(
-        children: [
-          _KpiCell(
-            value: '${stats.propertiesCount}',
-            label: 'דירות',
-            icon: IconsaxPlusLinear.buildings_2,
-            color: AppColors.primary,
-            isFirst: true,
-          ),
-          _KpiSeparator(),
-          _KpiCell(
-            value: '${stats.matchesCount}',
-            label: 'שיחות',
-            icon: IconsaxPlusLinear.message,
-            color: const Color(0xFF4A6CF7),
-          ),
-          _KpiSeparator(),
-          _KpiCell(
-            value: '${stats.conversionRate.round()}%',
-            label: 'המרה',
-            icon: IconsaxPlusLinear.chart_2,
-            color: AppColors.success,
-          ),
-          _KpiSeparator(),
-          _KpiCell(
-            value: '${stats.pendingCount}',
-            label: 'ממתינים',
-            icon: IconsaxPlusLinear.profile_2user,
-            color: stats.pendingCount > 0
-                ? const Color(0xFFE67E22)
-                : AppColors.textSecondary,
-            isLast: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _KpiCell extends StatelessWidget {
-  const _KpiCell({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.color,
-    this.isFirst = false,
-    this.isLast = false,
-  });
-
-  final String value;
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool isFirst;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.horizontal(
-            right: isFirst ? const Radius.circular(22) : Radius.zero,
-            left: isLast ? const Radius.circular(22) : Radius.zero,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 16),
-            ),
-            const SizedBox(height: 7),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 22,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tenantName,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: color,
-                    height: 1.0)),
-            const SizedBox(height: 3),
-            Text(label,
-                style: const TextStyle(
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _KpiSeparator extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 1,
-        margin: const EdgeInsets.symmetric(vertical: 16),
-        color: AppColors.borderLight,
-      );
-}
-
-// ── Section header ────────────────────────────────────────────────────────────
-
-class _LandlordSectionHeader extends StatelessWidget {
-  const _LandlordSectionHeader({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Icon(icon, size: 17, color: AppColors.primary),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900)),
-              Text(subtitle,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-        if (actionLabel != null && onAction != null)
-          GestureDetector(
-            onTap: onAction,
-            child: Row(
-              children: [
-                Text(actionLabel!,
-                    style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800)),
-                const RentchIcon(IconsaxPlusLinear.arrow_left,
-                    size: 13, color: AppColors.primary),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
-      ],
-    );
-  }
-}
-
-// ── Properties horizontal scroll ──────────────────────────────────────────────
-
-class _PropertiesHorizontalScroll extends StatelessWidget {
-  const _PropertiesHorizontalScroll({
-    required this.properties,
-    required this.onAdd,
-    required this.onTap,
-  });
-
-  final List<RentalProperty> properties;
-  final VoidCallback onAdd;
-  final ValueChanged<RentalProperty> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 188,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        itemCount: properties.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) {
-          if (i == properties.length) {
-            return _AddPropertyCard(onTap: onAdd);
-          }
-          return _PropertyMiniTile(
-            property: properties[i],
-            onTap: () => onTap(properties[i]),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _PropertyMiniTile extends StatelessWidget {
-  const _PropertyMiniTile({required this.property, required this.onTap});
-  final RentalProperty property;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final media = property.media.isNotEmpty ? property.media.first : null;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 138,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: const [
-            BoxShadow(
-                color: AppColors.shadow, blurRadius: 10, offset: Offset(0, 4)),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image
-              SizedBox(
-                height: 88,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    SafeMedia(
-                      media: media,
-                      fallback: Container(
-                        color: AppColors.navy.withValues(alpha: 0.8),
-                        child: const Center(
-                          child: RentchIcon(IconsaxPlusLinear.building,
-                              color: Colors.white30, size: 30),
-                        ),
-                      ),
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                    ),
-                    // Price badge
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.navy.withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          property.priceLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Details
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      property.city,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${property.roomsLabel} חד׳ • ${property.sizeM2} מ"ר',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text('פעיל',
-                          style: TextStyle(
-                              color: AppColors.success,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AddPropertyCard extends StatelessWidget {
-  const _AddPropertyCard({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 120,
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.3),
-              style: BorderStyle.solid),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(profile: profile)),
+            ),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF5F7FA),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(IconsaxPlusLinear.add_square,
-                  color: AppColors.primary, size: 22),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'הוסף\nדירה',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                height: 1.3,
+              child: const Center(
+                child: RentchIcon(
+                  IconsaxPlusLinear.edit_2,
+                  color: AppColors.textPrimary,
+                  size: 18,
+                ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Match conversations list ──────────────────────────────────────────────────
-
-class _MatchConversationList extends StatelessWidget {
-  const _MatchConversationList({
-    required this.matches,
-    required this.provider,
-    required this.tenantName,
-  });
-
-  final List<RentalMatch> matches;
-  final DatingProvider provider;
-  final String tenantName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 6)),
+          ),
         ],
       ),
-      child: Column(
-        children: matches.asMap().entries.map((entry) {
-          final isLast = entry.key == matches.length - 1;
-          return _ConversationRow(
-            match: entry.value,
-            provider: provider,
-            tenantName: tenantName,
-            isLast: isLast,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => MessageScreen(matchId: entry.value.id))),
-          );
-        }).toList(),
-      ),
     );
   }
-}
 
-class _ConversationRow extends StatelessWidget {
-  const _ConversationRow({
-    required this.match,
-    required this.provider,
-    required this.tenantName,
-    required this.isLast,
-    required this.onTap,
-  });
-
-  final RentalMatch match;
-  final DatingProvider provider;
-  final String tenantName;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final property = provider.propertyById(match.propertyId);
-    if (property == null) return const SizedBox.shrink();
-
-    final lastMsg = match.messages.isNotEmpty ? match.messages.last : null;
-    final awaitingReply = lastMsg != null && lastMsg.sender == tenantName;
-    final media = property.media.isNotEmpty ? property.media.first : null;
-
-    Color stageColor;
-    String stageLabel;
-    if (match.ownerSigned && match.tenantSigned) {
-      stageColor = AppColors.success;
-      stageLabel = 'מאומת';
-    } else if (match.contractSent) {
-      stageColor = AppColors.primary;
-      stageLabel = 'חוזה נשלח';
-    } else {
-      stageColor = AppColors.navy;
-      stageLabel = 'שיחה פתוחה';
-    }
-
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(
-              children: [
-                // Property thumbnail
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: SizedBox(
-                    width: 54,
-                    height: 54,
-                    child: SafeMedia(
-                      media: media,
-                      fallback: Container(
-                        color: AppColors.primaryLight2,
-                        child: const Center(
-                            child: RentchIcon(IconsaxPlusLinear.building,
-                                color: AppColors.primary, size: 22)),
-                      ),
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              property.address,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.navy,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: stageColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                  color: stageColor.withValues(alpha: 0.25)),
-                            ),
-                            child: Text(stageLabel,
-                                style: TextStyle(
-                                    color: stageColor,
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          if (awaitingReply) ...[
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE67E22)
-                                    .withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text('ממתין לתגובתך',
-                                  style: TextStyle(
-                                      color: Color(0xFFE67E22),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900)),
-                            ),
-                          ],
-                          Expanded(
-                            child: Text(
-                              lastMsg?.text ?? 'שיחה חדשה',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: const RentchIcon(IconsaxPlusLinear.arrow_left,
-                      size: 15, color: AppColors.primary),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (!isLast)
-          const Divider(height: 1, indent: 80, color: AppColors.borderLight),
-      ],
-    );
-  }
-}
-
-// ── Performance card ──────────────────────────────────────────────────────────
-
-class _PerformanceCard extends StatelessWidget {
-  const _PerformanceCard({required this.stats});
-  final LandlordStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final convRate = (stats.conversionRate / 100).clamp(0.0, 1.0);
-
+  Widget _buildProBanner(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
           BoxShadow(
-              color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 6)),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Column(
@@ -2440,157 +1496,555 @@ class _PerformanceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(11),
+              const Text(
+                'שדרג ל-PRO',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
                 ),
-                child: const RentchIcon(IconsaxPlusLinear.chart_2,
-                    size: 17, color: AppColors.primary),
               ),
-              const SizedBox(width: 10),
-              const Text('ביצועי החשבון',
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.textPrimary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'PRO',
                   style: TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900)),
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'שדרג לגרסת הפרו של Rentch לקבלת נתונים חיים עשירים יותר, התאמות ללא הגבלה ועוד פיצ\'רים מתקדמים.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 16),
-          _PerformanceRow(
-            label: 'מועמדים סה"כ',
-            value: '${stats.totalCandidatesSeen}',
-            icon: IconsaxPlusLinear.profile_2user,
-            color: AppColors.navy,
-          ),
-          const SizedBox(height: 10),
-          _PerformanceRow(
-            label: 'שיחות פעילות',
-            value: '${stats.matchesCount}',
-            icon: IconsaxPlusLinear.message,
-            color: const Color(0xFF4A6CF7),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Text('יחס המרה',
-                  style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700)),
-              const Spacer(),
-              Flexible(
-                child: Text(
-                  '${stats.conversionRate.round()}% מהמועמדים הפכו לשיחות',
-                  textAlign: TextAlign.left,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: AppColors.navy,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('תכונה זו תהיה זמינה בקרוב!')),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: convRate,
-              backgroundColor: AppColors.borderLight,
-              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-              minHeight: 7,
+              icon: const Icon(Icons.star, color: Colors.white, size: 18),
+              label: const Text(
+                'שדרג עכשיו',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _PerformanceRow extends StatelessWidget {
-  const _PerformanceRow({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 15, color: color),
-        const SizedBox(width: 8),
-        Text(label,
-            style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
-        const Spacer(),
-        Text(value,
-            style: TextStyle(
-                color: color, fontSize: 15, fontWeight: FontWeight.w900)),
-      ],
-    );
-  }
-}
-
-// ── Settings card ────────────────────────────────────────────────────────────
-
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.onEditProfile});
-  final VoidCallback onEditProfile;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSettingsGroup(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
           BoxShadow(
-              color: AppColors.shadow, blurRadius: 12, offset: Offset(0, 4)),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Column(
         children: [
-          _SettingsTile(
-            icon: IconsaxPlusLinear.user_edit,
-            label: 'עריכת פרופיל',
-            subtitle: 'שם, תמונה, פרטי קשר',
-            color: AppColors.primary,
-            onTap: onEditProfile,
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.user,
+            label: 'פרטי חשבון',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(profile: profile)),
+            ),
           ),
-          const Divider(height: 1, indent: 74, color: AppColors.borderLight),
-          _SettingsTile(
-            icon: IconsaxPlusLinear.notification,
+          const _SettingsDivider(),
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.setting_2,
             label: 'הגדרות התראות',
-            subtitle: 'לידים, שיחות, התאמות',
-            color: AppColors.navy,
-            onTap: () {},
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const _SettingsSubPage(
+                    title: 'הגדרות התראות',
+                    items: [
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.notification,
+                        title: 'התראות בנייד',
+                        subtitle: 'קבל עדכונים בזמן אמת על מכשירך',
+                        isSwitch: true,
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.sms,
+                        title: 'התראות אימייל',
+                        subtitle: 'קבל סיכומים שבועיים ועדכוני מערכת',
+                        isSwitch: true,
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.user_add,
+                        title: 'פניות שוכרים',
+                        subtitle: 'התראות על התאמות ולידים חדשים',
+                        isSwitch: true,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-          const Divider(height: 1, indent: 74, color: AppColors.borderLight),
-          _SettingsTile(
-            icon: IconsaxPlusLinear.shield_tick,
-            label: 'פרטיות ואבטחה',
-            subtitle: 'ניהול הרשאות',
-            color: const Color(0xFF4A6CF7),
-            onTap: () {},
+          const _SettingsDivider(),
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.security_safe,
+            label: 'אבטחת חשבון',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const _SettingsSubPage(
+                    title: 'אבטחת חשבון',
+                    items: [
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.key,
+                        title: 'שינוי סיסמה',
+                        subtitle: 'עדכן את סיסמת הכניסה לחשבון',
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.finger_scan,
+                        title: 'זיהוי ביומטרי',
+                        subtitle: 'התחברות מהירה באמצעות טביעת אצבע או פנים',
+                        isSwitch: true,
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.monitor_mobbile,
+                        title: 'מכשירים מחוברים',
+                        subtitle: 'נהל את המכשירים המחוברים לחשבונך',
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const _SettingsDivider(),
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.info_circle,
+            label: 'תמיכה ועזרה',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const _SettingsSubPage(
+                    title: 'תמיכה ועזרה',
+                    items: [
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.message_question,
+                        title: 'מרכז עזרה ומדריכים',
+                        subtitle: 'שאלות נפוצות ומאמרי תמיכה',
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.call_calling,
+                        title: 'צור קשר עם התמיכה',
+                        subtitle: 'אנחנו כאן לעזור 24/7',
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.document_text,
+                        title: 'תנאי שימוש ומדיניות',
+                        subtitle: 'הסכם שימוש ושמירה על פרטיות',
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
+
+  Widget _buildSystemActions(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.user_octagon,
+            label: 'החלף חשבון לשוכר',
+            color: AppColors.primary,
+            onTap: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22)),
+                  title: const Text('החלפת חשבון',
+                      style: TextStyle(
+                          color: AppColors.navy, fontWeight: FontWeight.w900)),
+                  content: const Text(
+                    'האם ברצונך להחליף את מצב החשבון למצב שוכר?',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('ביטול',
+                          style: TextStyle(color: AppColors.textSecondary)),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('החלף'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await provider.setUserRole('tenant');
+              }
+            },
+          ),
+          const _SettingsDivider(),
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.logout,
+            label: 'יציאה מהחשבון',
+            color: AppColors.coral,
+            onTap: onLogout,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
+    final email = 'owner@rentch.co.il';
+    final photoUrl = profile.photoUrl;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(context),
+              const SizedBox(height: 24),
+              _buildProfileCard(context, tenantName, email, photoUrl),
+              const SizedBox(height: 20),
+              _buildProBanner(context),
+              const SizedBox(height: 20),
+              _buildSettingsGroup(context),
+              const SizedBox(height: 20),
+              _buildSystemActions(context),
+              const SizedBox(height: 120),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileMenuItem extends StatelessWidget {
+  const _ProfileMenuItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = color ?? AppColors.textPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: activeColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: activeColor,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: activeColor,
+                ),
+              ),
+              const Spacer(),
+              RentchIcon(
+                IconsaxPlusLinear.arrow_left,
+                size: 16,
+                color: activeColor.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Settings Sub Page ────────────────────────────────────────────────────────
+
+class _SettingsSubPage extends StatefulWidget {
+  const _SettingsSubPage({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<_SubPageSettingItem> items;
+
+  @override
+  State<_SettingsSubPage> createState() => _SettingsSubPageState();
+}
+
+class _SettingsSubPageState extends State<_SettingsSubPage> {
+  late Map<String, bool> _switchStates;
+
+  @override
+  void initState() {
+    super.initState();
+    _switchStates = {
+      for (final item in widget.items)
+        if (item.isSwitch) item.title: item.initialSwitchValue
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 44), // Balancer
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: RentchIcon(
+                          IconsaxPlusLinear.arrow_right,
+                          color: AppColors.textPrimary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Settings Container Card
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: List.generate(widget.items.length, (index) {
+                    final item = widget.items[index];
+                    final isLast = index == widget.items.length - 1;
+
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  item.icon,
+                                  size: 20,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.title,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    if (item.subtitle != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        item.subtitle!,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (item.isSwitch)
+                                Switch.adaptive(
+                                  value: _switchStates[item.title] ?? false,
+                                  activeColor: AppColors.primary,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _switchStates[item.title] = val;
+                                    });
+                                  },
+                                )
+                              else
+                                RentchIcon(
+                                  IconsaxPlusLinear.arrow_left,
+                                  size: 16,
+                                  color: AppColors.textPrimary.withValues(alpha: 0.4),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (!isLast) const _SettingsDivider(),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubPageSettingItem {
+  const _SubPageSettingItem({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.isSwitch = false,
+    this.initialSwitchValue = true,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final bool isSwitch;
+  final bool initialSwitchValue;
 }
 
 class _SettingsTile extends StatelessWidget {

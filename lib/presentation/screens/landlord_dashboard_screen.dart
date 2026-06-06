@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -33,121 +35,112 @@ class LandlordDashboardScreen extends StatelessWidget {
         final photoUrl = profile?.photoUrl ?? '';
         final matches = provider.matches.take(3).toList();
         final properties = provider.myProperties;
-        final heroMedia = _landlordHeroMedia(properties);
-        final pendingCount = stats.pendingCount;
-        final unseenCount = provider.unseenMatchCount;
+        
+        // Calculate Expected Monthly Revenue
+        final double expectedRevenue = properties.fold<double>(
+          0.0,
+          (sum, property) => sum + property.price,
+        );
 
         if (provider.isLoading) {
           return const Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: Color(0xFFF5F7FA),
             body: Center(
-                child: CircularProgressIndicator(color: AppColors.primary)),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
           );
         }
 
         return Scaffold(
-          backgroundColor: AppColors.background,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // ── Collapsible hero ─────────────────────────────────────
-              SliverAppBar(
-                automaticallyImplyLeading: false,
-                expandedHeight: 220,
-                pinned: true,
-                stretch: true,
-                backgroundColor: const Color(0xFF06243A),
-                flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.parallax,
-                  background: _HeroBackground(
-                    name: landlordName,
-                    photoUrl: photoUrl,
-                    heroMedia: heroMedia,
-                    stats: stats,
-                    pendingCount: pendingCount,
-                    unseenCount: unseenCount,
+          backgroundColor: const Color(0xFFF5F7FA),
+          body: SafeArea(
+            bottom: false,
+            child: ListView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              children: [
+                // ── Header ──
+                _DashboardHeader(
+                  name: landlordName,
+                  photoUrl: photoUrl,
+                  pendingCount: stats.pendingCount,
+                ),
+                const SizedBox(height: 24),
+
+                // ── "System Performance" Styled Grid ──
+                _SystemPerformanceGrid(
+                  propertiesCount: properties.length,
+                  expectedRevenue: expectedRevenue,
+                  conversionRate: stats.conversionRate,
+                  pendingCount: stats.pendingCount,
+                ),
+                const SizedBox(height: 20),
+
+                // ── Occupancy Arc Meter ──
+                _OccupancyArcMeter(
+                  matchesCount: stats.matchesCount,
+                  propertiesCount: properties.length,
+                  expectedRevenue: expectedRevenue,
+                ),
+                const SizedBox(height: 20),
+
+                // ── Weekly Activity Bar Chart ──
+                const _WeeklyActivityChart(),
+                const SizedBox(height: 20),
+
+                // ── Quick Actions Grid ──
+                _QuickActionsGrid(
+                  pendingCount: stats.pendingCount,
+                  unseenCount: provider.unseenMatchCount,
+                  onAddProperty: () =>
+                      _push(context, const AddPropertyScreen()),
+                  onSwipes: onOpenSwipes,
+                  onMatches: onOpenMatches,
+                  onProperties: onOpenProperties,
+                ),
+                const SizedBox(height: 24),
+
+                // ── Active Matches ──
+                if (matches.isNotEmpty) ...[
+                  _SectionHeader(
+                    title: 'התאמות פעילות',
+                    subtitle: 'שיחות שמצפות לטיפול',
+                    onSeeAll: onOpenMatches,
                   ),
-                ),
-              ),
-
-              // ── Main content ─────────────────────────────────────────
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // Pipeline visualizer
-                    _PipelineCard(
-                      leadsCount: provider.ownerLeads.length,
-                      matchesCount: stats.matchesCount,
-                      propertiesCount: stats.propertiesCount,
-                      onLeads: onOpenSwipes,
-                      onMatches: onOpenMatches,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Quick actions
-                    _QuickActionsGrid(
-                      pendingCount: pendingCount,
-                      unseenCount: unseenCount,
-                      onAddProperty: () =>
-                          _push(context, const AddPropertyScreen()),
-                      onSwipes: onOpenSwipes,
-                      onMatches: onOpenMatches,
-                      onProperties: onOpenProperties,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Activity feed
-                    _ActivitySection(
-                      provider: provider,
-                      context: context,
-                      onOpenSwipes: onOpenSwipes,
-                      onOpenMatches: onOpenMatches,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Recent matches
-                    if (matches.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: 'התאמות פעילות',
-                        subtitle: 'שיחות שמצפות לטיפול',
-                        onSeeAll: onOpenMatches,
-                      ),
-                      const SizedBox(height: 12),
-                      ...matches.map(
-                        (m) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _MatchRow(
-                            match: m,
-                            provider: provider,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-
-                    // My properties preview
-                    if (properties.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: 'הנכסים שלי',
-                        subtitle: '${properties.length} נכסים פעילים',
-                        onSeeAll: onOpenProperties,
-                      ),
-                      const SizedBox(height: 12),
-                      _PropertiesScroll(
-                        properties: properties,
+                  const SizedBox(height: 12),
+                  ...matches.map(
+                    (m) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _MatchRow(
+                        match: m,
                         provider: provider,
-                        context: context,
                       ),
-                    ] else ...[
-                      _EmptyPropertiesCard(
-                        onAdd: () => _push(context, const AddPropertyScreen()),
-                      ),
-                    ],
-                  ]),
-                ),
-              ),
-            ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // ── Properties Scroll ──
+                if (properties.isNotEmpty) ...[
+                  _SectionHeader(
+                    title: 'הנכסים שלי',
+                    subtitle: '${properties.length} נכסים פעילים',
+                    onSeeAll: onOpenProperties,
+                  ),
+                  const SizedBox(height: 12),
+                  _PropertiesScroll(
+                    properties: properties,
+                    provider: provider,
+                    context: context,
+                  ),
+                ] else ...[
+                  _EmptyPropertiesCard(
+                    onAdd: () => _push(context, const AddPropertyScreen()),
+                  ),
+                ],
+                const SizedBox(height: 80),
+              ],
+            ),
           ),
         );
       },
@@ -159,212 +152,1103 @@ class LandlordDashboardScreen extends StatelessWidget {
   }
 }
 
-// ─── Hero Background ──────────────────────────────────────────────────────────
+// ─── Header Widget ──────────────────────────────────────────────────────────
 
-class _HeroBackground extends StatelessWidget {
-  const _HeroBackground({
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({
     required this.name,
     required this.photoUrl,
-    required this.heroMedia,
-    required this.stats,
     required this.pendingCount,
-    required this.unseenCount,
   });
 
   final String name;
   final String photoUrl;
-  final PropertyMedia? heroMedia;
-  final LandlordStats stats;
   final int pendingCount;
-  final int unseenCount;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
+    final firstName = name.split(' ').first;
+
+    return Row(
       children: [
-        _LandlordHeroBackdrop(heroMedia: heroMedia),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFF06243A).withValues(alpha: 0.46),
-                const Color(0xFF06243A).withValues(alpha: 0.84),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
+        // Left: Greeting text
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  _ProfileAvatar(photoUrl: photoUrl, name: name),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'שלום, $name 👋',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          pendingCount > 0
-                              ? '$pendingCount מועמדים מחכים לאישור'
-                              : 'הכל תחת שליטה',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.78),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (unseenCount > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const RentchIcon(IconsaxPlusLinear.message,
-                              size: 12, color: Colors.white),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$unseenCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              const Spacer(),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
+              RichText(
+                text: TextSpan(
                   children: [
-                    _HeroStatPill(
-                      label: '${stats.propertiesCount} דירות',
-                      icon: IconsaxPlusLinear.building,
+                    TextSpan(
+                      text: 'שלום, ',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    _HeroStatPill(
-                      label: '${stats.pendingCount} ממתינים',
-                      icon: IconsaxPlusLinear.profile_2user,
-                      highlight: pendingCount > 0,
-                    ),
-                    const SizedBox(width: 8),
-                    _HeroStatPill(
-                      label: '${stats.matchesCount} מאצ\'ים',
-                      icon: IconsaxPlusLinear.heart,
-                    ),
-                    const SizedBox(width: 8),
-                    _HeroStatPill(
-                      label: '${stats.conversionRate.round()}% המרה',
-                      icon: IconsaxPlusLinear.chart_2,
+                    TextSpan(
+                      text: '$firstName 👋',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                pendingCount > 0
+                    ? '$pendingCount מועמדים ממתינים לאישורך'
+                    : 'הכל מעודכן ותחת שליטה ✓',
+                style: TextStyle(
+                  color: pendingCount > 0
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
+        ),
+        const SizedBox(width: 12),
+        // Right: Notification bell + Avatar
+        Row(
+          children: [
+            // Notification bell
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: Colors.black.withValues(alpha: 0.06)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      IconsaxPlusLinear.notification,
+                      size: 20,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (pendingCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          pendingCount > 9 ? '9+' : '$pendingCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            // Avatar
+            _ProfileAvatar(photoUrl: photoUrl, name: name),
+          ],
         ),
       ],
     );
   }
 }
 
-PropertyMedia? _landlordHeroMedia(List<RentalProperty> properties) {
-  for (final property in properties) {
-    final media = property.primaryMedia;
-    if (media != null) return media;
-  }
-  return null;
-}
+// ─── System Performance Grid ──────────────────────────────────────────────────
 
-class _LandlordHeroBackdrop extends StatelessWidget {
-  const _LandlordHeroBackdrop({required this.heroMedia});
+class _SystemPerformanceGrid extends StatelessWidget {
+  const _SystemPerformanceGrid({
+    required this.propertiesCount,
+    required this.expectedRevenue,
+    required this.conversionRate,
+    required this.pendingCount,
+  });
 
-  final PropertyMedia? heroMedia;
+  final int propertiesCount;
+  final double expectedRevenue;
+  final double conversionRate;
+  final int pendingCount;
 
   @override
   Widget build(BuildContext context) {
-    if (heroMedia != null) {
-      return SafeMedia(
-        media: heroMedia!,
-        fit: BoxFit.cover,
-        fallback: const _HeroBackdropFallback(),
-        videoMode: SafeVideoDisplayMode.playback,
-      );
-    }
-    return const _HeroBackdropFallback();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ביצועי מערכת',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: 'סה״כ נכסים',
+                value: '$propertiesCount',
+                unit: 'פעילים',
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricCard(
+                title: 'הכנסה צפויה',
+                value: '₪${expectedRevenue.toInt()}',
+                unit: 'חודשי',
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _LargeProgressCard(
+          title: 'אחוז המרה',
+          progressValue: conversionRate / 100.0,
+          progressText: '${conversionRate.round()}%',
+          statusText: pendingCount > 0 ? 'בטעינה: $pendingCount ממתינים' : 'יציב ותקין',
+          icon: IconsaxPlusLinear.flash,
+        ),
+      ],
+    );
   }
 }
 
-class _HeroBackdropFallback extends StatelessWidget {
-  const _HeroBackdropFallback();
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.unit,
+    required this.backgroundColor,
+  });
+
+  final String title;
+  final String value;
+  final String unit;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF06243A), Color(0xFF0D3554)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            top: -24,
-            right: -18,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
-              ),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          Positioned(
-            bottom: -40,
-            left: -16,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.10),
-              ),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  unit,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LargeProgressCard extends StatelessWidget {
+  const _LargeProgressCard({
+    required this.title,
+    required this.progressValue,
+    required this.progressText,
+    required this.statusText,
+    required this.icon,
+  });
+
+  final String title;
+  final double progressValue;
+  final String progressText;
+  final String statusText;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Icon(
+                icon,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.bolt, color: AppColors.primary, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                statusText,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                progressText,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Custom Gradient Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              children: [
+                Container(
+                  height: 20,
+                  width: double.infinity,
+                  color: const Color(0xFFEDF1F5),
+                ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth * progressValue.clamp(0.0, 1.0);
+                    return Container(
+                      height: 20,
+                      width: width,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primaryLight,
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Occupancy Arc Meter ──────────────────────────────────────────────────────
+
+class _OccupancyArcMeter extends StatelessWidget {
+  const _OccupancyArcMeter({
+    required this.matchesCount,
+    required this.propertiesCount,
+    required this.expectedRevenue,
+  });
+
+  final int matchesCount;
+  final int propertiesCount;
+  final double expectedRevenue;
+
+  @override
+  Widget build(BuildContext context) {
+    final double occupancyRate = propertiesCount == 0
+        ? 0.0
+        : (matchesCount / propertiesCount).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'סטטוס תפוסה',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'מתוך $propertiesCount נכסים פעילים',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: SizedBox(
+              height: 148,
+              width: 280,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: const Size(280, 148),
+                    painter: _SegmentedArcPainter(
+                      progress: occupancyRate,
+                      totalSegments: 20,
+                      activeColor: AppColors.primary,
+                      inactiveColor: const Color(0xFFE8EDF2),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${(occupancyRate * 100).round()}%',
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'אחוז תפוסה',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Bottom stats row
+          Row(
+            children: [
+              Expanded(
+                child: _ArcStatChip(
+                  label: 'תפוסים',
+                  value: '$matchesCount',
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ArcStatChip(
+                  label: 'פנויים',
+                  value: '${(propertiesCount - matchesCount).clamp(0, propertiesCount)}',
+                  color: const Color(0xFFE8EDF2),
+                  textColor: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArcStatChip extends StatelessWidget {
+  const _ArcStatChip({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.textColor,
+  });
+  final String label;
+  final String value;
+  final Color color;
+  final Color? textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = textColor ?? Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  color: tc, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(value,
+              style: TextStyle(
+                  color: tc, fontSize: 18, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SegmentedArcPainter extends CustomPainter {
+  const _SegmentedArcPainter({
+    required this.progress,
+    required this.totalSegments,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  final double progress;
+  final int totalSegments;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height);
+    final radius = size.width * 0.44;
+    const segmentAngle = math.pi / 20; // 180° / 20 segments
+    const gapAngle = segmentAngle * 0.28;
+    const segmentSpan = segmentAngle - gapAngle;
+
+    final int filledCount = (progress * totalSegments).round();
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.085
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < totalSegments; i++) {
+      final startAngle = math.pi + i * segmentAngle + gapAngle / 2;
+      paint.color = i < filledCount ? activeColor : inactiveColor;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        segmentSpan,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentedArcPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+// ─── Weekly Activity Chart ────────────────────────────────────────────────────
+
+class _WeeklyActivityChart extends StatefulWidget {
+  const _WeeklyActivityChart();
+
+  @override
+  State<_WeeklyActivityChart> createState() => _WeeklyActivityChartState();
+}
+
+class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
+  int _selectedBarIndex = 3;
+  int _selectedPeriod = 0; // 0=שבועי, 1=חודשי, 2=שנתי
+
+  static const _periods = ['שבועי', 'חודשי', 'שנתי'];
+
+  // Data per period
+  static const _data = [
+    // Weekly — 7 days (Sun–Sat)
+    [3, 7, 5, 9, 4, 6, 2],
+    // Monthly — 4 weeks
+    [28, 35, 22, 41],
+    // Yearly — 12 months
+    [18, 24, 31, 27, 36, 42, 38, 29, 44, 37, 51, 46],
+  ];
+
+  static const _labels = [
+    ['א\'', 'ב\'', 'ג\'', 'ד\'', 'ה\'', 'ו\'', 'ש\''],
+    ['שב׳ 1', 'שב׳ 2', 'שב׳ 3', 'שב׳ 4'],
+    ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ', 'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'],
+  ];
+
+  static const _titleSuffix = ['השבוע', 'החודש', 'השנה'];
+
+  @override
+  Widget build(BuildContext context) {
+    final currentData = _data[_selectedPeriod];
+    final currentLabels = _labels[_selectedPeriod];
+    final maxVal = currentData.reduce((a, b) => a > b ? a : b);
+    final totalInquiries = currentData.reduce((a, b) => a + b);
+    final avgPerPeriod = (totalInquiries / currentData.length);
+    final safeBarIndex = _selectedBarIndex.clamp(0, currentData.length - 1);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'פניות שוכרים ${_titleSuffix[_selectedPeriod]}',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              // Period selector
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F4F8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(_periods.length, (i) {
+                    final selected = i == _selectedPeriod;
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() {
+                          _selectedPeriod = i;
+                          _selectedBarIndex = 0;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color:
+                              selected ? AppColors.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _periods[i],
+                          style: TextStyle(
+                            color:
+                                selected ? Colors.white : AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Summary row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'סה״כ פניות',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$totalInquiries פניות',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _selectedPeriod == 0
+                        ? 'ממוצע יומי'
+                        : _selectedPeriod == 1
+                            ? 'ממוצע שבועי'
+                            : 'ממוצע חודשי',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${avgPerPeriod.toStringAsFixed(1)}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Bar Chart
+          SizedBox(
+            height: 160,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(currentData.length, (index) {
+                final val = currentData[index];
+                final heightFactor = maxVal > 0 ? val / maxVal : 0.0;
+                final isHighlighted = index == safeBarIndex;
+
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedBarIndex = index);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (isHighlighted) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '$val',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                        ] else
+                          const SizedBox(height: 24),
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal:
+                                  currentData.length > 8 ? 3 : 5,
+                            ),
+                            child: FractionallySizedBox(
+                              heightFactor: heightFactor,
+                              alignment: Alignment.bottomCenter,
+                              child: CustomPaint(
+                                size: Size.infinite,
+                                painter: _BarPainter(
+                                  isHighlighted: isHighlighted,
+                                  themeColor: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          currentLabels[index],
+                          style: TextStyle(
+                            color: isHighlighted
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            fontSize: currentData.length > 8 ? 9 : 11,
+                            fontWeight: isHighlighted
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Striped Bar Painter ──────────────────────────────────────────────────────
+
+class _BarPainter extends CustomPainter {
+  const _BarPainter({
+    required this.isHighlighted,
+    required this.themeColor,
+  });
+
+  final bool isHighlighted;
+  final Color themeColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(8));
+
+    canvas.save();
+    canvas.clipRRect(rrect);
+
+    final bgPaint = Paint();
+    if (isHighlighted) {
+      bgPaint.color = themeColor;
+    } else {
+      bgPaint.color = const Color(0xFFF1F3F9);
+    }
+    canvas.drawRect(rect, bgPaint);
+
+    final stripePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5;
+
+    if (isHighlighted) {
+      stripePaint.color = Colors.white.withValues(alpha: 0.22);
+    } else {
+      stripePaint.color = themeColor.withValues(alpha: 0.12);
+    }
+
+    const double step = 11.0;
+    for (double i = -size.height; i < size.width + size.height; i += step) {
+      canvas.drawLine(
+        Offset(i, 0),
+        Offset(i + size.height, size.height),
+        stripePaint,
+      );
+    }
+
+    canvas.restore();
+
+    if (size.height > 25) {
+      final dotCenter = Offset(size.width / 2, 14);
+      final outerCirclePaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(dotCenter, 6.5, outerCirclePaint);
+
+      final innerDotPaint = Paint()
+        ..color = isHighlighted ? themeColor : const Color(0xFF0F172A)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(dotCenter, 3.5, innerDotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BarPainter oldDelegate) {
+    return oldDelegate.isHighlighted != isHighlighted ||
+        oldDelegate.themeColor != themeColor;
+  }
+}
+
+
+// ─── Quick Actions Grid ───────────────────────────────────────────────────────
+
+class _QuickActionsGrid extends StatelessWidget {
+  const _QuickActionsGrid({
+    required this.pendingCount,
+    required this.unseenCount,
+    required this.onAddProperty,
+    required this.onSwipes,
+    required this.onMatches,
+    required this.onProperties,
+  });
+
+  final int pendingCount;
+  final int unseenCount;
+  final VoidCallback onAddProperty;
+  final VoidCallback onSwipes;
+  final VoidCallback onMatches;
+  final VoidCallback onProperties;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'פעולות מהירות',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QABtn(
+                label: 'הוסף דירה',
+                icon: IconsaxPlusLinear.add_square,
+                color: AppColors.primary,
+                onTap: onAddProperty,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QABtn(
+                label: 'מועמדים',
+                icon: IconsaxPlusLinear.profile_2user,
+                badge: pendingCount,
+                color: AppColors.textPrimary,
+                onTap: onSwipes,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QABtn(
+                label: "מאצ'ים",
+                icon: IconsaxPlusLinear.heart,
+                badge: unseenCount,
+                color: AppColors.coral,
+                onTap: onMatches,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QABtn(
+                label: 'הנכסים',
+                icon: IconsaxPlusLinear.buildings_2,
+                color: AppColors.primaryDark,
+                onTap: onProperties,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QABtn extends StatelessWidget {
+  const _QABtn({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.badge = 0,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final int badge;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 17),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      constraints:
+                          const BoxConstraints(minWidth: 16, minHeight: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: color == AppColors.coral
+                            ? AppColors.primary
+                            : AppColors.coral,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          badge > 9 ? '9+' : '$badge',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -397,9 +1281,7 @@ class _ProfileAvatar extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Always-visible initials layer
             _InitialsCircle(initials: initials),
-            // Photo on top — only when URL is available
             if (photoUrl.isNotEmpty)
               Image.network(
                 photoUrl,
@@ -429,482 +1311,6 @@ class _InitialsCircle extends StatelessWidget {
             fontSize: 16,
             fontWeight: FontWeight.w900,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroStatPill extends StatelessWidget {
-  const _HeroStatPill({
-    required this.label,
-    required this.icon,
-    this.highlight = false,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: highlight
-            ? const Color(0xFFFFD166).withValues(alpha: 0.2)
-            : Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: highlight
-            ? Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.5))
-            : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              size: 12,
-              color: highlight
-                  ? const Color(0xFFFFD166)
-                  : Colors.white.withValues(alpha: 0.85)),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: highlight
-                  ? const Color(0xFFFFD166)
-                  : Colors.white.withValues(alpha: 0.85),
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Pipeline Card ────────────────────────────────────────────────────────────
-
-class _PipelineCard extends StatelessWidget {
-  const _PipelineCard({
-    required this.leadsCount,
-    required this.matchesCount,
-    required this.propertiesCount,
-    required this.onLeads,
-    required this.onMatches,
-  });
-
-  final int leadsCount;
-  final int matchesCount;
-  final int propertiesCount;
-  final VoidCallback onLeads;
-  final VoidCallback onMatches;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-              color: AppColors.shadow, blurRadius: 20, offset: Offset(0, 8)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              RentchIcon(IconsaxPlusLinear.chart_2,
-                  size: 16, color: AppColors.primary),
-              SizedBox(width: 7),
-              Text(
-                'משפך שכירות',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Pipeline flow
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {},
-                    child: _PipelineStage(
-                      label: 'נכסים',
-                      count: propertiesCount,
-                      icon: IconsaxPlusLinear.building,
-                      color: AppColors.navy,
-                    ),
-                  ),
-                ),
-                _PipelineArrow(),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: onLeads,
-                    child: _PipelineStage(
-                      label: 'לידים',
-                      count: leadsCount,
-                      icon: IconsaxPlusLinear.profile_2user,
-                      color: AppColors.primary,
-                      tappable: true,
-                    ),
-                  ),
-                ),
-                _PipelineArrow(),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: onMatches,
-                    child: _PipelineStage(
-                      label: "מאצ'ים",
-                      count: matchesCount,
-                      icon: IconsaxPlusLinear.heart,
-                      color: AppColors.coral,
-                      tappable: true,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          // Progress bar
-          _PipelineProgressBar(
-            leads: leadsCount,
-            matches: matchesCount,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PipelineStage extends StatelessWidget {
-  const _PipelineStage({
-    required this.label,
-    required this.count,
-    required this.icon,
-    required this.color,
-    this.tappable = false,
-  });
-
-  final String label;
-  final int count;
-  final IconData icon;
-  final Color color;
-  final bool tappable;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border:
-            tappable ? Border.all(color: color.withValues(alpha: 0.2)) : null,
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, size: 17, color: color),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$count',
-            style: TextStyle(
-              color: color,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (tappable)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'צפה',
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  RentchIcon(IconsaxPlusLinear.arrow_left,
-                      size: 10, color: color),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PipelineArrow extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: RentchIcon(
-        IconsaxPlusLinear.arrow_left,
-        size: 18,
-        color: AppColors.borderLight,
-      ),
-    );
-  }
-}
-
-class _PipelineProgressBar extends StatelessWidget {
-  const _PipelineProgressBar({required this.leads, required this.matches});
-  final int leads;
-  final int matches;
-
-  @override
-  Widget build(BuildContext context) {
-    final convRate = leads == 0 ? 0.0 : (matches / leads).clamp(0.0, 1.0);
-    final label = leads == 0
-        ? 'אין לידים פעילים עדיין'
-        : '${(convRate * 100).round()}% מהלידים הפכו למאצ\'ים';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'יחס המרה',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: convRate,
-            backgroundColor: AppColors.borderLight,
-            valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-            minHeight: 6,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Quick Actions Grid ───────────────────────────────────────────────────────
-
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid({
-    required this.pendingCount,
-    required this.unseenCount,
-    required this.onAddProperty,
-    required this.onSwipes,
-    required this.onMatches,
-    required this.onProperties,
-  });
-
-  final int pendingCount;
-  final int unseenCount;
-  final VoidCallback onAddProperty;
-  final VoidCallback onSwipes;
-  final VoidCallback onMatches;
-  final VoidCallback onProperties;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'פעולות מהירות',
-          style: TextStyle(
-            color: AppColors.navy,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _QABtn(
-                label: 'הוסף דירה',
-                icon: IconsaxPlusLinear.add_square,
-                color: AppColors.primary,
-                onTap: onAddProperty,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _QABtn(
-                label: 'מועמדים',
-                icon: IconsaxPlusLinear.profile_2user,
-                badge: pendingCount,
-                color: AppColors.navy,
-                onTap: onSwipes,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _QABtn(
-                label: "מאצ'ים",
-                icon: IconsaxPlusLinear.heart,
-                badge: unseenCount,
-                color: AppColors.coral,
-                onTap: onMatches,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _QABtn(
-                label: 'הנכסים',
-                icon: IconsaxPlusLinear.buildings_2,
-                color: AppColors.success,
-                onTap: onProperties,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _QABtn extends StatelessWidget {
-  const _QABtn({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.badge = 0,
-    this.color = AppColors.primary,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final int badge;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      child: Container(
-        height: 80,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withValues(alpha: 0.18)),
-          boxShadow: [
-            BoxShadow(
-                color: color.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 17),
-                ),
-                if (badge > 0)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      constraints:
-                          const BoxConstraints(minWidth: 16, minHeight: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: color == AppColors.coral
-                            ? AppColors.navy
-                            : AppColors.coral,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          badge > 9 ? '9+' : '$badge',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
         ),
       ),
     );
@@ -968,7 +1374,7 @@ class _ActivitySection extends StatelessWidget {
     } else {
       items.add(_ActivityItem(
         icon: IconsaxPlusLinear.chart_2,
-        color: AppColors.navy,
+        color: Colors.white.withValues(alpha: 0.9),
         title: 'פרופיל הנכסים שלך פעיל ומוצג לשוכרים',
         subtitle:
             '${props.length} ${props.length == 1 ? 'נכס' : 'נכסים'} פעילים — הוסף תמונות לשיפור הסיכויים',
@@ -991,7 +1397,7 @@ class _ActivitySection extends StatelessWidget {
         const Text(
           'מה קורה עכשיו',
           style: TextStyle(
-            color: AppColors.navy,
+            color: AppColors.textPrimary,
             fontSize: 16,
             fontWeight: FontWeight.w900,
           ),
@@ -1001,12 +1407,13 @@ class _ActivitySection extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
+            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+            boxShadow: [
               BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 16,
-                  offset: Offset(0, 6)),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
             ],
           ),
           child: Column(
@@ -1045,6 +1452,8 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final iconBgColor = item.color.withValues(alpha: 0.08);
+
     return Column(
       children: [
         InkWell(
@@ -1058,7 +1467,7 @@ class _ActivityRow extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: item.color.withValues(alpha: 0.1),
+                    color: iconBgColor,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(item.icon, color: item.color, size: 19),
@@ -1071,7 +1480,7 @@ class _ActivityRow extends StatelessWidget {
                       Text(
                         item.title,
                         style: const TextStyle(
-                          color: AppColors.navy,
+                          color: AppColors.textPrimary,
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1108,18 +1517,18 @@ class _ActivityRow extends StatelessWidget {
                     ),
                   ),
                 ] else
-                  RentchIcon(IconsaxPlusLinear.arrow_left,
+                  const RentchIcon(IconsaxPlusLinear.arrow_left,
                       size: 14,
-                      color: AppColors.textSecondary.withValues(alpha: 0.4)),
+                      color: AppColors.textSecondary),
               ],
             ),
           ),
         ),
         if (!isLast)
-          Divider(
+          const Divider(
             height: 1,
             indent: 70,
-            color: AppColors.borderLight.withValues(alpha: 0.6),
+            color: Color(0xFFEDF1F5),
           ),
       ],
     );
@@ -1151,17 +1560,19 @@ class _SectionHeader extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: -0.3,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -1170,19 +1581,28 @@ class _SectionHeader extends StatelessWidget {
         if (onSeeAll != null)
           GestureDetector(
             onTap: onSeeAll,
-            child: Row(
-              children: [
-                const Text(
-                  'הכל',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'הכל',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const RentchIcon(IconsaxPlusLinear.arrow_left,
-                    size: 13, color: AppColors.primary),
-              ],
+                  SizedBox(width: 3),
+                  RentchIcon(IconsaxPlusLinear.arrow_left,
+                      size: 12, color: AppColors.primary),
+                ],
+              ),
             ),
           ),
       ],
@@ -1203,30 +1623,51 @@ class _MatchRow extends StatelessWidget {
     if (property == null) return const SizedBox.shrink();
     final lastMsg = match.messages.isNotEmpty ? match.messages.last.text : null;
     final status = _status(match);
+    final isUnread = match.messages.isNotEmpty && !match.ownerSigned;
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => MessageScreen(matchId: match.id)),
       ),
       child: Container(
-        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: [
+            // Left accent bar
+            Container(
+              width: 4,
+              height: 76,
+              decoration: BoxDecoration(
+                color: status.color,
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Property thumbnail
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
               child: SizedBox(
-                width: 56,
-                height: 56,
+                width: 60,
+                height: 60,
                 child: property.media.isNotEmpty
                     ? SafeMedia(
                         media: property.media.first,
                         fallback: Container(
-                          color: AppColors.primaryLight2,
+                          color: AppColors.primary.withValues(alpha: 0.12),
                           child: const Center(
                             child: RentchIcon(IconsaxPlusLinear.building,
                                 color: AppColors.primary, size: 22),
@@ -1236,7 +1677,7 @@ class _MatchRow extends StatelessWidget {
                         alignment: Alignment.topCenter,
                       )
                     : Container(
-                        color: AppColors.primaryLight2,
+                        color: AppColors.primary.withValues(alpha: 0.12),
                         child: const Center(
                           child: RentchIcon(IconsaxPlusLinear.building,
                               color: AppColors.primary, size: 22),
@@ -1245,55 +1686,83 @@ class _MatchRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
+            // Content
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          property.address,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.navy,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13.5,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            property.address,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              letterSpacing: -0.2,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _StatusBadge(label: status.label, color: status.color),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    lastMsg ?? 'שיחה חדשה ממתינה',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      height: 1.3,
+                        const SizedBox(width: 8),
+                        _StatusBadge(label: status.label, color: status.color),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (isUnread)
+                          Container(
+                            width: 7,
+                            height: 7,
+                            margin: const EdgeInsets.only(left: 5),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            lastMsg ?? 'שיחה חדשה ממתינה',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isUnread
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: isUnread
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
+            // Arrow CTA
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              width: 34,
+              height: 34,
+              margin: const EdgeInsets.only(left: 12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text(
-                'פתח',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
+              child: const Center(
+                child: RentchIcon(
+                  IconsaxPlusLinear.arrow_left,
+                  color: Colors.white,
+                  size: 16,
                 ),
               ),
             ),
@@ -1311,7 +1780,7 @@ class _MatchRow extends StatelessWidget {
       return (label: 'חוזה נשלח', color: AppColors.primary);
     }
     if (m.messages.length >= 3) {
-      return (label: 'פעיל', color: AppColors.navy);
+      return (label: 'פעיל', color: AppColors.textPrimary);
     }
     return (label: 'ממתין', color: AppColors.textSecondary);
   }
@@ -1325,16 +1794,16 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Text(
         label,
-        style:
-            TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800),
+        style: TextStyle(
+            color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -1390,21 +1859,27 @@ class _PropertyMiniCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
               // Image
-              SizedBox(
-                height: 86,
+              Positioned.fill(
                 child: media != null
                     ? SafeMedia(
                         media: media,
                         fallback: Container(
-                          color: AppColors.navy,
+                          color: const Color(0xFF06243A),
                           child: const Center(
                             child: RentchIcon(IconsaxPlusLinear.building,
                                 color: Colors.white30, size: 32),
@@ -1414,19 +1889,41 @@ class _PropertyMiniCard extends StatelessWidget {
                         alignment: Alignment.topCenter,
                       )
                     : Container(
-                        color: AppColors.navy.withValues(alpha: 0.8),
+                        color: const Color(0xFF06243A),
                         child: const Center(
                           child: RentchIcon(IconsaxPlusLinear.building,
                               color: Colors.white30, size: 32),
                         ),
                       ),
               ),
+              // Bottom dark gradient overlay for text readability
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 105,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.85),
+                          Colors.black.withValues(alpha: 0.4),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               // Details
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
                       property.city.isNotEmpty
@@ -1435,36 +1932,41 @@ class _PropertyMiniCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.navy,
+                        color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       '${property.priceLabel} • ${property.roomsLabel} ח\'',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 10.5,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 6),
+                    // Glass status pill
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: AppColors.primary.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          width: 0.8,
+                        ),
                       ),
                       child: const Text(
                         'פעיל',
                         style: TextStyle(
                           color: AppColors.primary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
@@ -1492,11 +1994,16 @@ class _EmptyPropertiesCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.05),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.25),
-              style: BorderStyle.solid),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -1504,7 +2011,7 @@ class _EmptyPropertiesCard extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const RentchIcon(IconsaxPlusLinear.add_square,
@@ -1514,7 +2021,7 @@ class _EmptyPropertiesCard extends StatelessWidget {
             const Text(
               'הוסף את הנכס הראשון שלך',
               style: TextStyle(
-                color: AppColors.navy,
+                color: AppColors.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
               ),
@@ -1546,7 +2053,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF06243A),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -1558,7 +2065,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.borderLight,
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1566,7 +2073,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
           Text(
             property.address,
             style: const TextStyle(
-              color: AppColors.navy,
+              color: Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w900,
             ),
@@ -1592,19 +2099,19 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  backgroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF06243A),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(22)),
                   title: const Text('הסרת נכס',
                       style: TextStyle(
-                          color: AppColors.navy, fontWeight: FontWeight.w900)),
+                          color: Colors.white, fontWeight: FontWeight.w900)),
                   content: const Text('האם אתה בטוח שברצונך להסיר נכס זה?',
-                      style: TextStyle(color: AppColors.textSecondary)),
+                      style: TextStyle(color: Colors.white70)),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
                       child: const Text('ביטול',
-                          style: TextStyle(color: AppColors.textSecondary)),
+                          style: TextStyle(color: Colors.white70)),
                     ),
                     FilledButton(
                       style: FilledButton.styleFrom(
@@ -1625,7 +2132,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
           _SheetTile(
             icon: IconsaxPlusLinear.share,
             label: 'שתף קישור לנכס',
-            color: AppColors.navy,
+            color: Colors.white.withValues(alpha: 0.9),
             onTap: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1664,7 +2171,7 @@ class _SheetTile extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(icon, color: color, size: 18),
@@ -1674,14 +2181,14 @@ class _SheetTile extends StatelessWidget {
               label,
               style: TextStyle(
                 color:
-                    color == AppColors.coral ? AppColors.coral : AppColors.navy,
+                    color == AppColors.coral ? AppColors.coral : Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 14.5,
               ),
             ),
             const Spacer(),
-            const RentchIcon(IconsaxPlusLinear.arrow_left,
-                size: 16, color: AppColors.textSecondary),
+            RentchIcon(IconsaxPlusLinear.arrow_left,
+                size: 16, color: Colors.white.withValues(alpha: 0.4)),
           ],
         ),
       ),

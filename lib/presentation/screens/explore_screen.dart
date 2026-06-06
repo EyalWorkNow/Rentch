@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -32,178 +33,183 @@ class _ExploreScreenState extends State<ExploreScreen> {
         final leads = provider.ownerLeads;
         final total = leads.length;
 
+        // Reset index safely if total changes
+        final safeIndex = total > 0 ? _currentIndex.clamp(0, total - 1) : 0;
+
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: provider.isLoading || tenant == null
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary))
-              : SafeArea(
-                  child: Column(
-                    children: [
-                      _TopBar(
-                        current: _currentIndex,
-                        total: total,
-                        trustScore: provider.trustScore,
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: leads.isEmpty
-                            ? const _EmptyOwnerQueue()
-                            : CardSwiper(
-                                key: ValueKey(leads.map((p) => p.id).join('-')),
-                                controller: provider.ownerSwiperController,
-                                cardsCount: leads.length,
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                                scale: 0.93,
-                                threshold: 32,
-                                maxAngle: 14,
-                                isLoop: false,
-                                numberOfCardsDisplayed:
-                                    math.min(2, leads.length),
-                                allowedSwipeDirection:
-                                    const AllowedSwipeDirection.only(
-                                  left: true,
-                                  right: true,
-                                ),
-                                onSwipe: (prev, current, dir) {
-                                  if (current != null && mounted) {
-                                    setState(() => _currentIndex = current);
-                                  }
-                                  return provider.handleOwnerSwipe(
-                                      prev, current, dir);
-                                },
-                                cardBuilder: (
-                                  context,
-                                  index,
-                                  hOffset,
-                                  vOffset,
-                                ) {
-                                  if (index < 0 || index >= leads.length) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return _LeadCard(
-                                    tenant: tenant,
-                                    property: leads[index],
-                                    reviews: provider.tenantReviews,
-                                    hOffset: hOffset,
-                                  );
-                                },
-                              ),
-                      ),
-                      if (leads.isNotEmpty)
-                        _ActionBar(
-                          onSkip: () {
-                            HapticFeedback.lightImpact();
-                            provider.ownerSwiperController
-                                .swipe(CardSwiperDirection.bottom);
-                          },
-                          onReject: () {
-                            HapticFeedback.mediumImpact();
-                            provider.ownerSwipeLeft();
-                          },
-                          onAccept: () {
-                            HapticFeedback.heavyImpact();
-                            provider.ownerSwipeRight();
-                          },
-                        ),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-        );
-      },
-    );
-  }
-}
-
-// ─── Top bar ──────────────────────────────────────────────────────────────────
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.current,
-    required this.total,
-    required this.trustScore,
-  });
-
-  final int current;
-  final int total;
-  final int trustScore;
-
-  @override
-  Widget build(BuildContext context) {
-    final remaining = math.max(0, total - current);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          // Title
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'מועמדים',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.navy,
-                    height: 1.1,
-                  ),
-                ),
-                if (total > 0)
-                  Text(
-                    '$remaining ממתינים להחלטה',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                else
-                  const Text(
-                    'אין כרגע מועמדים חדשים',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (total > 0) ...[
-            // Progress dots / pill
-            _ProgressPill(current: current, total: total),
-            const SizedBox(width: 10),
-          ],
-          // Trust score badge
-          if (trustScore > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            backgroundColor: AppColors.background,
+            elevation: 0,
+            centerTitle: true,
+            title: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: _trustColor(trustScore).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
+                color: const Color(0xFFEDF1F5),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.black.withOpacity(0.04)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  RentchIcon(IconsaxPlusLinear.shield_tick,
-                      size: 13, color: _trustColor(trustScore)),
-                  const SizedBox(width: 5),
+                  const RentchIcon(
+                    IconsaxPlusLinear.profile_2user,
+                    size: 15,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    '$trustScore נקודות אמון',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: _trustColor(trustScore),
+                    'מועמדים',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
                     ),
                   ),
+                  if (total > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${safeIndex + 1}/$total',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-        ],
-      ),
+            actions: [
+              if (total > 0 && provider.trustScore > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _trustColor(provider.trustScore).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RentchIcon(
+                            IconsaxPlusLinear.shield_tick,
+                            size: 13,
+                            color: _trustColor(provider.trustScore),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '${provider.trustScore}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: _trustColor(provider.trustScore),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          body: provider.isLoading || tenant == null
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : leads.isEmpty
+                  ? const _EmptyOwnerQueue()
+                  : SafeArea(
+                      bottom: false,
+                      child: Stack(
+                        children: [
+                          // Full-height card swiper
+                          Positioned.fill(
+                            child: CardSwiper(
+                              key: ValueKey(leads.map((p) => p.id).join('-')),
+                              controller: provider.ownerSwiperController,
+                              cardsCount: leads.length,
+                              padding: const EdgeInsets.fromLTRB(10, 6, 10, 150),
+                              scale: 0.93,
+                              threshold: 38,
+                              maxAngle: 16,
+                              isLoop: false,
+                              numberOfCardsDisplayed: math.min(3, leads.length),
+                              backCardOffset: const Offset(0, 20),
+                              allowedSwipeDirection: const AllowedSwipeDirection.only(
+                                left: true,
+                                right: true,
+                                up: true,
+                              ),
+                              onSwipe: (prev, current, dir) {
+                                if (current != null && mounted) {
+                                  setState(() => _currentIndex = current);
+                                }
+                                return provider.handleOwnerSwipe(prev, current, dir);
+                              },
+                              cardBuilder: (context, index, hOffset, vOffset) {
+                                if (index < 0 || index >= leads.length) {
+                                  return const SizedBox.shrink();
+                                }
+                                return _LeadCard(
+                                  tenant: tenant,
+                                  property: leads[index],
+                                  reviews: provider.tenantReviews,
+                                  hOffset: hOffset,
+                                );
+                              },
+                            ),
+                          ),
+
+                          // Floating centered action buttons
+                          Positioned(
+                            bottom: 165,
+                            left: 0,
+                            right: 0,
+                            child: _ActionButtons(
+                              onReject: () {
+                                HapticFeedback.mediumImpact();
+                                provider.ownerSwipeLeft();
+                              },
+                              onAccept: () {
+                                HapticFeedback.heavyImpact();
+                                provider.ownerSwipeRight();
+                              },
+                              onInfo: () {
+                                if (leads.isEmpty || safeIndex >= leads.length) return;
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => TenantDetailScreen(
+                                      tenant: tenant,
+                                      property: leads[safeIndex],
+                                      reviews: provider.tenantReviews,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+        );
+      },
     );
   }
 
@@ -211,39 +217,6 @@ class _TopBar extends StatelessWidget {
     if (score >= 80) return const Color(0xFF27AE60);
     if (score >= 50) return const Color(0xFFE67E22);
     return AppColors.coral;
-  }
-}
-
-class _ProgressPill extends StatelessWidget {
-  const _ProgressPill({required this.current, required this.total});
-  final int current;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          RentchIcon(IconsaxPlusLinear.profile_2user,
-              size: 12, color: AppColors.primary),
-          const SizedBox(width: 5),
-          Text(
-            '${current + 1}/$total',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -285,176 +258,209 @@ class _LeadCardState extends State<_LeadCard> {
     return index.clamp(0, photoCount - 1).toInt();
   }
 
+  void _prevImage() {
+    final current = _safePhotoIndex(_photoIndex);
+    if (current > 0) setState(() => _photoIndex = current - 1);
+  }
+
+  void _nextImage() {
+    final current = _safePhotoIndex(_photoIndex);
+    if (current < widget.tenant.photoUrls.length - 1) {
+      setState(() => _photoIndex = current + 1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAccepting = widget.hOffset > 10;
     final isRejecting = widget.hOffset < -10;
     final photos = widget.tenant.photoUrls;
-    final hasMultiplePhotos = photos.length > 1;
+    final hasMultiple = photos.length > 1;
     final safePhotoIndex = _safePhotoIndex(_photoIndex);
     final currentPhoto = photos.isNotEmpty ? photos[safePhotoIndex] : '';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: const [
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.16),
+            width: 1.5,
+          ),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x12072946),
-              blurRadius: 28,
-              offset: Offset(0, 12),
+              color: Colors.black.withOpacity(0.28),
+              blurRadius: 18,
+              spreadRadius: 2,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.white.withOpacity(0.08),
+              blurRadius: 8,
+              spreadRadius: -1,
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(16.5),
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              // Main scrollable content
-              Column(
-                children: [
-                  // ── Photo header ────────────────────────────────────────
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height * 0.38,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Photo
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: SafeImage(
-                            key: ValueKey(
-                              '${widget.tenant.id}:$safePhotoIndex:$currentPhoto',
-                            ),
-                            source: currentPhoto,
-                            fallback: Container(
-                              color: AppColors.navy,
-                              child: const Center(
-                                child: RentchIcon(
-                                  IconsaxPlusLinear.profile_circle,
-                                  size: 80,
-                                  color: Colors.white24,
-                                ),
-                              ),
-                            ),
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
-                          ),
-                        ),
-                        // Bottom gradient
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                Color(0xF2072946),
-                                Color(0x22072946),
-                                Colors.transparent,
-                              ],
-                              stops: [0.0, 0.5, 0.8],
-                            ),
-                          ),
-                        ),
-                        // Photo navigation tap zones
-                        if (hasMultiplePhotos)
-                          Positioned.fill(
-                            child: Directionality(
-                              textDirection: TextDirection.ltr,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        if (safePhotoIndex > 0) {
-                                          setState(
-                                            () => _photoIndex =
-                                                safePhotoIndex - 1,
-                                          );
-                                        }
-                                      },
-                                      behavior: HitTestBehavior.translucent,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        if (safePhotoIndex <
-                                            photos.length - 1) {
-                                          setState(
-                                            () => _photoIndex =
-                                                safePhotoIndex + 1,
-                                          );
-                                        }
-                                      },
-                                      behavior: HitTestBehavior.translucent,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        // Photo dots
-                        if (hasMultiplePhotos)
-                          Positioned(
-                            top: 14,
-                            left: 0,
-                            right: 0,
-                            child: _PhotoDots(
-                              count: photos.length,
-                              current: safePhotoIndex,
-                            ),
-                          ),
-                        // Name + chips overlay
-                        Positioned(
-                          bottom: 16,
-                          right: 18,
-                          left: 18,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
+              // Main Image
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                child: SafeImage(
+                  key: ValueKey('${widget.tenant.id}:$safePhotoIndex:$currentPhoto'),
+                  source: currentPhoto,
+                  fallback: Container(
+                    color: AppColors.navy,
+                    child: const Center(
+                      child: RentchIcon(
+                        IconsaxPlusLinear.profile_circle,
+                        size: 80,
+                        color: Colors.white24,
+                      ),
+                    ),
+                  ),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                ),
+              ),
+
+              // Bottom dark gradient overlay
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black87,
+                      Colors.black54,
+                      Colors.black26,
+                      Colors.transparent,
+                    ],
+                    stops: [0.0, 0.35, 0.65, 0.85],
+                  ),
+                ),
+              ),
+
+              // Image navigation tap zones
+              if (hasMultiple)
+                Positioned.fill(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        flex: 60,
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
                             children: [
-                              Text(
-                                widget.tenant.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.1,
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _prevImage,
+                                  behavior: HitTestBehavior.translucent,
+                                  child: const SizedBox.expand(),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
-                                  _TenantChip(
-                                    icon: IconsaxPlusLinear.wallet,
-                                    label: _fmt(widget.tenant.budgetMax),
-                                  ),
-                                  _TenantChip(
-                                    icon: IconsaxPlusLinear.building,
-                                    label:
-                                        '${widget.tenant.desiredRooms.toStringAsFixed(widget.tenant.desiredRooms % 1 == 0 ? 0 : 1)} חדרים',
-                                  ),
-                                  _TenantChip(
-                                    icon: IconsaxPlusLinear.calendar,
-                                    label: widget.tenant.moveInWindow,
-                                  ),
-                                ],
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _nextImage,
+                                  behavior: HitTestBehavior.translucent,
+                                  child: const SizedBox.expand(),
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const Spacer(flex: 40),
+                    ],
                   ),
+                ),
 
-                  // ── Scrollable details ──────────────────────────────────
-                  Expanded(
-                    child: GestureDetector(
+              // Tap bottom area -> detail page
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: MediaQuery.sizeOf(context).height * 0.32,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TenantDetailScreen(
+                          tenant: widget.tenant,
+                          property: widget.property,
+                          reviews: widget.reviews,
+                        ),
+                      ),
+                    );
+                  },
+                  behavior: HitTestBehavior.translucent,
+                ),
+              ),
+
+              // Stories-style progress bars
+              if (hasMultiple)
+                Positioned(
+                  top: 12,
+                  left: 14,
+                  right: 14,
+                  child: Row(
+                    children: List.generate(photos.length, (i) {
+                      return Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 3,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: i <= safePhotoIndex
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+
+              // Top row: trust score or verification status badge
+              Positioned(
+                top: hasMultiple ? 26 : 16,
+                right: 16,
+                left: 16,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.92),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            IconsaxPlusLinear.shield_tick,
+                            color: AppColors.primary,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'פרופיל מאומת',
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -466,88 +472,49 @@ class _LeadCardState extends State<_LeadCard> {
                           ),
                         );
                       },
-                      behavior: HitTestBehavior.opaque,
-                      child: SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Liked property
-                            _LikedPropertyBox(property: widget.property),
-                            const SizedBox(height: 24),
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.15),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'הצג פרופיל מלא והעדפות',
-                                      style: TextStyle(
-                                        color: AppColors.primary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    RentchIcon(
-                                      IconsaxPlusLinear.arrow_left_1,
-                                      color: AppColors.primary,
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                          ],
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.42),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.12),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.info_outline_rounded,
+                          color: Colors.white,
+                          size: 18,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
-              // Swipe overlay badges — RTL-aware positioning
+              // Swipe overlays
               if (isAccepting || isRejecting)
                 Positioned(
-                  top: 22,
-                  right: isAccepting ? 18 : null,
-                  left: isRejecting ? 18 : null,
+                  top: 28,
+                  left: isRejecting ? 22 : null,
+                  right: isAccepting ? 22 : null,
                   child: Transform.rotate(
-                    angle: isAccepting ? -0.13 : 0.13,
+                    angle: isAccepting ? -0.15 : 0.15,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 9),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color:
-                              isAccepting ? AppColors.primary : AppColors.coral,
+                          color: isAccepting ? AppColors.primary : AppColors.coral,
                           width: 3,
                         ),
-                        color:
-                            (isAccepting ? AppColors.primary : AppColors.coral)
-                                .withValues(alpha: 0.1),
+                        color: (isAccepting ? AppColors.primary : AppColors.coral).withOpacity(0.08),
                       ),
                       child: Text(
                         isAccepting ? '✓ מאשר' : '✕ דוחה',
                         style: TextStyle(
-                          color:
-                              isAccepting ? AppColors.primary : AppColors.coral,
+                          color: isAccepting ? AppColors.primary : AppColors.coral,
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
@@ -555,6 +522,80 @@ class _LeadCardState extends State<_LeadCard> {
                     ),
                   ),
                 ),
+
+              // Bottom Info Content
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 128,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.tenant.name,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          _fmt(widget.tenant.budgetMax),
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '/ לחודש',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _LikedPropertyBox(property: widget.property),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          _StatPill(
+                            icon: IconsaxPlusLinear.building,
+                            label: '${widget.tenant.desiredRooms.toStringAsFixed(widget.tenant.desiredRooms % 1 == 0 ? 0 : 1)} חדרים',
+                          ),
+                          const SizedBox(width: 6),
+                          _StatPill(
+                            icon: IconsaxPlusLinear.calendar,
+                            label: widget.tenant.moveInWindow,
+                          ),
+                          if (widget.tenant.importantDetails.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            _StatPill(
+                              icon: IconsaxPlusLinear.info_circle,
+                              label: widget.tenant.importantDetails.first,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -563,31 +604,35 @@ class _LeadCardState extends State<_LeadCard> {
   }
 }
 
-// ─── Photo dots ───────────────────────────────────────────────────────────────
-
-class _PhotoDots extends StatelessWidget {
-  const _PhotoDots({required this.count, required this.current});
-  final int count;
-  final int current;
+class _StatPill extends StatelessWidget {
+  const _StatPill({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (i) {
-        final isActive = i == current;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: isActive ? 18 : 6,
-          height: 6,
-          decoration: BoxDecoration(
-            color:
-                isActive ? Colors.white : Colors.white.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(3),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white.withOpacity(0.6)),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
           ),
-        );
-      }),
+        ],
+      ),
     );
   }
 }
@@ -600,238 +645,267 @@ class _LikedPropertyBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF3FBFB), Color(0xFFE8F7F8)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.18),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const RentchIcon(
-              IconsaxPlusLinear.heart,
-              size: 18,
-              color: AppColors.primary,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'אהב/ה את הנכס',
-                  style: TextStyle(
-                    color: AppColors.primary,
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF13BEC9).withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: RentchIcon(
+                    IconsaxPlusLinear.heart,
+                    size: 16,
+                    color: Color(0xFF5AD4DC),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'התעניין/ה בנכס:',
+                      style: TextStyle(
+                        color: Color(0xFF5AD4DC),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      property.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  property.priceLabel,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  property.address,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Text(
-              property.priceLabel,
-              style: const TextStyle(
-                color: AppColors.navy,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Tenant chip (on photo) ───────────────────────────────────────────────────
-
-class _TenantChip extends StatelessWidget {
-  const _TenantChip({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.25),
-          width: 1,
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-// ─── Action bar ───────────────────────────────────────────────────────────────
+// ─── Action Buttons ───────────────────────────────────────────────────────────
 
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({
-    required this.onSkip,
+class _ActionButtons extends StatelessWidget {
+  const _ActionButtons({
     required this.onReject,
     required this.onAccept,
+    required this.onInfo,
   });
 
-  final VoidCallback onSkip;
   final VoidCallback onReject;
   final VoidCallback onAccept;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 6, 24, 10),
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _ActionBtn(
-              icon: IconsaxPlusLinear.forward,
-              label: 'דלג',
-              color: AppColors.textSecondary,
-              size: 54,
-              onPressed: onSkip,
-            ),
-            _ActionBtn(
-              icon: IconsaxPlusLinear.close_circle,
-              label: 'דחיה',
-              color: AppColors.coral,
-              size: 66,
-              onPressed: onReject,
-            ),
-            _ActionBtn(
-              icon: IconsaxPlusLinear.tick_circle,
-              label: 'אישור',
-              color: AppColors.primary,
-              size: 72,
-              onPressed: onAccept,
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 56),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Accept button (Right in RTL)
+          _ActionButton(
+            icon: IconsaxPlusBold.heart,
+            tooltip: 'אשר מועמד',
+            iconColor: AppColors.primary,
+            backgroundColor: Colors.white,
+            size: 72,
+            iconSize: 34,
+            onPressed: onAccept,
+            shadowColor: AppColors.primary,
+          ),
+
+          // Detail / Info (Center)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ActionButton(
+                icon: Icons.info_outline_rounded,
+                tooltip: 'הצג פרטים מלאים',
+                iconColor: const Color(0xFF072946),
+                backgroundColor: Colors.white,
+                size: 56,
+                iconSize: 26,
+                onPressed: onInfo,
+                shadowColor: const Color(0xFF072946),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'פרטים',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+
+          // Reject button (Left in RTL)
+          _ActionButton(
+            icon: Icons.close_rounded,
+            tooltip: 'דחה מועמד',
+            iconColor: AppColors.coral,
+            backgroundColor: Colors.white,
+            size: 62,
+            iconSize: 30,
+            onPressed: onReject,
+            shadowColor: AppColors.coral,
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ActionBtn extends StatelessWidget {
-  const _ActionBtn({
+class _ActionButton extends StatefulWidget {
+  const _ActionButton({
     required this.icon,
-    required this.label,
-    required this.color,
+    required this.tooltip,
+    required this.iconColor,
+    required this.backgroundColor,
     required this.size,
+    required this.iconSize,
     required this.onPressed,
+    this.shadowColor,
   });
 
   final IconData icon;
-  final String label;
-  final Color color;
+  final String tooltip;
+  final Color iconColor;
+  final Color backgroundColor;
   final double size;
+  final double iconSize;
   final VoidCallback onPressed;
+  final Color? shadowColor;
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      reverseDuration: const Duration(milliseconds: 180),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.88).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: onPressed,
+    final bool isDarkCenter = widget.iconColor == const Color(0xFF072946);
+    final actualIconColor = isDarkCenter ? Colors.white : widget.iconColor;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: GestureDetector(
+        onTapDown: (_) => _ctrl.forward(),
+        onTapUp: (_) async {
+          await _ctrl.reverse();
+          widget.onPressed();
+        },
+        onTapCancel: () => _ctrl.reverse(),
+        child: ScaleTransition(
+          scale: _scale,
           child: Container(
-            width: size,
-            height: size,
+            width: widget.size,
+            height: widget.size,
             decoration: BoxDecoration(
-              color: Colors.white,
               shape: BoxShape.circle,
-              border:
-                  Border.all(color: color.withValues(alpha: 0.18), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: color.withValues(alpha: 0.15),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
+                  color: (widget.shadowColor ?? Colors.black).withOpacity(0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Center(
-              child: Icon(icon, color: color, size: size * 0.42),
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.22),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      widget.icon,
+                      size: widget.iconSize,
+                      color: actualIconColor,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: color,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -843,8 +917,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasProperties =
-        context.read<DatingProvider>().myProperties.isNotEmpty;
+    final hasProperties = context.read<DatingProvider>().myProperties.isNotEmpty;
     final hasMatches = context.read<DatingProvider>().matches.isNotEmpty;
 
     return Center(
@@ -857,7 +930,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
               width: 92,
               height: 92,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: const RentchIcon(
@@ -895,17 +968,14 @@ class _EmptyOwnerQueue extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const AddPropertyScreen()),
+                    MaterialPageRoute(builder: (_) => const AddPropertyScreen()),
                   ),
-                  icon:
-                      const RentchIcon(IconsaxPlusLinear.add_square, size: 17),
+                  icon: const RentchIcon(IconsaxPlusLinear.add_square, size: 17),
                   label: const Text('הוסף נכס עכשיו'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ),
@@ -922,8 +992,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                     foregroundColor: AppColors.navy,
                     side: const BorderSide(color: AppColors.borderLight),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ),

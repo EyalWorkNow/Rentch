@@ -8,6 +8,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/main.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
+import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,6 +105,8 @@ void main() {
           _testProperty(
               id: 'landlord-1', street: 'אבן גבירול', city: 'תל אביב'),
           _testProperty(id: 'landlord-2', street: 'סוקולוב', city: 'רמת השרון'),
+          _testProperty(id: 'landlord-3', street: 'ויצמן', city: 'כפר סבא'),
+          _testProperty(id: 'landlord-4', street: 'ביאליק', city: 'רמת גן'),
         ]),
         localStorageService: _MemoryLocalStorageService(),
       );
@@ -169,6 +172,61 @@ void main() {
 
         expect(find.text('דשבורד'), findsOneWidget);
         expect(find.text('הדירות שלי'), findsWidgets);
+      } finally {
+        debugNetworkImageHttpClientProvider = null;
+        provider.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'landlord properties filter sheet applies a filter and closes',
+    (WidgetTester tester) async {
+      debugNetworkImageHttpClientProvider = () => _FakeHttpClient();
+      final provider = DatingProvider(
+        rentalDataService: _FakeRentalDataService([
+          _testProperty(id: 'seed-1', street: 'אלנבי', city: 'תל אביב'),
+          _testProperty(id: 'seed-2', street: 'ירמיהו', city: 'ירושלים'),
+          _testProperty(id: 'seed-3', street: 'ארלוזורוב', city: 'חיפה'),
+          _testProperty(id: 'seed-4', street: 'הנשיא', city: 'באר שבע'),
+        ]),
+        localStorageService: _MemoryLocalStorageService(),
+      );
+
+      try {
+        await provider.initialize();
+        await provider.enterGuestMode('landlord');
+        await tester.pumpWidget(
+          ChangeNotifierProvider<DatingProvider>.value(
+            value: provider,
+            child: MaterialApp(
+              builder: (context, child) {
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: child ?? const SizedBox.shrink(),
+                );
+              },
+              home: const LandlordPropertiesScreen(),
+            ),
+          ),
+        );
+        await _pumpFrames(tester);
+
+        expect(find.textContaining('דיזנגוף'), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('landlord-properties-filter-button')),
+        );
+        await _pumpFrames(tester);
+        expect(find.text('סינון ומיון נכסים'), findsOneWidget);
+
+        await tester.tap(find.text('עדיפות שיווקית (עד 6K)'));
+        await _pumpFrames(tester);
+
+        expect(find.text('סינון ומיון נכסים'), findsNothing);
+        expect(find.text('1 מתוך 4 נכסים'), findsOneWidget);
+        expect(find.textContaining('מסגר'), findsOneWidget);
+        expect(find.textContaining('דיזנגוף'), findsNothing);
       } finally {
         debugNetworkImageHttpClientProvider = null;
         provider.dispose();
@@ -510,13 +568,16 @@ RentalProperty _testProperty({
   required String id,
   String street = 'הרצל',
   String city = 'תל אביב',
+  int price = 7200,
+  double rooms = 3,
+  bool agencyListing = false,
   DateTime? createdAt,
 }) {
   return RentalProperty(
     id: id,
     url: 'https://example.com/$id',
-    price: 7200,
-    rooms: 3,
+    price: price,
+    rooms: rooms,
     sizeM2: 82,
     floor: '2',
     totalFloors: '6',
@@ -530,7 +591,7 @@ RentalProperty _testProperty({
     entryDate: '2026-06-15',
     condition: 'משופץ',
     ownerName: 'בעלים',
-    agencyListing: false,
+    agencyListing: agencyListing,
     features: const ['מעלית', 'מרפסת'],
     media: const [
       PropertyMedia(

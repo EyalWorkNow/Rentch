@@ -97,8 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final safeIndex = _currentIndex.clamp(0, screens.length - 1);
         final unseenCount = provider.unseenMatchCount;
 
-        const bool useGlass = true;
-
         return Scaffold(
           extendBody: true,
           body: IndexedStack(
@@ -120,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(100),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(useGlass ? 0.15 : 0.3),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -129,33 +127,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(100),
                       child: BackdropFilter(
-                        filter: ImageFilter.blur(
-                          sigmaX: useGlass ? 60 : 0.001,
-                          sigmaY: useGlass ? 60 : 0.001,
-                        ),
+                        filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: useGlass
-                                ? Colors.black.withValues(alpha: 0.35)
-                                : Colors.black,
+                            color: Colors.black.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(100),
-                            border: useGlass
-                                ? Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    width: 1.5)
-                                : null,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              width: 1.5,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: List.generate(items.length, (index) {
                               final item = items[index];
                               final isSelected = index == safeIndex;
-                              final showBadge = index == (isLandlord ? 2 : 1) &&
-                                  unseenCount > 0;
+                              final showBadge =
+                                  index == (isLandlord ? 2 : 1) &&
+                                      unseenCount > 0;
                               final isCompact = items.length >= 5;
-
-                              final double circleSize = isCompact ? 62.0 : 70.0;
+                              final double circleSize =
+                                  isCompact ? 62.0 : 70.0;
 
                               return GestureDetector(
                                 onTap: () => _onTabTap(index, provider),
@@ -165,8 +158,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   curve: Curves.easeOutCubic,
                                   width: circleSize,
                                   height: circleSize,
-                                  margin:
-                                      const EdgeInsets.symmetric(horizontal: 1.0),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 1.0),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: isSelected
@@ -176,7 +169,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: Center(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Stack(
                                           clipBehavior: Clip.none,
@@ -200,7 +194,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   padding:
                                                       const EdgeInsets.symmetric(
                                                           horizontal: 4),
-                                                  decoration: const BoxDecoration(
+                                                  decoration:
+                                                      const BoxDecoration(
                                                     color: AppColors.coral,
                                                     shape: BoxShape.circle,
                                                   ),
@@ -227,8 +222,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                           curve: Curves.easeOutBack,
                                           child: isSelected
                                               ? Padding(
-                                                  padding: const EdgeInsets.only(
-                                                      top: 2.0),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          top: 2),
                                                   child: Text(
                                                     item.label,
                                                     maxLines: 1,
@@ -238,7 +234,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                       color: Colors.white,
                                                       fontSize:
                                                           isCompact ? 9 : 10.5,
-                                                      fontWeight: FontWeight.w700,
+                                                      fontWeight:
+                                                          FontWeight.w700,
                                                       height: 1.1,
                                                     ),
                                                   ),

@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:provider/provider.dart';
 
 // ─── Collapsible FOMO Badge Base ─────────────────────────────────────────────
 class CollapsibleFomoBadge extends StatefulWidget {
@@ -440,9 +442,26 @@ class FomoCardOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final viewers = property.marketSignals.liveViewers;
-    final likes = property.marketSignals.likesTodayFor(DateTime.now());
-    final isNew = property.isNewListing;
+    final provider = context.watch<DatingProvider>();
+    final isGuest = provider.isGuestMode;
+    final properties = provider.filteredProperties;
+    final isFirst = isGuest && properties.isNotEmpty && property.id == properties.first.id;
+    final isSecond = isGuest && properties.length > 1 && property.id == properties[1].id;
+
+    final viewers = isFirst
+        ? 245
+        : isSecond
+            ? 3
+            : property.marketSignals.liveViewers;
+
+    final likes = isFirst
+        ? 84
+        : isSecond
+            ? 47
+            : property.marketSignals.likesTodayFor(DateTime.now());
+
+    final isNew = isSecond ? true : (isFirst ? false : property.isNewListing);
+
     if (!isNew && viewers == 0 && likes == 0) {
       return const SizedBox.shrink();
     }
@@ -451,7 +470,7 @@ class FomoCardOverlay extends StatelessWidget {
       children: [
         Positioned(
           top: 92,
-          left: 12,
+          left: 24,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
