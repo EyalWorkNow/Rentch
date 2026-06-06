@@ -10,6 +10,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:provider/provider.dart';
 
@@ -125,6 +126,125 @@ class _MessageScreenState extends State<MessageScreen> {
     ));
   }
 
+  // ── Media / file picker ───────────────────────────────────────────────────
+
+  Future<void> _pickAndSendMedia(DatingProvider provider, String senderName) async {
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+      if (file == null || !mounted) return;
+      await provider.sendMessage(
+        matchId: widget.matchId,
+        sender: senderName,
+        text: '__img__:${file.path}',
+      );
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) _snack('לא ניתן לגשת לגלריה', error: true);
+    }
+  }
+
+  Future<void> _pickAndSendFile(DatingProvider provider, String senderName) async {
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (file == null || !mounted) return;
+      await provider.sendMessage(
+        matchId: widget.matchId,
+        sender: senderName,
+        text: '__file__:${file.name}',
+      );
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) _snack('לא ניתן לגשת לקבצים', error: true);
+    }
+  }
+
+  // ── Block user ────────────────────────────────────────────────────────────
+
+  void _showBlockConfirm(DatingProvider provider, String ownerName) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.coral.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.block_rounded,
+                  color: AppColors.coral,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'חסום משתמש',
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 17,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'האם לחסום את "$ownerName"?\n\nכל המודעות שלהם יוסרו מהפיד שלך מיידית. הדיווח יועבר לצוות Rentch.',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13.5,
+              height: 1.55,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+              ),
+              child: const Text(
+                'ביטול',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.coral,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                await provider.blockOwner(ownerName);
+                if (mounted) Navigator.of(context).pop();
+              },
+              child: const Text(
+                'חסום',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Bottom sheets ─────────────────────────────────────────────────────────
 
   void _showTemplates() {
@@ -141,24 +261,30 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
-  void _showActions(DatingProvider provider, RentalMatch match) {
+  void _showActions(
+    DatingProvider provider,
+    RentalMatch match,
+    RentalProperty property,
+    String tenantName,
+  ) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _ActionsSheet(
         match: match,
+        ownerName: property.ownerName,
         onQuickMessage: () {
           Navigator.pop(context);
           _showTemplates();
         },
         onAttachFile: () {
           Navigator.pop(context);
-          _snack('צירוף קובץ יתווסף בהמשך');
+          _pickAndSendFile(provider, tenantName);
         },
         onAttachMedia: () {
           Navigator.pop(context);
-          _snack('צירוף תמונה או וידאו יתווסף בהמשך');
+          _pickAndSendMedia(provider, tenantName);
         },
         onSendContract: match.contractSent
             ? null
@@ -196,6 +322,10 @@ class _MessageScreenState extends State<MessageScreen> {
             onSubmit: (rating, text) =>
                 provider.addTenantReview(rating: rating, text: text),
           );
+        },
+        onBlockUser: () {
+          Navigator.pop(context);
+          _showBlockConfirm(provider, property.ownerName);
         },
       ),
     );
@@ -375,14 +505,55 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                 ),
             ]),
-            // Actions menu icon
+            // Actions menu icon + block popup
             actions: [
               IconButton(
                 icon: const RentchIcon(IconsaxPlusLinear.more_circle,
                     color: AppColors.navy, size: 22),
                 tooltip: 'פעולות',
-                onPressed: () => _showActions(provider, match),
+                onPressed: () =>
+                    _showActions(provider, match, property, tenantName),
               ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: AppColors.navy, size: 22),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (val) {
+                  if (val == 'block') {
+                    _showBlockConfirm(provider, property.ownerName);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem<String>(
+                    value: 'block',
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.coral.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.block_rounded,
+                              size: 16, color: AppColors.coral),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'חסום משתמש זה',
+                          style: TextStyle(
+                            color: AppColors.coral,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
             ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
@@ -418,7 +589,8 @@ class _MessageScreenState extends State<MessageScreen> {
                   controller: _msgCtrl,
                   isSending: isSending,
                   onSend: () => _handleSend(provider, tenantName),
-                  onActions: () => _showActions(provider, match),
+                  onActions: () =>
+                      _showActions(provider, match, property, tenantName),
                 ),
               ],
             ),
@@ -580,6 +752,7 @@ class _ContractBar extends StatelessWidget {
 class _ActionsSheet extends StatelessWidget {
   const _ActionsSheet({
     required this.match,
+    required this.ownerName,
     required this.onQuickMessage,
     required this.onAttachFile,
     required this.onAttachMedia,
@@ -588,9 +761,11 @@ class _ActionsSheet extends StatelessWidget {
     required this.onTenantSign,
     required this.onPropertyReview,
     required this.onTenantReview,
+    required this.onBlockUser,
   });
 
   final RentalMatch match;
+  final String ownerName;
   final VoidCallback onQuickMessage;
   final VoidCallback onAttachFile;
   final VoidCallback onAttachMedia;
@@ -599,6 +774,7 @@ class _ActionsSheet extends StatelessWidget {
   final VoidCallback? onTenantSign;
   final VoidCallback onPropertyReview;
   final VoidCallback onTenantReview;
+  final VoidCallback onBlockUser;
 
   @override
   Widget build(BuildContext context) {
@@ -706,6 +882,68 @@ class _ActionsSheet extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           ...actions.map((a) => _ActionTile(item: a)),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Color(0xFFF0F5F8)),
+          const SizedBox(height: 4),
+          // ── Danger zone ──────────────────────────────────────────────────
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onBlockUser,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.coral.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.block_rounded,
+                        size: 18,
+                        color: AppColors.coral,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'חסום משתמש זה',
+                            style: TextStyle(
+                              color: AppColors.coral,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            ownerName.isNotEmpty
+                                ? 'הסר את "$ownerName" מהפיד שלך'
+                                : 'הסר משתמש זה מהפיד שלך',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 13,
+                      color: AppColors.coral,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -901,12 +1139,43 @@ class _MessageBubble extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.75)
         : AppColors.textSecondary;
 
+    final isImg = message.text.startsWith('__img__:');
+    final isFile = message.text.startsWith('__file__:');
+    final isMedia = isImg || isFile;
+
+    Widget messageContent;
+    if (isImg) {
+      messageContent = _MediaBubbleContent(
+        icon: Icons.image_rounded,
+        label: 'תמונה נשלחה',
+        color: isTenant ? Colors.white : AppColors.primary,
+      );
+    } else if (isFile) {
+      final fileName = message.text.replaceFirst('__file__:', '');
+      messageContent = _MediaBubbleContent(
+        icon: Icons.attach_file_rounded,
+        label: fileName.isNotEmpty ? fileName : 'קובץ',
+        color: isTenant ? Colors.white : AppColors.primary,
+      );
+    } else {
+      messageContent = Text(
+        message.text,
+        style: TextStyle(
+          fontSize: 14.5,
+          color: textColor,
+          height: 1.48,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+
     final bubble = AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
       opacity: isPending ? 0.6 : 1.0,
       child: Container(
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.74),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * (isMedia ? 0.62 : 0.74),
+        ),
         margin: EdgeInsets.only(
           top: showAvatar || isTenant ? 8 : 3,
           bottom: 3,
@@ -929,36 +1198,37 @@ class _MessageBubble extends StatelessWidget {
               isTenant ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (!isTenant && showAvatar) ...[
-              Text(message.sender,
-                  style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11)),
+              Text(
+                message.sender,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
+              ),
               const SizedBox(height: 4),
             ],
-            Text(message.text,
-                style: TextStyle(
-                    fontSize: 14.5,
-                    color: textColor,
-                    height: 1.48,
-                    fontWeight: FontWeight.w500)),
+            messageContent,
             const SizedBox(height: 5),
             Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(_formatTime(message.createdAt),
-                    style: TextStyle(
-                        color: metaColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600)),
+                Text(
+                  _formatTime(message.createdAt),
+                  style: TextStyle(
+                    color: metaColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 if (isTenant) ...[
                   const SizedBox(width: 3),
                   Icon(
                     isPending ? Icons.done_rounded : Icons.done_all_rounded,
                     size: 12,
-                    color:
-                        Colors.white.withValues(alpha: isPending ? 0.5 : 0.85),
+                    color: Colors.white
+                        .withValues(alpha: isPending ? 0.5 : 0.85),
                   ),
                 ],
               ],
@@ -982,6 +1252,48 @@ class _MessageBubble extends StatelessWidget {
           bubble,
         ],
       ),
+    );
+  }
+}
+
+class _MediaBubbleContent extends StatelessWidget {
+  const _MediaBubbleContent({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
