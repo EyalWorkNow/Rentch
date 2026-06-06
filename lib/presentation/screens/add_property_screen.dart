@@ -5,6 +5,7 @@ import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/core/services/legal_consent_service.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
+import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -305,6 +306,25 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       setState(() => _isSubmittingTour = false);
       _showMediaError('סריקת ה־3D נכשלה: $error');
     }
+  }
+
+
+  Future<void> _linkScaniverseScan() async {
+    final service = ScaniverseService.instance;
+    if (!service.isConfigured) {
+      _showMediaError(
+        'Scaniverse לא מוגדר. הפעל עם --dart-define=SPATIAL_API_KEY=<token>.',
+      );
+      return;
+    }
+    final scan = await showModalBottomSheet<ScaniverseScan>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const _ScaniversePickerSheet(),
+    );
+    if (scan == null || !mounted) return;
+    setState(() => _virtualTourDraft = service.tourFromScan(scan));
   }
 
   Future<void> _captureVerificationVideo() async {
@@ -652,6 +672,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   _pickPropertyVideo(ImageSource.camera),
               onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
               onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
+              onLinkScaniverse: _linkScaniverseScan,
               onClearVirtualTour: () =>
                   setState(() => _virtualTourDraft = null),
               acceptedTerms: _acceptedPropertyTerms,
@@ -1273,6 +1294,7 @@ class _StepPhotos extends StatelessWidget {
     required this.onPickVideoFromCamera,
     required this.onPickScanFromGallery,
     required this.onPickScanFromCamera,
+    required this.onLinkScaniverse,
     required this.onClearVirtualTour,
     required this.acceptedTerms,
     required this.onAcceptedTermsChanged,
@@ -1302,6 +1324,7 @@ class _StepPhotos extends StatelessWidget {
   final VoidCallback onPickVideoFromCamera;
   final VoidCallback onPickScanFromGallery;
   final VoidCallback onPickScanFromCamera;
+  final VoidCallback onLinkScaniverse;
   final VoidCallback onClearVirtualTour;
   final bool acceptedTerms;
   final ValueChanged<bool> onAcceptedTermsChanged;
@@ -1544,6 +1567,7 @@ class _StepPhotos extends StatelessWidget {
                   onPickFromCamera: onPickScanFromCamera,
                   onPickFromGallery: onPickScanFromGallery,
                   onClear: onClearVirtualTour,
+                  onLinkScaniverse: onLinkScaniverse,
                 ),
               ],
               const SizedBox(height: 16),
@@ -2185,6 +2209,7 @@ class _Scan3dPanel extends StatelessWidget {
     required this.onPickFromCamera,
     required this.onPickFromGallery,
     required this.onClear,
+    this.onLinkScaniverse,
   });
 
   final PropertyVirtualTour? tour;
@@ -2193,6 +2218,7 @@ class _Scan3dPanel extends StatelessWidget {
   final VoidCallback onPickFromCamera;
   final VoidCallback onPickFromGallery;
   final VoidCallback onClear;
+  final VoidCallback? onLinkScaniverse;
 
   @override
   Widget build(BuildContext context) {
@@ -2283,6 +2309,7 @@ class _Scan3dPanel extends StatelessWidget {
             isSubmitting: isSubmitting,
             onPickFromCamera: onPickFromCamera,
             onPickFromGallery: onPickFromGallery,
+            onLinkScaniverse: onLinkScaniverse,
           )
         else
           _ScanStatusCard(
@@ -2335,113 +2362,155 @@ class _ScanActions extends StatelessWidget {
     required this.isSubmitting,
     required this.onPickFromCamera,
     required this.onPickFromGallery,
+    this.onLinkScaniverse,
   });
 
   final bool isSubmitting;
   final VoidCallback onPickFromCamera;
   final VoidCallback onPickFromGallery;
+  final VoidCallback? onLinkScaniverse;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.navy, Color(0xFF1E3A8A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.navy.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.navy, Color(0xFF1E3A8A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.navy.withValues(alpha: 0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: isSubmitting ? null : onPickFromCamera,
-                borderRadius: BorderRadius.circular(14),
-                child: Center(
-                  child: isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            RentchIcon(IconsaxPlusLinear.video_play,
-                                color: Colors.white, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'צלם סריקה',
-                              style: TextStyle(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: isSubmitting ? null : onPickFromCamera,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Center(
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
                                 color: Colors.white,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
                               ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                RentchIcon(IconsaxPlusLinear.video_play,
+                                    color: Colors.white, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'צלם סריקה',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderLight),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 6,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: isSubmitting ? null : onPickFromGallery,
-                borderRadius: BorderRadius.circular(14),
-                child: const Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      RentchIcon(IconsaxPlusLinear.video,
-                          color: AppColors.navy, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'בחר וידאו',
-                        style: TextStyle(
-                          color: AppColors.navy,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLight),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.shadow,
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: isSubmitting ? null : onPickFromGallery,
+                    borderRadius: BorderRadius.circular(14),
+                    child: const Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          RentchIcon(IconsaxPlusLinear.video,
+                              color: AppColors.navy, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'בחר וידאו',
+                            style: TextStyle(
+                              color: AppColors.navy,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+        // Scaniverse direct-link button — shown when API is configured
+        if (onLinkScaniverse != null) ...[
+          const SizedBox(height: 10),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isSubmitting ? null : onLinkScaniverse,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight2,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.view_in_ar_rounded,
+                        color: AppColors.primary, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'קשר סריקה מ-Scaniverse',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -3076,6 +3145,24 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     }
   }
 
+  Future<void> _linkScaniverseScan() async {
+    final service = ScaniverseService.instance;
+    if (!service.isConfigured) {
+      _showMediaError(
+        'Scaniverse לא מוגדר. הפעל עם --dart-define=SPATIAL_API_KEY=<token>.',
+      );
+      return;
+    }
+    final scan = await showModalBottomSheet<ScaniverseScan>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const _ScaniversePickerSheet(),
+    );
+    if (scan == null || !mounted) return;
+    setState(() => _virtualTourDraft = service.tourFromScan(scan));
+  }
+
   Future<void> _captureVerificationVideo() async {
     try {
       setState(() => _isCapturingVerification = true);
@@ -3418,6 +3505,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       _pickScanVideo(ImageSource.gallery),
                   onPickScanFromCamera: () =>
                       _pickScanVideo(ImageSource.camera),
+                  onLinkScaniverse: _linkScaniverseScan,
                   onClearVirtualTour: () =>
                       setState(() => _virtualTourDraft = null),
                   acceptedTerms: _acceptedPropertyTerms,
@@ -3547,6 +3635,289 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         saveLabel: 'עדכון הנכס',
         onNext: _next,
         onPrev: _prev,
+      ),
+    );
+  }
+}
+
+// ─── Scaniverse Scan Picker ───────────────────────────────────────────────────
+
+class _ScaniversePickerSheet extends StatefulWidget {
+  const _ScaniversePickerSheet();
+
+  @override
+  State<_ScaniversePickerSheet> createState() => _ScaniversePickerSheetState();
+}
+
+class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
+  List<ScaniverseScan>? _scans;
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final scans = await ScaniverseService.instance.listScans(limit: 30);
+      if (mounted) setState(() { _scans = scans; _loading = false; });
+    } on ScaniverseException catch (e) {
+      if (mounted) setState(() { _error = e.message; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.45,
+      maxChildSize: 0.92,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.borderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight2,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.view_in_ar_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'בחר סריקה מ-Scaniverse',
+                          style: TextStyle(
+                            color: AppColors.navy,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          'סריקות מחשבון Niantic Spatial שלך',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.borderLight),
+            Expanded(child: _buildBody(scrollCtrl)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(ScrollController ctrl) {
+    if (_loading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppColors.primary),
+            SizedBox(height: 12),
+            Text(
+              'טוען סריקות...',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.coral, size: 40),
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() { _loading = true; _error = null; });
+                  _load();
+                },
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('נסה שוב'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final scans = _scans ?? [];
+    if (scans.isEmpty) {
+      return const Center(
+        child: Text(
+          'לא נמצאו סריקות בחשבון Scaniverse.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+    return ListView.separated(
+      controller: ctrl,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      itemCount: scans.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) => _ScanTile(
+        scan: scans[i],
+        onTap: () => Navigator.pop(context, scans[i]),
+      ),
+    );
+  }
+}
+
+class _ScanTile extends StatelessWidget {
+  const _ScanTile({required this.scan, required this.onTap});
+  final ScaniverseScan scan;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isReady = scan.isReady;
+    final statusColor = isReady ? AppColors.success : AppColors.primary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isReady ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isReady ? AppColors.borderLight : AppColors.borderLight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight2,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.view_in_ar_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scan.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            isReady ? 'מוכן' : 'בעיבוד',
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (scan.createdAt != null) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '${scan.createdAt!.day}.${scan.createdAt!.month}.${scan.createdAt!.year}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (isReady)
+                const RentchIcon(
+                  IconsaxPlusLinear.arrow_left,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

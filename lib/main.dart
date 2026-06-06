@@ -1,8 +1,9 @@
-import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/config/app_config.dart';
+import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:dating_app/presentation/screens/onboarding_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:dating_app/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,10 @@ void main() async {
       debugPrint('Firebase initialization skipped: $error');
     }
   }
+
+  // Initialize Scaniverse service — seeds dart-define token to Keychain once,
+  // then reads from Keychain on subsequent launches without needing dart-define.
+  await ScaniverseService.instance.initialize();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

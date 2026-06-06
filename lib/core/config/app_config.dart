@@ -131,8 +131,26 @@ class AppConfig {
 
   static const String scan3dProvider = String.fromEnvironment(
     'RENTCH_3D_SCAN_PROVIDER',
-    defaultValue: 'splat3d',
+    defaultValue: 'scaniverse',
   );
+
+  // Niantic Spatial / Scaniverse Developer Token.
+  // Pass at build time: flutter run --dart-define=SPATIAL_API_KEY=eyJhbGci...
+  // On first launch the service writes it to Keychain — dart-define not needed
+  // on subsequent runs. NEVER hardcode this value in source.
+  static const String spatialApiKey = String.fromEnvironment(
+    'SPATIAL_API_KEY',
+    defaultValue: '',
+  );
+
+  // Niantic Spatial Service Account secret — used server-side only.
+  // NEVER include in the client binary. Store in your backend/.env.
+  static const String spatialServiceAccountSecret = String.fromEnvironment(
+    'SPATIAL_SERVICE_ACCOUNT_SECRET',
+    defaultValue: '',
+  );
+
+  static bool get hasSpatialConfig => spatialApiKey.trim().isNotEmpty;
 
   static const String scan3dProxyUrl = String.fromEnvironment(
     'RENTCH_3D_SCAN_PROXY_URL',
