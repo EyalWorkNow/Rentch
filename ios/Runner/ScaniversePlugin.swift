@@ -1,16 +1,15 @@
 import Flutter
 import UIKit
-// NSDK import — requires adding SPM package in Xcode:
-// File → Add Package Dependencies → https://github.com/nianticspatial/nsdk-library-xcframework
-// #if canImport(NSDK)
-// import NSDK
-// #endif
+import NSDK
 
-// ─── Flutter ↔ Native Method Channel ──────────────────────────────────────────
+// ─── Flutter ↔ NSDK Method Channel ───────────────────────────────────────────
 // Channel: com.rentch.scaniverse
-// Methods:
-//   listScans(token: String) → { scans: [ScanMap] }
-//   ping()                  → { status: "ok" }
+// NSDK Sites API flow:
+//   NSDKSession(accessToken:)         — init with JWT bearer token
+//   .acquireSitesSession()            — get NSDKSitesSession
+//   .requestSelfOrganizationInfo()    → OrganizationResult (.organizations[0].id)
+//   .requestSitesForOrganization(orgId:) → SiteResult (.sites)
+//   .requestAssetsForSite(siteId:)    → AssetResult (.assets where type == .splat/.mesh)
 
 @objc class ScaniversePlugin: NSObject, FlutterPlugin {
 
@@ -27,7 +26,7 @@ import UIKit
         switch call.method {
 
         case "ping":
-            result(["status": "ok", "sdk": "nsdk-xcframework"])
+            result(["status": "ok", "sdk": "NSDK \(NSDKSession.version())", "sdkReady": true])
 
         case "listScans":
             let args = call.arguments as? [String: Any]
@@ -37,10 +36,7 @@ import UIKit
                     message: "Bearer token is required", details: nil))
                 return
             }
-            // Run async SDK calls off the main thread
-            Task {
-                await self.fetchScans(token: token, flutterResult: result)
-            }
+            Task { await self.fetchScans(token: token, flutterResult: result) }
 
         default:
             result(FlutterMethodNotImplemented)
@@ -49,51 +45,43 @@ import UIKit
 
     // MARK: - NSDK Sites API
 
+    @MainActor
+    private func createSessionAndSites(token: String) -> (NSDKSession, NSDKSitesSession) {
+        let session = NSDKSession(accessToken: token, useLidar: false)
+        let sites = session.acquireSitesSession()
+        return (session, sites)
+    }
+
     private func fetchScans(token: String, flutterResult: @escaping FlutterResult) async {
-        // ── NSDK is enabled when the package is added in Xcode ────────────────
-        // Uncomment the block below after adding the SPM dependency.
-        // Until then this stub returns an empty list so Flutter compiles cleanly.
-
-        /*
         do {
-            // 1. Initialize session with bearer token
-            let userConfig = NSDKSession.UserConfig(
-                accessToken: token,
-                refreshToken: nil,
-                featureFlagFilePath: nil
-            )
-            let config = NSDKSession.Configuration(userConfig: userConfig)
-            let session = NSDKSession(configuration: config)
-            defer { session.destroy() }
+            // 1. Create session + Sites session on MainActor (NSDK requirement)
+            let (_, sites) = await MainActor.run { createSessionAndSites(token: token) }
 
-            // 2. Acquire Sites session
-            let sites = session.acquireSitesSession()
-            defer { sites.destroy() }
-
-            // 3. Get the service account's organization
-            let orgInfo = try await sites.requestSelfOrganizationInfo()
+            // 3. Get organization for the service account
+            let orgResult = try await sites.requestSelfOrganizationInfo()
+            guard let org = orgResult.organizations.first else {
+                flutterResult(["scans": [], "sdkReady": true])
+                return
+            }
 
             // 4. Get all Sites for the organization
-            let sitesResult = try await sites.requestSitesForOrganization(
-                organizationId: orgInfo.id
-            )
+            let siteResult = try await sites.requestSitesForOrganization(orgId: org.id)
 
-            // 5. For each site, get its Assets (3D scans)
+            // 5. For each Site, collect its Assets (3D scans)
             var scans: [[String: Any]] = []
-            for site in sitesResult.sites {
-                let assetsResult = try await sites.requestAssetsForSite(
-                    siteId: site.id
-                )
-                for asset in assetsResult.assets {
-                    // Only include 3D scan assets (splat / mesh)
-                    guard asset.assetType == .splat || asset.assetType == .mesh else {
-                        continue
+            for site in siteResult.sites {
+                let assetResult = try await sites.requestAssetsForSite(siteId: site.id)
+                for asset in assetResult.assets {
+                    switch asset.assetType {
+                    case AssetType.splat, AssetType.mesh:
+                        scans.append(buildScanMap(asset: asset, site: site))
+                    default:
+                        break
                     }
-                    scans.append(buildScanMap(asset: asset, site: site))
                 }
             }
 
-            flutterResult(["scans": scans])
+            flutterResult(["scans": scans, "sdkReady": true])
 
         } catch {
             flutterResult(FlutterError(
@@ -102,46 +90,42 @@ import UIKit
                 details: nil
             ))
         }
-        */
-
-        // ── STUB — replace with the block above after adding NSDK package ──
-        flutterResult(["scans": [], "sdkReady": false,
-            "hint": "Add NSDK SPM package in Xcode, then uncomment fetchScans body"])
     }
 
-    // MARK: - Helpers
-
-    /* Enable after adding NSDK package:
+    // MARK: - Map asset → Flutter dictionary
 
     private func buildScanMap(asset: AssetInfo, site: SiteInfo) -> [String: Any] {
         let status: String = {
             switch asset.pipelineJobStatus {
-            case .succeeded, .ready:  return "complete"
-            case .failed:             return "failed"
-            case .running, .pending:  return "processing"
-            default:                  return "processing"
+            case AssetPipelineJobStatus.succeeded, AssetPipelineJobStatus.ready:
+                return "complete"
+            case AssetPipelineJobStatus.failed:
+                return "failed"
+            case AssetPipelineJobStatus.running, AssetPipelineJobStatus.pending:
+                return "processing"
+            default:
+                return "processing"
             }
         }()
 
         let viewerUrl: String = {
-            // Splat scans: direct Scaniverse viewer
             if let splatData = asset.splatData, !splatData.rootNodeId.isEmpty {
                 return "https://scaniverse.nianticspatial.com/scan/\(splatData.rootNodeId)"
             }
-            // Mesh / fallback: portal web
             return "https://portal-web.nianticspatial.com/sites/\(site.id)/assets/\(asset.id)"
         }()
 
+        let assetTypeStr = asset.assetType == AssetType.splat ? "splat" : "mesh"
+
         return [
-            "id":            asset.id,
-            "title":         asset.name.isEmpty ? site.name : asset.name,
-            "status":        status,
-            "siteId":        site.id,
-            "siteName":      site.name,
-            "viewerUrl":     viewerUrl,
-            "assetType":     asset.assetType == .splat ? "splat" : "mesh",
-            "thumbnailUrl":  "",   // populate if NSDK exposes thumbnail
+            "id":           asset.id,
+            "title":        asset.name.isEmpty ? site.name : asset.name,
+            "status":       status,
+            "siteId":       site.id,
+            "siteName":     site.name,
+            "viewerUrl":    viewerUrl,
+            "assetType":    assetTypeStr,
+            "thumbnailUrl": "",
         ]
     }
-    */
 }
