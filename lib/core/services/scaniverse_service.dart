@@ -1,26 +1,27 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/services/secure_storage_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
-// Niantic Spatial / Scaniverse Portal API client.
+// Niantic Spatial / Scaniverse SDK bridge.
 //
-// Auth flow (token NEVER hardcoded in source):
-//   1. First run: pass SPATIAL_API_KEY via --dart-define at build time.
-//   2. Service writes it to iOS Keychain / Android EncryptedPrefs on init().
-//   3. Subsequent runs: reads from secure storage — no dart-define needed.
-//   4. Rotation: call updateToken() with a fresh JWT.
+// Architecture:
+//   Flutter (Dart) ──MethodChannel──▶ Swift (ScaniversePlugin.swift)
+//                                     └──▶ NSDK (nianticspatial SPM package)
+//                                           └──▶ CArdk.xcframework (C++ binary)
 //
-// API base: https://portal-backend-api.nianticpatial.com
-// Scopes needed: scaniverse-portal, vps
+// Sites API hierarchy:
+//   NSDKSession → NSDKSitesSession
+//     requestSelfOrganizationInfo()      → OrganizationInfo
+//     requestSitesForOrganization(orgId) → [SiteInfo]
+//     requestAssetsForSite(siteId)       → [AssetInfo] (mesh / splat)
+//
+// Token flow: dart-define SPATIAL_API_KEY → Keychain on first launch.
+// Subsequent launches read from Keychain (no dart-define needed).
+
 class ScaniverseService {
-  static const String _portalBase =
-      'https://portal-backend-api.nianticpatial.com';
-  static const Duration _timeout = Duration(seconds: 20);
+  static const MethodChannel _channel = MethodChannel('com.rentch.scaniverse');
   static const String _storageKey = 'spatial_api_key';
 
   final SecureStorageService _secure;
@@ -35,8 +36,8 @@ class ScaniverseService {
     return _instance!;
   }
 
-  // Call once at app startup.
-  // If SPATIAL_API_KEY dart-define is set, it seeds/overwrites the Keychain.
+  /// Call once at app startup.
+  /// Seeds SPATIAL_API_KEY dart-define into Keychain on first run.
   Future<void> initialize() async {
     const envToken = AppConfig.spatialApiKey;
     if (envToken.isNotEmpty) {
@@ -49,8 +50,19 @@ class ScaniverseService {
       _cachedToken = await _secure.readString(_storageKey);
       if (kDebugMode) {
         debugPrint(
-          'ScaniverseService: token ${_cachedToken != null ? "loaded from Keychain" : "NOT configured"}',
+          'ScaniverseService: token '
+          '${_cachedToken != null ? "loaded from Keychain" : "NOT configured"}',
         );
+      }
+    }
+
+    // Verify the native channel is reachable
+    if (kDebugMode) {
+      try {
+        final pong = await _channel.invokeMethod<Map>('ping');
+        debugPrint('ScaniverseService: channel ping → $pong');
+      } catch (e) {
+        debugPrint('ScaniverseService: channel ping failed — $e');
       }
     }
   }
@@ -67,59 +79,9 @@ class ScaniverseService {
 
   bool get isConfigured => (_cachedToken ?? '').trim().isNotEmpty;
 
-  // List scans for the authenticated service account.
-  Future<List<ScaniverseScan>> listScans({int limit = 20}) async {
-    final response = await _get('/api/v1/scans', params: {'limit': '$limit'});
-
-    // Handle multiple Niantic API response shapes
-    final raw = response['items'] ??
-        response['scans'] ??
-        response['data'] ??
-        response['results'] ??
-        [];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((item) => ScaniverseScan.fromJson(Map<String, dynamic>.from(item)))
-        .toList();
-  }
-
-  // Get a specific scan by ID.
-  Future<ScaniverseScan> getScan(String scanId) async {
-    final response = await _get('/api/v1/scans/$scanId');
-    final data = response['data'] ?? response['scan'] ?? response;
-    if (data is! Map) throw ScaniverseException('Unexpected scan response.');
-    return ScaniverseScan.fromJson(Map<String, dynamic>.from(data));
-  }
-
-  // Convert a ScaniverseScan to a PropertyVirtualTour.
-  PropertyVirtualTour tourFromScan(ScaniverseScan scan) {
-    final now = DateTime.now().toUtc();
-    final status = switch (scan.status.toLowerCase()) {
-      'complete' || 'completed' || 'ready' => PropertyTourStatus.ready,
-      'failed' || 'error' => PropertyTourStatus.failed,
-      'queued' || 'created' || 'pending' => PropertyTourStatus.queued,
-      _ => PropertyTourStatus.processing,
-    };
-    return PropertyVirtualTour(
-      id: scan.id,
-      provider: 'scaniverse',
-      status: status,
-      viewerUrl: scan.viewerUrl,
-      downloadUrl: scan.downloadUrl ?? '',
-      previewImageUrl: scan.thumbnailUrl ?? '',
-      format: 'scaniverse',
-      processingProgress: scan.progressPct,
-      qualityScore: scan.qualityScore,
-      createdAt: scan.createdAt ?? now,
-      updatedAt: scan.updatedAt ?? now,
-    );
-  }
-
-  Future<Map<String, dynamic>> _get(
-    String path, {
-    Map<String, String>? params,
-  }) async {
+  /// List 3D scans (Assets of type splat/mesh) from the authenticated account.
+  /// Calls the native NSDK Sites API via MethodChannel.
+  Future<List<ScaniverseScan>> listScans({int limit = 30}) async {
     final token = _cachedToken?.trim() ?? '';
     if (token.isEmpty) {
       throw const ScaniverseException(
@@ -127,63 +89,53 @@ class ScaniverseService {
       );
     }
 
-    var uri = Uri.parse('$_portalBase$path');
-    if (params != null && params.isNotEmpty) {
-      uri = uri.replace(queryParameters: params);
-    }
-
-    final client = HttpClient();
     try {
-      final request = await client.openUrl('GET', uri).timeout(_timeout);
-      request.headers
-        ..set(HttpHeaders.authorizationHeader, 'Bearer $token')
-        ..set(HttpHeaders.contentTypeHeader, 'application/json')
-        ..set('Accept', 'application/json');
+      final result = await _channel.invokeMethod<Map>('listScans', {'token': token});
+      if (result == null) return const [];
 
-      final response = await request.close().timeout(_timeout);
-      final body =
-          await utf8.decoder.bind(response).join().timeout(_timeout);
-
-      if (kDebugMode) {
-        debugPrint(
-          'ScaniverseService GET $path → HTTP ${response.statusCode}',
-        );
+      final sdkReady = result['sdkReady'] as bool? ?? true;
+      if (!sdkReady) {
+        // SDK stub — NSDK package not yet added in Xcode
+        if (kDebugMode) debugPrint('ScaniverseService: ${result["hint"]}');
+        return const [];
       }
 
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        throw const ScaniverseException(
-          'Spatial API key is invalid or expired. Generate a new Developer Token in the Niantic Portal.',
-        );
-      }
-      if (response.statusCode == 404) {
-        throw ScaniverseException('Resource not found: $path');
-      }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw ScaniverseException(
-          'Spatial API error ${response.statusCode}: $body',
-        );
-      }
-
-      if (body.trim().isEmpty) return const {};
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      // Bare list response
-      if (decoded is List) return {'items': decoded};
-      return const {};
-    } on TimeoutException {
-      throw const ScaniverseException(
-        'Spatial API request timed out. Check your connection.',
-      );
-    } on ScaniverseException {
-      rethrow;
+      final raw = result['scans'] as List? ?? [];
+      return raw
+          .whereType<Map>()
+          .map((m) => ScaniverseScan.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
+    } on PlatformException catch (e) {
+      throw ScaniverseException('NSDK error ${e.code}: ${e.message}');
     } catch (e) {
-      throw ScaniverseException('Spatial API unexpected error: $e');
-    } finally {
-      client.close(force: true);
+      throw ScaniverseException('Channel error: $e');
     }
   }
+
+  /// Convert a ScaniverseScan to a PropertyVirtualTour for use in the app.
+  PropertyVirtualTour tourFromScan(ScaniverseScan scan) {
+    final now = DateTime.now().toUtc();
+    final status = switch (scan.status.toLowerCase()) {
+      'complete' || 'ready' => PropertyTourStatus.ready,
+      'failed'              => PropertyTourStatus.failed,
+      'pending'             => PropertyTourStatus.queued,
+      _                     => PropertyTourStatus.processing,
+    };
+    return PropertyVirtualTour(
+      id: scan.id,
+      provider: 'scaniverse',
+      status: status,
+      viewerUrl: scan.viewerUrl,
+      downloadUrl: '',
+      previewImageUrl: scan.thumbnailUrl ?? '',
+      format: scan.assetType,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
 }
+
+// ─── Data model returned from native plugin ───────────────────────────────────
 
 class ScaniverseScan {
   const ScaniverseScan({
@@ -191,85 +143,36 @@ class ScaniverseScan {
     required this.title,
     required this.viewerUrl,
     required this.status,
+    required this.assetType,
+    this.siteId = '',
+    this.siteName = '',
     this.thumbnailUrl,
-    this.downloadUrl,
-    this.progressPct,
-    this.qualityScore,
-    this.createdAt,
-    this.updatedAt,
   });
 
   final String id;
   final String title;
   final String viewerUrl;
   final String status;
+  final String assetType; // 'splat' | 'mesh'
+  final String siteId;
+  final String siteName;
   final String? thumbnailUrl;
-  final String? downloadUrl;
-  final int? progressPct;
-  final double? qualityScore;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
 
-  bool get isReady =>
-      status == 'complete' || status == 'completed' || status == 'ready';
+  bool get isReady => status == 'complete' || status == 'ready';
   bool get isProcessing =>
-      status == 'processing' ||
-      status == 'training' ||
-      status == 'queued' ||
-      status == 'created';
+      status == 'processing' || status == 'pending' || status == 'running';
 
-  factory ScaniverseScan.fromJson(Map<String, dynamic> j) {
-    final id = j['id']?.toString() ??
-        j['scanId']?.toString() ??
-        j['sceneId']?.toString() ??
-        '';
-    // Construct viewer URL: prefer explicit field, fall back to canonical Scaniverse URL
-    final viewerUrl = j['viewerUrl']?.toString() ??
-        j['viewer_url']?.toString() ??
-        j['url']?.toString() ??
-        (id.isNotEmpty ? 'https://scaniverse.com/scan/$id' : '');
-
+  factory ScaniverseScan.fromMap(Map<String, dynamic> m) {
     return ScaniverseScan(
-      id: id,
-      title: j['title']?.toString() ??
-          j['name']?.toString() ??
-          j['displayName']?.toString() ??
-          'Scan $id',
-      viewerUrl: viewerUrl,
-      status: j['status']?.toString() ?? 'processing',
-      thumbnailUrl: j['thumbnailUrl']?.toString() ??
-          j['thumbnail_url']?.toString() ??
-          j['previewImageUrl']?.toString() ??
-          j['preview_url']?.toString(),
-      downloadUrl: j['downloadUrl']?.toString() ??
-          j['download_url']?.toString() ??
-          j['glbUrl']?.toString(),
-      progressPct: _parseInt(
-        j['progressPct'] ?? j['processing_pct'] ?? j['progress'],
-      ),
-      qualityScore: _parseDouble(j['qualityScore'] ?? j['ssim']),
-      createdAt: _parseDate(j['createdAt'] ?? j['created_at']),
-      updatedAt: _parseDate(j['updatedAt'] ?? j['updated_at']),
+      id:           m['id']?.toString() ?? '',
+      title:        m['title']?.toString() ?? m['siteName']?.toString() ?? 'Scan',
+      viewerUrl:    m['viewerUrl']?.toString() ?? '',
+      status:       m['status']?.toString() ?? 'processing',
+      assetType:    m['assetType']?.toString() ?? 'splat',
+      siteId:       m['siteId']?.toString() ?? '',
+      siteName:     m['siteName']?.toString() ?? '',
+      thumbnailUrl: m['thumbnailUrl']?.toString(),
     );
-  }
-
-  static int? _parseInt(Object? v) {
-    if (v == null) return null;
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return int.tryParse(v.toString());
-  }
-
-  static double? _parseDouble(Object? v) {
-    if (v == null) return null;
-    if (v is double) return v;
-    if (v is num) return v.toDouble();
-    return double.tryParse(v.toString());
-  }
-
-  static DateTime? _parseDate(Object? v) {
-    if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
-    return null;
   }
 }
 

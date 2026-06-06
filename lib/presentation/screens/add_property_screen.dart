@@ -3894,10 +3894,10 @@ class _ScanTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (scan.createdAt != null) ...[
+                        if (scan.siteName.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Text(
-                            '${scan.createdAt!.day}.${scan.createdAt!.month}.${scan.createdAt!.year}',
+                            scan.siteName,
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 11,
