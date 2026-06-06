@@ -31,120 +31,98 @@ class AppConfig {
     defaultValue: false,
   );
 
-  static const String appwriteEndpoint = String.fromEnvironment(
-    'APPWRITE_ENDPOINT',
-    defaultValue: 'https://fra.cloud.appwrite.io/v1',
+  // ── AWS API Gateway ──────────────────────────────────────────────────────────
+  // Set via: flutter run --dart-define=AWS_API_URL=https://xxx.execute-api.eu-central-1.amazonaws.com/prod
+  static const String awsApiGatewayUrl = String.fromEnvironment(
+    'AWS_API_URL',
+    defaultValue: '',
   );
 
-  static const String appwriteProjectId = String.fromEnvironment(
-    'APPWRITE_PROJECT_ID',
-    defaultValue: '6a11629d0022b837a38e',
+  // API Gateway Usage Plan key — added to x-api-key header.
+  static const String awsApiKey = String.fromEnvironment(
+    'AWS_API_KEY',
+    defaultValue: '',
   );
 
-  static const String appwriteDatabaseId = String.fromEnvironment(
-    'APPWRITE_DATABASE_ID',
-    defaultValue: '6a1201ae0028f7ff2e77',
+  static const String awsRegion = String.fromEnvironment(
+    'AWS_REGION',
+    defaultValue: 'eu-central-1',
   );
 
-  static const String appwriteAppStateTableId = String.fromEnvironment(
-    'APPWRITE_APP_STATE_TABLE_ID',
-    defaultValue: 'app_state',
+  // ── AWS DynamoDB table names ──────────────────────────────────────────────────
+  static const String dynamoPropertiesTable = String.fromEnvironment(
+    'DYNAMO_PROPERTIES_TABLE',
+    defaultValue: 'rentch-properties',
   );
 
+  static const String dynamoMessagesTable = String.fromEnvironment(
+    'DYNAMO_MESSAGES_TABLE',
+    defaultValue: 'rentch-messages',
+  );
+
+  static const String dynamoEventsTable = String.fromEnvironment(
+    'DYNAMO_EVENTS_TABLE',
+    defaultValue: 'rentch-events',
+  );
+
+  static const String dynamoUsersTable = String.fromEnvironment(
+    'DYNAMO_USERS_TABLE',
+    defaultValue: 'rentch-users',
+  );
+
+  static const String dynamoReportsTable = String.fromEnvironment(
+    'DYNAMO_REPORTS_TABLE',
+    defaultValue: 'rentch-reports',
+  );
+
+  static const String dynamoBlocksTable = String.fromEnvironment(
+    'DYNAMO_BLOCKS_TABLE',
+    defaultValue: 'rentch-blocks',
+  );
+
+  static const String dynamoPropertyViewsTable = String.fromEnvironment(
+    'DYNAMO_PROPERTY_VIEWS_TABLE',
+    defaultValue: '',
+  );
+
+  static const String dynamoPropertyLikesTable = String.fromEnvironment(
+    'DYNAMO_PROPERTY_LIKES_TABLE',
+    defaultValue: '',
+  );
+
+  // Per-device state document ID (Appwrite → DynamoDB migration kept same concept).
   // Empty default forces LocalStorageService to generate a per-device ID.
-  // Never set this to a shared value like 'global_state' in production —
-  // all users would overwrite each other's state.
-  static const String appwriteAppStateRowId = String.fromEnvironment(
-    'APPWRITE_APP_STATE_ROW_ID',
+  static const String awsAppStateRowId = String.fromEnvironment(
+    'AWS_APP_STATE_ROW_ID',
     defaultValue: '',
   );
 
-  static const String appwriteStorageBucketId = String.fromEnvironment(
-    'APPWRITE_STORAGE_BUCKET_ID',
-    defaultValue: '6a122da400013ecd35e0',
+  // ── AWS S3 ────────────────────────────────────────────────────────────────────
+  static const String awsS3Bucket = String.fromEnvironment(
+    'AWS_S3_BUCKET',
+    defaultValue: 'rentch-media',
   );
 
-  static const String appwriteMessagesTableId = String.fromEnvironment(
-    'APPWRITE_MESSAGES_TABLE_ID',
-    defaultValue: String.fromEnvironment(
-      'APPWRITE_MESSAGES_COLLECTION_ID',
-      defaultValue: 'messages',
-    ),
-  );
-
-  static const String appwritePropertiesTableId = String.fromEnvironment(
-    'APPWRITE_PROPERTIES_TABLE_ID',
-    defaultValue: 'properties',
-  );
-
-  // Optional property analytics tables.
-  //
-  // `property_view_sessions` stores one row per detail-page visit with
-  // heartbeat, dwell time, and gallery swipe counts.
-  // `property_likes` stores one row per user/property/day so "liked today"
-  // can be counted from the start of the local day without mutating blobs.
-  static const String appwritePropertyViewSessionsTableId =
-      String.fromEnvironment(
-    'APPWRITE_PROPERTY_VIEW_SESSIONS_TABLE_ID',
-    defaultValue: '',
-  );
-
-  static const String appwritePropertyLikesTableId = String.fromEnvironment(
-    'APPWRITE_PROPERTY_LIKES_TABLE_ID',
-    defaultValue: '',
-  );
-
-  // User / tenant profile collection for live user discovery.
-  // Set via: flutter run --dart-define=APPWRITE_USERS_TABLE_ID=your_id
-  static const String appwriteUsersTableId = String.fromEnvironment(
-    'APPWRITE_USERS_TABLE_ID',
-    defaultValue: '',
-  );
-
-  // Structured user-event log table (append-only analytics).
-  // Set via: flutter run --dart-define=APPWRITE_EVENTS_TABLE_ID=your_id
-  static const String appwriteEventsTableId = String.fromEnvironment(
-    'APPWRITE_EVENTS_TABLE_ID',
-    defaultValue: '',
-  );
-
-  // Moderation tables — required for Apple Guideline 1.2 compliance.
-  // Reports and blocks must reach the developer for 24h review.
-  static const String appwriteReportsTableId = String.fromEnvironment(
-    'APPWRITE_REPORTS_TABLE_ID',
-    defaultValue: 'reports',
-  );
-  static const String appwriteBlocksTableId = String.fromEnvironment(
-    'APPWRITE_BLOCKS_TABLE_ID',
-    defaultValue: 'blocks',
-  );
-
-  // Legal consent version. Bump to force re-consent from all property owners.
-  // Set via: flutter run --dart-define=RENTCH_LEGAL_CONSENT_VERSION=v1.1
+  // ── Legal ─────────────────────────────────────────────────────────────────────
   static const String legalConsentVersion = String.fromEnvironment(
     'RENTCH_LEGAL_CONSENT_VERSION',
     defaultValue: 'v1.0',
   );
 
-  // How many properties to load per page. Keep ≤ 200 to cap per-request payload.
+  // ── Pagination ────────────────────────────────────────────────────────────────
   static const int propertyPageSize = 150;
 
+  // ── 3D Scanning (Scaniverse / NSDK) ──────────────────────────────────────────
   static const String scan3dProvider = String.fromEnvironment(
     'RENTCH_3D_SCAN_PROVIDER',
     defaultValue: 'scaniverse',
   );
 
-  // Niantic Spatial / Scaniverse Developer Token.
-  // Pass at build time: flutter run --dart-define=SPATIAL_API_KEY=eyJhbGci...
-  // On first launch the service writes it to Keychain — dart-define not needed
-  // on subsequent runs. NEVER hardcode this value in source.
   static const String spatialApiKey = String.fromEnvironment(
     'SPATIAL_API_KEY',
     defaultValue: '',
   );
 
-  // Niantic Spatial Service Account secret — used server-side only.
-  // NEVER include in the client binary. Store in your backend/.env.
   static const String spatialServiceAccountSecret = String.fromEnvironment(
     'SPATIAL_SERVICE_ACCOUNT_SECRET',
     defaultValue: '',
@@ -167,72 +145,71 @@ class AppConfig {
     defaultValue: 'sog',
   );
 
+  // ── Derived capability flags ──────────────────────────────────────────────────
+
   static bool get isProduction => environment == 'production';
 
-  static bool get hasAppwriteCoreConfig =>
-      appwriteEndpoint.isNotEmpty && appwriteProjectId.isNotEmpty;
+  static bool get hasAwsCoreConfig => awsApiGatewayUrl.trim().isNotEmpty;
 
   static bool get canUseCloudStorage =>
-      enableCloudStorage &&
-      hasAppwriteCoreConfig &&
-      appwriteStorageBucketId.isNotEmpty;
+      enableCloudStorage && hasAwsCoreConfig;
 
-  static bool get canUseChat =>
-      hasAppwriteCoreConfig &&
-      appwriteDatabaseId.isNotEmpty &&
-      appwriteMessagesTableId.isNotEmpty;
+  static bool get canUseChat => hasAwsCoreConfig;
 
-  static bool get canUseProperties =>
-      hasAppwriteCoreConfig &&
-      appwriteDatabaseId.isNotEmpty &&
-      appwritePropertiesTableId.isNotEmpty;
+  static bool get canUseProperties => hasAwsCoreConfig;
 
   static bool get canUsePropertyAnalytics =>
-      hasAppwriteCoreConfig &&
-      appwriteDatabaseId.isNotEmpty &&
-      appwritePropertyViewSessionsTableId.isNotEmpty &&
-      appwritePropertyLikesTableId.isNotEmpty;
+      hasAwsCoreConfig &&
+      dynamoPropertyViewsTable.isNotEmpty &&
+      dynamoPropertyLikesTable.isNotEmpty;
 
   static bool get canUse3dScanBackend =>
       enable3dScanning && scan3dProxyUrl.trim().isNotEmpty;
 
   static bool get canUseRemoteState =>
-      enableRemoteState &&
-      hasAppwriteCoreConfig &&
-      appwriteDatabaseId.isNotEmpty &&
-      appwriteAppStateTableId.isNotEmpty;
+      enableRemoteState && hasAwsCoreConfig;
+
+  // ── Legacy aliases (kept so existing callers compile unchanged) ───────────────
+  // These map old Appwrite constant names → AWS equivalents.
+  static String get appwriteEndpoint => awsApiGatewayUrl;
+  static String get appwriteProjectId => '';
+  static String get appwriteDatabaseId => '';
+  static String get appwriteAppStateTableId => 'app_state';
+  static String get appwriteAppStateRowId => awsAppStateRowId;
+  static String get appwriteStorageBucketId => awsS3Bucket;
+  static String get appwriteMessagesTableId => dynamoMessagesTable;
+  static String get appwritePropertiesTableId => dynamoPropertiesTable;
+  static String get appwritePropertyViewSessionsTableId => dynamoPropertyViewsTable;
+  static String get appwritePropertyLikesTableId => dynamoPropertyLikesTable;
+  static String get appwriteUsersTableId => dynamoUsersTable;
+  static String get appwriteEventsTableId => dynamoEventsTable;
+  static String get appwriteReportsTableId => dynamoReportsTable;
+  static String get appwriteBlocksTableId => dynamoBlocksTable;
+  static bool get hasAppwriteCoreConfig => hasAwsCoreConfig;
 
   static List<String> productionReadinessIssues() {
     if (!isProduction) return const [];
-
     final issues = <String>[];
+    if (!hasAwsCoreConfig) {
+      issues.add('AWS_API_URL is not set. Set via --dart-define=AWS_API_URL=...');
+    }
+    if (awsApiKey.isEmpty) {
+      issues.add('AWS_API_KEY is not set. Set via --dart-define=AWS_API_KEY=...');
+    }
     if (enableCloudStorage && !canUseCloudStorage) {
-      issues.add(
-          'Appwrite storage is enabled but bucket configuration is missing.');
+      issues.add('Cloud storage is enabled but AWS is not configured.');
     }
     if (!enableCloudStorage) {
-      issues.add(
-          'Cloud image storage is disabled; uploaded images remain local on this device.');
+      issues.add('Cloud storage is disabled; uploaded images remain on-device only.');
     }
     if (enableRemoteState && !canUseRemoteState) {
-      issues.add(
-          'Remote state is enabled but Appwrite database/table configuration is missing.');
+      issues.add('Remote state is enabled but AWS_API_URL is missing.');
     }
     if (!enableRemoteState) {
-      issues.add(
-          'Remote state is disabled; marketplace state remains device-local.');
+      issues.add('Remote state is disabled; app state remains device-local.');
     }
     if (enable3dScanning && !canUse3dScanBackend) {
-      issues.add(
-          '3D scanning is enabled but RENTCH_3D_SCAN_PROXY_URL is missing.');
-    }
-    if (!canUsePropertyAnalytics) {
-      issues.add(
-          'Property analytics tables are missing; live viewers and daily likes will stay device-local.');
-    }
-    if (launchMode) {
-      issues.add(
-          'Launch mode uses the current shared Appwrite state row; replace it with user-scoped tables before a public launch.');
+      issues.add('3D scanning is enabled but RENTCH_3D_SCAN_PROXY_URL is missing.');
     }
     return issues;
   }
