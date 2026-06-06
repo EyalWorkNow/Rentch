@@ -197,6 +197,12 @@ class RentalDataService {
       'legal': _decodeJsonMap(data['legal']),
       'priceHistory': _decodeJsonList(data['priceHistory']),
       'marketSignals': _decodeJsonMap(data['marketSignals']),
+      'verification': _decodeJsonMap(data['verification']),
+      'verifiedListing': _asBool(data['verifiedListing']),
+      'verificationMethod': data['verificationMethod']?.toString() ?? '',
+      'verificationVideoUrl': data['verificationVideoUrl']?.toString() ?? '',
+      'verifiedAt': data['verifiedAt'],
+      'createdAt': data['createdAt'] ?? data[r'$createdAt'],
       if (virtualTour != null) 'virtualTour': virtualTour,
     });
   }

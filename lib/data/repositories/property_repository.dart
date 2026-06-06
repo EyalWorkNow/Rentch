@@ -13,7 +13,12 @@ import 'package:flutter/foundation.dart';
 enum PropertyRecordStatus { draft, active, paused, rented }
 
 // Reason a property save was rejected.
-enum PropertySaveRejection { notConfigured, consentMissing, consentStale, writeFailed }
+enum PropertySaveRejection {
+  notConfigured,
+  consentMissing,
+  consentStale,
+  writeFailed
+}
 
 class PropertySaveResult {
   const PropertySaveResult.ok() : rejection = null;
@@ -32,8 +37,7 @@ class PropertySaveResult {
         'לא נמצאה הסכמה לתנאי השימוש. יש לאשר את התנאים לפני פרסום הנכס.',
       PropertySaveRejection.consentStale =>
         'תנאי השימוש עודכנו. יש לאשר מחדש לפני פרסום.',
-      PropertySaveRejection.writeFailed =>
-        'שגיאה בשמירת הנכס, נסה שוב.',
+      PropertySaveRejection.writeFailed => 'שגיאה בשמירת הנכס, נסה שוב.',
     };
   }
 }
@@ -57,7 +61,10 @@ class PropertyRepository {
     required String ownerUserId,
     PropertyRecordStatus status = PropertyRecordStatus.active,
   }) async {
-    if (!isConfigured) return const PropertySaveResult.rejected(PropertySaveRejection.notConfigured);
+    if (!isConfigured) {
+      return const PropertySaveResult.rejected(
+          PropertySaveRejection.notConfigured);
+    }
 
     // Consent is required only for publicly visible listings (active, rented).
     // Draft properties can be saved without consent so the registration onboarding
@@ -68,7 +75,9 @@ class PropertyRepository {
     if (requiresConsent) {
       final reason = _legal.consentFailureReason(property.legal);
       if (reason != null) {
-        if (kDebugMode) debugPrint('PropertyRepository: consent rejected — $reason');
+        if (kDebugMode) {
+          debugPrint('PropertyRepository: consent rejected — $reason');
+        }
         final rejection = _legal.needsRenewal(property.legal)
             ? PropertySaveRejection.consentStale
             : PropertySaveRejection.consentMissing;
@@ -93,13 +102,16 @@ class PropertyRepository {
       );
       return const PropertySaveResult.ok();
     } on CircuitOpenException {
-      return const PropertySaveResult.rejected(PropertySaveRejection.writeFailed);
+      return const PropertySaveResult.rejected(
+          PropertySaveRejection.writeFailed);
     } on AppwriteException catch (error) {
       _log('save', property.id, error);
-      return const PropertySaveResult.rejected(PropertySaveRejection.writeFailed);
+      return const PropertySaveResult.rejected(
+          PropertySaveRejection.writeFailed);
     } catch (error) {
       _log('save', property.id, error);
-      return const PropertySaveResult.rejected(PropertySaveRejection.writeFailed);
+      return const PropertySaveResult.rejected(
+          PropertySaveRejection.writeFailed);
     }
   }
 
@@ -173,6 +185,7 @@ class PropertyRepository {
   }) {
     final tour = property.virtualTour;
     final model3d = property.model3d;
+    final verification = property.verification;
     final flags = property.featureFlags.values;
 
     return {
@@ -238,6 +251,8 @@ class PropertyRepository {
       // ── Transaction & status ───────────────────────────────────────────────
       'transactionType': property.transactionType.name,
       'status': status.name,
+      'createdAt': property.createdAt?.toUtc().toIso8601String() ??
+          DateTime.now().toUtc().toIso8601String(),
 
       // ── Extended data ──────────────────────────────────────────────────────
       'model3d': model3d == null ? '' : jsonEncode(model3d.toJson()),
@@ -245,6 +260,11 @@ class PropertyRepository {
       'priceHistory': jsonEncode(
           property.priceHistory.map((item) => item.toJson()).toList()),
       'marketSignals': jsonEncode(property.marketSignals.toJson()),
+      'verification': jsonEncode(verification.toJson()),
+      'verifiedListing': property.isVerifiedListing,
+      'verificationMethod': verification.method,
+      'verificationVideoUrl': verification.videoUrl,
+      'verifiedAt': verification.capturedAt?.toUtc().toIso8601String() ?? '',
 
       // ── Virtual tour ───────────────────────────────────────────────────────
       'virtualTour': tour == null ? '' : jsonEncode(tour.toJson()),

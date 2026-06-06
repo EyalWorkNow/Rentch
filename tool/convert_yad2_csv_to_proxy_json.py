@@ -97,6 +97,14 @@ def normalize_entry_date(value):
     return value.split(" ")[0]
 
 
+def normalize_created_at(row):
+    for key in ("created_at", "createdAt", "posted_at", "published_at"):
+        value = (row.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
 def build_feature_payload(row):
     feature_flags = {key: False for key in CANONICAL_FEATURES}
     feature_labels = []
@@ -119,6 +127,7 @@ def convert_row(row):
     images = parse_images(row.get("image_urls"))
     entry_date = normalize_entry_date(row.get("entry_date"))
     transaction_type = normalize_transaction_type(row.get("transaction_type"))
+    created_at = normalize_created_at(row)
     price_history = (
         [
             {
@@ -147,6 +156,7 @@ def convert_row(row):
         "lon": parse_float(row.get("lon")),
         "propertyType": (row.get("property_type") or "דירה").strip(),
         "entryDate": (row.get("entry_date") or "").strip(),
+        "createdAt": created_at,
         "condition": (row.get("condition") or "").strip(),
         "ownerName": (row.get("contact_name") or "בעל הנכס").strip(),
         "agencyListing": parse_bool(row.get("agency_listing")),
@@ -183,7 +193,24 @@ def convert_row(row):
             "skips": 0,
             "contactRequests": 0,
             "avgTimeIn3dSeconds": 0,
+            "liveViewers": 0,
+            "likesToday": 0,
+            "likesTodayDate": "",
+            "detailViews": 0,
+            "gallerySwipes": 0,
+            "avgDetailStaySeconds": 0,
+            "lastViewedAt": None,
         },
+        "verification": {
+            "verified": False,
+            "method": "",
+            "videoUrl": "",
+            "capturedAt": None,
+        },
+        "verifiedListing": False,
+        "verificationMethod": "",
+        "verificationVideoUrl": "",
+        "verifiedAt": None,
     }
 
 

@@ -18,7 +18,9 @@ class GamificationService {
     if (profile.bio.trim().length >= 15) score += 15;
     if (profile.budgetMax < 9000) score += 10; // changed from default
     if (profile.desiredRooms > 0) score += 5;
-    if (profile.moveInWindow.isNotEmpty && profile.moveInWindow != 'גמיש') score += 10;
+    if (profile.moveInWindow.isNotEmpty && profile.moveInWindow != 'גמיש') {
+      score += 10;
+    }
     if (profile.importantDetails.isNotEmpty) score += 10;
     if (profile.photoUrls.length >= 2) score += 5; // bonus for multi-photo
 
@@ -45,7 +47,9 @@ class GamificationService {
     if (profile.bio.trim().length >= 15) pct += 20;
     if (profile.budgetMax < 9000) pct += 15;
     if (profile.desiredRooms > 0) pct += 10;
-    if (profile.moveInWindow.isNotEmpty && profile.moveInWindow != 'גמיש') pct += 15;
+    if (profile.moveInWindow.isNotEmpty && profile.moveInWindow != 'גמיש') {
+      pct += 15;
+    }
     if (profile.importantDetails.isNotEmpty) pct += 10;
     return min(pct, 100);
   }
@@ -102,25 +106,21 @@ class GamificationService {
   // ─── FOMO — Property Signals ───────────────────────────────────────────────
 
   static bool isHotProperty(RentalProperty p, Set<String> likedIds) {
-    // Deterministic "hot" based on property id hash — stable across sessions
-    return p.id.codeUnits.fold(0, (a, b) => a + b) % 5 == 0;
+    return p.marketSignals.likesTodayFor(DateTime.now()) > 0;
   }
 
   static bool isNewProperty(RentalProperty p) {
-    final entry = p.entryDateValue;
-    if (entry == null) return false;
-    return DateTime.now().difference(entry).inHours < 48;
+    return p.isNewListing;
   }
 
+  @Deprecated('Use RentalProperty.marketSignals.liveViewers instead.')
   static int simulateLiveViewers(RentalProperty p) {
-    // Deterministic per-property so it doesn't flicker on rebuild
-    final seed = p.id.codeUnits.fold(0, (a, b) => a + b);
-    return 2 + (seed % 7); // 2–8 viewers
+    return p.marketSignals.liveViewers;
   }
 
+  @Deprecated('Use RentalProperty.marketSignals.likesTodayFor instead.')
   static int simulateLikesCount(RentalProperty p) {
-    final seed = p.id.codeUnits.fold(0, (a, b) => a + b);
-    return 8 + (seed % 34); // 8–41 likes
+    return p.marketSignals.likesTodayFor(DateTime.now());
   }
 
   // ─── FOMO — Match Expiry ───────────────────────────────────────────────────

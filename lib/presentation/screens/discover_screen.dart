@@ -12,6 +12,7 @@ import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -20,8 +21,310 @@ import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 
-class DiscoverScreen extends StatelessWidget {
+enum DiscoverTab { discover, forYou }
+
+class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
+
+  @override
+  State<DiscoverScreen> createState() => _DiscoverScreenState();
+}
+
+class _DiscoverScreenState extends State<DiscoverScreen> {
+  DiscoverTab _selectedTab = DiscoverTab.forYou;
+
+  Widget _buildPillSelector() {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.navy,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // "גלה" (Discover) Tab - Left
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedTab = DiscoverTab.discover;
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _selectedTab == DiscoverTab.discover
+                    ? AppColors.primary
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    IconsaxPlusLinear.location,
+                    size: 15,
+                    color: _selectedTab == DiscoverTab.discover
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'גלה',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: _selectedTab == DiscoverTab.discover
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // "במיוחד בשבילך" (For You) Tab - Right
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedTab = DiscoverTab.forYou;
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _selectedTab == DiscoverTab.forYou
+                    ? AppColors.primary
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    IconsaxPlusBold.flash,
+                    size: 15,
+                    color: _selectedTab == DiscoverTab.forYou
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'במיוחד בשבילך',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: _selectedTab == DiscoverTab.forYou
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiscoverGrid(
+    List<RentalProperty> properties,
+    DatingProvider provider,
+  ) {
+    if (properties.isEmpty) {
+      return const _NoMorePropertiesState();
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.72,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: properties.length,
+      itemBuilder: (context, index) {
+        final p = properties[index];
+        final media = p.primaryMedia;
+        final isFirst = index == 0;
+        final isSecond = index == 1;
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PropertyDetailScreen(property: p),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Full Card Image
+                  _MatchPropertyImage(media: media),
+
+                  // Bottom dark gradient overlay for text readability
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 120,
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.85),
+                              Colors.black.withOpacity(0.5),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Top horizontal glass pill badges (room count, size)
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    right: 10,
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _GlassPillBadge(
+                          icon: IconsaxPlusLinear.building,
+                          label: '${p.roomsLabel} חד׳',
+                        ),
+                        _GlassPillBadge(
+                          icon: IconsaxPlusLinear.maximize_3,
+                          label: '${p.sizeM2} מ״ר',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bottom Text: Price & Address
+                  Positioned(
+                    bottom: 12,
+                    left: 12,
+                    right: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isFirst) ...[
+                          Row(
+                            children: [
+                              _GlassPillBadge(
+                                icon: IconsaxPlusLinear.eye,
+                                label: '245',
+                              ),
+                              const SizedBox(width: 4),
+                              _GlassPillBadge(
+                                icon: IconsaxPlusLinear.heart,
+                                label: '84',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                        ] else if (isSecond) ...[
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444).withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4), width: 0.8),
+                                ),
+                                child: const Text(
+                                  'חדש!',
+                                  style: TextStyle(
+                                    color: Color(0xFFFCA5A5),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              _GlassPillBadge(
+                                icon: IconsaxPlusLinear.heart,
+                                label: '47',
+                              ),
+                              const SizedBox(width: 4),
+                              _GlassPillBadge(
+                                icon: IconsaxPlusLinear.people,
+                                label: '3',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        Text(
+                          p.priceLabel,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const RentchIcon(
+                              IconsaxPlusLinear.location,
+                              size: 11,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                p.address,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,14 +338,7 @@ class DiscoverScreen extends StatelessWidget {
             backgroundColor: AppColors.background,
             elevation: 0,
             centerTitle: true,
-            title: Text(
-              '${properties.length} דירות באזור',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.navy,
-              ),
-            ),
+            title: _buildPillSelector(),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(left: 16),
@@ -108,89 +404,134 @@ class DiscoverScreen extends StatelessWidget {
           ),
           body: provider.isLoading
               ? const _SkeletonDiscoverView()
-              : SafeArea(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Stack(
+              : _selectedTab == DiscoverTab.discover
+                  ? SafeArea(
+                      bottom: false,
+                      child: _buildDiscoverGrid(properties, provider),
+                    )
+                  : SafeArea(
+                      child: Stack(
                           children: [
-                            properties.isNotEmpty
-                                ? CardSwiper(
-                                    key: ValueKey(
-                                      provider.filteredPropertiesRevision,
-                                    ),
-                                    controller:
-                                        provider.propertySwiperController,
-                                    cardsCount: properties.length,
-                                    padding:
-                                        const EdgeInsets.fromLTRB(10, 6, 10, 0),
-                                    scale: 0.93,
-                                    threshold: 38,
-                                    maxAngle: 16,
-                                    isLoop: false,
-                                    numberOfCardsDisplayed:
-                                        math.min(3, properties.length),
-                                    backCardOffset: const Offset(0, 20),
-                                    allowedSwipeDirection:
-                                        const AllowedSwipeDirection.only(
-                                      left: true,
-                                      right: true,
-                                      up: true,
-                                    ),
-                                    onSwipe: provider.handlePropertySwipe,
-                                    cardBuilder: (
-                                      context,
-                                      index,
-                                      horizontalOffsetPercentage,
-                                      verticalOffsetPercentage,
-                                    ) {
-                                      if (index < 0 ||
-                                          index >= properties.length) {
-                                        return const SizedBox.shrink();
-                                      }
-                                      return Stack(
-                                        children: [
-                                          ProfileCard(
-                                            key: ValueKey(
-                                              properties[index].id,
+                            // Full-height card swiper extending almost to the bottom navbar
+                            Positioned.fill(
+                              child: properties.isNotEmpty
+                                  ? CardSwiper(
+                                      key: ValueKey(
+                                        provider.filteredPropertiesRevision,
+                                      ),
+                                      controller:
+                                          provider.propertySwiperController,
+                                      cardsCount: properties.length,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        10,
+                                        6,
+                                        10,
+                                        12,
+                                      ),
+                                      scale: 0.93,
+                                      threshold: 38,
+                                      maxAngle: 16,
+                                      isLoop: false,
+                                      numberOfCardsDisplayed:
+                                          math.min(3, properties.length),
+                                      backCardOffset: const Offset(0, 20),
+                                      allowedSwipeDirection:
+                                          const AllowedSwipeDirection.only(
+                                        left: true,
+                                        right: true,
+                                        up: true,
+                                      ),
+                                      onSwipe: provider.handlePropertySwipe,
+                                      cardBuilder: (
+                                        context,
+                                        index,
+                                        horizontalOffsetPercentage,
+                                        verticalOffsetPercentage,
+                                      ) {
+                                        if (index < 0 ||
+                                            index >= properties.length) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return Stack(
+                                          children: [
+                                            ProfileCard(
+                                              key: ValueKey(
+                                                properties[index].id,
+                                              ),
+                                              property: properties[index],
+                                              horizontalOffsetPercentage:
+                                                  horizontalOffsetPercentage,
                                             ),
-                                            property: properties[index],
-                                            horizontalOffsetPercentage:
-                                                horizontalOffsetPercentage,
-                                          ),
-                                          FomoCardOverlay(
-                                            property: properties[index],
-                                            likedIds: provider.likedPropertyIds,
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  )
-                                : const _NoMorePropertiesState(),
-                            // Undo floating button — bottom-left of card stack
+                                            FomoCardOverlay(
+                                              property: properties[index],
+                                              likedIds:
+                                                  provider.likedPropertyIds,
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    )
+                                  : const _NoMorePropertiesState(),
+                            ),
+
+                            // Floating centered action buttons row
+                            Positioned(
+                              bottom: 28,
+                              left: 0,
+                              right: 0,
+                              child: ActionButtons(
+                                onSwipeLeft: provider.swipePropertyLeft,
+                                onSwipeRight: provider.swipePropertyRight,
+                                onVirtualTour: () {
+                                  if (properties.isEmpty) return;
+                                  openPropertyTour(context, properties.first);
+                                },
+                              ),
+                            ),
+
+                            // Floating Undo button independently positioned on the bottom-left corner
                             if (provider.canUndo)
                               Positioned(
-                                bottom: 12,
-                                left: 16,
-                                child: _UndoButton(onTap: provider.undoSwipe),
+                                bottom: 36,
+                                left: 24,
+                                child: Tooltip(
+                                  message: 'חזור לפריט הקודם',
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      provider.undoSwipe();
+                                    },
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(0xFFE2E8F0),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFF59E0B)
+                                                .withOpacity(0.12),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.rotate_left_rounded,
+                                        color: Color(0xFFF59E0B),
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                           ],
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 4, 0, 16),
-                        child: ActionButtons(
-                          onSwipeLeft: provider.swipePropertyLeft,
-                          onSwipeRight: provider.swipePropertyRight,
-                          onVirtualTour: () {
-                            if (properties.isEmpty) return;
-                            openPropertyTour(context, properties.first);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
         );
       },
     );
@@ -224,16 +565,32 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
   late final AnimationController _ctrl;
   late final Animation<double> _scale;
   late final Animation<double> _fade;
+  late final Animation<double> _heartScale;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 1400),
     );
-    _scale = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut);
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _scale = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.65, curve: Curves.elasticOut),
+    );
+    _fade = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
+    );
+    _heartScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.25), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 1.25, end: 1.0), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.18), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 1.18, end: 1.0), weight: 55),
+    ]).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.65, 1.0, curve: Curves.easeInOut),
+    ));
     _ctrl.forward();
   }
 
@@ -249,105 +606,219 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
     final media = p.primaryMedia;
 
     return Material(
-      color: Colors.black.withValues(alpha: 0.88),
-      child: SafeArea(
-        child: FadeTransition(
-          opacity: _fade,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ScaleTransition(
-                scale: _scale,
-                child: Column(
-                  children: [
-                    Container(
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 3),
-                      ),
-                      child: const RentchIcon(
-                        IconsaxPlusLinear.heart,
-                        color: AppColors.primary,
-                        size: 48,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'זה מאצ׳!',
-                      style: TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'נוצרה התאמה עם\n${p.address}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
+      color: Colors.transparent,
+      child: Stack(
+        children: [
+          // Glassmorphism background blur
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                color: Colors.black.withOpacity(0.76),
               ),
-              const SizedBox(height: 28),
-              if (media != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: SizedBox(
-                    width: 220,
-                    height: 150,
-                    child: _MatchPropertyImage(media: media),
-                  ),
-                ),
-              const SizedBox(height: 36),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const RentchIcon(IconsaxPlusLinear.message),
-                        label: const Text('פתח צ׳אט'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white54),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                        ),
-                        child: const Text('המשך לחפש'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          
+          // Radial celebration glow
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 1.0,
+                  colors: [
+                    AppColors.primary.withOpacity(0.24),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fade,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ScaleTransition(
+                    scale: _scale,
+                    child: Column(
+                      children: [
+                        // Animated heartbeat container
+                        ScaleTransition(
+                          scale: _heartScale,
+                          child: Container(
+                            width: 104,
+                            height: 104,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 3,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.35),
+                                  blurRadius: 24,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: RentchIcon(
+                                IconsaxPlusBold.heart,
+                                color: AppColors.primary,
+                                size: 52,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'זה מאצ׳!',
+                          style: TextStyle(
+                            fontSize: 44,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -1.5,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black38,
+                                offset: Offset(0, 3),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'נוצרה התאמה עם\n${p.address}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Polaroid-style tilted property image card
+                  if (media != null)
+                    ScaleTransition(
+                      scale: _scale,
+                      child: Transform.rotate(
+                        angle: -0.04, // slight rotation for stylish look
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.4),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: SizedBox(
+                              width: 240,
+                              height: 160,
+                              child: _MatchPropertyImage(media: media),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 44),
+
+                  // Custom Action Buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Column(
+                      children: [
+                        // Open Chat Gradient Button
+                        Container(
+                          width: double.infinity,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            gradient: const LinearGradient(
+                              colors: [AppColors.primary, Color(0xFF5AD4DC)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.4),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const RentchIcon(
+                              IconsaxPlusLinear.message,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'פתח צ׳אט',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        // Keep Searching text/glass button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'המשך לחפש',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -356,12 +827,16 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
 class _MatchPropertyImage extends StatelessWidget {
   const _MatchPropertyImage({required this.media});
 
-  final PropertyMedia media;
+  final PropertyMedia? media;
 
   @override
   Widget build(BuildContext context) {
+    final m = media;
+    if (m == null) {
+      return _fallback();
+    }
     return SafeMedia(
-      media: media,
+      media: m,
       fallback: _fallback(),
       fit: BoxFit.cover,
     );
@@ -377,6 +852,48 @@ class _MatchPropertyImage extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _GlassPillBadge extends StatelessWidget {
+  const _GlassPillBadge({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.12),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 12),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Filters Sheet ────────────────────────────────────────────────────────────

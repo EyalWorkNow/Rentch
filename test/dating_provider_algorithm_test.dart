@@ -164,6 +164,52 @@ void main() {
     provider.dispose();
   });
 
+  test('verified camera-video listings receive a higher algorithm score',
+      () async {
+    final base = _property(
+      id: 'camera-base',
+      price: 12000,
+      rooms: 1,
+      sizeM2: 25,
+      street: '',
+      streetNumber: -1,
+      features: const [],
+      mediaCount: 0,
+      ownerName: '',
+      url: '',
+      entryDate: '2027-12-15',
+    );
+    final verified = _property(
+      id: 'camera-verified',
+      price: 12000,
+      rooms: 1,
+      sizeM2: 25,
+      street: '',
+      streetNumber: -1,
+      features: const [],
+      mediaCount: 0,
+      ownerName: '',
+      url: '',
+      entryDate: '2027-12-15',
+      verification: PropertyVerification.cameraVideo(
+        videoUrl: 'https://example.com/verification.mp4',
+        capturedAt: DateTime.utc(2026, 6, 4, 8),
+      ),
+    );
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([base, verified]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+
+    await provider.initialize();
+
+    expect(verified.isVerifiedListing, isTrue);
+    expect(
+        provider.matchScore(verified), greaterThan(provider.matchScore(base)));
+
+    provider.dispose();
+  });
+
   test('listing source and move-in support preferred and required states',
       () async {
     final provider = DatingProvider(
@@ -343,6 +389,7 @@ RentalProperty _property({
   String url = 'https://example.com/listing',
   String entryDate = '2026-06-15',
   bool agencyListing = false,
+  PropertyVerification? verification,
 }) {
   return RentalProperty(
     id: id,
@@ -371,5 +418,6 @@ RentalProperty _property({
           type: PropertyMediaType.image,
         ),
     ],
+    verification: verification,
   );
 }

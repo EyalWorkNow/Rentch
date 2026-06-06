@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -22,29 +23,50 @@ class PropertyDetailScreen extends StatefulWidget {
 
 class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   final _pageController = PageController();
+  DatingProvider? _analyticsProvider;
   int _currentPage = 0;
 
-  RentalProperty get p => widget.property;
-  bool get _hasVirtualTour => p.hasReadyVirtualTour || p.videoUrls.isNotEmpty;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = context.read<DatingProvider>();
+      _analyticsProvider = provider;
+      provider.beginPropertyDetailView(widget.property.id);
+    });
+  }
 
   @override
   void dispose() {
+    unawaited(
+      _analyticsProvider?.endPropertyDetailView(widget.property.id) ??
+          Future<void>.value(),
+    );
     _pageController.dispose();
     super.dispose();
   }
 
+  void _handleGalleryPageChanged(String propertyId, int index) {
+    setState(() => _currentPage = index);
+    context.read<DatingProvider>().recordPropertyGallerySwipe(
+          propertyId,
+          index,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final media = p.media;
-    final title = p.street.isNotEmpty
-        ? '${p.propertyType} ב${p.street} ${p.streetNumber}'
-        : '${p.propertyType} ב${p.city}';
-
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
+        final p = provider.propertyById(widget.property.id) ?? widget.property;
+        final media = p.media;
+        final hasVirtualTour = p.hasReadyVirtualTour || p.videoUrls.isNotEmpty;
+        final title = p.street.isNotEmpty
+            ? '${p.propertyType} ב${p.street} ${p.streetNumber}'
+            : '${p.propertyType} ב${p.city}';
         final reviews = provider.propertyReviews(p.id);
         final avgRating = provider.reviewAverage(reviews);
-        final isLiked = provider.isSaved(p.id);
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -65,7 +87,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             controller: _pageController,
                             currentPage: _currentPage,
                             onPageChanged: (i) =>
-                                setState(() => _currentPage = i),
+                                _handleGalleryPageChanged(p.id, i),
                             avgRating: avgRating,
                             onBackTap: () => Navigator.of(context).pop(),
                             onShareTap: () =>
@@ -125,6 +147,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
+                          if (_PropertySignalStrip.shouldShow(p)) ...[
+                            _PropertySignalStrip(property: p),
+                            const SizedBox(height: 24),
+                          ],
 
                           // Photos / Gallery Carousel (Mockup Style)
                           if (media.isNotEmpty) ...[
@@ -352,7 +378,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 bottom: 0,
                 child: _BottomBar(
                   property: p,
-                  hasVirtualTour: _hasVirtualTour,
+                  hasVirtualTour: hasVirtualTour,
                   onLike: () {
                     context.read<DatingProvider>().likeProperty(p.id);
                     Navigator.of(context).pop();
@@ -2436,6 +2462,98 @@ class _DarkMetricChip extends StatelessWidget {
               color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PropertySignalStrip extends StatelessWidget {
+  const _PropertySignalStrip({required this.property});
+
+  final RentalProperty property;
+
+  static bool shouldShow(RentalProperty property) {
+    final signals = property.marketSignals;
+    return property.isVerifiedListing ||
+        property.isNewListing ||
+        signals.liveViewers > 0 ||
+        signals.likesTodayFor(DateTime.now()) > 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final signals = property.marketSignals;
+    final likesToday = signals.likesTodayFor(DateTime.now());
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (property.isVerifiedListing)
+          const _PropertySignalChip(
+            icon: IconsaxPlusLinear.verify,
+            label: 'דירה מאומתת',
+            color: Color(0xFF13BEC9),
+          ),
+        if (property.isNewListing)
+          const _PropertySignalChip(
+            icon: IconsaxPlusLinear.flash_1,
+            label: 'חדש · היה מהראשונים',
+            color: Color(0xFF13BEC9),
+          ),
+        if (signals.liveViewers > 0)
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.eye,
+            label: signals.liveViewers == 1
+                ? 'מסתכל עכשיו'
+                : '${signals.liveViewers} מסתכלים עכשיו',
+            color: const Color(0xFF22C55E),
+          ),
+        if (likesToday > 0)
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.heart,
+            label: '$likesToday אהבו היום',
+            color: const Color(0xFFFF5A67),
+          ),
+      ],
+    );
+  }
+}
+
+class _PropertySignalChip extends StatelessWidget {
+  const _PropertySignalChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RentchIcon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

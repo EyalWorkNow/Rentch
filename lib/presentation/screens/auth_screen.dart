@@ -21,7 +21,7 @@ const _kScreenBg = Color(0xFFF0F4F7);
 const _kCardBg = Colors.white;
 const _kInputBorder = Color(0xFFDDE3EE);
 const _kInputFill = Color(0xFFF7F9FC);
-const _kPillBtn = AppColors.navy;
+const _kPillBtn = AppColors.primary;
 
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
 
@@ -32,9 +32,17 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
+enum AuthView { welcome, login, register }
+
 class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  AuthView _currentView = AuthView.welcome;
+  
+  final _googleAuthService = GoogleAuthService();
+  final _appleAuthService = AppleAuthService();
+  bool _googleLoading = false;
+  bool _appleLoading = false;
 
   @override
   void initState() {
@@ -70,67 +78,213 @@ class _AuthScreenState extends State<AuthScreen>
     if (mounted) _onEnter();
   }
 
+  Future<void> _loginWithGoogleForWelcome() async {
+    if (_googleLoading) return;
+    if (!AppConfig.enableGoogleSignIn) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('כניסה עם Google לא מופעלת בסביבת ההרצה הזו')));
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _googleLoading = true);
+    try {
+      final result = await _googleAuthService.signIn();
+      if (!mounted) return;
+      final provider = context.read<DatingProvider>();
+      await provider.applyGoogleIdentity(
+          displayName: result.displayName, photoUrl: result.photoUrl);
+      await provider.setUserRole(provider.userRole);
+      if (!mounted) return;
+      _onEnter();
+    } on GoogleAuthCanceledException {
+      // no-op
+    } on GoogleAuthConfigException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('הכניסה עם Google לא זמינה כרגע. נסו שוב מאוחר יותר.')));
+    } catch (error) {
+      if (!mounted) return;
+      final msg = error.toString().toLowerCase();
+      if (msg.contains('canceled') ||
+          msg.contains('cancelled') ||
+          msg.contains('sign_in_canceled')) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
+  Future<void> _loginWithAppleForWelcome() async {
+    if (_appleLoading) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _appleLoading = true);
+    try {
+      final result = await _appleAuthService.signIn();
+      if (!mounted) return;
+      final provider = context.read<DatingProvider>();
+      await provider.applyGoogleIdentity(
+          displayName: result.displayName, photoUrl: null);
+      await provider.setUserRole(provider.userRole);
+      if (!mounted) return;
+      _onEnter();
+    } on AppleAuthCanceledException {
+      // user dismissed — no-op
+    } on AppleAuthUnsupportedException {
+      if (!mounted) return;
+      _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
+    } catch (e) {
+      if (!mounted) return;
+      _showAppleError('הכניסה עם Apple נכשלה. נסו שוב.');
+    } finally {
+      if (mounted) setState(() => _appleLoading = false);
+    }
+  }
+
+  void _showAppleError(String message) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'כניסה עם Apple',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+        ),
+        content: Text(message,
+            style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('סגור', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _onGuestEnter();
+            },
+            child: const Text('כניסה כאורח'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= 1040;
-    return Scaffold(
-      backgroundColor: _kScreenBg,
-      body: isWide
-          ? _WideLayout(
-              tabController: _tabController,
-              onLogin: _onEnter,
-              onGuestLogin: _onGuestEnter,
-              onDone: _onEnter)
-          : _MobileLayout(
-              tabController: _tabController,
-              onLogin: _onEnter,
-              onGuestLogin: _onGuestEnter,
-              onDone: _onEnter),
-    );
-  }
-}
-
-// ─── Mobile Layout ────────────────────────────────────────────────────────────
-
-class _MobileLayout extends StatelessWidget {
-  const _MobileLayout({
-    required this.tabController,
-    required this.onLogin,
-    required this.onGuestLogin,
-    required this.onDone,
-  });
-
-  final TabController tabController;
-  final VoidCallback onLogin;
-  final VoidCallback onGuestLogin;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: SafeArea(
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: TabBarView(
-            controller: tabController,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _LoginTab(
-                onLogin: onLogin,
-                onGuestLogin: onGuestLogin,
-                onSwitchToRegister: () => tabController.animateTo(1),
-              ),
-              _RegisterFlow(
-                onDone: onDone,
-                onSwitchToLogin: () => tabController.animateTo(0),
-              ),
-            ],
-          ),
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: _kScreenBg,
+        body: _WideLayout(
+          tabController: _tabController,
+          onLogin: _onEnter,
+          onGuestLogin: _onGuestEnter,
+          onDone: _onEnter,
         ),
+      );
+    }
+
+    return Scaffold(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+        child: _buildMobileContent(),
       ),
     );
+  }
+
+  Widget _buildMobileContent() {
+    switch (_currentView) {
+      case AuthView.welcome:
+        return _WelcomePortal(
+          key: const ValueKey('welcome_portal'),
+          onLogin: () => setState(() => _currentView = AuthView.login),
+          onRegister: () => setState(() => _currentView = AuthView.register),
+          onGoogleLogin: _loginWithGoogleForWelcome,
+          onAppleLogin: _loginWithAppleForWelcome,
+          onGuestLogin: _onGuestEnter,
+        );
+      case AuthView.login:
+        return Stack(
+          key: const ValueKey('login_view'),
+          children: [
+            Image.network(
+              'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000',
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(color: AppColors.navy);
+              },
+              errorBuilder: (context, error, stackTrace) => Container(color: AppColors.navy),
+            ),
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+              ),
+            ),
+            SafeArea(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: _LoginTab(
+                  onLogin: _onEnter,
+                  onGuestLogin: _onGuestEnter,
+                  onSwitchToRegister: () => setState(() => _currentView = AuthView.register),
+                  onBack: () => setState(() => _currentView = AuthView.welcome),
+                ),
+              ),
+            ),
+          ],
+        );
+      case AuthView.register:
+        return Stack(
+          key: const ValueKey('register_view'),
+          children: [
+            Image.network(
+              'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000',
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(color: AppColors.navy);
+              },
+              errorBuilder: (context, error, stackTrace) => Container(color: AppColors.navy),
+            ),
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+              ),
+            ),
+            SafeArea(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: _RegisterFlow(
+                  onDone: _onEnter,
+                  onSwitchToLogin: () => setState(() => _currentView = AuthView.login),
+                  onBack: () => setState(() => _currentView = AuthView.welcome),
+                ),
+              ),
+            ),
+          ],
+        );
+    }
   }
 }
 
@@ -193,11 +347,15 @@ class _WideLayout extends StatelessWidget {
                                   onLogin: onLogin,
                                   onGuestLogin: onGuestLogin,
                                   onSwitchToRegister: () =>
-                                      tabController.animateTo(1)),
+                                      tabController.animateTo(1),
+                                  onBack: () {},
+                              ),
                               _RegisterFlow(
                                   onDone: onDone,
                                   onSwitchToLogin: () =>
-                                      tabController.animateTo(0)),
+                                      tabController.animateTo(0),
+                                  onBack: () {},
+                              ),
                             ],
                           ),
                         ),
@@ -217,17 +375,27 @@ class _WideLayout extends StatelessWidget {
 // ─── Logo Header for Mobile ──────────────────────────────────────────────────
 
 class _LogoHeader extends StatelessWidget {
-  const _LogoHeader({this.showBackButton = false, this.onBack});
+  const _LogoHeader({
+    required this.showBackButton,
+    this.onBack,
+    this.isDark = false,
+    this.logoHeight = 34,
+  });
+
   final bool showBackButton;
   final VoidCallback? onBack;
+  final bool isDark;
+  final double logoHeight;
 
   @override
   Widget build(BuildContext context) {
+    final color = isDark ? Colors.white : AppColors.navy;
+    final stackHeight = logoHeight > 34 ? logoHeight + 12 : 48.0;
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 8),
       child: SizedBox(
         width: double.infinity,
-        height: 48,
+        height: stackHeight,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -239,25 +407,25 @@ class _LogoHeader extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: _kInputBorder),
+                    color: isDark ? Colors.white.withOpacity(0.12) : Colors.white,
+                    border: Border.all(color: isDark ? Colors.white.withOpacity(0.18) : _kInputBorder),
                   ),
                   child: IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.arrow_back_rounded,
-                        size: 18, color: AppColors.navy),
+                    icon: Icon(Icons.arrow_back_rounded,
+                        size: 18, color: isDark ? Colors.white : AppColors.navy),
                     onPressed: onBack,
                   ),
                 ),
               ),
             SvgPicture.asset(
               'assets/images/rentch_logo_with_text.svg',
-              height: 34,
+              height: logoHeight,
               colorFilter:
-                  const ColorFilter.mode(AppColors.navy, BlendMode.srcIn),
-              placeholderBuilder: (_) => const Text('Rentch',
+                  ColorFilter.mode(color, BlendMode.srcIn),
+              placeholderBuilder: (_) => Text('Rentch',
                   style: TextStyle(
-                      color: AppColors.navy,
+                      color: color,
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -1)),
@@ -409,12 +577,14 @@ class _SocialRow extends StatelessWidget {
     required this.appleLoading,
     required this.onGoogle,
     required this.onApple,
+    this.isDark = false,
   });
 
   final bool googleLoading;
   final bool appleLoading;
   final VoidCallback onGoogle;
   final VoidCallback onApple;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -425,12 +595,15 @@ class _SocialRow extends StatelessWidget {
         final showGoogle = AppConfig.enableGoogleSignIn;
         if (!showGoogle && !showApple) return const SizedBox.shrink();
 
+        final textColor = isDark ? Colors.white : AppColors.navy;
+
         return Row(children: [
           if (showGoogle)
             Expanded(
               child: _SocialBtn(
                 loading: googleLoading,
                 onTap: onGoogle,
+                isDark: isDark,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -438,22 +611,22 @@ class _SocialRow extends StatelessWidget {
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                          color: const Color(0xFFF1F3F4),
+                          color: isDark ? Colors.white.withOpacity(0.15) : const Color(0xFFF1F3F4),
                           borderRadius: BorderRadius.circular(4)),
-                      child: const Center(
+                      child: Center(
                         child: Text('G',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF4285F4))),
+                                color: isDark ? Colors.white : const Color(0xFF4285F4))),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('Google',
+                    Text('Google',
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.navy)),
+                            color: textColor)),
                   ],
                 ),
               ),
@@ -464,16 +637,17 @@ class _SocialRow extends StatelessWidget {
               child: _SocialBtn(
                 loading: appleLoading,
                 onTap: onApple,
-                child: const Row(
+                isDark: isDark,
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.apple_rounded, size: 20, color: AppColors.navy),
-                    SizedBox(width: 6),
+                    Icon(Icons.apple_rounded, size: 20, color: isDark ? Colors.white : AppColors.navy),
+                    const SizedBox(width: 6),
                     Text('Apple',
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.navy)),
+                            color: textColor)),
                   ],
                 ),
               ),
@@ -485,11 +659,17 @@ class _SocialRow extends StatelessWidget {
 }
 
 class _SocialBtn extends StatelessWidget {
-  const _SocialBtn(
-      {required this.loading, required this.onTap, required this.child});
+  const _SocialBtn({
+    required this.loading,
+    required this.onTap,
+    required this.child,
+    this.isDark = false,
+  });
+
   final bool loading;
   final VoidCallback onTap;
   final Widget child;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -498,21 +678,26 @@ class _SocialBtn extends StatelessWidget {
       child: Container(
         height: 52,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kInputBorder, width: 1.5),
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
-          ],
+          border: Border.all(
+            color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder,
+            width: 1.5,
+          ),
+          boxShadow: isDark
+              ? const []
+              : const [
+                  BoxShadow(
+                      color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
+                ],
         ),
         child: loading
-            ? const Center(
+            ? Center(
                 child: SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.navy)))
+                        strokeWidth: 2, color: isDark ? Colors.white : AppColors.navy)))
             : child,
       ),
     );
@@ -522,21 +707,24 @@ class _SocialBtn extends StatelessWidget {
 // ─── OR Divider ───────────────────────────────────────────────────────────────
 
 class _OrDivider extends StatelessWidget {
-  const _OrDivider();
+  const _OrDivider({this.isDark = false});
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final lineColor = isDark ? Colors.white.withOpacity(0.15) : _kInputBorder;
+    final textColor = isDark ? Colors.white60 : AppColors.textSecondary.withValues(alpha: 0.7);
     return Row(children: [
-      const Expanded(child: Divider(color: _kInputBorder)),
+      Expanded(child: Divider(color: lineColor)),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Text('או',
             style: TextStyle(
-                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                color: textColor,
                 fontSize: 13,
                 fontWeight: FontWeight.w600)),
       ),
-      const Expanded(child: Divider(color: _kInputBorder)),
+      Expanded(child: Divider(color: lineColor)),
     ]);
   }
 }
@@ -551,50 +739,60 @@ class _GuestModeDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-        decoration: BoxDecoration(
-          color: _kCardBg,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x35072946), blurRadius: 36, offset: Offset(0, 16))
-          ],
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('המשך כאורח',
-                  style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.navy)),
-              const SizedBox(height: 8),
-              const Text(
-                'בחרו האם להיכנס כבעל דירה או כדייר שמחפש דירה.',
-                style: TextStyle(
-                    fontSize: 14, height: 1.5, color: AppColors.textSecondary),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('המשך כאורח',
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'בחרו האם להיכנס כבעל דירה או כדייר שמחפש דירה.',
+                    style: TextStyle(
+                        fontSize: 14, height: 1.5, color: Colors.white.withOpacity(0.7)),
+                  ),
+                  const SizedBox(height: 20),
+                  _GuestRoleOption(
+                    title: 'אורח כדייר מחפש דירה',
+                    subtitle: 'דירות פעילות ומאצ׳ים פתוחים.',
+                    icon: IconsaxPlusLinear.profile_circle,
+                    color: AppColors.primary,
+                    onTap: () => Navigator.of(context).pop('tenant'),
+                  ),
+                  const SizedBox(height: 12),
+                  _GuestRoleOption(
+                    title: 'אורח כבעל דירה',
+                    subtitle: 'נכסים פעילים ומועמדים בתהליך.',
+                    icon: IconsaxPlusLinear.home,
+                    color: AppColors.primary, // use primary brand color so it pops nicely on dark glass
+                    onTap: () => Navigator.of(context).pop('landlord'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 18),
-              _GuestRoleOption(
-                title: 'אורח כדייר מחפש דירה',
-                subtitle: 'דירות פעילות ומאצ׳ים פתוחים.',
-                icon: IconsaxPlusLinear.profile_circle,
-                color: AppColors.primary,
-                onTap: () => Navigator.of(context).pop('tenant'),
-              ),
-              const SizedBox(height: 12),
-              _GuestRoleOption(
-                title: 'אורח כבעל דירה',
-                subtitle: 'נכסים פעילים ומועמדים בתהליך.',
-                icon: IconsaxPlusLinear.home,
-                color: AppColors.navy,
-                onTap: () => Navigator.of(context).pop('landlord'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -626,12 +824,12 @@ class _GuestRoleOption extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: Ink(
+        child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _kInputBorder),
-            color: color.withValues(alpha: 0.06),
+            border: Border.all(color: Colors.white.withOpacity(0.18)),
+            color: Colors.white.withOpacity(0.05),
           ),
           child: Row(children: [
             Container(
@@ -650,17 +848,17 @@ class _GuestRoleOption extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.navy)),
+                          color: Colors.white)),
                   const SizedBox(height: 2),
                   Text(subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 12,
                           height: 1.4,
-                          color: AppColors.textSecondary)),
+                          color: Colors.white.withOpacity(0.7))),
                 ],
               ),
             ),
-            RentchIcon(IconsaxPlusLinear.arrow_left_2, color: color, size: 16),
+            const RentchIcon(IconsaxPlusLinear.arrow_left_2, color: Colors.white, size: 16),
           ]),
         ),
       ),
@@ -675,10 +873,12 @@ class _LoginTab extends StatefulWidget {
     required this.onLogin,
     required this.onGuestLogin,
     required this.onSwitchToRegister,
+    required this.onBack,
   });
   final VoidCallback onLogin;
   final VoidCallback onGuestLogin;
   final VoidCallback onSwitchToRegister;
+  final VoidCallback onBack;
 
   @override
   State<_LoginTab> createState() => _LoginTabState();
@@ -843,194 +1043,229 @@ class _LoginTabState extends State<_LoginTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Logo header at top of scroll view
-          const _LogoHeader(),
-          const SizedBox(height: 16),
-
-          // Title
-          const Text(
-            'ברוכים השבים',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: AppColors.navy,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'התחברו עם כתובת האימייל והסיסמה שלכם כדי לגשת לחשבון.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                height: 1.4,
-                fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 24),
-
-          // Social buttons
-          _SocialRow(
-            googleLoading: _googleLoading,
-            appleLoading: _appleLoading,
-            onGoogle: _loginWithGoogle,
-            onApple: _loginWithApple,
-          ),
-          const SizedBox(height: 20),
-
-          // OR divider
-          const _OrDivider(),
-          const SizedBox(height: 20),
-
-          // Email
-          const _FieldLabel(label: 'כתובת אימייל'),
-          const SizedBox(height: 6),
-          _CleanTextField(
-            controller: _emailCtrl,
-            hint: 'name@example.com',
-            keyboardType: TextInputType.emailAddress,
-            textDirection: TextDirection.ltr,
-          ),
-          const SizedBox(height: 16),
-
-          // Password
-          const _FieldLabel(label: 'סיסמה'),
-          const SizedBox(height: 6),
-          _CleanTextField(
-            controller: _passwordCtrl,
-            obscureText: _obscure,
-            hint: '••••••••',
-            suffixIcon: GestureDetector(
-              onTap: () => setState(() => _obscure = !_obscure),
-              child: Icon(
-                _obscure
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _LogoHeader(
+              showBackButton: true,
+              onBack: widget.onBack,
+              isDark: true,
+              logoHeight: 52,
             ),
-          ),
-          const SizedBox(height: 12),
-
-          // Remember me & Forgot Password
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(40),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(40),
+                    border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(22),
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _rememberMe = !_rememberMe),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(5),
-                        color: _rememberMe ? AppColors.primary : Colors.white,
-                        border: Border.all(
-                          color:
-                              _rememberMe ? AppColors.primary : _kInputBorder,
-                          width: 1.5,
-                        ),
+                  // Title
+                  const Text(
+                    'ברוכים השבים',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'התחברו עם כתובת האימייל והסיסמה שלכם כדי לגשת לחשבון.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 20),
+                  _SocialRow(
+                    googleLoading: _googleLoading,
+                    appleLoading: _appleLoading,
+                    onGoogle: _loginWithGoogle,
+                    onApple: _loginWithApple,
+                    isDark: true,
+                  ),
+                  const SizedBox(height: 16),
+                  const _OrDivider(isDark: true),
+                  const SizedBox(height: 16),
+
+                  // Email
+                  const _FieldLabel(label: 'כתובת אימייל', isDark: true),
+                  const SizedBox(height: 4),
+                  _CleanTextField(
+                    controller: _emailCtrl,
+                    hint: 'name@example.com',
+                    keyboardType: TextInputType.emailAddress,
+                    textDirection: TextDirection.ltr,
+                    prefixIcon: IconsaxPlusLinear.sms,
+                    isDark: true,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Password
+                  const _FieldLabel(label: 'סיסמה', isDark: true),
+                  const SizedBox(height: 4),
+                  _CleanTextField(
+                    controller: _passwordCtrl,
+                    obscureText: _obscure,
+                    hint: '••••••••',
+                    prefixIcon: IconsaxPlusLinear.key,
+                    isDark: true,
+                    suffixIcon: GestureDetector(
+                      onTap: () => setState(() => _obscure = !_obscure),
+                      child: Icon(
+                        _obscure
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        color: Colors.white,
+                        size: 20,
                       ),
-                      child: _rememberMe
-                          ? const Icon(Icons.check_rounded,
-                              size: 12, color: Colors.white)
-                          : null,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'זכור אותי',
-                    style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600),
+                  const SizedBox(height: 14),
+
+                  // Remember me & Forgot Password
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: () => setState(() => _rememberMe = !_rememberMe),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(5),
+                                color: _rememberMe ? AppColors.primary : Colors.transparent,
+                                border: Border.all(
+                                  color:
+                                      _rememberMe ? AppColors.primary : Colors.white.withOpacity(0.25),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: _rememberMe
+                                  ? const Icon(Icons.check_rounded,
+                                      size: 10, color: Colors.white)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'זכור אותי',
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'שכחת סיסמה?',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+
+                  // Login CTA
+                  _PillButton(
+                    label: 'התחברות',
+                    loading: _loading,
+                    onTap: _login,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Guest / Anonymous entry
+                  Center(
+                    child: TextButton(
+                      onPressed: widget.onGuestLogin,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(IconsaxPlusLinear.eye, size: 14, color: Colors.white.withOpacity(0.7)),
+                          const SizedBox(width: 6),
+                          Text('המשך כאורח',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      Colors.white.withOpacity(0.7))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Switch to register
+                  Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('אין לך חשבון? ',
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500)),
+                        GestureDetector(
+                          onTap: widget.onSwitchToRegister,
+                          child: const Text('הרשמה',
+                              style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800)),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'שכחת סיסמה?',
-                  style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Login CTA — black pill
-          _PillButton(
-            label: 'התחברות',
-            loading: _loading,
-            onTap: _login,
-          ),
-          const SizedBox(height: 16),
-
-          // Guest / Anonymous entry
-          Center(
-            child: TextButton(
-              onPressed: widget.onGuestLogin,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const RentchIcon(IconsaxPlusLinear.eye, size: 14),
-                  const SizedBox(width: 6),
-                  Text('המשך כאורח',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              AppColors.textSecondary.withValues(alpha: 0.85))),
-                ],
-              ),
             ),
           ),
-          const SizedBox(height: 12),
-
-          // Switch to register
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('אין לך חשבון? ',
-                    style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500)),
-                GestureDetector(
-                  onTap: widget.onSwitchToRegister,
-                  child: const Text('הרשמה',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800)),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
+      ],
+    ),
       ),
     );
   }
@@ -1039,9 +1274,14 @@ class _LoginTabState extends State<_LoginTab> {
 // ─── Register Flow ────────────────────────────────────────────────────────────
 
 class _RegisterFlow extends StatefulWidget {
-  const _RegisterFlow({required this.onDone, required this.onSwitchToLogin});
+  const _RegisterFlow({
+    required this.onDone,
+    required this.onSwitchToLogin,
+    required this.onBack,
+  });
   final VoidCallback onDone;
   final VoidCallback onSwitchToLogin;
+  final VoidCallback onBack;
 
   @override
   State<_RegisterFlow> createState() => _RegisterFlowState();
@@ -1329,103 +1569,140 @@ class _RegisterFlowState extends State<_RegisterFlow> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: _LogoHeader(
             showBackButton: true,
-            onBack: _step > 0 ? _prev : widget.onSwitchToLogin,
+            onBack: _step > 0 ? _prev : widget.onBack,
+            isDark: true,
           ),
         ),
         if (_step > 0)
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
             child: _StepProgress(step: _step, total: _totalSteps),
           ),
         Expanded(
-          child: PageView(
-            controller: _pageCtrl,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _StepEmailPassword(
-                nameCtrl: _nameCtrl,
-                emailCtrl: _emailCtrl,
-                passwordCtrl: _passwordCtrl,
-                obscure: _passwordObscure,
-                agreedToTerms: _agreedToTerms,
-                onToggleObscure: () =>
-                    setState(() => _passwordObscure = !_passwordObscure),
-                onToggleTerms: () =>
-                    setState(() => _agreedToTerms = !_agreedToTerms),
-                googleLoading: _googleLoading,
-                appleLoading: _appleLoading,
-                onGoogle: _loginWithGoogle,
-                onApple: _loginWithApple,
-                onSwitchToLogin: widget.onSwitchToLogin,
-              ),
-              _StepRole(
-                selected: _role,
-                onSelect: (role) => setState(() => _role = role),
-              ),
-              if (_role == 'landlord')
-                _StepPropertyDetails(
-                  cityCtrl: _cityCtrl,
-                  rooms: _propRooms,
-                  features: _propFeatures,
-                  onRooms: (v) => setState(() => _propRooms = v),
-                  onToggleFeature: (f) => setState(() =>
-                      _propFeatures.contains(f)
-                          ? _propFeatures.remove(f)
-                          : _propFeatures.add(f)),
-                )
-              else
-                _StepPersonal(
-                  nameCtrl: _nameCtrl,
-                  role: _role,
-                  budget: _budget,
-                  onBudget: (v) =>
-                      setState(() => _budget = (v / 100).round() * 100),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                16,
+                4,
+                16,
+                12 + MediaQuery.of(context).padding.bottom),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(40),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(40),
+                    border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+              children: [
+                Expanded(
+                  child: PageView(
+                    controller: _pageCtrl,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _StepEmailPassword(
+                        nameCtrl: _nameCtrl,
+                        emailCtrl: _emailCtrl,
+                        passwordCtrl: _passwordCtrl,
+                        obscure: _passwordObscure,
+                        agreedToTerms: _agreedToTerms,
+                        onToggleObscure: () =>
+                            setState(() => _passwordObscure = !_passwordObscure),
+                        onToggleTerms: () =>
+                            setState(() => _agreedToTerms = !_agreedToTerms),
+                        googleLoading: _googleLoading,
+                        appleLoading: _appleLoading,
+                        onGoogle: _loginWithGoogle,
+                        onApple: _loginWithApple,
+                        onSwitchToLogin: widget.onSwitchToLogin,
+                        isDark: true,
+                      ),
+                      _StepRole(
+                        selected: _role,
+                        onSelect: (role) => setState(() => _role = role),
+                        isDark: true,
+                      ),
+                      if (_role == 'landlord')
+                        _StepPropertyDetails(
+                          cityCtrl: _cityCtrl,
+                          rooms: _propRooms,
+                          features: _propFeatures,
+                          onRooms: (v) => setState(() => _propRooms = v),
+                          onToggleFeature: (f) => setState(() =>
+                              _propFeatures.contains(f)
+                                  ? _propFeatures.remove(f)
+                                  : _propFeatures.add(f)),
+                          isDark: true,
+                        )
+                      else
+                        _StepPersonal(
+                          nameCtrl: _nameCtrl,
+                          role: _role,
+                          budget: _budget,
+                          onBudget: (v) =>
+                              setState(() => _budget = (v / 100).round() * 100),
+                          isDark: true,
+                        ),
+                    ],
+                  ),
                 ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-              22, 4, 22, 14 + MediaQuery.of(context).padding.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _NavButtons(
-                nextLabel: _nextLabel,
-                loading: _loading,
-                onPrev: _step > 0 ? _prev : null,
-                onNext: _next,
-                onSkip: isOptionalStep ? _submit : null,
-              ),
-              if (_step == 0) ...[
-                const SizedBox(height: 12),
-                Center(
-                  child: Row(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('כבר יש לך חשבון? ',
-                          style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500)),
-                      GestureDetector(
-                        onTap: widget.onSwitchToLogin,
-                        child: const Text('התחברות',
-                            style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800)),
+                      _NavButtons(
+                        nextLabel: _nextLabel,
+                        loading: _loading,
+                        onPrev: _step > 0 ? _prev : null,
+                        onNext: _next,
+                        onSkip: isOptionalStep ? _submit : null,
                       ),
+                      if (_step == 0) ...[
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('כבר יש לך חשבון? ',
+                                  style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500)),
+                              GestureDetector(
+                                onTap: widget.onSwitchToLogin,
+                                child: const Text('התחברות',
+                                    style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    ),
+  ),
       ],
     );
   }
@@ -1857,6 +2134,7 @@ class _StepEmailPassword extends StatelessWidget {
     required this.onGoogle,
     required this.onApple,
     required this.onSwitchToLogin,
+    this.isDark = false,
   });
 
   final TextEditingController nameCtrl;
@@ -1871,30 +2149,31 @@ class _StepEmailPassword extends StatelessWidget {
   final VoidCallback onGoogle;
   final VoidCallback onApple;
   final VoidCallback onSwitchToLogin;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Title
-          const Text(
+          Text(
             'יצירת חשבון',
             textAlign: TextAlign.center,
             style: TextStyle(
-                color: AppColors.navy,
+                color: isDark ? Colors.white : AppColors.navy,
                 fontSize: 26,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -0.5),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'מלאו את שמכם המלא, אימייל וסיסמה כדי להירשם ולהתחיל.',
             textAlign: TextAlign.center,
             style: TextStyle(
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
                 fontSize: 13,
                 height: 1.3,
                 fontWeight: FontWeight.w500),
@@ -1907,46 +2186,53 @@ class _StepEmailPassword extends StatelessWidget {
             appleLoading: appleLoading,
             onGoogle: onGoogle,
             onApple: onApple,
+            isDark: isDark,
           ),
           const SizedBox(height: 14),
-          const _OrDivider(),
+          _OrDivider(isDark: isDark),
           const SizedBox(height: 14),
 
           // Name
-          const _FieldLabel(label: 'שם מלא'),
+          _FieldLabel(label: 'שם מלא', isDark: isDark),
           const SizedBox(height: 4),
           _CleanTextField(
             controller: nameCtrl,
             hint: 'שם ושם משפחה',
             textCapitalization: TextCapitalization.words,
+            prefixIcon: IconsaxPlusLinear.user,
+            isDark: isDark,
           ),
           const SizedBox(height: 12),
 
           // Email
-          const _FieldLabel(label: 'כתובת אימייל'),
+          _FieldLabel(label: 'כתובת אימייל', isDark: isDark),
           const SizedBox(height: 4),
           _CleanTextField(
             controller: emailCtrl,
             hint: 'name@example.com',
             keyboardType: TextInputType.emailAddress,
             textDirection: TextDirection.ltr,
+            prefixIcon: IconsaxPlusLinear.sms,
+            isDark: isDark,
           ),
           const SizedBox(height: 12),
 
           // Password
-          const _FieldLabel(label: 'סיסמה'),
+          _FieldLabel(label: 'סיסמה', isDark: isDark),
           const SizedBox(height: 4),
           _CleanTextField(
             controller: passwordCtrl,
             obscureText: obscure,
             hint: '••••••••',
+            prefixIcon: IconsaxPlusLinear.key,
+            isDark: isDark,
             suffixIcon: GestureDetector(
               onTap: onToggleObscure,
               child: Icon(
                 obscure
                     ? Icons.visibility_off_rounded
                     : Icons.visibility_rounded,
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white : AppColors.textSecondary,
                 size: 20,
               ),
             ),
@@ -1964,9 +2250,9 @@ class _StepEmailPassword extends StatelessWidget {
                   height: 20,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6),
-                    color: agreedToTerms ? AppColors.primary : Colors.white,
+                    color: agreedToTerms ? AppColors.primary : Colors.transparent,
                     border: Border.all(
-                      color: agreedToTerms ? AppColors.primary : _kInputBorder,
+                      color: agreedToTerms ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.6) : _kInputBorder),
                       width: 1.5,
                     ),
                   ),
@@ -1980,8 +2266,8 @@ class _StepEmailPassword extends StatelessWidget {
               Expanded(
                 child: Text.rich(
                   TextSpan(
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary),
+                    style: TextStyle(
+                        fontSize: 13, color: isDark ? Colors.white : AppColors.textSecondary),
                     children: const [
                       TextSpan(text: 'אני מסכים/ה ל'),
                       TextSpan(
@@ -2012,27 +2298,28 @@ class _StepEmailPassword extends StatelessWidget {
 // ─── Step: Role ───────────────────────────────────────────────────────────────
 
 class _StepRole extends StatelessWidget {
-  const _StepRole({required this.selected, required this.onSelect});
+  const _StepRole({required this.selected, required this.onSelect, this.isDark = false});
   final String selected;
   final ValueChanged<String> onSelect;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('מה מביא אותך לכאן?',
+          Text('מה מביא אותך לכאן?',
               style: TextStyle(
-                  color: AppColors.navy,
+                  color: isDark ? Colors.white : AppColors.navy,
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5)),
           const SizedBox(height: 4),
-          const Text('בחרו מסלול כדי שנוכל להתאים את החוויה',
+          Text('בחרו מסלול כדי שנוכל להתאים את החוויה',
               style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 14,
                   fontWeight: FontWeight.w500)),
           const SizedBox(height: 22),
@@ -2043,6 +2330,7 @@ class _StepRole extends StatelessWidget {
             accent: AppColors.primary,
             selected: selected == 'tenant',
             onTap: () => onSelect('tenant'),
+            isDark: isDark,
           ),
           const SizedBox(height: 12),
           _RoleCard(
@@ -2052,6 +2340,7 @@ class _StepRole extends StatelessWidget {
             accent: AppColors.navy,
             selected: selected == 'landlord',
             onTap: () => onSelect('landlord'),
+            isDark: isDark,
           ),
         ],
       ),
@@ -2067,6 +2356,7 @@ class _RoleCard extends StatelessWidget {
     required this.accent,
     required this.selected,
     required this.onTap,
+    this.isDark = false,
   });
 
   final IconData icon;
@@ -2075,9 +2365,17 @@ class _RoleCard extends StatelessWidget {
   final Color accent;
   final bool selected;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final cardBg = selected
+        ? accent
+        : (isDark ? Colors.white.withOpacity(0.08) : Colors.white);
+    final borderCol = selected
+        ? accent
+        : (isDark ? Colors.white.withOpacity(0.15) : _kInputBorder);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -2086,20 +2384,28 @@ class _RoleCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: selected ? accent : Colors.white,
+          color: cardBg,
           border: Border.all(
-            color: selected ? accent : _kInputBorder,
+            color: borderCol,
             width: selected ? 0 : 1.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: selected
-                  ? accent.withValues(alpha: 0.24)
-                  : const Color(0x0A072946),
-              blurRadius: selected ? 20 : 8,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.24),
+                    blurRadius: 20,
+                    offset: const Offset(0, 5),
+                  )
+                ]
+              : (isDark
+                  ? const []
+                  : const [
+                      BoxShadow(
+                        color: Color(0x0A072946),
+                        blurRadius: 8,
+                        offset: Offset(0, 5),
+                      )
+                    ]),
         ),
         child: Row(
           children: [
@@ -2109,11 +2415,11 @@ class _RoleCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? Colors.white.withValues(alpha: 0.18)
-                    : accent.withValues(alpha: 0.10),
+                    : (isDark ? Colors.white.withOpacity(0.1) : accent.withValues(alpha: 0.10)),
                 borderRadius: BorderRadius.circular(16),
               ),
               child:
-                  Icon(icon, color: selected ? Colors.white : accent, size: 26),
+                  Icon(icon, color: selected ? Colors.white : (isDark ? Colors.white : accent), size: 26),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -2122,7 +2428,7 @@ class _RoleCard extends StatelessWidget {
                 children: [
                   Text(title,
                       style: TextStyle(
-                          color: selected ? Colors.white : AppColors.navy,
+                          color: selected ? Colors.white : (isDark ? Colors.white : AppColors.navy),
                           fontSize: 16,
                           fontWeight: FontWeight.w900)),
                   const SizedBox(height: 3),
@@ -2130,7 +2436,7 @@ class _RoleCard extends StatelessWidget {
                       style: TextStyle(
                           color: selected
                               ? Colors.white.withValues(alpha: 0.72)
-                              : AppColors.textSecondary,
+                              : (isDark ? Colors.white70 : AppColors.textSecondary),
                           fontSize: 12,
                           fontWeight: FontWeight.w600)),
                 ],
@@ -2143,13 +2449,13 @@ class _RoleCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? Colors.white
-                    : _kInputBorder.withValues(alpha: 0.6),
+                    : (isDark ? Colors.white.withOpacity(0.12) : _kInputBorder.withValues(alpha: 0.6)),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                   selected ? Icons.check_rounded : Icons.circle_outlined,
                   size: 14,
-                  color: selected ? accent : AppColors.textDisabled),
+                  color: selected ? accent : (isDark ? Colors.white54 : AppColors.textDisabled)),
             ),
           ],
         ),
@@ -2166,37 +2472,39 @@ class _StepPersonal extends StatelessWidget {
     required this.role,
     required this.budget,
     required this.onBudget,
+    this.isDark = false,
   });
 
   final TextEditingController nameCtrl;
   final String role;
   final int budget;
   final ValueChanged<double> onBudget;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final isTenant = role == 'tenant';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('תקציב השכירות שלך',
+          Text('תקציב השכירות שלך',
               style: TextStyle(
-                  color: AppColors.navy,
+                  color: isDark ? Colors.white : AppColors.navy,
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5)),
           const SizedBox(height: 6),
-          const Text(
+          Text(
               'הגדר את התקציב החודשי כדי שנוכל להתאים עבורך את הדירות הטובות ביותר.',
               style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 14,
                   fontWeight: FontWeight.w500)),
           const SizedBox(height: 24),
           if (isTenant)
-            _CompactBudgetPicker(budget: budget, onBudget: onBudget),
+            _CompactBudgetPicker(budget: budget, onBudget: onBudget, isDark: isDark),
         ],
       ),
     );
@@ -2206,29 +2514,32 @@ class _StepPersonal extends StatelessWidget {
 // ─── Compact Budget Picker ────────────────────────────────────────────────────
 
 class _CompactBudgetPicker extends StatelessWidget {
-  const _CompactBudgetPicker({required this.budget, required this.onBudget});
+  const _CompactBudgetPicker({required this.budget, required this.onBudget, this.isDark = false});
   final int budget;
   final ValueChanged<double> onBudget;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kInputBorder),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
-        ],
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
+        boxShadow: isDark
+            ? const []
+            : const [
+                BoxShadow(
+                    color: Color(0x0A072946), blurRadius: 8, offset: Offset(0, 2))
+              ],
       ),
       child: Column(
         children: [
           Row(children: [
-            const Text('תקציב חודשי',
+            Text('תקציב חודשי',
                 style: TextStyle(
-                    color: AppColors.navy,
+                    color: isDark ? Colors.white : AppColors.navy,
                     fontSize: 14,
                     fontWeight: FontWeight.w700)),
             const Spacer(),
@@ -2246,7 +2557,7 @@ class _CompactBudgetPicker extends StatelessWidget {
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
               activeTrackColor: AppColors.primary,
-              inactiveTrackColor: const Color(0xFFD0EDF0),
+              inactiveTrackColor: isDark ? Colors.white.withOpacity(0.12) : const Color(0xFFD0EDF0),
               thumbColor: AppColors.primary,
               overlayColor: AppColors.primary.withValues(alpha: 0.16),
             ),
@@ -2362,14 +2673,15 @@ class _PillButton extends StatelessWidget {
 // ─── Field Label ──────────────────────────────────────────────────────────────
 
 class _FieldLabel extends StatelessWidget {
-  const _FieldLabel({required this.label});
+  const _FieldLabel({required this.label, this.isDark = false});
   final String label;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Text(label,
-        style: const TextStyle(
-            color: AppColors.navy, fontSize: 13, fontWeight: FontWeight.w700));
+        style: TextStyle(
+            color: isDark ? Colors.white : AppColors.navy, fontSize: 13, fontWeight: FontWeight.w700));
   }
 }
 
@@ -2383,7 +2695,9 @@ class _CleanTextField extends StatelessWidget {
     this.textDirection,
     this.obscureText = false,
     this.suffixIcon,
+    this.prefixIcon,
     this.textCapitalization = TextCapitalization.none,
+    this.isDark = false,
   });
 
   final TextEditingController? controller;
@@ -2392,13 +2706,18 @@ class _CleanTextField extends StatelessWidget {
   final TextDirection? textDirection;
   final bool obscureText;
   final Widget? suffixIcon;
+  final IconData? prefixIcon;
   final TextCapitalization textCapitalization;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: _kInputBorder),
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(
+        color: isDark ? Colors.white.withOpacity(0.24) : AppColors.navy.withOpacity(0.08),
+        width: 1.2,
+      ),
     );
 
     return TextField(
@@ -2407,10 +2726,13 @@ class _CleanTextField extends StatelessWidget {
       textDirection: textDirection,
       obscureText: obscureText,
       textCapitalization: textCapitalization,
-      style: const TextStyle(
-          color: AppColors.navy, fontSize: 15, fontWeight: FontWeight.w600),
+      style: TextStyle(
+          color: isDark ? Colors.white : AppColors.navy, fontSize: 15, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         hintText: hint,
+        prefixIcon: prefixIcon != null
+            ? Icon(prefixIcon, color: isDark ? Colors.white : AppColors.textSecondary.withOpacity(0.7), size: 20)
+            : null,
         suffixIcon: suffixIcon != null
             ? Padding(
                 padding: const EdgeInsets.only(left: 12),
@@ -2418,9 +2740,9 @@ class _CleanTextField extends StatelessWidget {
               )
             : null,
         filled: true,
-        fillColor: _kInputFill,
+        fillColor: isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.65),
         hintStyle: TextStyle(
-            color: AppColors.textSecondary.withValues(alpha: 0.6),
+            color: isDark ? Colors.white.withOpacity(0.45) : AppColors.textSecondary.withValues(alpha: 0.55),
             fontWeight: FontWeight.w400),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -2447,6 +2769,7 @@ class _AuthTextField extends StatelessWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.textCapitalization = TextCapitalization.none,
+    this.isDark = false,
   });
 
   final TextEditingController? controller;
@@ -2458,13 +2781,14 @@ class _AuthTextField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final TextCapitalization textCapitalization;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _FieldLabel(label: label),
+        _FieldLabel(label: label, isDark: isDark),
         const SizedBox(height: 6),
         _CleanTextField(
           controller: controller,
@@ -2473,7 +2797,9 @@ class _AuthTextField extends StatelessWidget {
           textDirection: textDirection,
           obscureText: obscureText,
           suffixIcon: suffixIcon,
+          prefixIcon: icon,
           textCapitalization: textCapitalization,
+          isDark: isDark,
         ),
       ],
     );
@@ -2489,6 +2815,7 @@ class _StepPropertyDetails extends StatelessWidget {
     required this.features,
     required this.onRooms,
     required this.onToggleFeature,
+    this.isDark = false,
   });
 
   final TextEditingController cityCtrl;
@@ -2496,6 +2823,20 @@ class _StepPropertyDetails extends StatelessWidget {
   final List<String> features;
   final ValueChanged<double> onRooms;
   final ValueChanged<String> onToggleFeature;
+  final bool isDark;
+
+  static const Map<String, IconData> _featureIcons = {
+    'מרפסת': Icons.balcony_rounded,
+    'חניה': Icons.local_parking_rounded,
+    'מעלית': Icons.elevator_rounded,
+    'מיזוג': Icons.ac_unit_rounded,
+    'ממ"ד': Icons.security_rounded,
+    'مחסן': Icons.warehouse_rounded,
+    'גינה': Icons.yard_rounded,
+    'ריהוט': Icons.chair_rounded,
+    'מחמדים': Icons.pets_rounded,
+    'אינטרנט': Icons.wifi_rounded,
+  };
 
   static const _featureTags = [
     'מרפסת',
@@ -2503,7 +2844,7 @@ class _StepPropertyDetails extends StatelessWidget {
     'מעלית',
     'מיזוג',
     'ממ"ד',
-    'מחסן',
+    'مחסן',
     'גינה',
     'ריהוט',
     'מחמדים',
@@ -2512,17 +2853,17 @@ class _StepPropertyDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 14, 22, 8),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text('פרטי הנכס',
+              Text('פרטי הנכס',
                   style: TextStyle(
-                      color: AppColors.navy,
+                      color: isDark ? Colors.white : AppColors.navy,
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.5)),
@@ -2542,9 +2883,9 @@ class _StepPropertyDetails extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 3),
-          const Text('ניתן לעדכן פרטים נוספים מתוך לוח הבקרה',
+          Text('ניתן לעדכן פרטים נוספים מתוך לוח הבקרה',
               style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500)),
           const SizedBox(height: 16),
@@ -2552,13 +2893,14 @@ class _StepPropertyDetails extends StatelessWidget {
             controller: cityCtrl,
             label: 'עיר / שכונה',
             icon: IconsaxPlusLinear.location,
+            isDark: isDark,
           ),
           const SizedBox(height: 12),
-          _RoomsStepper(rooms: rooms, onRooms: onRooms),
+          _RoomsStepper(rooms: rooms, onRooms: onRooms, isDark: isDark),
           const SizedBox(height: 14),
-          const Text('מה יש בנכס?',
+          Text('מה יש בנכס?',
               style: TextStyle(
-                  color: AppColors.navy,
+                  color: isDark ? Colors.white70 : AppColors.navy,
                   fontSize: 14,
                   fontWeight: FontWeight.w800)),
           const SizedBox(height: 9),
@@ -2570,6 +2912,8 @@ class _StepPropertyDetails extends StatelessWidget {
                       label: f,
                       selected: features.contains(f),
                       onTap: () => onToggleFeature(f),
+                      icon: _featureIcons[f],
+                      isDark: isDark,
                     ))
                 .toList(),
           ),
@@ -2582,9 +2926,10 @@ class _StepPropertyDetails extends StatelessWidget {
 // ─── Rooms Stepper ────────────────────────────────────────────────────────────
 
 class _RoomsStepper extends StatelessWidget {
-  const _RoomsStepper({required this.rooms, required this.onRooms});
+  const _RoomsStepper({required this.rooms, required this.onRooms, this.isDark = false});
   final double rooms;
   final ValueChanged<double> onRooms;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -2592,14 +2937,14 @@ class _RoomsStepper extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kInputBorder),
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
       ),
       child: Row(children: [
-        const Text('מספר חדרים',
+        Text('מספר חדרים',
             style: TextStyle(
-                color: AppColors.navy,
+                color: isDark ? Colors.white70 : AppColors.navy,
                 fontSize: 14,
                 fontWeight: FontWeight.w700)),
         const Spacer(),
@@ -2607,6 +2952,7 @@ class _RoomsStepper extends StatelessWidget {
           icon: Icons.remove_rounded,
           onTap: () => onRooms((rooms - 0.5).clamp(1.0, 8.0)),
           filled: false,
+          isDark: isDark,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -2621,6 +2967,7 @@ class _RoomsStepper extends StatelessWidget {
           icon: Icons.add_rounded,
           onTap: () => onRooms((rooms + 0.5).clamp(1.0, 8.0)),
           filled: true,
+          isDark: isDark,
         ),
       ]),
     );
@@ -2628,14 +2975,27 @@ class _RoomsStepper extends StatelessWidget {
 }
 
 class _StepperBtn extends StatelessWidget {
-  const _StepperBtn(
-      {required this.icon, required this.onTap, required this.filled});
+  const _StepperBtn({
+    required this.icon,
+    required this.onTap,
+    required this.filled,
+    this.isDark = false,
+  });
+
   final IconData icon;
   final VoidCallback onTap;
   final bool filled;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final color = filled
+        ? AppColors.primary
+        : (isDark ? Colors.white.withOpacity(0.12) : _kInputBorder.withValues(alpha: 0.6));
+    final iconColor = filled
+        ? Colors.white
+        : (isDark ? Colors.white : AppColors.textSecondary);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -2643,11 +3003,9 @@ class _StepperBtn extends StatelessWidget {
         height: 32,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              filled ? AppColors.primary : _kInputBorder.withValues(alpha: 0.6),
+          color: color,
         ),
-        child: Icon(icon,
-            size: 16, color: filled ? Colors.white : AppColors.textSecondary),
+        child: Icon(icon, size: 16, color: iconColor),
       ),
     );
   }
@@ -2656,14 +3014,29 @@ class _StepperBtn extends StatelessWidget {
 // ─── Feature Chip ─────────────────────────────────────────────────────────────
 
 class _FeatureChip extends StatelessWidget {
-  const _FeatureChip(
-      {required this.label, required this.selected, required this.onTap});
+  const _FeatureChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.isDark = false,
+  });
+
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final IconData? icon;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final chipBg = selected
+        ? AppColors.primary
+        : (isDark ? Colors.white.withOpacity(0.08) : Colors.white);
+    final borderCol = selected
+        ? AppColors.primary
+        : (isDark ? Colors.white.withOpacity(0.15) : _kInputBorder);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -2671,9 +3044,8 @@ class _FeatureChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          color: selected ? AppColors.primary : Colors.white,
-          border:
-              Border.all(color: selected ? AppColors.primary : _kInputBorder),
+          color: chipBg,
+          border: Border.all(color: borderCol),
           boxShadow: selected
               ? [
                   BoxShadow(
@@ -2686,13 +3058,21 @@ class _FeatureChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 14,
+                color: selected ? Colors.white : (isDark ? Colors.white70 : AppColors.textSecondary),
+              ),
+              const SizedBox(width: 5),
+            ],
             if (selected) ...[
               const Icon(Icons.check_rounded, size: 12, color: Colors.white),
               const SizedBox(width: 5),
             ],
             Text(label,
                 style: TextStyle(
-                    color: selected ? Colors.white : AppColors.navy,
+                    color: selected ? Colors.white : (isDark ? Colors.white : AppColors.navy),
                     fontSize: 13,
                     fontWeight: FontWeight.w700)),
           ],
@@ -2737,6 +3117,269 @@ class _EulaSection extends StatelessWidget {
               style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
+    );
+  }
+}
+
+class _WelcomePortal extends StatelessWidget {
+  final VoidCallback onLogin;
+  final VoidCallback onRegister;
+  final VoidCallback onGoogleLogin;
+  final VoidCallback onAppleLogin;
+  final VoidCallback onGuestLogin;
+
+  const _WelcomePortal({
+    super.key,
+    required this.onLogin,
+    required this.onRegister,
+    required this.onGoogleLogin,
+    required this.onAppleLogin,
+    required this.onGuestLogin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Immersive background image of modern villa
+        Image.network(
+          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000',
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(color: AppColors.navy);
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.navy, Color(0xFF0F172A)],
+                ),
+              ),
+            );
+          },
+        ),
+
+        // Bottom dark gradient overlay for text readability
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Colors.black.withOpacity(0.92),
+                  Colors.black.withOpacity(0.45),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.55, 1.0],
+              ),
+            ),
+          ),
+        ),
+
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Top logo / branding
+                Align(
+                  alignment: Alignment.center,
+                  child: SvgPicture.asset(
+                    'assets/images/rentch_logo_with_text.svg',
+                    height: 38,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                    placeholderBuilder: (_) => const Text(
+                      'Rentch',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+
+                // Title Text (Hebrew, right-aligned)
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'מצאו את המקום\nהמושלם עבורכם',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Action Buttons (Login / Sign Up)
+                Row(
+                  children: [
+                    // Login Button (App Brand Primary Teal)
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onLogin,
+                        child: Container(
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'התחברות',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Sign Up Button (Glass translucent)
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onRegister,
+                        child: Container(
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.18),
+                              width: 1.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'הרשמה',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Other Ways to sign in
+                const Align(
+                  alignment: Alignment.center,
+                  child: Text(
+                    'או התחברו באמצעות',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Social Row (Apple, Google) - No Facebook
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Apple Login Button
+                    GestureDetector(
+                      onTap: onAppleLogin,
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.apple_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+
+                    // Google Login Button
+                    GestureDetector(
+                      onTap: onGoogleLogin,
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.15),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'G',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Guest Mode option
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: onGuestLogin,
+                    child: const Text(
+                      'המשך כאורח',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

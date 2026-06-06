@@ -74,6 +74,23 @@ class AppConfig {
     defaultValue: 'properties',
   );
 
+  // Optional property analytics tables.
+  //
+  // `property_view_sessions` stores one row per detail-page visit with
+  // heartbeat, dwell time, and gallery swipe counts.
+  // `property_likes` stores one row per user/property/day so "liked today"
+  // can be counted from the start of the local day without mutating blobs.
+  static const String appwritePropertyViewSessionsTableId =
+      String.fromEnvironment(
+    'APPWRITE_PROPERTY_VIEW_SESSIONS_TABLE_ID',
+    defaultValue: '',
+  );
+
+  static const String appwritePropertyLikesTableId = String.fromEnvironment(
+    'APPWRITE_PROPERTY_LIKES_TABLE_ID',
+    defaultValue: '',
+  );
+
   // User / tenant profile collection for live user discovery.
   // Set via: flutter run --dart-define=APPWRITE_USERS_TABLE_ID=your_id
   static const String appwriteUsersTableId = String.fromEnvironment(
@@ -149,6 +166,12 @@ class AppConfig {
       appwriteDatabaseId.isNotEmpty &&
       appwritePropertiesTableId.isNotEmpty;
 
+  static bool get canUsePropertyAnalytics =>
+      hasAppwriteCoreConfig &&
+      appwriteDatabaseId.isNotEmpty &&
+      appwritePropertyViewSessionsTableId.isNotEmpty &&
+      appwritePropertyLikesTableId.isNotEmpty;
+
   static bool get canUse3dScanBackend =>
       enable3dScanning && scan3dProxyUrl.trim().isNotEmpty;
 
@@ -181,6 +204,10 @@ class AppConfig {
     if (enable3dScanning && !canUse3dScanBackend) {
       issues.add(
           '3D scanning is enabled but RENTCH_3D_SCAN_PROXY_URL is missing.');
+    }
+    if (!canUsePropertyAnalytics) {
+      issues.add(
+          'Property analytics tables are missing; live viewers and daily likes will stay device-local.');
     }
     if (launchMode) {
       issues.add(

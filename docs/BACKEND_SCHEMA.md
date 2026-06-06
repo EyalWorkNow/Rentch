@@ -2,6 +2,11 @@
 
 The current `RENTCH_LAUNCH_MODE=true` path can run a controlled MVP against the existing Appwrite `app_state/global_state` row. It is not the final production backend because user state is not isolated per authenticated user.
 
+Enable property analytics with:
+
+- `APPWRITE_PROPERTY_VIEW_SESSIONS_TABLE_ID`: table ID for detail-page presence, dwell time, and gallery swipe sessions.
+- `APPWRITE_PROPERTY_LIKES_TABLE_ID`: table ID for per-user daily property likes.
+
 ## Required Tables For Public Launch
 
 `users`
@@ -58,7 +63,12 @@ The current `RENTCH_LAUNCH_MODE=true` path can run a controlled MVP against the 
 - `model3d`: JSON text object with `viewerUrl`, `glbUrl`, `objUrl`, `textureFolder`, `floorPlanUrl`, `modelQualityScore`, and `scanDate`.
 - `legal`: JSON text object with `thirdPartyTransferAllowed`, `commercialSaleAllowed`, `aiTrainingAllowed`, `consentVersion`, `consentTimestamp`, and `consentSource`.
 - `priceHistory`: JSON text array with `{ "date": "YYYY-MM-DD", "price": 123, "transactionType": "rent" | "sale" }`.
-- `marketSignals`: JSON text object with `views`, `likes`, `saves`, `skips`, `contactRequests`, and `avgTimeIn3dSeconds`.
+- `marketSignals`: JSON text object with `views`, `likes`, `saves`, `skips`, `contactRequests`, `avgTimeIn3dSeconds`, `liveViewers`, `likesToday`, `likesTodayDate`, `detailViews`, `gallerySwipes`, `avgDetailStaySeconds`, and `lastViewedAt`.
+- `verification`: JSON text object with `verified`, `method`, `videoUrl`, and `capturedAt`. A property is treated as verified only when `verified=true`, `method="camera_video"`, and `videoUrl` is present.
+- `verifiedListing`: boolean denormalized from `verification` for server-side filtering and ranking diagnostics.
+- `verificationMethod`: string, currently `camera_video` for landlord-captured verification video.
+- `verificationVideoUrl`: string, the captured in-app verification video URL/path.
+- `verifiedAt`: datetime, when the in-app verification video was captured.
 - `virtualTour`: JSON text, optional current 3D tour snapshot.
 - `tourStatus`: enum string, `none`, `captured`, `queued`, `uploading`, `processing`, `ready`, `failed`.
 - `tourViewerUrl`: string, optional lightweight hosted viewer URL.
@@ -106,6 +116,30 @@ For owner-created properties, require a fresh property-level consent capture bef
 - `propertyId`: string.
 - `direction`: enum string, `like`, `pass`, `superLike`.
 - `createdAt`: datetime.
+
+`property_view_sessions`
+
+- `sessionId`: string, deterministic client session ID.
+- `propertyId`: string, indexed.
+- `userId`: string, indexed.
+- `startedAt`: datetime.
+- `lastSeenAt`: datetime, indexed.
+- `endedAt`: datetime, optional.
+- `active`: boolean, indexed.
+- `durationSeconds`: integer.
+- `photoSwipeCount`: integer, number of gallery image/video transitions inside the property detail page.
+- `currentPhotoIndex`: integer, last visible gallery index.
+
+Use this table for `x מסתכלים עכשיו`: count rows for the same `propertyId` where `active=true` and `lastSeenAt` is within the active-viewer window. The Flutter client currently uses a 45-second window and sends a heartbeat while the detail page is open.
+
+`property_likes`
+
+- `propertyId`: string, indexed.
+- `userId`: string, indexed.
+- `date`: string, `YYYY-MM-DD`, indexed.
+- `likedAt`: datetime.
+
+Use row IDs keyed by `propertyId + userId + date` so each user counts once per property per day. `x אהבו היום` is the count of rows for the property where `date` equals the current local day.
 
 `landlord_decisions`
 

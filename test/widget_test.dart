@@ -235,7 +235,18 @@ void main() {
         likes: 3,
         saves: 2,
         avgTimeIn3dSeconds: 41,
+        liveViewers: 2,
+        likesToday: 5,
+        likesTodayDate: '2026-06-06',
+        detailViews: 7,
+        gallerySwipes: 11,
+        avgDetailStaySeconds: 28,
       ),
+      verification: PropertyVerification.cameraVideo(
+        videoUrl: 'https://example.com/verification.mp4',
+        capturedAt: DateTime.utc(2026, 6, 3, 9, 45),
+      ),
+      createdAt: DateTime.utc(2026, 6, 3, 9, 30),
     );
 
     final decoded = RentalProperty.fromJson(property.toJson());
@@ -252,7 +263,97 @@ void main() {
     expect(decoded.legal.consentVersion, 'terms_v4.2');
     expect(decoded.priceHistory, hasLength(1));
     expect(decoded.marketSignals.views, 12);
+    expect(decoded.marketSignals.liveViewers, 2);
+    expect(decoded.marketSignals.likesToday, 5);
+    expect(decoded.marketSignals.detailViews, 7);
+    expect(decoded.marketSignals.gallerySwipes, 11);
+    expect(decoded.marketSignals.avgDetailStaySeconds, 28);
+    expect(decoded.isVerifiedListing, isTrue);
+    expect(decoded.verification.method, PropertyVerification.cameraVideoMethod);
+    expect(
+        decoded.verification.videoUrl, 'https://example.com/verification.mp4');
+    expect(decoded.verification.capturedAt, DateTime.utc(2026, 6, 3, 9, 45));
+    expect(decoded.createdAt, DateTime.utc(2026, 6, 3, 9, 30));
     expect(decoded.model3d?.viewerUrl, 'https://example.com/tour/scene-1');
+  });
+
+  test('property verification also parses flat backend columns', () {
+    final decoded = RentalProperty.fromJson({
+      ..._testProperty(id: 'verified-flat').toJson(),
+      'verification': null,
+      'verifiedListing': true,
+      'verificationMethod': PropertyVerification.cameraVideoMethod,
+      'verificationVideoUrl': 'https://example.com/flat-verification.mp4',
+      'verifiedAt': '2026-06-04T08:00:00.000Z',
+    });
+
+    expect(decoded.isVerifiedListing, isTrue);
+    expect(
+      decoded.verification.videoUrl,
+      'https://example.com/flat-verification.mp4',
+    );
+    expect(decoded.verification.capturedAt, DateTime.utc(2026, 6, 4, 8));
+  });
+
+  test('property signals reset daily likes and detect new listings', () {
+    final today = DateTime(2026, 6, 6, 11);
+    final yesterdaySignals = const PropertyMarketSignals(
+      likesToday: 4,
+      likesTodayDate: '2026-06-05',
+    );
+
+    final normalized = yesterdaySignals.normalizedForToday(today);
+    expect(normalized.likesToday, 0);
+    expect(normalized.likesTodayDate, '2026-06-06');
+
+    final fresh = _testProperty(
+      id: 'fresh',
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+    );
+    final stale = _testProperty(
+      id: 'stale',
+      createdAt: DateTime.now().subtract(const Duration(days: 12)),
+    );
+
+    expect(fresh.isNewListing, isTrue);
+    expect(stale.isNewListing, isFalse);
+  });
+
+  test('dating provider tracks detail sessions and daily likes locally',
+      () async {
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([
+        _testProperty(id: 'signals-1'),
+      ]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+
+    try {
+      await provider.initialize();
+      provider.beginPropertyDetailView('signals-1');
+
+      var property = provider.propertyById('signals-1')!;
+      expect(property.marketSignals.liveViewers, 1);
+      expect(property.marketSignals.detailViews, 1);
+      expect(property.marketSignals.views, 1);
+
+      provider.recordPropertyGallerySwipe('signals-1', 1);
+      property = provider.propertyById('signals-1')!;
+      expect(property.marketSignals.gallerySwipes, 1);
+
+      await provider.endPropertyDetailView('signals-1');
+      property = provider.propertyById('signals-1')!;
+      expect(property.marketSignals.liveViewers, 0);
+      expect(
+          property.marketSignals.avgDetailStaySeconds, greaterThanOrEqualTo(0));
+
+      await provider.likeProperty('signals-1');
+      property = provider.propertyById('signals-1')!;
+      expect(property.marketSignals.likes, 1);
+      expect(property.marketSignals.likesTodayFor(DateTime.now()), 1);
+    } finally {
+      provider.dispose();
+    }
   });
 }
 
@@ -407,8 +508,9 @@ class _MemoryLocalStorageService extends LocalStorageService {
 
 RentalProperty _testProperty({
   required String id,
-  required String street,
-  required String city,
+  String street = 'הרצל',
+  String city = 'תל אביב',
+  DateTime? createdAt,
 }) {
   return RentalProperty(
     id: id,
@@ -436,5 +538,6 @@ RentalProperty _testProperty({
         type: PropertyMediaType.image,
       ),
     ],
+    createdAt: createdAt,
   );
 }

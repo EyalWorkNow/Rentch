@@ -10,6 +10,7 @@ import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/repositories/moderation_repository.dart';
+import 'package:dating_app/data/repositories/property_analytics_repository.dart';
 import 'package:dating_app/data/repositories/property_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
 import 'package:flutter/foundation.dart';
@@ -21,17 +22,21 @@ class DatingProvider extends ChangeNotifier {
     RentalDataService? rentalDataService,
     LocalStorageService? localStorageService,
     PropertyRepository? propertyRepository,
+    PropertyAnalyticsRepository? propertyAnalyticsRepository,
     UserRepository? userRepository,
     ModerationRepository? moderationRepository,
   })  : _rentalDataService = rentalDataService ?? RentalDataService(),
         _localStorageService = localStorageService ?? LocalStorageService(),
         _propertyRepository = propertyRepository ?? PropertyRepository(),
+        _propertyAnalyticsRepository =
+            propertyAnalyticsRepository ?? PropertyAnalyticsRepository(),
         _userRepository = userRepository ?? UserRepository(),
         _moderationRepository = moderationRepository ?? ModerationRepository();
 
   final RentalDataService _rentalDataService;
   final LocalStorageService _localStorageService;
   final PropertyRepository _propertyRepository;
+  final PropertyAnalyticsRepository _propertyAnalyticsRepository;
   final UserRepository _userRepository;
   final ModerationRepository _moderationRepository;
 
@@ -65,6 +70,10 @@ class DatingProvider extends ChangeNotifier {
   int _remainingSuperLikes = 3;
   Set<String> _blockedOwnerNames = <String>{};
   Set<String> _reportedPropertyIds = <String>{};
+  Map<String, PropertyMarketSignals> _propertySignalOverrides =
+      <String, PropertyMarketSignals>{};
+  final Map<String, _PropertyDetailSession> _activeDetailSessions =
+      <String, _PropertyDetailSession>{};
 
   // Pagination state — properties are loaded in pages to avoid loading the
   // entire catalog upfront (which would be prohibitive at scale).
@@ -142,9 +151,16 @@ class DatingProvider extends ChangeNotifier {
     final cached = _allPropertiesCache;
     if (cached != null) return cached;
     return _allPropertiesCache = [
-      ..._baseProperties,
-      ..._customProperties,
+      ..._baseProperties.map(_propertyWithSignalOverride),
+      ..._customProperties.map(_propertyWithSignalOverride),
     ];
+  }
+
+  RentalProperty _propertyWithSignalOverride(RentalProperty property) {
+    final signals = _propertySignalOverrides[property.id];
+    return signals == null
+        ? property
+        : property.copyWith(marketSignals: signals);
   }
 
   void _invalidateCatalogCache() {
@@ -1182,15 +1198,228 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void beginPropertyDetailView(String propertyId) {
+    if (propertyId.trim().isEmpty ||
+        _activeDetailSessions.containsKey(propertyId)) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final session = _PropertyDetailSession(
+      propertyId: propertyId,
+      sessionId: _newDetailSessionId(propertyId),
+      startedAt: now,
+    );
+    session.heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      final activeSession = _activeDetailSessions[propertyId];
+      if (activeSession == null) return;
+      unawaited(
+        _propertyAnalyticsRepository.heartbeatViewSession(
+          sessionId: activeSession.sessionId,
+          startedAt: activeSession.startedAt,
+          photoSwipeCount: activeSession.photoSwipeCount,
+          currentPhotoIndex: activeSession.currentPhotoIndex,
+        ),
+      );
+      unawaited(refreshPropertySignals(propertyId));
+    });
+    _activeDetailSessions[propertyId] = session;
+
+    final current = _signalsFor(propertyId).normalizedForToday(now);
+    _setPropertySignals(
+      propertyId,
+      current.copyWith(
+        views: current.views + 1,
+        detailViews: current.detailViews + 1,
+        liveViewers: current.liveViewers + 1,
+        lastViewedAt: now,
+      ),
+    );
+
+    unawaited(
+      _propertyAnalyticsRepository.startViewSession(
+        sessionId: session.sessionId,
+        propertyId: propertyId,
+        userId: _currentAnalyticsUserId,
+        startedAt: now,
+      ),
+    );
+    unawaited(refreshPropertySignals(propertyId));
+    unawaited(_persist());
+    notifyListeners();
+  }
+
+  void recordPropertyGallerySwipe(String propertyId, int currentPhotoIndex) {
+    final session = _activeDetailSessions[propertyId];
+    if (session == null) return;
+
+    session.photoSwipeCount += 1;
+    session.currentPhotoIndex = currentPhotoIndex;
+    final current = _signalsFor(propertyId).normalizedForToday(DateTime.now());
+    _setPropertySignals(
+      propertyId,
+      current.copyWith(gallerySwipes: current.gallerySwipes + 1),
+    );
+    unawaited(
+      _propertyAnalyticsRepository.heartbeatViewSession(
+        sessionId: session.sessionId,
+        startedAt: session.startedAt,
+        photoSwipeCount: session.photoSwipeCount,
+        currentPhotoIndex: session.currentPhotoIndex,
+      ),
+    );
+    unawaited(_persist());
+    notifyListeners();
+  }
+
+  Future<void> endPropertyDetailView(String propertyId) async {
+    final session = _activeDetailSessions.remove(propertyId);
+    if (session == null) return;
+
+    session.heartbeatTimer?.cancel();
+    final endedAt = DateTime.now();
+    final durationSeconds =
+        math.max(0, endedAt.difference(session.startedAt).inSeconds);
+    final current = _signalsFor(propertyId).normalizedForToday(endedAt);
+    final completedBefore = math.max(0, current.detailViews - 1);
+    final avgStay = completedBefore <= 0
+        ? durationSeconds
+        : ((current.avgDetailStaySeconds * completedBefore) +
+                durationSeconds) ~/
+            (completedBefore + 1);
+
+    _setPropertySignals(
+      propertyId,
+      current.copyWith(
+        liveViewers: math.max(0, current.liveViewers - 1),
+        avgDetailStaySeconds: avgStay,
+        lastViewedAt: endedAt,
+      ),
+    );
+
+    await _propertyAnalyticsRepository.endViewSession(
+      sessionId: session.sessionId,
+      startedAt: session.startedAt,
+      photoSwipeCount: session.photoSwipeCount,
+      currentPhotoIndex: session.currentPhotoIndex,
+      endedAt: endedAt,
+    );
+    unawaited(refreshPropertySignals(propertyId));
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> refreshPropertySignals(String propertyId) async {
+    final snapshot =
+        await _propertyAnalyticsRepository.fetchSnapshot(propertyId);
+    if (snapshot == null) return;
+
+    final current = _signalsFor(propertyId).normalizedForToday(DateTime.now());
+    _setPropertySignals(
+      propertyId,
+      current.copyWith(
+        liveViewers: snapshot.liveViewers,
+        likesToday: snapshot.likesToday,
+        likesTodayDate: snapshot.likesTodayDate,
+      ),
+    );
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> likeProperty(String propertyId) async {
     if (!_likedPropertyIds.contains(propertyId)) {
       _likedPropertyIds.add(propertyId);
+      _recordPropertyLike(propertyId);
       _swipeHistory.add(_SwipeRecord(propertyId: propertyId, liked: true));
       if (_swipeHistory.length > 10) _swipeHistory.removeAt(0);
       _removeFromFilteredCache(propertyId);
       await _persist();
       notifyListeners();
     }
+  }
+
+  void _recordPropertyLike(String propertyId) {
+    final now = DateTime.now();
+    final current = _signalsFor(propertyId).normalizedForToday(now);
+    _setPropertySignals(
+      propertyId,
+      current.copyWith(
+        likes: current.likes + 1,
+        likesToday: current.likesToday + 1,
+        likesTodayDate: _todayKey(now),
+      ),
+    );
+    unawaited(
+      _propertyAnalyticsRepository.recordLike(
+        propertyId: propertyId,
+        userId: _currentAnalyticsUserId,
+        likedAt: now,
+      ),
+    );
+    unawaited(refreshPropertySignals(propertyId));
+  }
+
+  void _removePropertyLike(String propertyId) {
+    final now = DateTime.now();
+    final current = _signalsFor(propertyId).normalizedForToday(now);
+    _setPropertySignals(
+      propertyId,
+      current.copyWith(
+        likes: math.max(0, current.likes - 1),
+        likesToday: math.max(0, current.likesToday - 1),
+        likesTodayDate: _todayKey(now),
+      ),
+    );
+    unawaited(
+      _propertyAnalyticsRepository.removeLike(
+        propertyId: propertyId,
+        userId: _currentAnalyticsUserId,
+        likedAt: now,
+      ),
+    );
+    unawaited(refreshPropertySignals(propertyId));
+  }
+
+  PropertyMarketSignals _signalsFor(String propertyId) {
+    final override = _propertySignalOverrides[propertyId];
+    if (override != null) return override;
+    return propertyById(propertyId)?.marketSignals ??
+        const PropertyMarketSignals();
+  }
+
+  void _setPropertySignals(String propertyId, PropertyMarketSignals signals) {
+    _propertySignalOverrides[propertyId] = signals;
+    _baseProperties = _baseProperties
+        .map((property) => property.id == propertyId
+            ? property.copyWith(marketSignals: signals)
+            : property)
+        .toList();
+    _customProperties = _customProperties
+        .map((property) => property.id == propertyId
+            ? property.copyWith(marketSignals: signals)
+            : property)
+        .toList();
+    _invalidateCatalogCache();
+  }
+
+  String get _currentAnalyticsUserId {
+    final profileId = _tenantProfile?.id.trim();
+    if (profileId != null && profileId.isNotEmpty) return profileId;
+    if (_isGuestMode) return 'guest_$_userRole';
+    return 'local_user';
+  }
+
+  String _newDetailSessionId(String propertyId) {
+    final raw = 'view_${propertyId}_${DateTime.now().microsecondsSinceEpoch}_'
+        '${math.Random().nextInt(999999)}';
+    return raw.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  }
+
+  String _todayKey(DateTime value) {
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+    return '${value.year}-$month-$day';
   }
 
   Future<void> swipePropertyLeft() async {
@@ -1220,6 +1449,7 @@ class DatingProvider extends ChangeNotifier {
     final last = _swipeHistory.removeLast();
     if (last.liked) {
       _likedPropertyIds.remove(last.propertyId);
+      _removePropertyLike(last.propertyId);
     } else {
       _passedPropertyIds.remove(last.propertyId);
     }
@@ -1244,7 +1474,8 @@ class DatingProvider extends ChangeNotifier {
       AppEvents.instance.log(UserEventType.swipeLeft, propertyId: property.id);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
-      _likedPropertyIds.add(property.id);
+      final isNewLike = _likedPropertyIds.add(property.id);
+      if (isNewLike) _recordPropertyLike(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: true));
       final eventType = direction == CardSwiperDirection.top
           ? UserEventType.superLike
@@ -1449,6 +1680,10 @@ class DatingProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final session in _activeDetailSessions.values) {
+      session.heartbeatTimer?.cancel();
+    }
+    _activeDetailSessions.clear();
     propertySwiperController.dispose();
     ownerSwiperController.dispose();
     super.dispose();
@@ -1866,6 +2101,7 @@ class DatingProvider extends ChangeNotifier {
     if (property.media.length >= 2) score += 1;
     if (property.media.length >= 4) score += 0.5;
     if (property.videoUrls.isNotEmpty) score += 0.5;
+    if (property.isVerifiedListing) score += 1.8;
     if (property.hasReadyVirtualTour) {
       score += 1.2;
     } else if (property.virtualTour?.isProcessing == true) {
@@ -2369,6 +2605,20 @@ class DatingProvider extends ChangeNotifier {
     _reportedPropertyIds = Set<String>.from(
       storedState['reportedPropertyIds'] as List<dynamic>? ?? const [],
     );
+    final signalsJson =
+        storedState['propertySignalOverrides'] as Map<dynamic, dynamic>? ??
+            const {};
+    _propertySignalOverrides = signalsJson.map((key, value) {
+      if (value is! Map) {
+        return MapEntry(key.toString(), const PropertyMarketSignals());
+      }
+      return MapEntry(
+        key.toString(),
+        PropertyMarketSignals.fromJson(
+          Map<String, dynamic>.from(value),
+        ),
+      );
+    });
     _lastSeenMatchCount = storedState['lastSeenMatchCount'] as int? ?? 0;
     _pendingMatchPropertyId = null;
     _invalidateCatalogCache();
@@ -2427,6 +2677,9 @@ class DatingProvider extends ChangeNotifier {
       'savedPropertyIds': _savedPropertyIds.toList(),
       'blockedOwnerNames': _blockedOwnerNames.toList(),
       'reportedPropertyIds': _reportedPropertyIds.toList(),
+      'propertySignalOverrides': _propertySignalOverrides.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      ),
       'lastSeenMatchCount': _lastSeenMatchCount,
     };
 
@@ -2563,6 +2816,21 @@ class _SwipeRecord {
   const _SwipeRecord({required this.propertyId, required this.liked});
   final String propertyId;
   final bool liked;
+}
+
+class _PropertyDetailSession {
+  _PropertyDetailSession({
+    required this.propertyId,
+    required this.sessionId,
+    required this.startedAt,
+  });
+
+  final String propertyId;
+  final String sessionId;
+  final DateTime startedAt;
+  int photoSwipeCount = 0;
+  int currentPhotoIndex = 0;
+  Timer? heartbeatTimer;
 }
 
 enum PriceContext { belowAverage, average, aboveAverage }

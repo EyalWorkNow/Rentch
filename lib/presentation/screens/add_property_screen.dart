@@ -106,7 +106,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final Set<String> _selectedFeatures = {};
   bool _isSaving = false;
   bool _isSubmittingTour = false;
+  bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
+  bool _wantsVerifiedListing = false;
+  String _verificationVideoUrl = '';
+  DateTime? _verificationCapturedAt;
   bool _acceptedPropertyTerms = false;
   bool _thirdPartyTransferAllowed = false;
   bool _commercialSaleAllowed = false;
@@ -175,6 +179,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   }
 
   Future<void> _pickPropertyImage(ImageSource source) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      return;
+    }
     try {
       final file = await _picker.pickImage(
         source: source,
@@ -198,6 +206,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   }
 
   Future<void> _pickPropertyVideo(ImageSource source) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      return;
+    }
     try {
       final file = await _picker.pickVideo(
         source: source,
@@ -220,6 +232,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   }
 
   Future<void> _pickScanVideo(ImageSource source) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError(
+          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+      return;
+    }
     try {
       final file = await _picker.pickVideo(
         source: source,
@@ -290,6 +307,45 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
   }
 
+  Future<void> _captureVerificationVideo() async {
+    try {
+      setState(() => _isCapturingVerification = true);
+      final file = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 90),
+      );
+      if (file == null) {
+        if (mounted) setState(() => _isCapturingVerification = false);
+        return;
+      }
+
+      final localPath = await _storageService.saveVideoLocally(
+        file,
+        folderName: 'property_verification_videos',
+      );
+      final remoteUrl = await _storageService.uploadToCloud(localPath);
+      final videoUrl = remoteUrl ?? localPath;
+      final capturedAt = DateTime.now().toUtc();
+      if (!mounted) return;
+      setState(() {
+        _wantsVerifiedListing = true;
+        _verificationVideoUrl = videoUrl;
+        _verificationCapturedAt = capturedAt;
+        _virtualTourDraft = null;
+        _replaceMediaDraftsWithSingleVideo(videoUrl);
+        _isCapturingVerification = false;
+      });
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() => _isCapturingVerification = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isCapturingVerification = false);
+      _showMediaError('צילום וידאו האימות נכשל: $error');
+    }
+  }
+
   String _scanTitle() {
     final city = _cityCtrl.text.trim();
     final street = _streetCtrl.text.trim();
@@ -302,6 +358,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אי אפשר להוסיף מדיה ידנית או מהגלריה.');
+      return;
+    }
     final emptyIndex = _mediaDrafts.indexWhere(
       (draft) => draft.controller.text.trim().isEmpty,
     );
@@ -320,6 +380,47 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
     setState(() {
       _mediaDrafts.add(_PropertyMediaDraft(initialValue: path, type: type));
+    });
+  }
+
+  void _replaceMediaDraftsWithSingleVideo(String videoUrl) {
+    for (final draft in _mediaDrafts) {
+      draft.dispose();
+    }
+    _mediaDrafts
+      ..clear()
+      ..add(
+        _PropertyMediaDraft(
+          initialValue: videoUrl,
+          type: PropertyMediaType.video,
+        ),
+      );
+  }
+
+  void _resetMediaDrafts() {
+    for (final draft in _mediaDrafts) {
+      draft.dispose();
+    }
+    _mediaDrafts
+      ..clear()
+      ..add(_PropertyMediaDraft());
+  }
+
+  void _setVerifiedListingMode(bool value) {
+    setState(() {
+      _wantsVerifiedListing = value;
+      _verificationVideoUrl = '';
+      _verificationCapturedAt = null;
+      _virtualTourDraft = null;
+      _resetMediaDrafts();
+    });
+  }
+
+  void _clearVerificationVideo() {
+    setState(() {
+      _verificationVideoUrl = '';
+      _verificationCapturedAt = null;
+      _resetMediaDrafts();
     });
   }
 
@@ -364,17 +465,45 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
     if (city.isEmpty || street.isEmpty || size == 0) return;
 
+    final sanitizedVerificationVideoUrl =
+        InputSanitizer.sanitizeMediaUrl(_verificationVideoUrl);
+    if (_wantsVerifiedListing &&
+        (sanitizedVerificationVideoUrl == null ||
+            sanitizedVerificationVideoUrl.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('כדי לפרסם דירה מאומתת צריך לצלם וידאו מתוך האפליקציה.'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
-    final media = _mediaDrafts
-        .map((draft) {
-          final sanitized =
-              InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
-          if (sanitized == null || sanitized.isEmpty) return null;
-          return PropertyMedia(url: sanitized, type: draft.type);
-        })
-        .whereType<PropertyMedia>()
-        .toList();
+    final media = _wantsVerifiedListing
+        ? [
+            PropertyMedia(
+              url: sanitizedVerificationVideoUrl!,
+              type: PropertyMediaType.video,
+            ),
+          ]
+        : _mediaDrafts
+            .map((draft) {
+              final sanitized =
+                  InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
+              if (sanitized == null || sanitized.isEmpty) return null;
+              return PropertyMedia(url: sanitized, type: draft.type);
+            })
+            .whereType<PropertyMedia>()
+            .toList();
+    final verification = _wantsVerifiedListing
+        ? PropertyVerification.cameraVideo(
+            videoUrl: sanitizedVerificationVideoUrl!,
+            capturedAt: _verificationCapturedAt ?? DateTime.now().toUtc(),
+          )
+        : const PropertyVerification();
     final sanitizedPrice = InputSanitizer.clampPrice(_price);
     final transactionType = PropertyTransactionType.rent;
     final priceHistory = sanitizedPrice > 0
@@ -421,6 +550,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       virtualTour: _virtualTourDraft,
       legal: legal,
       priceHistory: priceHistory,
+      verification: verification,
+      createdAt: DateTime.now(),
     );
 
     await context.read<DatingProvider>().addLandlordProperty(property);
@@ -504,6 +635,13 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               virtualTourDraft: _virtualTourDraft,
               isSubmittingTour: _isSubmittingTour,
               isScanBackendConfigured: _scanService.isConfigured,
+              wantsVerifiedListing: _wantsVerifiedListing,
+              verificationVideoUrl: _verificationVideoUrl,
+              verificationCapturedAt: _verificationCapturedAt,
+              isCapturingVerification: _isCapturingVerification,
+              onVerifiedListingChanged: _setVerifiedListingMode,
+              onCaptureVerificationVideo: _captureVerificationVideo,
+              onClearVerificationVideo: _clearVerificationVideo,
               onPickImageFromGallery: () =>
                   _pickPropertyImage(ImageSource.gallery),
               onPickImageFromCamera: () =>
@@ -1122,6 +1260,13 @@ class _StepPhotos extends StatelessWidget {
     required this.virtualTourDraft,
     required this.isSubmittingTour,
     required this.isScanBackendConfigured,
+    required this.wantsVerifiedListing,
+    required this.verificationVideoUrl,
+    required this.verificationCapturedAt,
+    required this.isCapturingVerification,
+    required this.onVerifiedListingChanged,
+    required this.onCaptureVerificationVideo,
+    required this.onClearVerificationVideo,
     required this.onPickImageFromGallery,
     required this.onPickImageFromCamera,
     required this.onPickVideoFromGallery,
@@ -1144,6 +1289,13 @@ class _StepPhotos extends StatelessWidget {
   final PropertyVirtualTour? virtualTourDraft;
   final bool isSubmittingTour;
   final bool isScanBackendConfigured;
+  final bool wantsVerifiedListing;
+  final String verificationVideoUrl;
+  final DateTime? verificationCapturedAt;
+  final bool isCapturingVerification;
+  final ValueChanged<bool> onVerifiedListingChanged;
+  final VoidCallback onCaptureVerificationVideo;
+  final VoidCallback onClearVerificationVideo;
   final VoidCallback onPickImageFromGallery;
   final VoidCallback onPickImageFromCamera;
   final VoidCallback onPickVideoFromGallery;
@@ -1321,60 +1473,79 @@ class _StepPhotos extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
         _SectionHint(
-          icon: IconsaxPlusLinear.gallery,
-          title: 'תמונות וסרטונים',
-          subtitle: 'העלה תמונות וסרטונים המראים את הדירה במיטבה',
+          icon: wantsVerifiedListing
+              ? IconsaxPlusLinear.verify
+              : IconsaxPlusLinear.gallery,
+          title: wantsVerifiedListing ? 'דירה מאומתת' : 'תמונות וסרטונים',
+          subtitle: wantsVerifiedListing
+              ? 'אימות דורש צילום וידאו מתוך האפליקציה בלבד'
+              : 'העלה תמונות וסרטונים המראים את הדירה במיטבה',
         ),
         const SizedBox(height: 16),
         _FormCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 1.1,
-                ),
-                itemCount: mediaDrafts.length +
-                    (mediaDrafts.length < 10 &&
-                            (mediaDrafts.isEmpty ||
-                                mediaDrafts.last.controller.text
-                                    .trim()
-                                    .isNotEmpty)
-                        ? 1
-                        : 0),
-                itemBuilder: (context, i) {
-                  if (i == mediaDrafts.length) {
+              _VerifiedListingPanel(
+                wantsVerifiedListing: wantsVerifiedListing,
+                verificationVideoUrl: verificationVideoUrl,
+                verificationCapturedAt: verificationCapturedAt,
+                isCapturingVerification: isCapturingVerification,
+                onChanged: onVerifiedListingChanged,
+                onCaptureVideo: onCaptureVerificationVideo,
+                onClearVideo: onClearVerificationVideo,
+              ),
+              if (wantsVerifiedListing) ...[
+                const SizedBox(height: 16),
+                const _VerifiedMediaLockNotice(),
+              ] else ...[
+                const SizedBox(height: 18),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.1,
+                  ),
+                  itemCount: mediaDrafts.length +
+                      (mediaDrafts.length < 10 &&
+                              (mediaDrafts.isEmpty ||
+                                  mediaDrafts.last.controller.text
+                                      .trim()
+                                      .isNotEmpty)
+                          ? 1
+                          : 0),
+                  itemBuilder: (context, i) {
+                    if (i == mediaDrafts.length) {
+                      return _MediaGridItem(
+                        index: i,
+                        draft: _PropertyMediaDraft(),
+                        onRemove: () {},
+                        onTapEmpty: () => _showMediaPickerSheet(context),
+                      );
+                    }
                     return _MediaGridItem(
                       index: i,
-                      draft: _PropertyMediaDraft(),
-                      onRemove: () {},
+                      draft: mediaDrafts[i],
+                      onRemove: () => onRemoveMedia(i),
                       onTapEmpty: () => _showMediaPickerSheet(context),
                     );
-                  }
-                  return _MediaGridItem(
-                    index: i,
-                    draft: mediaDrafts[i],
-                    onRemove: () => onRemoveMedia(i),
-                    onTapEmpty: () => _showMediaPickerSheet(context),
-                  );
-                },
-              ),
-              const SizedBox(height: 18),
-              const Divider(height: 1, color: AppColors.borderLight),
-              const SizedBox(height: 16),
-              _Scan3dPanel(
-                tour: virtualTourDraft,
-                isSubmitting: isSubmittingTour,
-                isBackendConfigured: isScanBackendConfigured,
-                onPickFromCamera: onPickScanFromCamera,
-                onPickFromGallery: onPickScanFromGallery,
-                onClear: onClearVirtualTour,
-              ),
+                  },
+                ),
+                const SizedBox(height: 18),
+                const Divider(height: 1, color: AppColors.borderLight),
+                const SizedBox(height: 16),
+                _Scan3dPanel(
+                  tour: virtualTourDraft,
+                  isSubmitting: isSubmittingTour,
+                  isBackendConfigured: isScanBackendConfigured,
+                  onPickFromCamera: onPickScanFromCamera,
+                  onPickFromGallery: onPickScanFromGallery,
+                  onClear: onClearVirtualTour,
+                ),
+              ],
               const SizedBox(height: 16),
               _PropertyRightsPanel(
                 acceptedTerms: acceptedTerms,
@@ -1390,6 +1561,280 @@ class _StepPhotos extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _VerifiedListingPanel extends StatelessWidget {
+  const _VerifiedListingPanel({
+    required this.wantsVerifiedListing,
+    required this.verificationVideoUrl,
+    required this.verificationCapturedAt,
+    required this.isCapturingVerification,
+    required this.onChanged,
+    required this.onCaptureVideo,
+    required this.onClearVideo,
+  });
+
+  final bool wantsVerifiedListing;
+  final String verificationVideoUrl;
+  final DateTime? verificationCapturedAt;
+  final bool isCapturingVerification;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onCaptureVideo;
+  final VoidCallback onClearVideo;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasVideo = verificationVideoUrl.trim().isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: RentchIcon(
+                  IconsaxPlusLinear.verify,
+                  color: AppColors.primary,
+                  size: 19,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'פרסום דירה מאומתת',
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'דירה מאומתת מקבלת ניקוד גבוה יותר באלגוריתם.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: wantsVerifiedListing,
+              onChanged: isCapturingVerification ? null : onChanged,
+            ),
+          ],
+        ),
+        if (wantsVerifiedListing) ...[
+          const SizedBox(height: 14),
+          Text(
+            hasVideo
+                ? 'וידאו האימות נשמר מתוך המצלמה של האפליקציה.'
+                : 'כדי לאמת את הדירה צריך לצלם עכשיו וידאו קצר מתוך האפליקציה.',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (hasVideo)
+            _VerificationVideoPreview(
+              videoUrl: verificationVideoUrl,
+              capturedAt: verificationCapturedAt,
+              isCapturing: isCapturingVerification,
+              onReplace: onCaptureVideo,
+              onClear: onClearVideo,
+            )
+          else
+            FilledButton.icon(
+              onPressed: isCapturingVerification ? null : onCaptureVideo,
+              icon: isCapturingVerification
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const RentchIcon(IconsaxPlusLinear.video_play, size: 17),
+              label: Text(
+                isCapturingVerification ? 'פותח מצלמה...' : 'צלם וידאו אימות',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _VerificationVideoPreview extends StatelessWidget {
+  const _VerificationVideoPreview({
+    required this.videoUrl,
+    required this.capturedAt,
+    required this.isCapturing,
+    required this.onReplace,
+    required this.onClear,
+  });
+
+  final String videoUrl;
+  final DateTime? capturedAt;
+  final bool isCapturing;
+  final VoidCallback onReplace;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final capturedLabel = capturedAt == null
+        ? ''
+        : capturedAt!.toLocal().toString().split('.').first;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FBFD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0EBF2)),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 86,
+              height: 64,
+              child: SafeMedia(
+                media: PropertyMedia(
+                  url: videoUrl,
+                  type: PropertyMediaType.video,
+                ),
+                fit: BoxFit.cover,
+                videoMode: SafeVideoDisplayMode.iconOnly,
+                fallback: Container(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  child: const Center(
+                    child: RentchIcon(
+                      IconsaxPlusLinear.video_tick,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'וידאו אימות מוכן',
+                  style: TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (capturedLabel.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    capturedLabel,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: isCapturing ? null : onReplace,
+                      icon:
+                          const RentchIcon(IconsaxPlusLinear.refresh, size: 14),
+                      label: const Text('צלם מחדש'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        side: const BorderSide(color: AppColors.borderLight),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: isCapturing ? null : onClear,
+                      icon: const Icon(Icons.close, color: AppColors.coral),
+                      tooltip: 'הסר וידאו אימות',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerifiedMediaLockNotice extends StatelessWidget {
+  const _VerifiedMediaLockNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RentchIcon(
+            IconsaxPlusLinear.lock,
+            color: AppColors.primary,
+            size: 18,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'בפרסום מאומת אין העלאה מהגלריה, קישור URL, תמונות או וידאו קיים. וידאו האימות המצולם הוא המדיה היחידה של הדירה.',
+              style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 12.5,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2396,7 +2841,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late final Set<String> _selectedFeatures;
   bool _isSaving = false;
   bool _isSubmittingTour = false;
+  bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
+  late bool _wantsVerifiedListing;
+  late String _verificationVideoUrl;
+  DateTime? _verificationCapturedAt;
   late bool _acceptedPropertyTerms;
   late bool _thirdPartyTransferAllowed;
   late bool _commercialSaleAllowed;
@@ -2431,6 +2880,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _agencyListing = p.agencyListing;
     _selectedFeatures = Set<String>.from(p.features);
     _virtualTourDraft = p.virtualTour;
+    _wantsVerifiedListing = p.isVerifiedListing;
+    _verificationVideoUrl = p.verification.videoUrl;
+    _verificationCapturedAt = p.verification.capturedAt;
     // Show checkbox as checked only when consent exists AND version is current.
     // Stale consent (version mismatch) requires re-acceptance.
     _acceptedPropertyTerms =
@@ -2504,6 +2956,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   }
 
   Future<void> _pickPropertyImage(ImageSource source) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      return;
+    }
     try {
       final file = await _picker.pickImage(
         source: source,
@@ -2523,6 +2979,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   }
 
   Future<void> _pickPropertyVideo(ImageSource source) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אפשר לצלם רק וידאו אימות מתוך האפליקציה.');
+      return;
+    }
     try {
       final file = await _picker.pickVideo(
         source: source,
@@ -2541,6 +3001,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   }
 
   Future<void> _pickScanVideo(ImageSource source) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError(
+          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+      return;
+    }
     try {
       final file = await _picker.pickVideo(
         source: source,
@@ -2611,6 +3076,45 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     }
   }
 
+  Future<void> _captureVerificationVideo() async {
+    try {
+      setState(() => _isCapturingVerification = true);
+      final file = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 90),
+      );
+      if (file == null) {
+        if (mounted) setState(() => _isCapturingVerification = false);
+        return;
+      }
+
+      final localPath = await _storageService.saveVideoLocally(
+        file,
+        folderName: 'property_verification_videos',
+      );
+      final remoteUrl = await _storageService.uploadToCloud(localPath);
+      final videoUrl = remoteUrl ?? localPath;
+      final capturedAt = DateTime.now().toUtc();
+      if (!mounted) return;
+      setState(() {
+        _wantsVerifiedListing = true;
+        _verificationVideoUrl = videoUrl;
+        _verificationCapturedAt = capturedAt;
+        _virtualTourDraft = null;
+        _replaceMediaDraftsWithSingleVideo(videoUrl);
+        _isCapturingVerification = false;
+      });
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() => _isCapturingVerification = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isCapturingVerification = false);
+      _showMediaError('צילום וידאו האימות נכשל: $error');
+    }
+  }
+
   String _scanTitle() {
     final city = _cityCtrl.text.trim();
     final street = _streetCtrl.text.trim();
@@ -2623,6 +3127,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
   void _assignPickedMedia(String path, PropertyMediaType type) {
     if (!mounted) return;
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אי אפשר להוסיף מדיה ידנית או מהגלריה.');
+      return;
+    }
     final emptyIndex = _mediaDrafts.indexWhere(
       (draft) => draft.controller.text.trim().isEmpty,
     );
@@ -2641,6 +3149,47 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     }
     setState(() {
       _mediaDrafts.add(_PropertyMediaDraft(initialValue: path, type: type));
+    });
+  }
+
+  void _replaceMediaDraftsWithSingleVideo(String videoUrl) {
+    for (final draft in _mediaDrafts) {
+      draft.dispose();
+    }
+    _mediaDrafts
+      ..clear()
+      ..add(
+        _PropertyMediaDraft(
+          initialValue: videoUrl,
+          type: PropertyMediaType.video,
+        ),
+      );
+  }
+
+  void _resetMediaDrafts() {
+    for (final draft in _mediaDrafts) {
+      draft.dispose();
+    }
+    _mediaDrafts
+      ..clear()
+      ..add(_PropertyMediaDraft());
+  }
+
+  void _setVerifiedListingMode(bool value) {
+    setState(() {
+      _wantsVerifiedListing = value;
+      _verificationVideoUrl = '';
+      _verificationCapturedAt = null;
+      _virtualTourDraft = null;
+      _resetMediaDrafts();
+    });
+  }
+
+  void _clearVerificationVideo() {
+    setState(() {
+      _verificationVideoUrl = '';
+      _verificationCapturedAt = null;
+      _resetMediaDrafts();
     });
   }
 
@@ -2671,17 +3220,47 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       return;
     }
 
+    final sanitizedVerificationVideoUrl =
+        InputSanitizer.sanitizeMediaUrl(_verificationVideoUrl);
+    if (_wantsVerifiedListing &&
+        (sanitizedVerificationVideoUrl == null ||
+            sanitizedVerificationVideoUrl.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('כדי לשמור דירה מאומתת צריך לצלם וידאו מתוך האפליקציה.'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
-    final media = _mediaDrafts
-        .map((draft) {
-          final sanitized =
-              InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
-          if (sanitized == null || sanitized.isEmpty) return null;
-          return PropertyMedia(url: sanitized, type: draft.type);
-        })
-        .whereType<PropertyMedia>()
-        .toList();
+    final media = _wantsVerifiedListing
+        ? [
+            PropertyMedia(
+              url: sanitizedVerificationVideoUrl!,
+              type: PropertyMediaType.video,
+            ),
+          ]
+        : _mediaDrafts
+            .map((draft) {
+              final sanitized =
+                  InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
+              if (sanitized == null || sanitized.isEmpty) return null;
+              return PropertyMedia(url: sanitized, type: draft.type);
+            })
+            .whereType<PropertyMedia>()
+            .toList();
+    final verification = _wantsVerifiedListing
+        ? PropertyVerification.cameraVideo(
+            videoUrl: sanitizedVerificationVideoUrl!,
+            capturedAt: _verificationCapturedAt ??
+                widget.property.verification.capturedAt ??
+                DateTime.now().toUtc(),
+          )
+        : const PropertyVerification();
     final sanitizedPrice = InputSanitizer.clampPrice(_price);
     final transactionType = widget.property.transactionType;
     final nextHistory = [
@@ -2731,7 +3310,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       legal: legal,
       priceHistory: nextHistory,
       marketSignals: widget.property.marketSignals,
+      verification: verification,
       isActive: _isActive,
+      createdAt: widget.property.createdAt,
     );
 
     await context.read<DatingProvider>().updateLandlordProperty(updated);
@@ -2818,6 +3399,13 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   virtualTourDraft: _virtualTourDraft,
                   isSubmittingTour: _isSubmittingTour,
                   isScanBackendConfigured: _scanService.isConfigured,
+                  wantsVerifiedListing: _wantsVerifiedListing,
+                  verificationVideoUrl: _verificationVideoUrl,
+                  verificationCapturedAt: _verificationCapturedAt,
+                  isCapturingVerification: _isCapturingVerification,
+                  onVerifiedListingChanged: _setVerifiedListingMode,
+                  onCaptureVerificationVideo: _captureVerificationVideo,
+                  onClearVerificationVideo: _clearVerificationVideo,
                   onPickImageFromGallery: () =>
                       _pickPropertyImage(ImageSource.gallery),
                   onPickImageFromCamera: () =>
@@ -2885,11 +3473,13 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                 Switch(
                   value: _isActive,
                   onChanged: (value) => setState(() => _isActive = value),
-                  activeColor: AppColors.success,
+                  activeThumbColor: AppColors.success,
                 ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: () async {
+                    final provider = context.read<DatingProvider>();
+                    final navigator = Navigator.of(context);
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
@@ -2927,11 +3517,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       ),
                     );
                     if (confirmed == true) {
-                      await context
-                          .read<DatingProvider>()
-                          .removeLandlordProperty(widget.property.id);
+                      await provider.removeLandlordProperty(widget.property.id);
                       if (mounted) {
-                        Navigator.of(context).pop();
+                        navigator.pop();
                       }
                     }
                   },

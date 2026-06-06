@@ -442,6 +442,13 @@ class PropertyMarketSignals {
     this.skips = 0,
     this.contactRequests = 0,
     this.avgTimeIn3dSeconds = 0,
+    this.liveViewers = 0,
+    this.likesToday = 0,
+    this.likesTodayDate = '',
+    this.detailViews = 0,
+    this.gallerySwipes = 0,
+    this.avgDetailStaySeconds = 0,
+    this.lastViewedAt,
   });
 
   final int views;
@@ -450,6 +457,13 @@ class PropertyMarketSignals {
   final int skips;
   final int contactRequests;
   final int avgTimeIn3dSeconds;
+  final int liveViewers;
+  final int likesToday;
+  final String likesTodayDate;
+  final int detailViews;
+  final int gallerySwipes;
+  final int avgDetailStaySeconds;
+  final DateTime? lastViewedAt;
 
   PropertyMarketSignals copyWith({
     int? views,
@@ -458,6 +472,13 @@ class PropertyMarketSignals {
     int? skips,
     int? contactRequests,
     int? avgTimeIn3dSeconds,
+    int? liveViewers,
+    int? likesToday,
+    String? likesTodayDate,
+    int? detailViews,
+    int? gallerySwipes,
+    int? avgDetailStaySeconds,
+    DateTime? lastViewedAt,
   }) {
     return PropertyMarketSignals(
       views: views ?? this.views,
@@ -466,6 +487,13 @@ class PropertyMarketSignals {
       skips: skips ?? this.skips,
       contactRequests: contactRequests ?? this.contactRequests,
       avgTimeIn3dSeconds: avgTimeIn3dSeconds ?? this.avgTimeIn3dSeconds,
+      liveViewers: liveViewers ?? this.liveViewers,
+      likesToday: likesToday ?? this.likesToday,
+      likesTodayDate: likesTodayDate ?? this.likesTodayDate,
+      detailViews: detailViews ?? this.detailViews,
+      gallerySwipes: gallerySwipes ?? this.gallerySwipes,
+      avgDetailStaySeconds: avgDetailStaySeconds ?? this.avgDetailStaySeconds,
+      lastViewedAt: lastViewedAt ?? this.lastViewedAt,
     );
   }
 
@@ -477,7 +505,24 @@ class PropertyMarketSignals {
       skips: _optionalInt(json['skips']) ?? 0,
       contactRequests: _optionalInt(json['contactRequests']) ?? 0,
       avgTimeIn3dSeconds: _optionalInt(json['avgTimeIn3dSeconds']) ?? 0,
+      liveViewers: _optionalInt(json['liveViewers']) ?? 0,
+      likesToday: _optionalInt(json['likesToday']) ?? 0,
+      likesTodayDate: json['likesTodayDate']?.toString() ?? '',
+      detailViews: _optionalInt(json['detailViews']) ?? 0,
+      gallerySwipes: _optionalInt(json['gallerySwipes']) ?? 0,
+      avgDetailStaySeconds: _optionalInt(json['avgDetailStaySeconds']) ?? 0,
+      lastViewedAt: _optionalDate(json['lastViewedAt']),
     );
+  }
+
+  int likesTodayFor(DateTime now) {
+    return likesTodayDate == _formatLocalDateOnly(now) ? likesToday : 0;
+  }
+
+  PropertyMarketSignals normalizedForToday(DateTime now) {
+    final today = _formatLocalDateOnly(now);
+    if (likesTodayDate == today) return this;
+    return copyWith(likesToday: 0, likesTodayDate: today);
   }
 
   Map<String, dynamic> toJson() {
@@ -488,6 +533,93 @@ class PropertyMarketSignals {
       'skips': skips,
       'contactRequests': contactRequests,
       'avgTimeIn3dSeconds': avgTimeIn3dSeconds,
+      'liveViewers': liveViewers,
+      'likesToday': likesToday,
+      'likesTodayDate': likesTodayDate,
+      'detailViews': detailViews,
+      'gallerySwipes': gallerySwipes,
+      'avgDetailStaySeconds': avgDetailStaySeconds,
+      'lastViewedAt': lastViewedAt?.toUtc().toIso8601String(),
+    };
+  }
+}
+
+class PropertyVerification {
+  const PropertyVerification({
+    this.verified = false,
+    this.method = '',
+    this.videoUrl = '',
+    this.capturedAt,
+  });
+
+  static const cameraVideoMethod = 'camera_video';
+
+  final bool verified;
+  final String method;
+  final String videoUrl;
+  final DateTime? capturedAt;
+
+  bool get hasCameraVideo =>
+      method == cameraVideoMethod && videoUrl.trim().isNotEmpty;
+  bool get isVerified => verified && hasCameraVideo;
+
+  PropertyVerification copyWith({
+    bool? verified,
+    String? method,
+    String? videoUrl,
+    DateTime? capturedAt,
+  }) {
+    return PropertyVerification(
+      verified: verified ?? this.verified,
+      method: method ?? this.method,
+      videoUrl: videoUrl ?? this.videoUrl,
+      capturedAt: capturedAt ?? this.capturedAt,
+    );
+  }
+
+  factory PropertyVerification.cameraVideo({
+    required String videoUrl,
+    required DateTime capturedAt,
+  }) {
+    return PropertyVerification(
+      verified: true,
+      method: cameraVideoMethod,
+      videoUrl: videoUrl,
+      capturedAt: capturedAt,
+    );
+  }
+
+  factory PropertyVerification.fromJson(Map<String, dynamic> json) {
+    final videoUrl = json['videoUrl']?.toString().trim() ??
+        json['verificationVideoUrl']?.toString().trim() ??
+        '';
+    final method = json['method']?.toString().trim() ??
+        json['verificationMethod']?.toString().trim() ??
+        (videoUrl.isNotEmpty ? cameraVideoMethod : '');
+    final verified = _asBoolFlag(
+      json['verified'] ??
+          json['verifiedListing'] ??
+          json['isVerifiedListing'] ??
+          false,
+    );
+    return PropertyVerification(
+      verified: verified,
+      method: method,
+      videoUrl: videoUrl,
+      capturedAt: _optionalDate(
+        json['capturedAt'] ??
+            json['verifiedAt'] ??
+            json['verificationCapturedAt'],
+      ),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'verified': verified,
+      'method': method,
+      'videoUrl': videoUrl,
+      'capturedAt': capturedAt?.toUtc().toIso8601String(),
     };
   }
 }
@@ -522,7 +654,9 @@ class RentalProperty {
     PropertyLegal? legal,
     List<PropertyPricePoint>? priceHistory,
     PropertyMarketSignals? marketSignals,
+    PropertyVerification? verification,
     this.isActive = true,
+    this.createdAt,
   })  : sourceUrl = sourceUrl.isNotEmpty ? sourceUrl : (url ?? ''),
         featureFlags = featureFlags ?? PropertyFeatureSet.fromJson(features),
         model3d = _resolveModel3d(model3d, virtualTour),
@@ -536,6 +670,7 @@ class RentalProperty {
           ),
         ),
         marketSignals = marketSignals ?? const PropertyMarketSignals(),
+        verification = verification ?? const PropertyVerification(),
         features = List.unmodifiable(
           _resolveFeatureLabels(features, featureFlags),
         );
@@ -567,9 +702,20 @@ class RentalProperty {
   final PropertyLegal legal;
   final List<PropertyPricePoint> priceHistory;
   final PropertyMarketSignals marketSignals;
+  final PropertyVerification verification;
   final bool isActive;
+  final DateTime? createdAt;
 
   String get url => sourceUrl;
+  static const Duration newListingWindow = Duration(hours: 252);
+
+  bool get isNewListing {
+    final created = createdAt;
+    if (created == null) return false;
+    final age = DateTime.now().difference(created);
+    return !age.isNegative && age <= newListingWindow;
+  }
+
   PropertyMedia? get primaryMedia => media.isEmpty ? null : media.first;
   List<String> get mediaUrls => media.map((item) => item.url).toList();
   List<String> get imageUrls =>
@@ -580,6 +726,7 @@ class RentalProperty {
   bool get hasVirtualTour =>
       hasReadyVirtualTour || virtualTour?.isProcessing == true;
   bool get hasModel3d => model3d?.hasAnyAsset ?? false;
+  bool get isVerifiedListing => verification.isVerified;
   String get imageUrl => imageUrls.isEmpty ? '' : imageUrls.first;
   LatLng get point => LatLng(lat, lon);
   int? get floorNumber => int.tryParse(floor);
@@ -592,6 +739,7 @@ class RentalProperty {
         ownerName,
         propertyType,
         condition,
+        if (isVerifiedListing) 'מאומת',
         transactionType == PropertyTransactionType.sale ? 'מכירה' : 'השכרה',
         ...features,
       ].join(' ').toLowerCase();
@@ -642,7 +790,9 @@ class RentalProperty {
     PropertyLegal? legal,
     List<PropertyPricePoint>? priceHistory,
     PropertyMarketSignals? marketSignals,
+    PropertyVerification? verification,
     bool? isActive,
+    DateTime? createdAt,
   }) {
     return RentalProperty(
       id: id ?? this.id,
@@ -672,7 +822,9 @@ class RentalProperty {
       legal: legal ?? this.legal,
       priceHistory: priceHistory ?? this.priceHistory,
       marketSignals: marketSignals ?? this.marketSignals,
+      verification: verification ?? this.verification,
       isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -752,7 +904,14 @@ class RentalProperty {
       ),
       marketSignals: _parseMarketSignals(json['marketSignals']) ??
           const PropertyMarketSignals(),
+      verification: _parsePropertyVerification(json),
       isActive: json['isActive'] as bool? ?? true,
+      createdAt: _optionalDate(
+        json['createdAt'] ??
+            json['postedAt'] ??
+            json['uploadedAt'] ??
+            json[r'$createdAt'],
+      ),
     );
   }
 
@@ -788,7 +947,13 @@ class RentalProperty {
       'legal': legal.toJson(),
       'priceHistory': priceHistory.map((item) => item.toJson()).toList(),
       'marketSignals': marketSignals.toJson(),
+      'verification': verification.toJson(),
+      'verifiedListing': isVerifiedListing,
+      'verificationMethod': verification.method,
+      'verificationVideoUrl': verification.videoUrl,
+      'verifiedAt': verification.capturedAt?.toUtc().toIso8601String(),
       'isActive': isActive,
+      'createdAt': createdAt?.toUtc().toIso8601String(),
     };
   }
 }
@@ -1475,6 +1640,12 @@ String _formatDateOnly(DateTime value) {
   return '${utc.year}-$month-$day';
 }
 
+String _formatLocalDateOnly(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
+}
+
 PropertyMediaType _inferMediaType(String url) {
   final normalized = url.split('?').first.toLowerCase();
   if (normalized.endsWith('.mp4') ||
@@ -1850,6 +2021,72 @@ PropertyMarketSignals? _parseMarketSignals(Object? value) {
     return _parseMarketSignals(decoded);
   }
   return null;
+}
+
+PropertyVerification _parsePropertyVerification(Map<String, dynamic> json) {
+  final raw = json['verification'];
+  PropertyVerification parsed = const PropertyVerification();
+  if (raw is Map<String, dynamic>) {
+    parsed = PropertyVerification.fromJson(raw);
+  } else if (raw is Map) {
+    parsed = PropertyVerification.fromJson(Map<String, dynamic>.from(raw));
+  } else if (raw is String && raw.trim().isNotEmpty) {
+    final decoded = _decodeJsonSafely(raw);
+    if (decoded is Map<String, dynamic>) {
+      parsed = PropertyVerification.fromJson(decoded);
+    } else if (decoded is Map) {
+      parsed = PropertyVerification.fromJson(
+        Map<String, dynamic>.from(decoded),
+      );
+    }
+  }
+
+  final flatVideoUrl =
+      json['verificationVideoUrl']?.toString().trim().isNotEmpty == true
+          ? json['verificationVideoUrl']!.toString().trim()
+          : json['verifiedVideoUrl']?.toString().trim() ?? '';
+  final flatMethod = json['verificationMethod']?.toString().trim() ?? '';
+  final flatCapturedAt = _optionalDate(
+    json['verifiedAt'] ?? json['verificationCapturedAt'],
+  );
+  final hasFlatVerification = _asBoolFlag(
+    json['verifiedListing'] ??
+        json['isVerifiedListing'] ??
+        json['verified'] ??
+        false,
+  );
+
+  final hasStructuredVerification =
+      parsed.videoUrl.isNotEmpty || parsed.method.isNotEmpty || parsed.verified;
+  if (hasStructuredVerification) {
+    return parsed.copyWith(
+      verified: parsed.verified || hasFlatVerification,
+      method: parsed.method.isNotEmpty
+          ? parsed.method
+          : (flatMethod.isNotEmpty
+              ? flatMethod
+              : (flatVideoUrl.isNotEmpty
+                  ? PropertyVerification.cameraVideoMethod
+                  : parsed.method)),
+      videoUrl: parsed.videoUrl.isNotEmpty ? parsed.videoUrl : flatVideoUrl,
+      capturedAt: parsed.capturedAt ?? flatCapturedAt,
+    );
+  }
+
+  if (!hasFlatVerification && flatVideoUrl.isEmpty) {
+    return parsed;
+  }
+
+  return PropertyVerification(
+    verified: hasFlatVerification,
+    method: flatMethod.isNotEmpty
+        ? flatMethod
+        : (flatVideoUrl.isNotEmpty
+            ? PropertyVerification.cameraVideoMethod
+            : parsed.method),
+    videoUrl: flatVideoUrl,
+    capturedAt: flatCapturedAt,
+  );
 }
 
 int? _optionalInt(Object? value) {

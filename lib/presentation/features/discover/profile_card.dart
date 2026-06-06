@@ -90,287 +90,376 @@ class _ProfileCardState extends State<ProfileCard> {
     final currentMedia = media.isNotEmpty ? media[safeCurrentImage] : null;
     final score = provider.matchScore(p);
     final priceCtx = provider.priceContext(p);
+    final properties = provider.filteredProperties;
+    final isFirst = properties.isNotEmpty && p.id == properties.first.id;
+    final isSecond = properties.length > 1 && p.id == properties[1].id;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background image — AnimatedSwitcher crossfades between images
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                fit: StackFit.expand,
-                children: [
-                  ...previousChildren,
-                  if (currentChild != null) currentChild,
-                ],
-              ),
-              child: _CardImage(
-                key: ValueKey<String>(
-                  '${p.id}:$safeCurrentImage:${currentMedia?.url ?? 'empty'}',
-                ),
-                media: currentMedia,
-                city: p.city,
-              ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.16),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 18,
+              spreadRadius: 2,
+              offset: const Offset(0, 6),
             ),
-
-            // Dark gradient — deeper at bottom for better text contrast
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Color(0xFF040F1C),
-                    Color(0xE0051E34),
-                    Color(0x66072946),
-                    Colors.transparent,
-                  ],
-                  stops: [0.0, 0.32, 0.60, 0.82],
-                ),
-              ),
-            ),
-
-            // Image navigation tap zones (upper 55% of card)
-            if (hasMultiple)
-              Positioned.fill(
-                child: Column(
-                  children: [
-                    Expanded(
-                      flex: 55,
-                      child: Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Row(
-                          children: [
-                            // Left tap -> prev
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _prevImage,
-                                behavior: HitTestBehavior.translucent,
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
-                            // Right tap -> next
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _nextImage,
-                                behavior: HitTestBehavior.translucent,
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Expanded(flex: 45, child: SizedBox.shrink()),
-                  ],
-                ),
-              ),
-
-            // Tap bottom area → detail page
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: MediaQuery.sizeOf(context).height * 0.28,
-              child: GestureDetector(
-                onTap: () => _openDetail(context),
-                behavior: HitTestBehavior.translucent,
-              ),
-            ),
-
-            // Progress bars — Stories-style image counter at very top
-            if (hasMultiple)
-              Positioned(
-                top: 12,
-                left: 14,
-                right: 14,
-                child: _ImageProgressBars(
-                  count: media.length,
-                  current: safeCurrentImage,
-                ),
-              ),
-
-            // Top row: agency badge + send/more buttons
-            Positioned(
-              top: hasMultiple ? 26 : 16,
-              right: 16,
-              left: 16,
-              child: Row(
-                children: [
-                  _AgencyBadge(agencyListing: p.agencyListing),
-                  if (p.hasReadyVirtualTour) ...[
-                    const SizedBox(width: 8),
-                    const _TourReadyBadge(),
-                  ],
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _showSendOptions,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.42),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.12),
-                        ),
-                      ),
-                      child: const RentchIcon(
-                        IconsaxPlusLinear.send_2,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _showMoreOptions(context),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.42),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.12),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.more_vert,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Swipe labels
-            if (isLiking || isPassing)
-              Positioned(
-                top: 28,
-                left: isPassing ? 22 : null,
-                right: isLiking ? 22 : null,
-                child: Transform.rotate(
-                  angle: isLiking ? -0.15 : 0.15,
-                  child: _SwipeBadge(
-                    label: isLiking ? '♥ מתאים' : 'דלג',
-                    color: isLiking ? AppColors.primary : AppColors.coral,
-                  ),
-                ),
-              ),
-            // Content overlay (bottom layout directly on the dark gradient)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 20,
-              child: GestureDetector(
-                onTap: () => _openDetail(context),
-                behavior: HitTestBehavior.opaque,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        if (priceCtx != PriceContext.average)
-                          _PriceContextBadge(ctx: priceCtx)
-                        else
-                          const SizedBox.shrink(),
-                        if (score > 0)
-                          _MatchScoreBadge(score: score)
-                        else
-                          const SizedBox.shrink(),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          p.priceLabel,
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          p.priceSuffixLabel,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const RentchIcon(
-                          IconsaxPlusLinear.location,
-                          size: 14,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            p.address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          _StatPill(
-                              icon: IconsaxPlusLinear.building,
-                              label: '${p.roomsLabel} חדרים'),
-                          const SizedBox(width: 6),
-                          _StatPill(
-                              icon: IconsaxPlusLinear.maximize_3,
-                              label: '${p.sizeM2} מ"ר'),
-                          if (p.floor.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            _StatPill(
-                                icon: IconsaxPlusLinear.layer,
-                                label: 'קומה ${p.floor}'),
-                          ],
-                          if (p.sizeM2 > 0) ...[
-                            const SizedBox(width: 6),
-                            _StatPill(
-                              icon: IconsaxPlusLinear.moneys,
-                              label: '₪${(p.price / p.sizeM2).round()}/מ"ר',
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // Outward glass glow/reflection
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.08),
+              blurRadius: 8,
+              spreadRadius: -1,
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26.5),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background image — AnimatedSwitcher crossfades between images
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                ),
+                child: _CardImage(
+                  key: ValueKey<String>(
+                    '${p.id}:$safeCurrentImage:${currentMedia?.url ?? 'empty'}',
+                  ),
+                  media: currentMedia,
+                  city: p.city,
+                ),
+              ),
+
+              // Dark gradient — deeper at bottom for better text contrast
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Color(0xFF040F1C),
+                      Color(0xE0051E34),
+                      Color(0x66072946),
+                      Colors.transparent,
+                    ],
+                    stops: [0.0, 0.32, 0.60, 0.82],
+                  ),
+                ),
+              ),
+
+              // Image navigation tap zones (upper 55% of card)
+              if (hasMultiple)
+                Positioned.fill(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        flex: 55,
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            children: [
+                              // Left tap -> prev
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _prevImage,
+                                  behavior: HitTestBehavior.translucent,
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
+                              // Right tap -> next
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _nextImage,
+                                  behavior: HitTestBehavior.translucent,
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Expanded(flex: 45, child: SizedBox.shrink()),
+                    ],
+                  ),
+                ),
+
+              // Tap bottom area → detail page
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: MediaQuery.sizeOf(context).height * 0.28,
+                child: GestureDetector(
+                  onTap: () => _openDetail(context),
+                  behavior: HitTestBehavior.translucent,
+                ),
+              ),
+
+              // Progress bars — Stories-style image counter at very top
+              if (hasMultiple)
+                Positioned(
+                  top: 12,
+                  left: 14,
+                  right: 14,
+                  child: _ImageProgressBars(
+                    count: media.length,
+                    current: safeCurrentImage,
+                  ),
+                ),
+
+              // Top row: agency badge + send/more buttons
+              Positioned(
+                top: hasMultiple ? 26 : 16,
+                right: 16,
+                left: 16,
+                child: Row(
+                  children: [
+                    _AgencyBadge(agencyListing: p.agencyListing),
+                    if (p.isVerifiedListing) ...[
+                      const SizedBox(width: 8),
+                      const _VerifiedListingBadge(),
+                    ],
+                    if (p.hasReadyVirtualTour) ...[
+                      const SizedBox(width: 8),
+                      const _TourReadyBadge(),
+                    ],
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _showSendOptions,
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.42),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                        ),
+                        child: const RentchIcon(
+                          IconsaxPlusLinear.send_2,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _showMoreOptions(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.42),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.more_vert,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Swipe labels
+              if (isLiking || isPassing)
+                Positioned(
+                  top: 28,
+                  left: isPassing ? 22 : null,
+                  right: isLiking ? 22 : null,
+                  child: Transform.rotate(
+                    angle: isLiking ? -0.15 : 0.15,
+                    child: _SwipeBadge(
+                      label: isLiking ? '♥ מתאים' : 'דלג',
+                      color: isLiking ? AppColors.primary : AppColors.coral,
+                    ),
+                  ),
+                ),
+              // Content overlay (bottom layout directly on the dark gradient)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 128,
+                child: GestureDetector(
+                  onTap: () => _openDetail(context),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (priceCtx != PriceContext.average)
+                            _PriceContextBadge(ctx: priceCtx)
+                          else
+                            const SizedBox.shrink(),
+                          if (score > 0)
+                            _MatchScoreBadge(score: score)
+                          else
+                            const SizedBox.shrink(),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            p.priceLabel,
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            p.priceSuffixLabel,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const RentchIcon(
+                            IconsaxPlusLinear.location,
+                            size: 14,
+                            color: Colors.white70,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              p.address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (isFirst) ...[
+                        Row(
+                          children: [
+                            _StatPill(
+                              icon: IconsaxPlusLinear.eye,
+                              label: '245 צפו',
+                              highlight: true,
+                            ),
+                            const SizedBox(width: 6),
+                            _StatPill(
+                              icon: IconsaxPlusLinear.heart,
+                              label: '84 אהבו',
+                              highlight: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ] else if (isSecond) ...[
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withOpacity(0.25),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.flash_on_rounded, size: 13, color: Color(0xFFFCA5A5)),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'דירה חדשה!',
+                                    style: TextStyle(
+                                      color: Color(0xFFFCA5A5),
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _StatPill(
+                              icon: IconsaxPlusLinear.heart,
+                              label: '47 אהבו',
+                              highlight: true,
+                            ),
+                            const SizedBox(width: 6),
+                            _StatPill(
+                              icon: IconsaxPlusLinear.people,
+                              label: '3 צופים עכשיו',
+                              highlight: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            _StatPill(
+                                icon: IconsaxPlusLinear.building,
+                                label: '${p.roomsLabel} חדרים'),
+                            const SizedBox(width: 6),
+                            _StatPill(
+                                icon: IconsaxPlusLinear.maximize_3,
+                                label: '${p.sizeM2} מ"ר'),
+                            if (p.floor.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              _StatPill(
+                                  icon: IconsaxPlusLinear.layer,
+                                  label: 'קומה ${p.floor}'),
+                            ],
+                            if (p.sizeM2 > 0) ...[
+                              const SizedBox(width: 6),
+                              _StatPill(
+                                icon: IconsaxPlusLinear.moneys,
+                                label: '₪${(p.price / p.sizeM2).round()}/מ"ר',
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -490,6 +579,37 @@ class _AgencyBadge extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.navy,
               fontWeight: FontWeight.w800,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerifiedListingBadge extends StatelessWidget {
+  const _VerifiedListingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13BEC9).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(IconsaxPlusLinear.verify, color: Colors.white, size: 13),
+          SizedBox(width: 5),
+          Text(
+            'מאומתת',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
               fontSize: 11,
             ),
           ),

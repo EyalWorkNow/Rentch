@@ -149,6 +149,10 @@ class LocalStorageService {
           item['videoUrls'] = _remoteUrls(item['videoUrls']);
           item['virtualTour'] = _remoteVirtualTour(item['virtualTour']);
           item['model3d'] = _remoteModel3d(item['model3d']);
+          item['verification'] = _remoteVerification(item['verification']);
+          item['verificationVideoUrl'] = _remoteUrlString(
+            item['verificationVideoUrl'],
+          );
         }
       }
     }
@@ -207,6 +211,14 @@ class LocalStorageService {
             item['model3d'],
             localItem['model3d'],
           );
+          item['verification'] = _mergeVerification(
+            item['verification'],
+            localItem['verification'],
+          );
+          item['verificationVideoUrl'] = _mergeUrlString(
+            item['verificationVideoUrl'],
+            localItem['verificationVideoUrl'],
+          );
         }
       }
     }
@@ -238,6 +250,21 @@ class LocalStorageService {
       ...remote,
       ...local.where((url) => !remote.contains(url)),
     ];
+  }
+
+  String _remoteUrlString(Object? value) {
+    if (value is! String) return '';
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null) return '';
+    return uri.scheme == 'https' || uri.scheme == 'http' ? value.trim() : '';
+  }
+
+  String _mergeUrlString(Object? remoteValue, Object? localValue) {
+    final remote = _remoteUrlString(remoteValue);
+    if (remote.isNotEmpty) return remote;
+    if (localValue is! String) return '';
+    final local = localValue.trim();
+    return local.startsWith('/') || local.startsWith('file://') ? local : '';
   }
 
   List<Map<String, dynamic>> _remoteMediaItems(Object? value) {
@@ -372,6 +399,32 @@ class LocalStorageService {
       if (localValue.startsWith('/') || localValue.startsWith('file://')) {
         remote[field] = localValue;
       }
+    }
+
+    return remote.isEmpty ? null : remote;
+  }
+
+  Map<String, dynamic>? _remoteVerification(Object? value) {
+    if (value is! Map) return null;
+    final verification = Map<String, dynamic>.from(value);
+    verification['videoUrl'] = _remoteUrlString(verification['videoUrl']);
+    return verification;
+  }
+
+  Map<String, dynamic>? _mergeVerification(
+    Object? remoteValue,
+    Object? localValue,
+  ) {
+    final remote = remoteValue is Map
+        ? Map<String, dynamic>.from(remoteValue)
+        : <String, dynamic>{};
+    if (localValue is! Map) return remote.isEmpty ? null : remote;
+
+    final local = Map<String, dynamic>.from(localValue);
+    final remoteVideo = _remoteUrlString(remote['videoUrl']);
+    final localVideo = _mergeUrlString('', local['videoUrl']);
+    if (remoteVideo.isEmpty && localVideo.isNotEmpty) {
+      remote['videoUrl'] = localVideo;
     }
 
     return remote.isEmpty ? null : remote;

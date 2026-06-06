@@ -6,6 +6,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -162,6 +163,14 @@ def normalize_entry_date(value: str | None) -> str:
     return value.split(" ")[0]
 
 
+def normalize_created_at(row: dict[str, str]) -> str:
+    for key in ("created_at", "createdAt", "posted_at", "published_at"):
+        value = (row.get(key) or "").strip()
+        if value:
+            return value
+    return datetime.now(timezone.utc).isoformat()
+
+
 def build_feature_payload(row: dict[str, str]) -> tuple[dict[str, bool], list[str]]:
     feature_flags = {key: False for key in CANONICAL_FEATURES}
     feature_labels: list[str] = []
@@ -186,6 +195,7 @@ def convert_row(row: dict[str, str]) -> dict[str, object] | None:
     ]
     transaction_type = parse_transaction_type(row.get("transaction_type"))
     entry_date = normalize_entry_date(row.get("entry_date"))
+    created_at = normalize_created_at(row)
     price_history = (
         [
             {
@@ -214,6 +224,7 @@ def convert_row(row: dict[str, str]) -> dict[str, object] | None:
         "lon": parse_float(row.get("lon")),
         "propertyType": (row.get("property_type") or "דירה").strip(),
         "entryDate": (row.get("entry_date") or "").strip(),
+        "createdAt": created_at,
         "condition": (row.get("condition") or "").strip(),
         "features": json.dumps(feature_flags, ensure_ascii=False),
         "featureLabels": json.dumps(feature_labels, ensure_ascii=False),
@@ -255,9 +266,29 @@ def convert_row(row: dict[str, str]) -> dict[str, object] | None:
                 "skips": 0,
                 "contactRequests": 0,
                 "avgTimeIn3dSeconds": 0,
+                "liveViewers": 0,
+                "likesToday": 0,
+                "likesTodayDate": "",
+                "detailViews": 0,
+                "gallerySwipes": 0,
+                "avgDetailStaySeconds": 0,
+                "lastViewedAt": None,
             },
             ensure_ascii=False,
         ),
+        "verification": json.dumps(
+            {
+                "verified": False,
+                "method": "",
+                "videoUrl": "",
+                "capturedAt": None,
+            },
+            ensure_ascii=False,
+        ),
+        "verifiedListing": 0,
+        "verificationMethod": "",
+        "verificationVideoUrl": "",
+        "verifiedAt": None,
     }
 
 
