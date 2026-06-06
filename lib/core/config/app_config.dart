@@ -51,9 +51,12 @@ class AppConfig {
     defaultValue: 'app_state',
   );
 
+  // Empty default forces LocalStorageService to generate a per-device ID.
+  // Never set this to a shared value like 'global_state' in production —
+  // all users would overwrite each other's state.
   static const String appwriteAppStateRowId = String.fromEnvironment(
     'APPWRITE_APP_STATE_ROW_ID',
-    defaultValue: 'global_state',
+    defaultValue: '',
   );
 
   static const String appwriteStorageBucketId = String.fromEnvironment(

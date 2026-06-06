@@ -7,6 +7,7 @@ import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/core/services/appwrite_client.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalStorageService {
@@ -16,15 +17,62 @@ class LocalStorageService {
   static const String _updatedAtField = 'updatedAt';
   static const String _remoteStateIdKey = 'rentch_remote_state_document_id_v2';
 
+  // SEC-8: On iOS, app state is stored in the Keychain (Secure Enclave AES-256)
+  // instead of NSUserDefaults (plain-text on non-jailbroken devices but
+  // readable on jailbroken ones). On Android, SharedPreferences already uses
+  // EncryptedSharedPreferences via encryptedSharedPreferences: true.
+  static const _secureStorage = FlutterSecureStorage(
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
+  static bool get _useKeychain =>
+      defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+
+  Future<String?> _readStateLocal(SharedPreferences prefs) async {
+    if (_useKeychain) {
+      // Try Keychain first; fall back to SharedPreferences for migration of
+      // existing users who were on an older version of the app.
+      final secure = await _secureStorage.read(key: _appStateKey);
+      if (secure != null) return secure;
+      final legacy = prefs.getString(_appStateKey);
+      if (legacy != null) {
+        // Migrate: write to Keychain, remove from plain storage.
+        await _secureStorage.write(key: _appStateKey, value: legacy);
+        await prefs.remove(_appStateKey);
+      }
+      return legacy;
+    }
+    return prefs.getString(_appStateKey);
+  }
+
+  Future<void> _writeStateLocal(SharedPreferences prefs, String json) async {
+    if (_useKeychain) {
+      await _secureStorage.write(key: _appStateKey, value: json);
+    } else {
+      await prefs.setString(_appStateKey, json);
+    }
+  }
+
+  Future<void> _deleteStateLocal(SharedPreferences prefs) async {
+    if (_useKeychain) {
+      await _secureStorage.delete(key: _appStateKey);
+    }
+    await prefs.remove(_appStateKey);
+  }
+
   Future<Map<String, dynamic>?> loadAppState() async {
     final preferences = await SharedPreferences.getInstance();
-    final rawLocalState = preferences.getString(_appStateKey);
+    final rawLocalState = await _readStateLocal(preferences);
     final localState = _decodeState(rawLocalState);
 
     final remoteState = await _loadRemoteState(preferences);
     if (remoteState != null) {
       final mergedState = _mergeLocalMedia(remoteState, localState);
-      await preferences.setString(_appStateKey, jsonEncode(mergedState));
+      await _writeStateLocal(preferences, jsonEncode(mergedState));
       return mergedState;
     }
 
@@ -41,7 +89,7 @@ class LocalStorageService {
   }) async {
     final preferences = await SharedPreferences.getInstance();
     final encodedState = jsonEncode(state);
-    await preferences.setString(_appStateKey, encodedState);
+    await _writeStateLocal(preferences, encodedState);
     if (!syncRemote) return;
     await _saveRemoteState(preferences, state);
   }
@@ -53,7 +101,7 @@ class LocalStorageService {
 
   Future<void> clearAppState() async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.remove(_appStateKey);
+    await _deleteStateLocal(preferences);
   }
 
   Map<String, dynamic>? _decodeState(String? rawState) {

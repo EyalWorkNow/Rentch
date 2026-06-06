@@ -135,10 +135,12 @@ class _MessageScreenState extends State<MessageScreen> {
         imageQuality: 80,
       );
       if (file == null || !mounted) return;
+      // SEC: never store local device paths in messages — they expose the
+      // file system to the other party and are useless cross-device.
       await provider.sendMessage(
         matchId: widget.matchId,
         sender: senderName,
-        text: '__img__:${file.path}',
+        text: '📷 [תמונה]',
       );
       _scrollToBottom();
     } catch (_) {
@@ -150,10 +152,12 @@ class _MessageScreenState extends State<MessageScreen> {
     try {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file == null || !mounted) return;
+      // SEC: send only the file name, never the full local path.
+      final safeName = file.name.split('/').last.split('\\').last;
       await provider.sendMessage(
         matchId: widget.matchId,
         sender: senderName,
-        text: '__file__:${file.name}',
+        text: '📎 [$safeName]',
       );
       _scrollToBottom();
     } catch (_) {
@@ -1139,22 +1143,24 @@ class _MessageBubble extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.75)
         : AppColors.textSecondary;
 
-    final isImg = message.text.startsWith('__img__:');
-    final isFile = message.text.startsWith('__file__:');
+    // Detect media messages (📷 / 📎 prefix) for richer bubble rendering.
+    // Legacy __img__: paths are treated as plain text (no file path exposure).
+    final isImg = message.text == '📷 [תמונה]';
+    final isFile = message.text.startsWith('📎 [') && message.text.endsWith(']');
     final isMedia = isImg || isFile;
 
     Widget messageContent;
     if (isImg) {
       messageContent = _MediaBubbleContent(
         icon: Icons.image_rounded,
-        label: 'תמונה נשלחה',
+        label: 'תמונה',
         color: isTenant ? Colors.white : AppColors.primary,
       );
     } else if (isFile) {
-      final fileName = message.text.replaceFirst('__file__:', '');
+      final label = message.text.substring(4, message.text.length - 1);
       messageContent = _MediaBubbleContent(
         icon: Icons.attach_file_rounded,
-        label: fileName.isNotEmpty ? fileName : 'קובץ',
+        label: label.isNotEmpty ? label : 'קובץ',
         color: isTenant ? Colors.white : AppColors.primary,
       );
     } else {

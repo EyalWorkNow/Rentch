@@ -1053,7 +1053,7 @@ class _LoginTabState extends State<_LoginTab> {
               showBackButton: true,
               onBack: widget.onBack,
               isDark: true,
-              logoHeight: 52,
+              logoHeight: 135,
             ),
             const SizedBox(height: 12),
             ClipRRect(
@@ -1334,9 +1334,9 @@ class _RegisterFlowState extends State<_RegisterFlow> {
             const SnackBar(content: Text('יש להזין כתובת אימייל תקינה')));
         return;
       }
-      if (password.length < 6) {
+      if (password.length < 8) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('הסיסמה חייבת להכיל לפחות 6 תווים')));
+            const SnackBar(content: Text('הסיסמה חייבת להכיל לפחות 8 תווים')));
         return;
       }
       if (!_agreedToTerms) {
@@ -1589,13 +1589,13 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                 16,
                 12 + MediaQuery.of(context).padding.bottom),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(40),
+              borderRadius: BorderRadius.circular(56),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(40),
+                    borderRadius: BorderRadius.circular(56),
                     border: Border.all(color: Colors.white.withOpacity(0.24), width: 1.5),
                     boxShadow: [
                       BoxShadow(
@@ -2882,28 +2882,28 @@ class _StepPropertyDetails extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 3),
-          Text('ניתן לעדכן פרטים נוספים מתוך לוח הבקרה',
+          const SizedBox(height: 6),
+          Text('הגדר את מאפייני הדירה שלך כדי שנוכל לחבר אותך לשוכרים המתאימים ביותר.',
               style: TextStyle(
                   color: isDark ? Colors.white70 : AppColors.textSecondary,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           _AuthTextField(
             controller: cityCtrl,
             label: 'עיר / שכונה',
             icon: IconsaxPlusLinear.location,
             isDark: isDark,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           _RoomsStepper(rooms: rooms, onRooms: onRooms, isDark: isDark),
-          const SizedBox(height: 14),
+          const SizedBox(height: 22),
           Text('מה יש בנכס?',
               style: TextStyle(
-                  color: isDark ? Colors.white70 : AppColors.navy,
+                  color: isDark ? Colors.white : AppColors.navy,
                   fontSize: 14,
                   fontWeight: FontWeight.w800)),
-          const SizedBox(height: 9),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -2935,16 +2935,16 @@ class _RoomsStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = rooms % 1 == 0 ? rooms.toInt().toString() : '$rooms';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.08) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : _kInputBorder),
       ),
       child: Row(children: [
         Text('מספר חדרים',
             style: TextStyle(
-                color: isDark ? Colors.white70 : AppColors.navy,
+                color: isDark ? Colors.white : AppColors.navy,
                 fontSize: 14,
                 fontWeight: FontWeight.w700)),
         const Spacer(),
