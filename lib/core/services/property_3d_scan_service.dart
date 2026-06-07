@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Property3dScanService {
   Property3dScanService({
@@ -136,6 +137,20 @@ class Property3dScanService {
     try {
       final request = await client.openUrl(method, uri).timeout(_timeout);
       request.headers.contentType = ContentType.json;
+      final apiKey = AppConfig.awsApiKey.trim();
+      if (apiKey.isNotEmpty) {
+        request.headers.add('x-api-key', apiKey);
+      }
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final token = await user.getIdToken();
+          if (token != null && token.isNotEmpty) {
+            request.headers
+                .add(HttpHeaders.authorizationHeader, 'Bearer $token');
+          }
+        }
+      } catch (_) {}
       if (body != null) {
         request.write(jsonEncode(body));
       }

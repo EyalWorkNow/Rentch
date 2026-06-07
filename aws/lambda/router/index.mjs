@@ -23,7 +23,7 @@ import {
   QueryCommand,
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { S3Client, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const REGION = process.env.AWS_REGION;
@@ -76,6 +76,18 @@ export const handler = async (event) => {
     // ── 3D viewer routes ────────────────────────────────────────────────────
     if (segments[0] === '3d' && segments[1] === 'viewers' && method === 'POST') {
       return await create3dViewer(event);
+    }
+
+    // ── Scan routes ─────────────────────────────────────────────────────────
+    if (segments[0] === 'scans') {
+      const scanId = segments[1] ? decodeURIComponent(segments[1]) : null;
+      // POST /scans → create scan job + presigned upload URL
+      if (method === 'POST' && !scanId) return await createScan(event);
+      // POST /scans/:id/process → build video viewer HTML
+      if (method === 'POST' && scanId && segments[2] === 'process') return await processScan(scanId);
+      // GET /scans/:id → return scan status + viewerUrl
+      if (method === 'GET' && scanId) return await getScan(scanId);
+      return json(404, { message: 'Unknown scan route' });
     }
 
     // ── Table CRUD ──────────────────────────────────────────────────────────
@@ -515,6 +527,193 @@ function commonPrefix(values) {
   }
   const slash = prefix.lastIndexOf('/');
   return slash >= 0 ? prefix.slice(0, slash + 1) : prefix;
+}
+
+// ── Scan handlers (video → virtual-tour viewer) ──────────────────────────────
+
+async function createScan(event) {
+  const body = event.body ? JSON.parse(event.body) : {};
+  const propertyId = sanitizeId(body.propertyId || body.id || 'prop');
+  const contentType = body.contentType || 'video/mp4';
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 10);
+  const scanId = `sc_${ts}_${rand}`;
+  const ext = contentType.includes('quicktime') ? 'mov'
+    : contentType.includes('m4v') ? 'm4v'
+    : contentType.includes('webm') ? 'webm'
+    : 'mp4';
+  const videoKey = `3d-scans/${propertyId}/${scanId}.${ext}`;
+
+  const uploadUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: S3_BUCKET, Key: videoKey, ContentType: contentType }),
+    { expiresIn: 3600 },
+  );
+
+  const meta = { scanId, propertyId, videoKey, contentType, status: 'pending', createdAt: ts };
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `3d-scans/meta/${scanId}.json`,
+    Body: JSON.stringify(meta),
+    ContentType: 'application/json',
+  }));
+
+  return json(200, { data: { scanId, uploadUrl } });
+}
+
+async function processScan(scanId) {
+  let meta;
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: `3d-scans/meta/${scanId}.json`,
+    }));
+    meta = JSON.parse(await streamToString(obj.Body));
+  } catch {
+    return json(404, { message: 'Scan not found' });
+  }
+
+  const videoUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${meta.videoKey}`;
+  const html = renderVideoViewerHtml({
+    title: 'Rentch Virtual Tour',
+    videoUrl,
+    propertyId: meta.propertyId,
+  });
+  const viewerKey = `3d-viewers/${meta.propertyId}/${scanId}-viewer.html`;
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: viewerKey,
+    Body: html,
+    ContentType: 'text/html; charset=utf-8',
+    CacheControl: 'public, max-age=3600',
+  }));
+
+  const viewerUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${viewerKey}`;
+  const updated = { ...meta, status: 'ready', viewerUrl, videoUrl, processedAt: Date.now() };
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `3d-scans/meta/${scanId}.json`,
+    Body: JSON.stringify(updated),
+    ContentType: 'application/json',
+  }));
+
+  return json(200, {
+    data: {
+      id: scanId,
+      scanId,
+      status: 'ready',
+      viewerUrl,
+      downloadUrl: videoUrl,
+      format: 'video',
+    },
+  });
+}
+
+async function getScan(scanId) {
+  let meta;
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: `3d-scans/meta/${scanId}.json`,
+    }));
+    meta = JSON.parse(await streamToString(obj.Body));
+  } catch {
+    return json(404, { message: 'Scan not found' });
+  }
+  return json(200, {
+    id: scanId,
+    status: meta.status || 'pending',
+    viewerUrl: meta.viewerUrl || '',
+    downloadUrl: meta.videoUrl || '',
+    format: 'video',
+  });
+}
+
+async function streamToString(stream) {
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks).toString('utf-8');
+}
+
+function renderVideoViewerHtml({ title, videoUrl, propertyId }) {
+  const safeTitle = escapeHtml(title);
+  const safePropId = escapeHtml(propertyId);
+  const safeVideoUrl = escapeHtml(videoUrl);
+  return `<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>${safeTitle}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#07111c;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+    #wrap{position:relative;height:100%;display:flex;flex-direction:column}
+    header{position:absolute;top:0;left:0;right:0;z-index:10;padding:env(safe-area-inset-top,16px) 18px 12px;
+      background:linear-gradient(to bottom,rgba(7,17,28,.85) 0%,transparent 100%);
+      display:flex;align-items:center;gap:12px}
+    .logo{width:32px;height:32px;background:linear-gradient(135deg,#0ea5e9,#1d4ed8);border-radius:8px;
+      display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#fff;flex-shrink:0}
+    h1{font-size:16px;font-weight:700;letter-spacing:-.2px}
+    .sub{font-size:12px;color:rgba(245,247,251,.55)}
+    video{width:100%;height:100%;object-fit:contain;background:#000}
+    #controls{position:absolute;bottom:0;left:0;right:0;z-index:10;
+      padding:12px 18px calc(env(safe-area-inset-bottom,12px) + 12px);
+      background:linear-gradient(to top,rgba(7,17,28,.85) 0%,transparent 100%)}
+    #progress{width:100%;height:3px;background:rgba(255,255,255,.2);border-radius:2px;margin-bottom:10px;cursor:pointer}
+    #bar{height:100%;background:#0ea5e9;border-radius:2px;width:0;transition:width .1s linear}
+    .btns{display:flex;align-items:center;gap:14px}
+    button{background:none;border:none;color:#fff;cursor:pointer;padding:4px;opacity:.9}
+    button:hover{opacity:1}
+    svg{display:block}
+    #time{font-size:12px;color:rgba(245,247,251,.65);margin-right:auto}
+    #badge{background:rgba(14,165,233,.18);border:1px solid rgba(14,165,233,.35);
+      color:#7dd3fc;font-size:11px;font-weight:600;letter-spacing:.4px;
+      padding:3px 8px;border-radius:20px;white-space:nowrap}
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <div class="logo">R</div>
+    <div><h1>${safeTitle}</h1><div class="sub">נכס #${safePropId}</div></div>
+    <div id="badge">סיור וירטואלי</div>
+  </header>
+  <video id="v" src="${safeVideoUrl}" playsinline preload="metadata"></video>
+  <div id="controls">
+    <div id="progress"><div id="bar"></div></div>
+    <div class="btns">
+      <button id="btnPlay" title="נגן/עצור">
+        <svg id="iconPlay" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="iconPause" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <span id="time">0:00 / 0:00</span>
+      <button id="btnFs" title="מסך מלא">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+  const v=document.getElementById('v'),bar=document.getElementById('bar'),
+    btnPlay=document.getElementById('btnPlay'),iconPlay=document.getElementById('iconPlay'),
+    iconPause=document.getElementById('iconPause'),timeEl=document.getElementById('time'),
+    progress=document.getElementById('progress'),btnFs=document.getElementById('btnFs');
+  const fmt=s=>{const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec};
+  v.addEventListener('timeupdate',()=>{
+    if(!v.duration)return;
+    bar.style.width=(v.currentTime/v.duration*100)+'%';
+    timeEl.textContent=fmt(v.currentTime)+' / '+fmt(v.duration);
+  });
+  v.addEventListener('play',()=>{iconPlay.hidden=true;iconPause.hidden=false});
+  v.addEventListener('pause',()=>{iconPlay.hidden=false;iconPause.hidden=true});
+  btnPlay.onclick=()=>v.paused?v.play():v.pause();
+  progress.onclick=e=>{const r=progress.getBoundingClientRect();v.currentTime=(e.clientX-r.left)/r.width*v.duration};
+  btnFs.onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();
+  v.play().catch(()=>{});
+</script>
+</body>
+</html>`;
 }
 
 function escapeHtml(value) {

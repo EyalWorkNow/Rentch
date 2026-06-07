@@ -143,10 +143,16 @@ class AppConfig {
 
   static bool get hasSpatialConfig => spatialApiKey.trim().isNotEmpty;
 
-  static const String scan3dProxyUrl = String.fromEnvironment(
+  static const String _scan3dProxyUrlOverride = String.fromEnvironment(
     'RENTCH_3D_SCAN_PROXY_URL',
     defaultValue: '',
   );
+
+  static String get scan3dProxyUrl {
+    final explicit = _scan3dProxyUrlOverride.trim();
+    if (explicit.isNotEmpty) return explicit;
+    return awsApiGatewayUrl.trim();
+  }
 
   static const String scan3dDefaultPreset = String.fromEnvironment(
     'RENTCH_3D_SCAN_PRESET',
