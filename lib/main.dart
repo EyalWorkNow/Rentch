@@ -11,20 +11,28 @@ import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Startup must never throw before runApp — a failure here is the classic
+  // cause of a launch crash on TestFlight/release. Every step is guarded so the
+  // app always reaches runApp(); degraded features fail soft instead.
   if (AppConfig.enableGoogleSignIn) {
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
     } catch (error) {
-      if (AppConfig.isProduction) rethrow;
+      // Never rethrow on launch — Firebase Auth can still recover later.
       debugPrint('Firebase initialization skipped: $error');
     }
   }
 
-  // Initialize Scaniverse service — seeds dart-define token to Keychain once,
-  // then reads from Keychain on subsequent launches without needing dart-define.
-  await ScaniverseService.instance.initialize();
+  // Scaniverse is optional; a failure must not block launch.
+  try {
+    await ScaniverseService.instance.initialize();
+  } catch (error) {
+    debugPrint('Scaniverse initialization skipped: $error');
+  }
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

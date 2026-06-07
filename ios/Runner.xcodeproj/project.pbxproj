@@ -14,7 +14,6 @@
 		8CEDEAB40ECA483D880F19AF /* ScaniversePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECB7366A16E474E8D7919DE /* ScaniversePlugin.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
-		2D00A56909C446DE8A213091 /* NSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 367EE19C6DFE4BFAABA9068B /* NSDK */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
@@ -89,7 +88,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
-				2D00A56909C446DE8A213091 /* NSDK in Frameworks */,
 				B683446ACA3914A9E80EFEE3 /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -221,7 +219,6 @@
 			name = Runner;
 			packageProductDependencies = (
 				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
-				367EE19C6DFE4BFAABA9068B /* NSDK */,
 			);
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
@@ -258,7 +255,6 @@
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
 				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
-				20F40108E76B43AC93B0785D /* XCRemoteSwiftPackageReference "nsdk-library-xcframework" */,
 			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
 			projectDirPath = "";
@@ -779,26 +775,10 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		20F40108E76B43AC93B0785D /* XCRemoteSwiftPackageReference "nsdk-library-xcframework" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/nianticspatial/nsdk-library-xcframework";
-			requirement = {
-				kind = exactVersion;
-				version = "4.1.0-26051913";
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
-		};
-		367EE19C6DFE4BFAABA9068B /* NSDK */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 20F40108E76B43AC93B0785D /* XCRemoteSwiftPackageReference "nsdk-library-xcframework" */;
-			productName = NSDK;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
