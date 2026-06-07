@@ -17,6 +17,7 @@ Add video-to-3D apartment tours without making Rentch heavy:
 2. The scan guide favors a 45-75 second steady walkthrough with good lighting and one pass through each room.
 3. Publishing is not blocked by processing. If the backend proxy is unavailable, the scan is saved as a local draft with `captured` status.
 4. When `RENTCH_3D_SCAN_PROXY_URL` is configured, the app submits the capture through the proxy and saves the returned scan status.
+5. Owners can also import exported `Scaniverse` model files (`.glb`, `.obj`, `.mtl`, `.usdz`, textures, and related assets). The app uploads them to S3, then asks the backend to create a hosted viewer page.
 
 ### Tenant Discovery
 
@@ -67,6 +68,36 @@ Then:
 PUT {uploadUrl}
 POST /scans/{scanId}/process
 GET /scans/{scanId}
+```
+
+For imported 3D assets, the Flutter client also uses:
+
+```http
+POST /3d/viewers
+{
+  "propertyId": "custom-...",
+  "title": "Dizengoff, Tel Aviv",
+  "assets": [
+    {
+      "kind": "glb",
+      "url": "https://rentch-media-.../3d-assets/custom-.../box.glb",
+      "fileName": "box.glb",
+      "contentType": "model/gltf-binary"
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "data": {
+    "viewerUrl": "https://rentch-media-.../3d-viewers/custom-.../viewer.html",
+    "downloadUrl": "https://rentch-media-.../3d-assets/custom-.../box.glb",
+    "format": "glb"
+  }
+}
 ```
 
 Status responses should normalize provider fields to:

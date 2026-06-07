@@ -84,6 +84,7 @@ class AwsApiClient {
     String localPath, {
     String? contentType,
     String folder = 'uploads',
+    String? fileName,
   }) async {
     if (!isConfigured || !AppConfig.canUseCloudStorage) return null;
     try {
@@ -91,7 +92,11 @@ class AwsApiClient {
       if (!file.existsSync()) return null;
 
       final ext = localPath.split('.').last.toLowerCase();
-      final key = '$folder/${DateTime.now().microsecondsSinceEpoch}.$ext';
+      final normalizedName = _sanitizeFileName(fileName);
+      final suffix = normalizedName == null || normalizedName.isEmpty
+          ? '${DateTime.now().microsecondsSinceEpoch}.$ext'
+          : '${DateTime.now().microsecondsSinceEpoch}_$normalizedName';
+      final key = '$folder/$suffix';
       final mime = contentType ?? _mimeFor(ext);
 
       // 1. Get presigned URL from Lambda
@@ -126,7 +131,8 @@ class AwsApiClient {
   static const Duration _timeout = Duration(seconds: 20);
 
   Uri _uri(String path, {Map<String, String>? query}) {
-    final base = AppConfig.awsApiGatewayUrl.trimRight().replaceFirst(RegExp(r'/$'), '');
+    final base =
+        AppConfig.awsApiGatewayUrl.trimRight().replaceFirst(RegExp(r'/$'), '');
     final normalized = path.startsWith('/') ? path : '/$path';
     var uri = Uri.parse('$base$normalized');
     if (query != null && query.isNotEmpty) {
@@ -153,7 +159,9 @@ class AwsApiClient {
         }
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('AwsApiClient: could not get Firebase token: $e');
+      if (kDebugMode) {
+        debugPrint('AwsApiClient: could not get Firebase token: $e');
+      }
     }
 
     return h;
@@ -187,8 +195,25 @@ class AwsApiClient {
       'mp4' => 'video/mp4',
       'mov' => 'video/quicktime',
       'm4v' => 'video/x-m4v',
+      'glb' => 'model/gltf-binary',
+      'gltf' => 'model/gltf+json',
+      'obj' => 'text/plain',
+      'mtl' => 'text/plain',
+      'bin' => 'application/octet-stream',
+      'usdz' => 'model/vnd.usdz+zip',
+      'spz' => 'application/octet-stream',
+      'ply' => 'application/octet-stream',
+      'sog' => 'application/octet-stream',
+      'html' => 'text/html; charset=utf-8',
       _ => 'application/octet-stream',
     };
+  }
+
+  static String? _sanitizeFileName(String? fileName) {
+    final raw = fileName?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    final cleaned = raw.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return cleaned.isEmpty ? null : cleaned;
   }
 
   void dispose() => _http.close();

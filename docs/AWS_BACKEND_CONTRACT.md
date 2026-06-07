@@ -47,7 +47,7 @@ Every row carries an `id` field (the DynamoDB partition key unless noted).
 
 | Method | Path | Query / Body | Notes |
 |---|---|---|---|
-| GET | `/properties` | `?status=active&limit=150&offset=0` | Paginated. Optional `areaId`. |
+| GET | `/properties` | `?status=active&limit=150&lastKey=<cursor>` | Cursor-paginated. Omit `lastKey` for the first page. |
 | POST | `/properties` | `{ id, propertyId, ownerUserId, price, rooms, sizeM2, city, ... , status }` | Create. |
 | PUT | `/properties/{id}` | full row | Upsert/update. |
 | DELETE | `/properties/{id}` | — | Owner-only. |
@@ -126,6 +126,16 @@ devices (prevents the old `global_state` overwrite bug).
 The client requests a presigned `PUT` URL, then uploads bytes **directly to S3**
 (no Lambda in the data path). `publicUrl` is the final HTTPS object URL stored on
 the property/profile row.
+
+### Hosted 3D viewers
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/3d/viewers` | `{ propertyId, title, assets[] }` | `{ data: { viewerUrl, downloadUrl, format, model3d } }` |
+
+`assets[]` contains already-uploaded S3 object URLs for files exported from
+Scaniverse or other 3D tools. The router creates a hosted HTML viewer page in
+S3 that renders GLB/USDZ through `model-viewer` and OBJ/MTL through Three.js.
 
 ---
 

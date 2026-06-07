@@ -12,9 +12,14 @@ import 'package:latlong2/latlong.dart';
 
 // Result type for paginated property loading.
 class PropertyPage {
-  const PropertyPage({required this.items, required this.hasMore});
+  const PropertyPage({
+    required this.items,
+    required this.hasMore,
+    this.nextCursor,
+  });
   final List<RentalProperty> items;
   final bool hasMore;
+  final String? nextCursor;
   bool get isEmpty => items.isEmpty;
 }
 
@@ -42,9 +47,14 @@ class RentalDataService {
   // Loads subsequent pages. Call when the swipe deck runs low.
   Future<PropertyPage> loadPage({
     required int offset,
+    String? cursor,
     String areaId = 'all_israel',
   }) async {
-    final remote = await _loadPage(offset: offset, areaId: areaId);
+    final remote = await _loadPage(
+      offset: offset,
+      cursor: cursor,
+      areaId: areaId,
+    );
     if (remote != null) return remote;
 
     // Asset fallback for subsequent pages
@@ -63,12 +73,13 @@ class RentalDataService {
 
   Future<PropertyPage?> _loadPage({
     required int offset,
+    String? cursor,
     required String areaId,
   }) async {
     if (!AppConfig.canUseProperties) return null;
     if (_breaker.isOpen) return null;
 
-    final cacheKey = '$areaId:$offset';
+    final cacheKey = '$areaId:${cursor ?? offset}';
     final cached = AppCache.instance.propertyPages.get(cacheKey);
     if (cached != null) {
       return PropertyPage(
@@ -76,25 +87,28 @@ class RentalDataService {
             .map((row) => _propertyFromRow(row))
             .where((p) => p.id.trim().isNotEmpty)
             .toList(),
-        hasMore: cached.length == AppConfig.propertyPageSize,
+        hasMore: false,
       );
     }
 
     try {
+      final query = <String, String>{
+        'status': 'active',
+        'limit': AppConfig.propertyPageSize.toString(),
+      };
+      if (cursor != null && cursor.isNotEmpty) {
+        query['lastKey'] = cursor;
+      }
+
       final payload = await _breaker.call(
         () => RetryPolicy.transient.execute(
           () => aws.get(
             '/${AppConfig.appwritePropertiesTableId}',
-            query: {
-              'status': 'active',
-              'limit': AppConfig.propertyPageSize.toString(),
-              'offset': offset.toString(),
-            },
+            query: query,
           ),
         ),
       );
 
-      if (payload is! Map) return null;
       final rows = payload['items'] ?? payload['rows'];
       if (rows is! List) return null;
 
@@ -110,9 +124,15 @@ class RentalDataService {
           .where((p) => p.id.trim().isNotEmpty)
           .toList();
 
+      final nextCursor = payload['lastKey']?.toString();
+      final hasMore = payload['hasMore'] == true &&
+          nextCursor != null &&
+          nextCursor.isNotEmpty;
+
       return PropertyPage(
         items: items,
-        hasMore: items.length == AppConfig.propertyPageSize,
+        hasMore: hasMore,
+        nextCursor: hasMore ? nextCursor : null,
       );
     } on CircuitOpenException {
       return null;

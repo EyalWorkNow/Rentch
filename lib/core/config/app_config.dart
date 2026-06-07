@@ -164,8 +164,7 @@ class AppConfig {
 
   static bool get hasAwsCoreConfig => awsApiGatewayUrl.trim().isNotEmpty;
 
-  static bool get canUseCloudStorage =>
-      enableCloudStorage && hasAwsCoreConfig;
+  static bool get canUseCloudStorage => enableCloudStorage && hasAwsCoreConfig;
 
   static bool get canUseChat => hasAwsCoreConfig;
 
@@ -179,8 +178,7 @@ class AppConfig {
   static bool get canUse3dScanBackend =>
       enable3dScanning && scan3dProxyUrl.trim().isNotEmpty;
 
-  static bool get canUseRemoteState =>
-      enableRemoteState && hasAwsCoreConfig;
+  static bool get canUseRemoteState => enableRemoteState && hasAwsCoreConfig;
 
   // ── Legacy aliases (kept so existing callers compile unchanged) ───────────────
   // These map old Appwrite constant names → AWS equivalents.
@@ -190,30 +188,35 @@ class AppConfig {
   static String get appwriteAppStateTableId => 'app_state';
   static String get appwriteAppStateRowId => awsAppStateRowId;
   static String get appwriteStorageBucketId => awsS3Bucket;
-  static String get appwriteMessagesTableId => dynamoMessagesTable;
-  static String get appwritePropertiesTableId => dynamoPropertiesTable;
-  static String get appwritePropertyViewSessionsTableId => dynamoPropertyViewsTable;
-  static String get appwritePropertyLikesTableId => dynamoPropertyLikesTable;
-  static String get appwriteUsersTableId => dynamoUsersTable;
-  static String get appwriteEventsTableId => dynamoEventsTable;
-  static String get appwriteReportsTableId => dynamoReportsTable;
-  static String get appwriteBlocksTableId => dynamoBlocksTable;
+  static String get appwriteMessagesTableId => 'messages';
+  static String get appwritePropertiesTableId => 'properties';
+  static String get appwritePropertyViewSessionsTableId =>
+      dynamoPropertyViewsTable.isEmpty ? '' : 'property_views';
+  static String get appwritePropertyLikesTableId =>
+      dynamoPropertyLikesTable.isEmpty ? '' : 'property_likes';
+  static String get appwriteUsersTableId => 'users';
+  static String get appwriteEventsTableId => 'events';
+  static String get appwriteReportsTableId => 'reports';
+  static String get appwriteBlocksTableId => 'blocks';
   static bool get hasAppwriteCoreConfig => hasAwsCoreConfig;
 
   static List<String> productionReadinessIssues() {
     if (!isProduction) return const [];
     final issues = <String>[];
     if (!hasAwsCoreConfig) {
-      issues.add('AWS_API_URL is not set. Set via --dart-define=AWS_API_URL=...');
+      issues
+          .add('AWS_API_URL is not set. Set via --dart-define=AWS_API_URL=...');
     }
     if (awsApiKey.isEmpty) {
-      issues.add('AWS_API_KEY is not set. Set via --dart-define=AWS_API_KEY=...');
+      issues
+          .add('AWS_API_KEY is not set. Set via --dart-define=AWS_API_KEY=...');
     }
     if (enableCloudStorage && !canUseCloudStorage) {
       issues.add('Cloud storage is enabled but AWS is not configured.');
     }
     if (!enableCloudStorage) {
-      issues.add('Cloud storage is disabled; uploaded images remain on-device only.');
+      issues.add(
+          'Cloud storage is disabled; uploaded images remain on-device only.');
     }
     if (enableRemoteState && !canUseRemoteState) {
       issues.add('Remote state is enabled but AWS_API_URL is missing.');
@@ -222,7 +225,8 @@ class AppConfig {
       issues.add('Remote state is disabled; app state remains device-local.');
     }
     if (enable3dScanning && !canUse3dScanBackend) {
-      issues.add('3D scanning is enabled but RENTCH_3D_SCAN_PROXY_URL is missing.');
+      issues.add(
+          '3D scanning is enabled but RENTCH_3D_SCAN_PROXY_URL is missing.');
     }
     return issues;
   }

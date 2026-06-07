@@ -263,11 +263,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444).withOpacity(0.25),
+                                  color:
+                                      const Color(0xFFEF4444).withOpacity(0.25),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4), width: 0.8),
+                                  border: Border.all(
+                                      color: const Color(0xFFEF4444)
+                                          .withOpacity(0.4),
+                                      width: 0.8),
                                 ),
                                 child: const Text(
                                   'חדש!',
@@ -421,126 +426,125 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   : SafeArea(
                       bottom: false,
                       child: Stack(
-                          children: [
-                            // Full-height card swiper extending almost to the bottom navbar
-                            Positioned.fill(
-                              child: properties.isNotEmpty
-                                  ? CardSwiper(
-                                      key: ValueKey(
-                                        provider.filteredPropertiesRevision,
-                                      ),
-                                      controller:
-                                          provider.propertySwiperController,
-                                      cardsCount: properties.length,
-                                      padding: const EdgeInsets.fromLTRB(
-                                        10,
-                                        6,
-                                        10,
-                                        150,
-                                      ),
-                                      scale: 0.93,
-                                      threshold: 38,
-                                      maxAngle: 16,
-                                      isLoop: false,
-                                      numberOfCardsDisplayed:
-                                          math.min(3, properties.length),
-                                      backCardOffset: const Offset(0, 20),
-                                      allowedSwipeDirection:
-                                          const AllowedSwipeDirection.only(
-                                        left: true,
-                                        right: true,
-                                        up: true,
-                                      ),
-                                      onSwipe: provider.handlePropertySwipe,
-                                      cardBuilder: (
-                                        context,
-                                        index,
-                                        horizontalOffsetPercentage,
-                                        verticalOffsetPercentage,
-                                      ) {
-                                        if (index < 0 ||
-                                            index >= properties.length) {
-                                          return const SizedBox.shrink();
-                                        }
-                                        return Stack(
-                                          children: [
-                                            ProfileCard(
-                                              key: ValueKey(
-                                                properties[index].id,
-                                              ),
-                                              property: properties[index],
-                                              horizontalOffsetPercentage:
-                                                  horizontalOffsetPercentage,
+                        children: [
+                          // Full-height card swiper extending almost to the bottom navbar
+                          Positioned.fill(
+                            child: properties.isNotEmpty
+                                ? CardSwiper(
+                                    key: ValueKey(
+                                      provider.filteredPropertiesRevision,
+                                    ),
+                                    controller:
+                                        provider.propertySwiperController,
+                                    cardsCount: properties.length,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      10,
+                                      6,
+                                      10,
+                                      150,
+                                    ),
+                                    scale: 0.93,
+                                    threshold: 38,
+                                    maxAngle: 16,
+                                    isLoop: false,
+                                    numberOfCardsDisplayed:
+                                        math.min(3, properties.length),
+                                    backCardOffset: const Offset(0, 20),
+                                    allowedSwipeDirection:
+                                        const AllowedSwipeDirection.only(
+                                      left: true,
+                                      right: true,
+                                      up: true,
+                                    ),
+                                    onSwipe: provider.handlePropertySwipe,
+                                    cardBuilder: (
+                                      context,
+                                      index,
+                                      horizontalOffsetPercentage,
+                                      verticalOffsetPercentage,
+                                    ) {
+                                      if (index < 0 ||
+                                          index >= properties.length) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return Stack(
+                                        children: [
+                                          ProfileCard(
+                                            key: ValueKey(
+                                              properties[index].id,
                                             ),
-                                            FomoCardOverlay(
-                                              property: properties[index],
-                                              likedIds:
-                                                  provider.likedPropertyIds,
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    )
-                                  : const _NoMorePropertiesState(),
-                            ),
-
-                            // Floating centered action buttons row
-                            Positioned(
-                              bottom: 165,
-                              left: 0,
-                              right: 0,
-                              child: ActionButtons(
-                                onSwipeLeft: provider.swipePropertyLeft,
-                                onSwipeRight: provider.swipePropertyRight,
-                                onVirtualTour: () {
-                                  if (properties.isEmpty) return;
-                                  openPropertyTour(context, properties.first);
-                                },
-                              ),
-                            ),
-
-                            // Floating Undo button independently positioned on the bottom-left corner
-                            if (provider.canUndo)
-                              Positioned(
-                                bottom: 173,
-                                left: 24,
-                                child: Tooltip(
-                                  message: 'חזור לפריט הקודם',
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      HapticFeedback.lightImpact();
-                                      provider.undoSwipe();
-                                    },
-                                    child: Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: const Color(0xFFE2E8F0),
-                                          width: 1.5,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFFF59E0B)
-                                                .withOpacity(0.12),
-                                            blurRadius: 12,
-                                            offset: const Offset(0, 4),
+                                            property: properties[index],
+                                            horizontalOffsetPercentage:
+                                                horizontalOffsetPercentage,
+                                          ),
+                                          FomoCardOverlay(
+                                            property: properties[index],
+                                            likedIds: provider.likedPropertyIds,
                                           ),
                                         ],
+                                      );
+                                    },
+                                  )
+                                : const _NoMorePropertiesState(),
+                          ),
+
+                          // Floating centered action buttons row
+                          Positioned(
+                            bottom: 165,
+                            left: 0,
+                            right: 0,
+                            child: ActionButtons(
+                              onSwipeLeft: provider.swipePropertyLeft,
+                              onSwipeRight: provider.swipePropertyRight,
+                              onVirtualTour: () {
+                                if (properties.isEmpty) return;
+                                openPropertyTour(context, properties.first);
+                              },
+                            ),
+                          ),
+
+                          // Floating Undo button independently positioned on the bottom-left corner
+                          if (provider.canUndo)
+                            Positioned(
+                              bottom: 173,
+                              left: 24,
+                              child: Tooltip(
+                                message: 'חזור לפריט הקודם',
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    provider.undoSwipe();
+                                  },
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                        width: 1.5,
                                       ),
-                                      child: const Icon(
-                                        Icons.rotate_left_rounded,
-                                        color: Color(0xFFF59E0B),
-                                        size: 20,
-                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFF59E0B)
+                                              .withOpacity(0.12),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.rotate_left_rounded,
+                                      color: Color(0xFFF59E0B),
+                                      size: 20,
                                     ),
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
+                      ),
                     ),
         );
       },
@@ -628,7 +632,7 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
               ),
             ),
           ),
-          
+
           // Radial celebration glow
           Positioned.fill(
             child: DecoratedBox(
@@ -1242,489 +1246,444 @@ class _FiltersSheetState extends State<_FiltersSheet> {
           ),
         ];
 
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.92,
-          ),
-          decoration: const BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.borderLight,
-                      borderRadius: BorderRadius.circular(99),
+        return Material(
+          color: AppColors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+            ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderLight,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
                   ),
-                ),
-                // Header
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF2F4F5),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close,
-                                size: 18, color: AppColors.navy),
-                          ),
-                        ),
-                      ),
-                      const Text(
-                        'סינון ומיון',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.navy,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  height: 1,
-                  color: AppColors.borderLight.withValues(alpha: 0.8),
-                ),
-                // Scrollable content
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-                    children: [
-                      // ── מטרה ──
-                      _FilterSection(
-                        title: 'מטרה',
-                        icon: IconsaxPlusLinear.category,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _TransactionCard(
-                            label: 'הכל',
-                            price: _transactionMetric(
-                              provider,
-                              f,
-                              TransactionTypeFilter.any,
-                            ),
-                            isSelected:
-                                f.transactionType == TransactionTypeFilter.any,
-                            onTap: () {
-                              _setDraftFilters(
-                                _filtersForTransaction(
-                                  f,
-                                  TransactionTypeFilter.any,
-                                ),
-                                provider,
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          _TransactionCard(
-                            label: 'שכירות',
-                            price: _transactionMetric(
-                              provider,
-                              f,
-                              TransactionTypeFilter.rent,
-                            ),
-                            isSelected:
-                                f.transactionType == TransactionTypeFilter.rent,
-                            onTap: () {
-                              _setDraftFilters(
-                                _filtersForTransaction(
-                                  f,
-                                  TransactionTypeFilter.rent,
-                                ),
-                                provider,
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          _TransactionCard(
-                            label: 'קנייה',
-                            price: _transactionMetric(
-                              provider,
-                              f,
-                              TransactionTypeFilter.sale,
-                            ),
-                            isSelected:
-                                f.transactionType == TransactionTypeFilter.sale,
-                            onTap: () {
-                              _setDraftFilters(
-                                _filtersForTransaction(
-                                  f,
-                                  TransactionTypeFilter.sale,
-                                ),
-                                provider,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // ── תקציב ──
-                      _FilterSection(
-                        title: 'טווח מחירים',
-                        icon: IconsaxPlusLinear.money,
-                      ),
-                      const SizedBox(height: 12),
-                      _PriceHistogram(
-                        minBudget: f.minBudget.toDouble().clamp(
-                              _priceSliderMin(f.transactionType),
-                              _priceSliderMax(f.transactionType),
-                            ),
-                        maxBudget: f.maxBudget.toDouble().clamp(
-                              _priceSliderMin(f.transactionType),
-                              _priceSliderMax(f.transactionType),
-                            ),
-                        sliderMin: _priceSliderMin(f.transactionType),
-                        sliderMax: _priceSliderMax(f.transactionType),
-                      ),
-                      const SizedBox(height: 4),
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          rangeThumbShape: const _CustomRangeSliderThumbShape(),
-                          activeTrackColor: AppColors.primary,
-                          inactiveTrackColor: const Color(0xFFE2ECF1),
-                        ),
-                        child: RangeSlider(
-                          values: RangeValues(
-                            f.minBudget.toDouble().clamp(
-                                _priceSliderMin(f.transactionType),
-                                _priceSliderMax(f.transactionType)),
-                            f.maxBudget.toDouble().clamp(
-                                _priceSliderMin(f.transactionType),
-                                _priceSliderMax(f.transactionType)),
-                          ),
-                          min: _priceSliderMin(f.transactionType),
-                          max: _priceSliderMax(f.transactionType),
-                          divisions: _priceSliderDivisions(f.transactionType),
-                          onChanged: (values) => _setDraftFilters(
-                            f.copyWith(
-                              minBudget: _roundedPriceForTransaction(
-                                f.transactionType,
-                                values.start,
-                              ),
-                              maxBudget: _roundedPriceForTransaction(
-                                f.transactionType,
-                                values.end,
-                              ),
-                            ),
-                            provider,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _PriceInputCard(
-                            label: 'מינימום',
-                            value: _formatCurrency(f.minBudget.round()),
-                            onTap: () => _editRangeValues(
-                              context: context,
-                              title: _priceFilterLabel(),
-                              initialMinValue: f.minBudget.toString(),
-                              initialMaxValue: f.maxBudget.toString(),
-                              suffix: '₪',
-                              keyboardType: TextInputType.number,
-                              onSubmitted: (minRaw, maxRaw) {
-                                final minParsed = int.tryParse(
-                                  minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-                                );
-                                final maxParsed = maxRaw.trim().isEmpty
-                                    ? 2000000000
-                                    : int.tryParse(
-                                        maxRaw.replaceAll(
-                                            RegExp(r'[^0-9]'), ''),
-                                      );
-                                if (minParsed == null || maxParsed == null) {
-                                  return;
-                                }
-                                final sliderMin =
-                                    _priceSliderMin(f.transactionType).round();
-                                final clampedMin = _roundedPriceForTransaction(
-                                  f.transactionType,
-                                  math.max(sliderMin, minParsed).toDouble(),
-                                );
-                                final clampedMax = _roundedPriceForTransaction(
-                                  f.transactionType,
-                                  math.max(clampedMin, maxParsed).toDouble(),
-                                );
-                                _setDraftFilters(
-                                  f.copyWith(
-                                    minBudget: clampedMin,
-                                    maxBudget: clampedMax,
-                                  ),
-                                  provider,
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _PriceInputCard(
-                            label: 'מקסימום',
-                            value: f.maxBudget >= 2000000000
-                                ? 'ללא הגבלה'
-                                : _formatCurrency(f.maxBudget.round()),
-                            onTap: () => _editRangeValues(
-                              context: context,
-                              title: _priceFilterLabel(),
-                              initialMinValue: f.minBudget.toString(),
-                              initialMaxValue: f.maxBudget.toString(),
-                              suffix: '₪',
-                              keyboardType: TextInputType.number,
-                              onSubmitted: (minRaw, maxRaw) {
-                                final minParsed = int.tryParse(
-                                  minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-                                );
-                                final maxParsed = maxRaw.trim().isEmpty
-                                    ? 2000000000
-                                    : int.tryParse(
-                                        maxRaw.replaceAll(
-                                            RegExp(r'[^0-9]'), ''),
-                                      );
-                                if (minParsed == null || maxParsed == null) {
-                                  return;
-                                }
-                                final sliderMin =
-                                    _priceSliderMin(f.transactionType).round();
-                                final clampedMin = _roundedPriceForTransaction(
-                                  f.transactionType,
-                                  math.max(sliderMin, minParsed).toDouble(),
-                                );
-                                final clampedMax = _roundedPriceForTransaction(
-                                  f.transactionType,
-                                  math.max(clampedMin, maxParsed).toDouble(),
-                                );
-                                _setDraftFilters(
-                                  f.copyWith(
-                                    minBudget: clampedMin,
-                                    maxBudget: clampedMax,
-                                  ),
-                                  provider,
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      SwitchListTile.adaptive(
-                        value: f.includeUnknownPriceListings,
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'לכלול דירות בלי מחיר',
-                          style: TextStyle(
-                            color: AppColors.navy,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'מחיר מתחת ל-600 ש"ח נחשב כלא ידוע',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                        onChanged: (value) => _setDraftFilters(
-                          f.copyWith(includeUnknownPriceListings: value),
-                          provider,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── חדרים ──
-                      _FilterSection(
-                        title: 'חדרים',
-                        icon: IconsaxPlusLinear.home,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          for (int i = 0; i <= 5; i++) ...[
-                            _CircleSelectorButton(
-                              label: i == 0 ? 'הכל' : '$i+',
-                              isSelected: i == 0
-                                  ? (f.minRooms == 0 && f.maxRooms == 10)
-                                  : (f.minRooms == i.toDouble()),
-                              onTap: () {
-                                if (i == 0) {
-                                  _setDraftFilters(
-                                    f.copyWith(minRooms: 0, maxRooms: 10),
-                                    provider,
-                                  );
-                                } else {
-                                  _setDraftFilters(
-                                    f.copyWith(
-                                        minRooms: i.toDouble(), maxRooms: 10),
-                                    provider,
-                                  );
-                                }
-                              },
-                            ),
-                          ]
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // ── מיקום (עיר + אזור) ──
-                      _FilterSection(
-                        title: 'מיקום',
-                        icon: IconsaxPlusLinear.location,
-                        action: (f.city.isNotEmpty ||
-                                f.areaId != 'all_israel' ||
-                                f.hasCustomArea)
-                            ? TextButton(
-                                onPressed: () {
-                                  setState(() => _locationCtrl.clear());
-                                  _setDraftFilters(
-                                    f.copyWith(
-                                      city: '',
-                                      areaId: 'all_israel',
-                                      customAreaPolygon: const <LatLng>[],
-                                    ),
-                                    provider,
-                                  );
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  foregroundColor: AppColors.primary,
-                                ),
-                                child: const Text('הכל'),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(color: const Color(0xFFE2ECF1)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: Row(
-                          children: [
-                            const SizedBox(width: 10),
-                            const RentchIcon(
-                              IconsaxPlusLinear.search_normal,
-                              size: 18,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _locationCtrl,
-                                textDirection: TextDirection.rtl,
-                                onChanged: (v) => setState(() {}),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.navy,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'חפש עיר או אזור',
-                                  hintStyle: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary
-                                        .withValues(alpha: 0.72),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                              ),
-                            ),
-                            if (_locationCtrl.text.isNotEmpty)
-                              IconButton(
-                                icon: const RentchIcon(
-                                  IconsaxPlusLinear.close_circle,
-                                  size: 18,
-                                  color: AppColors.textSecondary,
-                                ),
-                                onPressed: () {
-                                  setState(() => _locationCtrl.clear());
-                                  _setDraftFilters(
-                                    f.copyWith(
-                                      city: '',
-                                      areaId: 'all_israel',
-                                      customAreaPolygon: const <LatLng>[],
-                                    ),
-                                    provider,
-                                  );
-                                },
-                              ),
-                            Container(
-                              width: 40,
-                              height: 40,
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: Container(
+                              width: 36,
+                              height: 36,
                               decoration: const BoxDecoration(
                                 color: Color(0xFFF2F4F5),
                                 shape: BoxShape.circle,
                               ),
-                              child: const RentchIcon(
-                                IconsaxPlusLinear.location,
-                                size: 18,
-                                color: AppColors.navy,
+                              child: const Icon(Icons.close,
+                                  size: 18, color: AppColors.navy),
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          'סינון ומיון',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.navy,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 1,
+                    color: AppColors.borderLight.withValues(alpha: 0.8),
+                  ),
+                  // Scrollable content
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+                      children: [
+                        // ── מטרה ──
+                        _FilterSection(
+                          title: 'מטרה',
+                          icon: IconsaxPlusLinear.category,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _TransactionCard(
+                              label: 'הכל',
+                              price: _transactionMetric(
+                                provider,
+                                f,
+                                TransactionTypeFilter.any,
+                              ),
+                              isSelected: f.transactionType ==
+                                  TransactionTypeFilter.any,
+                              onTap: () {
+                                _setDraftFilters(
+                                  _filtersForTransaction(
+                                    f,
+                                    TransactionTypeFilter.any,
+                                  ),
+                                  provider,
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            _TransactionCard(
+                              label: 'שכירות',
+                              price: _transactionMetric(
+                                provider,
+                                f,
+                                TransactionTypeFilter.rent,
+                              ),
+                              isSelected: f.transactionType ==
+                                  TransactionTypeFilter.rent,
+                              onTap: () {
+                                _setDraftFilters(
+                                  _filtersForTransaction(
+                                    f,
+                                    TransactionTypeFilter.rent,
+                                  ),
+                                  provider,
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            _TransactionCard(
+                              label: 'קנייה',
+                              price: _transactionMetric(
+                                provider,
+                                f,
+                                TransactionTypeFilter.sale,
+                              ),
+                              isSelected: f.transactionType ==
+                                  TransactionTypeFilter.sale,
+                              onTap: () {
+                                _setDraftFilters(
+                                  _filtersForTransaction(
+                                    f,
+                                    TransactionTypeFilter.sale,
+                                  ),
+                                  provider,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // ── תקציב ──
+                        _FilterSection(
+                          title: 'טווח מחירים',
+                          icon: IconsaxPlusLinear.money,
+                        ),
+                        const SizedBox(height: 12),
+                        _PriceHistogram(
+                          minBudget: f.minBudget.toDouble().clamp(
+                                _priceSliderMin(f.transactionType),
+                                _priceSliderMax(f.transactionType),
+                              ),
+                          maxBudget: f.maxBudget.toDouble().clamp(
+                                _priceSliderMin(f.transactionType),
+                                _priceSliderMax(f.transactionType),
+                              ),
+                          sliderMin: _priceSliderMin(f.transactionType),
+                          sliderMax: _priceSliderMax(f.transactionType),
+                        ),
+                        const SizedBox(height: 4),
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            rangeThumbShape:
+                                const _CustomRangeSliderThumbShape(),
+                            activeTrackColor: AppColors.primary,
+                            inactiveTrackColor: const Color(0xFFE2ECF1),
+                          ),
+                          child: RangeSlider(
+                            values: RangeValues(
+                              f.minBudget.toDouble().clamp(
+                                  _priceSliderMin(f.transactionType),
+                                  _priceSliderMax(f.transactionType)),
+                              f.maxBudget.toDouble().clamp(
+                                  _priceSliderMin(f.transactionType),
+                                  _priceSliderMax(f.transactionType)),
+                            ),
+                            min: _priceSliderMin(f.transactionType),
+                            max: _priceSliderMax(f.transactionType),
+                            divisions: _priceSliderDivisions(f.transactionType),
+                            onChanged: (values) => _setDraftFilters(
+                              f.copyWith(
+                                minBudget: _roundedPriceForTransaction(
+                                  f.transactionType,
+                                  values.start,
+                                ),
+                                maxBudget: _roundedPriceForTransaction(
+                                  f.transactionType,
+                                  values.end,
+                                ),
+                              ),
+                              provider,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _PriceInputCard(
+                              label: 'מינימום',
+                              value: _formatCurrency(f.minBudget.round()),
+                              onTap: () => _editRangeValues(
+                                context: context,
+                                title: _priceFilterLabel(),
+                                initialMinValue: f.minBudget.toString(),
+                                initialMaxValue: f.maxBudget.toString(),
+                                suffix: '₪',
+                                keyboardType: TextInputType.number,
+                                onSubmitted: (minRaw, maxRaw) {
+                                  final minParsed = int.tryParse(
+                                    minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                  );
+                                  final maxParsed = maxRaw.trim().isEmpty
+                                      ? 2000000000
+                                      : int.tryParse(
+                                          maxRaw.replaceAll(
+                                              RegExp(r'[^0-9]'), ''),
+                                        );
+                                  if (minParsed == null || maxParsed == null) {
+                                    return;
+                                  }
+                                  final sliderMin =
+                                      _priceSliderMin(f.transactionType)
+                                          .round();
+                                  final clampedMin =
+                                      _roundedPriceForTransaction(
+                                    f.transactionType,
+                                    math.max(sliderMin, minParsed).toDouble(),
+                                  );
+                                  final clampedMax =
+                                      _roundedPriceForTransaction(
+                                    f.transactionType,
+                                    math.max(clampedMin, maxParsed).toDouble(),
+                                  );
+                                  _setDraftFilters(
+                                    f.copyWith(
+                                      minBudget: clampedMin,
+                                      maxBudget: clampedMax,
+                                    ),
+                                    provider,
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _PriceInputCard(
+                              label: 'מקסימום',
+                              value: f.maxBudget >= 2000000000
+                                  ? 'ללא הגבלה'
+                                  : _formatCurrency(f.maxBudget.round()),
+                              onTap: () => _editRangeValues(
+                                context: context,
+                                title: _priceFilterLabel(),
+                                initialMinValue: f.minBudget.toString(),
+                                initialMaxValue: f.maxBudget.toString(),
+                                suffix: '₪',
+                                keyboardType: TextInputType.number,
+                                onSubmitted: (minRaw, maxRaw) {
+                                  final minParsed = int.tryParse(
+                                    minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                  );
+                                  final maxParsed = maxRaw.trim().isEmpty
+                                      ? 2000000000
+                                      : int.tryParse(
+                                          maxRaw.replaceAll(
+                                              RegExp(r'[^0-9]'), ''),
+                                        );
+                                  if (minParsed == null || maxParsed == null) {
+                                    return;
+                                  }
+                                  final sliderMin =
+                                      _priceSliderMin(f.transactionType)
+                                          .round();
+                                  final clampedMin =
+                                      _roundedPriceForTransaction(
+                                    f.transactionType,
+                                    math.max(sliderMin, minParsed).toDouble(),
+                                  );
+                                  final clampedMax =
+                                      _roundedPriceForTransaction(
+                                    f.transactionType,
+                                    math.max(clampedMin, maxParsed).toDouble(),
+                                  );
+                                  _setDraftFilters(
+                                    f.copyWith(
+                                      minBudget: clampedMin,
+                                      maxBudget: clampedMax,
+                                    ),
+                                    provider,
+                                  );
+                                },
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          reverse: true,
-                          child: Row(
-                            textDirection: TextDirection.rtl,
-                            children: [
-                              for (final city in [
-                                'תל אביב',
-                                'ירושלים',
-                                'חיפה',
-                                'גבעתיים',
-                                'רמת גן',
-                                'הרצליה',
-                                'ראשון לציון',
-                              ]) ...[
-                                _FilterLocationPill(
-                                  label: city,
-                                  isSelected: f.city == city,
-                                  onTap: () {
-                                    final nextCity = f.city == city ? '' : city;
-                                    setState(() {
-                                      _locationCtrl.text = nextCity;
-                                    });
+                        const SizedBox(height: 10),
+                        SwitchListTile.adaptive(
+                          value: f.includeUnknownPriceListings,
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'לכלול דירות בלי מחיר',
+                            style: TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'מחיר מתחת ל-600 ש"ח נחשב כלא ידוע',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          onChanged: (value) => _setDraftFilters(
+                            f.copyWith(includeUnknownPriceListings: value),
+                            provider,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // ── חדרים ──
+                        _FilterSection(
+                          title: 'חדרים',
+                          icon: IconsaxPlusLinear.home,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            for (int i = 0; i <= 5; i++) ...[
+                              _CircleSelectorButton(
+                                label: i == 0 ? 'הכל' : '$i+',
+                                isSelected: i == 0
+                                    ? (f.minRooms == 0 && f.maxRooms == 10)
+                                    : (f.minRooms == i.toDouble()),
+                                onTap: () {
+                                  if (i == 0) {
+                                    _setDraftFilters(
+                                      f.copyWith(minRooms: 0, maxRooms: 10),
+                                      provider,
+                                    );
+                                  } else {
                                     _setDraftFilters(
                                       f.copyWith(
-                                        city: nextCity,
+                                          minRooms: i.toDouble(), maxRooms: 10),
+                                      provider,
+                                    );
+                                  }
+                                },
+                              ),
+                            ]
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // ── מיקום (עיר + אזור) ──
+                        _FilterSection(
+                          title: 'מיקום',
+                          icon: IconsaxPlusLinear.location,
+                          action: (f.city.isNotEmpty ||
+                                  f.areaId != 'all_israel' ||
+                                  f.hasCustomArea)
+                              ? TextButton(
+                                  onPressed: () {
+                                    setState(() => _locationCtrl.clear());
+                                    _setDraftFilters(
+                                      f.copyWith(
+                                        city: '',
+                                        areaId: 'all_israel',
+                                        customAreaPolygon: const <LatLng>[],
+                                      ),
+                                      provider,
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    foregroundColor: AppColors.primary,
+                                  ),
+                                  child: const Text('הכל'),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(color: const Color(0xFFE2ECF1)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 10),
+                              const RentchIcon(
+                                IconsaxPlusLinear.search_normal,
+                                size: 18,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _locationCtrl,
+                                  textDirection: TextDirection.rtl,
+                                  onChanged: (v) => setState(() {}),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.navy,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'חפש עיר או אזור',
+                                    hintStyle: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary
+                                          .withValues(alpha: 0.72),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                  ),
+                                ),
+                              ),
+                              if (_locationCtrl.text.isNotEmpty)
+                                IconButton(
+                                  icon: const RentchIcon(
+                                    IconsaxPlusLinear.close_circle,
+                                    size: 18,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  onPressed: () {
+                                    setState(() => _locationCtrl.clear());
+                                    _setDraftFilters(
+                                      f.copyWith(
+                                        city: '',
                                         areaId: 'all_israel',
                                         customAreaPolygon: const <LatLng>[],
                                       ),
@@ -1732,335 +1691,410 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     );
                                   },
                                 ),
-                                const SizedBox(width: 8),
-                              ]
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (locationQuery.isNotEmpty &&
-                          locationSuggestions.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 6),
-                          child: Text(
-                            'לא נמצאו ערים או אזורים מתאימים',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      if (locationQuery.isNotEmpty &&
-                          locationSuggestions.isNotEmpty)
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.borderLight),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.navy.withValues(alpha: 0.04),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF2F4F5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const RentchIcon(
+                                  IconsaxPlusLinear.location,
+                                  size: 18,
+                                  color: AppColors.navy,
+                                ),
                               ),
                             ],
                           ),
-                          child: Column(
-                            children: [
-                              for (var i = 0;
-                                  i < locationSuggestions.length;
-                                  i++)
-                                _LocationSuggestionTile(
-                                  suggestion: locationSuggestions[i],
-                                  isSelected: locationSuggestions[i].isCity
-                                      ? f.city == locationSuggestions[i].label
-                                      : f.areaId ==
-                                          locationSuggestions[i].area!.id,
-                                  showDivider:
-                                      i != locationSuggestions.length - 1,
-                                  onTap: () {
-                                    final suggestion = locationSuggestions[i];
-                                    setState(() {
-                                      _locationCtrl.text = suggestion.label;
-                                    });
-                                    if (suggestion.isCity) {
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            reverse: true,
+                            child: Row(
+                              textDirection: TextDirection.rtl,
+                              children: [
+                                for (final city in [
+                                  'תל אביב',
+                                  'ירושלים',
+                                  'חיפה',
+                                  'גבעתיים',
+                                  'רמת גן',
+                                  'הרצליה',
+                                  'ראשון לציון',
+                                ]) ...[
+                                  _FilterLocationPill(
+                                    label: city,
+                                    isSelected: f.city == city,
+                                    onTap: () {
+                                      final nextCity =
+                                          f.city == city ? '' : city;
+                                      setState(() {
+                                        _locationCtrl.text = nextCity;
+                                      });
                                       _setDraftFilters(
                                         f.copyWith(
-                                          city: suggestion.label,
+                                          city: nextCity,
                                           areaId: 'all_israel',
                                           customAreaPolygon: const <LatLng>[],
                                         ),
                                         provider,
                                       );
-                                      return;
-                                    }
-                                    _setDraftFilters(
-                                      f.copyWith(
-                                        city: '',
-                                        areaId: suggestion.area!.id,
-                                        customAreaPolygon: const <LatLng>[],
-                                      ),
-                                      provider,
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 14),
-                      // Mini map
-                      Container(
-                        height: 160,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                ]
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: Stack(
-                            children: [
-                              FlutterMap(
-                                key: ValueKey(
-                                  '${f.areaId}-${f.city}-${f.customAreaPolygon.length}',
-                                ),
-                                options: MapOptions(
-                                  initialCenter: area.center,
-                                  initialZoom: area.id == 'all_israel' ? 7.5 : 11,
-                                  interactionOptions: const InteractionOptions(
-                                    flags: InteractiveFlag.all,
-                                  ),
-                                  onTap: (_, __) async {
-                                    final polygon = await Navigator.of(context)
-                                        .push<List<LatLng>>(
-                                      MaterialPageRoute(
-                                        fullscreenDialog: true,
-                                        builder: (_) => _AreaLassoScreen(
-                                          initialArea: area,
-                                          initialPolygon: f.customAreaPolygon,
-                                          previewMarkers: _markerPreview,
-                                        ),
-                                      ),
-                                    );
-                                    if (!mounted || polygon == null) return;
-                                    _setDraftFilters(
-                                      f.copyWith(
-                                        city: '',
-                                        areaId: 'all_israel',
-                                        customAreaPolygon: polygon,
-                                      ),
-                                      provider,
-                                    );
-                                  },
-                                ),
-                                children: [
-                                  TileLayer(
-                                    urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                    userAgentPackageName: 'com.rentch.app',
-                                  ),
-                                  PolygonLayer(
-                                    polygons: [
-                                      Polygon(
-                                        points: area.polygon,
-                                        color: AppColors.primary
-                                            .withValues(alpha: 0.2),
-                                        borderColor: AppColors.primary,
-                                        borderStrokeWidth: 3,
-                                      ),
-                                    ],
-                                  ),
-                                  MarkerLayer(
-                                    markers: _markerPreview
-                                        .map((p) => Marker(
-                                              point: p.point,
-                                              width: 28,
-                                              height: 28,
-                                              child: const RentchIcon(
-                                                  IconsaxPlusLinear.building,
-                                                  color: AppColors.primary,
-                                                  size: 22),
-                                            ))
-                                        .toList(),
-                                  ),
-                                ],
+                        const SizedBox(height: 10),
+                        if (locationQuery.isNotEmpty &&
+                            locationSuggestions.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 6),
+                            child: Text(
+                              'לא נמצאו ערים או אזורים מתאימים',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
-                              // Interactive overlay hint
-                              Positioned(
-                                top: 12,
-                                right: 12,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.1),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.edit_location_alt_rounded,
-                                        size: 14,
-                                        color: AppColors.primary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        f.hasCustomArea ? 'ערוך אזור' : 'סמן אזור',
-                                        style: const TextStyle(
-                                          color: AppColors.navy,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            ),
+                          ),
+                        if (locationQuery.isNotEmpty &&
+                            locationSuggestions.isNotEmpty)
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.borderLight),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.navy.withValues(alpha: 0.04),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 8),
                                 ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                for (var i = 0;
+                                    i < locationSuggestions.length;
+                                    i++)
+                                  _LocationSuggestionTile(
+                                    suggestion: locationSuggestions[i],
+                                    isSelected: locationSuggestions[i].isCity
+                                        ? f.city == locationSuggestions[i].label
+                                        : f.areaId ==
+                                            locationSuggestions[i].area!.id,
+                                    showDivider:
+                                        i != locationSuggestions.length - 1,
+                                    onTap: () {
+                                      final suggestion = locationSuggestions[i];
+                                      setState(() {
+                                        _locationCtrl.text = suggestion.label;
+                                      });
+                                      if (suggestion.isCity) {
+                                        _setDraftFilters(
+                                          f.copyWith(
+                                            city: suggestion.label,
+                                            areaId: 'all_israel',
+                                            customAreaPolygon: const <LatLng>[],
+                                          ),
+                                          provider,
+                                        );
+                                        return;
+                                      }
+                                      _setDraftFilters(
+                                        f.copyWith(
+                                          city: '',
+                                          areaId: suggestion.area!.id,
+                                          customAreaPolygon: const <LatLng>[],
+                                        ),
+                                        provider,
+                                      );
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 14),
+                        // Mini map
+                        Container(
+                          height: 160,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFE2E8F0),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        f.hasCustomArea
-                            ? 'האזור מסומן ידנית. אפשר להזיז את המפה וללחוץ עליה כדי לערוך את הלאסו.'
-                            : 'אפשר להזיז את המפה. לחיצה עליה תפתח סימון ידני עם לאסו.',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── מיון ──
-                      _FilterSection(
-                          title: 'מיון', icon: IconsaxPlusLinear.sort),
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        reverse: true,
-                        child: Row(
-                          textDirection: TextDirection.rtl,
-                          children: SearchSortOption.values.map((option) {
-                            final selected = f.sortBy == option;
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
-                              child: GestureDetector(
-                                onTap: () => _setDraftFilters(
-                                  f.copyWith(sortBy: option),
-                                  provider,
-                                ),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Stack(
+                              children: [
+                                FlutterMap(
+                                  key: ValueKey(
+                                    '${f.areaId}-${f.city}-${f.customAreaPolygon.length}',
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: selected
-                                        ? AppColors.primary
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
+                                  options: MapOptions(
+                                    initialCenter: area.center,
+                                    initialZoom:
+                                        area.id == 'all_israel' ? 7.5 : 11,
+                                    interactionOptions:
+                                        const InteractionOptions(
+                                      flags: InteractiveFlag.all,
+                                    ),
+                                    onTap: (_, __) async {
+                                      final polygon =
+                                          await Navigator.of(context)
+                                              .push<List<LatLng>>(
+                                        MaterialPageRoute(
+                                          fullscreenDialog: true,
+                                          builder: (_) => _AreaLassoScreen(
+                                            initialArea: area,
+                                            initialPolygon: f.customAreaPolygon,
+                                            previewMarkers: _markerPreview,
+                                          ),
+                                        ),
+                                      );
+                                      if (!mounted || polygon == null) return;
+                                      _setDraftFilters(
+                                        f.copyWith(
+                                          city: '',
+                                          areaId: 'all_israel',
+                                          customAreaPolygon: polygon,
+                                        ),
+                                        provider,
+                                      );
+                                    },
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate:
+                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                      userAgentPackageName: 'com.rentch.app',
+                                    ),
+                                    PolygonLayer(
+                                      polygons: [
+                                        Polygon(
+                                          points: area.polygon,
+                                          color: AppColors.primary
+                                              .withValues(alpha: 0.2),
+                                          borderColor: AppColors.primary,
+                                          borderStrokeWidth: 3,
+                                        ),
+                                      ],
+                                    ),
+                                    MarkerLayer(
+                                      markers: _markerPreview
+                                          .map((p) => Marker(
+                                                point: p.point,
+                                                width: 28,
+                                                height: 28,
+                                                child: const RentchIcon(
+                                                    IconsaxPlusLinear.building,
+                                                    color: AppColors.primary,
+                                                    size: 22),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ],
+                                ),
+                                // Interactive overlay hint
+                                Positioned(
+                                  top: 12,
+                                  right: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.9),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.1),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.edit_location_alt_rounded,
+                                          size: 14,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          f.hasCustomArea
+                                              ? 'ערוך אזור'
+                                              : 'סמן אזור',
+                                          style: const TextStyle(
+                                            color: AppColors.navy,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          f.hasCustomArea
+                              ? 'האזור מסומן ידנית. אפשר להזיז את המפה וללחוץ עליה כדי לערוך את הלאסו.'
+                              : 'אפשר להזיז את המפה. לחיצה עליה תפתח סימון ידני עם לאסו.',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // ── מיון ──
+                        _FilterSection(
+                            title: 'מיון', icon: IconsaxPlusLinear.sort),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: Row(
+                            textDirection: TextDirection.rtl,
+                            children: SearchSortOption.values.map((option) {
+                              final selected = f.sortBy == option;
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: GestureDetector(
+                                  onTap: () => _setDraftFilters(
+                                    f.copyWith(sortBy: option),
+                                    provider,
+                                  ),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
                                       color: selected
                                           ? AppColors.primary
-                                          : AppColors.borderLight,
-                                    ),
-                                    boxShadow: selected
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.primary
-                                                  .withValues(alpha: 0.22),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        _sortIcon(option),
-                                        size: 13,
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
                                         color: selected
-                                            ? Colors.white
-                                            : AppColors.navy,
+                                            ? AppColors.primary
+                                            : AppColors.borderLight,
                                       ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _sortLabel(option),
-                                        style: TextStyle(
+                                      boxShadow: selected
+                                          ? [
+                                              BoxShadow(
+                                                color: AppColors.primary
+                                                    .withValues(alpha: 0.22),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _sortIcon(option),
+                                          size: 13,
                                           color: selected
                                               ? Colors.white
                                               : AppColors.navy,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _sortLabel(option),
+                                          style: TextStyle(
+                                            color: selected
+                                                ? Colors.white
+                                                : AppColors.navy,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── גודל ──
-                      _RangeSliderField(
-                        label: 'טווח גודל',
-                        icon: IconsaxPlusLinear.maximize_4,
-                        values: RangeValues(
-                          f.minSizeM2.toDouble().clamp(0, 2000),
-                          f.maxSizeM2.toDouble().clamp(0, 2000),
-                        ),
-                        min: 0,
-                        max: 2000,
-                        divisions: 200,
-                        displayValue:
-                            _sizeDisplayValue(f.minSizeM2, f.maxSizeM2),
-                        onValueTap: () => _editRangeValues(
-                          context: context,
-                          title: 'טווח גודל',
-                          initialMinValue: f.minSizeM2.toString(),
-                          initialMaxValue: f.maxSizeM2 >= 1000000
-                              ? ''
-                              : f.maxSizeM2.toString(),
-                          suffix: 'מ"ר',
-                          keyboardType: TextInputType.number,
-                          onSubmitted: (minRaw, maxRaw) {
-                            final minParsed = int.tryParse(
-                              minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-                            );
-                            final maxParsed = maxRaw.trim().isEmpty
+                        const SizedBox(height: 24),
+                        // ── גודל ──
+                        _RangeSliderField(
+                          label: 'טווח גודל',
+                          icon: IconsaxPlusLinear.maximize_4,
+                          values: RangeValues(
+                            f.minSizeM2.toDouble().clamp(0, 2000),
+                            f.maxSizeM2.toDouble().clamp(0, 2000),
+                          ),
+                          min: 0,
+                          max: 2000,
+                          divisions: 200,
+                          displayValue:
+                              _sizeDisplayValue(f.minSizeM2, f.maxSizeM2),
+                          onValueTap: () => _editRangeValues(
+                            context: context,
+                            title: 'טווח גודל',
+                            initialMinValue: f.minSizeM2.toString(),
+                            initialMaxValue: f.maxSizeM2 >= 1000000
+                                ? ''
+                                : f.maxSizeM2.toString(),
+                            suffix: 'מ"ר',
+                            keyboardType: TextInputType.number,
+                            onSubmitted: (minRaw, maxRaw) {
+                              final minParsed = int.tryParse(
+                                minRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                              );
+                              final maxParsed = maxRaw.trim().isEmpty
+                                  ? 1000000
+                                  : int.tryParse(
+                                      maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                    );
+                              if (minParsed == null || maxParsed == null)
+                                return;
+                              final minSize = math.max(0, minParsed);
+                              final maxSize = math.max(minSize, maxParsed);
+                              _setDraftFilters(
+                                f.copyWith(
+                                  minSizeM2: minSize,
+                                  maxSizeM2: maxSize,
+                                ),
+                                provider,
+                              );
+                            },
+                          ),
+                          onChanged: (values) {
+                            final minSize = values.start.round();
+                            final maxSize = values.end.round() >= 2000
                                 ? 1000000
-                                : int.tryParse(
-                                    maxRaw.replaceAll(RegExp(r'[^0-9]'), ''),
-                                  );
-                            if (minParsed == null || maxParsed == null) return;
-                            final minSize = math.max(0, minParsed);
-                            final maxSize = math.max(minSize, maxParsed);
+                                : values.end.round();
                             _setDraftFilters(
                               f.copyWith(
                                 minSizeM2: minSize,
@@ -2070,388 +2104,382 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             );
                           },
                         ),
-                        onChanged: (values) {
-                          final minSize = values.start.round();
-                          final maxSize = values.end.round() >= 2000
-                              ? 1000000
-                              : values.end.round();
-                          _setDraftFilters(
-                            f.copyWith(
-                              minSizeM2: minSize,
-                              maxSizeM2: maxSize,
-                            ),
+                        const SizedBox(height: 24),
+                        // ── קומה ──
+                        _SliderField(
+                          label: 'קומה מינימלית',
+                          icon: IconsaxPlusLinear.building,
+                          value: f.minFloor.toDouble(),
+                          min: 0,
+                          max: 30,
+                          divisions: 30,
+                          displayValue: f.minFloor == 0
+                              ? 'ללא הגבלה'
+                              : 'קומה ${f.minFloor}+',
+                          onValueTap: () => _editSliderValue(
+                            context: context,
+                            title: 'קומה מינימלית',
+                            initialValue:
+                                f.minFloor == 0 ? '' : '${f.minFloor}',
+                            suffix: '',
+                            keyboardType: TextInputType.number,
+                            onSubmitted: (raw) {
+                              final parsed = raw.trim().isEmpty
+                                  ? 0
+                                  : int.tryParse(
+                                      raw.replaceAll(RegExp(r'[^0-9]'), ''),
+                                    );
+                              if (parsed == null) return;
+                              _setDraftFilters(
+                                f.copyWith(minFloor: math.max(0, parsed)),
+                                provider,
+                              );
+                            },
+                          ),
+                          onChanged: (value) => _setDraftFilters(
+                            f.copyWith(minFloor: value.round()),
                             provider,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      // ── קומה ──
-                      _SliderField(
-                        label: 'קומה מינימלית',
-                        icon: IconsaxPlusLinear.building,
-                        value: f.minFloor.toDouble(),
-                        min: 0,
-                        max: 30,
-                        divisions: 30,
-                        displayValue: f.minFloor == 0
-                            ? 'ללא הגבלה'
-                            : 'קומה ${f.minFloor}+',
-                        onValueTap: () => _editSliderValue(
-                          context: context,
-                          title: 'קומה מינימלית',
-                          initialValue: f.minFloor == 0 ? '' : '${f.minFloor}',
-                          suffix: '',
-                          keyboardType: TextInputType.number,
-                          onSubmitted: (raw) {
-                            final parsed = raw.trim().isEmpty
-                                ? 0
-                                : int.tryParse(
-                                    raw.replaceAll(RegExp(r'[^0-9]'), ''),
-                                  );
-                            if (parsed == null) return;
-                            _setDraftFilters(
-                              f.copyWith(minFloor: math.max(0, parsed)),
-                              provider,
-                            );
-                          },
+                          ),
                         ),
-                        onChanged: (value) => _setDraftFilters(
-                          f.copyWith(minFloor: value.round()),
-                          provider,
+                        const SizedBox(height: 24),
+                        // ── סוג נכס ──
+                        _FilterSection(
+                          title: 'סוג נכס',
+                          icon: IconsaxPlusLinear.building,
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── סוג נכס ──
-                      _FilterSection(
-                        title: 'סוג נכס',
-                        icon: IconsaxPlusLinear.building,
-                      ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        reverse: true,
-                        child: Row(
-                          textDirection: TextDirection.rtl,
-                          children: provider.availablePropertyTypes.map((type) {
-                            final state = f.propertyTypeState(type);
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
-                              child: _PropertyTypeCard(
-                                label: type,
-                                state: state,
-                                icon: _propertyTypeIcon(type),
-                                onTap: () => _handlePriorityTap(
-                                  key: 'type:$type',
-                                  current: state,
-                                  onSelected: (priority) => _setDraftFilters(
-                                    f.setPropertyTypeState(type, priority),
-                                    provider,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── מצב הנכס ──
-                      _FilterSection(
-                        title: 'מצב הנכס',
-                        icon: IconsaxPlusLinear.shield_tick,
-                        action: const _PriorityLegend(),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: provider.availableConditions.map((condition) {
-                          final state = f.conditionState(condition);
-                          return _PriorityFilterChip(
-                            label: condition,
-                            state: state,
-                            icon: IconsaxPlusLinear.shield_tick,
-                            onTap: () => _handlePriorityTap(
-                              key: 'condition:$condition',
-                              current: state,
-                              onSelected: (priority) => _setDraftFilters(
-                                f.setConditionState(condition, priority),
-                                provider,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── מקור מודעה ──
-                      _FilterSection(
-                        title: 'מקור מודעה',
-                        icon: IconsaxPlusLinear.profile_2user,
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: ListingSourceFilter.values
-                            .where(
-                                (source) => source != ListingSourceFilter.any)
-                            .map((source) {
-                          final state = f.listingSourceState(source);
-                          return _PriorityFilterChip(
-                            label: _listingSourceLabel(source),
-                            state: state,
-                            icon: _listingSourceIcon(source),
-                            onTap: () => _handlePriorityTap(
-                              key: 'listing-source:${source.name}',
-                              current: state,
-                              onSelected: (priority) => _setDraftFilters(
-                                f.setListingSourceState(source, priority),
-                                provider,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'ללא בחירה: יוצגו גם פרטיות וגם מתיווך',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── מועד כניסה ──
-                      _FilterSection(
-                        title: 'מועד כניסה',
-                        icon: IconsaxPlusLinear.calendar_1,
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: MoveInFilter.values
-                            .where((option) => option != MoveInFilter.any)
-                            .map((option) {
-                          final state = f.moveInState(option);
-                          return _PriorityFilterChip(
-                            label: _moveInLabel(option),
-                            state: state,
-                            icon: IconsaxPlusLinear.calendar_1,
-                            onTap: () => _handlePriorityTap(
-                              key: 'move-in:${option.name}',
-                              current: state,
-                              onSelected: (priority) => _setDraftFilters(
-                                f.setMoveInState(option, priority),
-                                provider,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'ללא בחירה: כל מועדי הכניסה רלוונטיים',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // ── מאפיינים ──
-                      Builder(
-                        builder: (context) {
-                          final selectedCount = provider.availableFeatures
-                              .where((f2) =>
-                                  f.featureState(f2) != FilterPriority.none)
-                              .length;
-                          return _FilterSection(
-                            title: 'מאפיינים חשובים',
-                            icon: IconsaxPlusLinear.filter,
-                            badge: selectedCount > 0 ? '$selectedCount' : null,
-                            action: GestureDetector(
-                              onTap: () => setState(
-                                () => _showAllFeatures = !_showAllFeatures,
-                              ),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: _showAllFeatures
-                                      ? AppColors.primary
-                                          .withValues(alpha: 0.12)
-                                      : const Color(0xFFF2F4F5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  _showAllFeatures
-                                      ? Icons.keyboard_arrow_up
-                                      : Icons.add,
-                                  size: 16,
-                                  color: _showAllFeatures
-                                      ? AppColors.primary
-                                      : AppColors.navy,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      if (!_showAllFeatures) ...[
-                        Builder(
-                          builder: (context) {
-                            final selectedFeatures = provider.availableFeatures
-                                .map((feature) =>
-                                    (feature, f.featureState(feature)))
-                                .where((pair) => pair.$2 != FilterPriority.none)
-                                .toList();
-                            if (selectedFeatures.isEmpty) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8),
-                                child: Text(
-                                  'לא נבחרו מאפיינים. לחץ על + כדי להוסיף.',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          child: Row(
+                            textDirection: TextDirection.rtl,
+                            children:
+                                provider.availablePropertyTypes.map((type) {
+                              final state = f.propertyTypeState(type);
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: _PropertyTypeCard(
+                                  label: type,
+                                  state: state,
+                                  icon: _propertyTypeIcon(type),
+                                  onTap: () => _handlePriorityTap(
+                                    key: 'type:$type',
+                                    current: state,
+                                    onSelected: (priority) => _setDraftFilters(
+                                      f.setPropertyTypeState(type, priority),
+                                      provider,
+                                    ),
                                   ),
                                 ),
                               );
-                            }
-                            return Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: selectedFeatures.map((pair) {
-                                return _FeatureTag(
-                                  label: pair.$1,
-                                  state: pair.$2,
-                                  onClear: () {
-                                    _setDraftFilters(
-                                      f.setFeatureState(
-                                          pair.$1, FilterPriority.none),
-                                      provider,
-                                    );
-                                  },
-                                );
-                              }).toList(),
-                            );
-                          },
+                            }).toList(),
+                          ),
                         ),
-                      ] else ...[
+                        const SizedBox(height: 24),
+                        // ── מצב הנכס ──
+                        _FilterSection(
+                          title: 'מצב הנכס',
+                          icon: IconsaxPlusLinear.shield_tick,
+                          action: const _PriorityLegend(),
+                        ),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: provider.availableFeatures
-                              .take(24)
-                              .map((feature) {
-                            final state = f.featureState(feature);
+                          children:
+                              provider.availableConditions.map((condition) {
+                            final state = f.conditionState(condition);
                             return _PriorityFilterChip(
-                              label: feature,
+                              label: condition,
                               state: state,
-                              icon: _featureIcon(feature),
-                              onTap: () {
-                                _handlePriorityTap(
-                                  key: 'feature:$feature',
-                                  current: state,
-                                  onSelected: (priority) => _setDraftFilters(
-                                    f.setFeatureState(feature, priority),
-                                    provider,
-                                  ),
-                                );
-                              },
+                              icon: IconsaxPlusLinear.shield_tick,
+                              onTap: () => _handlePriorityTap(
+                                key: 'condition:$condition',
+                                current: state,
+                                onSelected: (priority) => _setDraftFilters(
+                                  f.setConditionState(condition, priority),
+                                  provider,
+                                ),
+                              ),
                             );
                           }).toList(),
                         ),
+                        const SizedBox(height: 24),
+                        // ── מקור מודעה ──
+                        _FilterSection(
+                          title: 'מקור מודעה',
+                          icon: IconsaxPlusLinear.profile_2user,
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: ListingSourceFilter.values
+                              .where(
+                                  (source) => source != ListingSourceFilter.any)
+                              .map((source) {
+                            final state = f.listingSourceState(source);
+                            return _PriorityFilterChip(
+                              label: _listingSourceLabel(source),
+                              state: state,
+                              icon: _listingSourceIcon(source),
+                              onTap: () => _handlePriorityTap(
+                                key: 'listing-source:${source.name}',
+                                current: state,
+                                onSelected: (priority) => _setDraftFilters(
+                                  f.setListingSourceState(source, priority),
+                                  provider,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'ללא בחירה: יוצגו גם פרטיות וגם מתיווך',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // ── מועד כניסה ──
+                        _FilterSection(
+                          title: 'מועד כניסה',
+                          icon: IconsaxPlusLinear.calendar_1,
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: MoveInFilter.values
+                              .where((option) => option != MoveInFilter.any)
+                              .map((option) {
+                            final state = f.moveInState(option);
+                            return _PriorityFilterChip(
+                              label: _moveInLabel(option),
+                              state: state,
+                              icon: IconsaxPlusLinear.calendar_1,
+                              onTap: () => _handlePriorityTap(
+                                key: 'move-in:${option.name}',
+                                current: state,
+                                onSelected: (priority) => _setDraftFilters(
+                                  f.setMoveInState(option, priority),
+                                  provider,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'ללא בחירה: כל מועדי הכניסה רלוונטיים',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // ── מאפיינים ──
+                        Builder(
+                          builder: (context) {
+                            final selectedCount = provider.availableFeatures
+                                .where((f2) =>
+                                    f.featureState(f2) != FilterPriority.none)
+                                .length;
+                            return _FilterSection(
+                              title: 'מאפיינים חשובים',
+                              icon: IconsaxPlusLinear.filter,
+                              badge:
+                                  selectedCount > 0 ? '$selectedCount' : null,
+                              action: GestureDetector(
+                                onTap: () => setState(
+                                  () => _showAllFeatures = !_showAllFeatures,
+                                ),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: _showAllFeatures
+                                        ? AppColors.primary
+                                            .withValues(alpha: 0.12)
+                                        : const Color(0xFFF2F4F5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _showAllFeatures
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.add,
+                                    size: 16,
+                                    color: _showAllFeatures
+                                        ? AppColors.primary
+                                        : AppColors.navy,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        if (!_showAllFeatures) ...[
+                          Builder(
+                            builder: (context) {
+                              final selectedFeatures = provider
+                                  .availableFeatures
+                                  .map((feature) =>
+                                      (feature, f.featureState(feature)))
+                                  .where(
+                                      (pair) => pair.$2 != FilterPriority.none)
+                                  .toList();
+                              if (selectedFeatures.isEmpty) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Text(
+                                    'לא נבחרו מאפיינים. לחץ על + כדי להוסיף.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: selectedFeatures.map((pair) {
+                                  return _FeatureTag(
+                                    label: pair.$1,
+                                    state: pair.$2,
+                                    onClear: () {
+                                      _setDraftFilters(
+                                        f.setFeatureState(
+                                            pair.$1, FilterPriority.none),
+                                        provider,
+                                      );
+                                    },
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: provider.availableFeatures
+                                .take(24)
+                                .map((feature) {
+                              final state = f.featureState(feature);
+                              return _PriorityFilterChip(
+                                label: feature,
+                                state: state,
+                                icon: _featureIcon(feature),
+                                onTap: () {
+                                  _handlePriorityTap(
+                                    key: 'feature:$feature',
+                                    current: state,
+                                    onSelected: (priority) => _setDraftFilters(
+                                      f.setFeatureState(feature, priority),
+                                      provider,
+                                    ),
+                                  );
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                ),
-                // Footer
-                Container(
-                  padding: EdgeInsets.fromLTRB(
-                      20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                    border: const Border(
-                      top: BorderSide(color: Color(0xFFE2ECF1)),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () {
-                            _resetFilters(provider);
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          child: const Text(
-                            'נקה הכל',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                  // Footer
+                  Container(
+                    padding: EdgeInsets.fromLTRB(
+                        20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -4),
                         ),
+                      ],
+                      border: const Border(
+                        top: BorderSide(color: Color(0xFFE2ECF1)),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        flex: 2,
-                        child: FilledButton(
-                          onPressed: () {
-                            _didCommit = true;
-                            unawaited(provider.updateFilters(_draftFilters));
-                            Navigator.of(context).pop();
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () {
+                              _resetFilters(provider);
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
-                          ),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            transitionBuilder: (child, anim) => FadeTransition(
-                              opacity: anim,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 0.3),
-                                  end: Offset.zero,
-                                ).animate(anim),
-                                child: child,
-                              ),
-                            ),
-                            child: Text(
-                              'הצג $_visibleCount דירות',
-                              key: ValueKey(_visibleCount),
-                              style: const TextStyle(
+                            child: const Text(
+                              'נקה הכל',
+                              style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton(
+                            onPressed: () {
+                              _didCommit = true;
+                              unawaited(provider.updateFilters(_draftFilters));
+                              Navigator.of(context).pop();
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 250),
+                              transitionBuilder: (child, anim) =>
+                                  FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.3),
+                                    end: Offset.zero,
+                                  ).animate(anim),
+                                  child: child,
+                                ),
+                              ),
+                              child: Text(
+                                'הצג $_visibleCount דירות',
+                                key: ValueKey(_visibleCount),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -3374,7 +3402,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
               bottom: 368 + MediaQuery.of(context).padding.bottom,
               child: GestureDetector(
                 onTap: canSave
-                    ? () => Navigator.of(context).pop(List<LatLng>.from(polygon))
+                    ? () =>
+                        Navigator.of(context).pop(List<LatLng>.from(polygon))
                     : null,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

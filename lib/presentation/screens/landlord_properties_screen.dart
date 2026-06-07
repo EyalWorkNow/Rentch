@@ -4,6 +4,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
+import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -572,18 +573,28 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                           .where((m) =>
                                               m.propertyId == property.id)
                                           .length;
-                                      return _PropertyManageCard(
-                                        property: property,
-                                        matchCount: matchCount,
-                                        onRemove: () => context
-                                            .read<DatingProvider>()
-                                            .removeLandlordProperty(
-                                                property.id),
-                                        onEdit: () =>
-                                            Navigator.of(context).push(
+                                      return GestureDetector(
+                                        onTap: () => Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) => EditPropertyScreen(
-                                                property: property),
+                                            builder: (_) => PropertyDetailScreen(
+                                              property: property,
+                                              isLandlordPreview: true,
+                                            ),
+                                          ),
+                                        ),
+                                        child: _PropertyManageCard(
+                                          property: property,
+                                          matchCount: matchCount,
+                                          onRemove: () => context
+                                              .read<DatingProvider>()
+                                              .removeLandlordProperty(
+                                                  property.id),
+                                          onEdit: () =>
+                                              Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => EditPropertyScreen(
+                                                  property: property),
+                                            ),
                                           ),
                                         ),
                                       );

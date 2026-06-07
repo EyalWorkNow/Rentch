@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart'
     show RateLimiter, WriteDebouncer;
+import 'package:dating_app/core/services/cache_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/services/local_storage.dart';
@@ -13,6 +14,8 @@ import 'package:dating_app/data/repositories/moderation_repository.dart';
 import 'package:dating_app/data/repositories/property_analytics_repository.dart';
 import 'package:dating_app/data/repositories/property_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:latlong2/latlong.dart';
@@ -79,7 +82,9 @@ class DatingProvider extends ChangeNotifier {
   // entire catalog upfront (which would be prohibitive at scale).
   bool _hasMoreProperties = false;
   bool _isLoadingMoreProperties = false;
+  bool _isRefreshingRemoteCatalog = false;
   int _propertiesOffset = 0;
+  String? _propertiesCursor;
 
   List<RentalProperty>? _allPropertiesCache;
   Map<String, RentalProperty>? _propertyByIdCache;
@@ -866,6 +871,7 @@ class DatingProvider extends ChangeNotifier {
     _baseProperties = firstPage.items;
     _hasMoreProperties = firstPage.hasMore;
     _propertiesOffset = firstPage.items.length;
+    _propertiesCursor = firstPage.nextCursor;
     _invalidateCatalogCache();
     _searchAreas = _rentalDataService.createSearchAreas();
     if (kDebugMode) {
@@ -893,6 +899,10 @@ class DatingProvider extends ChangeNotifier {
     _filters = _normalizeFilters(_filters);
     _ensureVisibleListings();
     await _persist();
+
+    if (_hasAuthenticatedFirebaseUser) {
+      unawaited(_refreshRemoteCatalogAfterAuth());
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -922,12 +932,14 @@ class DatingProvider extends ChangeNotifier {
     try {
       final page = await _rentalDataService.loadPage(
         offset: _propertiesOffset,
+        cursor: _propertiesCursor,
         areaId: _filters.areaId,
       );
       if (page.items.isNotEmpty) {
         _baseProperties = [..._baseProperties, ...page.items];
         _propertiesOffset += page.items.length;
         _hasMoreProperties = page.hasMore;
+        _propertiesCursor = page.nextCursor;
         _invalidateCatalogCache();
         if (kDebugMode) {
           debugPrint(
@@ -937,6 +949,7 @@ class DatingProvider extends ChangeNotifier {
         }
       } else {
         _hasMoreProperties = false;
+        _propertiesCursor = null;
       }
     } catch (e) {
       if (kDebugMode) debugPrint('DatingProvider.loadMore error: $e');
@@ -1008,9 +1021,78 @@ class DatingProvider extends ChangeNotifier {
     _userRole = role;
     _isGuestMode = false;
     _hasActiveSession = true;
+    await _refreshRemoteCatalogAfterAuth();
     await _persist();
     AppEvents.instance.log(UserEventType.roleChanged, metadata: {'role': role});
     notifyListeners();
+  }
+
+  Future<void> _refreshRemoteCatalogAfterAuth() async {
+    if (_isRefreshingRemoteCatalog) return;
+    if (!_hasAuthenticatedFirebaseUser) return;
+
+    _isRefreshingRemoteCatalog = true;
+    try {
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      AppCache.instance.propertyPages.clear();
+
+      final firstPage = await _rentalDataService.loadFirstPage(
+        areaId: _filters.areaId,
+      );
+
+      var items = firstPage.items;
+      var hasMore = firstPage.hasMore;
+      var cursor = firstPage.nextCursor;
+      var offset = firstPage.items.length;
+      var pagesLoaded = 1;
+
+      while (
+          hasMore && cursor != null && cursor.isNotEmpty && pagesLoaded < 50) {
+        final page = await _rentalDataService.loadPage(
+          offset: offset,
+          cursor: cursor,
+          areaId: _filters.areaId,
+        );
+        if (page.items.isEmpty) break;
+        items = [...items, ...page.items];
+        offset += page.items.length;
+        hasMore = page.hasMore;
+        cursor = page.nextCursor;
+        pagesLoaded += 1;
+      }
+
+      if (items.isEmpty) return;
+
+      _baseProperties = items;
+      _hasMoreProperties = hasMore;
+      _propertiesOffset = offset;
+      _propertiesCursor = cursor;
+      _invalidateCatalogCache();
+      _useRemoteCatalogDefaults();
+      _filters = _normalizeFilters(_filters);
+      _ensureVisibleListings();
+      if (kDebugMode) {
+        debugPrint(
+          'DatingProvider.refreshRemoteCatalog: loaded ${_baseProperties.length} base properties'
+          ' (hasMore: $_hasMoreProperties)',
+        );
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('DatingProvider.refreshRemoteCatalog failed: $error');
+      }
+    } finally {
+      _isRefreshingRemoteCatalog = false;
+    }
+  }
+
+  bool get _hasAuthenticatedFirebaseUser {
+    if (Firebase.apps.isEmpty) return false;
+    try {
+      return FirebaseAuth.instance.currentUser != null;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> enterGuestMode(String role) async {

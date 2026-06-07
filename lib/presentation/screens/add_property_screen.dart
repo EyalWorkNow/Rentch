@@ -5,6 +5,7 @@ import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/core/services/legal_consent_service.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
+import 'package:dating_app/core/services/scaniverse_asset_import_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -96,6 +97,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _picker = ImagePicker();
   final _storageService = StorageService();
   final _scanService = Property3dScanService();
+  final _scaniverseImportService = ScaniverseAssetImportService();
   final String _draftPropertyId =
       'custom-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -109,6 +111,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   bool _isSubmittingTour = false;
   bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
+  PropertyModel3d? _model3dDraft;
   bool _wantsVerifiedListing = false;
   String _verificationVideoUrl = '';
   DateTime? _verificationCapturedAt;
@@ -260,6 +263,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (!_scanService.isConfigured) {
         setState(() {
           _virtualTourDraft = captured;
+          _model3dDraft = null;
           _isSubmittingTour = false;
         });
         _showMediaError(
@@ -273,6 +277,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           status: PropertyTourStatus.uploading,
           updatedAt: DateTime.now().toUtc(),
         );
+        _model3dDraft = null;
       });
 
       final submitted = await _scanService.submitScanVideo(
@@ -284,6 +289,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (!mounted) return;
       setState(() {
         _virtualTourDraft = submitted;
+        _model3dDraft = null;
         _isSubmittingTour = false;
       });
     } on Property3dScanException catch (error) {
@@ -308,7 +314,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
   }
 
-
   Future<void> _linkScaniverseScan() async {
     final service = ScaniverseService.instance;
     if (!service.isConfigured) {
@@ -324,7 +329,43 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       builder: (_) => const _ScaniversePickerSheet(),
     );
     if (scan == null || !mounted) return;
-    setState(() => _virtualTourDraft = service.tourFromScan(scan));
+    setState(() {
+      _virtualTourDraft = service.tourFromScan(scan);
+      _model3dDraft = null;
+    });
+  }
+
+  Future<void> _importScaniverseAssets() async {
+    if (_wantsVerifiedListing) {
+      _showMediaError(
+          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+      return;
+    }
+    try {
+      setState(() => _isSubmittingTour = true);
+      final imported = await _scaniverseImportService.importExportedModel(
+        propertyId: _draftPropertyId,
+        title: _scanTitle(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = imported.tour;
+        _model3dDraft = imported.model3d;
+        _isSubmittingTour = false;
+      });
+    } on ScaniverseAssetImportException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } on ScaniverseException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError('ייבוא מודל מ-Scaniverse נכשל: $error');
+    }
   }
 
   Future<void> _captureVerificationVideo() async {
@@ -352,6 +393,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         _verificationVideoUrl = videoUrl;
         _verificationCapturedAt = capturedAt;
         _virtualTourDraft = null;
+        _model3dDraft = null;
         _replaceMediaDraftsWithSingleVideo(videoUrl);
         _isCapturingVerification = false;
       });
@@ -432,6 +474,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       _verificationVideoUrl = '';
       _verificationCapturedAt = null;
       _virtualTourDraft = null;
+      _model3dDraft = null;
       _resetMediaDrafts();
     });
   }
@@ -568,6 +611,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       media: media,
       transactionType: transactionType,
       virtualTour: _virtualTourDraft,
+      model3d: _model3dDraft,
       legal: legal,
       priceHistory: priceHistory,
       verification: verification,
@@ -672,9 +716,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   _pickPropertyVideo(ImageSource.camera),
               onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
               onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
-              onLinkScaniverse: _linkScaniverseScan,
-              onClearVirtualTour: () =>
-                  setState(() => _virtualTourDraft = null),
+              onLinkScaniverse: ScaniverseService.instance.isConfigured
+                  ? () => _linkScaniverseScan()
+                  : null,
+              onImportScaniverseAssets: _importScaniverseAssets,
+              onClearVirtualTour: () => setState(() {
+                _virtualTourDraft = null;
+                _model3dDraft = null;
+              }),
               acceptedTerms: _acceptedPropertyTerms,
               onAcceptedTermsChanged: (value) =>
                   setState(() => _acceptedPropertyTerms = value),
@@ -1294,7 +1343,8 @@ class _StepPhotos extends StatelessWidget {
     required this.onPickVideoFromCamera,
     required this.onPickScanFromGallery,
     required this.onPickScanFromCamera,
-    required this.onLinkScaniverse,
+    this.onLinkScaniverse,
+    required this.onImportScaniverseAssets,
     required this.onClearVirtualTour,
     required this.acceptedTerms,
     required this.onAcceptedTermsChanged,
@@ -1324,7 +1374,8 @@ class _StepPhotos extends StatelessWidget {
   final VoidCallback onPickVideoFromCamera;
   final VoidCallback onPickScanFromGallery;
   final VoidCallback onPickScanFromCamera;
-  final VoidCallback onLinkScaniverse;
+  final VoidCallback? onLinkScaniverse;
+  final VoidCallback onImportScaniverseAssets;
   final VoidCallback onClearVirtualTour;
   final bool acceptedTerms;
   final ValueChanged<bool> onAcceptedTermsChanged;
@@ -1568,6 +1619,7 @@ class _StepPhotos extends StatelessWidget {
                   onPickFromGallery: onPickScanFromGallery,
                   onClear: onClearVirtualTour,
                   onLinkScaniverse: onLinkScaniverse,
+                  onImportScaniverseAssets: onImportScaniverseAssets,
                 ),
               ],
               const SizedBox(height: 16),
@@ -2210,6 +2262,7 @@ class _Scan3dPanel extends StatelessWidget {
     required this.onPickFromGallery,
     required this.onClear,
     this.onLinkScaniverse,
+    this.onImportScaniverseAssets,
   });
 
   final PropertyVirtualTour? tour;
@@ -2219,6 +2272,7 @@ class _Scan3dPanel extends StatelessWidget {
   final VoidCallback onPickFromGallery;
   final VoidCallback onClear;
   final VoidCallback? onLinkScaniverse;
+  final VoidCallback? onImportScaniverseAssets;
 
   @override
   Widget build(BuildContext context) {
@@ -2310,6 +2364,7 @@ class _Scan3dPanel extends StatelessWidget {
             onPickFromCamera: onPickFromCamera,
             onPickFromGallery: onPickFromGallery,
             onLinkScaniverse: onLinkScaniverse,
+            onImportScaniverseAssets: onImportScaniverseAssets,
           )
         else
           _ScanStatusCard(
@@ -2363,12 +2418,14 @@ class _ScanActions extends StatelessWidget {
     required this.onPickFromCamera,
     required this.onPickFromGallery,
     this.onLinkScaniverse,
+    this.onImportScaniverseAssets,
   });
 
   final bool isSubmitting;
   final VoidCallback onPickFromCamera;
   final VoidCallback onPickFromGallery;
   final VoidCallback? onLinkScaniverse;
+  final VoidCallback? onImportScaniverseAssets;
 
   @override
   Widget build(BuildContext context) {
@@ -2489,7 +2546,8 @@ class _ScanActions extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight2,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -2501,6 +2559,43 @@ class _ScanActions extends StatelessWidget {
                       'קשר סריקה מ-Scaniverse',
                       style: TextStyle(
                         color: AppColors.primary,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (onImportScaniverseAssets != null) ...[
+          const SizedBox(height: 10),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isSubmitting ? null : onImportScaniverseAssets,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFD6E3F0)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      IconsaxPlusLinear.document_upload,
+                      color: AppColors.navy,
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'ייבא קבצי 3D מ-Scaniverse',
+                      style: TextStyle(
+                        color: AppColors.navy,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                       ),
@@ -2901,6 +2996,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   final _picker = ImagePicker();
   final _storageService = StorageService();
   final _scanService = Property3dScanService();
+  final _scaniverseImportService = ScaniverseAssetImportService();
 
   late int _price;
   late double _rooms;
@@ -2912,6 +3008,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   bool _isSubmittingTour = false;
   bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
+  PropertyModel3d? _model3dDraft;
   late bool _wantsVerifiedListing;
   late String _verificationVideoUrl;
   DateTime? _verificationCapturedAt;
@@ -2949,6 +3046,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _agencyListing = p.agencyListing;
     _selectedFeatures = Set<String>.from(p.features);
     _virtualTourDraft = p.virtualTour;
+    _model3dDraft = p.model3d;
     _wantsVerifiedListing = p.isVerifiedListing;
     _verificationVideoUrl = p.verification.videoUrl;
     _verificationCapturedAt = p.verification.capturedAt;
@@ -3097,6 +3195,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (!_scanService.isConfigured) {
         setState(() {
           _virtualTourDraft = captured;
+          _model3dDraft = null;
           _isSubmittingTour = false;
         });
         _showMediaError(
@@ -3110,6 +3209,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           status: PropertyTourStatus.uploading,
           updatedAt: DateTime.now().toUtc(),
         );
+        _model3dDraft = null;
       });
 
       final submitted = await _scanService.submitScanVideo(
@@ -3121,6 +3221,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (!mounted) return;
       setState(() {
         _virtualTourDraft = submitted;
+        _model3dDraft = null;
         _isSubmittingTour = false;
       });
     } on Property3dScanException catch (error) {
@@ -3160,7 +3261,43 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       builder: (_) => const _ScaniversePickerSheet(),
     );
     if (scan == null || !mounted) return;
-    setState(() => _virtualTourDraft = service.tourFromScan(scan));
+    setState(() {
+      _virtualTourDraft = service.tourFromScan(scan);
+      _model3dDraft = null;
+    });
+  }
+
+  Future<void> _importScaniverseAssets() async {
+    if (_wantsVerifiedListing) {
+      _showMediaError(
+          'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
+      return;
+    }
+    try {
+      setState(() => _isSubmittingTour = true);
+      final imported = await _scaniverseImportService.importExportedModel(
+        propertyId: widget.property.id,
+        title: _scanTitle(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = imported.tour;
+        _model3dDraft = imported.model3d;
+        _isSubmittingTour = false;
+      });
+    } on ScaniverseAssetImportException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } on ScaniverseException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError('ייבוא מודל מ-Scaniverse נכשל: $error');
+    }
   }
 
   Future<void> _captureVerificationVideo() async {
@@ -3188,6 +3325,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         _verificationVideoUrl = videoUrl;
         _verificationCapturedAt = capturedAt;
         _virtualTourDraft = null;
+        _model3dDraft = null;
         _replaceMediaDraftsWithSingleVideo(videoUrl);
         _isCapturingVerification = false;
       });
@@ -3268,6 +3406,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       _verificationVideoUrl = '';
       _verificationCapturedAt = null;
       _virtualTourDraft = null;
+      _model3dDraft = null;
       _resetMediaDrafts();
     });
   }
@@ -3394,6 +3533,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       media: media,
       transactionType: transactionType,
       virtualTour: _virtualTourDraft,
+      model3d: _model3dDraft,
       legal: legal,
       priceHistory: nextHistory,
       marketSignals: widget.property.marketSignals,
@@ -3505,9 +3645,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       _pickScanVideo(ImageSource.gallery),
                   onPickScanFromCamera: () =>
                       _pickScanVideo(ImageSource.camera),
-                  onLinkScaniverse: _linkScaniverseScan,
-                  onClearVirtualTour: () =>
-                      setState(() => _virtualTourDraft = null),
+                  onLinkScaniverse: ScaniverseService.instance.isConfigured
+                      ? () => _linkScaniverseScan()
+                      : null,
+                  onImportScaniverseAssets: _importScaniverseAssets,
+                  onClearVirtualTour: () => setState(() {
+                    _virtualTourDraft = null;
+                    _model3dDraft = null;
+                  }),
                   acceptedTerms: _acceptedPropertyTerms,
                   onAcceptedTermsChanged: (value) =>
                       setState(() => _acceptedPropertyTerms = value),
@@ -3663,11 +3808,26 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
   Future<void> _load() async {
     try {
       final scans = await ScaniverseService.instance.listScans(limit: 30);
-      if (mounted) setState(() { _scans = scans; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _scans = scans;
+          _loading = false;
+        });
+      }
     } on ScaniverseException catch (e) {
-      if (mounted) setState(() { _error = e.message; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -3779,7 +3939,10 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () {
-                  setState(() { _loading = true; _error = null; });
+                  setState(() {
+                    _loading = true;
+                    _error = null;
+                  });
                   _load();
                 },
                 icon: const Icon(Icons.refresh_rounded),

@@ -11,11 +11,17 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rentch_icon.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
 import 'package:url_launcher/url_launcher.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
-  const PropertyDetailScreen({super.key, required this.property});
+  const PropertyDetailScreen({
+    super.key,
+    required this.property,
+    this.isLandlordPreview = false,
+  });
   final RentalProperty property;
+  final bool isLandlordPreview;
 
   @override
   State<PropertyDetailScreen> createState() => _PropertyDetailScreenState();
@@ -29,30 +35,36 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final provider = context.read<DatingProvider>();
-      _analyticsProvider = provider;
-      provider.beginPropertyDetailView(widget.property.id);
-    });
+    if (!widget.isLandlordPreview) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final provider = context.read<DatingProvider>();
+        _analyticsProvider = provider;
+        provider.beginPropertyDetailView(widget.property.id);
+      });
+    }
   }
 
   @override
   void dispose() {
-    unawaited(
-      _analyticsProvider?.endPropertyDetailView(widget.property.id) ??
-          Future<void>.value(),
-    );
+    if (!widget.isLandlordPreview) {
+      unawaited(
+        _analyticsProvider?.endPropertyDetailView(widget.property.id) ??
+            Future<void>.value(),
+      );
+    }
     _pageController.dispose();
     super.dispose();
   }
 
   void _handleGalleryPageChanged(String propertyId, int index) {
     setState(() => _currentPage = index);
-    context.read<DatingProvider>().recordPropertyGallerySwipe(
-          propertyId,
-          index,
-        );
+    if (!widget.isLandlordPreview) {
+      context.read<DatingProvider>().recordPropertyGallerySwipe(
+            propertyId,
+            index,
+          );
+    }
   }
 
   @override
@@ -379,11 +391,17 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 child: _BottomBar(
                   property: p,
                   hasVirtualTour: hasVirtualTour,
+                  isLandlordPreview: widget.isLandlordPreview,
                   onLike: () {
                     context.read<DatingProvider>().likeProperty(p.id);
                     Navigator.of(context).pop();
                   },
                   onTour: () => openPropertyTour(context, p),
+                  onEdit: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => EditPropertyScreen(property: p),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1692,11 +1710,15 @@ class _BottomBar extends StatelessWidget {
     required this.hasVirtualTour,
     required this.onLike,
     required this.onTour,
+    this.isLandlordPreview = false,
+    this.onEdit,
   });
   final RentalProperty property;
   final bool hasVirtualTour;
   final VoidCallback onLike;
   final VoidCallback onTour;
+  final bool isLandlordPreview;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1719,19 +1741,33 @@ class _BottomBar extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onLike,
-                  icon: const RentchIcon(IconsaxPlusLinear.heart, size: 18),
-                  label: const Text('אהבתי',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0F172A),
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
+                child: isLandlordPreview
+                    ? OutlinedButton.icon(
+                        onPressed: onEdit,
+                        icon: const RentchIcon(IconsaxPlusLinear.edit, size: 18),
+                        label: const Text('עריכת נכס',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0F172A),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: onLike,
+                        icon: const RentchIcon(IconsaxPlusLinear.heart, size: 18),
+                        label: const Text('אהבתי',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0F172A),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(

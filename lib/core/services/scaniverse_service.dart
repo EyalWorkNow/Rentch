@@ -44,7 +44,8 @@ class ScaniverseService {
       await _secure.writeString(_storageKey, envToken);
       _cachedToken = envToken;
       if (kDebugMode) {
-        debugPrint('ScaniverseService: token seeded from dart-define → Keychain');
+        debugPrint(
+            'ScaniverseService: token seeded from dart-define → Keychain');
       }
     } else {
       _cachedToken = await _secure.readString(_storageKey);
@@ -79,6 +80,22 @@ class ScaniverseService {
 
   bool get isConfigured => (_cachedToken ?? '').trim().isNotEmpty;
 
+  Future<List<ScaniverseExportedAsset>> pickExportedAssets() async {
+    try {
+      final result = await _channel.invokeMethod<List<dynamic>>('pick3dAssets');
+      if (result == null) return const [];
+      return result
+          .whereType<Map>()
+          .map((item) =>
+              ScaniverseExportedAsset.fromMap(Map<String, dynamic>.from(item)))
+          .toList(growable: false);
+    } on PlatformException catch (e) {
+      throw ScaniverseException('Asset picker error ${e.code}: ${e.message}');
+    } catch (e) {
+      throw ScaniverseException('Asset picker failed: $e');
+    }
+  }
+
   /// List 3D scans (Assets of type splat/mesh) from the authenticated account.
   /// Calls the native NSDK Sites API via MethodChannel.
   Future<List<ScaniverseScan>> listScans({int limit = 30}) async {
@@ -90,7 +107,8 @@ class ScaniverseService {
     }
 
     try {
-      final result = await _channel.invokeMethod<Map>('listScans', {'token': token});
+      final result =
+          await _channel.invokeMethod<Map>('listScans', {'token': token});
       if (result == null) return const [];
 
       final sdkReady = result['sdkReady'] as bool? ?? true;
@@ -117,9 +135,9 @@ class ScaniverseService {
     final now = DateTime.now().toUtc();
     final status = switch (scan.status.toLowerCase()) {
       'complete' || 'ready' => PropertyTourStatus.ready,
-      'failed'              => PropertyTourStatus.failed,
-      'pending'             => PropertyTourStatus.queued,
-      _                     => PropertyTourStatus.processing,
+      'failed' => PropertyTourStatus.failed,
+      'pending' => PropertyTourStatus.queued,
+      _ => PropertyTourStatus.processing,
     };
     return PropertyVirtualTour(
       id: scan.id,
@@ -164,14 +182,40 @@ class ScaniverseScan {
 
   factory ScaniverseScan.fromMap(Map<String, dynamic> m) {
     return ScaniverseScan(
-      id:           m['id']?.toString() ?? '',
-      title:        m['title']?.toString() ?? m['siteName']?.toString() ?? 'Scan',
-      viewerUrl:    m['viewerUrl']?.toString() ?? '',
-      status:       m['status']?.toString() ?? 'processing',
-      assetType:    m['assetType']?.toString() ?? 'splat',
-      siteId:       m['siteId']?.toString() ?? '',
-      siteName:     m['siteName']?.toString() ?? '',
+      id: m['id']?.toString() ?? '',
+      title: m['title']?.toString() ?? m['siteName']?.toString() ?? 'Scan',
+      viewerUrl: m['viewerUrl']?.toString() ?? '',
+      status: m['status']?.toString() ?? 'processing',
+      assetType: m['assetType']?.toString() ?? 'splat',
+      siteId: m['siteId']?.toString() ?? '',
+      siteName: m['siteName']?.toString() ?? '',
       thumbnailUrl: m['thumbnailUrl']?.toString(),
+    );
+  }
+}
+
+class ScaniverseExportedAsset {
+  const ScaniverseExportedAsset({
+    required this.localPath,
+    required this.fileName,
+    required this.kind,
+    required this.contentType,
+    this.sizeBytes,
+  });
+
+  final String localPath;
+  final String fileName;
+  final String kind;
+  final String contentType;
+  final int? sizeBytes;
+
+  factory ScaniverseExportedAsset.fromMap(Map<String, dynamic> m) {
+    return ScaniverseExportedAsset(
+      localPath: m['path']?.toString() ?? '',
+      fileName: m['fileName']?.toString() ?? '',
+      kind: m['kind']?.toString() ?? '',
+      contentType: m['contentType']?.toString() ?? 'application/octet-stream',
+      sizeBytes: m['sizeBytes'] is num ? (m['sizeBytes'] as num).round() : null,
     );
   }
 }

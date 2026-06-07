@@ -267,8 +267,13 @@ class PropertyModel3d {
     this.viewerUrl = '',
     this.glbUrl = '',
     this.objUrl = '',
+    this.mtlUrl = '',
+    this.usdzUrl = '',
+    this.spzUrl = '',
+    this.plyUrl = '',
     this.textureFolder = '',
     this.floorPlanUrl = '',
+    this.assets = const [],
     this.modelQualityScore,
     this.scanDate,
   });
@@ -276,8 +281,13 @@ class PropertyModel3d {
   final String viewerUrl;
   final String glbUrl;
   final String objUrl;
+  final String mtlUrl;
+  final String usdzUrl;
+  final String spzUrl;
+  final String plyUrl;
   final String textureFolder;
   final String floorPlanUrl;
+  final List<PropertyModelAsset> assets;
   final int? modelQualityScore;
   final DateTime? scanDate;
 
@@ -285,15 +295,25 @@ class PropertyModel3d {
       viewerUrl.trim().isNotEmpty ||
       glbUrl.trim().isNotEmpty ||
       objUrl.trim().isNotEmpty ||
+      mtlUrl.trim().isNotEmpty ||
+      usdzUrl.trim().isNotEmpty ||
+      spzUrl.trim().isNotEmpty ||
+      plyUrl.trim().isNotEmpty ||
       textureFolder.trim().isNotEmpty ||
-      floorPlanUrl.trim().isNotEmpty;
+      floorPlanUrl.trim().isNotEmpty ||
+      assets.isNotEmpty;
 
   PropertyModel3d copyWith({
     String? viewerUrl,
     String? glbUrl,
     String? objUrl,
+    String? mtlUrl,
+    String? usdzUrl,
+    String? spzUrl,
+    String? plyUrl,
     String? textureFolder,
     String? floorPlanUrl,
+    List<PropertyModelAsset>? assets,
     int? modelQualityScore,
     DateTime? scanDate,
   }) {
@@ -301,20 +321,35 @@ class PropertyModel3d {
       viewerUrl: viewerUrl ?? this.viewerUrl,
       glbUrl: glbUrl ?? this.glbUrl,
       objUrl: objUrl ?? this.objUrl,
+      mtlUrl: mtlUrl ?? this.mtlUrl,
+      usdzUrl: usdzUrl ?? this.usdzUrl,
+      spzUrl: spzUrl ?? this.spzUrl,
+      plyUrl: plyUrl ?? this.plyUrl,
       textureFolder: textureFolder ?? this.textureFolder,
       floorPlanUrl: floorPlanUrl ?? this.floorPlanUrl,
+      assets: assets ?? this.assets,
       modelQualityScore: modelQualityScore ?? this.modelQualityScore,
       scanDate: scanDate ?? this.scanDate,
     );
   }
 
   factory PropertyModel3d.fromJson(Map<String, dynamic> json) {
+    final rawAssets = json['assets'] as List<dynamic>? ?? const [];
     return PropertyModel3d(
       viewerUrl: json['viewerUrl']?.toString() ?? '',
       glbUrl: json['glbUrl']?.toString() ?? '',
       objUrl: json['objUrl']?.toString() ?? '',
+      mtlUrl: json['mtlUrl']?.toString() ?? '',
+      usdzUrl: json['usdzUrl']?.toString() ?? '',
+      spzUrl: json['spzUrl']?.toString() ?? '',
+      plyUrl: json['plyUrl']?.toString() ?? '',
       textureFolder: json['textureFolder']?.toString() ?? '',
       floorPlanUrl: json['floorPlanUrl']?.toString() ?? '',
+      assets: rawAssets
+          .whereType<Map>()
+          .map((item) =>
+              PropertyModelAsset.fromJson(Map<String, dynamic>.from(item)))
+          .toList(growable: false),
       modelQualityScore: _optionalInt(json['modelQualityScore']),
       scanDate: _optionalDate(json['scanDate']),
     );
@@ -334,10 +369,51 @@ class PropertyModel3d {
       'viewerUrl': viewerUrl,
       'glbUrl': glbUrl,
       'objUrl': objUrl,
+      'mtlUrl': mtlUrl,
+      'usdzUrl': usdzUrl,
+      'spzUrl': spzUrl,
+      'plyUrl': plyUrl,
       'textureFolder': textureFolder,
       'floorPlanUrl': floorPlanUrl,
+      'assets': assets.map((item) => item.toJson()).toList(),
       'modelQualityScore': modelQualityScore,
       'scanDate': scanDate == null ? null : _formatDateOnly(scanDate!),
+    };
+  }
+}
+
+class PropertyModelAsset {
+  const PropertyModelAsset({
+    required this.kind,
+    required this.url,
+    this.fileName = '',
+    this.contentType = '',
+    this.sizeBytes,
+  });
+
+  final String kind;
+  final String url;
+  final String fileName;
+  final String contentType;
+  final int? sizeBytes;
+
+  factory PropertyModelAsset.fromJson(Map<String, dynamic> json) {
+    return PropertyModelAsset(
+      kind: json['kind']?.toString() ?? '',
+      url: json['url']?.toString() ?? '',
+      fileName: json['fileName']?.toString() ?? '',
+      contentType: json['contentType']?.toString() ?? '',
+      sizeBytes: _optionalInt(json['sizeBytes']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'kind': kind,
+      'url': url,
+      'fileName': fileName,
+      'contentType': contentType,
+      'sizeBytes': sizeBytes,
     };
   }
 }
