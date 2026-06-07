@@ -898,6 +898,15 @@ class DatingProvider extends ChangeNotifier {
     _useRemoteCatalogDefaults();
     _filters = _normalizeFilters(_filters);
     _ensureVisibleListings();
+
+    // Ensure guest sessions have a Firebase JWT before the first _persist() so
+    // the remote state sync doesn't fail with 401 on startup.
+    if (_isGuestMode && !_hasAuthenticatedFirebaseUser) {
+      try {
+        await FirebaseAuth.instance.signInAnonymously();
+      } catch (_) {}
+    }
+
     await _persist();
 
     if (_hasAuthenticatedFirebaseUser) {
@@ -1098,6 +1107,13 @@ class DatingProvider extends ChangeNotifier {
   Future<void> enterGuestMode(String role) async {
     _seedGuestDemoState(role);
     _hasActiveSession = true;
+    // Sign in anonymously so guest requests carry a Firebase JWT and aren't
+    // blocked by the API Gateway authorizer.
+    if (FirebaseAuth.instance.currentUser == null) {
+      try {
+        await FirebaseAuth.instance.signInAnonymously();
+      } catch (_) {}
+    }
     await _persist();
     notifyListeners();
   }

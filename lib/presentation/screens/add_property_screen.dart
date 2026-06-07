@@ -296,8 +296,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (!mounted) return;
       setState(() {
         _virtualTourDraft = _virtualTourDraft?.copyWith(
-          status: PropertyTourStatus.failed,
-          errorMessage: error.message,
+          status: PropertyTourStatus.captured,
           updatedAt: DateTime.now().toUtc(),
         );
         _isSubmittingTour = false;
@@ -2725,8 +2724,11 @@ class _ScanStatusCard extends StatelessWidget {
     if (tour.hasFailed && tour.errorMessage.isNotEmpty) {
       return tour.errorMessage;
     }
-    if (tour.needsBackendUpload && !isBackendConfigured) {
-      return 'הווידאו נשמר במכשיר. אחרי חיבור proxy עם API key, הוא יישלח לעיבוד בענן.';
+    if (tour.needsBackendUpload) {
+      if (!isBackendConfigured) {
+        return 'הווידאו נשמר במכשיר. כדי לשלוח לעיבוד יש לוודא שהגדרות השרת תקינות.';
+      }
+      return 'לחץ על ״החלף סריקה״ לנסות שוב (ייתכן שיש להתחבר תחילה לחשבון).';
     }
     if (tour.processingStage.isNotEmpty) {
       return 'שלב נוכחי: ${tour.processingStage}';
@@ -3228,8 +3230,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (!mounted) return;
       setState(() {
         _virtualTourDraft = _virtualTourDraft?.copyWith(
-          status: PropertyTourStatus.failed,
-          errorMessage: error.message,
+          status: PropertyTourStatus.captured,
           updatedAt: DateTime.now().toUtc(),
         );
         _isSubmittingTour = false;

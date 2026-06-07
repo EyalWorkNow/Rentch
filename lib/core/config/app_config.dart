@@ -28,7 +28,7 @@ class AppConfig {
 
   static const bool enable3dScanning = bool.fromEnvironment(
     'RENTCH_ENABLE_3D_SCANNING',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   // ── AWS API Gateway ──────────────────────────────────────────────────────────

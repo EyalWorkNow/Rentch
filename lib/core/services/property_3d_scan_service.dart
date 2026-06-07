@@ -157,9 +157,14 @@ class Property3dScanService {
       final response = await request.close().timeout(_timeout);
       final responseBody =
           await utf8.decoder.bind(response).join().timeout(_timeout);
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw const Property3dScanException(
+          'יש להתחבר לחשבון כדי להשתמש בתכונת הסריקה. אנא התחבר ונסה שוב.',
+        );
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Property3dScanException(
-          '3D scan backend returned ${response.statusCode}: $responseBody',
+          'שגיאה בשרת הסריקה (${response.statusCode}). אנא נסה שוב מאוחר יותר.',
         );
       }
       if (responseBody.trim().isEmpty) return const {};
