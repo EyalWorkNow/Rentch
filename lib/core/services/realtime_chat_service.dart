@@ -1,60 +1,41 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
 import 'package:dating_app/core/services/appwrite_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/foundation.dart';
 
-// Shared Appwrite-backed chat service.
+// Shared AWS-backed chat service.
 //
-// Architecture:
-//   Messages are stored in an Appwrite collection (tableId = appwriteMessagesTableId).
-//   Both tenant and landlord read+write to the SAME collection, filtered by matchId.
-//   This is the shared source of truth — no per-user state blob involved.
+// Messages are stored in DynamoDB via the API Gateway (tableId = appwriteMessagesTableId).
+// Both tenant and landlord read+write to the SAME table, filtered by matchId.
 //
-// Collection schema (create in Appwrite console):
-//   matchId    : string  (indexed)
-//   senderId   : string
-//   senderName : string
-//   text       : string  (max 2000 chars)
-//   createdAt  : string  (ISO-8601, sortable)
-//
-// Scalability notes:
-//   WebSocket subscriptions use exponential backoff with full jitter on reconnect.
-//   Max reconnect attempts: [_maxReconnectAttempts] — prevents infinite retry loops
-//   that would keep hammering Appwrite during outages.
-//
-//   Client-side matchId filtering is intentional: Appwrite Realtime does not
-//   support attribute-level filters on collection subscriptions. Each active chat
-//   screen opens one WebSocket and discards irrelevant events locally.
-//   At production scale, migrate to a per-match channel model using Appwrite
-//   Functions that publish to dedicated channels.
-//
-// To enable: ensure APPWRITE_MESSAGES_TABLE_ID is set in --dart-define, OR
-//            set AppConfig.appwriteMessagesTableId default to your collection ID.
+// Real-time: WebSocket subscriptions are not available with the AWS HTTP client.
+// Instead, subscribe() starts a polling timer that emits new messages to the stream.
+// Poll interval: 3 seconds while active.
 
 class RealtimeChatService {
   RealtimeChatService() : _collectionId = AppConfig.appwriteMessagesTableId;
 
   final String _collectionId;
 
-  Realtime? _realtime;
-  RealtimeSubscription? _subscription;
+  Timer? _pollTimer;
+  String? _watchedMatchId;
+  String? _lastSeenId;
   final _controller = StreamController<ChatMessage>.broadcast();
 
   int _reconnectAttempt = 0;
   static const int _maxReconnectAttempts = 8;
   static const Duration _reconnectBase = Duration(milliseconds: 500);
   static const Duration _reconnectCap = Duration(minutes: 2);
+  static const Duration _pollInterval = Duration(seconds: 3);
   static final _rng = math.Random.secure();
 
   bool get isConfigured => _collectionId.isNotEmpty;
-  bool get isActive => _subscription != null && !_controller.isClosed;
+  bool get isActive => _pollTimer != null && !_controller.isClosed;
 
-  // Live stream of incoming messages for the currently watched match.
   Stream<ChatMessage> get messages => _controller.stream;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -70,42 +51,18 @@ class RealtimeChatService {
       return;
     }
 
-    _unsubscribeInternal();
-    _realtime = Realtime(client);
-
-    // Appwrite realtime channel for a collection's documents.
-    // Even when the REST API uses TablesDB ("tables"/"rows" naming),
-    // the realtime events are published on the standard collections path.
-    final channel =
-        'databases.$appwriteDatabaseId.collections.$_collectionId.documents';
-
-    _subscription = _realtime!.subscribe([channel]);
-    _subscription!.stream.listen(
-      (event) => _handleEvent(event, matchId),
-      onError: (Object error) {
-        if (kDebugMode) debugPrint('RealtimeChatService: WS error: $error');
-        _subscription = null;
-        _scheduleReconnect(matchId);
-      },
-      onDone: () {
-        if (kDebugMode) debugPrint('RealtimeChatService: WS closed');
-        _subscription = null;
-        // Only reconnect if the controller is still open (not disposed).
-        // Closed = user navigated away; don't reconnect.
-        if (!_controller.isClosed) {
-          _scheduleReconnect(matchId);
-        }
-      },
-    );
-
-    // Reset backoff on a successful subscribe
+    _stopPoll();
+    _watchedMatchId = matchId;
+    _lastSeenId = null;
     _reconnectAttempt = 0;
+
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
   }
 
-  void unsubscribe() => _unsubscribeInternal();
+  void unsubscribe() => _stopPoll();
 
   Future<void> dispose() async {
-    _unsubscribeInternal();
+    _stopPoll();
     if (!_controller.isClosed) await _controller.close();
   }
 
@@ -156,7 +113,7 @@ class RealtimeChatService {
   }) async {
     if (!isConfigured) return const [];
     try {
-      final queries = [
+      final queries = <String>[
         Query.equal('matchId', matchId),
         Query.orderAsc('createdAt'),
         Query.limit(limit),
@@ -179,11 +136,27 @@ class RealtimeChatService {
     }
   }
 
+  // ── Polling ──────────────────────────────────────────────────────────────────
+
+  Future<void> _poll() async {
+    final matchId = _watchedMatchId;
+    if (matchId == null || _controller.isClosed) return;
+    try {
+      final msgs = await fetchMessages(matchId, afterId: _lastSeenId);
+      for (final msg in msgs) {
+        if (!_controller.isClosed) {
+          _controller.add(msg);
+          _lastSeenId = msg.id;
+        }
+      }
+      _reconnectAttempt = 0;
+    } catch (e) {
+      if (kDebugMode) debugPrint('RealtimeChatService._poll error: $e');
+      _scheduleReconnect(matchId);
+    }
+  }
+
   // ── Reconnect with exponential backoff + full jitter ─────────────────────────
-  //
-  // Full jitter: delay = random(0, min(cap, base * 2^attempt))
-  // This prevents all clients reconnecting simultaneously after an outage,
-  // which would re-create the thundering-herd problem the backoff is meant to solve.
 
   void _scheduleReconnect(String matchId) {
     if (_controller.isClosed) return;
@@ -220,19 +193,6 @@ class RealtimeChatService {
 
   // ── Internal ─────────────────────────────────────────────────────────────────
 
-  void _handleEvent(RealtimeMessage event, String targetMatchId) {
-    final isCreate = event.events.any((e) => e.contains('.create'));
-    if (!isCreate) return;
-
-    final msgMatchId = event.payload['matchId'] as String?;
-    if (msgMatchId != targetMatchId) return;
-
-    final msg = _rowToMessage(event.payload);
-    if (msg != null && !_controller.isClosed) {
-      _controller.add(msg);
-    }
-  }
-
   ChatMessage? _rowToMessage(Map<String, dynamic> data) {
     try {
       final id = (data[r'$id'] ?? data['id'] ?? '').toString();
@@ -247,11 +207,9 @@ class RealtimeChatService {
     }
   }
 
-  void _unsubscribeInternal() {
-    try {
-      _subscription?.close();
-    } catch (_) {}
-    _subscription = null;
-    _realtime = null;
+  void _stopPoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _watchedMatchId = null;
   }
 }

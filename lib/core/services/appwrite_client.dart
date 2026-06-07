@@ -17,6 +17,7 @@ const String appwriteDatabaseId = ''; // unused — AWS uses table-name routing
 const String appwriteProjectId = ''; // unused
 const String appwritePublicEndpoint = ''; // unused
 const String appwriteStorageBucketId = AppConfig.awsS3Bucket;
+String get appwriteAppStateCollectionId => AppConfig.appwriteAppStateTableId;
 
 // Shared singleton — all services use this.
 final AwsApiClient aws = AwsApiClient.instance;
@@ -70,6 +71,7 @@ class TablesDB {
     required String databaseId,
     required String tableId,
     List<String> queries = const [],
+    bool total = false, // ignored — RowList.total is derived from row count
   }) async {
     final qMap = _parseQueries(queries);
     final result = await aws.get('/$tableId', query: qMap);
@@ -110,6 +112,8 @@ class TablesDB {
         map['order'] = 'desc';
       } else if (q.startsWith('cursorAfter(')) {
         map['after'] = q.substring(12, q.length - 1).replaceAll('"', '');
+      } else if (q.startsWith('offset(')) {
+        map['offset'] = q.substring(7, q.length - 1);
       }
     }
     return map;
@@ -145,6 +149,7 @@ class Query {
   static String isNotNull(String field) => 'isNotNull($field)';
   static String greaterThan(String field, Object value) =>
       'greaterThan("$field","$value")';
+  static String offset(int n) => 'offset($n)';
 }
 
 // ── ID generator (replaces Appwrite's ID.unique()) ────────────────────────────

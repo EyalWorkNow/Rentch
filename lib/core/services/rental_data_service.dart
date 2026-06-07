@@ -1,10 +1,5 @@
 import 'dart:convert';
 
-import 'package:appwrite/appwrite.dart';
-// Appwrite exposes Client.call publicly but not the HttpMethod enum it requires.
-// Keep this isolated here until the Flutter SDK exports it from the public API.
-// ignore: implementation_imports
-import 'package:appwrite/src/enums.dart' show HttpMethod;
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
@@ -86,27 +81,21 @@ class RentalDataService {
     }
 
     try {
-      final response = await _breaker.call(
+      final payload = await _breaker.call(
         () => RetryPolicy.transient.execute(
-          () => client.call(
-            HttpMethod.get,
-            path: '/tablesdb/${AppConfig.appwriteDatabaseId}'
-                '/tables/${AppConfig.appwritePropertiesTableId}/rows',
-            params: {
-              'queries': [
-                Query.equal('status', 'active'),
-                Query.limit(AppConfig.propertyPageSize),
-                Query.offset(offset),
-              ],
-              'total': false,
+          () => aws.get(
+            '/${AppConfig.appwritePropertiesTableId}',
+            query: {
+              'status': 'active',
+              'limit': AppConfig.propertyPageSize.toString(),
+              'offset': offset.toString(),
             },
           ),
         ),
       );
 
-      final payload = response.data;
       if (payload is! Map) return null;
-      final rows = payload['rows'];
+      final rows = payload['items'] ?? payload['rows'];
       if (rows is! List) return null;
 
       final rawRows = rows
@@ -127,14 +116,9 @@ class RentalDataService {
       );
     } on CircuitOpenException {
       return null;
-    } on AppwriteException catch (error) {
-      if (kDebugMode) {
-        debugPrint('RentalDataService: remote page load failed: $error');
-      }
-      return null;
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('RentalDataService: unexpected page load failure: $error');
+        debugPrint('RentalDataService: remote page load failed: $error');
       }
       return null;
     }

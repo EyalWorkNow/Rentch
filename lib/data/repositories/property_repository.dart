@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
@@ -104,10 +103,6 @@ class PropertyRepository {
     } on CircuitOpenException {
       return const PropertySaveResult.rejected(
           PropertySaveRejection.writeFailed);
-    } on AppwriteException catch (error) {
-      _log('save', property.id, error);
-      return const PropertySaveResult.rejected(
-          PropertySaveRejection.writeFailed);
     } catch (error) {
       _log('save', property.id, error);
       return const PropertySaveResult.rejected(
@@ -142,9 +137,6 @@ class PropertyRepository {
       return true;
     } on CircuitOpenException {
       return false;
-    } on AppwriteException catch (error) {
-      _log('upsert', property.id, error);
-      return false;
     } catch (error) {
       _log('upsert', property.id, error);
       return false;
@@ -166,9 +158,6 @@ class PropertyRepository {
       );
       return true;
     } on CircuitOpenException {
-      return false;
-    } on AppwriteException catch (error) {
-      _log('delete', propertyId, error);
       return false;
     } catch (error) {
       _log('delete', propertyId, error);

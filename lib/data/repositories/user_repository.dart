@@ -1,4 +1,3 @@
-import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
@@ -72,9 +71,6 @@ class UserRepository {
       return true;
     } on CircuitOpenException {
       return false;
-    } on AppwriteException catch (e) {
-      _log('upsert', profile.id, e);
-      return false;
     } catch (e) {
       _log('upsert', profile.id, e);
       return false;
@@ -97,9 +93,6 @@ class UserRepository {
       AppCache.instance.profiles.invalidate(userId);
       return true;
     } on CircuitOpenException {
-      return false;
-    } on AppwriteException catch (e) {
-      _log('delete', userId, e);
       return false;
     } catch (e) {
       _log('delete', userId, e);
@@ -127,9 +120,6 @@ class UserRepository {
       AppCache.instance.profiles.invalidate(userId);
       return true;
     } on CircuitOpenException {
-      return false;
-    } on AppwriteException catch (e) {
-      _log('setDiscoverable', userId, e);
       return false;
     } catch (e) {
       _log('setDiscoverable', userId, e);

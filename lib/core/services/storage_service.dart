@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
@@ -11,10 +10,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 class StorageService {
-  static const _bucketId = appwriteStorageBucketId;
-
-  Storage? _storage;
-  Storage get _cloudStorage => _storage ??= Storage(client);
 
   // Returns the local path on success, throws [StorageException] on rejection.
   Future<String> saveImageLocally(
@@ -86,13 +81,11 @@ class StorageService {
   Future<String?> uploadToCloud(String localPath) async {
     if (!AppConfig.canUseCloudStorage) return null;
 
-    // Rate-limit cloud uploads to prevent storage abuse
     if (!RateLimiter.instance.allowImageUpload()) {
       if (kDebugMode) debugPrint('StorageService: image upload rate limit hit');
       return null;
     }
 
-    // SEC-9: Reject paths that leave the app directory
     if (!InputSanitizer.isValidLocalMediaPathSync(localPath)) {
       if (kDebugMode) {
         debugPrint('StorageService: rejected suspicious path: $localPath');
@@ -101,34 +94,24 @@ class StorageService {
     }
 
     try {
-      final fileId = ID.unique();
-      final uploaded = await _cloudStorage.createFile(
-        bucketId: _bucketId,
-        fileId: fileId,
-        file: InputFile.fromPath(path: localPath),
-      );
-      return '$appwritePublicEndpoint/storage/buckets/$_bucketId'
-          '/files/${uploaded.$id}/view?project=$appwriteProjectId';
+      return await aws.uploadFile(localPath, folder: 'uploads');
     } catch (error) {
-      if (kDebugMode) debugPrint('Appwrite image upload failed: $error');
+      if (kDebugMode) debugPrint('StorageService: upload failed: $error');
       return null;
     }
   }
 
   Future<void> deleteFromCloud(String fileUrl) async {
     if (!AppConfig.canUseCloudStorage) return;
-
-    // SEC-2: Validate URL before using it to construct API calls
     final sanitized = InputSanitizer.sanitizeMediaUrl(fileUrl);
     if (sanitized == null) return;
-
     try {
       final uri = Uri.parse(sanitized);
-      final segments = uri.pathSegments;
-      final filesIdx = segments.indexOf('files');
-      if (filesIdx == -1 || filesIdx + 1 >= segments.length) return;
-      final fileId = segments[filesIdx + 1];
-      await _cloudStorage.deleteFile(bucketId: _bucketId, fileId: fileId);
+      // Extract S3 key from the URL path (everything after the bucket hostname).
+      // e.g. https://bucket.s3.region.amazonaws.com/uploads/123.jpg → uploads/123.jpg
+      final key = uri.pathSegments.join('/');
+      if (key.isEmpty) return;
+      await aws.delete('/storage/$key');
     } catch (_) {}
   }
 }

@@ -1,4 +1,3 @@
-import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
@@ -79,11 +78,8 @@ class MatchService {
       return page;
     } on CircuitOpenException {
       return _mockPage(cursor: cursor);
-    } on AppwriteException catch (e) {
-      if (kDebugMode) debugPrint('MatchService.getPage error: $e');
-      return _mockPage(cursor: cursor);
     } catch (e) {
-      if (kDebugMode) debugPrint('MatchService.getPage unexpected: $e');
+      if (kDebugMode) debugPrint('MatchService.getPage error: $e');
       return _mockPage(cursor: cursor);
     }
   }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:appwrite/appwrite.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/core/services/appwrite_client.dart';
@@ -139,9 +138,6 @@ class LocalStorageService {
       if (payload is String) {
         return _decodeState(payload);
       }
-    } on AppwriteException catch (error) {
-      _logRemoteError('load', error);
-      return null;
     } catch (error) {
       _logRemoteError('load', error);
       return null;
@@ -170,9 +166,6 @@ class LocalStorageService {
         rowId: await _remoteStateDocumentId(preferences),
         data: data,
       );
-    } on AppwriteException catch (error) {
-      _logRemoteError('save', error);
-      return;
     } catch (error) {
       _logRemoteError('save', error);
       return;

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:appwrite/appwrite.dart';
+import 'package:dating_app/core/services/appwrite_client.dart' show AwsApiException;
 
 // Exponential backoff with full jitter.
 //
@@ -39,13 +39,11 @@ class RetryPolicy {
   static final _rng = math.Random.secure();
 
   static bool _isTransient(Object error) {
-    if (error is AppwriteException) {
-      final code = error.code ?? 0;
+    if (error is AwsApiException) {
+      final code = error.statusCode ?? 0;
       // 429 = rate limit, 5xx = server errors — all retry-worthy
-      // 4xx client errors (except 429) are non-transient: don't retry
       return code == 429 || code >= 500;
     }
-    // Network-level failures (socket closed, timeout) are always transient
     return true;
   }
 
