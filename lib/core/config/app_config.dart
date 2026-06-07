@@ -18,12 +18,12 @@ class AppConfig {
 
   static const bool enableCloudStorage = bool.fromEnvironment(
     'RENTCH_ENABLE_CLOUD_STORAGE',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   static const bool enableRemoteState = bool.fromEnvironment(
     'RENTCH_ENABLE_REMOTE_STATE',
-    defaultValue: launchMode,
+    defaultValue: true,
   );
 
   static const bool enable3dScanning = bool.fromEnvironment(
@@ -32,13 +32,17 @@ class AppConfig {
   );
 
   // ── AWS API Gateway ──────────────────────────────────────────────────────────
-  // Set via: flutter run --dart-define=AWS_API_URL=https://xxx.execute-api.eu-central-1.amazonaws.com/prod
+  // Live deployed backend (us-east-1). Override per-build with
+  //   --dart-define=AWS_API_URL=https://<id>.execute-api.<region>.amazonaws.com/prod
+  // The endpoint is protected by the Firebase JWT authorizer, so embedding it is
+  // safe (no data is reachable without a valid Firebase ID token).
   static const String awsApiGatewayUrl = String.fromEnvironment(
     'AWS_API_URL',
-    defaultValue: '',
+    defaultValue: 'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod',
   );
 
-  // API Gateway Usage Plan key — added to x-api-key header.
+  // Optional API Gateway Usage-Plan key (x-api-key). Not required — the backend
+  // authorizes via Firebase JWT. Leave empty unless you add a usage plan.
   static const String awsApiKey = String.fromEnvironment(
     'AWS_API_KEY',
     defaultValue: '',
@@ -46,7 +50,7 @@ class AppConfig {
 
   static const String awsRegion = String.fromEnvironment(
     'AWS_REGION',
-    defaultValue: 'eu-central-1',
+    defaultValue: 'us-east-1',
   );
 
   // ── AWS DynamoDB table names ──────────────────────────────────────────────────

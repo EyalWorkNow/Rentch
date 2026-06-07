@@ -3,6 +3,18 @@
 Serverless backend: **API Gateway → Lambda (Firebase JWT auth) → DynamoDB + S3**.
 Implements the contract in [`docs/AWS_BACKEND_CONTRACT.md`](../docs/AWS_BACKEND_CONTRACT.md).
 
+## 🟢 LIVE — deployed & verified
+
+- **API URL:** `https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod`
+- **Region:** `us-east-1`  ·  **Account:** `543897290879`
+- **Data:** 1,548 properties seeded into `rentch-properties`
+- **Set as the default** in `lib/core/config/app_config.dart` — the app talks to
+  AWS out of the box (no dart-define needed).
+
+End-to-end verified: auth rejects missing/invalid tokens (401); valid Firebase
+token returns live data; messages/events/users/app_state CRUD; S3 presigned
+upload + public read round-trip. Redeploy any time with `./deploy.sh`.
+
 ```
 aws/
 ├── template.yaml          CloudFormation: 9 DynamoDB tables, S3, IAM, 2 Lambdas, API Gateway
