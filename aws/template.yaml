@@ -14,6 +14,15 @@ Parameters:
   AuthorizerKey:
     Type: String
     Default: authorizer.zip
+  WsKey:
+    Type: String
+    Default: ws.zip
+  BroadcasterKey:
+    Type: String
+    Default: broadcaster.zip
+  WsAuthorizerKey:
+    Type: String
+    Default: ws-authorizer.zip
   TablePrefix:
     Type: String
     Default: rentch-
@@ -44,6 +53,8 @@ Resources:
     Properties:
       TableName: !Sub '${TablePrefix}messages'
       BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
       AttributeDefinitions:
         - { AttributeName: id, AttributeType: S }
         - { AttributeName: matchId, AttributeType: S }
@@ -55,6 +66,23 @@ Resources:
           KeySchema:
             - { AttributeName: matchId, KeyType: HASH }
             - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+
+  # Active WebSocket connections (connectionId ↔ matchId)
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${TablePrefix}ws-connections'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: connectionId, AttributeType: S }
+        - { AttributeName: matchId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: connectionId, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: matchId-index
+          KeySchema:
+            - { AttributeName: matchId, KeyType: HASH }
           Projection: { ProjectionType: ALL }
 
   UsersTable:
@@ -357,9 +385,185 @@ Resources:
           ThrottlingBurstLimit: 50
           ThrottlingRateLimit: 25
 
+  # ── WebSocket API (real-time chat) ──────────────────────────────────────────
+  WsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ws-connections
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem]
+                Resource: !GetAtt ConnectionsTable.Arn
+
+  BroadcasterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: broadcaster
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:Query, dynamodb:DeleteItem]
+                Resource:
+                  - !GetAtt ConnectionsTable.Arn
+                  - !Sub '${ConnectionsTable.Arn}/index/*'
+              - Effect: Allow
+                Action: [dynamodb:GetRecords, dynamodb:GetShardIterator, dynamodb:DescribeStream, dynamodb:ListStreams]
+                Resource: !GetAtt MessagesTable.StreamArn
+              - Effect: Allow
+                Action: execute-api:ManageConnections
+                Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WsApi}/*'
+
+  WsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-ws
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt WsRole.Arn
+      Timeout: 10
+      Code: { S3Bucket: !Ref CodeBucket, S3Key: !Ref WsKey }
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+
+  WsAuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-ws-authorizer
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt AuthorizerRole.Arn
+      Timeout: 10
+      Code: { S3Bucket: !Ref CodeBucket, S3Key: !Ref WsAuthorizerKey }
+      Environment:
+        Variables:
+          FIREBASE_PROJECT_ID: !Ref FirebaseProjectId
+
+  BroadcasterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-broadcaster
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt BroadcasterRole.Arn
+      Timeout: 20
+      Code: { S3Bucket: !Ref CodeBucket, S3Key: !Ref BroadcasterKey }
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+          WS_ENDPOINT: !Sub 'https://${WsApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+
+  BroadcasterMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt MessagesTable.StreamArn
+      FunctionName: !Ref BroadcasterFunction
+      StartingPosition: LATEST
+      BatchSize: 10
+      MaximumRetryAttempts: 2
+
+  WsApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: rentch-ws
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: '$request.body.action'
+
+  WsApiAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref WsApi
+      Name: ws-firebase
+      AuthorizerType: REQUEST
+      IdentitySource: ['route.request.querystring.token']
+      AuthorizerUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsAuthorizerFunction.Arn}/invocations'
+
+  WsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsFunction.Arn}/invocations'
+
+  WsConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WsApi
+      RouteKey: '$connect'
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref WsApiAuthorizer
+      Target: !Sub 'integrations/${WsIntegration}'
+
+  WsDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WsApi
+      RouteKey: '$disconnect'
+      Target: !Sub 'integrations/${WsIntegration}'
+
+  WsSubscribeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WsApi
+      RouteKey: subscribe
+      Target: !Sub 'integrations/${WsIntegration}'
+
+  WsDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn: [WsConnectRoute, WsDisconnectRoute, WsSubscribeRoute]
+    Properties:
+      ApiId: !Ref WsApi
+
+  WsStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WsApi
+      DeploymentId: !Ref WsDeployment
+      StageName: prod
+
+  WsFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WsApi}/*'
+
+  WsAuthorizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WsAuthorizerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WsApi}/*'
+
 Outputs:
   ApiUrl:
-    Description: Base URL — pass as --dart-define=AWS_API_URL
+    Description: REST base URL — pass as --dart-define=AWS_API_URL
     Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod'
+  WsUrl:
+    Description: WebSocket URL — pass as --dart-define=AWS_WS_URL
+    Value: !Sub 'wss://${WsApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
   MediaBucketName:
     Value: !Ref MediaBucket

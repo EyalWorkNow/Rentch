@@ -23,13 +23,17 @@ fi
 
 # 2. Package Lambdas (no node_modules — runtime provides AWS SDK v3)
 echo "==> Zipping Lambdas"
-cd "$HERE/lambda/router"     && zip -q -j /tmp/router.zip index.mjs
-cd "$HERE/lambda/authorizer" && zip -q -j /tmp/authorizer.zip index.mjs
+cd "$HERE/lambda/router"        && zip -q -j /tmp/router.zip index.mjs
+cd "$HERE/lambda/authorizer"    && zip -q -j /tmp/authorizer.zip index.mjs
+cd "$HERE/lambda/ws"            && zip -q -j /tmp/ws.zip index.mjs
+cd "$HERE/lambda/broadcaster"   && zip -q -j /tmp/broadcaster.zip index.mjs
+cd "$HERE/lambda/ws-authorizer" && zip -q -j /tmp/ws-authorizer.zip index.mjs
 
 # 3. Upload zips
 echo "==> Uploading code"
-aws s3 cp /tmp/router.zip     "s3://$CODE_BUCKET/router.zip"     --region "$REGION"
-aws s3 cp /tmp/authorizer.zip "s3://$CODE_BUCKET/authorizer.zip" --region "$REGION"
+for z in router authorizer ws broadcaster ws-authorizer; do
+  aws s3 cp "/tmp/$z.zip" "s3://$CODE_BUCKET/$z.zip" --region "$REGION"
+done
 
 # 4. Deploy CloudFormation
 echo "==> Deploying CloudFormation stack: $STACK"
@@ -40,23 +44,31 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides CodeBucket="$CODE_BUCKET"
 
-# 5. Force-refresh Lambda code (deploy only updates if S3 key changed)
+# 5. Force-refresh Lambda code (deploy only updates if S3 key changed).
+# Portable across macOS bash 3.2 — no associative arrays.
 echo "==> Updating Lambda code"
-aws lambda update-function-code --function-name rentch-router \
-  --s3-bucket "$CODE_BUCKET" --s3-key router.zip --region "$REGION" >/dev/null 2>&1 || true
-aws lambda update-function-code --function-name rentch-authorizer \
-  --s3-bucket "$CODE_BUCKET" --s3-key authorizer.zip --region "$REGION" >/dev/null 2>&1 || true
+for pair in "rentch-router:router" "rentch-authorizer:authorizer" \
+            "rentch-ws:ws" "rentch-broadcaster:broadcaster" \
+            "rentch-ws-authorizer:ws-authorizer"; do
+  fn="${pair%%:*}"; key="${pair##*:}"
+  aws lambda update-function-code --function-name "$fn" \
+    --s3-bucket "$CODE_BUCKET" --s3-key "$key.zip" --region "$REGION" >/dev/null 2>&1 || true
+done
 
-# 6. Output the API URL
+# 6. Output the URLs
 API_URL="$(aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
   --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)"
+WS_URL="$(aws cloudformation describe-stacks --stack-name "$STACK" --region "$REGION" \
+  --query "Stacks[0].Outputs[?OutputKey=='WsUrl'].OutputValue" --output text)"
 echo ""
-echo "==> DONE. API URL:"
-echo "    $API_URL"
+echo "==> DONE."
+echo "    REST: $API_URL"
+echo "    WS:   $WS_URL"
 echo ""
 echo "Run the app with:"
 echo "    flutter run \\"
 echo "      --dart-define=AWS_API_URL=$API_URL \\"
+echo "      --dart-define=AWS_WS_URL=$WS_URL \\"
 echo "      --dart-define=AWS_REGION=$REGION \\"
 echo "      --dart-define=RENTCH_ENABLE_REMOTE_STATE=true \\"
 echo "      --dart-define=RENTCH_ENABLE_CLOUD_STORAGE=true"

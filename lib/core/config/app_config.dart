@@ -41,6 +41,15 @@ class AppConfig {
     defaultValue: 'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod',
   );
 
+  // Live WebSocket endpoint for real-time chat (us-east-1). Firebase token is
+  // passed as ?token=… on connect; gated by the WS authorizer Lambda.
+  static const String awsWebSocketUrl = String.fromEnvironment(
+    'AWS_WS_URL',
+    defaultValue: 'wss://43ccfrrt44.execute-api.us-east-1.amazonaws.com/prod',
+  );
+
+  static bool get hasWebSocket => awsWebSocketUrl.trim().isNotEmpty;
+
   // Optional API Gateway Usage-Plan key (x-api-key). Not required — the backend
   // authorizes via Firebase JWT. Leave empty unless you add a usage plan.
   static const String awsApiKey = String.fromEnvironment(
