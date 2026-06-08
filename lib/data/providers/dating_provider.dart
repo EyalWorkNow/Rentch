@@ -546,7 +546,7 @@ class DatingProvider extends ChangeNotifier {
 
   List<RentalProperty> previewFilteredProperties(
     SearchFilters filters, {
-    int limit = 18,
+    int limit = 500,
   }) {
     if (_searchAreas.isEmpty || limit <= 0) return const [];
     final now = DateTime.now();

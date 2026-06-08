@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show PathMetric;
+import 'dart:ui' show PathMetric, ImageFilter;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
@@ -957,7 +957,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             ),
           ],
         ),
-        bottomSheet: _WizardNavBar(
+        bottomNavigationBar: _WizardNavBar(
           step: _step,
           total: 4,
           isLoading: _isSaving,
@@ -1057,6 +1057,8 @@ class _StepIndicator extends StatelessWidget {
 
 // ─── Wizard Nav Bar ───────────────────────────────────────────────────────────
 
+// ─── Wizard Nav Bar ───────────────────────────────────────────────────────────
+
 class _WizardNavBar extends StatelessWidget {
   const _WizardNavBar({
     required this.step,
@@ -1079,11 +1081,17 @@ class _WizardNavBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(
           16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
+        border: const Border(
+          top: BorderSide(color: Color(0xFFF0F3F6), width: 1.5),
+        ),
         boxShadow: [
           BoxShadow(
-              color: AppColors.shadow, blurRadius: 16, offset: Offset(0, -4))
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
         ],
       ),
       child: Row(
@@ -1092,14 +1100,14 @@ class _WizardNavBar extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: onPrev,
-                icon: const RentchIcon(IconsaxPlusLinear.arrow_right, size: 16),
+                icon: const RentchIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
                 label: const Text('חזרה'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.navy,
-                  side: const BorderSide(color: AppColors.borderLight),
+                  side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(16)),
                 ),
               ),
             ),
@@ -1122,11 +1130,13 @@ class _WizardNavBar extends StatelessWidget {
                   : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 disabledBackgroundColor:
                     AppColors.primary.withValues(alpha: 0.5),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
               ),
             ),
           ),
@@ -1135,6 +1145,169 @@ class _WizardNavBar extends StatelessWidget {
     );
   }
 }
+
+// ─── Edit Property Footer ─────────────────────────────────────────────────────
+
+class _EditPropertyFooter extends StatelessWidget {
+  const _EditPropertyFooter({
+    required this.step,
+    required this.total,
+    required this.isLoading,
+    required this.onNext,
+    required this.onPrev,
+    required this.isActive,
+    required this.onActiveChanged,
+    required this.onDelete,
+    required this.transactionType,
+    this.saveLabel,
+  });
+
+  final int step;
+  final int total;
+  final bool isLoading;
+  final VoidCallback onNext;
+  final VoidCallback onPrev;
+  final bool isActive;
+  final ValueChanged<bool> onActiveChanged;
+  final VoidCallback onDelete;
+  final PropertyTransactionType transactionType;
+  final String? saveLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLast = step == total - 1;
+    final isSale = transactionType == PropertyTransactionType.sale;
+    final activeLabel = isSale ? 'עדיין למכירה' : 'עדיין להשכרה';
+    final inactiveLabel = isSale ? 'לא למכירה / נמכר' : 'לא להשכרה / הושכר';
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(
+          top: BorderSide(color: Color(0xFFF0F3F6), width: 1.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: Active status Switch + Delete button
+          Row(
+            children: [
+              Icon(
+                isActive
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.pause_circle_outline_rounded,
+                color: isActive ? AppColors.success : AppColors.textSecondary,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isActive ? activeLabel : inactiveLabel,
+                style: TextStyle(
+                  color: isActive ? AppColors.success : AppColors.textSecondary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Theme(
+                data: ThemeData(
+                  useMaterial3: true,
+                ).copyWith(
+                  colorScheme: ColorScheme.fromSeed(seedColor: AppColors.success),
+                ),
+                child: Switch(
+                  value: isActive,
+                  onChanged: onActiveChanged,
+                  activeThumbColor: AppColors.success,
+                  activeTrackColor: AppColors.success.withValues(alpha: 0.2),
+                  inactiveThumbColor: AppColors.textSecondary,
+                  inactiveTrackColor: const Color(0xFFE2E8F0),
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onDelete,
+                icon: const RentchIcon(IconsaxPlusLinear.trash,
+                    color: AppColors.coral, size: 16),
+                label: const Text(
+                  'מחיקת נכס',
+                  style: TextStyle(
+                    color: AppColors.coral,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(color: Color(0xFFEDF2F7), height: 1, thickness: 1),
+          const SizedBox(height: 10),
+          // Row 2: Navigation buttons
+          Row(
+            children: [
+              if (step > 0) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onPrev,
+                    icon: const RentchIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
+                    label: const Text('חזרה'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.navy,
+                      side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: step > 0 ? 2 : 1,
+                child: FilledButton.icon(
+                  onPressed: isLoading ? null : onNext,
+                  icon: isLoading
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Icon(isLast ? IconsaxPlusLinear.add_square : null,
+                          size: 16),
+                  label: Text(isLoading
+                      ? 'שומר...'
+                      : (isLast ? (saveLabel ?? 'פרסום הדירה') : 'הבא →')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor:
+                        AppColors.primary.withValues(alpha: 0.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
 
 // ─── Step 1: Location ─────────────────────────────────────────────────────────
 
@@ -4329,112 +4502,64 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               ],
             ),
           ),
-          // Action bar at bottom: active status toggle and delete button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                  top: BorderSide(color: AppColors.borderLight, width: 1)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _isActive
-                      ? Icons.check_circle_outline_rounded
-                      : Icons.pause_circle_outline_rounded,
-                  color:
-                      _isActive ? AppColors.success : AppColors.textSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _isActive ? 'סטטוס: פעיל' : 'סטטוס: לא פעיל',
-                  style: TextStyle(
-                    color:
-                        _isActive ? AppColors.success : AppColors.textSecondary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Switch(
-                  value: _isActive,
-                  onChanged: (value) => setState(() => _isActive = value),
-                  activeThumbColor: AppColors.success,
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () async {
-                    final provider = context.read<DatingProvider>();
-                    final navigator = Navigator.of(context);
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22)),
-                        title: const Text(
-                          'הסרת נכס',
-                          style: TextStyle(
-                              color: AppColors.navy,
-                              fontWeight: FontWeight.w900),
-                        ),
-                        content: Text(
-                          'להסיר את "${widget.property.address}"?\nהפעולה אינה ניתנת לביטול.',
-                          style: const TextStyle(
-                              color: AppColors.textSecondary, height: 1.4),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('ביטול',
-                                style:
-                                    TextStyle(color: AppColors.textSecondary)),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.coral,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('הסר'),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      await provider.removeLandlordProperty(widget.property.id);
-                      if (mounted) {
-                        navigator.pop();
-                      }
-                    }
-                  },
-                  icon: const RentchIcon(IconsaxPlusLinear.trash,
-                      color: AppColors.coral, size: 16),
-                  label: const Text(
-                    'מחיקת נכס',
-                    style: TextStyle(
-                      color: AppColors.coral,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 72 + MediaQuery.of(context).padding.bottom),
         ],
       ),
-      bottomSheet: _WizardNavBar(
+      bottomNavigationBar: _EditPropertyFooter(
         step: _step,
         total: 4,
         isLoading: _isSaving,
         saveLabel: 'עדכון הנכס',
-        onNext: _next,
+        onNext: _save,
         onPrev: _prev,
+        isActive: _isActive,
+        onActiveChanged: (value) => setState(() => _isActive = value),
+        transactionType: widget.property.transactionType,
+        onDelete: () async {
+          final provider = context.read<DatingProvider>();
+          final navigator = Navigator.of(context);
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22)),
+              title: const Text(
+                'הסרת נכס',
+                style: TextStyle(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w900),
+              ),
+              content: Text(
+                'להסיר את "${widget.property.address}"?\nהפעולה אינה ניתנת לביטול.',
+                style: const TextStyle(
+                    color: AppColors.textSecondary, height: 1.4),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('ביטול',
+                      style:
+                          TextStyle(color: AppColors.textSecondary)),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.coral,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('הסר'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            await provider.removeLandlordProperty(widget.property.id);
+            if (mounted) {
+              navigator.pop();
+            }
+          }
+        },
       ),
     );
   }

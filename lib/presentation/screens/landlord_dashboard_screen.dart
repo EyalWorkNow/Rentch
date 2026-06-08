@@ -2041,26 +2041,42 @@ class _PropertyMiniCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    // Glass status pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.4),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: const Text(
-                        'פעיל',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final isSale = property.transactionType == PropertyTransactionType.sale;
+                        final isActive = property.isActive;
+                        final String statusText;
+                        final Color statusColor;
+
+                        if (isActive) {
+                          statusText = isSale ? 'למכירה' : 'להשכרה';
+                          statusColor = AppColors.primary;
+                        } else {
+                          statusText = isSale ? 'נמכר' : 'הושכר';
+                          statusColor = AppColors.textSecondary;
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.4),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        );
+                      }
                     ),
                   ],
                 ),

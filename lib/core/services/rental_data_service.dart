@@ -130,6 +130,10 @@ class RentalDataService {
     try {
       final query = <String, String>{
         'status': 'active',
+        // Newest first so freshly-added listings (by any user) show up at the
+        // top of the catalog/map immediately instead of being buried behind
+        // ~1500 older rows.
+        'order': 'desc',
         'limit': AppConfig.propertyPageSize.toString(),
       };
       if (cursor != null && cursor.isNotEmpty) {
