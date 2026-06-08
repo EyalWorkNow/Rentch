@@ -114,6 +114,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   PropertyVirtualTour? _virtualTourDraft;
   PropertyModel3d? _model3dDraft;
   Timer? _pollTimer;
+  String? _stagingProgress;
   bool _wantsVerifiedListing = false;
   String _verificationVideoUrl = '';
   DateTime? _verificationCapturedAt;
@@ -685,7 +686,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   }
 
   // ── AI virtual staging ("הדמיה") ────────────────────────────────────────────
-  Future<void> _generateStaging(ImageSource source, String style) async {
+  Future<void> _generateStaging(
+      ImageSource source, String style, bool multiple) async {
     if (_wantsVerifiedListing) {
       _showMediaError('בדירה מאומתת אי אפשר ליצור הדמיות AI.');
       return;
@@ -695,93 +697,126 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       return;
     }
     try {
-      final file = await _picker.pickImage(
-        source: source,
-        imageQuality: 92,
-        maxWidth: 2000,
-      );
-      if (file == null) return;
-
-      final localPath = await _storageService.saveImageLocally(
-        file,
-        folderName: 'staging_src',
-      );
+      final List<XFile> files = [];
+      if (multiple && source == ImageSource.gallery) {
+        final picked =
+            await _picker.pickMultiImage(imageQuality: 92, maxWidth: 2000);
+        files.addAll(picked);
+      } else {
+        final one = await _picker.pickImage(
+            source: source, imageQuality: 92, maxWidth: 2000);
+        if (one != null) files.add(one);
+      }
+      if (files.isEmpty) return;
 
       setState(() {
         _isSubmittingTour = true;
         _virtualTourDraft = null;
         _model3dDraft = null;
+        _stagingProgress =
+            files.length > 1 ? 'מעבד תמונה 1 מתוך ${files.length}...' : null;
       });
 
-      final submitted = await _scanService.submitStagingImage(
-        propertyId: _draftPropertyId,
-        localImagePath: localPath,
-        style: style,
-      );
+      var done = 0;
+      PropertyVirtualTour? lastReady;
+      for (var i = 0; i < files.length; i++) {
+        if (!mounted) return;
+        setState(() {
+          _stagingProgress = files.length > 1
+              ? 'מעבד תמונה ${i + 1} מתוך ${files.length}...'
+              : null;
+        });
+        try {
+          final localPath = await _storageService.saveImageLocally(
+            files[i],
+            folderName: 'staging_src',
+          );
+          final submitted = await _scanService.submitStagingImage(
+            propertyId: _draftPropertyId,
+            localImagePath: localPath,
+            style: style,
+          );
+          final result = await _awaitStagingReady(submitted);
+          if (result != null && result.status == PropertyTourStatus.ready) {
+            _addStagedToMedia(result, announce: false);
+            lastReady = result;
+            done++;
+          }
+        } catch (_) {
+          // Skip this image and continue with the rest.
+        }
+      }
 
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = submitted;
         _isSubmittingTour = false;
+        _stagingProgress = null;
+        _virtualTourDraft = lastReady;
       });
 
-      switch (submitted.status) {
-        case PropertyTourStatus.ready:
-          _addStagedToMedia(submitted);
-          break;
-        case PropertyTourStatus.failed:
-          _showMediaError('יצירת ההדמיה נכשלה. נסו תמונה אחרת.');
-          break;
-        default:
-          _startStagingPolling();
+      if (done > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          backgroundColor: AppColors.primary,
+          content: Text(done == 1
+              ? '✨ ההדמיה נוצרה ונוספה לתמונות הדירה!'
+              : '✨ נוצרו $done הדמיות ונוספו לתמונות הדירה!'),
+        ));
+      } else {
+        _showMediaError(
+            'יצירת ההדמיה נכשלה. נסו תמונות ברורות יותר של החדרים.');
       }
     } on Property3dScanException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() {
+        _isSubmittingTour = false;
+        _stagingProgress = null;
+      });
       _showMediaError(error.message);
     } on StorageException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() {
+        _isSubmittingTour = false;
+        _stagingProgress = null;
+      });
       _showMediaError(error.message);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() {
+        _isSubmittingTour = false;
+        _stagingProgress = null;
+      });
       _showMediaError('יצירת ההדמיה נכשלה: $error');
     }
   }
 
-  void _startStagingPolling() {
-    _stopTourPolling();
-    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
-      final tour = _virtualTourDraft;
-      if (tour == null) {
-        _stopTourPolling();
-        return;
+  /// Polls a staging job until ready/failed, with a hard cap so it can never
+  /// hang forever. Returns the final tour, or null if unmounted.
+  Future<PropertyVirtualTour?> _awaitStagingReady(
+      PropertyVirtualTour initial) async {
+    var tour = initial;
+    if (tour.status == PropertyTourStatus.ready ||
+        tour.status == PropertyTourStatus.failed) {
+      return tour;
+    }
+    const maxAttempts = 30; // up to ~2.5 min per image, then give up.
+    for (var i = 0; i < maxAttempts; i++) {
+      await Future<void>.delayed(const Duration(seconds: 5));
+      if (!mounted) return null;
+      try {
+        tour = await _scanService.refresh(tour);
+      } catch (_) {
+        continue;
       }
       if (tour.status == PropertyTourStatus.ready ||
           tour.status == PropertyTourStatus.failed) {
-        _stopTourPolling();
-        return;
+        return tour;
       }
-      try {
-        final updated = await _scanService.refresh(tour);
-        if (!mounted) {
-          _stopTourPolling();
-          return;
-        }
-        setState(() => _virtualTourDraft = updated);
-        if (updated.status == PropertyTourStatus.ready) {
-          _stopTourPolling();
-          _addStagedToMedia(updated);
-        } else if (updated.status == PropertyTourStatus.failed) {
-          _stopTourPolling();
-          _showMediaError('יצירת ההדמיה נכשלה. נסו תמונה אחרת.');
-        }
-      } catch (_) {}
-    });
+    }
+    return tour; // timed out — caller treats non-ready as a skip.
   }
 
-  void _addStagedToMedia(PropertyVirtualTour tour) {
+  void _addStagedToMedia(PropertyVirtualTour tour, {bool announce = true}) {
     final url = tour.previewImageUrl.trim();
     if (url.isEmpty) return;
     final alreadyAdded =
@@ -789,14 +824,15 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (!alreadyAdded) {
       _assignPickedMedia(url, PropertyMediaType.image);
     }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        duration: Duration(milliseconds: 2800),
-        content: Text('✨ ההדמיה נוצרה ונוספה לתמונות הדירה!'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    if (announce && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: Duration(milliseconds: 2800),
+          content: Text('✨ ההדמיה נוצרה ונוספה לתמונות הדירה!'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    }
   }
 
   @override
@@ -917,6 +953,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 _mediaDrafts.removeAt(i);
               }),
               onGenerateStaging: _generateStaging,
+              stagingProgress: _stagingProgress,
             ),
           ],
         ),
@@ -1601,6 +1638,7 @@ class _StepPhotos extends StatelessWidget {
     required this.onAddMediaUrl,
     required this.onRemoveMedia,
     this.onGenerateStaging,
+    this.stagingProgress,
   });
   final List<_PropertyMediaDraft> mediaDrafts;
   final PropertyVirtualTour? virtualTourDraft;
@@ -1632,7 +1670,9 @@ class _StepPhotos extends StatelessWidget {
   final ValueChanged<bool> onAiTrainingChanged;
   final void Function(String url, PropertyMediaType type) onAddMediaUrl;
   final ValueChanged<int> onRemoveMedia;
-  final void Function(ImageSource source, String style)? onGenerateStaging;
+  final void Function(ImageSource source, String style, bool multiple)?
+      onGenerateStaging;
+  final String? stagingProgress;
 
   void _showMediaPickerSheet(BuildContext context) {
     showModalBottomSheet<void>(
@@ -1861,6 +1901,7 @@ class _StepPhotos extends StatelessWidget {
                   _StagingPanel(
                     tour: virtualTourDraft,
                     isSubmitting: isSubmittingTour,
+                    progressText: stagingProgress,
                     onGenerate: onGenerateStaging!,
                     onClear: onClearVirtualTour,
                   ),
@@ -2631,12 +2672,15 @@ class _StagingPanel extends StatefulWidget {
     required this.isSubmitting,
     required this.onGenerate,
     required this.onClear,
+    this.progressText,
   });
 
   final PropertyVirtualTour? tour;
   final bool isSubmitting;
-  final void Function(ImageSource source, String style) onGenerate;
+  final void Function(ImageSource source, String style, bool multiple)
+      onGenerate;
   final VoidCallback onClear;
+  final String? progressText;
 
   @override
   State<_StagingPanel> createState() => _StagingPanelState();
@@ -2777,6 +2821,7 @@ class _StagingPanelState extends State<_StagingPanel> {
   }
 
   Widget _stagingBusyCard() {
+    final progress = widget.progressText;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
@@ -2785,25 +2830,25 @@ class _StagingPanelState extends State<_StagingPanel> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderLight),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 26,
             height: 26,
             child: CircularProgressIndicator(
                 strokeWidth: 2.6, color: AppColors.primary),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
-            'יוצרים את ההדמיה...',
-            style: TextStyle(
+            progress ?? 'יוצרים את ההדמיה...',
+            style: const TextStyle(
                 color: AppColors.navy,
                 fontSize: 14,
                 fontWeight: FontWeight.w900),
           ),
-          SizedBox(height: 4),
-          Text(
-            'זה לוקח בערך 30–60 שניות. אפשר להמשיך למלא פרטים.',
+          const SizedBox(height: 4),
+          const Text(
+            'כל תמונה לוקחת בערך 30–60 שניות. אפשר להמשיך למלא פרטים.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
@@ -2899,41 +2944,44 @@ class _StagingPanelState extends State<_StagingPanel> {
   }
 
   Widget _stagingActions() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () =>
-                widget.onGenerate(ImageSource.gallery, _style),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              minimumSize: const Size.fromHeight(48),
-            ),
-            icon: const Icon(IconsaxPlusLinear.gallery, size: 18),
-            label: const Text('מהגלריה',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+        ElevatedButton.icon(
+          onPressed: () =>
+              widget.onGenerate(ImageSource.gallery, _style, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size.fromHeight(48),
           ),
+          icon: const Icon(IconsaxPlusLinear.gallery, size: 18),
+          label: const Text('בחרו תמונות מהגלריה',
+              style: TextStyle(fontWeight: FontWeight.w800)),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () =>
-                widget.onGenerate(ImageSource.camera, _style),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.navy,
-              side: const BorderSide(color: AppColors.borderLight),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              minimumSize: const Size.fromHeight(48),
-            ),
-            icon: const Icon(IconsaxPlusLinear.camera, size: 18),
-            label: const Text('מצלמה',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () =>
+              widget.onGenerate(ImageSource.camera, _style, false),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.navy,
+            side: const BorderSide(color: AppColors.borderLight),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size.fromHeight(48),
           ),
+          icon: const Icon(IconsaxPlusLinear.camera, size: 18),
+          label: const Text('צלמו תמונה',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'אפשר לבחור כמה תמונות יחד (חדרים שונים) — לכל אחת תיווצר הדמיה.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
         ),
       ],
     );
