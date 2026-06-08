@@ -152,13 +152,21 @@ class _AuthScreenState extends State<AuthScreen>
     } on AppleAuthUnsupportedException {
       if (!mounted) return;
       _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
-    } on FirebaseAuthException catch (e) {
+    } on SignInWithAppleAuthorizationException catch (e, st) {
       if (!mounted) return;
-      final msg = _appleFirebaseErrorMessage(e.code);
-      _showAppleError(msg);
-    } catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) return;
+      debugPrint('[AppleAuth] AUTH-EXC ${e.code.name}: ${e.message}\n$st');
+      _showAppleError(
+          'הכניסה עם Apple נכשלה.\n\nקוד: ${e.code.name}\nפרטים: ${e.message}');
+    } on FirebaseAuthException catch (e, st) {
       if (!mounted) return;
-      _showAppleError('הכניסה עם Apple נכשלה. נסו שוב.');
+      debugPrint('[AppleAuth] FIREBASE ${e.code}: ${e.message}\n$st');
+      _showAppleError(
+          '${_appleFirebaseErrorMessage(e.code)}\n\n[firebase:${e.code}]');
+    } catch (e, st) {
+      if (!mounted) return;
+      debugPrint('[AppleAuth] GENERIC ${e.runtimeType}: $e\n$st');
+      _showAppleError('הכניסה עם Apple נכשלה.\n\n${e.runtimeType}: $e');
     } finally {
       if (mounted) setState(() => _appleLoading = false);
     }
@@ -189,8 +197,10 @@ class _AuthScreenState extends State<AuthScreen>
           'כניסה עם Apple',
           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
         ),
-        content: Text(message,
-            style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+        content: SingleChildScrollView(
+          child: SelectableText(message,
+              style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -1130,16 +1140,21 @@ class _LoginTabState extends State<_LoginTab> {
     } on AppleAuthUnsupportedException {
       if (!mounted) return;
       _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
-    } on SignInWithAppleAuthorizationException catch (e) {
+    } on SignInWithAppleAuthorizationException catch (e, st) {
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
-      _showAppleError('הכניסה עם Apple נכשלה (${e.code.name}). נסו שוב.');
-    } on FirebaseAuthException catch (e) {
+      debugPrint('[AppleAuth] AUTH-EXC ${e.code.name}: ${e.message}\n$st');
+      _showAppleError(
+          'הכניסה עם Apple נכשלה.\n\nקוד: ${e.code.name}\nפרטים: ${e.message}');
+    } on FirebaseAuthException catch (e, st) {
       if (!mounted) return;
-      _showAppleError(_appleFirebaseErrorMessage(e.code));
-    } catch (e) {
+      debugPrint('[AppleAuth] FIREBASE ${e.code}: ${e.message}\n$st');
+      _showAppleError(
+          '${_appleFirebaseErrorMessage(e.code)}\n\n[firebase:${e.code}]');
+    } catch (e, st) {
       if (!mounted) return;
-      _showAppleError('הכניסה עם Apple נכשלה. נסו שוב.');
+      debugPrint('[AppleAuth] GENERIC ${e.runtimeType}: $e\n$st');
+      _showAppleError('הכניסה עם Apple נכשלה.\n\n${e.runtimeType}: $e');
     } finally {
       if (mounted) setState(() => _appleLoading = false);
     }
@@ -1170,8 +1185,10 @@ class _LoginTabState extends State<_LoginTab> {
           'כניסה עם Apple',
           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
         ),
-        content: Text(message,
-            style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+        content: SingleChildScrollView(
+          child: SelectableText(message,
+              style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
