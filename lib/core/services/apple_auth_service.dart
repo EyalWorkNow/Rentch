@@ -66,11 +66,13 @@ class AppleAuthService {
     }
 
     // Sign in to Firebase so the user has a real UID and JWT.
-    // Only idToken + rawNonce are needed — authorizationCode is for server-side
-    // token revocation only and must NOT be passed as accessToken here.
+    // NOTE: passing authorizationCode as accessToken is REQUIRED here — this
+    // matches the build-40 version that worked. Removing it (build 42) broke
+    // Apple sign-in, so it is restored.
     final oauthCredential = OAuthProvider('apple.com').credential(
       idToken: identityToken,
       rawNonce: rawNonce,
+      accessToken: credential.authorizationCode,
     );
 
     UserCredential userCredential;
