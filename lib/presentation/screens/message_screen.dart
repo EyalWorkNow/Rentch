@@ -129,7 +129,8 @@ class _MessageScreenState extends State<MessageScreen> {
 
   // ── Media / file picker ───────────────────────────────────────────────────
 
-  Future<void> _pickAndSendMedia(DatingProvider provider, String senderName) async {
+  Future<void> _pickAndSendMedia(
+      DatingProvider provider, String senderName) async {
     try {
       final file = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -149,7 +150,8 @@ class _MessageScreenState extends State<MessageScreen> {
     }
   }
 
-  Future<void> _pickAndSendFile(DatingProvider provider, String senderName) async {
+  Future<void> _pickAndSendFile(
+      DatingProvider provider, String senderName) async {
     try {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file == null || !mounted) return;
@@ -314,9 +316,10 @@ class _MessageScreenState extends State<MessageScreen> {
           _showReviewDialog(
             title: 'ביקורת על הדירה',
             onSubmit: (rating, text) => provider.addPropertyReview(
-              propertyId: provider.matchById(widget.matchId)!.propertyId,
+              propertyId: match.propertyId,
               rating: rating,
               text: text,
+              matchId: match.id,
             ),
           );
         },
@@ -324,8 +327,13 @@ class _MessageScreenState extends State<MessageScreen> {
           Navigator.pop(context);
           _showReviewDialog(
             title: 'ביקורת על השוכר',
-            onSubmit: (rating, text) =>
-                provider.addTenantReview(rating: rating, text: text),
+            onSubmit: (rating, text) => provider.addTenantReview(
+              rating: rating,
+              text: text,
+              tenantId: provider.tenantProfile?.id ?? 'tenant-${match.id}',
+              matchId: match.id,
+              propertyId: match.propertyId,
+            ),
           );
         },
         onBlockUser: () {
@@ -520,7 +528,8 @@ class _MessageScreenState extends State<MessageScreen> {
                     _showActions(provider, match, property, tenantName),
               ),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, color: AppColors.navy, size: 22),
+                icon: const Icon(Icons.more_vert,
+                    color: AppColors.navy, size: 22),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -1147,7 +1156,8 @@ class _MessageBubble extends StatelessWidget {
     // Detect media messages (📷 / 📎 prefix) for richer bubble rendering.
     // Legacy __img__: paths are treated as plain text (no file path exposure).
     final isImg = message.text == '📷 [תמונה]';
-    final isFile = message.text.startsWith('📎 [') && message.text.endsWith(']');
+    final isFile =
+        message.text.startsWith('📎 [') && message.text.endsWith(']');
     final isMedia = isImg || isFile;
 
     Widget messageContent;
@@ -1234,8 +1244,8 @@ class _MessageBubble extends StatelessWidget {
                   Icon(
                     isPending ? Icons.done_rounded : Icons.done_all_rounded,
                     size: 12,
-                    color: Colors.white
-                        .withValues(alpha: isPending ? 0.5 : 0.85),
+                    color:
+                        Colors.white.withValues(alpha: isPending ? 0.5 : 0.85),
                   ),
                 ],
               ],

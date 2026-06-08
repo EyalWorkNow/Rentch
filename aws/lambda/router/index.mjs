@@ -41,12 +41,13 @@ const s3 = new S3Client({ region: REGION });
 // Path segment → DynamoDB table name. Also defines the partition-key attribute
 // and an optional GSI used for list queries.
 const TABLES = {
-  properties:      { name: `${TABLE_PREFIX}properties`,      gsi: { name: 'status-createdAt',     pk: 'status',         filterKey: 'status' } },
+  properties:      { name: `${TABLE_PREFIX}properties`,      gsi: { name: 'status-createdAt',     pk: 'status',         filterKey: 'status' }, ownerIndex: 'ownerUserId-createdAt' },
   messages:        { name: `${TABLE_PREFIX}messages`,        gsi: { name: 'matchId-createdAt',    pk: 'matchId',        filterKey: 'matchId' } },
   users:           { name: `${TABLE_PREFIX}users`,           gsi: { name: 'discoverable-updatedAt', pk: 'discoverable', filterKey: 'discoverable' } },
   events:          { name: `${TABLE_PREFIX}events`,          gsi: null },
   reports:         { name: `${TABLE_PREFIX}reports`,         gsi: null },
   blocks:          { name: `${TABLE_PREFIX}blocks`,          gsi: null },
+  reviews:         { name: `${TABLE_PREFIX}reviews`,         gsi: { name: 'targetKey-createdAt', pk: 'targetKey', filterKey: 'targetKey' } },
   property_views:  { name: `${TABLE_PREFIX}property-views`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
   property_likes:  { name: `${TABLE_PREFIX}property-likes`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
   app_state:       { name: `${TABLE_PREFIX}app-state`,       gsi: null },
@@ -134,6 +135,22 @@ async function listItems(table, query) {
   const filterKey = table.gsi?.filterKey;
   const filterVal = filterKey ? query[filterKey] : undefined;
   const cursor = parseCursor(query.lastKey);
+
+  // Per-owner query (e.g. GET /properties?ownerUserId=<uid>) — uses a dedicated
+  // GSI so a user only ever reads their own rows, never a full-table scan.
+  if (table.ownerIndex && query.ownerUserId) {
+    const out = await ddb.send(new QueryCommand({
+      TableName: table.name,
+      IndexName: table.ownerIndex,
+      KeyConditionExpression: '#o = :o',
+      ExpressionAttributeNames: { '#o': 'ownerUserId' },
+      ExpressionAttributeValues: { ':o': String(query.ownerUserId) },
+      Limit: limit,
+      ExclusiveStartKey: cursor,
+      ScanIndexForward: query.order !== 'desc',
+    }));
+    return json(200, pageBody(out));
+  }
 
   // Query the GSI when the matching filter is supplied (efficient path).
   if (table.gsi && filterVal !== undefined) {

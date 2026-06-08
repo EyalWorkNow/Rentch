@@ -2,6 +2,7 @@ import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -391,6 +392,49 @@ void main() {
 
     provider.dispose();
   });
+
+  test('property and tenant reviews save locally and submit to repository',
+      () async {
+    final reviewRepository = _FakeReviewRepository();
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([
+        _property(id: 'reviewed-property', ownerUserId: 'owner-1'),
+      ]),
+      localStorageService: _MemoryLocalStorageService(),
+      reviewRepository: reviewRepository,
+    );
+
+    await provider.initialize();
+    await provider.addPropertyReview(
+      propertyId: 'reviewed-property',
+      rating: 6,
+      text: ' דירה מצוינת ',
+      matchId: 'match-1',
+    );
+    await provider.addTenantReview(
+      tenantId: 'tenant-reviewed',
+      rating: 0,
+      text: ' שוכר מסודר ',
+      matchId: 'match-1',
+      propertyId: 'reviewed-property',
+    );
+
+    expect(provider.propertyReviews('reviewed-property').single.rating, 5);
+    expect(provider.propertyReviews('reviewed-property').single.text,
+        'דירה מצוינת');
+    expect(provider.tenantReviews.single.rating, 1);
+    expect(provider.tenantReviews.single.text, 'שוכר מסודר');
+
+    expect(reviewRepository.saved, hasLength(2));
+    expect(reviewRepository.saved[0].targetType, ReviewTargetType.property);
+    expect(reviewRepository.saved[0].targetKey, 'property#reviewed-property');
+    expect(reviewRepository.saved[0].matchId, 'match-1');
+    expect(reviewRepository.saved[1].targetType, ReviewTargetType.tenant);
+    expect(reviewRepository.saved[1].targetKey, 'tenant#tenant-reviewed');
+    expect(reviewRepository.saved[1].propertyId, 'reviewed-property');
+
+    provider.dispose();
+  });
 }
 
 class _FakeRentalDataService extends RentalDataService {
@@ -475,6 +519,25 @@ class _MemoryLocalStorageService extends LocalStorageService {
   @override
   Future<void> clearAppState() async {
     state = null;
+  }
+}
+
+class _FakeReviewRepository extends ReviewRepository {
+  final saved = <ReviewRecord>[];
+
+  @override
+  Future<bool> saveReview(ReviewRecord review) async {
+    saved.add(review);
+    return true;
+  }
+
+  @override
+  Future<List<AppReview>> fetchReviews({
+    required ReviewTargetType targetType,
+    required String targetId,
+    int limit = 50,
+  }) async {
+    return const [];
   }
 }
 

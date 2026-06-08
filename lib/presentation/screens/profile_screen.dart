@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
@@ -1766,7 +1767,11 @@ class _LandlordProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
-    final email = 'owner@rentch.co.il';
+    String email = '';
+    try {
+      email = FirebaseAuth.instance.currentUser?.email ?? '';
+    } catch (_) {}
+    if (email.isEmpty) email = 'לא מחובר';
     final photoUrl = profile.photoUrl;
 
     return Scaffold(

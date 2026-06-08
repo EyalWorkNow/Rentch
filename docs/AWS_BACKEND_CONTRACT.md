@@ -48,6 +48,7 @@ Every row carries an `id` field (the DynamoDB partition key unless noted).
 | Method | Path | Query / Body | Notes |
 |---|---|---|---|
 | GET | `/properties` | `?status=active&limit=150&lastKey=<cursor>` | Cursor-paginated. Omit `lastKey` for the first page. |
+| GET | `/properties` | `?ownerUserId=FIREBASE_UID&limit=200` | Landlord-owned listings for profile/dashboard. |
 | POST | `/properties` | `{ id, propertyId, ownerUserId, price, rooms, sizeM2, city, ... , status }` | Create. |
 | PUT | `/properties/{id}` | full row | Upsert/update. |
 | DELETE | `/properties/{id}` | — | Owner-only. |
@@ -92,6 +93,19 @@ endpoint cheap — query on a `matchId-createdAt` GSI.
 
 Wire these to an SNS topic / email so reports are actioned within 24 hours
 (App Store Guideline 1.2 requirement).
+
+### Reviews — `rentch-reviews`
+
+| Method | Path | Query / Body | Notes |
+|---|---|---|---|
+| GET | `/reviews` | `?targetKey=property%23PROPERTY_ID&order=desc&limit=50` | Reviews for a property. |
+| GET | `/reviews` | `?targetKey=tenant%23TENANT_ID&order=desc&limit=50` | Reviews for a tenant/renter profile. |
+| POST | `/reviews` | `{ id, targetType, targetId, targetKey, reviewerUserId, reviewerRole, authorName, rating, text, matchId?, propertyId?, revieweeUserId?, createdAt }` | Create review. |
+
+`targetType ∈ {property, tenant}` and `targetKey = "${targetType}#${targetId}"`.
+`rating` is clamped client-side to 1–5 and `text` is limited to 1,000 chars.
+The client writes locally first, then posts to AWS so offline/unauthorized
+sessions do not lose the review.
 
 ### Property analytics (optional) — `rentch-property-views`, `rentch-property-likes`
 
@@ -143,12 +157,13 @@ S3 that renders GLB/USDZ through `model-viewer` and OBJ/MTL through Three.js.
 
 | Table | PK | SK / GSI | Notes |
 |---|---|---|---|
-| `rentch-properties` | `id` (S) | GSI: `status-createdAt` for paginated active feed | |
+| `rentch-properties` | `id` (S) | GSI: `status-createdAt`, `ownerUserId-createdAt` | active feed and landlord-owned listings |
 | `rentch-messages` | `id` (S) | GSI: `matchId-createdAt` for chat history | |
 | `rentch-users` | `id` (S) = Firebase UID | GSI: `discoverable-updatedAt` | |
 | `rentch-events` | `id` (S) | GSI: `userId-createdAt`, `eventType-createdAt` | TTL on `createdAt` if desired |
 | `rentch-reports` | `id` (S) | GSI: `createdAt` | stream → SNS |
 | `rentch-blocks` | `id` (S) | GSI: `reporterUserId` | |
+| `rentch-reviews` | `id` (S) | GSI: `targetKey-createdAt` | property and tenant/renter reviews |
 | `rentch-property-views` | `id` (S) | GSI: `propertyId` | |
 | `rentch-property-likes` | `id` (S) | GSI: `propertyId-day` | |
 | `rentch-app-state` | `id` (S) = device rowId | — | single-item get/put |

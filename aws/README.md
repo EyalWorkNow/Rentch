@@ -17,7 +17,7 @@ upload + public read round-trip. Redeploy any time with `./deploy.sh`.
 
 ```
 aws/
-├── template.yaml          CloudFormation: 9 DynamoDB tables, S3, IAM, 2 Lambdas, API Gateway
+├── template.yaml          CloudFormation: 10 DynamoDB tables, S3, IAM, Lambdas, API Gateway
 ├── lambda/
 │   ├── router/index.mjs       all CRUD + S3 presign (one Lambda, runtime SDK v3)
 │   └── authorizer/index.mjs   Firebase ID-token verification (zero deps)
@@ -68,6 +68,9 @@ All tables are **PAY_PER_REQUEST** and Lambda/API Gateway are pay-per-call —
 - **One router Lambda** handles every table via path → table mapping, plus S3
   presigned uploads. Adding a table = one line in `TABLES` (router) + one
   `AWS::DynamoDB::Table` in the template.
+- **Reviews** are stored in `rentch-reviews` and queried by
+  `targetKey` (`property#...` or `tenant#...`) so property and renter feedback
+  stay separate but use one table.
 - **Chat** uses 3-second HTTP polling (`GET /messages?matchId=…&after=…`) — no
   WebSocket. Upgrade path: API Gateway WebSocket + a connections table.
 - **Throttling**: API Gateway stage caps 25 req/s (burst 50), mirroring the

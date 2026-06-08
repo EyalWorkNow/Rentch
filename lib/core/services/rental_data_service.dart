@@ -69,6 +69,42 @@ class RentalDataService {
     );
   }
 
+  /// Loads all properties owned by [ownerUserId] from the backend (via the
+  /// ownerUserId GSI). Used on login so a landlord gets their own listings back.
+  Future<List<RentalProperty>> loadPropertiesByOwner(String ownerUserId) async {
+    if (!AppConfig.canUseProperties || ownerUserId.trim().isEmpty) {
+      return const [];
+    }
+    try {
+      final payload = await _breaker.call(
+        () => RetryPolicy.transient.execute(
+          () => aws.get(
+            '/${AppConfig.appwritePropertiesTableId}',
+            query: {
+              'ownerUserId': ownerUserId,
+              'order': 'desc',
+              'limit': '200'
+            },
+          ),
+        ),
+      );
+      final rows = payload['items'] ?? payload['rows'];
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((row) => _propertyFromRow(Map<String, dynamic>.from(row)))
+          .where((p) => p.id.trim().isNotEmpty)
+          .toList();
+    } on CircuitOpenException {
+      return const [];
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('RentalDataService: loadPropertiesByOwner failed: $error');
+      }
+      return const [];
+    }
+  }
+
   // ── Remote loading ────────────────────────────────────────────────────────────
 
   Future<PropertyPage?> _loadPage({

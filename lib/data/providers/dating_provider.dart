@@ -13,6 +13,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/repositories/moderation_repository.dart';
 import 'package:dating_app/data/repositories/property_analytics_repository.dart';
 import 'package:dating_app/data/repositories/property_repository.dart';
+import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,13 +29,15 @@ class DatingProvider extends ChangeNotifier {
     PropertyAnalyticsRepository? propertyAnalyticsRepository,
     UserRepository? userRepository,
     ModerationRepository? moderationRepository,
+    ReviewRepository? reviewRepository,
   })  : _rentalDataService = rentalDataService ?? RentalDataService(),
         _localStorageService = localStorageService ?? LocalStorageService(),
         _propertyRepository = propertyRepository ?? PropertyRepository(),
         _propertyAnalyticsRepository =
             propertyAnalyticsRepository ?? PropertyAnalyticsRepository(),
         _userRepository = userRepository ?? UserRepository(),
-        _moderationRepository = moderationRepository ?? ModerationRepository();
+        _moderationRepository = moderationRepository ?? ModerationRepository(),
+        _reviewRepository = reviewRepository ?? ReviewRepository();
 
   final RentalDataService _rentalDataService;
   final LocalStorageService _localStorageService;
@@ -42,6 +45,7 @@ class DatingProvider extends ChangeNotifier {
   final PropertyAnalyticsRepository _propertyAnalyticsRepository;
   final UserRepository _userRepository;
   final ModerationRepository _moderationRepository;
+  final ReviewRepository _reviewRepository;
 
   // Batches rapid successive writes so we don't hammer Appwrite on every swipe.
   // With 10k concurrent users, unbatched writes would exhaust API rate limits.
@@ -975,6 +979,7 @@ class DatingProvider extends ChangeNotifier {
 
     if (_hasAuthenticatedFirebaseUser) {
       unawaited(_refreshRemoteCatalogAfterAuth());
+      unawaited(_refreshCurrentTenantReviewsAfterAuth());
     }
 
     _isLoading = false;
@@ -1254,8 +1259,18 @@ class DatingProvider extends ChangeNotifier {
     final wasGuestMode = _isGuestMode;
     final previousOwnerUserId = _currentOwnerUserId;
     final uid = _firebaseAuthOrNull?.currentUser?.uid;
-    final base =
-        _tenantProfile ?? _rentalDataService.createDefaultTenantProfile();
+
+    // Load the user's EXISTING profile from the backend first, so a returning
+    // user gets their saved data instead of a fresh local default (and so we
+    // never overwrite their stored profile with an empty one on re-login).
+    TenantProfile? remoteProfile;
+    if (uid != null && uid.isNotEmpty) {
+      remoteProfile = await _userRepository.getProfile(uid);
+    }
+
+    final base = remoteProfile ??
+        _tenantProfile ??
+        _rentalDataService.createDefaultTenantProfile();
     final current = (uid != null && uid.isNotEmpty && base.id != uid)
         ? base.copyWith(id: uid)
         : base;
@@ -1275,6 +1290,26 @@ class DatingProvider extends ChangeNotifier {
         nextOwnerUserId: _currentOwnerUserId,
       );
     }
+
+    // Load the user's own properties from the backend and merge them in, so
+    // the landlord sees every listing they ever uploaded — on any device.
+    if (uid != null && uid.isNotEmpty) {
+      final ownerProps = await _rentalDataService.loadPropertiesByOwner(uid);
+      if (ownerProps.isNotEmpty) {
+        final merged = [..._customProperties];
+        for (final prop in ownerProps) {
+          final idx = merged.indexWhere((p) => p.id == prop.id);
+          if (idx >= 0) {
+            merged[idx] = prop;
+          } else {
+            merged.add(prop);
+          }
+        }
+        _customProperties = merged;
+        _invalidateCatalogCache();
+      }
+    }
+
     await _persist();
     unawaited(_userRepository.upsertProfile(
       _tenantProfile!,
@@ -1422,6 +1457,8 @@ class DatingProvider extends ChangeNotifier {
         _activeDetailSessions.containsKey(propertyId)) {
       return;
     }
+
+    unawaited(refreshPropertyReviews(propertyId));
 
     final now = DateTime.now();
     final session = _PropertyDetailSession(
@@ -1792,39 +1829,147 @@ class DatingProvider extends ChangeNotifier {
     required String propertyId,
     required int rating,
     required String text,
+    String matchId = '',
   }) async {
-    final current = _propertyReviews[propertyId] ?? const [];
+    final targetPropertyId =
+        InputSanitizer.sanitizeText(propertyId, maxLength: 96);
+    final sanitizedText = InputSanitizer.sanitizeText(text, maxLength: 1000);
+    if (targetPropertyId.isEmpty || sanitizedText.isEmpty) return;
+
+    final now = DateTime.now();
+    final safeRating = rating.clamp(1, 5);
+    final property = propertyById(targetPropertyId);
+    final review = AppReview(
+      id: 'property-review-${now.microsecondsSinceEpoch}',
+      authorName: _tenantProfile?.name ?? 'שוכר',
+      rating: safeRating,
+      text: sanitizedText,
+    );
+    final current = _propertyReviews[targetPropertyId] ?? const [];
     _propertyReviews = {
       ..._propertyReviews,
-      propertyId: [
+      targetPropertyId: [
         ...current,
-        AppReview(
-          id: 'property-review-${DateTime.now().microsecondsSinceEpoch}',
-          authorName: _tenantProfile?.name ?? 'שוכר',
-          rating: rating,
-          text: text,
-        ),
+        review,
       ],
     };
     await _persist();
+    unawaited(
+      _reviewRepository.saveReview(
+        ReviewRecord(
+          id: review.id,
+          targetType: ReviewTargetType.property,
+          targetId: targetPropertyId,
+          reviewerUserId: _currentAnalyticsUserId,
+          reviewerRole: isLandlord ? 'landlord' : 'tenant',
+          authorName: review.authorName,
+          rating: safeRating,
+          text: sanitizedText,
+          createdAt: now,
+          matchId: matchId,
+          propertyId: targetPropertyId,
+          revieweeUserId: property?.ownerUserId ?? '',
+        ),
+      ),
+    );
     notifyListeners();
   }
 
   Future<void> addTenantReview({
     required int rating,
     required String text,
+    String tenantId = '',
+    String matchId = '',
+    String propertyId = '',
   }) async {
+    final targetTenantId = InputSanitizer.sanitizeText(tenantId, maxLength: 96);
+    final resolvedTenantId = targetTenantId.isNotEmpty
+        ? targetTenantId
+        : InputSanitizer.sanitizeText(
+            _tenantProfile?.id ?? 'tenant-$matchId',
+            maxLength: 96,
+          );
+    final sanitizedText = InputSanitizer.sanitizeText(text, maxLength: 1000);
+    if (resolvedTenantId.isEmpty || sanitizedText.isEmpty) return;
+
+    final now = DateTime.now();
+    final safeRating = rating.clamp(1, 5);
+    final review = AppReview(
+      id: 'tenant-review-${now.microsecondsSinceEpoch}',
+      authorName: isLandlord ? (_tenantProfile?.name ?? 'בעל דירה') : 'שוכר',
+      rating: safeRating,
+      text: sanitizedText,
+    );
     _tenantReviews = [
       ..._tenantReviews,
-      AppReview(
-        id: 'tenant-review-${DateTime.now().microsecondsSinceEpoch}',
-        authorName: 'בעל דירה',
-        rating: rating,
-        text: text,
-      ),
+      review,
     ];
     await _persist();
+    unawaited(
+      _reviewRepository.saveReview(
+        ReviewRecord(
+          id: review.id,
+          targetType: ReviewTargetType.tenant,
+          targetId: resolvedTenantId,
+          reviewerUserId: _currentAnalyticsUserId,
+          reviewerRole: isLandlord ? 'landlord' : 'tenant',
+          authorName: review.authorName,
+          rating: safeRating,
+          text: sanitizedText,
+          createdAt: now,
+          matchId: matchId,
+          propertyId: propertyId,
+          revieweeUserId: resolvedTenantId,
+        ),
+      ),
+    );
     notifyListeners();
+  }
+
+  Future<void> refreshPropertyReviews(String propertyId) async {
+    final targetPropertyId =
+        InputSanitizer.sanitizeText(propertyId, maxLength: 96);
+    if (!_hasAuthenticatedFirebaseUser || targetPropertyId.isEmpty) return;
+    final remoteReviews = await _reviewRepository.fetchReviews(
+      targetType: ReviewTargetType.property,
+      targetId: targetPropertyId,
+    );
+    if (remoteReviews.isEmpty) return;
+    _propertyReviews = {
+      ..._propertyReviews,
+      targetPropertyId: _mergeReviews(
+        _propertyReviews[targetPropertyId] ?? const [],
+        remoteReviews,
+      ),
+    };
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> _refreshCurrentTenantReviewsAfterAuth() async {
+    final targetTenantId = _tenantProfile?.id.trim() ?? '';
+    if (!_hasAuthenticatedFirebaseUser || targetTenantId.isEmpty) return;
+    final remoteReviews = await _reviewRepository.fetchReviews(
+      targetType: ReviewTargetType.tenant,
+      targetId: targetTenantId,
+    );
+    if (remoteReviews.isEmpty) return;
+    _tenantReviews = _mergeReviews(_tenantReviews, remoteReviews);
+    await _persist();
+    notifyListeners();
+  }
+
+  List<AppReview> _mergeReviews(
+    List<AppReview> current,
+    List<AppReview> incoming,
+  ) {
+    final byId = <String, AppReview>{
+      for (final review in current) review.id: review,
+    };
+    for (final review in incoming) {
+      byId[review.id] = review;
+    }
+    return byId.values.toList(growable: false);
   }
 
   Future<void> sendMessage({

@@ -77,6 +77,67 @@ class UserRepository {
     }
   }
 
+  // ── Read ──────────────────────────────────────────────────────────────────────
+
+  /// Loads a user's profile from the backend by Firebase UID. Returns null if
+  /// not configured, not found, or on error. Used on login so a returning user
+  /// gets their saved profile instead of a fresh local default.
+  Future<TenantProfile?> getProfile(String userId) async {
+    if (!isConfigured || userId.trim().isEmpty) return null;
+    try {
+      final row = await _breaker.call(
+        () => RetryPolicy.transient.execute(
+          () => tables.getRow(
+            databaseId: appwriteDatabaseId,
+            tableId: _tableId,
+            rowId: _rowId(userId),
+          ),
+        ),
+      );
+      final data = row.data;
+      if (data.isEmpty) return null;
+      final hasIdentity = (data['name'] ?? data['userId']) != null;
+      if (!hasIdentity) return null;
+
+      final photoUrlsRaw = (data['photoUrls'] ?? '').toString();
+      final photos = photoUrlsRaw
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final single = (data['photoUrl'] ?? '').toString().trim();
+      if (photos.isEmpty && single.isNotEmpty) photos.add(single);
+
+      return TenantProfile(
+        id: userId,
+        name: (data['name'] ?? '').toString(),
+        bio: (data['bio'] ?? '').toString(),
+        photoUrls: photos,
+        budgetMax: _asInt(data['budgetMax']),
+        desiredRooms: _asDouble(data['desiredRooms']),
+        moveInWindow: (data['moveInWindow'] ?? '').toString(),
+        importantDetails: const [],
+      );
+    } on CircuitOpenException {
+      return null;
+    } catch (e) {
+      _log('getProfile', userId, e);
+      return null;
+    }
+  }
+
+  int _asInt(Object? v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
+  double _asDouble(Object? v) {
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '') ?? 0;
+  }
+
   // Hard-deletes the profile row — call on account deletion (GDPR).
   Future<bool> deleteProfile(String userId) async {
     if (!isConfigured || userId.trim().isEmpty) return false;

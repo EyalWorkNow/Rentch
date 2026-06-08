@@ -93,6 +93,11 @@ class AppConfig {
     defaultValue: 'rentch-blocks',
   );
 
+  static const String dynamoReviewsTable = String.fromEnvironment(
+    'DYNAMO_REVIEWS_TABLE',
+    defaultValue: 'rentch-reviews',
+  );
+
   static const String dynamoPropertyViewsTable = String.fromEnvironment(
     'DYNAMO_PROPERTY_VIEWS_TABLE',
     defaultValue: '',
@@ -204,6 +209,7 @@ class AppConfig {
   static String get appwriteEventsTableId => 'events';
   static String get appwriteReportsTableId => 'reports';
   static String get appwriteBlocksTableId => 'blocks';
+  static String get appwriteReviewsTableId => 'reviews';
   static bool get hasAppwriteCoreConfig => hasAwsCoreConfig;
 
   static List<String> productionReadinessIssues() {
