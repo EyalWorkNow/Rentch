@@ -533,7 +533,7 @@ class _LargeProgressCard extends StatelessWidget {
 
 // ─── Occupancy Arc Meter ──────────────────────────────────────────────────────
 
-class _OccupancyArcMeter extends StatelessWidget {
+class _OccupancyArcMeter extends StatefulWidget {
   const _OccupancyArcMeter({
     required this.matchesCount,
     required this.propertiesCount,
@@ -545,10 +545,34 @@ class _OccupancyArcMeter extends StatelessWidget {
   final double expectedRevenue;
 
   @override
+  State<_OccupancyArcMeter> createState() => _OccupancyArcMeterState();
+}
+
+class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final double occupancyRate = propertiesCount == 0
+    final double occupancyRate = widget.propertiesCount == 0
         ? 0.0
-        : (matchesCount / propertiesCount).clamp(0.0, 1.0);
+        : (widget.matchesCount / widget.propertiesCount).clamp(0.0, 1.0);
+
+    final bool isHigh = occupancyRate > 0.48;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
@@ -577,68 +601,107 @@ class _OccupancyArcMeter extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'מתוך $propertiesCount נכסים פעילים',
+            'מתוך ${widget.propertiesCount} נכסים פעילים',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Center(
             child: SizedBox(
-              height: 148,
-              width: 280,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CustomPaint(
-                    size: const Size(280, 148),
-                    painter: _SegmentedArcPainter(
-                      progress: occupancyRate,
-                      totalSegments: 20,
-                      activeColor: AppColors.primary,
-                      inactiveColor: const Color(0xFFE8EDF2),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '${(occupancyRate * 100).round()}%',
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 36,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1,
+              height: 160,
+              width: 160,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Circular wave container
+                      Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary,
+                            width: 3.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: CustomPaint(
+                            painter: _WavePainter(
+                              progress: occupancyRate,
+                              waveValue: _controller.value,
+                              waveColor: AppColors.primary,
+                              backWaveColor: AppColors.primaryLight.withValues(alpha: 0.4),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'אחוז תפוסה',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      // Text overlay
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${(occupancyRate * 100).round()}%',
+                            style: TextStyle(
+                              color: isHigh ? Colors.white : AppColors.textPrimary,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                              shadows: isHigh ? [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ] : null,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                          const SizedBox(height: 1),
+                          Text(
+                            'אחוז תפוסה',
+                            style: TextStyle(
+                              color: isHigh
+                                  ? Colors.white.withValues(alpha: 0.95)
+                                  : AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              shadows: isHigh ? [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 2,
+                                  offset: const Offset(0, 1),
+                                )
+                              ] : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           // Bottom stats row
           Row(
             children: [
               Expanded(
                 child: _ArcStatChip(
                   label: 'תפוסים',
-                  value: '$matchesCount',
+                  value: '${widget.matchesCount}',
                   color: AppColors.primary,
                 ),
               ),
@@ -646,7 +709,7 @@ class _OccupancyArcMeter extends StatelessWidget {
               Expanded(
                 child: _ArcStatChip(
                   label: 'פנויים',
-                  value: '${(propertiesCount - matchesCount).clamp(0, propertiesCount)}',
+                  value: '${(widget.propertiesCount - widget.matchesCount).clamp(0, widget.propertiesCount)}',
                   color: const Color(0xFFE8EDF2),
                   textColor: AppColors.textSecondary,
                 ),
@@ -695,50 +758,79 @@ class _ArcStatChip extends StatelessWidget {
   }
 }
 
-class _SegmentedArcPainter extends CustomPainter {
-  const _SegmentedArcPainter({
+class _WavePainter extends CustomPainter {
+  _WavePainter({
     required this.progress,
-    required this.totalSegments,
-    required this.activeColor,
-    required this.inactiveColor,
+    required this.waveValue,
+    required this.waveColor,
+    required this.backWaveColor,
   });
 
   final double progress;
-  final int totalSegments;
-  final Color activeColor;
-  final Color inactiveColor;
+  final double waveValue;
+  final Color waveColor;
+  final Color backWaveColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height);
-    final radius = size.width * 0.44;
-    const segmentAngle = math.pi / 20; // 180° / 20 segments
-    const gapAngle = segmentAngle * 0.28;
-    const segmentSpan = segmentAngle - gapAngle;
+    final double width = size.width;
+    final double height = size.height;
 
-    final int filledCount = (progress * totalSegments).round();
+    // Background fill
+    final bgPaint = Paint()..color = const Color(0xFFF6FAFC);
+    canvas.drawRect(Rect.fromLTWH(0, 0, width, height), bgPaint);
 
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.085
-      ..strokeCap = StrokeCap.round;
+    if (progress <= 0.0) return;
 
-    for (int i = 0; i < totalSegments; i++) {
-      final startAngle = math.pi + i * segmentAngle + gapAngle / 2;
-      paint.color = i < filledCount ? activeColor : inactiveColor;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        segmentSpan,
-        false,
-        paint,
-      );
+    final double baseHeight = height * (1.0 - progress);
+
+    // Wave parameters
+    const double waveAmplitude = 6.0;
+    const double waveFrequency = 1.3;
+
+    // 1. Back wave
+    final Path backPath = Path();
+    backPath.moveTo(0, baseHeight);
+    for (double x = 0; x <= width; x++) {
+      final double waveOffset = waveValue * 2 * math.pi;
+      final double y = baseHeight +
+          math.sin((x / width) * 2 * math.pi * waveFrequency + waveOffset) *
+              waveAmplitude;
+      backPath.lineTo(x, y);
     }
+    backPath.lineTo(width, height);
+    backPath.lineTo(0, height);
+    backPath.close();
+
+    final Paint backPaint = Paint()
+      ..color = backWaveColor
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(backPath, backPaint);
+
+    // 2. Front wave
+    final Path frontPath = Path();
+    frontPath.moveTo(0, baseHeight);
+    for (double x = 0; x <= width; x++) {
+      final double waveOffset = waveValue * 2 * math.pi + (math.pi * 0.7);
+      final double y = baseHeight +
+          math.sin((x / width) * 2 * math.pi * waveFrequency - waveOffset) *
+              waveAmplitude;
+      frontPath.lineTo(x, y);
+    }
+    frontPath.lineTo(width, height);
+    frontPath.lineTo(0, height);
+    frontPath.close();
+
+    final Paint frontPaint = Paint()
+      ..color = waveColor
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(frontPath, frontPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _SegmentedArcPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+  bool shouldRepaint(covariant _WavePainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.waveValue != waveValue;
+  }
 }
 
 // ─── Weekly Activity Chart ────────────────────────────────────────────────────
@@ -2136,7 +2228,10 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('שיתוף בקרוב...')),
+                const SnackBar(
+                  duration: Duration(milliseconds: 2500),
+                  content: Text('שיתוף בקרוב...'),
+                ),
               );
             },
           ),

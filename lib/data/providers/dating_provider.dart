@@ -54,6 +54,7 @@ class DatingProvider extends ChangeNotifier {
   String _userRole = 'tenant';
   bool _isGuestMode = false;
   bool _hasActiveSession = false;
+  bool _roleExplicitlyChosen = false;
   TenantProfile? _tenantProfile;
   SearchFilters _filters = _defaultFilters;
   List<RentalProperty> _baseProperties = const [];
@@ -111,6 +112,8 @@ class DatingProvider extends ChangeNotifier {
   static const int _unsetBudget = 2000000000;
   static const double _unsetMaxRooms = 10;
   static const int _unsetMaxSizeM2 = 1000000;
+  static const String _guestLandlordOwnerId = 'guest_landlord';
+  static const String _localLandlordOwnerId = 'local_landlord';
   static const SearchFilters _defaultFilters = SearchFilters(
     query: '',
     minBudget: _defaultMinBudget,
@@ -157,8 +160,17 @@ class DatingProvider extends ChangeNotifier {
     if (cached != null) return cached;
     return _allPropertiesCache = [
       ..._baseProperties.map(_propertyWithSignalOverride),
-      ..._customProperties.map(_propertyWithSignalOverride),
+      ..._customProperties
+          .where(_isDiscoverableCustomProperty)
+          .map(_propertyWithSignalOverride),
     ];
+  }
+
+  bool _isDiscoverableCustomProperty(RentalProperty property) {
+    if (_isGuestDemoProperty(property)) return _isGuestMode;
+    final ownerUserId = property.ownerUserId.trim();
+    if (ownerUserId.isEmpty) return true;
+    return ownerUserId == _currentOwnerUserId;
   }
 
   RentalProperty _propertyWithSignalOverride(RentalProperty property) {
@@ -210,23 +222,30 @@ class DatingProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLandlord => _userRole == 'landlord';
   String get userRole => _userRole;
+  bool get roleExplicitlyChosen => _roleExplicitlyChosen;
   bool get isGuestMode => _isGuestMode;
   bool get hasActiveSession => _hasActiveSession;
   TenantProfile? get tenantProfile => _tenantProfile;
   SearchFilters get filters => _filters;
   List<SearchArea> get searchAreas => _searchAreas;
   List<AppReview> get tenantReviews => _tenantReviews;
-  List<RentalMatch> get matches => _matches;
+  List<RentalMatch> get matches => isLandlord
+      ? _matches.where((match) {
+          final property = propertyById(match.propertyId);
+          return property != null && _belongsToCurrentLandlord(property);
+        }).toList(growable: false)
+      : _matches;
   int get likesCount => _likedPropertyIds.length;
   Set<String> get likedPropertyIds => _likedPropertyIds;
   int get passedCount => _passedPropertyIds.length;
-  int get matchesCount => _matches.length;
+  int get matchesCount => matches.length;
   bool get canUndo => _swipeHistory.isNotEmpty;
   int get remainingSuperLikes => _remainingSuperLikes;
   String get _currentOwnerUserId {
+    if (_isGuestMode && isLandlord) return _guestLandlordOwnerId;
     final profileId = _tenantProfile?.id.trim();
     if (profileId != null && profileId.isNotEmpty) return profileId;
-    return _isGuestMode ? 'guest_landlord' : 'local_landlord';
+    return _isGuestMode ? 'guest_$_userRole' : _localLandlordOwnerId;
   }
 
   int get trustScore => _tenantProfile == null
@@ -242,9 +261,11 @@ class DatingProvider extends ChangeNotifier {
       : GamificationService.nextCompletionHint(_tenantProfile!);
   RentalProperty? get pendingMatchProperty =>
       propertyById(_pendingMatchPropertyId);
-  List<RentalProperty> get myProperties => _customProperties;
+  List<RentalProperty> get myProperties => _customProperties
+      .where(_belongsToCurrentLandlord)
+      .toList(growable: false);
   int get unseenMatchCount =>
-      (_matches.length - _lastSeenMatchCount).clamp(0, 99);
+      (matches.length - _lastSeenMatchCount).clamp(0, 99);
   List<RentalProperty> get savedProperties =>
       _allProperties.where((p) => _savedPropertyIds.contains(p.id)).toList();
   bool isSaved(String id) => _savedPropertyIds.contains(id);
@@ -830,21 +851,66 @@ class DatingProvider extends ChangeNotifier {
 
   List<RentalProperty> get ownerLeads {
     return _allProperties.where((property) {
-      return _likedPropertyIds.contains(property.id) &&
+      return _belongsToCurrentLandlord(property) &&
+          _likedPropertyIds.contains(property.id) &&
           !_ownerAcceptedPropertyIds.contains(property.id) &&
           !_ownerRejectedPropertyIds.contains(property.id) &&
           !_matches.any((match) => match.propertyId == property.id);
     }).toList();
   }
 
-  RentalProperty? get activeLandlordProxy {
-    if (_allProperties.isEmpty) return null;
-    if (_likedPropertyIds.isNotEmpty) {
-      return propertyById(_likedPropertyIds.first);
+  bool _belongsToCurrentLandlord(RentalProperty property) {
+    final ownerUserId = property.ownerUserId.trim();
+    if (ownerUserId.isNotEmpty) {
+      return ownerUserId == _currentOwnerUserId;
     }
-    return filteredProperties.isNotEmpty
-        ? filteredProperties.first
-        : _allProperties.first;
+
+    if (_isGuestDemoProperty(property)) {
+      return _isGuestMode && isLandlord;
+    }
+
+    // Legacy locally-added listings predate ownerUserId. Keep them visible for
+    // the active landlord account, but never treat imported/base listings as
+    // owned just because they lack ownership metadata.
+    return !_isGuestMode &&
+        isLandlord &&
+        _customProperties.any((custom) => custom.id == property.id);
+  }
+
+  bool _isGuestDemoProperty(RentalProperty property) {
+    return property.id.startsWith('demo-prop-') ||
+        property.ownerUserId == _guestLandlordOwnerId;
+  }
+
+  RentalProperty? _customPropertyById(String propertyId) {
+    for (final property in _customProperties) {
+      if (property.id == propertyId) return property;
+    }
+    return null;
+  }
+
+  RentalProperty _ownedByCurrentLandlord(RentalProperty property) {
+    final existing = _customPropertyById(property.id);
+    final existingOwnerUserId = existing?.ownerUserId.trim() ?? '';
+    if (existingOwnerUserId.isNotEmpty) {
+      return property.copyWith(ownerUserId: existingOwnerUserId);
+    }
+    return property.copyWith(ownerUserId: _currentOwnerUserId);
+  }
+
+  RentalProperty? get activeLandlordProxy {
+    final properties = isLandlord ? myProperties : _allProperties;
+    if (properties.isEmpty) return null;
+    if (_likedPropertyIds.isNotEmpty) {
+      final liked = propertyById(_likedPropertyIds.first);
+      if (liked != null && properties.any((p) => p.id == liked.id)) {
+        return liked;
+      }
+    }
+    if (!isLandlord && filteredProperties.isNotEmpty) {
+      return filteredProperties.first;
+    }
+    return properties.first;
   }
 
   List<RentalProperty> get landlordProxyPortfolio {
@@ -853,7 +919,7 @@ class DatingProvider extends ChangeNotifier {
     if (active != null) {
       featured.add(active);
     }
-    for (final property in _allProperties) {
+    for (final property in isLandlord ? myProperties : _allProperties) {
       if (featured.length >= 2) break;
       if (active != null && property.id == active.id) continue;
       featured.add(property);
@@ -902,9 +968,7 @@ class DatingProvider extends ChangeNotifier {
     // Ensure guest sessions have a Firebase JWT before the first _persist() so
     // the remote state sync doesn't fail with 401 on startup.
     if (_isGuestMode && !_hasAuthenticatedFirebaseUser) {
-      try {
-        await FirebaseAuth.instance.signInAnonymously();
-      } catch (_) {}
+      await _ensureAnonymousFirebaseSession();
     }
 
     await _persist();
@@ -1026,10 +1090,11 @@ class DatingProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> setUserRole(String role) async {
+  Future<void> setUserRole(String role, {bool explicit = false}) async {
     _userRole = role;
     _isGuestMode = false;
     _hasActiveSession = true;
+    if (explicit) _roleExplicitlyChosen = true;
     await _refreshRemoteCatalogAfterAuth();
     await _persist();
     AppEvents.instance.log(UserEventType.roleChanged, metadata: {'role': role});
@@ -1042,7 +1107,7 @@ class DatingProvider extends ChangeNotifier {
 
     _isRefreshingRemoteCatalog = true;
     try {
-      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      await _firebaseAuthOrNull?.currentUser?.getIdToken(true);
       AppCache.instance.propertyPages.clear();
 
       final firstPage = await _rentalDataService.loadFirstPage(
@@ -1096,12 +1161,26 @@ class DatingProvider extends ChangeNotifier {
   }
 
   bool get _hasAuthenticatedFirebaseUser {
-    if (Firebase.apps.isEmpty) return false;
+    return _firebaseAuthOrNull?.currentUser != null;
+  }
+
+  FirebaseAuth? get _firebaseAuthOrNull {
+    if (Firebase.apps.isEmpty) return null;
     try {
-      return FirebaseAuth.instance.currentUser != null;
+      return FirebaseAuth.instance;
     } catch (_) {
-      return false;
+      return null;
     }
+  }
+
+  Future<void> _ensureAnonymousFirebaseSession() async {
+    final auth = _firebaseAuthOrNull;
+    if (auth == null) return;
+    try {
+      if (auth.currentUser == null) {
+        await auth.signInAnonymously();
+      }
+    } catch (_) {}
   }
 
   Future<void> enterGuestMode(String role) async {
@@ -1109,11 +1188,7 @@ class DatingProvider extends ChangeNotifier {
     _hasActiveSession = true;
     // Sign in anonymously so guest requests carry a Firebase JWT and aren't
     // blocked by the API Gateway authorizer.
-    if (FirebaseAuth.instance.currentUser == null) {
-      try {
-        await FirebaseAuth.instance.signInAnonymously();
-      } catch (_) {}
-    }
+    await _ensureAnonymousFirebaseSession();
     await _persist();
     notifyListeners();
   }
@@ -1173,9 +1248,18 @@ class DatingProvider extends ChangeNotifier {
   Future<void> applyGoogleIdentity({
     required String displayName,
     String? photoUrl,
+    String source = 'google',
   }) async {
-    final current =
+    // Bind the profile to the real Firebase UID so each user's data is isolated.
+    final wasGuestMode = _isGuestMode;
+    final previousOwnerUserId = _currentOwnerUserId;
+    final uid = _firebaseAuthOrNull?.currentUser?.uid;
+    final base =
         _tenantProfile ?? _rentalDataService.createDefaultTenantProfile();
+    final current = (uid != null && uid.isNotEmpty && base.id != uid)
+        ? base.copyWith(id: uid)
+        : base;
+
     final nextPhotos = <String>[
       if (photoUrl != null && photoUrl.trim().isNotEmpty) photoUrl.trim(),
       ...current.photoUrls.where((url) => url != photoUrl),
@@ -1185,6 +1269,12 @@ class DatingProvider extends ChangeNotifier {
       photoUrls: nextPhotos,
     );
     _isGuestMode = false;
+    if (isLandlord && !wasGuestMode) {
+      _retagCurrentLandlordProperties(
+        previousOwnerUserId: previousOwnerUserId,
+        nextOwnerUserId: _currentOwnerUserId,
+      );
+    }
     await _persist();
     unawaited(_userRepository.upsertProfile(
       _tenantProfile!,
@@ -1193,8 +1283,31 @@ class DatingProvider extends ChangeNotifier {
     ));
     AppEvents.instance
       ..setUserId(_tenantProfile!.id)
-      ..log(UserEventType.profileUpdated, metadata: {'source': 'google'});
+      ..log(UserEventType.profileUpdated, metadata: {'source': source});
     notifyListeners();
+  }
+
+  void _retagCurrentLandlordProperties({
+    required String previousOwnerUserId,
+    required String nextOwnerUserId,
+  }) {
+    if (nextOwnerUserId.trim().isEmpty ||
+        previousOwnerUserId == nextOwnerUserId) {
+      return;
+    }
+
+    var changed = false;
+    _customProperties = _customProperties.map((property) {
+      if (_isGuestDemoProperty(property)) return property;
+      final ownerUserId = property.ownerUserId.trim();
+      if (ownerUserId.isNotEmpty && ownerUserId != previousOwnerUserId) {
+        return property;
+      }
+      changed = true;
+      return property.copyWith(ownerUserId: nextOwnerUserId);
+    }).toList(growable: false);
+
+    if (changed) _invalidateCatalogCache();
   }
 
   Future<void> updateFilters(SearchFilters filters) async {
@@ -1211,13 +1324,14 @@ class DatingProvider extends ChangeNotifier {
     RentalProperty property, {
     PropertyRecordStatus status = PropertyRecordStatus.active,
   }) async {
-    _customProperties = [..._customProperties, property];
+    final ownedProperty = _ownedByCurrentLandlord(property);
+    _customProperties = [..._customProperties, ownedProperty];
     _invalidateCatalogCache();
     await _persist();
     unawaited(
       _propertyRepository
-          .saveProperty(property,
-              ownerUserId: _currentOwnerUserId, status: status)
+          .saveProperty(ownedProperty,
+              ownerUserId: ownedProperty.ownerUserId, status: status)
           .then((result) {
         if (!result.isOk && kDebugMode) {
           debugPrint(
@@ -1227,10 +1341,10 @@ class DatingProvider extends ChangeNotifier {
     );
     AppEvents.instance.log(
       UserEventType.propertyAdded,
-      propertyId: property.id,
+      propertyId: ownedProperty.id,
       metadata: {
-        'city': property.city,
-        'type': property.propertyType,
+        'city': ownedProperty.city,
+        'type': ownedProperty.propertyType,
         'status': status.name,
       },
     );
@@ -1238,13 +1352,17 @@ class DatingProvider extends ChangeNotifier {
   }
 
   Future<void> updateLandlordProperty(RentalProperty updated) async {
-    _customProperties =
-        _customProperties.map((p) => p.id == updated.id ? updated : p).toList();
+    final existing = _customPropertyById(updated.id);
+    if (existing == null || !_belongsToCurrentLandlord(existing)) return;
+    final ownedProperty = _ownedByCurrentLandlord(updated);
+    _customProperties = _customProperties
+        .map((p) => p.id == ownedProperty.id ? ownedProperty : p)
+        .toList();
     _invalidateCatalogCache();
     await _persist();
     unawaited(
       _propertyRepository
-          .saveProperty(updated, ownerUserId: _currentOwnerUserId)
+          .saveProperty(ownedProperty, ownerUserId: ownedProperty.ownerUserId)
           .then((result) {
         if (!result.isOk && kDebugMode) {
           debugPrint(
@@ -1253,11 +1371,13 @@ class DatingProvider extends ChangeNotifier {
       }),
     );
     AppEvents.instance
-        .log(UserEventType.propertyUpdated, propertyId: updated.id);
+        .log(UserEventType.propertyUpdated, propertyId: ownedProperty.id);
     notifyListeners();
   }
 
   Future<void> removeLandlordProperty(String propertyId) async {
+    final existing = _customPropertyById(propertyId);
+    if (existing == null || !_belongsToCurrentLandlord(existing)) return;
     _customProperties =
         _customProperties.where((p) => p.id != propertyId).toList();
     _invalidateCatalogCache();
@@ -1273,6 +1393,7 @@ class DatingProvider extends ChangeNotifier {
     var changed = false;
     final updated = _customProperties.map((property) {
       if (property.id != propertyId) return property;
+      if (!_belongsToCurrentLandlord(property)) return property;
       changed = true;
       return property.copyWith(virtualTour: tour);
     }).toList();
@@ -1840,8 +1961,9 @@ class DatingProvider extends ChangeNotifier {
   }
 
   void markMatchesSeen() {
-    if (_lastSeenMatchCount >= _matches.length) return;
-    _lastSeenMatchCount = _matches.length;
+    final visibleCount = matches.length;
+    if (_lastSeenMatchCount >= visibleCount) return;
+    _lastSeenMatchCount = visibleCount;
     notifyListeners();
   }
 
@@ -2347,7 +2469,6 @@ class DatingProvider extends ChangeNotifier {
       return;
     }
 
-    final pendingLead = propertyPool[2];
     final savedProperty = propertyPool[3];
 
     _tenantProfile = tenant;
@@ -2369,6 +2490,7 @@ class DatingProvider extends ChangeNotifier {
       RentalProperty(
         id: 'demo-prop-1',
         url: '',
+        ownerUserId: _guestLandlordOwnerId,
         price: 8500,
         rooms: 3,
         sizeM2: 82,
@@ -2407,6 +2529,7 @@ class DatingProvider extends ChangeNotifier {
       RentalProperty(
         id: 'demo-prop-2',
         url: '',
+        ownerUserId: _guestLandlordOwnerId,
         price: 6900,
         rooms: 4,
         sizeM2: 108,
@@ -2445,6 +2568,7 @@ class DatingProvider extends ChangeNotifier {
       RentalProperty(
         id: 'demo-prop-3',
         url: '',
+        ownerUserId: _guestLandlordOwnerId,
         price: 7200,
         rooms: 2.5,
         sizeM2: 68,
@@ -2478,6 +2602,7 @@ class DatingProvider extends ChangeNotifier {
       RentalProperty(
         id: 'demo-prop-4',
         url: '',
+        ownerUserId: _guestLandlordOwnerId,
         price: 5400,
         rooms: 1.5,
         sizeM2: 44,
@@ -2513,7 +2638,7 @@ class DatingProvider extends ChangeNotifier {
       'demo-prop-1',
       'demo-prop-2',
       'demo-prop-3',
-      pendingLead.id,
+      'demo-prop-4',
     };
     _passedPropertyIds = <String>{savedProperty.id};
     _ownerAcceptedPropertyIds = <String>{
@@ -2690,6 +2815,8 @@ class DatingProvider extends ChangeNotifier {
     _isGuestMode = storedState['isGuestMode'] as bool? ?? false;
     _hasActiveSession =
         storedState['hasActiveSession'] as bool? ?? _isGuestMode;
+    _roleExplicitlyChosen =
+        storedState['roleExplicitlyChosen'] as bool? ?? false;
 
     if (_tenantReviews.isEmpty) {
       _tenantReviews = _rentalDataService.createTenantReviews();
@@ -2772,6 +2899,7 @@ class DatingProvider extends ChangeNotifier {
       'userRole': InputSanitizer.sanitizeRole(_userRole),
       'isGuestMode': _isGuestMode,
       'hasActiveSession': _hasActiveSession,
+      'roleExplicitlyChosen': _roleExplicitlyChosen,
       'savedPropertyIds': _savedPropertyIds.toList(),
       'blockedOwnerNames': _blockedOwnerNames.toList(),
       'reportedPropertyIds': _reportedPropertyIds.toList(),

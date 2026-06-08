@@ -7,15 +7,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-// Thrown when the user actively dismisses the Google sign-in UI.
-// The caller should treat this as a no-op (no error message to show).
 class GoogleAuthCanceledException implements Exception {
   const GoogleAuthCanceledException();
   @override
   String toString() => 'GoogleAuthCanceledException';
 }
 
-// Thrown when the Google / Firebase configuration is incomplete.
 class GoogleAuthConfigException implements Exception {
   const GoogleAuthConfigException(this.technicalMessage);
   final String technicalMessage;
@@ -28,11 +25,13 @@ class GoogleAuthResult {
     required this.displayName,
     required this.email,
     required this.photoUrl,
+    required this.isNewUser,
   });
 
   final String displayName;
   final String email;
   final String? photoUrl;
+  final bool isNewUser;
 }
 
 class GoogleAuthService {
@@ -45,21 +44,23 @@ class GoogleAuthService {
   final FirebaseAuth? _firebaseAuth;
   final GoogleSignIn _googleSignIn;
 
+  // initialize() must be called exactly once per GoogleSignIn instance.
+  bool _initialized = false;
+
   Future<GoogleAuthResult> signIn() async {
     final firebaseAuth = _resolveFirebaseAuth();
 
-    // On iOS, GIDClientID in Info.plist is the primary configuration source.
-    // Passing it programmatically as well handles non-standard build setups
-    // where Info.plist is not read (e.g., running tests with a mock runner).
-    final clientId = !kIsWeb && Platform.isIOS
-        ? DefaultFirebaseOptions.ios.iosClientId
-        : null;
-
-    try {
-      await _googleSignIn.initialize(clientId: clientId);
-    } on PlatformException catch (e) {
-      debugPrint('[GoogleAuth] initialize failed: ${e.code} — ${e.message}');
-      throw GoogleAuthConfigException('${e.code}: ${e.message}');
+    if (!_initialized) {
+      final clientId = !kIsWeb && Platform.isIOS
+          ? DefaultFirebaseOptions.ios.iosClientId
+          : null;
+      try {
+        await _googleSignIn.initialize(clientId: clientId);
+        _initialized = true;
+      } on PlatformException catch (e) {
+        debugPrint('[GoogleAuth] initialize failed: ${e.code} — ${e.message}');
+        throw GoogleAuthConfigException('${e.code}: ${e.message}');
+      }
     }
 
     late final GoogleSignInAccount account;
@@ -90,6 +91,10 @@ class GoogleAuthService {
     }
 
     final auth = account.authentication;
+    if (auth.idToken == null) {
+      throw GoogleAuthConfigException(
+          'Google sign-in succeeded but returned no ID token.');
+    }
 
     final credential = GoogleAuthProvider.credential(
       idToken: auth.idToken,
@@ -107,6 +112,7 @@ class GoogleAuthService {
           : 'משתמש Google',
       email: user.email?.trim() ?? '',
       photoUrl: user.photoURL,
+      isNewUser: userCredential.additionalUserInfo?.isNewUser ?? false,
     );
   }
 
@@ -115,6 +121,7 @@ class GoogleAuthService {
       await (_firebaseAuth ?? FirebaseAuth.instance).signOut();
     }
     await _googleSignIn.signOut();
+    _initialized = false;
   }
 
   FirebaseAuth _resolveFirebaseAuth() {

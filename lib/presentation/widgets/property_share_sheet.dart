@@ -50,7 +50,10 @@ Future<void> _shareViaUri(
   }
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(errorMessage)),
+    SnackBar(
+      duration: const Duration(milliseconds: 2500),
+      content: Text(errorMessage),
+    ),
   );
 }
 
@@ -62,7 +65,10 @@ Future<void> _copyToClipboard(
   await Clipboard.setData(ClipboardData(text: value));
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(confirmation)),
+    SnackBar(
+      duration: const Duration(milliseconds: 2500),
+      content: Text(confirmation),
+    ),
   );
 }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show PathMetric;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
@@ -112,6 +113,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
   PropertyModel3d? _model3dDraft;
+  Timer? _pollTimer;
   bool _wantsVerifiedListing = false;
   String _verificationVideoUrl = '';
   DateTime? _verificationCapturedAt;
@@ -122,6 +124,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   @override
   void dispose() {
+    _stopTourPolling();
     _pageCtrl.dispose();
     _cityCtrl.dispose();
     _neighborhoodCtrl.dispose();
@@ -135,6 +138,30 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       item.dispose();
     }
     super.dispose();
+  }
+
+  void _startTourPolling() {
+    _stopTourPolling();
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      final tour = _virtualTourDraft;
+      if (tour == null) { _stopTourPolling(); return; }
+      if (tour.status == PropertyTourStatus.ready || tour.status == PropertyTourStatus.failed) {
+        _stopTourPolling(); return;
+      }
+      try {
+        final updated = await _scanService.refresh(tour);
+        if (!mounted) { _stopTourPolling(); return; }
+        setState(() => _virtualTourDraft = updated);
+        if (updated.status == PropertyTourStatus.ready || updated.status == PropertyTourStatus.failed) {
+          _stopTourPolling();
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _stopTourPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
   }
 
   bool _validateCurrentStep() {
@@ -153,6 +180,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (!_validateCurrentStep()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content: Text('יש למלא את השדות הנדרשים'),
           backgroundColor: AppColors.coral,
         ),
@@ -244,9 +272,18 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     try {
       final file = await _picker.pickVideo(
         source: source,
-        maxDuration: const Duration(seconds: 75),
+        maxDuration: const Duration(seconds: 60),
       );
       if (file == null) return;
+
+      final rawSize = await file.length();
+      if (rawSize > 150 * 1024 * 1024) {
+        _showMediaError(
+          'הסרטון גדול מדי (${(rawSize / 1024 / 1024).toStringAsFixed(0)} MB). '
+          'צלם סרטון קצר יותר של עד 60 שניות.',
+        );
+        return;
+      }
 
       setState(() => _isSubmittingTour = true);
       final localPath = await _storageService.saveVideoLocally(
@@ -292,6 +329,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         _model3dDraft = null;
         _isSubmittingTour = false;
       });
+      if (submitted.status == PropertyTourStatus.processing ||
+          submitted.status == PropertyTourStatus.queued) {
+        _startTourPolling();
+      }
     } on Property3dScanException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -490,6 +531,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(milliseconds: 2500),
         content: Text(message),
         backgroundColor: AppColors.coral,
       ),
@@ -501,6 +543,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (!RateLimiter.instance.allowPropertyAdd()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content: Text('הוספת יותר מדי נכסים לאחרונה. נסה שוב מאוחר יותר.'),
           backgroundColor: AppColors.coral,
         ),
@@ -511,6 +554,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (!_acceptedPropertyTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content:
               Text('יש לאשר את תנאי השימוש והצהרת הזכויות לפני פרסום נכס.'),
           backgroundColor: AppColors.coral,
@@ -534,6 +578,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             sanitizedVerificationVideoUrl.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content:
               Text('כדי לפרסם דירה מאומתת צריך לצלם וידאו מתוך האפליקציה.'),
           backgroundColor: AppColors.coral,
@@ -584,6 +629,22 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       aiTrainingAllowed: _aiTrainingAllowed,
     );
 
+    double lat = 32.0853;
+    double lon = 34.7818;
+    try {
+      final addressParts = <String>[
+        if (street.isNotEmpty) street,
+        if (_streetNumCtrl.text.trim().isNotEmpty) _streetNumCtrl.text.trim(),
+        if (city.isNotEmpty) city,
+        'ישראל',
+      ];
+      final locations = await locationFromAddress(addressParts.join(', '));
+      if (locations.isNotEmpty) {
+        lat = locations.first.latitude;
+        lon = locations.first.longitude;
+      }
+    } catch (_) {}
+
     final property = RentalProperty(
       id: _draftPropertyId,
       sourceUrl: '',
@@ -597,8 +658,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       neighborhood: InputSanitizer.sanitizeAddress(_neighborhoodCtrl.text),
       street: street,
       streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
-      lat: 32.0853,
-      lon: 34.7818,
+      lat: lat,
+      lon: lon,
       propertyType: _propertyType,
       entryDate: InputSanitizer.sanitizeText(_entryDateCtrl.text.trim(),
           maxLength: 20),
@@ -621,6 +682,121 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
     if (!mounted) return;
     Navigator.of(context).pop();
+  }
+
+  // ── AI virtual staging ("הדמיה") ────────────────────────────────────────────
+  Future<void> _generateStaging(ImageSource source, String style) async {
+    if (_wantsVerifiedListing) {
+      _showMediaError('בדירה מאומתת אי אפשר ליצור הדמיות AI.');
+      return;
+    }
+    if (!_scanService.isConfigured) {
+      _showMediaError('יצירת הדמיות אינה זמינה בגרסה זו.');
+      return;
+    }
+    try {
+      final file = await _picker.pickImage(
+        source: source,
+        imageQuality: 92,
+        maxWidth: 2000,
+      );
+      if (file == null) return;
+
+      final localPath = await _storageService.saveImageLocally(
+        file,
+        folderName: 'staging_src',
+      );
+
+      setState(() {
+        _isSubmittingTour = true;
+        _virtualTourDraft = null;
+        _model3dDraft = null;
+      });
+
+      final submitted = await _scanService.submitStagingImage(
+        propertyId: _draftPropertyId,
+        localImagePath: localPath,
+        style: style,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _virtualTourDraft = submitted;
+        _isSubmittingTour = false;
+      });
+
+      switch (submitted.status) {
+        case PropertyTourStatus.ready:
+          _addStagedToMedia(submitted);
+          break;
+        case PropertyTourStatus.failed:
+          _showMediaError('יצירת ההדמיה נכשלה. נסו תמונה אחרת.');
+          break;
+        default:
+          _startStagingPolling();
+      }
+    } on Property3dScanException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError(error.message);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isSubmittingTour = false);
+      _showMediaError('יצירת ההדמיה נכשלה: $error');
+    }
+  }
+
+  void _startStagingPolling() {
+    _stopTourPolling();
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
+      final tour = _virtualTourDraft;
+      if (tour == null) {
+        _stopTourPolling();
+        return;
+      }
+      if (tour.status == PropertyTourStatus.ready ||
+          tour.status == PropertyTourStatus.failed) {
+        _stopTourPolling();
+        return;
+      }
+      try {
+        final updated = await _scanService.refresh(tour);
+        if (!mounted) {
+          _stopTourPolling();
+          return;
+        }
+        setState(() => _virtualTourDraft = updated);
+        if (updated.status == PropertyTourStatus.ready) {
+          _stopTourPolling();
+          _addStagedToMedia(updated);
+        } else if (updated.status == PropertyTourStatus.failed) {
+          _stopTourPolling();
+          _showMediaError('יצירת ההדמיה נכשלה. נסו תמונה אחרת.');
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _addStagedToMedia(PropertyVirtualTour tour) {
+    final url = tour.previewImageUrl.trim();
+    if (url.isEmpty) return;
+    final alreadyAdded =
+        _mediaDrafts.any((d) => d.controller.text.trim() == url);
+    if (!alreadyAdded) {
+      _assignPickedMedia(url, PropertyMediaType.image);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        duration: Duration(milliseconds: 2800),
+        content: Text('✨ ההדמיה נוצרה ונוספה לתמונות הדירה!'),
+        backgroundColor: AppColors.primary,
+      ),
+    );
   }
 
   @override
@@ -740,6 +916,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 _mediaDrafts[i].dispose();
                 _mediaDrafts.removeAt(i);
               }),
+              onGenerateStaging: _generateStaging,
             ),
           ],
         ),
@@ -988,6 +1165,7 @@ class _StepLocationState extends State<_StepLocation> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
+              duration: Duration(milliseconds: 2500),
               content: Text('המיקום זוהה והוזן בהצלחה!'),
               backgroundColor: AppColors.success,
             ),
@@ -1000,6 +1178,7 @@ class _StepLocationState extends State<_StepLocation> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 2500),
             content: Text('שגיאה בזיהוי המיקום: $e'),
             backgroundColor: AppColors.coral,
           ),
@@ -1177,6 +1356,7 @@ class _StepDetails extends StatelessWidget {
                       ctrl: floorCtrl,
                       label: 'קומה',
                       icon: IconsaxPlusLinear.layer,
+                      numeric: true,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1185,6 +1365,7 @@ class _StepDetails extends StatelessWidget {
                       ctrl: totalFloorsCtrl,
                       label: 'סה"כ קומות',
                       icon: IconsaxPlusLinear.buildings,
+                      numeric: true,
                     ),
                   ),
                 ],
@@ -1253,6 +1434,59 @@ class _StepFeatures extends StatelessWidget {
   final Set<String> selectedFeatures;
   final ValueChanged<String> onToggle;
 
+  IconData _getFeatureIcon(String label) {
+    switch (label) {
+      case 'מרפסת':
+        return Icons.balcony;
+      case 'חניה':
+        return Icons.local_parking;
+      case 'מחסן':
+        return Icons.inventory_2_outlined;
+      case 'מזגן':
+        return Icons.ac_unit;
+      case 'ממ"ד':
+        return Icons.gpp_good_outlined;
+      case 'מרפסת שמש':
+        return Icons.wb_sunny_outlined;
+      case 'גינה':
+        return Icons.yard_outlined;
+      case 'מעלית':
+        return Icons.elevator;
+      case 'ריהוט':
+        return Icons.chair_outlined;
+      case 'אינטרנט כלול':
+        return Icons.wifi;
+      case 'מטבח מאובזר':
+        return Icons.countertops_outlined;
+      case 'חיות מחמד מותר':
+        return Icons.pets;
+      case 'כביסה כלולה':
+        return Icons.local_laundry_service_outlined;
+      case 'שומר/אבטחה':
+        return Icons.security;
+      case 'נגישות לנכים':
+        return Icons.accessible;
+      case 'גג משותף':
+        return Icons.roofing;
+      case 'בריכה':
+        return Icons.pool;
+      case 'חדר כושר':
+        return Icons.fitness_center;
+      case 'סורגים':
+        return Icons.grid_3x3;
+      case 'משופצת':
+        return Icons.build_circle_outlined;
+      case 'מתאימה לשותפים':
+        return Icons.group_outlined;
+      case 'מקלט':
+        return Icons.shield_outlined;
+      case 'מרחב מוגן קומתי':
+        return Icons.domain_disabled;
+      default:
+        return Icons.star_border;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -1300,14 +1534,25 @@ class _StepFeatures extends StatelessWidget {
                               : AppColors.borderLight,
                         ),
                       ),
-                      child: Text(
-                        f,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              selected ? Colors.white : AppColors.textSecondary,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getFeatureIcon(f),
+                            size: 16,
+                            color: selected ? Colors.white : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            f,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  selected ? Colors.white : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -1355,6 +1600,7 @@ class _StepPhotos extends StatelessWidget {
     required this.onAiTrainingChanged,
     required this.onAddMediaUrl,
     required this.onRemoveMedia,
+    this.onGenerateStaging,
   });
   final List<_PropertyMediaDraft> mediaDrafts;
   final PropertyVirtualTour? virtualTourDraft;
@@ -1386,6 +1632,7 @@ class _StepPhotos extends StatelessWidget {
   final ValueChanged<bool> onAiTrainingChanged;
   final void Function(String url, PropertyMediaType type) onAddMediaUrl;
   final ValueChanged<int> onRemoveMedia;
+  final void Function(ImageSource source, String style)? onGenerateStaging;
 
   void _showMediaPickerSheet(BuildContext context) {
     showModalBottomSheet<void>(
@@ -1607,19 +1854,17 @@ class _StepPhotos extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 18),
-                const Divider(height: 1, color: AppColors.borderLight),
-                const SizedBox(height: 16),
-                _Scan3dPanel(
-                  tour: virtualTourDraft,
-                  isSubmitting: isSubmittingTour,
-                  isBackendConfigured: isScanBackendConfigured,
-                  onPickFromCamera: onPickScanFromCamera,
-                  onPickFromGallery: onPickScanFromGallery,
-                  onClear: onClearVirtualTour,
-                  onLinkScaniverse: onLinkScaniverse,
-                  onImportScaniverseAssets: onImportScaniverseAssets,
-                ),
+                if (onGenerateStaging != null) ...[
+                  const SizedBox(height: 18),
+                  const Divider(height: 1, color: AppColors.borderLight),
+                  const SizedBox(height: 16),
+                  _StagingPanel(
+                    tour: virtualTourDraft,
+                    isSubmitting: isSubmittingTour,
+                    onGenerate: onGenerateStaging!,
+                    onClear: onClearVirtualTour,
+                  ),
+                ],
               ],
               const SizedBox(height: 16),
               _PropertyRightsPanel(
@@ -2378,6 +2623,323 @@ class _Scan3dPanel extends StatelessWidget {
   }
 }
 
+// AI virtual-staging panel ("הדמיה"): pick a room photo + style, generate a
+// furnished/staged render via Luma uni-1, and auto-add it to the listing photos.
+class _StagingPanel extends StatefulWidget {
+  const _StagingPanel({
+    required this.tour,
+    required this.isSubmitting,
+    required this.onGenerate,
+    required this.onClear,
+  });
+
+  final PropertyVirtualTour? tour;
+  final bool isSubmitting;
+  final void Function(ImageSource source, String style) onGenerate;
+  final VoidCallback onClear;
+
+  @override
+  State<_StagingPanel> createState() => _StagingPanelState();
+}
+
+class _StagingPanelState extends State<_StagingPanel> {
+  static const List<({String key, String label})> _styles = [
+    (key: 'modern', label: 'מודרני'),
+    (key: 'scandinavian', label: 'סקנדינבי'),
+    (key: 'cozy', label: 'חמים'),
+    (key: 'luxury', label: 'יוקרתי'),
+  ];
+  String _style = 'modern';
+
+  bool get _isBusy {
+    if (widget.isSubmitting) return true;
+    final t = widget.tour;
+    return t != null &&
+        (t.status == PropertyTourStatus.processing ||
+            t.status == PropertyTourStatus.queued ||
+            t.status == PropertyTourStatus.uploading);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tour = widget.tour;
+    final isReady = tour != null && tour.status == PropertyTourStatus.ready;
+    final isFailed = tour != null && tour.status == PropertyTourStatus.failed;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.auto_awesome_rounded,
+                  color: Colors.white, size: 23),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'הדמיית AI לדירה',
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'הפכו תמונה של חדר להדמיה מעוצבת ומרוהטת — אוטומטית.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12.5,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          'בחרו סגנון עיצוב',
+          style: TextStyle(
+            color: AppColors.navy,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final s in _styles)
+              GestureDetector(
+                onTap: _isBusy ? null : () => setState(() => _style = s.key),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _style == s.key
+                        ? AppColors.primary
+                        : AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _style == s.key
+                          ? AppColors.primary
+                          : AppColors.borderLight,
+                    ),
+                  ),
+                  child: Text(
+                    s.label,
+                    style: TextStyle(
+                      color: _style == s.key ? Colors.white : AppColors.navy,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_isBusy)
+          _stagingBusyCard()
+        else if (isReady)
+          _stagingResultCard(tour)
+        else if (isFailed)
+          _stagingFailedCard()
+        else
+          _stagingActions(),
+      ],
+    );
+  }
+
+  Widget _stagingBusyCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: const Column(
+        children: [
+          SizedBox(
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(
+                strokeWidth: 2.6, color: AppColors.primary),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'יוצרים את ההדמיה...',
+            style: TextStyle(
+                color: AppColors.navy,
+                fontSize: 14,
+                fontWeight: FontWeight.w900),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'זה לוקח בערך 30–60 שניות. אפשר להמשיך למלא פרטים.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stagingResultCard(PropertyVirtualTour tour) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: AspectRatio(
+            aspectRatio: 3 / 2,
+            child: Image.network(
+              tour.previewImageUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  color: AppColors.background,
+                  alignment: Alignment.center,
+                  child: const CircularProgressIndicator(
+                      strokeWidth: 2.4, color: AppColors.primary),
+                );
+              },
+              errorBuilder: (_, __, ___) => Container(
+                color: AppColors.background,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_rounded,
+                    color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: const [
+            Icon(Icons.check_circle_rounded,
+                color: Color(0xFF16A34A), size: 18),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'ההדמיה נוספה לתמונות הדירה',
+                style: TextStyle(
+                    color: Color(0xFF16A34A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: widget.onClear,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: const BorderSide(color: AppColors.primary),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            minimumSize: const Size.fromHeight(46),
+          ),
+          icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+          label: const Text('צור הדמיה נוספת',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      ],
+    );
+  }
+
+  Widget _stagingFailedCard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFFECACA)),
+          ),
+          child: const Text(
+            'יצירת ההדמיה נכשלה. נסו תמונה ברורה יותר של החדר.',
+            style: TextStyle(color: Color(0xFFB91C1C), fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _stagingActions(),
+      ],
+    );
+  }
+
+  Widget _stagingActions() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () =>
+                widget.onGenerate(ImageSource.gallery, _style),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(IconsaxPlusLinear.gallery, size: 18),
+            label: const Text('מהגלריה',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () =>
+                widget.onGenerate(ImageSource.camera, _style),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.navy,
+              side: const BorderSide(color: AppColors.borderLight),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            icon: const Icon(IconsaxPlusLinear.camera, size: 18),
+            label: const Text('מצלמה',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ScanTip extends StatelessWidget {
   const _ScanTip({required this.icon, required this.label});
   final IconData icon;
@@ -3011,6 +3573,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
   PropertyModel3d? _model3dDraft;
+  Timer? _pollTimer;
   late bool _wantsVerifiedListing;
   late String _verificationVideoUrl;
   DateTime? _verificationCapturedAt;
@@ -3064,6 +3627,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
   @override
   void dispose() {
+    _stopTourPolling();
     _pageCtrl.dispose();
     _cityCtrl.dispose();
     _neighborhoodCtrl.dispose();
@@ -3077,6 +3641,30 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       item.dispose();
     }
     super.dispose();
+  }
+
+  void _startTourPolling() {
+    _stopTourPolling();
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      final tour = _virtualTourDraft;
+      if (tour == null) { _stopTourPolling(); return; }
+      if (tour.status == PropertyTourStatus.ready || tour.status == PropertyTourStatus.failed) {
+        _stopTourPolling(); return;
+      }
+      try {
+        final updated = await _scanService.refresh(tour);
+        if (!mounted) { _stopTourPolling(); return; }
+        setState(() => _virtualTourDraft = updated);
+        if (updated.status == PropertyTourStatus.ready || updated.status == PropertyTourStatus.failed) {
+          _stopTourPolling();
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _stopTourPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
   }
 
   bool _validateCurrentStep() {
@@ -3095,6 +3683,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     if (!_validateCurrentStep()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content: Text('יש למלא את השדות הנדרשים'),
           backgroundColor: AppColors.coral,
         ),
@@ -3178,9 +3767,18 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     try {
       final file = await _picker.pickVideo(
         source: source,
-        maxDuration: const Duration(seconds: 75),
+        maxDuration: const Duration(seconds: 60),
       );
       if (file == null) return;
+
+      final rawSize = await file.length();
+      if (rawSize > 150 * 1024 * 1024) {
+        _showMediaError(
+          'הסרטון גדול מדי (${(rawSize / 1024 / 1024).toStringAsFixed(0)} MB). '
+          'צלם סרטון קצר יותר של עד 60 שניות.',
+        );
+        return;
+      }
 
       setState(() => _isSubmittingTour = true);
       final localPath = await _storageService.saveVideoLocally(
@@ -3225,6 +3823,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         _virtualTourDraft = submitted;
         _model3dDraft = null;
         _isSubmittingTour = false;
+      if (submitted.status == PropertyTourStatus.processing ||
+          submitted.status == PropertyTourStatus.queued) {
+        _startTourPolling();
+      }
       });
     } on Property3dScanException catch (error) {
       if (!mounted) return;
@@ -3424,6 +4026,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(milliseconds: 2500),
         content: Text(message),
         backgroundColor: AppColors.coral,
       ),
@@ -3439,6 +4042,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     if (!_acceptedPropertyTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content:
               Text('יש לאשר את תנאי השימוש והצהרת הזכויות לפני שמירת הנכס.'),
           backgroundColor: AppColors.coral,
@@ -3454,6 +4058,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             sanitizedVerificationVideoUrl.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content:
               Text('כדי לשמור דירה מאומתת צריך לצלם וידאו מתוך האפליקציה.'),
           backgroundColor: AppColors.coral,
@@ -3548,6 +4153,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
+        duration: Duration(milliseconds: 2500),
         content: Text('הנכס עודכן בהצלחה'),
         backgroundColor: Color(0xFF1B9C6A),
       ),

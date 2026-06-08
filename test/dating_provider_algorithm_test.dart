@@ -289,6 +289,108 @@ void main() {
 
     provider.dispose();
   });
+
+  test('landlord sees only owned local properties and leads', () async {
+    final ownLead = _property(id: 'own-lead', ownerUserId: 'owner-1');
+    final ownVisible = _property(id: 'own-visible', ownerUserId: 'owner-1');
+    final guestDemo = _property(
+      id: 'demo-prop-1',
+      ownerUserId: 'guest_landlord',
+      ownerName: 'Guest Demo',
+    );
+    final storage = _MemoryLocalStorageService()
+      ..state = {
+        'schema': 'rental_match_v2',
+        'tenantProfile': const TenantProfile(
+          id: 'owner-1',
+          name: 'Owner One',
+          bio: '',
+          photoUrls: <String>[],
+          budgetMax: 6000,
+          desiredRooms: 3,
+          moveInWindow: 'within 30 days',
+          importantDetails: <String>[],
+        ).toJson(),
+        'filters': const <String, dynamic>{},
+        'likedPropertyIds': [ownLead.id, guestDemo.id],
+        'passedPropertyIds': const <String>[],
+        'ownerAcceptedPropertyIds': const <String>[],
+        'ownerRejectedPropertyIds': const <String>[],
+        'matches': [
+          RentalMatch(
+            id: 'guest-match',
+            propertyId: guestDemo.id,
+            createdAt: DateTime.utc(2026, 6, 8),
+            messages: const [],
+            contractSent: false,
+            ownerSigned: false,
+            tenantSigned: false,
+          ).toJson(),
+        ],
+        'tenantReviews': const <Map<String, dynamic>>[],
+        'propertyReviews': const <String, dynamic>{},
+        'customProperties': [
+          ownLead.toJson(),
+          ownVisible.toJson(),
+          guestDemo.toJson(),
+        ],
+        'userRole': 'landlord',
+        'isGuestMode': false,
+        'hasActiveSession': true,
+        'roleExplicitlyChosen': true,
+        'savedPropertyIds': const <String>[],
+        'blockedOwnerNames': const <String>[],
+        'reportedPropertyIds': const <String>[],
+        'propertySignalOverrides': const <String, dynamic>{},
+        'lastSeenMatchCount': 0,
+      };
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(const []),
+      localStorageService: storage,
+    );
+
+    await provider.initialize();
+
+    expect(provider.myProperties.map((p) => p.id), [ownLead.id, ownVisible.id]);
+    expect(provider.ownerLeads.map((p) => p.id), [ownLead.id]);
+    expect(provider.matches.map((m) => m.id), isNot(contains('guest-match')));
+    expect(
+      provider.filteredProperties.map((p) => p.id),
+      contains(ownVisible.id),
+    );
+    expect(
+      provider.filteredProperties.map((p) => p.id),
+      isNot(contains(guestDemo.id)),
+    );
+
+    provider.dispose();
+  });
+
+  test('landlord-added property is owned locally and remains discoverable',
+      () async {
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(const []),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+
+    await provider.initialize();
+    await provider.setUserRole('landlord');
+    await provider.addLandlordProperty(_property(id: 'new-upload'));
+
+    final ownProperty = provider.myProperties.single;
+    expect(ownProperty.id, 'new-upload');
+    expect(ownProperty.ownerUserId, 'tenant-test');
+    expect(
+      provider.filteredProperties.map((p) => p.id),
+      contains('new-upload'),
+    );
+    expect(
+      provider.previewFilteredProperties(provider.filters).map((p) => p.id),
+      contains('new-upload'),
+    );
+
+    provider.dispose();
+  });
 }
 
 class _FakeRentalDataService extends RentalDataService {
@@ -386,6 +488,7 @@ RentalProperty _property({
   List<String> features = const ['parking'],
   int mediaCount = 2,
   String ownerName = 'Owner',
+  String ownerUserId = '',
   String url = 'https://example.com/listing',
   String entryDate = '2026-06-15',
   bool agencyListing = false,
@@ -394,6 +497,7 @@ RentalProperty _property({
   return RentalProperty(
     id: id,
     url: url,
+    ownerUserId: ownerUserId,
     price: price,
     rooms: rooms,
     sizeM2: sizeM2,

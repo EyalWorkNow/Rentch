@@ -13,18 +13,28 @@ class Property3dScanService {
     String? provider,
     String? preset,
     String? outputFormat,
-    Duration timeout = const Duration(seconds: 45),
+    Duration apiTimeout = const Duration(seconds: 45),
   })  : _backendUrl = backendUrl ?? AppConfig.scan3dProxyUrl,
         _provider = provider ?? AppConfig.scan3dProvider,
         _preset = preset ?? AppConfig.scan3dDefaultPreset,
         _outputFormat = outputFormat ?? AppConfig.scan3dOutputFormat,
-        _timeout = timeout;
+        _apiTimeout = apiTimeout;
 
   final String _backendUrl;
   final String _provider;
   final String _preset;
   final String _outputFormat;
-  final Duration _timeout;
+  // Timeout for lightweight API calls (create/process/status).
+  final Duration _apiTimeout;
+
+  // Upload timeout: 1 second per 50 KB, minimum 3 minutes, maximum 20 minutes.
+  // Handles large videos on slow cellular without premature failure.
+  Duration _uploadTimeoutFor(int fileSizeBytes) {
+    final seconds = (fileSizeBytes / 50000).ceil();
+    return Duration(
+      seconds: seconds.clamp(180, 1200),
+    );
+  }
 
   bool get isConfigured =>
       AppConfig.enable3dScanning && _backendUrl.trim().isNotEmpty;
@@ -117,6 +127,70 @@ class Property3dScanService {
     );
   }
 
+  /// Virtual staging ("הדמיה"): upload an apartment photo, run Luma uni-1
+  /// image_edit to furnish/stage it, and return a tour whose previewImageUrl
+  /// holds the staged image. Reuses the same /scans backend pipeline.
+  Future<PropertyVirtualTour> submitStagingImage({
+    required String propertyId,
+    required String localImagePath,
+    required String style,
+  }) async {
+    if (!isConfigured) {
+      throw const Property3dScanException(
+        'Staging backend is not configured.',
+      );
+    }
+
+    final sanitizedPath = InputSanitizer.sanitizeMediaUrl(localImagePath);
+    if (sanitizedPath == null) {
+      throw const Property3dScanException('Invalid staging image path.');
+    }
+
+    final file = File(sanitizedPath);
+    if (!file.existsSync()) {
+      throw const Property3dScanException('Staging image file was not found.');
+    }
+
+    final fileSize = await file.length();
+    final contentType = _imageContentTypeForPath(sanitizedPath);
+    final createPayload = {
+      'propertyId': propertyId,
+      'contentType': contentType,
+      'style': style,
+      'fileSize': fileSize,
+    };
+
+    final created = await _jsonRequest(
+      'POST',
+      _resolve('/scans'),
+      body: createPayload,
+    );
+    final createdData = _data(created);
+    final scanId = _stringValue(createdData, const ['scanId', 'id']);
+    final uploadUrl = _stringValue(createdData, const ['uploadUrl']);
+    if (scanId.isEmpty || uploadUrl.isEmpty) {
+      throw const Property3dScanException(
+        'Staging backend did not return scanId/uploadUrl.',
+      );
+    }
+
+    await _uploadToPresignedUrl(
+      Uri.parse(uploadUrl),
+      file,
+      contentType: contentType,
+    );
+
+    await _jsonRequest('POST', _resolve('/scans/$scanId/process'));
+
+    final status = await _jsonRequest('GET', _resolve('/scans/$scanId'));
+    return _tourFromPayload(
+      status,
+      fallbackScanId: scanId,
+      sourceVideoUrl: sanitizedPath,
+      sizeBytes: fileSize,
+    );
+  }
+
   Future<PropertyVirtualTour> refresh(PropertyVirtualTour tour) async {
     if (!isConfigured || tour.id.trim().isEmpty) return tour;
     final status = await _jsonRequest('GET', _resolve('/scans/${tour.id}'));
@@ -135,7 +209,7 @@ class Property3dScanService {
   }) async {
     final client = HttpClient();
     try {
-      final request = await client.openUrl(method, uri).timeout(_timeout);
+      final request = await client.openUrl(method, uri).timeout(_apiTimeout);
       request.headers.contentType = ContentType.json;
       final apiKey = AppConfig.awsApiKey.trim();
       if (apiKey.isNotEmpty) {
@@ -154,9 +228,9 @@ class Property3dScanService {
       if (body != null) {
         request.write(jsonEncode(body));
       }
-      final response = await request.close().timeout(_timeout);
+      final response = await request.close().timeout(_apiTimeout);
       final responseBody =
-          await utf8.decoder.bind(response).join().timeout(_timeout);
+          await utf8.decoder.bind(response).join().timeout(_apiTimeout);
       if (response.statusCode == 401 || response.statusCode == 403) {
         throw const Property3dScanException(
           'יש להתחבר לחשבון כדי להשתמש בתכונת הסריקה. אנא התחבר ונסה שוב.',
@@ -184,22 +258,30 @@ class Property3dScanService {
     File file, {
     required String contentType,
   }) async {
+    final fileSize = await file.length();
+    final uploadTimeout = _uploadTimeoutFor(fileSize);
     final client = HttpClient();
     try {
-      final request = await client.openUrl('PUT', uploadUrl).timeout(_timeout);
+      final request =
+          await client.openUrl('PUT', uploadUrl).timeout(_apiTimeout);
       request.headers.contentType = ContentType.parse(contentType);
-      request.headers.set(HttpHeaders.contentLengthHeader, await file.length());
-      await request.addStream(file.openRead()).timeout(_timeout);
-      final response = await request.close().timeout(_timeout);
+      request.headers.set(HttpHeaders.contentLengthHeader, fileSize);
+      // Stream upload uses the size-based timeout — large videos on slow
+      // connections need minutes, not seconds.
+      await request.addStream(file.openRead()).timeout(uploadTimeout);
+      final response = await request.close().timeout(_apiTimeout);
       final responseBody =
-          await utf8.decoder.bind(response).join().timeout(_timeout);
+          await utf8.decoder.bind(response).join().timeout(_apiTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Property3dScanException(
           '3D scan upload returned ${response.statusCode}: $responseBody',
         );
       }
     } on TimeoutException {
-      throw const Property3dScanException('3D scan upload timed out.');
+      throw Property3dScanException(
+        'העלאת הוידאו נכשלה — הקובץ גדול מדי לחיבור הנוכחי. '
+        'נסה שוב ב-WiFi או קצר את הסרטון.',
+      );
     } finally {
       client.close(force: true);
     }
@@ -304,7 +386,7 @@ class Property3dScanService {
     return switch (normalized) {
       'complete' || 'completed' || 'ready' => PropertyTourStatus.ready,
       'training' || 'processing' || 'running' => PropertyTourStatus.processing,
-      'queued' || 'created' || 'pending' => PropertyTourStatus.queued,
+      'queued' || 'created' || 'pending' || 'draft' => PropertyTourStatus.queued,
       'failed' || 'error' => PropertyTourStatus.failed,
       _ => PropertyTourStatus.processing,
     };
@@ -317,6 +399,17 @@ class Property3dScanService {
       'm4v' => 'video/x-m4v',
       'webm' => 'video/webm',
       _ => 'video/mp4',
+    };
+  }
+
+  String _imageContentTypeForPath(String path) {
+    final ext = path.split('?').first.split('.').last.toLowerCase();
+    return switch (ext) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'heic' => 'image/heic',
+      'heif' => 'image/heif',
+      _ => 'image/jpeg',
     };
   }
 }

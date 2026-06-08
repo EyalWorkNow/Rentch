@@ -1539,7 +1539,10 @@ class _LandlordProfileScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('תכונה זו תהיה זמינה בקרוב!')),
+                  const SnackBar(
+                    duration: Duration(milliseconds: 2500),
+                    content: Text('תכונה זו תהיה זמינה בקרוב!'),
+                  ),
                 );
               },
               style: ElevatedButton.styleFrom(

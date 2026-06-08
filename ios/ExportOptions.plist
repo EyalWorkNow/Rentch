@@ -13,6 +13,12 @@
     <key>uploadSymbols</key>
     <true/>
     <key>destination</key>
-    <string>upload</string>
+    <string>export</string>
+    <key>authenticationKeyID</key>
+    <string>J2XJZ5F4SU</string>
+    <key>authenticationKeyIssuerID</key>
+    <string>0585f51f-6b01-4b84-96b8-17d00cf0362e</string>
+    <key>authenticationKeyPath</key>
+    <string>/Users/eyalatiya/.appstoreconnect/private_keys/AuthKey_J2XJZ5F4SU.p8</string>
 </dict>
 </plist>

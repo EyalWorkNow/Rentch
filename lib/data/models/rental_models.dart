@@ -705,6 +705,7 @@ class RentalProperty {
     required this.id,
     String sourceUrl = '',
     String? url,
+    this.ownerUserId = '',
     required this.price,
     required this.rooms,
     required this.sizeM2,
@@ -753,6 +754,7 @@ class RentalProperty {
 
   final String id;
   final String sourceUrl;
+  final String ownerUserId;
   final int price;
   final double rooms;
   final int sizeM2;
@@ -841,6 +843,7 @@ class RentalProperty {
     String? id,
     String? sourceUrl,
     String? url,
+    String? ownerUserId,
     int? price,
     double? rooms,
     int? sizeM2,
@@ -873,6 +876,7 @@ class RentalProperty {
     return RentalProperty(
       id: id ?? this.id,
       sourceUrl: sourceUrl ?? url ?? this.sourceUrl,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
       price: price ?? this.price,
       rooms: rooms ?? this.rooms,
       sizeM2: sizeM2 ?? this.sizeM2,
@@ -949,6 +953,10 @@ class RentalProperty {
     return RentalProperty(
       id: json['id'] as String,
       sourceUrl: json['sourceUrl']?.toString() ?? json['url']?.toString() ?? '',
+      ownerUserId: json['ownerUserId']?.toString() ??
+          json['ownerId']?.toString() ??
+          json['landlordUserId']?.toString() ??
+          '',
       price: parsedPrice,
       rooms: (json['rooms'] as num).toDouble(),
       sizeM2: json['sizeM2'] as int,
@@ -996,6 +1004,7 @@ class RentalProperty {
       'id': id,
       'sourceUrl': sourceUrl,
       'url': url,
+      'ownerUserId': ownerUserId,
       'price': price,
       'rooms': rooms,
       'sizeM2': sizeM2,
@@ -1058,6 +1067,7 @@ class TenantProfile {
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
   TenantProfile copyWith({
+    String? id,
     String? name,
     String? bio,
     List<String>? photoUrls,
@@ -1067,7 +1077,7 @@ class TenantProfile {
     List<String>? importantDetails,
   }) {
     return TenantProfile(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       bio: bio ?? this.bio,
       photoUrls: photoUrls ?? this.photoUrls,

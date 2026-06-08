@@ -121,6 +121,7 @@ class _MessageScreenState extends State<MessageScreen> {
 
   void _snack(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 2500),
       content: Text(msg),
       backgroundColor: error ? AppColors.coral : AppColors.primary,
     ));

@@ -29,6 +29,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 const REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.S3_BUCKET;
 const TABLE_PREFIX = process.env.TABLE_PREFIX || 'rentch-';
+const LUMA_API_KEY = process.env.LUMA_API_KEY || '';
+// Luma Agents image API (uni-1) — virtual staging via image_edit.
+const LUMA_BASE = 'https://agents.lumalabs.ai/v1';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }), {
   marshallOptions: { removeUndefinedValues: true },
@@ -531,102 +534,199 @@ function commonPrefix(values) {
 
 // ── Scan handlers (video → virtual-tour viewer) ──────────────────────────────
 
-async function createScan(event) {
-  const body = event.body ? JSON.parse(event.body) : {};
-  const propertyId = sanitizeId(body.propertyId || body.id || 'prop');
-  const contentType = body.contentType || 'video/mp4';
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 10);
-  const scanId = `sc_${ts}_${rand}`;
-  const ext = contentType.includes('quicktime') ? 'mov'
-    : contentType.includes('m4v') ? 'm4v'
-    : contentType.includes('webm') ? 'webm'
-    : 'mp4';
-  const videoKey = `3d-scans/${propertyId}/${scanId}.${ext}`;
+// ── Virtual staging ("הדמיה") via Luma Agents uni-1 image_edit ───────────────
+// Flow: POST /scans → presigned PUT for the source photo; client uploads it;
+// POST /scans/:id/process → kick off a Luma image_edit generation;
+// GET /scans/:id → poll Luma, re-host the result on S3, return the staged URL.
 
-  const uploadUrl = await getSignedUrl(
-    s3,
-    new PutObjectCommand({ Bucket: S3_BUCKET, Key: videoKey, ContentType: contentType }),
-    { expiresIn: 3600 },
-  );
+const STAGING_STYLES = ['modern', 'scandinavian', 'cozy', 'luxury', 'empty_to_furnished'];
 
-  const meta = { scanId, propertyId, videoKey, contentType, status: 'pending', createdAt: ts };
+function sanitizeStyle(value) {
+  const s = (value || '').toString().toLowerCase().trim();
+  return STAGING_STYLES.includes(s) ? s : 'modern';
+}
+
+function stagingPrompt(style) {
+  const styleText = {
+    modern: 'Furnish and decorate this room as a warm, modern living space with contemporary furniture, a sofa, coffee table, rug, plants and soft natural lighting.',
+    scandinavian: 'Furnish this room in a bright Scandinavian style: light wood furniture, neutral tones, cozy textiles, minimal decor and abundant natural light.',
+    cozy: 'Furnish this room as a cozy, inviting home: warm lighting, comfortable sofa, soft rugs, cushions, plants and homely decor.',
+    luxury: 'Furnish this room as a high-end luxury interior: elegant designer furniture, refined materials, tasteful art, ambient lighting and a premium real-estate look.',
+    empty_to_furnished: 'Fully furnish this empty room with tasteful modern furniture and decor appropriate to the space, with pleasant lighting.',
+  }[style] || '';
+  return `${styleText} Photorealistic real-estate listing photo, high quality. Preserve the existing windows, doors, walls, floor, ceiling and overall room architecture exactly as they are — only add furniture, decor and lighting. Do not change the room layout, structure or proportions.`;
+}
+
+async function getScanMeta(scanId) {
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: `3d-scans/meta/${scanId}.json`,
+    }));
+    return JSON.parse(await streamToString(obj.Body));
+  } catch {
+    return null;
+  }
+}
+
+async function putScanMeta(scanId, meta) {
   await s3.send(new PutObjectCommand({
     Bucket: S3_BUCKET,
     Key: `3d-scans/meta/${scanId}.json`,
     Body: JSON.stringify(meta),
     ContentType: 'application/json',
   }));
-
-  return json(200, { data: { scanId, uploadUrl } });
 }
 
-async function processScan(scanId) {
-  let meta;
-  try {
-    const obj = await s3.send(new GetObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: `3d-scans/meta/${scanId}.json`,
-    }));
-    meta = JSON.parse(await streamToString(obj.Body));
-  } catch {
-    return json(404, { message: 'Scan not found' });
-  }
-
-  const videoUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${meta.videoKey}`;
-  const html = renderVideoViewerHtml({
-    title: 'Rentch Virtual Tour',
-    videoUrl,
-    propertyId: meta.propertyId,
-  });
-  const viewerKey = `3d-viewers/${meta.propertyId}/${scanId}-viewer.html`;
-  await s3.send(new PutObjectCommand({
-    Bucket: S3_BUCKET,
-    Key: viewerKey,
-    Body: html,
-    ContentType: 'text/html; charset=utf-8',
-    CacheControl: 'public, max-age=3600',
-  }));
-
-  const viewerUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${viewerKey}`;
-  const updated = { ...meta, status: 'ready', viewerUrl, videoUrl, processedAt: Date.now() };
-  await s3.send(new PutObjectCommand({
-    Bucket: S3_BUCKET,
-    Key: `3d-scans/meta/${scanId}.json`,
-    Body: JSON.stringify(updated),
-    ContentType: 'application/json',
-  }));
-
+function scanResponse(meta) {
+  const url = meta.stagedUrl || meta.viewerUrl || '';
   return json(200, {
     data: {
-      id: scanId,
-      scanId,
-      status: 'ready',
-      viewerUrl,
-      downloadUrl: videoUrl,
-      format: 'video',
+      id: meta.scanId,
+      scanId: meta.scanId,
+      status: meta.status || 'pending',
+      viewerUrl: url,
+      previewImageUrl: url,
+      downloadUrl: url,
+      processingError: meta.error || '',
+      format: 'image',
     },
   });
 }
 
-async function getScan(scanId) {
-  let meta;
-  try {
-    const obj = await s3.send(new GetObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: `3d-scans/meta/${scanId}.json`,
-    }));
-    meta = JSON.parse(await streamToString(obj.Body));
-  } catch {
-    return json(404, { message: 'Scan not found' });
+// Download the Luma presigned result (expires in 1h) and re-host permanently on S3.
+async function rehostImage(sourceUrl, key) {
+  const res = await fetch(sourceUrl);
+  if (!res.ok) throw new Error(`rehost download failed ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: buf,
+    ContentType: 'image/png',
+    CacheControl: 'public, max-age=31536000',
+  }));
+  return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+}
+
+async function createScan(event) {
+  const body = event.body ? JSON.parse(event.body) : {};
+  const propertyId = sanitizeId(body.propertyId || body.id || 'prop');
+  const style = sanitizeStyle(body.style);
+  const contentType = (body.contentType || 'image/jpeg').toLowerCase();
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 10);
+  const scanId = `st_${ts}_${rand}`;
+  const ext = contentType.includes('png') ? 'png'
+    : contentType.includes('webp') ? 'webp'
+    : contentType.includes('heic') ? 'heic'
+    : 'jpg';
+  const srcKey = `staging-src/${propertyId}/${scanId}.${ext}`;
+
+  const uploadUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: S3_BUCKET, Key: srcKey, ContentType: contentType }),
+    { expiresIn: 3600 },
+  );
+
+  const meta = { scanId, propertyId, srcKey, style, contentType, provider: 'luma-staging', status: 'pending', createdAt: ts };
+  await putScanMeta(scanId, meta);
+  return json(200, { data: { scanId, uploadUrl } });
+}
+
+async function processScan(scanId) {
+  const meta = await getScanMeta(scanId);
+  if (!meta) return json(404, { message: 'Scan not found' });
+
+  if (!LUMA_API_KEY) {
+    const updated = { ...meta, status: 'failed', error: 'Staging is not configured (no LUMA_API_KEY).' };
+    await putScanMeta(scanId, updated);
+    return scanResponse(updated);
   }
-  return json(200, {
-    id: scanId,
-    status: meta.status || 'pending',
-    viewerUrl: meta.viewerUrl || '',
-    downloadUrl: meta.videoUrl || '',
-    format: 'video',
-  });
+
+  const srcUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${meta.srcKey}`;
+  try {
+    const res = await fetch(`${LUMA_BASE}/generations`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LUMA_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'image_edit',
+        model: 'uni-1',
+        prompt: stagingPrompt(meta.style),
+        source: { url: srcUrl },
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      console.warn('Luma create generation failed', res.status, txt);
+      const updated = { ...meta, status: 'failed', error: `Luma error ${res.status}` };
+      await putScanMeta(scanId, updated);
+      return scanResponse(updated);
+    }
+    const data = await res.json();
+    if (!data.id) {
+      const updated = { ...meta, status: 'failed', error: 'Luma returned no generation id' };
+      await putScanMeta(scanId, updated);
+      return scanResponse(updated);
+    }
+    const updated = { ...meta, generationId: data.id, srcUrl, status: 'processing', processedAt: Date.now() };
+    await putScanMeta(scanId, updated);
+    return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image' } });
+  } catch (e) {
+    console.warn('Luma create generation error', e.message);
+    const updated = { ...meta, status: 'failed', error: e.message };
+    await putScanMeta(scanId, updated);
+    return scanResponse(updated);
+  }
+}
+
+async function getScan(scanId) {
+  const meta = await getScanMeta(scanId);
+  if (!meta) return json(404, { message: 'Scan not found' });
+
+  if (meta.status === 'ready' || meta.status === 'failed') {
+    return scanResponse(meta);
+  }
+
+  if (meta.generationId && LUMA_API_KEY) {
+    try {
+      const res = await fetch(`${LUMA_BASE}/generations/${meta.generationId}`, {
+        headers: { 'Authorization': `Bearer ${LUMA_API_KEY}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const state = (data.state || '').toLowerCase();
+        if (state === 'completed') {
+          const outUrl = data.output && data.output[0] && data.output[0].url;
+          if (outUrl) {
+            const stagedKey = `staged/${meta.propertyId}/${scanId}.png`;
+            const stagedUrl = await rehostImage(outUrl, stagedKey);
+            const updated = { ...meta, status: 'ready', viewerUrl: stagedUrl, stagedUrl, completedAt: Date.now() };
+            await putScanMeta(scanId, updated);
+            return scanResponse(updated);
+          }
+          const updated = { ...meta, status: 'failed', error: 'Luma completed with no image output' };
+          await putScanMeta(scanId, updated);
+          return scanResponse(updated);
+        }
+        if (state === 'failed') {
+          const updated = { ...meta, status: 'failed', error: data.failure_reason || 'Luma generation failed' };
+          await putScanMeta(scanId, updated);
+          return scanResponse(updated);
+        }
+        // queued / processing
+        return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image' } });
+      }
+      console.warn('Luma getScan poll HTTP', res.status);
+    } catch (e) {
+      console.warn('Luma getScan poll failed:', e.message);
+    }
+  }
+
+  return scanResponse(meta);
 }
 
 async function streamToString(stream) {

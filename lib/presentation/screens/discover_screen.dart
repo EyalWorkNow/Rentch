@@ -940,10 +940,21 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     _visibleCount = widget.provider.filteredCountFor(_draftFilters);
     _markerPreview = widget.provider.previewFilteredProperties(_draftFilters);
     _locationCtrl = TextEditingController(text: widget.provider.filters.city);
+    widget.provider.addListener(_refreshMarkers);
+  }
+
+  void _refreshMarkers() {
+    if (mounted) {
+      setState(() {
+        _markerPreview =
+            widget.provider.previewFilteredProperties(_draftFilters);
+      });
+    }
   }
 
   @override
   void dispose() {
+    widget.provider.removeListener(_refreshMarkers);
     _commitDraftIfNeeded();
     _pendingPriorityTimer?.cancel();
     _locationCtrl.dispose();

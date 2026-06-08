@@ -309,7 +309,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 2500),
+      content: Text(msg),
+    ));
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────────

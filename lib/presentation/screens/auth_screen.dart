@@ -82,6 +82,7 @@ class _AuthScreenState extends State<AuthScreen>
     if (_googleLoading) return;
     if (!AppConfig.enableGoogleSignIn) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content: Text('כניסה עם Google לא מופעלת בסביבת ההרצה הזו')));
       return;
     }
@@ -90,10 +91,16 @@ class _AuthScreenState extends State<AuthScreen>
     try {
       final result = await _googleAuthService.signIn();
       if (!mounted) return;
+
       final provider = context.read<DatingProvider>();
+      final picked = await _promptSocialRole(context);
+      if (!mounted) return;
+      if (picked == null) return;
+      final role = picked;
+
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: result.photoUrl);
-      await provider.setUserRole(provider.userRole);
+      await provider.setUserRole(role, explicit: true);
       if (!mounted) return;
       _onEnter();
     } on GoogleAuthCanceledException {
@@ -101,6 +108,7 @@ class _AuthScreenState extends State<AuthScreen>
     } on GoogleAuthConfigException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content:
               Text('הכניסה עם Google לא זמינה כרגע. נסו שוב מאוחר יותר.')));
     } catch (error) {
@@ -112,7 +120,9 @@ class _AuthScreenState extends State<AuthScreen>
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+          const SnackBar(
+              duration: Duration(milliseconds: 2500),
+              content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -125,10 +135,16 @@ class _AuthScreenState extends State<AuthScreen>
     try {
       final result = await _appleAuthService.signIn();
       if (!mounted) return;
+
       final provider = context.read<DatingProvider>();
+      final picked = await _promptSocialRole(context);
+      if (!mounted) return;
+      if (picked == null) return;
+      final role = picked;
+
       await provider.applyGoogleIdentity(
-          displayName: result.displayName, photoUrl: null);
-      await provider.setUserRole(provider.userRole);
+          displayName: result.displayName, photoUrl: null, source: 'apple');
+      await provider.setUserRole(role, explicit: true);
       if (!mounted) return;
       _onEnter();
     } on AppleAuthCanceledException {
@@ -136,11 +152,30 @@ class _AuthScreenState extends State<AuthScreen>
     } on AppleAuthUnsupportedException {
       if (!mounted) return;
       _showAppleError('כניסה עם Apple זמינה במכשירי Apple בלבד.');
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final msg = _appleFirebaseErrorMessage(e.code);
+      _showAppleError(msg);
     } catch (e) {
       if (!mounted) return;
       _showAppleError('הכניסה עם Apple נכשלה. נסו שוב.');
     } finally {
       if (mounted) setState(() => _appleLoading = false);
+    }
+  }
+
+  String _appleFirebaseErrorMessage(String code) {
+    switch (code) {
+      case 'operation-not-allowed':
+        return 'כניסה עם Apple לא מופעלת כרגע. נסו שוב מאוחר יותר.';
+      case 'account-exists-with-different-credential':
+        return 'כתובת המייל כבר רשומה עם שיטת כניסה אחרת. נסו להיכנס עם Google.';
+      case 'invalid-credential':
+        return 'פרטי ה-Apple אינם תקינים. נסו שוב.';
+      case 'user-disabled':
+        return 'החשבון הזה הושבת. פנו לתמיכה.';
+      default:
+        return 'הכניסה עם Apple נכשלה ($code). נסו שוב.';
     }
   }
 
@@ -800,6 +835,93 @@ class _GuestModeDialog extends StatelessWidget {
   }
 }
 
+// ─── Social Sign-In Role Dialog ───────────────────────────────────────────────
+
+/// Shows the landlord/tenant chooser after a social sign-in. Returns the chosen
+/// role ('landlord'/'tenant'), or null if dismissed. Always presented so the
+/// user can pick how they enter the app on every social login.
+Future<String?> _promptSocialRole(BuildContext context) {
+  return showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const _SocialRoleDialog(),
+  );
+}
+
+class _SocialRoleDialog extends StatelessWidget {
+  const _SocialRoleDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(
+                  color: Colors.white.withOpacity(0.24), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ברוך הבא! 👋',
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'מה תפקידך ב-Rentch?',
+                    style: TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: Colors.white.withOpacity(0.75)),
+                  ),
+                  const SizedBox(height: 22),
+                  _GuestRoleOption(
+                    title: 'מחפש/ת דירה',
+                    subtitle: 'גלה דירות, שלח בקשות וקבל התאמות.',
+                    icon: IconsaxPlusLinear.profile_circle,
+                    color: AppColors.primary,
+                    onTap: () => Navigator.of(context).pop('tenant'),
+                  ),
+                  const SizedBox(height: 12),
+                  _GuestRoleOption(
+                    title: 'בעל/ת דירה',
+                    subtitle: 'פרסם נכסים, נהל בקשות ומצא דיירים.',
+                    icon: IconsaxPlusLinear.home,
+                    color: AppColors.primary,
+                    onTap: () => Navigator.of(context).pop('landlord'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GuestRoleOption extends StatelessWidget {
   const _GuestRoleOption({
     required this.title,
@@ -908,7 +1030,9 @@ class _LoginTabState extends State<_LoginTab> {
     final password = _passwordCtrl.text;
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('יש למלא אימייל וסיסמה')));
+          .showSnackBar(const SnackBar(
+              duration: Duration(milliseconds: 2500),
+              content: Text('יש למלא אימייל וסיסמה')));
       return;
     }
     setState(() => _loading = true);
@@ -930,7 +1054,9 @@ class _LoginTabState extends State<_LoginTab> {
         'too-many-requests' => 'יותר מדי ניסיונות, נסה שוב מאוחר יותר',
         _ => 'שגיאה בכניסה, נסה שוב',
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(msg)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -940,6 +1066,7 @@ class _LoginTabState extends State<_LoginTab> {
     if (_googleLoading) return;
     if (!AppConfig.enableGoogleSignIn) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content: Text('כניסה עם Google לא מופעלת בסביבת ההרצה הזו')));
       return;
     }
@@ -949,9 +1076,12 @@ class _LoginTabState extends State<_LoginTab> {
       final result = await _googleAuthService.signIn();
       if (!mounted) return;
       final provider = context.read<DatingProvider>();
+      final picked = await _promptSocialRole(context);
+      if (!mounted) return;
+      if (picked == null) return;
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: result.photoUrl);
-      await provider.setUserRole(provider.userRole);
+      await provider.setUserRole(picked, explicit: true);
       if (!mounted) return;
       widget.onLogin();
     } on GoogleAuthCanceledException {
@@ -959,6 +1089,7 @@ class _LoginTabState extends State<_LoginTab> {
     } on GoogleAuthConfigException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 2500),
           content:
               Text('הכניסה עם Google לא זמינה כרגע. נסו שוב מאוחר יותר.')));
     } catch (error) {
@@ -970,7 +1101,9 @@ class _LoginTabState extends State<_LoginTab> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+          const SnackBar(
+              duration: Duration(milliseconds: 2500),
+              content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -984,9 +1117,12 @@ class _LoginTabState extends State<_LoginTab> {
       final result = await _appleAuthService.signIn();
       if (!mounted) return;
       final provider = context.read<DatingProvider>();
+      final picked = await _promptSocialRole(context);
+      if (!mounted) return;
+      if (picked == null) return;
       await provider.applyGoogleIdentity(
-          displayName: result.displayName, photoUrl: null);
-      await provider.setUserRole(provider.userRole);
+          displayName: result.displayName, photoUrl: null, source: 'apple');
+      await provider.setUserRole(picked, explicit: true);
       if (!mounted) return;
       widget.onLogin();
     } on AppleAuthCanceledException {
@@ -998,11 +1134,29 @@ class _LoginTabState extends State<_LoginTab> {
       if (!mounted) return;
       if (e.code == AuthorizationErrorCode.canceled) return;
       _showAppleError('הכניסה עם Apple נכשלה (${e.code.name}). נסו שוב.');
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      _showAppleError(_appleFirebaseErrorMessage(e.code));
     } catch (e) {
       if (!mounted) return;
       _showAppleError('הכניסה עם Apple נכשלה. נסו שוב.');
     } finally {
       if (mounted) setState(() => _appleLoading = false);
+    }
+  }
+
+  String _appleFirebaseErrorMessage(String code) {
+    switch (code) {
+      case 'operation-not-allowed':
+        return 'כניסה עם Apple לא מופעלת כרגע. נסו שוב מאוחר יותר.';
+      case 'account-exists-with-different-credential':
+        return 'כתובת המייל כבר רשומה עם שיטת כניסה אחרת. נסו להיכנס עם Google.';
+      case 'invalid-credential':
+        return 'פרטי ה-Apple אינם תקינים. נסו שוב.';
+      case 'user-disabled':
+        return 'החשבון הזה הושבת. פנו לתמיכה.';
+      default:
+        return 'הכניסה עם Apple נכשלה ($code). נסו שוב.';
     }
   }
 
@@ -1326,28 +1480,37 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       final password = _passwordCtrl.text;
       if (name.isEmpty) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('יש להזין שם מלא')));
+            .showSnackBar(const SnackBar(
+                duration: Duration(milliseconds: 2500),
+                content: Text('יש להזין שם מלא')));
         return;
       }
       if (email.isEmpty || !email.contains('@')) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('יש להזין כתובת אימייל תקינה')));
+            const SnackBar(
+                duration: Duration(milliseconds: 2500),
+                content: Text('יש להזין כתובת אימייל תקינה')));
         return;
       }
       if (password.length < 8) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('הסיסמה חייבת להכיל לפחות 8 תווים')));
+            const SnackBar(
+                duration: Duration(milliseconds: 2500),
+                content: Text('הסיסמה חייבת להכיל לפחות 8 תווים')));
         return;
       }
       if (!_agreedToTerms) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            duration: Duration(milliseconds: 2500),
             content: Text('יש לאשר את תנאי השימוש ומדיניות הפרטיות')));
         return;
       }
     }
     if (_step == 1 && _role.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('יש לבחור תפקיד')));
+          .showSnackBar(const SnackBar(
+              duration: Duration(milliseconds: 2500),
+              content: Text('יש לבחור תפקיד')));
       return;
     }
     if (_step >= _totalSteps - 1) {
@@ -1388,7 +1551,9 @@ class _RegisterFlowState extends State<_RegisterFlow> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
+          const SnackBar(
+              duration: Duration(milliseconds: 2500),
+              content: Text('הכניסה עם Google נכשלה. נסו שוב.')));
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -1524,7 +1689,9 @@ class _RegisterFlowState extends State<_RegisterFlow> {
         'invalid-email' => 'כתובת אימייל לא תקינה',
         _ => 'שגיאה ביצירת החשבון, נסה שוב',
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(msg)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

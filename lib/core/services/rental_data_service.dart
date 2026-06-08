@@ -169,6 +169,7 @@ class RentalDataService {
     return RentalProperty.fromJson({
       'id': data['propertyId'] ?? '',
       'sourceUrl': data['sourceUrl'] ?? data['url'] ?? '',
+      'ownerUserId': data['ownerUserId'] ?? '',
       'price': _asInt(data['price']),
       'rooms': _asDouble(data['rooms']),
       'sizeM2': _asInt(data['sizeM2']),

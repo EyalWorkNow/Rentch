@@ -853,7 +853,10 @@ class _MoreOptionsSheet extends StatelessWidget {
                   await provider.reportProperty(property.id, reason);
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('הדיווח נשלח. תודה.')),
+                      const SnackBar(
+                        duration: Duration(milliseconds: 2500),
+                        content: Text('הדיווח נשלח. תודה.'),
+                      ),
                     );
                   }
                 },
@@ -891,7 +894,10 @@ class _MoreOptionsSheet extends StatelessWidget {
                 await provider.blockOwner(ownerName);
                 if (ctx.mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('"$ownerName" נחסם בהצלחה.')),
+                    SnackBar(
+                      duration: const Duration(milliseconds: 2500),
+                      content: Text('"$ownerName" נחסם בהצלחה.'),
+                    ),
                   );
                 }
               },
