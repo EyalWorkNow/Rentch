@@ -9,6 +9,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/main.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,9 +64,12 @@ void main() {
       await tester.tap(find.text('אורח כדייר מחפש דירה'));
       await _pumpFrames(tester);
 
+      // Only the selected tab shows its label — check the first (selected) tab
       expect(find.text('גלה דירות'), findsOneWidget);
-      expect(find.text('התאמות'), findsOneWidget);
-      expect(find.text('פרופיל'), findsOneWidget);
+      // Verify we can reach all tabs via key-based nav (nav bar labels hidden when unselected)
+      expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
+      expect(find.byKey(const Key('nav_tab_1')), findsOneWidget);
+      expect(find.byKey(const Key('nav_tab_2')), findsOneWidget);
       expect(find.textContaining('לחודש'), findsWidgets);
 
       await tester.tap(find.byTooltip('דלג על דירה'));
@@ -73,17 +77,18 @@ void main() {
       await tester.tap(find.byTooltip('אהבתי דירה'));
       await _pumpFrames(tester);
 
-      await tester.tap(find.text('התאמות'));
+      _invokeGestureTap(tester, find.byKey(const Key('nav_tab_1')));
       await _pumpFrames(tester);
 
       expect(find.textContaining('התאמות'), findsWidgets);
-      expect(find.text('שיחה פתוחה'), findsOneWidget);
+      // MatchesScreen toolbar always shows "N שיחות פעילות" when there are matches
+      expect(find.textContaining('שיחות פעילות'), findsAtLeastNWidgets(1));
 
-      await tester.tap(find.text('פרופיל'));
+      _invokeGestureTap(tester, find.byKey(const Key('nav_tab_2')));
       await _pumpFrames(tester);
 
       expect(find.text('נועה לוי'), findsOneWidget);
-      await tester.tap(find.text('עריכה'));
+      _invokeGestureTap(tester, find.byKey(const Key('profile_edit_button')));
       await _pumpFrames(tester);
 
       await tester.enterText(find.byType(TextField).first, 'דניאל');
@@ -129,7 +134,12 @@ void main() {
         );
         await _pumpFrames(tester);
 
-        expect(find.text('פעולות מהירות'), findsOneWidget);
+        // Dashboard ListView: _QuickActionsGrid is below the fold — scroll to it
+        await tester.scrollUntilVisible(
+          find.text('פעולות מהירות'),
+          300.0,
+        );
+        expect(find.byKey(const Key('quick_actions_header')), findsOneWidget);
 
         _invokeGestureTap(
           tester,
@@ -138,15 +148,13 @@ void main() {
         await _pumpFrames(tester);
 
         expect(find.text('סוויפים'), findsOneWidget);
-        expect(find.text('דשבורד'), findsOneWidget);
-        expect(find.text('הדירות שלי'), findsOneWidget);
+        expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
+        expect(find.byKey(const Key('nav_tab_3')), findsOneWidget);
 
-        _invokeInkWellTap(
-          tester,
-          find.widgetWithText(InkWell, 'דשבורד'),
-        );
+        _invokeGestureTap(tester, find.byKey(const Key('nav_tab_0')));
         await _pumpFrames(tester);
-        expect(find.text('פעולות מהירות'), findsOneWidget);
+        // IndexedStack preserves ListView scroll — quick actions still in view
+        expect(find.byKey(const Key('quick_actions_header')), findsOneWidget);
 
         _invokeGestureTap(
           tester,
@@ -154,15 +162,13 @@ void main() {
         );
         await _pumpFrames(tester);
 
-        expect(find.text('דשבורד'), findsOneWidget);
-        expect(find.text('הדירות שלי'), findsWidgets);
+        expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
+        expect(find.byKey(const Key('nav_tab_3')), findsWidgets);
 
-        _invokeInkWellTap(
-          tester,
-          find.widgetWithText(InkWell, 'דשבורד'),
-        );
+        _invokeGestureTap(tester, find.byKey(const Key('nav_tab_0')));
         await _pumpFrames(tester);
-        expect(find.text('פעולות מהירות'), findsOneWidget);
+        // IndexedStack preserves ListView scroll — quick actions still in view
+        expect(find.byKey(const Key('quick_actions_header')), findsOneWidget);
 
         _invokeGestureTap(
           tester,
@@ -170,7 +176,7 @@ void main() {
         );
         await _pumpFrames(tester);
 
-        expect(find.text('דשבורד'), findsOneWidget);
+        expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
         expect(find.text('הדירות שלי'), findsWidgets);
       } finally {
         debugNetworkImageHttpClientProvider = null;
@@ -418,7 +424,7 @@ void main() {
 Future<void> _pumpApp(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
-  await tester.pumpWidget(const RentchApp());
+  await tester.pumpWidget(const RentlyApp());
   for (var attempt = 0; attempt < 25; attempt++) {
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 120));
@@ -427,6 +433,16 @@ Future<void> _pumpApp(WidgetTester tester) async {
     final context = tester.element(find.byType(MaterialApp));
     final provider = Provider.of<DatingProvider>(context, listen: false);
     if (!provider.isLoading) {
+      // Advance through OnboardingScreen (added after this test was written)
+      while (find.text('הבא').evaluate().isNotEmpty) {
+        await tester.tap(find.text('הבא'));
+        await _pumpFrames(tester);
+      }
+      if (find.text('מתחילים').evaluate().isNotEmpty) {
+        await tester.tap(find.text('מתחילים'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle(const Duration(seconds: 1));
+      }
       return;
     }
   }
@@ -441,14 +457,14 @@ Future<void> _pumpFrames(WidgetTester tester) async {
 }
 
 void _invokeGestureTap(WidgetTester tester, Finder finder) {
-  final widget = tester.widget<GestureDetector>(finder.first);
-  widget.onTap?.call();
+  final w = tester.widget(finder.first);
+  if (w is ScaleBounce) {
+    w.onTap?.call();
+  } else {
+    (w as GestureDetector).onTap?.call();
+  }
 }
 
-void _invokeInkWellTap(WidgetTester tester, Finder finder) {
-  final widget = tester.widget<InkWell>(finder.first);
-  widget.onTap?.call();
-}
 
 class _FakeHttpClient extends Fake implements HttpClient {
   @override

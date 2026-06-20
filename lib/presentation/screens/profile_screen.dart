@@ -1,8 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
@@ -11,11 +15,16 @@ import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
+import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -56,16 +65,114 @@ class ProfileScreen extends StatelessWidget {
     if (!context.mounted) return;
     final provider = context.read<DatingProvider>();
     final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
+    // deleteAccount() removes the Firebase Auth credential itself, so it must run
+    // while the user is still signed in (do NOT sign out first).
     try {
-      await GoogleAuthService().signOut();
+      await provider.deleteAccount();
+    } on ReauthRequiredException catch (e) {
+      // Email/password account: ask for the password inline and complete the
+      // deletion in-flow, instead of bouncing the user back to the login screen.
+      if (e.needsPassword) {
+        if (!context.mounted) return;
+        final password = await _promptDeletePassword(context);
+        if (password == null || password.isEmpty) return; // cancelled — stay
+        try {
+          await provider.deleteAccount(reauthPassword: password);
+        } on ReauthRequiredException {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('הסיסמה שגויה. נסו שוב למחוק את החשבון.'),
+          ));
+          return;
+        } catch (_) {}
+        if (!context.mounted) return;
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthScreen()),
+          (_) => false,
+        );
+        return;
+      }
+      // OAuth (Google/Apple): re-login then retry.
+      messenger.showSnackBar(const SnackBar(
+        duration: Duration(milliseconds: 3500),
+        content: Text(
+            'מטעמי אבטחה יש להתחבר מחדש ולאחר מכן למחוק את החשבון.'),
+      ));
+      try {
+        await GoogleAuthService().signOut();
+      } catch (_) {}
+      if (!context.mounted) return;
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        (_) => false,
+      );
+      return;
     } catch (_) {}
-    await provider.deleteAccount();
 
     if (!context.mounted) return;
     navigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AuthScreen()),
       (_) => false,
+    );
+  }
+
+  /// Inline password prompt used when Firebase requires a fresh login before
+  /// deleting an email/password account. Returns the entered password, or null
+  /// if the user cancels.
+  Future<String?> _promptDeletePassword(BuildContext context) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text('אישור מחיקה',
+            style:
+                TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'מטעמי אבטחה הזינו את הסיסמה כדי להשלים את מחיקת החשבון.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              autofocus: true,
+              textDirection: TextDirection.ltr,
+              decoration: InputDecoration(
+                hintText: 'סיסמה',
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.borderLight),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ביטול',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('מחק חשבון'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -124,7 +231,7 @@ class ProfileScreen extends StatelessWidget {
       builder: (context, provider, _) {
         final profile = provider.tenantProfile;
         if (provider.isLoading || profile == null) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: AppColors.background,
             body: Center(
                 child: CircularProgressIndicator(color: AppColors.primary)),
@@ -192,7 +299,7 @@ class ProfileScreen extends StatelessWidget {
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              const RentchIcon(
+                              const RentlyIcon(
                                 IconsaxPlusLinear.notification,
                                 color: Color(0xFF0F172A),
                                 size: 20,
@@ -203,7 +310,7 @@ class ProfileScreen extends StatelessWidget {
                                 child: Container(
                                   width: 8,
                                   height: 8,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     color: AppColors.primary, // App primary color instead of pink
                                     shape: BoxShape.circle,
                                   ),
@@ -261,7 +368,7 @@ class ProfileScreen extends StatelessWidget {
                                               fit: BoxFit.cover))
                                       : Container(
                                           color: const Color(0xFFE2E8F0),
-                                          child: const RentchIcon(
+                                          child: const RentlyIcon(
                                             IconsaxPlusLinear.user,
                                             size: 100,
                                             color: Color(0xFF64748B),
@@ -312,6 +419,7 @@ class ProfileScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               GestureDetector(
+                                key: const Key('profile_edit_button'),
                                 onTap: () => Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) =>
@@ -326,7 +434,7 @@ class ProfileScreen extends StatelessWidget {
                                     border: Border.all(
                                         color: const Color(0xFFE2E8F0)),
                                   ),
-                                  child: const RentchIcon(
+                                  child: const RentlyIcon(
                                     IconsaxPlusLinear.edit_2,
                                     size: 14,
                                     color: Color(0xFF0F172A),
@@ -499,7 +607,7 @@ class ProfileScreen extends StatelessWidget {
                           children: [
                             const Row(
                               children: [
-                                RentchIcon(IconsaxPlusLinear.user,
+                                RentlyIcon(IconsaxPlusLinear.user,
                                     size: 18, color: Color(0xFF64748B)),
                                 SizedBox(width: 8),
                                 Text(
@@ -543,11 +651,13 @@ class ProfileScreen extends StatelessWidget {
                             isDestructive: true,
                           ),
                           const _SettingsDivider(),
+                          // Account deletion (App Store 5.1.1(v)) — the demo
+                          // account is a tenant, so it MUST appear here too.
+                          // Understated (normal dark row, not a loud CTA).
                           _ActionRow(
                             icon: IconsaxPlusLinear.trash,
                             label: 'מחיקת חשבון',
                             onTap: () => _confirmDeleteAccount(context),
-                            isDestructive: true,
                           ),
                         ],
                       ),
@@ -646,7 +756,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
       actions: [
         TextButton.icon(
           onPressed: widget.onEdit,
-          icon: const RentchIcon(IconsaxPlusLinear.edit,
+          icon: const RentlyIcon(IconsaxPlusLinear.edit,
               color: Colors.white, size: 16),
           label: const Text(
             'עריכה',
@@ -776,27 +886,30 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                          ),
-                          child: CircleAvatar(
-                            radius: 36,
-                            backgroundColor: AppColors.primary,
-                            backgroundImage: profile.photoUrl.isNotEmpty &&
-                                    !profile.photoUrl.startsWith('/')
-                                ? NetworkImage(profile.photoUrl)
-                                : null,
-                            foregroundImage: profile.photoUrl.startsWith('/')
-                                ? FileImage(File(profile.photoUrl))
-                                : null,
-                            child: profile.photoUrl.isEmpty
-                                ? const RentchIcon(
-                                    IconsaxPlusLinear.profile_circle,
-                                    color: Colors.white,
-                                    size: 34)
-                                : null,
+                        AvatarPulseRing(
+                          active: true,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                            child: CircleAvatar(
+                              radius: 36,
+                              backgroundColor: AppColors.primary,
+                              backgroundImage: profile.photoUrl.isNotEmpty &&
+                                      !profile.photoUrl.startsWith('/')
+                                  ? NetworkImage(profile.photoUrl)
+                                  : null,
+                              foregroundImage: profile.photoUrl.startsWith('/')
+                                  ? FileImage(File(profile.photoUrl))
+                                  : null,
+                              child: profile.photoUrl.isEmpty
+                                  ? const RentlyIcon(
+                                      IconsaxPlusLinear.profile_circle,
+                                      color: Colors.white,
+                                      size: 34)
+                                  : null,
+                            ),
                           ),
                         ),
                         if (widget.profileCompletion < 100)
@@ -843,7 +956,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const RentchIcon(IconsaxPlusLinear.money,
+                        const RentlyIcon(IconsaxPlusLinear.money,
                             size: 14, color: Colors.white60),
                         const SizedBox(width: 5),
                         Text(
@@ -1175,7 +1288,7 @@ class _ReviewCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const RentchIcon(IconsaxPlusLinear.star_1,
+              const RentlyIcon(IconsaxPlusLinear.star_1,
                   color: Color(0xFFE8A84A), size: 15),
               const SizedBox(width: 5),
               Text(
@@ -1254,7 +1367,7 @@ class _ActionTile extends StatelessWidget {
                   ),
                 ),
               ),
-              RentchIcon(
+              RentlyIcon(
                 IconsaxPlusLinear.arrow_left,
                 size: 16,
                 color: AppColors.textSecondary.withValues(alpha: 0.5),
@@ -1410,7 +1523,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                     child: Center(
                       child: Text(
                         _initials(tenantName),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
@@ -1439,6 +1552,33 @@ class _LandlordProfileScreen extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (provider.isBroker) ...[
+                  const SizedBox(height: 5),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: BrandPalette.broker.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(IconsaxPlusLinear.briefcase,
+                            size: 12, color: BrandPalette.broker.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'מתווך נדל״ן',
+                          style: TextStyle(
+                            color: BrandPalette.broker.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
                   email,
@@ -1464,7 +1604,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Center(
-                child: RentchIcon(
+                child: RentlyIcon(
                   IconsaxPlusLinear.edit_2,
                   color: AppColors.textPrimary,
                   size: 18,
@@ -1525,7 +1665,7 @@ class _LandlordProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'שדרג לגרסת הפרו של Rentch לקבלת נתונים חיים עשירים יותר, התאמות ללא הגבלה ועוד פיצ\'רים מתקדמים.',
+            'שדרג לגרסת הפרו של Rently לקבלת נתונים חיים עשירים יותר, התאמות ללא הגבלה ועוד פיצ\'רים מתקדמים.',
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
@@ -1593,33 +1733,53 @@ class _LandlordProfileScreen extends StatelessWidget {
                   builder: (_) => EditProfileScreen(profile: profile)),
             ),
           ),
+          if (provider.isBroker) ...[
+            const _SettingsDivider(),
+            _ProfileMenuItem(
+              icon: IconsaxPlusLinear.color_swatch,
+              label: 'מיתוג ותבניות',
+              color: BrandPalette.broker.primary,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const BrokerBrandingScreen(),
+                ),
+              ),
+            ),
+          ],
           const _SettingsDivider(),
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.setting_2,
-            label: 'הגדרות התראות',
+            label: 'הגדרות',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const _SettingsSubPage(
-                    title: 'הגדרות התראות',
+                  builder: (_) => _SettingsSubPage(
+                    title: 'הגדרות',
                     items: [
-                      _SubPageSettingItem(
+                      const _SubPageSettingItem(
                         icon: IconsaxPlusLinear.notification,
                         title: 'התראות בנייד',
                         subtitle: 'קבל עדכונים בזמן אמת על מכשירך',
                         isSwitch: true,
                       ),
-                      _SubPageSettingItem(
+                      const _SubPageSettingItem(
                         icon: IconsaxPlusLinear.sms,
                         title: 'התראות אימייל',
                         subtitle: 'קבל סיכומים שבועיים ועדכוני מערכת',
                         isSwitch: true,
                       ),
-                      _SubPageSettingItem(
+                      const _SubPageSettingItem(
                         icon: IconsaxPlusLinear.user_add,
                         title: 'פניות שוכרים',
                         subtitle: 'התראות על התאמות ולידים חדשים',
                         isSwitch: true,
+                      ),
+                      _SubPageSettingItem(
+                        icon: IconsaxPlusLinear.trash,
+                        title: 'מחיקת חשבון',
+                        subtitle: 'מחק את החשבון והמידע שלך לצמיתות',
+                        color: Colors.red.shade700,
+                        onTap: onDeleteAccount,
                       ),
                     ],
                   ),
@@ -1666,23 +1826,35 @@ class _LandlordProfileScreen extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const _SettingsSubPage(
+                  builder: (_) => _SettingsSubPage(
                     title: 'תמיכה ועזרה',
                     items: [
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.message_question,
                         title: 'מרכז עזרה ומדריכים',
                         subtitle: 'שאלות נפוצות ומאמרי תמיכה',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://rently.app/help'),
+                          mode: LaunchMode.externalApplication,
+                        ),
                       ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.call_calling,
                         title: 'צור קשר עם התמיכה',
                         subtitle: 'אנחנו כאן לעזור 24/7',
+                        onTap: () => launchUrl(
+                          Uri.parse('mailto:support@rently.app'),
+                          mode: LaunchMode.externalApplication,
+                        ),
                       ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.document_text,
                         title: 'תנאי שימוש ומדיניות',
                         subtitle: 'הסכם שימוש ושמירה על פרטיות',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://rently.app/privacy'),
+                          mode: LaunchMode.externalApplication,
+                        ),
                       ),
                     ],
                   ),
@@ -1712,52 +1884,21 @@ class _LandlordProfileScreen extends StatelessWidget {
       child: Column(
         children: [
           _ProfileMenuItem(
-            icon: IconsaxPlusLinear.user_octagon,
-            label: 'החלף חשבון לשוכר',
-            color: AppColors.primary,
-            onTap: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22)),
-                  title: const Text('החלפת חשבון',
-                      style: TextStyle(
-                          color: AppColors.navy, fontWeight: FontWeight.w900)),
-                  content: const Text(
-                    'האם ברצונך להחליף את מצב החשבון למצב שוכר?',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('ביטול',
-                          style: TextStyle(color: AppColors.textSecondary)),
-                    ),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('החלף'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true) {
-                await provider.setUserRole('tenant');
-              }
-            },
-          ),
-          const _SettingsDivider(),
-          _ProfileMenuItem(
             icon: IconsaxPlusLinear.logout,
             label: 'יציאה מהחשבון',
             color: AppColors.coral,
             onTap: onLogout,
+          ),
+          const _SettingsDivider(),
+          // Account deletion (App Store Guideline 5.1.1(v)). Kept here next to
+          // logout — a normal, discoverable menu row in muted grey rather than a
+          // loud red CTA — so a reviewer finds it immediately without it
+          // dominating the profile.
+          _ProfileMenuItem(
+            icon: IconsaxPlusLinear.trash,
+            label: 'מחיקת חשבון',
+            color: AppColors.textSecondary,
+            onTap: onDeleteAccount,
           ),
         ],
       ),
@@ -1802,6 +1943,1037 @@ class _LandlordProfileScreen extends StatelessWidget {
   }
 }
 
+class BrokerBrandingScreen extends StatefulWidget {
+  const BrokerBrandingScreen({super.key});
+
+  @override
+  State<BrokerBrandingScreen> createState() => _BrokerBrandingScreenState();
+}
+
+class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
+  final ImagePicker _picker = ImagePicker();
+  bool _detectingLogoColors = false;
+
+  Future<void> _pickLogo(DatingProvider provider) async {
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+      );
+      if (file == null || !mounted) return;
+
+      setState(() => _detectingLogoColors = true);
+      final detected = await _detectPalette(file);
+      if (!mounted) return;
+
+      final current = provider.brokerBranding;
+      await provider.updateBrokerBranding(
+        current.copyWith(
+          logoPath: file.path,
+          primaryColorValue: detected?.primary,
+          secondaryColorValue: detected?.secondary,
+          accentColorValue: detected?.accent,
+        ),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            detected == null
+                ? 'הלוגו נוסף. לא זוהו צבעים ברורים, אפשר לבחור פלטה ידנית.'
+                : 'הלוגו נוסף והצבעים זוהו מהתמונה.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('לא ניתן לקרוא את קובץ הלוגו.')),
+      );
+    } finally {
+      if (mounted) setState(() => _detectingLogoColors = false);
+    }
+  }
+
+  Future<void> _removeLogo(DatingProvider provider) async {
+    await provider.updateBrokerBranding(
+      provider.brokerBranding.copyWith(logoPath: ''),
+    );
+  }
+
+  Future<_DetectedLogoPalette?> _detectPalette(XFile file) async {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) return null;
+    final codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: 64,
+      targetHeight: 64,
+    );
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    image.dispose();
+    if (byteData == null) return null;
+
+    final buckets = <int, int>{};
+    final data = byteData.buffer.asUint8List();
+    for (var i = 0; i + 3 < data.length; i += 16) {
+      final r = data[i];
+      final g = data[i + 1];
+      final b = data[i + 2];
+      final a = data[i + 3];
+      if (a < 180) continue;
+      final color = Color.fromARGB(255, r, g, b);
+      final hsl = HSLColor.fromColor(color);
+      if (hsl.lightness < 0.14 ||
+          hsl.lightness > 0.92 ||
+          hsl.saturation < 0.12) {
+        continue;
+      }
+      final bucket = Color.fromARGB(
+        255,
+        (r ~/ 32) * 32,
+        (g ~/ 32) * 32,
+        (b ~/ 32) * 32,
+      ).value;
+      buckets[bucket] = (buckets[bucket] ?? 0) + 1;
+    }
+
+    final ranked = buckets.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    if (ranked.isEmpty) return null;
+
+    final selected = <Color>[];
+    for (final entry in ranked) {
+      final color = Color(entry.key);
+      if (selected.every((existing) => _colorDistance(existing, color) > 74)) {
+        selected.add(color);
+      }
+      if (selected.length == 3) break;
+    }
+    if (selected.isEmpty) return null;
+
+    final primary = selected.first;
+    final secondary =
+        selected.length > 1 ? selected[1] : _readablePairFor(primary);
+    final accent = selected.length > 2
+        ? selected[2]
+        : HSLColor.fromColor(primary)
+            .withLightness(0.72)
+            .withSaturation(0.88)
+            .toColor();
+    return _DetectedLogoPalette(
+      primary: primary.value,
+      secondary: secondary.value,
+      accent: accent.value,
+    );
+  }
+
+  double _colorDistance(Color a, Color b) {
+    final dr = a.red - b.red;
+    final dg = a.green - b.green;
+    final db = a.blue - b.blue;
+    return (dr * dr + dg * dg + db * db).toDouble();
+  }
+
+  Color _readablePairFor(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    if (hsl.lightness > 0.55) {
+      return hsl.withLightness(0.18).withSaturation(0.40).toColor();
+    }
+    return hsl.withLightness(0.86).withSaturation(0.28).toColor();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<DatingProvider>(
+      builder: (context, provider, _) {
+        if (!provider.isBroker) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF5F7FA),
+            body: SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'מיתוג ותבניות זמינים לחשבון מתווך נדל״ן בלבד.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        final branding = provider.brokerBranding;
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          body: SafeArea(
+            bottom: false,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _BrokerBrandingHeader(
+                    onBack: () => Navigator.of(context).pop(),
+                    onReset: () => provider.updateBrokerBranding(
+                      BrokerBrandingConfig.defaults,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _BrokerBrandPreview(branding: branding),
+                  const SizedBox(height: 16),
+                  _BrokerLogoCard(
+                    branding: branding,
+                    detecting: _detectingLogoColors,
+                    onPick: () => _pickLogo(provider),
+                    onRemove:
+                        branding.hasLogo ? () => _removeLogo(provider) : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _BrandingSectionShell(
+                    title: 'עמוד דירה',
+                    child: Column(
+                      children: BrokerPropertyTemplate.values
+                          .map(
+                            (template) => _BrokerPropertyTemplateTile(
+                              template: template,
+                              branding: branding,
+                              selected:
+                                  branding.propertyTemplate == template,
+                              onTap: () => provider.updateBrokerBranding(
+                                branding.copyWith(
+                                  propertyTemplate: template,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _BrandingSectionShell(
+                    title: 'שיחות',
+                    child: Column(
+                      children: BrokerChatTemplate.values
+                          .map(
+                            (template) => _BrokerChatTemplateTile(
+                              template: template,
+                              branding: branding,
+                              selected: branding.chatTemplate == template,
+                              onTap: () => provider.updateBrokerBranding(
+                                branding.copyWith(chatTemplate: template),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _BrandingSectionShell(
+                    title: 'צבעים',
+                    child: Column(
+                      children: _brokerColorPresets
+                          .map(
+                            (preset) => _BrokerColorPresetTile(
+                              preset: preset,
+                              selected: branding.primaryColorValue ==
+                                      preset.primary &&
+                                  branding.secondaryColorValue ==
+                                      preset.secondary &&
+                                  branding.accentColorValue == preset.accent,
+                              onTap: () => provider.updateBrokerBranding(
+                                branding.copyWith(
+                                  primaryColorValue: preset.primary,
+                                  secondaryColorValue: preset.secondary,
+                                  accentColorValue: preset.accent,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DetectedLogoPalette {
+  const _DetectedLogoPalette({
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+  });
+
+  final int primary;
+  final int secondary;
+  final int accent;
+}
+
+class _BrokerBrandingHeader extends StatelessWidget {
+  const _BrokerBrandingHeader({
+    required this.onBack,
+    required this.onReset,
+  });
+
+  final VoidCallback onBack;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: onBack,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: RentlyIcon(
+                IconsaxPlusLinear.arrow_right,
+                color: AppColors.textPrimary,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+        const Expanded(
+          child: Text(
+            'מיתוג ותבניות',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: onReset,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.restart_alt_rounded,
+                color: AppColors.textPrimary,
+                size: 21,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BrokerBrandPreview extends StatelessWidget {
+  const _BrokerBrandPreview({required this.branding});
+
+  final BrokerBrandingConfig branding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 150,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            branding.primaryColor,
+            branding.secondaryColor,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 18,
+            bottom: 18,
+            child: Container(
+              width: 98,
+              height: 58,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white30),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 20,
+            top: 20,
+            child: _BrokerLogoPreview(
+              branding: branding,
+              size: 58,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          Positioned(
+            right: 20,
+            left: 132,
+            bottom: 24,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  branding.propertyTemplate.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  branding.chatTemplate.title,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.76),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 20,
+            top: 22,
+            child: Row(
+              children: [
+                _ColorDot(color: branding.primaryColor, size: 18),
+                const SizedBox(width: 8),
+                _ColorDot(color: branding.secondaryColor, size: 18),
+                const SizedBox(width: 8),
+                _ColorDot(color: branding.accentColor, size: 18),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrokerLogoCard extends StatelessWidget {
+  const _BrokerLogoCard({
+    required this.branding,
+    required this.detecting,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final BrokerBrandingConfig branding;
+  final bool detecting;
+  final VoidCallback onPick;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return _BrandingSectionShell(
+      title: 'לוגו',
+      child: Row(
+        children: [
+          _BrokerLogoPreview(
+            branding: branding,
+            size: 68,
+            backgroundColor: const Color(0xFFF5F7FA),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  detecting ? 'מזהה צבעים...' : 'לוגו משרד',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  branding.hasLogo ? 'משויך לתבניות הנכס והשיחה' : 'לא נבחר',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton.filled(
+            onPressed: detecting ? null : onPick,
+            style: IconButton.styleFrom(
+              backgroundColor: branding.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            icon: detecting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.image_outlined),
+          ),
+          if (onRemove != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: detecting ? null : onRemove,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BrokerLogoPreview extends StatelessWidget {
+  const _BrokerLogoPreview({
+    required this.branding,
+    required this.size,
+    required this.backgroundColor,
+  });
+
+  final BrokerBrandingConfig branding;
+  final double size;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Container(
+      color: backgroundColor,
+      child: Center(
+        child: Icon(
+          Icons.business_rounded,
+          color: branding.primaryColor,
+          size: size * 0.42,
+        ),
+      ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.30),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(size * 0.30),
+        ),
+        child: branding.hasLogo
+            ? SafeImage(source: branding.logoPath, fallback: fallback)
+            : fallback,
+      ),
+    );
+  }
+}
+
+class _BrandingSectionShell extends StatelessWidget {
+  const _BrandingSectionShell({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _BrokerPropertyTemplateTile extends StatelessWidget {
+  const _BrokerPropertyTemplateTile({
+    required this.template,
+    required this.branding,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BrokerPropertyTemplate template;
+  final BrokerBrandingConfig branding;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TemplateChoiceTile(
+      title: template.title,
+      selected: selected,
+      onTap: onTap,
+      preview: _PropertyTemplatePreview(
+        template: template,
+        branding: branding,
+      ),
+    );
+  }
+}
+
+class _BrokerChatTemplateTile extends StatelessWidget {
+  const _BrokerChatTemplateTile({
+    required this.template,
+    required this.branding,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BrokerChatTemplate template;
+  final BrokerBrandingConfig branding;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TemplateChoiceTile(
+      title: template.title,
+      selected: selected,
+      onTap: onTap,
+      preview: _ChatTemplatePreview(
+        template: template,
+        branding: branding,
+      ),
+    );
+  }
+}
+
+class _TemplateChoiceTile extends StatelessWidget {
+  const _TemplateChoiceTile({
+    required this.title,
+    required this.preview,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final Widget preview;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ScaleBounce(
+        onTap: onTap,
+        scaleDownTo: 0.98,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFF7F8FF) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? BrandPalette.broker.primary : AppColors.divider,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              preview,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: selected
+                        ? BrandPalette.broker.primary
+                        : AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: selected ? BrandPalette.broker.primary : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected
+                        ? BrandPalette.broker.primary
+                        : AppColors.borderLight,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 15,
+                      )
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PropertyTemplatePreview extends StatelessWidget {
+  const _PropertyTemplatePreview({
+    required this.template,
+    required this.branding,
+  });
+
+  final BrokerPropertyTemplate template;
+  final BrokerBrandingConfig branding;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = switch (template) {
+      BrokerPropertyTemplate.acidHero => branding.accentColor,
+      BrokerPropertyTemplate.dashboardGlass => const Color(0xFFEAF5EF),
+      BrokerPropertyTemplate.estateCard => const Color(0xFFF5F6F8),
+      BrokerPropertyTemplate.galleryEditorial => Colors.white,
+      BrokerPropertyTemplate.cinematicGlass => branding.secondaryColor,
+      BrokerPropertyTemplate.rentlyClassic => const Color(0xFFE6F9FB),
+    };
+
+    return Container(
+      width: 58,
+      height: 74,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: template == BrokerPropertyTemplate.cinematicGlass ? 0 : 8,
+            left: 8,
+            right: 8,
+            height: template == BrokerPropertyTemplate.cinematicGlass ? 44 : 30,
+            child: Container(
+              decoration: BoxDecoration(
+                color: template == BrokerPropertyTemplate.cinematicGlass
+                    ? Colors.white.withValues(alpha: 0.22)
+                    : branding.primaryColor.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 8,
+            left: 8,
+            bottom: 8,
+            child: Column(
+              children: [
+                Container(
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: template == BrokerPropertyTemplate.cinematicGlass
+                        ? Colors.white
+                        : branding.secondaryColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: branding.primaryColor,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: branding.accentColor,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatTemplatePreview extends StatelessWidget {
+  const _ChatTemplatePreview({
+    required this.template,
+    required this.branding,
+  });
+
+  final BrokerChatTemplate template;
+  final BrokerBrandingConfig branding;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = template == BrokerChatTemplate.nightSuite;
+    final bg = switch (template) {
+      BrokerChatTemplate.rentlyClassic => const Color(0xFFF6FAFC),
+      BrokerChatTemplate.softGlass => branding.primaryColor.withValues(alpha: 0.12),
+      BrokerChatTemplate.editorialLight => const Color(0xFFFAF7F1),
+      BrokerChatTemplate.nightSuite => branding.secondaryColor,
+    };
+
+    return Container(
+      width: 58,
+      height: 58,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              width: 30,
+              height: 10,
+              decoration: BoxDecoration(
+                color: branding.primaryColor,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: 24,
+              height: 10,
+              decoration: BoxDecoration(
+                color: dark ? Colors.white24 : Colors.white,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            height: 7,
+            decoration: BoxDecoration(
+              color: dark ? Colors.white24 : Colors.white,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrokerColorPreset {
+  const _BrokerColorPreset({
+    required this.name,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+  });
+
+  final String name;
+  final int primary;
+  final int secondary;
+  final int accent;
+}
+
+const _brokerColorPresets = [
+  _BrokerColorPreset(
+    name: 'Lime Noir',
+    primary: 0xFF1E1B4B,
+    secondary: 0xFF1D1D24,
+    accent: 0xFFECFF74,
+  ),
+  _BrokerColorPreset(
+    name: 'Indigo Pro',
+    primary: 0xFF6C5CE7,
+    secondary: 0xFF111827,
+    accent: 0xFF9D90FF,
+  ),
+  _BrokerColorPreset(
+    name: 'Estate Red',
+    primary: 0xFFEF2D35,
+    secondary: 0xFF232323,
+    accent: 0xFFFFF0F0,
+  ),
+  _BrokerColorPreset(
+    name: 'Ocean Mint',
+    primary: 0xFF4E8F8B,
+    secondary: 0xFF102A35,
+    accent: 0xFFE4F4EE,
+  ),
+  _BrokerColorPreset(
+    name: 'Stone Gold',
+    primary: 0xFFB39145,
+    secondary: 0xFF2D2921,
+    accent: 0xFFF3E8CA,
+  ),
+];
+
+class _BrokerColorPresetTile extends StatelessWidget {
+  const _BrokerColorPresetTile({
+    required this.preset,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _BrokerColorPreset preset;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ScaleBounce(
+        onTap: onTap,
+        scaleDownTo: 0.98,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFF7F8FF) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? BrandPalette.broker.primary : AppColors.divider,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              _ColorDot(color: Color(preset.primary), size: 24),
+              const SizedBox(width: 8),
+              _ColorDot(color: Color(preset.secondary), size: 24),
+              const SizedBox(width: 8),
+              _ColorDot(color: Color(preset.accent), size: 24),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  preset.name,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: BrandPalette.broker.primary,
+                  size: 22,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorDot extends StatelessWidget {
+  const _ColorDot({
+    required this.color,
+    required this.size,
+  });
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProfileMenuItem extends StatelessWidget {
   const _ProfileMenuItem({
     required this.icon,
@@ -1818,44 +2990,45 @@ class _ProfileMenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeColor = color ?? AppColors.textPrimary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: activeColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: activeColor,
-                ),
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.96,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: activeColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 16),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: activeColor,
-                ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: activeColor,
               ),
-              const Spacer(),
-              RentchIcon(
-                IconsaxPlusLinear.arrow_left,
-                size: 16,
-                color: activeColor.withValues(alpha: 0.4),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: activeColor,
               ),
-            ],
-          ),
+            ),
+            const Spacer(),
+            RentlyIcon(
+              IconsaxPlusLinear.arrow_left,
+              size: 16,
+              color: activeColor.withValues(alpha: 0.4),
+            ),
+          ],
         ),
       ),
     );
@@ -1930,7 +3103,7 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                         ],
                       ),
                       child: const Center(
-                        child: RentchIcon(
+                        child: RentlyIcon(
                           IconsaxPlusLinear.arrow_right,
                           color: AppColors.textPrimary,
                           size: 20,
@@ -1963,20 +3136,23 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
 
                     return Column(
                       children: [
-                        Padding(
+                        GestureDetector(
+                          onTap: item.onTap,
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                           child: Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.08),
+                                  color: (item.color ?? AppColors.primary).withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
                                   item.icon,
                                   size: 20,
-                                  color: AppColors.primary,
+                                  color: item.color ?? AppColors.primary,
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -1986,10 +3162,10 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                                   children: [
                                     Text(
                                       item.title,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.textPrimary,
+                                        color: item.color ?? AppColors.textPrimary,
                                       ),
                                     ),
                                     if (item.subtitle != null) ...[
@@ -2017,13 +3193,14 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                                   },
                                 )
                               else
-                                RentchIcon(
+                                RentlyIcon(
                                   IconsaxPlusLinear.arrow_left,
                                   size: 16,
-                                  color: AppColors.textPrimary.withValues(alpha: 0.4),
+                                  color: (item.color ?? AppColors.textPrimary).withValues(alpha: 0.4),
                                 ),
                             ],
                           ),
+                        ),
                         ),
                         if (!isLast) const _SettingsDivider(),
                       ],
@@ -2046,6 +3223,8 @@ class _SubPageSettingItem {
     this.subtitle,
     this.isSwitch = false,
     this.initialSwitchValue = true,
+    this.onTap,
+    this.color,
   });
 
   final IconData icon;
@@ -2053,6 +3232,8 @@ class _SubPageSettingItem {
   final String? subtitle;
   final bool isSwitch;
   final bool initialSwitchValue;
+  final VoidCallback? onTap;
+  final Color? color;
 }
 
 class _SettingsTile extends StatelessWidget {
@@ -2072,49 +3253,49 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 20),
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.96,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14.5,
-                            color: AppColors.navy)),
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500)),
-                  ],
-                ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14.5,
+                          color: AppColors.navy)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ],
               ),
-              RentchIcon(IconsaxPlusLinear.arrow_left,
-                  size: 16,
-                  color: AppColors.textSecondary.withValues(alpha: 0.5)),
-            ],
-          ),
+            ),
+            RentlyIcon(IconsaxPlusLinear.arrow_left,
+                size: 16,
+                color: AppColors.textSecondary.withValues(alpha: 0.5)),
+          ],
         ),
       ),
     );
@@ -2162,7 +3343,7 @@ class _MockupStatBox extends StatelessWidget {
               color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: RentchIcon(
+            child: RentlyIcon(
               icon,
               size: 20,
               color: color,
@@ -2215,7 +3396,7 @@ class _PreferenceTile extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: RentchIcon(
+            child: RentlyIcon(
               icon,
               size: 20,
               color: AppColors.primary,
@@ -2247,7 +3428,7 @@ class _PreferenceTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const RentchIcon(
+          const RentlyIcon(
             IconsaxPlusLinear.arrow_left,
             size: 16,
             color: Color(0xFF94A3B8),
@@ -2290,10 +3471,14 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final color =
         isDestructive ? AppColors.coral : const Color(0xFF0F172A);
-    return InkWell(
+    return ScaleBounce(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Padding(
+      scaleDownTo: 0.96,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
@@ -2322,7 +3507,7 @@ class _ActionRow extends StatelessWidget {
                 ),
               ),
             ),
-            RentchIcon(
+            RentlyIcon(
               IconsaxPlusLinear.arrow_left,
               size: 16,
               color: isDestructive

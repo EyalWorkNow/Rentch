@@ -65,37 +65,37 @@ class AppConfig {
   // ── AWS DynamoDB table names ──────────────────────────────────────────────────
   static const String dynamoPropertiesTable = String.fromEnvironment(
     'DYNAMO_PROPERTIES_TABLE',
-    defaultValue: 'rentch-properties',
+    defaultValue: 'rently-properties',
   );
 
   static const String dynamoMessagesTable = String.fromEnvironment(
     'DYNAMO_MESSAGES_TABLE',
-    defaultValue: 'rentch-messages',
+    defaultValue: 'rently-messages',
   );
 
   static const String dynamoEventsTable = String.fromEnvironment(
     'DYNAMO_EVENTS_TABLE',
-    defaultValue: 'rentch-events',
+    defaultValue: 'rently-events',
   );
 
   static const String dynamoUsersTable = String.fromEnvironment(
     'DYNAMO_USERS_TABLE',
-    defaultValue: 'rentch-users',
+    defaultValue: 'rently-users',
   );
 
   static const String dynamoReportsTable = String.fromEnvironment(
     'DYNAMO_REPORTS_TABLE',
-    defaultValue: 'rentch-reports',
+    defaultValue: 'rently-reports',
   );
 
   static const String dynamoBlocksTable = String.fromEnvironment(
     'DYNAMO_BLOCKS_TABLE',
-    defaultValue: 'rentch-blocks',
+    defaultValue: 'rently-blocks',
   );
 
   static const String dynamoReviewsTable = String.fromEnvironment(
     'DYNAMO_REVIEWS_TABLE',
-    defaultValue: 'rentch-reviews',
+    defaultValue: 'rently-reviews',
   );
 
   static const String dynamoPropertyViewsTable = String.fromEnvironment(
@@ -118,7 +118,7 @@ class AppConfig {
   // ── AWS S3 ────────────────────────────────────────────────────────────────────
   static const String awsS3Bucket = String.fromEnvironment(
     'AWS_S3_BUCKET',
-    defaultValue: 'rentch-media',
+    defaultValue: 'rently-media',
   );
 
   // ── Legal ─────────────────────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ class AppConfig {
   // These map old Appwrite constant names → AWS equivalents.
   static String get appwriteEndpoint => awsApiGatewayUrl;
   static String get appwriteProjectId => '';
-  static String get appwriteDatabaseId => '';
+  static String get appwriteDatabaseId => 'rently-db';
   static String get appwriteAppStateTableId => 'app_state';
   static String get appwriteAppStateRowId => awsAppStateRowId;
   static String get appwriteStorageBucketId => awsS3Bucket;

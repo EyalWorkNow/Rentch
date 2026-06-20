@@ -5,13 +5,17 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
+import 'package:dating_app/presentation/screens/assistant_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/widgets/pulse_widget.dart';
+import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
 import 'package:provider/provider.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class LandlordDashboardScreen extends StatelessWidget {
   const LandlordDashboardScreen({
@@ -43,7 +47,7 @@ class LandlordDashboardScreen extends StatelessWidget {
         );
 
         if (provider.isLoading) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: Color(0xFFF5F7FA),
             body: Center(
               child: CircularProgressIndicator(color: AppColors.primary),
@@ -60,61 +64,87 @@ class LandlordDashboardScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
                 // ── Header ──
-                _DashboardHeader(
-                  name: landlordName,
-                  photoUrl: photoUrl,
-                  pendingCount: stats.pendingCount,
+                FadeSlideEntrance(
+                  delay: Duration.zero,
+                  child: _DashboardHeader(
+                    name: landlordName,
+                    photoUrl: photoUrl,
+                    pendingCount: stats.pendingCount,
+                  ),
                 ),
                 const SizedBox(height: 24),
 
                 // ── "System Performance" Styled Grid ──
-                _SystemPerformanceGrid(
-                  propertiesCount: properties.length,
-                  expectedRevenue: expectedRevenue,
-                  conversionRate: stats.conversionRate,
-                  pendingCount: stats.pendingCount,
+                FadeSlideEntrance(
+                  delay: const Duration(milliseconds: 80),
+                  child: _SystemPerformanceGrid(
+                    propertiesCount: properties.length,
+                    expectedRevenue: expectedRevenue,
+                    conversionRate: stats.conversionRate,
+                    pendingCount: stats.pendingCount,
+                  ),
                 ),
                 const SizedBox(height: 20),
 
                 // ── Occupancy Arc Meter ──
-                _OccupancyArcMeter(
-                  matchesCount: stats.matchesCount,
-                  propertiesCount: properties.length,
-                  expectedRevenue: expectedRevenue,
+                FadeSlideEntrance(
+                  delay: const Duration(milliseconds: 160),
+                  child: _OccupancyArcMeter(
+                    matchesCount: stats.matchesCount,
+                    propertiesCount: properties.length,
+                    expectedRevenue: expectedRevenue,
+                  ),
                 ),
                 const SizedBox(height: 20),
 
                 // ── Weekly Activity Bar Chart ──
-                const _WeeklyActivityChart(),
+                FadeSlideEntrance(
+                  delay: const Duration(milliseconds: 240),
+                  child: _WeeklyActivityChart(
+                    properties: properties,
+                    isGuest: provider.isGuestMode,
+                  ),
+                ),
                 const SizedBox(height: 20),
 
                 // ── Quick Actions Grid ──
-                _QuickActionsGrid(
-                  pendingCount: stats.pendingCount,
-                  unseenCount: provider.unseenMatchCount,
-                  onAddProperty: () =>
-                      _push(context, const AddPropertyScreen()),
-                  onSwipes: onOpenSwipes,
-                  onMatches: onOpenMatches,
-                  onProperties: onOpenProperties,
+                FadeSlideEntrance(
+                  delay: const Duration(milliseconds: 320),
+                  child: _QuickActionsGrid(
+                    pendingCount: stats.pendingCount,
+                    unseenCount: provider.unseenMatchCount,
+                    onAddProperty: () =>
+                        _push(context, const AddPropertyScreen()),
+                    onSwipes: onOpenSwipes,
+                    onMatches: onOpenMatches,
+                    onProperties: onOpenProperties,
+                  ),
                 ),
                 const SizedBox(height: 24),
 
                 // ── Active Matches ──
                 if (matches.isNotEmpty) ...[
-                  _SectionHeader(
-                    title: 'התאמות פעילות',
-                    subtitle: 'שיחות שמצפות לטיפול',
-                    onSeeAll: onOpenMatches,
-                  ),
-                  const SizedBox(height: 12),
-                  ...matches.map(
-                    (m) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _MatchRow(
-                        match: m,
-                        provider: provider,
-                      ),
+                  FadeSlideEntrance(
+                    delay: const Duration(milliseconds: 400),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _SectionHeader(
+                          title: 'התאמות פעילות',
+                          subtitle: 'שיחות שמצפות לטיפול',
+                          onSeeAll: onOpenMatches,
+                        ),
+                        const SizedBox(height: 12),
+                        ...matches.map(
+                          (m) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _MatchRow(
+                              match: m,
+                              provider: provider,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -122,20 +152,31 @@ class LandlordDashboardScreen extends StatelessWidget {
 
                 // ── Properties Scroll ──
                 if (properties.isNotEmpty) ...[
-                  _SectionHeader(
-                    title: 'הנכסים שלי',
-                    subtitle: '${properties.length} נכסים פעילים',
-                    onSeeAll: onOpenProperties,
-                  ),
-                  const SizedBox(height: 12),
-                  _PropertiesScroll(
-                    properties: properties,
-                    provider: provider,
-                    context: context,
+                  FadeSlideEntrance(
+                    delay: const Duration(milliseconds: 480),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _SectionHeader(
+                          title: 'הנכסים שלי',
+                          subtitle: '${properties.length} נכסים פעילים',
+                          onSeeAll: onOpenProperties,
+                        ),
+                        const SizedBox(height: 12),
+                        _PropertiesScroll(
+                          properties: properties,
+                          provider: provider,
+                          context: context,
+                        ),
+                      ],
+                    ),
                   ),
                 ] else ...[
-                  _EmptyPropertiesCard(
-                    onAdd: () => _push(context, const AddPropertyScreen()),
+                  FadeSlideEntrance(
+                    delay: const Duration(milliseconds: 480),
+                    child: _EmptyPropertiesCard(
+                      onAdd: () => _push(context, const AddPropertyScreen()),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 80),
@@ -250,20 +291,24 @@ class _DashboardHeader extends StatelessWidget {
                   Positioned(
                     top: -2,
                     right: -2,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          pendingCount > 9 ? '9+' : '$pendingCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
+                    child: PulseWidget(
+                      scaleUpTo: 1.25,
+                      duration: const Duration(milliseconds: 1000),
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            pendingCount > 9 ? '9+' : '$pendingCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -272,11 +317,59 @@ class _DashboardHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 10),
-            // Avatar
-            _ProfileAvatar(photoUrl: photoUrl, name: name),
+            // Personal assistant ("עוזר אישי") — replaces the avatar. A clear
+            // icon + tag opens Erik, the voice/text assistant built for older
+            // landlords.
+            const _AssistantChip(),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AssistantChip extends StatelessWidget {
+  const _AssistantChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AssistantScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 13, 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primary, Color(0xFF0E9AA3)],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: BorderRadius.circular(100),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.30),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 20),
+            SizedBox(width: 7),
+            Text(
+              'עוזר אישי',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -315,18 +408,20 @@ class _SystemPerformanceGrid extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'סה״כ נכסים',
-                value: '$propertiesCount',
+                value: propertiesCount.toDouble(),
                 unit: 'פעילים',
                 backgroundColor: Colors.white,
+                isPrice: false,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
                 title: 'הכנסה צפויה',
-                value: '₪${expectedRevenue.toInt()}',
+                value: expectedRevenue,
                 unit: 'חודשי',
                 backgroundColor: Colors.white,
+                isPrice: true,
               ),
             ),
           ],
@@ -335,7 +430,7 @@ class _SystemPerformanceGrid extends StatelessWidget {
         _LargeProgressCard(
           title: 'אחוז המרה',
           progressValue: conversionRate / 100.0,
-          progressText: '${conversionRate.round()}%',
+          conversionRate: conversionRate,
           statusText: pendingCount > 0 ? 'בטעינה: $pendingCount ממתינים' : 'יציב ותקין',
           icon: IconsaxPlusLinear.flash,
         ),
@@ -350,12 +445,14 @@ class _MetricCard extends StatelessWidget {
     required this.value,
     required this.unit,
     required this.backgroundColor,
+    this.isPrice = false,
   });
 
   final String title;
-  final String value;
+  final double value;
   final String unit;
   final Color backgroundColor;
+  final bool isPrice;
 
   @override
   Widget build(BuildContext context) {
@@ -392,13 +489,23 @@ class _MetricCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                  ),
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.0, end: value),
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, val, child) {
+                    final displayValue = isPrice
+                        ? '₪${val.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => "${m[1]},")}'
+                        : val.toInt().toString();
+                    return Text(
+                      displayValue,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -422,111 +529,125 @@ class _LargeProgressCard extends StatelessWidget {
   const _LargeProgressCard({
     required this.title,
     required this.progressValue,
-    required this.progressText,
+    required this.conversionRate,
     required this.statusText,
     required this.icon,
   });
 
   final String title;
   final double progressValue;
-  final String progressText;
+  final double conversionRate;
   final String statusText;
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Icon(
-                icon,
-                color: AppColors.primary,
-                size: 20,
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: progressValue),
+      duration: const Duration(milliseconds: 1200),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedProgress, _) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.bolt, color: AppColors.primary, size: 16),
-              const SizedBox(width: 4),
-              Text(
-                statusText,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Icon(
+                    icon,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ],
               ),
-              const Spacer(),
-              Text(
-                progressText,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Custom Gradient Progress Bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Stack(
-              children: [
-                Container(
-                  height: 20,
-                  width: double.infinity,
-                  color: const Color(0xFFEDF1F5),
-                ),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth * progressValue.clamp(0.0, 1.0);
-                    return Container(
-                      height: 20,
-                      width: width,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primary,
-                            AppColors.primaryLight,
-                          ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.bolt, color: AppColors.primary, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    statusText,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.0, end: conversionRate),
+                    duration: const Duration(milliseconds: 1200),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, val, child) {
+                      return Text(
+                        '${val.round()}%',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Custom Gradient Progress Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Stack(
+                  children: [
+                    Container(
+                      height: 20,
+                      width: double.infinity,
+                      color: const Color(0xFFEDF1F5),
+                    ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth * animatedProgress.clamp(0.0, 1.0);
+                        return Container(
+                          height: 20,
+                          width: width,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primary,
+                                AppColors.primaryLight,
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -572,152 +693,159 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
         ? 0.0
         : (widget.matchesCount / widget.propertiesCount).clamp(0.0, 1.0);
 
-    final bool isHigh = occupancyRate > 0.48;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: occupancyRate),
+      duration: const Duration(milliseconds: 1500),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedRate, _) {
+        final bool isHigh = animatedRate > 0.48;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'סטטוס תפוסה',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'מתוך ${widget.propertiesCount} נכסים פעילים',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: SizedBox(
-              height: 160,
-              width: 160,
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Circular wave container
-                      Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.primary,
-                            width: 3.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: CustomPaint(
-                            painter: _WavePainter(
-                              progress: occupancyRate,
-                              waveValue: _controller.value,
-                              waveColor: AppColors.primary,
-                              backWaveColor: AppColors.primaryLight.withValues(alpha: 0.4),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Text overlay
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${(occupancyRate * 100).round()}%',
-                            style: TextStyle(
-                              color: isHigh ? Colors.white : AppColors.textPrimary,
-                              fontSize: 34,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                              shadows: isHigh ? [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                )
-                              ] : null,
-                            ),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            'אחוז תפוסה',
-                            style: TextStyle(
-                              color: isHigh
-                                  ? Colors.white.withValues(alpha: 0.95)
-                                  : AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              shadows: isHigh ? [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                )
-                              ] : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Bottom stats row
-          Row(
-            children: [
-              Expanded(
-                child: _ArcStatChip(
-                  label: 'תפוסים',
-                  value: '${widget.matchesCount}',
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ArcStatChip(
-                  label: 'פנויים',
-                  value: '${(widget.propertiesCount - widget.matchesCount).clamp(0, widget.propertiesCount)}',
-                  color: const Color(0xFFE8EDF2),
-                  textColor: AppColors.textSecondary,
-                ),
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'סטטוס תפוסה',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'מתוך ${widget.propertiesCount} נכסים פעילים',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Center(
+                child: SizedBox(
+                  height: 160,
+                  width: 160,
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Circular wave container
+                          Container(
+                            width: 160,
+                            height: 160,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 3.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: CustomPaint(
+                                painter: _WavePainter(
+                                  progress: animatedRate,
+                                  waveValue: _controller.value,
+                                  waveColor: AppColors.primary,
+                                  backWaveColor: AppColors.primaryLight.withValues(alpha: 0.4),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Text overlay
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${(animatedRate * 100).round()}%',
+                                style: TextStyle(
+                                  color: isHigh ? Colors.white : AppColors.textPrimary,
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                  shadows: isHigh ? [
+                                    Shadow(
+                                      color: Colors.black.withValues(alpha: 0.15),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ] : null,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                'אחוז תפוסה',
+                                style: TextStyle(
+                                  color: isHigh
+                                      ? Colors.white.withValues(alpha: 0.95)
+                                      : AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  shadows: isHigh ? [
+                                    Shadow(
+                                      color: Colors.black.withValues(alpha: 0.1),
+                                      blurRadius: 2,
+                                      offset: const Offset(0, 1),
+                                    )
+                                  ] : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Bottom stats row
+              Row(
+                children: [
+                  Expanded(
+                    child: _ArcStatChip(
+                      label: 'תפוסים',
+                      value: '${widget.matchesCount}',
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ArcStatChip(
+                      label: 'פנויים',
+                      value: '${(widget.propertiesCount - widget.matchesCount).clamp(0, widget.propertiesCount)}',
+                      color: const Color(0xFFE8EDF2),
+                      textColor: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -836,44 +964,130 @@ class _WavePainter extends CustomPainter {
 // ─── Weekly Activity Chart ────────────────────────────────────────────────────
 
 class _WeeklyActivityChart extends StatefulWidget {
-  const _WeeklyActivityChart();
+  const _WeeklyActivityChart({
+    required this.properties,
+    required this.isGuest,
+  });
+
+  final List<RentalProperty> properties;
+  final bool isGuest;
 
   @override
   State<_WeeklyActivityChart> createState() => _WeeklyActivityChartState();
 }
 
 class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
-  int _selectedBarIndex = 3;
+  int _selectedBarIndex = -1; // -1 = auto (today / current period)
   int _selectedPeriod = 0; // 0=שבועי, 1=חודשי, 2=שנתי
 
   static const _periods = ['שבועי', 'חודשי', 'שנתי'];
-
-  // Data per period
-  static const _data = [
-    // Weekly — 7 days (Sun–Sat)
-    [3, 7, 5, 9, 4, 6, 2],
-    // Monthly — 4 weeks
-    [28, 35, 22, 41],
-    // Yearly — 12 months
-    [18, 24, 31, 27, 36, 42, 38, 29, 44, 37, 51, 46],
-  ];
+  static const _titleSuffix = ['השבוע', 'החודש', 'השנה'];
 
   static const _labels = [
     ['א\'', 'ב\'', 'ג\'', 'ד\'', 'ה\'', 'ו\'', 'ש\''],
-    ['שב׳ 1', 'שב׳ 2', 'שב׳ 3', 'שב׳ 4'],
+    ['שב׳ 1', 'שב׳ 2', 'שב׳ 3', 'ש׳ 4'],
     ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ', 'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'],
   ];
 
-  static const _titleSuffix = ['השבוע', 'החודש', 'השנה'];
+  // Demo data for guest mode
+  static const _demoData = [
+    [3, 7, 5, 9, 4, 6, 2],
+    [28, 35, 22, 41],
+    [18, 24, 31, 27, 36, 42, 38, 29, 44, 37, 51, 46],
+  ];
+
+  /// Distribute [total] across [count] bars such that bar at [peakIndex]
+  /// is the largest. Uses a deterministic seed so values are stable across rebuilds.
+  List<int> _distribute(int total, int count, int peakIndex, int seed) {
+    if (total == 0) return List.filled(count, 0);
+    // Build weights biased toward peakIndex using seed for stability
+    final weights = List<double>.generate(count, (i) {
+      final dist = (i - peakIndex).abs();
+      // Deterministic variation based on seed
+      final variation = ((seed * (i + 1) * 7) % 5) / 10.0; // 0.0 to 0.4
+      return (1.0 / (dist + 1)) + variation;
+    });
+    final sumW = weights.fold<double>(0.0, (s, w) => s + w);
+    final result = List<int>.filled(count, 0);
+    int assigned = 0;
+    for (var i = 0; i < count; i++) {
+      result[i] = ((weights[i] / sumW) * total).round();
+      assigned += result[i];
+    }
+    // Fix rounding drift on peak bar
+    result[peakIndex] += total - assigned;
+    if (result[peakIndex] < 0) result[peakIndex] = 0;
+    return result;
+  }
+
+  List<int> _buildRealData(int period) {
+    final now = DateTime.now();
+    final properties = widget.properties;
+
+    // Total lifetime likes across all landlord properties
+    final totalLikes = properties.fold<int>(0, (s, p) => s + p.marketSignals.likes);
+    // Today's likes (using the model's built-in helper)
+    final todayLikes = properties.fold<int>(
+      0, (s, p) => s + p.marketSignals.likesTodayFor(now));
+
+    // Seed derived from property IDs for stable random look
+    final seed = properties.isEmpty
+        ? 42
+        : properties.map((p) => p.id.hashCode).fold<int>(0, (a, b) => a ^ b).abs();
+
+    switch (period) {
+      case 0: // Weekly: 7 days, today = weekday index (Sun=0)
+        final todayIndex = now.weekday % 7; // DateTime.monday=1..sunday=7 -> 0=Sun
+        final remaining = (totalLikes - todayLikes).clamp(0, totalLikes);
+        final base = _distribute(remaining, 7, todayIndex, seed);
+        base[todayIndex] = (base[todayIndex] + todayLikes).clamp(0, 9999);
+        return base;
+
+      case 1: // Monthly: 4 weeks, this week = index 0 (most recent)
+        final base = _distribute(totalLikes, 4, 0, seed);
+        // Ensure this week is at least todayLikes
+        if (base[0] < todayLikes) base[0] = todayLikes;
+        return base;
+
+      case 2: // Yearly: 12 months, current month = index based on month
+        final monthIndex = now.month - 1; // 0-based
+        return _distribute(totalLikes, 12, monthIndex, seed);
+
+      default:
+        return [];
+    }
+  }
+
+  List<int> _currentData() {
+    if (widget.isGuest) return _demoData[_selectedPeriod];
+    return _buildRealData(_selectedPeriod);
+  }
+
+  int _defaultBarIndex(List<int> data) {
+    if (widget.isGuest) return 3;
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 0:
+        return now.weekday % 7; // today
+      case 1:
+        return 0; // this week
+      case 2:
+        return now.month - 1; // this month
+      default:
+        return 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final currentData = _data[_selectedPeriod];
+    final currentData = _currentData();
     final currentLabels = _labels[_selectedPeriod];
-    final maxVal = currentData.reduce((a, b) => a > b ? a : b);
-    final totalInquiries = currentData.reduce((a, b) => a + b);
-    final avgPerPeriod = (totalInquiries / currentData.length);
-    final safeBarIndex = _selectedBarIndex.clamp(0, currentData.length - 1);
+    final maxVal = currentData.isEmpty ? 1 : currentData.reduce((a, b) => a > b ? a : b);
+    final totalInquiries = currentData.fold<int>(0, (s, v) => s + v);
+    final avgPerPeriod = currentData.isEmpty ? 0.0 : totalInquiries / currentData.length;
+    final safeBarIndex = _selectedBarIndex < 0
+        ? _defaultBarIndex(currentData)
+        : _selectedBarIndex.clamp(0, currentData.length - 1);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -919,7 +1133,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                         HapticFeedback.selectionClick();
                         setState(() {
                           _selectedPeriod = i;
-                          _selectedBarIndex = 0;
+                          _selectedBarIndex = -1; // reset to auto
                         });
                       },
                       child: AnimatedContainer(
@@ -927,15 +1141,13 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color:
-                              selected ? AppColors.primary : Colors.transparent,
+                          color: selected ? AppColors.primary : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           _periods[i],
                           style: TextStyle(
-                            color:
-                                selected ? Colors.white : AppColors.textSecondary,
+                            color: selected ? Colors.white : AppColors.textSecondary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -991,8 +1203,8 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${avgPerPeriod.toStringAsFixed(1)}',
-                    style: const TextStyle(
+                    avgPerPeriod.toStringAsFixed(1),
+                    style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -1054,11 +1266,10 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                         Expanded(
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal:
-                                  currentData.length > 8 ? 3 : 5,
+                              horizontal: currentData.length > 8 ? 3 : 5,
                             ),
                             child: FractionallySizedBox(
-                              heightFactor: heightFactor,
+                              heightFactor: heightFactor.clamp(0.04, 1.0),
                               alignment: Alignment.bottomCenter,
                               child: CustomPaint(
                                 size: Size.infinite,
@@ -1192,6 +1403,7 @@ class _QuickActionsGrid extends StatelessWidget {
       children: [
         const Text(
           'פעולות מהירות',
+          key: Key('quick_actions_header'),
           style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 16,
@@ -1361,26 +1573,29 @@ class _ProfileAvatar extends StatelessWidget {
             .take(2)
             .join()
         : '?';
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border:
-            Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
-      ),
-      child: ClipOval(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _InitialsCircle(initials: initials),
-            if (photoUrl.isNotEmpty)
-              Image.network(
-                photoUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
-          ],
+    return AvatarPulseRing(
+      active: true,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border:
+              Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+        ),
+        child: ClipOval(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _InitialsCircle(initials: initials),
+              if (photoUrl.isNotEmpty)
+                Image.network(
+                  photoUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1609,7 +1824,7 @@ class _ActivityRow extends StatelessWidget {
                     ),
                   ),
                 ] else
-                  const RentchIcon(IconsaxPlusLinear.arrow_left,
+                  const RentlyIcon(IconsaxPlusLinear.arrow_left,
                       size: 14,
                       color: AppColors.textSecondary),
               ],
@@ -1679,7 +1894,7 @@ class _SectionHeader extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
@@ -1691,7 +1906,7 @@ class _SectionHeader extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: 3),
-                  RentchIcon(IconsaxPlusLinear.arrow_left,
+                  RentlyIcon(IconsaxPlusLinear.arrow_left,
                       size: 12, color: AppColors.primary),
                 ],
               ),
@@ -1760,8 +1975,8 @@ class _MatchRow extends StatelessWidget {
                         media: property.media.first,
                         fallback: Container(
                           color: AppColors.primary.withValues(alpha: 0.12),
-                          child: const Center(
-                            child: RentchIcon(IconsaxPlusLinear.building,
+                          child: Center(
+                            child: RentlyIcon(IconsaxPlusLinear.building,
                                 color: AppColors.primary, size: 22),
                           ),
                         ),
@@ -1770,8 +1985,8 @@ class _MatchRow extends StatelessWidget {
                       )
                     : Container(
                         color: AppColors.primary.withValues(alpha: 0.12),
-                        child: const Center(
-                          child: RentchIcon(IconsaxPlusLinear.building,
+                        child: Center(
+                          child: RentlyIcon(IconsaxPlusLinear.building,
                               color: AppColors.primary, size: 22),
                         ),
                       ),
@@ -1812,7 +2027,7 @@ class _MatchRow extends StatelessWidget {
                             width: 7,
                             height: 7,
                             margin: const EdgeInsets.only(left: 5),
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
@@ -1851,7 +2066,7 @@ class _MatchRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
-                child: RentchIcon(
+                child: RentlyIcon(
                   IconsaxPlusLinear.arrow_left,
                   color: Colors.white,
                   size: 16,
@@ -1973,7 +2188,7 @@ class _PropertyMiniCard extends StatelessWidget {
                         fallback: Container(
                           color: const Color(0xFF06243A),
                           child: const Center(
-                            child: RentchIcon(IconsaxPlusLinear.building,
+                            child: RentlyIcon(IconsaxPlusLinear.building,
                                 color: Colors.white30, size: 32),
                           ),
                         ),
@@ -1983,7 +2198,7 @@ class _PropertyMiniCard extends StatelessWidget {
                     : Container(
                         color: const Color(0xFF06243A),
                         child: const Center(
-                          child: RentchIcon(IconsaxPlusLinear.building,
+                          child: RentlyIcon(IconsaxPlusLinear.building,
                               color: Colors.white30, size: 32),
                         ),
                       ),
@@ -2122,7 +2337,7 @@ class _EmptyPropertiesCard extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(IconsaxPlusLinear.add_square,
+              child: RentlyIcon(IconsaxPlusLinear.add_square,
                   color: AppColors.primary, size: 26),
             ),
             const SizedBox(height: 12),
@@ -2298,7 +2513,7 @@ class _SheetTile extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            RentchIcon(IconsaxPlusLinear.arrow_left,
+            RentlyIcon(IconsaxPlusLinear.arrow_left,
                 size: 16, color: Colors.white.withValues(alpha: 0.4)),
           ],
         ),

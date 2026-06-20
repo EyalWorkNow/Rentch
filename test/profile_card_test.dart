@@ -38,12 +38,27 @@ void main() {
         await tester.pump(const Duration(milliseconds: 260));
       }
 
-      expect(find.text('6/6'), findsOneWidget);
+      // Progress bars replaced the "X/Y" text counter; verify via the card image key
+      expect(
+        find.byKey(
+          const ValueKey(
+            'six-media:5:https://example.com/six-media-5.jpg',
+          ),
+        ),
+        findsOneWidget,
+      );
 
       await _pumpCard(tester, provider, second);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('1/4'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey(
+            'four-media:0:https://example.com/four-media-0.jpg',
+          ),
+        ),
+        findsOneWidget,
+      );
     } finally {
       debugNetworkImageHttpClientProvider = null;
       provider.dispose();
@@ -77,7 +92,15 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 260));
 
-      expect(find.text('2/3'), findsOneWidget);
+      // Progress bars replaced the "X/Y" text counter; verify via the card image key
+      expect(
+        find.byKey(
+          const ValueKey(
+            'rtl-media:1:https://example.com/rtl-media-1.jpg',
+          ),
+        ),
+        findsOneWidget,
+      );
       await tester.pump(const Duration(milliseconds: 900));
     } finally {
       debugNetworkImageHttpClientProvider = null;

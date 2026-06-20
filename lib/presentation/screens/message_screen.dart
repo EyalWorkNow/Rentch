@@ -4,6 +4,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
+import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/chat_provider.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -11,8 +12,14 @@ import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
+import 'package:dating_app/presentation/screens/contract_form_screen.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
+import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
+import 'package:dating_app/presentation/widgets/pulse_widget.dart';
 import 'package:provider/provider.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -21,6 +28,150 @@ const _surface = Colors.white;
 const _border = Color(0xFFDCE8EF);
 const _outgoing = Color(0xFF12AEB8); // teal bubble
 const _incoming = Color(0xFFF0F5F8); // light-grey bubble
+
+class _ChatThemeSpec {
+  const _ChatThemeSpec({
+    required this.backgroundColor,
+    required this.appBarColor,
+    required this.composerColor,
+    required this.inputColor,
+    required this.borderColor,
+    required this.outgoingColor,
+    required this.incomingColor,
+    required this.primaryText,
+    required this.secondaryText,
+    required this.iconSurface,
+    required this.accent,
+    this.backgroundGradient,
+    this.glassChrome = false,
+  });
+
+  final Color backgroundColor;
+  final Color appBarColor;
+  final Color composerColor;
+  final Color inputColor;
+  final Color borderColor;
+  final Color outgoingColor;
+  final Color incomingColor;
+  final Color primaryText;
+  final Color secondaryText;
+  final Color iconSurface;
+  final Color accent;
+  final Gradient? backgroundGradient;
+  final bool glassChrome;
+
+  static final standard = _ChatThemeSpec(
+    backgroundColor: _bg,
+    appBarColor: _surface,
+    composerColor: _surface,
+    inputColor: Colors.white,
+    borderColor: _border,
+    outgoingColor: _outgoing,
+    incomingColor: _incoming,
+    primaryText: AppColors.navy,
+    secondaryText: AppColors.textSecondary,
+    iconSurface: Color(0xFFF0F5F8),
+    accent: AppColors.primary,
+  );
+
+  factory _ChatThemeSpec.forBranding(BrokerBrandingConfig branding) {
+    return switch (branding.chatTemplate) {
+      BrokerChatTemplate.rentlyClassic => standard.copyWith(
+          accent: branding.primaryColor,
+          outgoingColor: branding.primaryColor,
+        ),
+      BrokerChatTemplate.softGlass => _ChatThemeSpec(
+          backgroundColor: Color.alphaBlend(
+            branding.primaryColor.withValues(alpha: 0.06),
+            const Color(0xFFF7FAFC),
+          ),
+          appBarColor: Colors.white.withValues(alpha: 0.78),
+          composerColor: Colors.white.withValues(alpha: 0.74),
+          inputColor: Colors.white.withValues(alpha: 0.82),
+          borderColor: branding.primaryColor.withValues(alpha: 0.14),
+          outgoingColor: branding.primaryColor,
+          incomingColor: Colors.white.withValues(alpha: 0.82),
+          primaryText: branding.secondaryColor,
+          secondaryText: branding.secondaryColor.withValues(alpha: 0.58),
+          iconSurface: Colors.white.withValues(alpha: 0.76),
+          accent: branding.primaryColor,
+          glassChrome: true,
+          backgroundGradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              branding.primaryColor.withValues(alpha: 0.14),
+              branding.accentColor.withValues(alpha: 0.12),
+              const Color(0xFFF7FAFC),
+            ],
+          ),
+        ),
+      BrokerChatTemplate.editorialLight => _ChatThemeSpec(
+          backgroundColor: const Color(0xFFFAF7F1),
+          appBarColor: const Color(0xFFFFFCF7),
+          composerColor: const Color(0xFFFFFCF7),
+          inputColor: Colors.white,
+          borderColor: const Color(0xFFE9E0D2),
+          outgoingColor: branding.secondaryColor,
+          incomingColor: Colors.white,
+          primaryText: branding.secondaryColor,
+          secondaryText: const Color(0xFF8B8174),
+          iconSurface: const Color(0xFFF3EBDD),
+          accent: branding.primaryColor,
+        ),
+      BrokerChatTemplate.nightSuite => _ChatThemeSpec(
+          backgroundColor: branding.secondaryColor,
+          appBarColor: Color.alphaBlend(
+            Colors.black.withValues(alpha: 0.18),
+            branding.secondaryColor,
+          ),
+          composerColor: Color.alphaBlend(
+            Colors.white.withValues(alpha: 0.08),
+            branding.secondaryColor,
+          ),
+          inputColor: Colors.white.withValues(alpha: 0.10),
+          borderColor: Colors.white.withValues(alpha: 0.14),
+          outgoingColor: branding.primaryColor,
+          incomingColor: Colors.white.withValues(alpha: 0.12),
+          primaryText: Colors.white,
+          secondaryText: Colors.white.withValues(alpha: 0.64),
+          iconSurface: Colors.white.withValues(alpha: 0.12),
+          accent: branding.accentColor,
+          glassChrome: true,
+          backgroundGradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              branding.primaryColor.withValues(alpha: 0.26),
+              branding.secondaryColor,
+              Colors.black.withValues(alpha: 0.86),
+            ],
+          ),
+        ),
+    };
+  }
+
+  _ChatThemeSpec copyWith({
+    Color? accent,
+    Color? outgoingColor,
+  }) {
+    return _ChatThemeSpec(
+      backgroundColor: backgroundColor,
+      appBarColor: appBarColor,
+      composerColor: composerColor,
+      inputColor: inputColor,
+      borderColor: borderColor,
+      outgoingColor: outgoingColor ?? this.outgoingColor,
+      incomingColor: incomingColor,
+      primaryText: primaryText,
+      secondaryText: secondaryText,
+      iconSurface: iconSurface,
+      accent: accent ?? this.accent,
+      backgroundGradient: backgroundGradient,
+      glassChrome: glassChrome,
+    );
+  }
+}
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 class MessageScreen extends StatefulWidget {
@@ -37,6 +188,7 @@ class _MessageScreenState extends State<MessageScreen> {
 
   ChatProvider? _chatProvider;
   bool _chatInitialized = false;
+  bool _actionsOpen = false;
 
   @override
   void didChangeDependencies() {
@@ -101,6 +253,10 @@ class _MessageScreenState extends State<MessageScreen> {
     }
     if (!RateLimiter.instance.allowMessage()) {
       _snack('שלחת יותר מדי הודעות. המתן רגע.', error: true);
+      return;
+    }
+    if (InputSanitizer.containsObjectionableContent(raw)) {
+      _snack('ההודעה מכילה תוכן לא הולם ולכן לא נשלחה.', error: true);
       return;
     }
 
@@ -207,7 +363,7 @@ class _MessageScreenState extends State<MessageScreen> {
             ],
           ),
           content: Text(
-            'האם לחסום את "$ownerName"?\n\nכל המודעות שלהם יוסרו מהפיד שלך מיידית. הדיווח יועבר לצוות Rentch.',
+            'האם לחסום את "$ownerName"?\n\nכל המודעות שלהם יוסרו מהפיד שלך מיידית. הדיווח יועבר לצוות Rently.',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13.5,
@@ -273,8 +429,9 @@ class _MessageScreenState extends State<MessageScreen> {
     RentalMatch match,
     RentalProperty property,
     String tenantName,
-  ) {
-    showModalBottomSheet<void>(
+  ) async {
+    setState(() => _actionsOpen = true);
+    await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -297,119 +454,58 @@ class _MessageScreenState extends State<MessageScreen> {
             ? null
             : () {
                 Navigator.pop(context);
-                provider.sendContract(match.id);
+                final existing = provider.contractForMatch(match.id);
+                if (existing != null) {
+                  _openContract(existing.id, match.id);
+                } else if (provider.isLandlord) {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => ContractFormScreen(matchId: match.id),
+                  ));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('ממתין שבעל הדירה ישלח חוזה לחתימה'),
+                  ));
+                }
               },
         onOwnerSign: (!match.contractSent || match.ownerSigned)
             ? null
             : () {
                 Navigator.pop(context);
-                provider.signContract(match.id, asOwner: true);
+                _openContractForMatch(provider, match.id);
               },
         onTenantSign: (!match.contractSent || match.tenantSigned)
             ? null
             : () {
                 Navigator.pop(context);
-                provider.signContract(match.id, asOwner: false);
+                _openContractForMatch(provider, match.id);
               },
-        onPropertyReview: () {
-          Navigator.pop(context);
-          _showReviewDialog(
-            title: 'ביקורת על הדירה',
-            onSubmit: (rating, text) => provider.addPropertyReview(
-              propertyId: match.propertyId,
-              rating: rating,
-              text: text,
-              matchId: match.id,
-            ),
-          );
-        },
-        onTenantReview: () {
-          Navigator.pop(context);
-          _showReviewDialog(
-            title: 'ביקורת על השוכר',
-            onSubmit: (rating, text) => provider.addTenantReview(
-              rating: rating,
-              text: text,
-              tenantId: provider.tenantProfile?.id ?? 'tenant-${match.id}',
-              matchId: match.id,
-              propertyId: match.propertyId,
-            ),
-          );
-        },
         onBlockUser: () {
           Navigator.pop(context);
           _showBlockConfirm(provider, property.ownerName);
         },
       ),
     );
+    if (mounted) {
+      setState(() => _actionsOpen = false);
+    }
   }
 
-  Future<void> _showReviewDialog({
-    required String title,
-    required Future<void> Function(int rating, String text) onSubmit,
-  }) async {
-    final controller = TextEditingController();
-    var rating = 5;
+  void _openContract(String contractId, String matchId) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) =>
+          ContractDetailScreen(contractId: contractId, matchId: matchId),
+    ));
+  }
 
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Text(title,
-              style: const TextStyle(
-                  color: AppColors.navy, fontWeight: FontWeight.w900)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(children: [
-                const Text('דירוג',
-                    style: TextStyle(
-                        color: AppColors.navy, fontWeight: FontWeight.w700)),
-                Expanded(
-                  child: Slider(
-                    value: rating.toDouble(),
-                    min: 1,
-                    max: 5,
-                    divisions: 4,
-                    label: '$rating',
-                    activeColor: AppColors.primary,
-                    onChanged: (v) => setS(() => rating = v.round()),
-                  ),
-                ),
-                Text('$rating / 5',
-                    style: const TextStyle(
-                        color: AppColors.navy, fontWeight: FontWeight.w800)),
-              ]),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 3,
-                textAlign: TextAlign.right,
-                decoration: const InputDecoration(
-                  hintText: 'כתוב ביקורת קצרה...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('ביטול')),
-            FilledButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await onSubmit(rating, controller.text.trim());
-              },
-              child: const Text('שלח ביקורת'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _openContractForMatch(DatingProvider provider, String matchId) {
+    final contract = provider.contractForMatch(matchId);
+    if (contract != null) {
+      _openContract(contract.id, matchId);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('החוזה לא נמצא. נסו לרענן את הצ׳אט.'),
+      ));
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -442,19 +538,22 @@ class _MessageScreenState extends State<MessageScreen> {
         final tenantName = provider.tenantProfile?.name ?? 'השוכר';
         final imageUrl =
             property.imageUrls.isNotEmpty ? property.imageUrls.first : '';
+        final chatTheme = provider.isBroker
+            ? _ChatThemeSpec.forBranding(provider.brokerBranding)
+            : _ChatThemeSpec.standard;
 
         return Scaffold(
-          backgroundColor: _bg,
+          backgroundColor: chatTheme.backgroundColor,
           resizeToAvoidBottomInset: true,
 
           // ── AppBar ──────────────────────────────────────────────────────
           appBar: AppBar(
-            backgroundColor: _surface,
+            backgroundColor: chatTheme.appBarColor,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0.5,
-            shadowColor: _border,
-            iconTheme: const IconThemeData(color: AppColors.navy),
+            shadowColor: chatTheme.borderColor,
+            iconTheme: IconThemeData(color: chatTheme.primaryText),
             titleSpacing: 0,
             title: Row(children: [
               // Property thumbnail
@@ -463,16 +562,16 @@ class _MessageScreenState extends State<MessageScreen> {
                 height: 40,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _border),
+                  border: Border.all(color: chatTheme.borderColor),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: SafeImage(
                     source: imageUrl,
                     fallback: Container(
-                      color: AppColors.primaryLight2,
-                      child: const RentchIcon(IconsaxPlusLinear.building,
-                          color: AppColors.primary, size: 18),
+                      color: chatTheme.iconSurface,
+                      child: RentlyIcon(IconsaxPlusLinear.building,
+                          color: chatTheme.accent, size: 18),
                     ),
                   ),
                 ),
@@ -486,8 +585,8 @@ class _MessageScreenState extends State<MessageScreen> {
                     Text(property.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: AppColors.navy,
+                        style: TextStyle(
+                            color: chatTheme.primaryText,
                             fontSize: 15,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 2),
@@ -495,8 +594,8 @@ class _MessageScreenState extends State<MessageScreen> {
                       '${property.priceLabel} · ${property.city}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: AppColors.textSecondary,
+                      style: TextStyle(
+                          color: chatTheme.secondaryText,
                           fontSize: 12,
                           fontWeight: FontWeight.w600),
                     ),
@@ -507,13 +606,17 @@ class _MessageScreenState extends State<MessageScreen> {
               if (isRemote)
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color:
-                          isConnected ? AppColors.success : AppColors.warning,
+                  child: PulseWidget(
+                    scaleUpTo: 1.35,
+                    duration: const Duration(milliseconds: 1500),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            isConnected ? AppColors.success : AppColors.warning,
+                      ),
                     ),
                   ),
                 ),
@@ -521,15 +624,15 @@ class _MessageScreenState extends State<MessageScreen> {
             // Actions menu icon + block popup
             actions: [
               IconButton(
-                icon: const RentchIcon(IconsaxPlusLinear.more_circle,
-                    color: AppColors.navy, size: 22),
+                icon: RentlyIcon(IconsaxPlusLinear.more_circle,
+                    color: chatTheme.primaryText, size: 22),
                 tooltip: 'פעולות',
                 onPressed: () =>
                     _showActions(provider, match, property, tenantName),
               ),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert,
-                    color: AppColors.navy, size: 22),
+                icon: Icon(Icons.more_vert,
+                    color: chatTheme.primaryText, size: 22),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -571,7 +674,7 @@ class _MessageScreenState extends State<MessageScreen> {
             ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: _border),
+              child: Container(height: 1, color: chatTheme.borderColor),
             ),
           ),
 
@@ -579,34 +682,67 @@ class _MessageScreenState extends State<MessageScreen> {
           body: SafeArea(
             top: false,
             bottom: false,
-            child: Column(
-              children: [
-                // Contract progress bar (compact strip, only when started)
-                if (match.contractSent)
-                  _ContractBar(
-                    match: match,
-                    onOwnerSign: (!match.ownerSigned)
-                        ? () => provider.signContract(match.id, asOwner: true)
-                        : null,
-                    onTenantSign: (!match.tenantSigned)
-                        ? () => provider.signContract(match.id, asOwner: false)
-                        : null,
+            child: _ChatBackground(
+              theme: chatTheme,
+              child: Column(
+                children: [
+                  // Contract progress bar (compact strip, only when started)
+                  if (match.contractSent)
+                    _ContractBar(
+                      match: match,
+                      onOwnerSign: (!match.ownerSigned)
+                          ? () => provider.signContract(match.id, asOwner: true)
+                          : null,
+                      onTenantSign: (!match.tenantSigned)
+                          ? () => provider.signContract(match.id, asOwner: false)
+                          : null,
+                    ),
+
+                  // Message list
+                  Expanded(
+                    child: _buildMessageList(
+                      messages,
+                      tenantName,
+                      isLoading,
+                      chatTheme,
+                    ),
                   ),
 
-                // Message list
-                Expanded(
-                  child: _buildMessageList(messages, tenantName, isLoading),
-                ),
+                  if (isSending)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TypingIndicatorDots(color: chatTheme.secondaryText),
+                            const SizedBox(width: 8),
+                            Text(
+                              'הצד השני מקליד...',
+                              style: TextStyle(
+                                color: chatTheme.secondaryText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
-                // Input bar
-                _MessageInput(
-                  controller: _msgCtrl,
-                  isSending: isSending,
-                  onSend: () => _handleSend(provider, tenantName),
-                  onActions: () =>
-                      _showActions(provider, match, property, tenantName),
-                ),
-              ],
+                  // Input bar
+                  _MessageInput(
+                    controller: _msgCtrl,
+                    isSending: isSending,
+                    actionsOpen: _actionsOpen,
+                    theme: chatTheme,
+                    onSend: () => _handleSend(provider, tenantName),
+                    onActions: () =>
+                        _showActions(provider, match, property, tenantName),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -618,8 +754,9 @@ class _MessageScreenState extends State<MessageScreen> {
     List<ChatMessage> messages,
     String tenantName,
     bool isLoading,
+    _ChatThemeSpec theme,
   ) {
-    if (messages.isEmpty && !isLoading) return const _EmptyChat();
+    if (messages.isEmpty && !isLoading) return _EmptyChat(theme: theme);
 
     return Stack(
       children: [
@@ -639,12 +776,17 @@ class _MessageScreenState extends State<MessageScreen> {
 
             return Column(
               children: [
-                if (showDate) _DateDivider(date: msg.createdAt),
-                _MessageBubble(
-                  message: msg,
-                  isTenant: isTenant,
-                  showAvatar: showAvatar,
-                  isPending: isPending,
+                if (showDate) _DateDivider(date: msg.createdAt, theme: theme),
+                FadeSlideEntrance(
+                  duration: const Duration(milliseconds: 250),
+                  offset: const Offset(0.0, 15.0),
+                  child: _MessageBubble(
+                    message: msg,
+                    isTenant: isTenant,
+                    showAvatar: showAvatar,
+                    isPending: isPending,
+                    theme: theme,
+                  ),
                 ),
               ],
             );
@@ -660,7 +802,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: AppColors.navy,
+                  color: theme.primaryText,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Row(
@@ -684,6 +826,27 @@ class _MessageScreenState extends State<MessageScreen> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ChatBackground extends StatelessWidget {
+  const _ChatBackground({
+    required this.theme,
+    required this.child,
+  });
+
+  final _ChatThemeSpec theme;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.backgroundColor,
+        gradient: theme.backgroundGradient,
+      ),
+      child: child,
     );
   }
 }
@@ -773,8 +936,6 @@ class _ActionsSheet extends StatelessWidget {
     required this.onSendContract,
     required this.onOwnerSign,
     required this.onTenantSign,
-    required this.onPropertyReview,
-    required this.onTenantReview,
     required this.onBlockUser,
   });
 
@@ -786,8 +947,6 @@ class _ActionsSheet extends StatelessWidget {
   final VoidCallback? onSendContract;
   final VoidCallback? onOwnerSign;
   final VoidCallback? onTenantSign;
-  final VoidCallback onPropertyReview;
-  final VoidCallback onTenantReview;
   final VoidCallback onBlockUser;
 
   @override
@@ -821,20 +980,6 @@ class _ActionsSheet extends StatelessWidget {
                 : 'אשר חתימת שוכר',
         enabled: match.contractSent && !match.tenantSigned,
         onTap: onTenantSign,
-      ),
-      _ActionItem(
-        icon: IconsaxPlusLinear.star,
-        label: 'ביקורת על הדירה',
-        subtitle: 'הוסף משוב על הנכס',
-        enabled: true,
-        onTap: onPropertyReview,
-      ),
-      _ActionItem(
-        icon: IconsaxPlusLinear.profile_circle,
-        label: 'ביקורת על השוכר',
-        subtitle: 'הוסף משוב על השוכר',
-        enabled: true,
-        onTap: onTenantReview,
       ),
     ];
 
@@ -1075,7 +1220,7 @@ class _ActionTile extends StatelessWidget {
               ),
             ),
             if (item.enabled)
-              const RentchIcon(IconsaxPlusLinear.arrow_left,
+              const RentlyIcon(IconsaxPlusLinear.arrow_left,
                   size: 14, color: AppColors.textSecondary),
           ]),
         ),
@@ -1087,7 +1232,9 @@ class _ActionTile extends StatelessWidget {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyChat extends StatelessWidget {
-  const _EmptyChat();
+  const _EmptyChat({required this.theme});
+
+  final _ChatThemeSpec theme;
 
   @override
   Widget build(BuildContext context) {
@@ -1100,11 +1247,11 @@ class _EmptyChat extends StatelessWidget {
             Container(
               width: 64,
               height: 64,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.primaryLight2,
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(IconsaxPlusLinear.message,
+              child: RentlyIcon(IconsaxPlusLinear.message,
                   color: AppColors.primary, size: 26),
             ),
             const SizedBox(height: 16),
@@ -1138,8 +1285,10 @@ class _MessageBubble extends StatelessWidget {
     required this.isTenant,
     required this.showAvatar,
     required this.isPending,
+    required this.theme,
   });
 
+  final _ChatThemeSpec theme;
   final ChatMessage message;
   final bool isTenant;
   final bool showAvatar;
@@ -1147,7 +1296,7 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isTenant ? _outgoing : _incoming;
+    final bubbleColor = isTenant ? theme.accent : _incoming;
     final textColor = isTenant ? Colors.white : AppColors.navy;
     final metaColor = isTenant
         ? Colors.white.withValues(alpha: 0.75)
@@ -1217,7 +1366,7 @@ class _MessageBubble extends StatelessWidget {
             if (!isTenant && showAvatar) ...[
               Text(
                 message.sender,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w800,
                   fontSize: 11,
@@ -1241,11 +1390,17 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 if (isTenant) ...[
                   const SizedBox(width: 3),
-                  Icon(
-                    isPending ? Icons.done_rounded : Icons.done_all_rounded,
-                    size: 12,
-                    color:
-                        Colors.white.withValues(alpha: isPending ? 0.5 : 0.85),
+                  AnimatedScale(
+                    scale: isPending ? 1.0 : 1.25,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.elasticOut,
+                    child: Icon(
+                      isPending ? Icons.done_rounded : Icons.done_all_rounded,
+                      size: 12,
+                      color: isPending
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : const Color(0xFF38BDF8),
+                    ),
                   ),
                 ],
               ],
@@ -1266,7 +1421,10 @@ class _MessageBubble extends StatelessWidget {
             _SenderAvatar(show: showAvatar),
             const SizedBox(width: 6),
           ],
-          bubble,
+          BubbleEntrance(
+            isMe: isTenant,
+            child: bubble,
+          ),
         ],
       ),
     );
@@ -1322,15 +1480,20 @@ class _SenderAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!show) return const SizedBox(width: 28);
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: const BoxDecoration(
-        color: AppColors.primaryLight2,
-        shape: BoxShape.circle,
+    return PulseRing(
+      ringColor: AppColors.primary,
+      maxRadius: 4.0,
+      active: true,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight2,
+          shape: BoxShape.circle,
+        ),
+        child: RentlyIcon(IconsaxPlusLinear.building,
+            color: AppColors.primary, size: 12),
       ),
-      child: const RentchIcon(IconsaxPlusLinear.building,
-          color: AppColors.primary, size: 12),
     );
   }
 }
@@ -1338,7 +1501,9 @@ class _SenderAvatar extends StatelessWidget {
 // ─── Date divider ─────────────────────────────────────────────────────────────
 
 class _DateDivider extends StatelessWidget {
-  const _DateDivider({required this.date});
+  const _DateDivider({required this.date, required this.theme});
+
+  final _ChatThemeSpec theme;
   final DateTime date;
 
   @override
@@ -1373,12 +1538,17 @@ class _MessageInput extends StatelessWidget {
   const _MessageInput({
     required this.controller,
     required this.isSending,
+    required this.actionsOpen,
     required this.onSend,
     required this.onActions,
+    required this.theme,
   });
+
+  final _ChatThemeSpec theme;
 
   final TextEditingController controller;
   final bool isSending;
+  final bool actionsOpen;
   final VoidCallback onSend;
   final VoidCallback onActions;
 
@@ -1403,8 +1573,29 @@ class _MessageInput extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Send on the right in RTL layouts.
-          _SendBtn(isSending: isSending, onTap: onSend),
-          const SizedBox(width: 10),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, value, child) {
+              final hasText = value.text.trim().isNotEmpty;
+              final isVisible = hasText || isSending;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                width: isVisible ? 58.0 : 0.0,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: isVisible ? 1.0 : 0.0,
+                  curve: Curves.easeOutBack,
+                  child: isVisible
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 10),
+                          child: _SendBtn(isSending: isSending, onTap: onSend),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              );
+            },
+          ),
           Expanded(
             child: Container(
               constraints: const BoxConstraints(maxHeight: 118),
@@ -1441,11 +1632,16 @@ class _MessageInput extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           // Plus on the left in RTL layouts.
-          _IconBtn(
-            icon: Icons.add_rounded,
-            color: AppColors.navy,
-            bg: const Color(0xFFF0F5F8),
-            onTap: onActions,
+          AnimatedRotation(
+            turns: actionsOpen ? 0.125 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutBack,
+            child: _IconBtn(
+              icon: Icons.add_rounded,
+              color: AppColors.navy,
+              bg: const Color(0xFFF0F5F8),
+              onTap: onActions,
+            ),
           ),
         ],
       ),
@@ -1468,20 +1664,17 @@ class _IconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(icon, size: 20, color: color),
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.88,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(16),
         ),
+        child: Icon(icon, size: 20, color: color),
       ),
     );
   }
@@ -1495,57 +1688,60 @@ class _SendBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: isSending ? null : onTap,
+    final btn = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 48,
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: isSending
+            ? LinearGradient(
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.45),
+                  AppColors.primary.withValues(alpha: 0.3),
+                ],
+              )
+            : const LinearGradient(
+                colors: [Color(0xFF1BC7D5), Color(0xFF0EA5B2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(18),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 48,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: isSending
-                ? LinearGradient(
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.45),
-                      AppColors.primary.withValues(alpha: 0.3),
-                    ],
-                  )
-                : const LinearGradient(
-                    colors: [Color(0xFF1BC7D5), Color(0xFF0EA5B2)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: isSending
-                ? const []
-                : [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.26),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-          ),
-          child: Center(
-            child: isSending
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const RentchIcon(
-                    IconsaxPlusLinear.send_1,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-          ),
-        ),
+        boxShadow: isSending
+            ? const []
+            : [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.26),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
+      child: Center(
+        child: isSending
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const RentlyIcon(
+                IconsaxPlusLinear.send_1,
+                color: Colors.white,
+                size: 18,
+              ),
+      ),
+    );
+
+    if (isSending) {
+      return btn;
+    }
+
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.88,
+      child: btn,
     );
   }
 }
@@ -1662,7 +1858,7 @@ class _TemplateLibrarySheet extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: AppColors.primaryLight2,
                       borderRadius: BorderRadius.circular(12)),
-                  child: const RentchIcon(IconsaxPlusLinear.message_text,
+                  child: RentlyIcon(IconsaxPlusLinear.message_text,
                       color: AppColors.primary, size: 16),
                 ),
                 const SizedBox(width: 10),
@@ -1767,7 +1963,7 @@ class _TemplateTile extends StatelessWidget {
                 ],
               ),
             ),
-            const RentchIcon(IconsaxPlusLinear.arrow_left,
+            const RentlyIcon(IconsaxPlusLinear.arrow_left,
                 size: 14, color: AppColors.textSecondary),
           ]),
         ),

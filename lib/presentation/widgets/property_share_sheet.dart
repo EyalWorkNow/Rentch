@@ -3,7 +3,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Future<void> showPropertyShareSheet(
@@ -29,7 +29,7 @@ Future<void> showPropertyShareSheet(
 
 String _shareMessage(RentalProperty property) {
   final details = <String>[
-    'מצאתי נכס מעניין ב-Rentch',
+    'מצאתי נכס מעניין ב-Rently',
     property.address,
     '${property.priceLabel} ${property.priceSuffixLabel}',
     '${property.roomsLabel} חדרים',
@@ -300,7 +300,7 @@ class _PropertyPreviewCard extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const RentchIcon(
+            child: const RentlyIcon(
               IconsaxPlusLinear.send_2,
               color: Colors.white,
               size: 24,
@@ -413,7 +413,7 @@ class _ShareLinkButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: const RentchIcon(IconsaxPlusLinear.link_1, size: 18),
+        icon: const RentlyIcon(IconsaxPlusLinear.link_1, size: 18),
         label: const Text('העתק קישור לשיתוף'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.navy,

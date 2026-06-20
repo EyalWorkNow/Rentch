@@ -427,8 +427,16 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: [dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem]
+                Action: [dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem, dynamodb:GetItem]
                 Resource: !GetAtt ConnectionsTable.Arn
+              # Read-only access so `subscribe` can verify chat membership before
+              # binding a connection to a matchId (property owner + messages GSI).
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:Query]
+                Resource:
+                  - !GetAtt PropertiesTable.Arn
+                  - !GetAtt MessagesTable.Arn
+                  - !Sub '${MessagesTable.Arn}/index/*'
 
   BroadcasterRole:
     Type: AWS::IAM::Role
@@ -470,6 +478,7 @@ Resources:
       Environment:
         Variables:
           CONNECTIONS_TABLE: !Ref ConnectionsTable
+          TABLE_PREFIX: !Ref TablePrefix
 
   WsAuthorizerFunction:
     Type: AWS::Lambda::Function

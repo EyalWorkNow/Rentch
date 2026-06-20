@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Rentch brand palette (from SVG logo)
-  static const Color primary = Color(0xFF13BEC9);      // teal
-  static const Color primaryDark = Color(0xFF0D96A0);
-  static const Color primaryLight = Color(0xFF5AD4DC);
+  // Rently brand palette (from SVG logo). The four brand-accent colours are
+  // RUNTIME-SWAPPABLE by account type: brokers (מתווך) get an indigo identity
+  // app-wide. They are non-const on purpose — call [applyRole] on login / role
+  // change, then rebuild the tree so every widget repaints in the new accent.
+  static Color primary = const Color(0xFF13BEC9);      // teal
+  static Color primaryDark = const Color(0xFF0D96A0);
+  static Color primaryLight = const Color(0xFF5AD4DC);
+
+  /// Switches the brand accent to match [role] ('broker' → indigo, else teal).
+  static void applyRole(String role) {
+    if (role == 'broker') {
+      primary = const Color(0xFF6C5CE7);
+      primaryDark = const Color(0xFF5346C9);
+      primaryLight = const Color(0xFF9D90FF);
+      primaryLight2 = const Color(0xFFEEEBFF);
+    } else {
+      primary = const Color(0xFF13BEC9);
+      primaryDark = const Color(0xFF0D96A0);
+      primaryLight = const Color(0xFF5AD4DC);
+      primaryLight2 = const Color(0xFFE6F9FB);
+    }
+  }
+
   static const Color navy = Color(0xFF072946);          // dark navy
   static const Color coral = Color(0xFFFF5A67);         // coral/reject
 
@@ -30,7 +49,7 @@ class AppColors {
   static const Color shadow = Color(0x18072946);
 
   // Legacy aliases (keep old code building)
-  static const Color primaryLight2 = Color(0xFFE6F9FB);
+  static Color primaryLight2 = const Color(0xFFE6F9FB);
   static const Color secondary = Color(0xFFFF5A67);
   static const Color success = Color(0xFF27AE60);
   static const Color warning = Color(0xFFF39C12);

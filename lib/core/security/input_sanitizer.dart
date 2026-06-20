@@ -36,6 +36,51 @@ class InputSanitizer {
     return sanitizeText(address, maxLength: SecurityConfig.maxAddressLength);
   }
 
+  // ── Objectionable content filter (App Store Guideline 1.2) ───────────────────
+  //
+  // A lightweight client-side moderation gate. Any user-generated text (chat
+  // messages, listing titles/descriptions, profile bio/name) is checked before
+  // it is sent or published. This is the first line of defence; it is backed up
+  // by user reporting/blocking and server-side review of reports within 24h.
+  //
+  // Intentionally conservative to avoid blocking ordinary rental wording — it
+  // targets unambiguous slurs, sexual, hateful and threatening language.
+
+  // Hebrew terms are matched as substrings (Hebrew has no ASCII word boundary).
+  // Deliberately excludes short tokens that occur inside ordinary words
+  // (e.g. "זין" inside "מגזין") to avoid blocking legitimate listings.
+  static const List<String> _objectionableHe = [
+    'זונה', 'זונות', 'שרמוטה', 'שרמוטות', 'בן זונה', 'בת זונה',
+    'כוס אמק', 'כוסאמק', 'תזדיין', 'תזדייני', 'מזדיין', 'זיון',
+    'מפגר', 'מפגרת', 'נאצי', 'נאצים', 'אנאל', 'אונס',
+    'אהרוג אותך', 'אשרוף אותך', 'בן כלב',
+  ];
+
+  // English/Latin terms — matched on a normalised, separator-stripped form so
+  // simple evasion ("f.u.c.k", "f u c k") is still caught. Excludes short
+  // tokens prone to false positives (rape→grape, cock→peacock, spic→spice).
+  static const List<String> _objectionableEn = [
+    'fuck', 'motherfucker', 'cunt', 'bitch', 'whore', 'slut',
+    'rapist', 'faggot', 'nigger', 'retard', 'kike', 'pussy',
+    'pedophile', 'killyou', 'killyourself', 'nazi', 'incest',
+  ];
+
+  /// Returns true if [input] contains clearly objectionable content and must not
+  /// be published or sent.
+  static bool containsObjectionableContent(String input) {
+    if (input.trim().isEmpty) return false;
+    final lower = input.toLowerCase();
+    for (final term in _objectionableHe) {
+      if (lower.contains(term)) return true;
+    }
+    // Strip separators used to evade simple filters before scanning the Latin set.
+    final collapsed = lower.replaceAll(RegExp(r'[\s._\-*]+'), '');
+    for (final term in _objectionableEn) {
+      if (collapsed.contains(term.replaceAll(' ', ''))) return true;
+    }
+    return false;
+  }
+
   // ── Numeric property bounds ───────────────────────────────────────────────────
 
   static int clampPrice(int price) {
@@ -199,7 +244,12 @@ class InputSanitizer {
   //
   // SEC-4: Role must come from a fixed allowlist, not arbitrary client input.
 
-  static const Set<String> _allowedRoles = {'tenant', 'landlord', 'guest'};
+  static const Set<String> _allowedRoles = {
+    'tenant',
+    'landlord',
+    'broker',
+    'guest',
+  };
 
   static String sanitizeRole(String role) {
     if (_allowedRoles.contains(role)) return role;

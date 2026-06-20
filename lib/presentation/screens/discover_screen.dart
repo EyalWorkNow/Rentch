@@ -12,12 +12,13 @@ import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 
@@ -34,113 +35,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   DiscoverTab _selectedTab = DiscoverTab.forYou;
 
   Widget _buildPillSelector() {
-    return Container(
-      height: 42,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEDF1F5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black.withOpacity(0.04)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // "גלה" (Discover) Tab - Left
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedTab = DiscoverTab.discover;
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _selectedTab == DiscoverTab.discover
-                    ? AppColors.primary
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    IconsaxPlusLinear.location,
-                    size: 15,
-                    color: _selectedTab == DiscoverTab.discover
-                        ? Colors.white
-                        : AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'גלה',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: _selectedTab == DiscoverTab.discover
-                          ? Colors.white
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // "במיוחד בשבילך" (For You) Tab - Right
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedTab = DiscoverTab.forYou;
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _selectedTab == DiscoverTab.forYou
-                    ? AppColors.primary
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    IconsaxPlusBold.flash,
-                    size: 15,
-                    color: _selectedTab == DiscoverTab.forYou
-                        ? Colors.white
-                        : AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'במיוחד בשבילך',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: _selectedTab == DiscoverTab.forYou
-                          ? Colors.white
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _PillSelector(
+      selectedTab: _selectedTab,
+      onTabChanged: (tab) {
+        setState(() {
+          _selectedTab = tab;
+        });
+      },
     );
   }
+
 
   Widget _buildDiscoverGrid(
     List<RentalProperty> properties,
@@ -150,7 +54,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       return const _NoMorePropertiesState();
     }
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
+      padding: const EdgeInsets.fromLTRB(16, 72, 16, 140),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.72,
@@ -308,7 +212,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const RentchIcon(
+                            const RentlyIcon(
                               IconsaxPlusLinear.location,
                               size: 11,
                               color: Colors.white70,
@@ -347,207 +251,226 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         final properties = provider.filteredProperties;
 
         return Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: AppColors.background,
-            elevation: 0,
-            centerTitle: true,
-            title: _buildPillSelector(),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: GestureDetector(
-                  onTap: provider.isLoading
-                      ? null
-                      : () => _showFilters(context, provider),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        height: 42,
-                        width: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+          appBar: null,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: provider.isLoading
+                    ? const _SkeletonDiscoverView()
+                    : _selectedTab == DiscoverTab.discover
+                        ? SafeArea(
+                            bottom: false,
+                            child: _buildDiscoverGrid(properties, provider),
+                          )
+                        : SafeArea(
+                            bottom: false,
+                            child: Stack(
+                              children: [
+                                // Full-height card swiper extending almost to the bottom navbar
+                                Positioned.fill(
+                                  child: properties.isNotEmpty
+                                      ? CardSwiper(
+                                          key: ValueKey(
+                                            provider.filteredPropertiesRevision,
+                                          ),
+                                          controller:
+                                              provider.propertySwiperController,
+                                          cardsCount: properties.length,
+                                          padding: const EdgeInsets.fromLTRB(
+                                            10,
+                                            72,
+                                            10,
+                                            110,
+                                          ),
+                                          scale: 0.93,
+                                          threshold: 38,
+                                          maxAngle: 16,
+                                          isLoop: false,
+                                          numberOfCardsDisplayed:
+                                              math.min(3, properties.length),
+                                          backCardOffset: const Offset(0, 20),
+                                          allowedSwipeDirection:
+                                              const AllowedSwipeDirection.only(
+                                            left: true,
+                                            right: true,
+                                            up: true,
+                                          ),
+                                          onSwipe: provider.handlePropertySwipe,
+                                          cardBuilder: (
+                                            context,
+                                            index,
+                                            horizontalOffsetPercentage,
+                                            verticalOffsetPercentage,
+                                          ) {
+                                            if (index < 0 ||
+                                                index >= properties.length) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            return Stack(
+                                              children: [
+                                                ProfileCard(
+                                                  key: ValueKey(
+                                                    properties[index].id,
+                                                  ),
+                                                  property: properties[index],
+                                                  horizontalOffsetPercentage:
+                                                      horizontalOffsetPercentage,
+                                                ),
+                                                FomoCardOverlay(
+                                                  property: properties[index],
+                                                  likedIds: provider.likedPropertyIds,
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        )
+                                      : const _NoMorePropertiesState(),
+                                ),
+
+                                // Floating centered action buttons row
+                                Positioned(
+                                  bottom: 125,
+                                  left: 0,
+                                  right: 0,
+                                  child: ActionButtons(
+                                    onSwipeLeft: provider.swipePropertyLeft,
+                                    onSwipeRight: provider.swipePropertyRight,
+                                    onVirtualTour: () {
+                                      if (properties.isEmpty) return;
+                                      openPropertyTour(context, properties.first);
+                                    },
+                                  ),
+                                ),
+
+                                // Floating Undo button independently positioned on the bottom-left corner
+                                if (provider.canUndo)
+                                  Positioned(
+                                    bottom: 133,
+                                    left: 24,
+                                    child: Tooltip(
+                                      message: 'חזור לפריט הקודם',
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          HapticFeedback.lightImpact();
+                                          provider.undoSwipe();
+                                        },
+                                        child: Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: const Color(0xFFE2E8F0),
+                                              width: 1.5,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFFF59E0B)
+                                                    .withOpacity(0.12),
+                                                blurRadius: 12,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.rotate_left_rounded,
+                                            color: Color(0xFFF59E0B),
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: RentchIcon(
-                            IconsaxPlusLinear.setting_4,
-                            size: 20,
-                            color: AppColors.navy,
                           ),
-                        ),
+              ),
+              // Floating header containing selector and filters button
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 16,
+                right: 16,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 42),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: _buildPillSelector(),
                       ),
-                      if (provider.activeFilterCount > 0)
-                        Positioned(
-                          top: -2,
-                          right: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${provider.activeFilterCount}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildFiltersButton(context, provider),
+                  ],
                 ),
               ),
             ],
           ),
-          body: provider.isLoading
-              ? const _SkeletonDiscoverView()
-              : _selectedTab == DiscoverTab.discover
-                  ? SafeArea(
-                      bottom: false,
-                      child: _buildDiscoverGrid(properties, provider),
-                    )
-                  : SafeArea(
-                      bottom: false,
-                      child: Stack(
-                        children: [
-                          // Full-height card swiper extending almost to the bottom navbar
-                          Positioned.fill(
-                            child: properties.isNotEmpty
-                                ? CardSwiper(
-                                    key: ValueKey(
-                                      provider.filteredPropertiesRevision,
-                                    ),
-                                    controller:
-                                        provider.propertySwiperController,
-                                    cardsCount: properties.length,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      10,
-                                      6,
-                                      10,
-                                      150,
-                                    ),
-                                    scale: 0.93,
-                                    threshold: 38,
-                                    maxAngle: 16,
-                                    isLoop: false,
-                                    numberOfCardsDisplayed:
-                                        math.min(3, properties.length),
-                                    backCardOffset: const Offset(0, 20),
-                                    allowedSwipeDirection:
-                                        const AllowedSwipeDirection.only(
-                                      left: true,
-                                      right: true,
-                                      up: true,
-                                    ),
-                                    onSwipe: provider.handlePropertySwipe,
-                                    cardBuilder: (
-                                      context,
-                                      index,
-                                      horizontalOffsetPercentage,
-                                      verticalOffsetPercentage,
-                                    ) {
-                                      if (index < 0 ||
-                                          index >= properties.length) {
-                                        return const SizedBox.shrink();
-                                      }
-                                      return Stack(
-                                        children: [
-                                          ProfileCard(
-                                            key: ValueKey(
-                                              properties[index].id,
-                                            ),
-                                            property: properties[index],
-                                            horizontalOffsetPercentage:
-                                                horizontalOffsetPercentage,
-                                          ),
-                                          FomoCardOverlay(
-                                            property: properties[index],
-                                            likedIds: provider.likedPropertyIds,
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  )
-                                : const _NoMorePropertiesState(),
-                          ),
-
-                          // Floating centered action buttons row
-                          Positioned(
-                            bottom: 165,
-                            left: 0,
-                            right: 0,
-                            child: ActionButtons(
-                              onSwipeLeft: provider.swipePropertyLeft,
-                              onSwipeRight: provider.swipePropertyRight,
-                              onVirtualTour: () {
-                                if (properties.isEmpty) return;
-                                openPropertyTour(context, properties.first);
-                              },
-                            ),
-                          ),
-
-                          // Floating Undo button independently positioned on the bottom-left corner
-                          if (provider.canUndo)
-                            Positioned(
-                              bottom: 173,
-                              left: 24,
-                              child: Tooltip(
-                                message: 'חזור לפריט הקודם',
-                                child: GestureDetector(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    provider.undoSwipe();
-                                  },
-                                  child: Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: const Color(0xFFE2E8F0),
-                                        width: 1.5,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFFF59E0B)
-                                              .withOpacity(0.12),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.rotate_left_rounded,
-                                      color: Color(0xFFF59E0B),
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
         );
       },
+    );
+  }
+
+  Widget _buildFiltersButton(BuildContext context, DatingProvider provider) {
+    return GestureDetector(
+      onTap: provider.isLoading
+          ? null
+          : () => _showFilters(context, provider),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            height: 42,
+            width: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: RentlyIcon(
+                IconsaxPlusLinear.setting_4,
+                size: 20,
+                color: AppColors.navy,
+              ),
+            ),
+          ),
+          if (provider.activeFilterCount > 0)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${provider.activeFilterCount}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -680,8 +603,8 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: RentchIcon(
+                            child: Center(
+                              child: RentlyIcon(
                                 IconsaxPlusBold.heart,
                                 color: AppColors.primary,
                                 size: 52,
@@ -765,7 +688,7 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                           height: 52,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
-                            gradient: const LinearGradient(
+                            gradient: LinearGradient(
                               colors: [AppColors.primary, Color(0xFF5AD4DC)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -780,7 +703,7 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                           ),
                           child: ElevatedButton.icon(
                             onPressed: () => Navigator.of(context).pop(),
-                            icon: const RentchIcon(
+                            icon: const RentlyIcon(
                               IconsaxPlusLinear.message,
                               color: Colors.white,
                               size: 18,
@@ -859,7 +782,7 @@ class _MatchPropertyImage extends StatelessWidget {
   Widget _fallback() => Container(
         color: AppColors.navy,
         child: const Center(
-          child: RentchIcon(
+          child: RentlyIcon(
             IconsaxPlusLinear.building,
             color: Colors.white30,
             size: 40,
@@ -1651,7 +1574,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           child: Row(
                             children: [
                               const SizedBox(width: 10),
-                              const RentchIcon(
+                              const RentlyIcon(
                                 IconsaxPlusLinear.search_normal,
                                 size: 18,
                                 color: Colors.grey,
@@ -1685,7 +1608,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               ),
                               if (_locationCtrl.text.isNotEmpty)
                                 IconButton(
-                                  icon: const RentchIcon(
+                                  icon: const RentlyIcon(
                                     IconsaxPlusLinear.close_circle,
                                     size: 18,
                                     color: AppColors.textSecondary,
@@ -1709,7 +1632,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                   color: Color(0xFFF2F4F5),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const RentchIcon(
+                                child: const RentlyIcon(
                                   IconsaxPlusLinear.location,
                                   size: 18,
                                   color: AppColors.navy,
@@ -1913,7 +1836,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                                 point: p.point,
                                                 width: 28,
                                                 height: 28,
-                                                child: const RentchIcon(
+                                                child: RentlyIcon(
                                                     IconsaxPlusLinear.building,
                                                     color: AppColors.primary,
                                                     size: 22),
@@ -1945,7 +1868,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.edit_location_alt_rounded,
                                           size: 14,
                                           color: AppColors.primary,
@@ -2306,105 +2229,33 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               icon: IconsaxPlusLinear.filter,
                               badge:
                                   selectedCount > 0 ? '$selectedCount' : null,
-                              action: GestureDetector(
-                                onTap: () => setState(
-                                  () => _showAllFeatures = !_showAllFeatures,
-                                ),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: _showAllFeatures
-                                        ? AppColors.primary
-                                            .withValues(alpha: 0.12)
-                                        : const Color(0xFFF2F4F5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _showAllFeatures
-                                        ? Icons.keyboard_arrow_up
-                                        : Icons.add,
-                                    size: 16,
-                                    color: _showAllFeatures
-                                        ? AppColors.primary
-                                        : AppColors.navy,
-                                  ),
-                                ),
-                              ),
                             );
                           },
                         ),
-                        const SizedBox(height: 10),
-                        if (!_showAllFeatures) ...[
-                          Builder(
-                            builder: (context) {
-                              final selectedFeatures = provider
-                                  .availableFeatures
-                                  .map((feature) =>
-                                      (feature, f.featureState(feature)))
-                                  .where(
-                                      (pair) => pair.$2 != FilterPriority.none)
-                                  .toList();
-                              if (selectedFeatures.isEmpty) {
-                                return const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8),
-                                  child: Text(
-                                    'לא נבחרו מאפיינים. לחץ על + כדי להוסיף.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: provider.availableFeatures
+                              .map((feature) {
+                            final state = f.featureState(feature);
+                            return _PriorityFilterChip(
+                              label: feature,
+                              state: state,
+                              icon: _featureIcon(feature),
+                              onTap: () {
+                                _handlePriorityTap(
+                                  key: 'feature:$feature',
+                                  current: state,
+                                  onSelected: (priority) => _setDraftFilters(
+                                    f.setFeatureState(feature, priority),
+                                    provider,
                                   ),
                                 );
-                              }
-                              return Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: selectedFeatures.map((pair) {
-                                  return _FeatureTag(
-                                    label: pair.$1,
-                                    state: pair.$2,
-                                    onClear: () {
-                                      _setDraftFilters(
-                                        f.setFeatureState(
-                                            pair.$1, FilterPriority.none),
-                                        provider,
-                                      );
-                                    },
-                                  );
-                                }).toList(),
-                              );
-                            },
-                          ),
-                        ] else ...[
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: provider.availableFeatures
-                                .take(24)
-                                .map((feature) {
-                              final state = f.featureState(feature);
-                              return _PriorityFilterChip(
-                                label: feature,
-                                state: state,
-                                icon: _featureIcon(feature),
-                                onTap: () {
-                                  _handlePriorityTap(
-                                    key: 'feature:$feature',
-                                    current: state,
-                                    onSelected: (priority) => _setDraftFilters(
-                                      f.setFeatureState(feature, priority),
-                                      provider,
-                                    ),
-                                  );
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ],
+                              },
+                            );
+                          }).toList(),
+                        ),
                       ],
                     ),
                   ),
@@ -2772,14 +2623,14 @@ class _SliderField extends StatelessWidget {
                     children: [
                       Text(
                         displayValue,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w900,
                           fontSize: 15,
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const RentchIcon(
+                      RentlyIcon(
                         IconsaxPlusLinear.edit_2,
                         size: 14,
                         color: AppColors.primary,
@@ -2867,14 +2718,14 @@ class _RangeSliderField extends StatelessWidget {
                     children: [
                       Text(
                         displayValue,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w900,
                           fontSize: 15,
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const RentchIcon(
+                      RentlyIcon(
                         IconsaxPlusLinear.edit_2,
                         size: 14,
                         color: AppColors.primary,
@@ -3126,7 +2977,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                                   media: property.primaryMedia,
                                   fallback: Container(
                                     color: AppColors.primaryLight2,
-                                    child: RentchIcon(
+                                    child: RentlyIcon(
                                       IconsaxPlusLinear.building,
                                       size: isSelected ? 22 : 14,
                                       color: AppColors.primary,
@@ -3317,7 +3168,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
-                            const RentchIcon(
+                            const RentlyIcon(
                               IconsaxPlusLinear.setting_4,
                               size: 18,
                               color: AppColors.navy,
@@ -3632,7 +3483,7 @@ class _PropertyThumb extends StatelessWidget {
 
   Widget _fallback() => Container(
         color: AppColors.primaryLight2,
-        child: const RentchIcon(
+        child: RentlyIcon(
           IconsaxPlusLinear.building,
           size: 42,
           color: AppColors.primary,
@@ -3933,7 +3784,7 @@ class _UndoButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            RentchIcon(IconsaxPlusLinear.undo,
+            RentlyIcon(IconsaxPlusLinear.undo,
                 size: 16, color: AppColors.textSecondary),
             SizedBox(width: 5),
             Text(
@@ -3971,7 +3822,7 @@ class _NoMorePropertiesState extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(
+              child: RentlyIcon(
                 IconsaxPlusLinear.search_normal,
                 color: AppColors.primary,
                 size: 40,
@@ -4114,7 +3965,7 @@ class _SkeletonDiscoverViewState extends State<_SkeletonDiscoverView>
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+        padding: const EdgeInsets.fromLTRB(18, 72, 18, 0),
         child: AnimatedBuilder(
           animation: _shimmer,
           builder: (context, _) {
@@ -4682,7 +4533,7 @@ class _TransactionCard extends StatelessWidget {
                         color: AppColors.primaryLight2,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
+                      child: Text(
                         'חי',
                         style: TextStyle(
                           fontSize: 8,
@@ -5062,4 +4913,481 @@ class _TrianglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PillSelector extends StatefulWidget {
+  const _PillSelector({
+    required this.selectedTab,
+    required this.onTabChanged,
+  });
+
+  final DiscoverTab selectedTab;
+  final ValueChanged<DiscoverTab> onTabChanged;
+
+  @override
+  State<_PillSelector> createState() => _PillSelectorState();
+}
+
+class _PillSelectorState extends State<_PillSelector>
+    with SingleTickerProviderStateMixin {
+  static const _selectorSpring = SpringDescription(
+    mass: 0.72,
+    stiffness: 520,
+    damping: 30,
+  );
+
+  late final AnimationController _controller;
+  bool _hasSyncedInitialPosition = false;
+
+  bool _isDiscoverPressed = false;
+  bool _isForYouPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController.unbounded(
+      vsync: this,
+      value: 0,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final target = _targetFor(widget.selectedTab);
+    if (!_hasSyncedInitialPosition) {
+      _controller.value = target;
+      _hasSyncedInitialPosition = true;
+    } else if (!_controller.isAnimating) {
+      _controller.value = target;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PillSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedTab != widget.selectedTab) {
+      _springToSelected();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  double _targetFor(DiscoverTab tab) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    if (tab == DiscoverTab.discover) {
+      return isRtl ? 1.0 : -1.0;
+    }
+    return isRtl ? -1.0 : 1.0;
+  }
+
+  void _springToSelected() {
+    final target = _targetFor(widget.selectedTab);
+    final delta = target - _controller.value;
+    final kick = delta.sign * math.max(3.4, delta.abs() * 3.1);
+    _controller.animateWith(
+      SpringSimulation(
+        _selectorSpring,
+        _controller.value,
+        target,
+        kick,
+      ),
+    );
+  }
+
+  void _setPressed(DiscoverTab tab, bool isPressed) {
+    setState(() {
+      if (tab == DiscoverTab.discover) {
+        _isDiscoverPressed = isPressed;
+      } else {
+        _isForYouPressed = isPressed;
+      }
+    });
+  }
+
+  void _selectTab(DiscoverTab tab) {
+    if (widget.selectedTab == tab) {
+      HapticFeedback.selectionClick();
+      return;
+    }
+    HapticFeedback.lightImpact();
+    widget.onTabChanged(tab);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fallbackWidth = MediaQuery.sizeOf(context).width - 128;
+        final maxWidth =
+            constraints.hasBoundedWidth ? constraints.maxWidth : fallbackWidth;
+        final width = math.max(0.0, math.min(306.0, maxWidth));
+
+        return Semantics(
+          label: 'בחירת תצוגת דירות',
+          child: SizedBox(
+            width: width,
+            height: 52,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                final alignmentX =
+                    _controller.value.clamp(-1.08, 1.08).toDouble();
+                final targetX = _targetFor(widget.selectedTab);
+                final velocity =
+                    (_controller.velocity.abs() / 14).clamp(0.0, 1.0).toDouble();
+                final distance =
+                    (targetX - _controller.value).abs().clamp(0.0, 1.0).toDouble();
+                final energy = math.max(velocity, distance * 0.65);
+                final stretch = 1.0 + energy * 0.22;
+                final squeeze = 1.0 - energy * 0.08;
+                final isDiscoverSelected =
+                    widget.selectedTab == DiscoverTab.discover;
+
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.96),
+                        const Color(0xFFEAF9FB).withValues(alpha: 0.94),
+                        const Color(0xFFF8FBFD).withValues(alpha: 0.98),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.78),
+                      width: 1.4,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.navy.withValues(alpha: 0.10),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
+                      ),
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.14),
+                        blurRadius: 18,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Padding(
+                        padding: const EdgeInsets.all(5),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _SelectorEnergyPainter(
+                                  alignmentX: alignmentX,
+                                  energy: energy,
+                                  isDiscoverSelected: isDiscoverSelected,
+                                ),
+                              ),
+                            ),
+                            Positioned.fill(
+                              child: Align(
+                                alignment: Alignment(alignmentX, 0),
+                                child: FractionallySizedBox(
+                                  widthFactor: 0.5,
+                                  heightFactor: 1,
+                                  child: Transform.scale(
+                                    scaleX: stretch,
+                                    scaleY: squeeze,
+                                    child: _SlidingSelectorThumb(
+                                      energy: energy,
+                                      isDiscoverSelected: isDiscoverSelected,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                _buildSegment(
+                                  tab: DiscoverTab.discover,
+                                  icon: IconsaxPlusLinear.location,
+                                  label: 'גלה',
+                                  isSelected: isDiscoverSelected,
+                                  isPressed: _isDiscoverPressed,
+                                ),
+                                _buildSegment(
+                                  tab: DiscoverTab.forYou,
+                                  icon: IconsaxPlusBold.flash,
+                                  label: 'במיוחד בשבילך',
+                                  isSelected: !isDiscoverSelected,
+                                  isPressed: _isForYouPressed,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSegment({
+    required DiscoverTab tab,
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required bool isPressed,
+  }) {
+    final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
+    final selectedShadow = [
+      Shadow(
+        color: AppColors.navy.withValues(alpha: 0.22),
+        offset: const Offset(0, 1),
+        blurRadius: 5,
+      ),
+    ];
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => _setPressed(tab, true),
+          onTapUp: (_) => _setPressed(tab, false),
+          onTapCancel: () => _setPressed(tab, false),
+          onTap: () => _selectTab(tab),
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            scale: isPressed ? 0.93 : (isSelected ? 1.03 : 1),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isPressed && !isSelected
+                        ? AppColors.navy.withValues(alpha: 0.06)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedRotation(
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutBack,
+                        turns: isSelected && tab == DiscoverTab.forYou
+                            ? -0.06
+                            : 0,
+                        child: AnimatedScale(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutBack,
+                          scale: isSelected ? 1.16 : 1,
+                          child: Icon(
+                            icon,
+                            size: 16,
+                            color: isSelected ? Colors.white : inactiveColor,
+                            shadows: isSelected ? selectedShadow : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1,
+                          letterSpacing: 0,
+                          fontWeight:
+                              isSelected ? FontWeight.w900 : FontWeight.w800,
+                          color: isSelected ? Colors.white : inactiveColor,
+                          shadows: isSelected ? selectedShadow : null,
+                        ),
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlidingSelectorThumb extends StatelessWidget {
+  const _SlidingSelectorThumb({
+    required this.energy,
+    required this.isDiscoverSelected,
+  });
+
+  final double energy;
+  final bool isDiscoverSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isDiscoverSelected
+        ? const Color(0xFF2F80ED)
+        : const Color(0xFFFF6B7A);
+    final glowColor = isDiscoverSelected ? AppColors.superLike : AppColors.coral;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF14D3DC),
+            AppColors.primary,
+            accent,
+          ],
+          stops: const [0, 0.52, 1],
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.30),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35 + energy * 0.18),
+            blurRadius: 13 + energy * 10,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: glowColor.withValues(alpha: 0.18 + energy * 0.12),
+            blurRadius: 20 + energy * 12,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(23),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.30),
+                    Colors.white.withValues(alpha: 0.05),
+                    Colors.black.withValues(alpha: 0.07),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          PositionedDirectional(
+            top: 6,
+            start: 12,
+            width: 38,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.48),
+                    Colors.white.withValues(alpha: 0.02),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectorEnergyPainter extends CustomPainter {
+  _SelectorEnergyPainter({
+    required this.alignmentX,
+    required this.energy,
+    required this.isDiscoverSelected,
+  });
+
+  final double alignmentX;
+  final double energy;
+  final bool isDiscoverSelected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final activeCenter = Offset(
+      size.width * (0.25 + ((alignmentX + 1) / 2) * 0.5),
+      size.height / 2,
+    );
+    final railPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = AppColors.primary.withValues(alpha: 0.12 + energy * 0.08);
+    final rail = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(24),
+    ).deflate(0.5);
+    canvas.drawRRect(rail, railPaint);
+
+    final sparkPaint = Paint()..style = PaintingStyle.fill;
+    final leadColor =
+        isDiscoverSelected ? AppColors.superLike : AppColors.coral;
+    final sparks = <({Offset offset, double radius, Color color})>[
+      (
+        offset: Offset(-size.width * 0.18, -size.height * 0.25),
+        radius: 2.1 + energy * 1.4,
+        color: leadColor,
+      ),
+      (
+        offset: Offset(size.width * 0.18, size.height * 0.23),
+        radius: 1.7 + energy * 1.1,
+        color: AppColors.primary,
+      ),
+      (
+        offset: Offset(size.width * 0.04, -size.height * 0.30),
+        radius: 1.2 + energy * 0.9,
+        color: Colors.white,
+      ),
+    ];
+
+    for (final spark in sparks) {
+      sparkPaint.color = spark.color.withValues(alpha: 0.20 + energy * 0.35);
+      canvas.drawCircle(activeCenter + spark.offset, spark.radius, sparkPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SelectorEnergyPainter oldDelegate) {
+    return oldDelegate.alignmentX != alignmentX ||
+        oldDelegate.energy != energy ||
+        oldDelegate.isDiscoverSelected != isDiscoverSelected;
+  }
 }

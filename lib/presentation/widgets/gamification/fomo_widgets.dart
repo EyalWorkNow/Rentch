@@ -294,7 +294,7 @@ class NewPropertyBadge extends StatelessWidget {
     return CollapsibleFomoBadge(
       icon: const SparkleIcon(),
       text: const Text(
-        'חדש · היה מהראשונים',
+        'דירה הועלתה לאחרונה',
         style: TextStyle(
           color: Colors.white,
           fontSize: 10.5,

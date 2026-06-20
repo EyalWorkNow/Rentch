@@ -1,4 +1,4 @@
-// Rentch API router — single Lambda handling all REST routes.
+// Rently API router — single Lambda handling all REST routes.
 //
 // Routes (see docs/AWS_BACKEND_CONTRACT.md):
 //   GET    /{table}            list (with query filters)
@@ -28,10 +28,43 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.S3_BUCKET;
-const TABLE_PREFIX = process.env.TABLE_PREFIX || 'rentch-';
+const TABLE_PREFIX = process.env.TABLE_PREFIX || 'rently-';
 const LUMA_API_KEY = process.env.LUMA_API_KEY || '';
 // Luma Agents image API (uni-1) — virtual staging via image_edit.
 const LUMA_BASE = 'https://agents.lumalabs.ai/v1';
+
+// "Erik" — the voice/text personal assistant (Gemini). Key stays server-side
+// ONLY; the client never sees it. Stateless: the conversation is passed in on
+// every request and nothing about the user is stored server-side.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// Fallback chain — a free-tier model is frequently overloaded (429/503). If the
+// primary is busy we try the next one so the assistant keeps answering instead
+// of telling the user "the server is busy".
+// Order = fastest-first for low latency, then capable fallbacks for availability.
+const GEMINI_MODELS = (process.env.GEMINI_MODELS
+  || 'gemini-2.5-flash-lite,gemini-2.0-flash,gemini-2.5-flash,gemini-flash-latest')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+
+// Gemini Live (real-time bidirectional audio). The client never gets the API
+// key — the backend mints a short-lived ephemeral token, locked to Erik's model,
+// persona and create_property tool, and the client connects directly to the
+// Gemini Live WebSocket with that token. Falls back to GEMINI_API_KEY if a
+// dedicated Live key isn't configured.
+const GEMINI_LIVE_API_KEY = process.env.GEMINI_LIVE_API_KEY || GEMINI_API_KEY;
+const GEMINI_LIVE_MODEL =
+  process.env.GEMINI_LIVE_MODEL || 'models/gemini-2.5-flash-native-audio-latest';
+
+// Varjo Teleport — builds an interactive Gaussian-splat 3D walkthrough of an
+// apartment from an mp4 (or zip of images). The client_secret stays server-side
+// ONLY; the backend mints a short-lived token and hands the client just the
+// presigned S3 upload URLs (so big videos upload straight to storage).
+const TELEPORT_CLIENT_ID = process.env.TELEPORT_CLIENT_ID || '';
+const TELEPORT_CLIENT_SECRET = process.env.TELEPORT_CLIENT_SECRET || '';
+const TELEPORT_AUTH_URL = process.env.TELEPORT_AUTH_URL
+  || 'https://signin.teleport.varjo.com/oauth2/token';
+const TELEPORT_API_BASE = process.env.TELEPORT_API_BASE
+  || 'https://teleport.varjo.com';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }), {
   marshallOptions: { removeUndefinedValues: true },
@@ -52,6 +85,69 @@ const TABLES = {
   property_likes:  { name: `${TABLE_PREFIX}property-likes`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
   app_state:       { name: `${TABLE_PREFIX}app-state`,       gsi: null },
 };
+
+// One row per user (pk: userId) holding the set of their FCM device tokens, so
+// the scheduled tour-notifier Lambda can push "your 3D tour is ready" to every
+// device a landlord owns. Created out-of-band (see deploy checklist).
+const DEVICE_TOKENS_TABLE = `${TABLE_PREFIX}device-tokens`;
+
+// Rental contracts (pk: id). Stores terms + each party's Ed25519 signature.
+// Only the contract's landlord or tenant can read/sign it.
+const CONTRACTS_TABLE = `${TABLE_PREFIX}contracts`;
+
+// Profile-tag → cross-side compatibility key. Mirrors the client's
+// ProfileTagCatalog so server-side lead ranking uses the exact same model.
+const TENANT_TAG_KEYS = {
+  'זוג': 'couples', 'משפחה עם ילדים': 'family', 'מחפש/ת שותפים': 'roommates',
+  'סטודנט/ית': 'students', 'לא מעשן/ת': 'no_smoking', 'יש לי חיות מחמד': 'pets',
+  'שקט/ה ומסודר/ת': 'quiet', 'חייב/ת חניה': 'parking', 'מרוהטת': 'furnished',
+  'מעלית': 'elevator', 'מרפסת': 'balcony', 'ממ"ד / מקלט': 'shelter',
+  'מיזוג אוויר': 'ac', 'נגישות לנכים': 'accessible',
+  'מתאים לחיות מחמד': 'pets_allowed', 'אישור הכנסה מוכן': 'income_proof',
+  'יש לי ערבים': 'guarantors', 'שכירות ארוכת טווח': 'long_term',
+  'שכירות לטווח קצר': 'short_term', 'כניסה מיידית': 'immediate',
+};
+const LANDLORD_TAG_KEYS = {
+  'הדירה מרוהטת': 'furnished', 'יש חניה': 'parking', 'יש מעלית': 'elevator',
+  'יש מרפסת': 'balcony', 'ממ"ד / מקלט': 'shelter', 'מיזוג אוויר': 'ac',
+  'דירה נגישה': 'accessible', 'מאפשר בעלי חיים': 'pets_allowed',
+  'מתאים לזוגות': 'couples', 'מתאים למשפחות': 'family',
+  'מתאים לשותפים': 'roommates', 'מתאים לסטודנטים': 'students',
+  'מעדיף שוכרים לא מעשנים': 'no_smoking', 'מחפש שוכרים שקטים': 'quiet',
+  'חוזה ארוך טווח': 'long_term', 'מאפשר טווח קצר': 'short_term',
+  'כניסה מיידית': 'immediate', 'דורש אישור הכנסה': 'income_proof',
+  'דורש ערבים': 'guarantors',
+};
+function keysFor(tags, map) {
+  const out = new Set();
+  for (const t of (tags || [])) { if (map[t]) out.add(map[t]); }
+  return out;
+}
+
+// ── Authorization ─────────────────────────────────────────────────────────────
+// The API Gateway authorizer verifies the Firebase JWT and passes the caller's
+// uid via event.requestContext.authorizer.uid. Reads stay open (this is a public
+// listings/discovery marketplace), but every WRITE stamps the owner field from
+// the verified uid — so a caller can never create/overwrite a row owned by
+// someone else — and DELETEs on owned tables are rejected unless the caller owns
+// the row. Legitimate clients already send their own uid, so this is transparent
+// for them; it only blocks forged cross-user writes/deletes.
+//
+// Only fields verified to exist in the data model are stamped, to avoid breaking
+// GSI filters: properties.ownerUserId, messages.senderId, users.id (== uid).
+const OWNED_TABLES = new Set(['properties', 'messages', 'users']);
+
+function callerUidOf(event) {
+  return event.requestContext?.authorizer?.uid || null;
+}
+
+// Force the owner field to the authenticated uid before a write.
+function stampOwner(tableKey, body, uid) {
+  if (!uid) return;
+  if (tableKey === 'properties') body.ownerUserId = uid;
+  else if (tableKey === 'messages') body.senderId = uid;
+  else if (tableKey === 'users') body.id = uid;
+}
 
 const json = (status, body) => ({
   statusCode: status,
@@ -94,6 +190,64 @@ export const handler = async (event) => {
       return json(404, { message: 'Unknown scan route' });
     }
 
+    // ── Varjo Teleport 3D captures ──────────────────────────────────────────
+    if (segments[0] === 'teleport' && segments[1] === 'captures') {
+      const eid = segments[2] ? decodeURIComponent(segments[2]) : null;
+      // POST /teleport/captures → create a capture (returns eid + num_parts)
+      if (method === 'POST' && !eid) return await teleportCreateCapture(event);
+      // POST /teleport/captures/:eid/upload-url/:part → presigned S3 URL
+      if (method === 'POST' && eid && segments[3] === 'upload-url') {
+        return await teleportUploadUrl(event, eid, segments[4]);
+      }
+      // POST /teleport/captures/:eid/finalize → finalize the upload
+      if (method === 'POST' && eid && segments[3] === 'finalize') {
+        return await teleportFinalize(event, eid);
+      }
+      // GET /teleport/captures/:eid → status + viewer_url
+      if (method === 'GET' && eid) return await teleportGetCapture(eid);
+      return json(404, { message: 'Unknown teleport route' });
+    }
+
+    // ── Push notification device tokens ─────────────────────────────────────
+    if (segments[0] === 'notifications' && segments[1] === 'register-token'
+        && method === 'POST') {
+      return await handleRegisterToken(event);
+    }
+
+    // ── Two-sided match ranking (landlord's leads) ──────────────────────────
+    if (segments[0] === 'match' && segments[1] === 'leads' && method === 'POST') {
+      return await handleMatchLeads(event);
+    }
+
+    // ── Rental contracts with e-signatures ──────────────────────────────────
+    if (segments[0] === 'contracts') {
+      const cid = segments[1] ? decodeURIComponent(segments[1]) : null;
+      if (method === 'POST' && !cid) return await contractCreate(event);
+      if (method === 'GET' && !cid) return await contractList(event);
+      if (method === 'GET' && cid) return await contractGet(event, cid);
+      if (method === 'POST' && cid && segments[2] === 'sign') {
+        return await contractSign(event, cid);
+      }
+      if (method === 'POST' && cid && segments[2] === 'cancel') {
+        return await contractCancel(event, cid);
+      }
+      return json(404, { message: 'Unknown contracts route' });
+    }
+
+    // ── Erik personal assistant ─────────────────────────────────────────────
+    if (segments[0] === 'assistant' && method === 'POST') {
+      // POST /assistant/tts → Gemini natural voice for a reply (audio bytes).
+      if (segments[1] === 'tts') return await handleAssistantTts(event);
+      // POST /assistant/live-token → ephemeral token for the real-time Live voice
+      // session (the API key never leaves the backend).
+      if (segments[1] === 'live-token') return await handleAssistantLiveToken(event);
+      // POST /assistant/extract → the ONLY model call in the cost-optimised
+      // listing flow: pull structured property fields out of a free-text
+      // description + report which required fields are still missing.
+      if (segments[1] === 'extract') return await handleAssistantExtract(event);
+      return await handleAssistant(event);
+    }
+
     // ── Table CRUD ──────────────────────────────────────────────────────────
     const tableKey = segments[0];
     const table = TABLES[tableKey];
@@ -102,32 +256,163 @@ export const handler = async (event) => {
     const id = segments[1] ? decodeURIComponent(segments[1]) : null;
     const body = event.body ? JSON.parse(event.body) : {};
     const query = event.queryStringParameters || {};
+    const callerUid = callerUidOf(event);
+
+    // Writes/deletes on owner-scoped tables require a verified identity.
+    const isMutation = method === 'POST' || method === 'PUT' || method === 'DELETE';
+    if (isMutation && OWNED_TABLES.has(tableKey) && !callerUid) {
+      return json(401, { message: 'Unauthorized' });
+    }
 
     switch (method) {
       case 'GET':
-        return id
-          ? await getOne(table, id)
-          : await listItems(table, query);
-      case 'POST':
-        return await putItem(table, body.id || body.propertyId || body.userId, body);
-      case 'PUT':
-        return await putItem(table, id, body);
+        // Public aggregate counts (no row data leaked) — how many likes/views a
+        // listing has. Enabled only for the analytics tables.
+        if (id === 'count') {
+          if (tableKey !== 'property_likes' && tableKey !== 'property_views') {
+            return json(404, { message: 'Not found' });
+          }
+          return await countItems(table, query);
+        }
+        if (id) return await getOne(table, id);
+        // Chat history is private: only the property owner (landlord) or someone
+        // who has already posted in the thread may read it. Non-members get an
+        // empty thread (not an error) so the UI degrades gracefully and a new
+        // thread the tenant hasn't written to yet simply shows empty.
+        if (tableKey === 'messages') {
+          const matchId = query.matchId;
+          if (!matchId) return json(400, { message: 'matchId required' });
+          if (!(await isThreadMember(matchId, callerUid))) {
+            return json(200, { items: [], hasMore: false, lastKey: null });
+          }
+        }
+        // Who-liked-my-property is private: only the property's owner may read
+        // the likes (and thus the interested tenants' identities).
+        if (tableKey === 'property_likes') {
+          const pid = query.propertyId;
+          if (!pid) return json(400, { message: 'propertyId required' });
+          if (!callerUid || !(await isOwnerOf(pid, callerUid))) {
+            return json(200, { items: [], hasMore: false, lastKey: null });
+          }
+        }
+        return await listItems(table, query);
+      case 'POST': {
+        stampOwner(tableKey, body, callerUid);
+        const writeId = tableKey === 'users'
+          ? callerUid
+          : (body.id || body.propertyId || body.userId);
+        return await putItem(table, writeId, body);
+      }
+      case 'PUT': {
+        stampOwner(tableKey, body, callerUid);
+        // For the users table the row id IS the uid — never let a caller PUT to
+        // another user's id.
+        const writeId = tableKey === 'users' ? callerUid : id;
+        return await putItem(table, writeId, body);
+      }
       case 'DELETE':
-        return await deleteItem(table, id);
+        return await deleteItem(table, tableKey, id, callerUid);
       default:
         return json(405, { message: 'Method not allowed' });
     }
   } catch (e) {
+    // Log the full error server-side; return a generic message so internal
+    // details (stack, table names, SDK errors) never leak to clients.
     console.error('Router error:', e);
-    return json(500, { message: e.message });
+    return json(500, { message: 'Internal error' });
   }
 };
+
+// Rejects S3 keys that try to escape their folder via traversal or absolute
+// paths. (Per-user key namespacing is a recommended follow-up — see audit.)
+function isSafeStorageKey(key) {
+  if (typeof key !== 'string' || key.length === 0 || key.length > 1024) return false;
+  if (key.startsWith('/')) return false;
+  if (key.split('/').some((seg) => seg === '..')) return false;
+  return true;
+}
+
+// ── Chat membership ──────────────────────────────────────────────────────────
+// matchId formats:
+//   • New:    "match-<propertyId>~<tenantUid>"  → exact two-party membership:
+//             the embedded tenant and the property owner (landlord), nobody else.
+//             This gives each tenant interested in a property their own private
+//             thread (no cross-tenant leakage).
+//   • Legacy: "match-<propertyId>"  → owner, or anyone who already posted in the
+//             thread (pre-migration data; kept readable for back-compat).
+async function isOwnerOf(propertyId, uid) {
+  try {
+    const prop = await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name,
+      Key: { id: propertyId },
+    }));
+    return !!(prop.Item && prop.Item.ownerUserId === uid);
+  } catch (e) {
+    console.error('isThreadMember property lookup failed:', e);
+    return false;
+  }
+}
+
+async function isThreadMember(matchId, uid) {
+  if (!uid || !matchId) return false;
+  const rest = matchId.startsWith('match-') ? matchId.slice(6) : matchId;
+  const sep = rest.lastIndexOf('~');
+
+  if (sep >= 0) {
+    const propertyId = rest.slice(0, sep);
+    const tenantUid = rest.slice(sep + 1);
+    if (uid === tenantUid) return true;
+    return await isOwnerOf(propertyId, uid);
+  }
+
+  // Legacy: owner OR anyone who has already posted in the thread.
+  if (await isOwnerOf(rest, uid)) return true;
+  try {
+    const msgs = await ddb.send(new QueryCommand({
+      TableName: TABLES.messages.name,
+      IndexName: TABLES.messages.gsi.name,
+      KeyConditionExpression: 'matchId = :m',
+      ExpressionAttributeValues: { ':m': matchId },
+      Limit: 200,
+    }));
+    return (msgs.Items || []).some((m) => m.senderId === uid);
+  } catch (e) {
+    console.error('isThreadMember message lookup failed:', e);
+    return false;
+  }
+}
 
 // ── DynamoDB handlers ────────────────────────────────────────────────────────
 
 async function getOne(table, id) {
   const r = await ddb.send(new GetCommand({ TableName: table.name, Key: { id } }));
   return r.Item ? json(200, r.Item) : json(404, {});
+}
+
+// Aggregate count of rows matching the GSI filter (e.g. all likes/views for a
+// propertyId). Pages through with Select:COUNT so no row data is returned.
+async function countItems(table, query) {
+  const filterKey = table.gsi?.filterKey;
+  const filterVal = filterKey ? query[filterKey] : undefined;
+  if (!table.gsi || filterVal === undefined) {
+    return json(400, { message: `${filterKey || 'filter'} required` });
+  }
+  let count = 0;
+  let cursor;
+  do {
+    const out = await ddb.send(new QueryCommand({
+      TableName: table.name,
+      IndexName: table.gsi.name,
+      KeyConditionExpression: '#pk = :v',
+      ExpressionAttributeNames: { '#pk': table.gsi.pk },
+      ExpressionAttributeValues: { ':v': castFilter(filterVal) },
+      Select: 'COUNT',
+      ExclusiveStartKey: cursor,
+    }));
+    count += out.Count || 0;
+    cursor = out.LastEvaluatedKey;
+  } while (cursor);
+  return json(200, { count });
 }
 
 async function listItems(table, query) {
@@ -204,8 +489,23 @@ async function putItem(table, id, body) {
   return json(200, item);
 }
 
-async function deleteItem(table, id) {
+async function deleteItem(table, tableKey, id, callerUid) {
   if (!id) return json(400, { message: 'Missing id' });
+
+  // Ownership enforcement: a caller may only delete rows they own.
+  //  • users      — the row id IS the uid, so id must equal the caller.
+  //  • properties — fetch the row and compare its ownerUserId.
+  // Other tables have no verified owner field; they remain authenticated-only.
+  if (tableKey === 'users') {
+    if (id !== callerUid) return json(403, { message: 'Forbidden' });
+  } else if (tableKey === 'properties') {
+    const existing = await ddb.send(
+      new GetCommand({ TableName: table.name, Key: { id } }),
+    );
+    const owner = existing.Item?.ownerUserId;
+    if (owner && owner !== callerUid) return json(403, { message: 'Forbidden' });
+  }
+
   await ddb.send(new DeleteCommand({ TableName: table.name, Key: { id } }));
   return json(200, { id, deleted: true });
 }
@@ -226,6 +526,7 @@ async function handleStorage(method, segments, event) {
     const key = body.key;
     const contentType = body.contentType || 'application/octet-stream';
     if (!key) return json(400, { message: 'Missing key' });
+    if (!isSafeStorageKey(key)) return json(400, { message: 'Invalid key' });
 
     const uploadUrl = await getSignedUrl(
       s3,
@@ -240,6 +541,7 @@ async function handleStorage(method, segments, event) {
   if (method === 'DELETE') {
     const key = segments.slice(1).map(decodeURIComponent).join('/');
     if (!key) return json(400, { message: 'Missing key' });
+    if (!isSafeStorageKey(key)) return json(400, { message: 'Invalid key' });
     await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
     return json(200, { key, deleted: true });
   }
@@ -250,7 +552,7 @@ async function handleStorage(method, segments, event) {
 async function create3dViewer(event) {
   const body = event.body ? JSON.parse(event.body) : {};
   const propertyId = sanitizeId(body.propertyId || body.id || 'property');
-  const title = sanitizeText(body.title || 'Rentch 3D Tour');
+  const title = sanitizeText(body.title || 'Rently 3D Tour');
   const assets = normalizeAssets(body.assets);
   if (assets.length === 0) {
     return json(400, { message: 'At least one 3D asset URL is required.' });
@@ -382,7 +684,7 @@ function renderViewerHtml({ title, manifest, propertyId }) {
 <body>
   <header>
     <h1>${safeTitle}</h1>
-    <p>Rentch property ${safePropertyId}</p>
+    <p>Rently property ${safePropertyId}</p>
   </header>
   <div id="viewer">
     <model-viewer id="model-viewer" camera-controls touch-action="pan-y" interaction-prompt="auto" ar></model-viewer>
@@ -574,6 +876,173 @@ function stagingPrompt(style) {
   return `${styleText} Photorealistic real-estate listing photo, high quality. Preserve the existing windows, doors, walls, floor, ceiling and overall room architecture exactly as they are — only add furniture, decor and lighting. Do not change the room layout, structure or proportions.`;
 }
 
+// ── Varjo Teleport helpers ──────────────────────────────────────────────────
+
+let _teleportToken = null;
+let _teleportTokenExp = 0;
+
+async function teleportAuthToken() {
+  const now = Date.now();
+  if (_teleportToken && now < _teleportTokenExp - 60000) return _teleportToken;
+  const res = await fetch(TELEPORT_AUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: TELEPORT_CLIENT_ID,
+      client_secret: TELEPORT_CLIENT_SECRET,
+    }).toString(),
+  });
+  if (!res.ok) throw new Error(`teleport auth ${res.status}`);
+  const data = await res.json();
+  _teleportToken = data.access_token;
+  // Tokens last ~1h; refresh a minute early. Default to 50 min if unsure.
+  _teleportTokenExp = now + (data.expires_in ? data.expires_in * 1000 : 3000000);
+  return _teleportToken;
+}
+
+async function teleportFetch(path, { method = 'GET', body } = {}) {
+  const token = await teleportAuthToken();
+  const res = await fetch(`${TELEPORT_API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function teleportConfigured() {
+  return TELEPORT_CLIENT_ID && TELEPORT_CLIENT_SECRET;
+}
+
+// POST /teleport/captures {name, bytesize} → {eid, numParts, chunkSize}
+async function teleportCreateCapture(event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  if (!teleportConfigured()) return json(503, { message: '3D capture not configured.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+  const name = (typeof body.name === 'string' && body.name.trim())
+    ? body.name.trim().slice(0, 120) : 'Rently apartment';
+  const bytesize = Number(body.bytesize);
+  if (!Number.isFinite(bytesize) || bytesize <= 0) {
+    return json(400, { message: 'bytesize required' });
+  }
+  // Teleport REQUIRES input_data_format. Omitting it makes the pipeline treat
+  // the upload as a bulk-images zip, so every mp4 video fails reconstruction
+  // (state=ERROR). We always send "video"; the file name carries an .mp4 hint.
+  const inputDataFormat = (body.inputDataFormat === 'bulk-images')
+    ? 'bulk-images' : 'video';
+  const capName = (inputDataFormat === 'video' && !/\.(mp4|mov)$/i.test(name))
+    ? `${name}.mp4` : name;
+  try {
+    const r = await teleportFetch('/api/v1/captures', {
+      method: 'POST',
+      body: { name: capName, bytesize, input_data_format: inputDataFormat },
+    });
+    if (!r.ok) {
+      console.warn('teleport create failed', r.status, JSON.stringify(r.data).slice(0, 200));
+      return json(502, { message: 'Could not start 3D capture.' });
+    }
+    return json(200, {
+      eid: r.data.eid,
+      numParts: r.data.num_parts,
+      chunkSize: r.data.chunk_size,
+    });
+  } catch (e) {
+    console.warn('teleport create exception', e.message);
+    return json(502, { message: 'Could not start 3D capture.' });
+  }
+}
+
+// POST /teleport/captures/:eid/upload-url/:part {bytesize} → {uploadUrl}
+async function teleportUploadUrl(event, eid, partStr) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  if (!teleportConfigured()) return json(503, { message: '3D capture not configured.' });
+  const part = parseInt(partStr || '0', 10);
+  if (!Number.isInteger(part) || part < 1) return json(400, { message: 'invalid part' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const bytesize = Number(body.bytesize) || undefined;
+  try {
+    const r = await teleportFetch(
+      `/api/v1/captures/${encodeURIComponent(eid)}/create-upload-url/${part}`,
+      { method: 'POST', body: { eid, bytesize } },
+    );
+    if (!r.ok) {
+      console.warn('teleport upload-url failed', r.status);
+      return json(502, { message: 'Could not get upload URL.' });
+    }
+    return json(200, { uploadUrl: r.data.upload_url, chunkSize: r.data.chunk_size });
+  } catch (e) {
+    console.warn('teleport upload-url exception', e.message);
+    return json(502, { message: 'Could not get upload URL.' });
+  }
+}
+
+// POST /teleport/captures/:eid/finalize {parts:[{number,etag}]} → status
+async function teleportFinalize(event, eid) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  if (!teleportConfigured()) return json(503, { message: '3D capture not configured.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+  const parts = Array.isArray(body.parts) ? body.parts : [];
+  if (parts.length === 0) return json(400, { message: 'parts required' });
+  try {
+    const r = await teleportFetch(
+      `/api/v1/captures/${encodeURIComponent(eid)}/uploaded`,
+      { method: 'POST', body: { eid, parts } },
+    );
+    if (!r.ok) {
+      console.warn('teleport finalize failed', r.status, JSON.stringify(r.data).slice(0, 200));
+      return json(502, { message: 'Could not finalize 3D capture.' });
+    }
+    return json(200, teleportCaptureView(r.data));
+  } catch (e) {
+    console.warn('teleport finalize exception', e.message);
+    return json(502, { message: 'Could not finalize 3D capture.' });
+  }
+}
+
+// GET /teleport/captures/:eid → {eid, state, viewerUrl, ...}
+async function teleportGetCapture(eid) {
+  if (!teleportConfigured()) return json(503, { message: '3D capture not configured.' });
+  try {
+    // The item GET is 405; the list endpoint carries state + viewer_url.
+    const r = await teleportFetch('/api/v1/captures');
+    if (!r.ok || !Array.isArray(r.data)) {
+      return json(502, { message: 'Could not read 3D capture.' });
+    }
+    const cap = r.data.find((c) => c && c.eid === eid);
+    if (!cap) return json(404, { message: 'Capture not found' });
+    return json(200, teleportCaptureView(cap));
+  } catch (e) {
+    console.warn('teleport get exception', e.message);
+    return json(502, { message: 'Could not read 3D capture.' });
+  }
+}
+
+function teleportCaptureView(c) {
+  return {
+    eid: c.eid,
+    sid: c.sid,
+    state: c.state, // CREATED | PROCESSING | READY | ...
+    stateDescription: c.state_description || null,
+    errorReason: c.error_reason || null,
+    viewerUrl: c.viewer_url || null,
+    previewUrl: c.preview_url || null,
+    videoUrl: c.video_url || null,
+    shareUrl: c.share_url || null,
+  };
+}
+
 async function getScanMeta(scanId) {
   try {
     const obj = await s3.send(new GetObjectCommand({
@@ -597,16 +1066,22 @@ async function putScanMeta(scanId, meta) {
 
 function scanResponse(meta) {
   const url = meta.stagedUrl || meta.viewerUrl || '';
+  const s = meta.status || 'pending';
+  const processingStage = s === 'ready' ? 'complete'
+    : s === 'failed' ? 'failed'
+    : s === 'processing' ? 'staging'
+    : 'pending';
   return json(200, {
     data: {
       id: meta.scanId,
       scanId: meta.scanId,
-      status: meta.status || 'pending',
+      status: s,
       viewerUrl: url,
       previewImageUrl: url,
       downloadUrl: url,
       processingError: meta.error || '',
-      format: 'image',
+      processingStage,
+      format: meta.contentType?.startsWith('video/') ? 'video' : 'image',
     },
   });
 }
@@ -629,16 +1104,22 @@ async function rehostImage(sourceUrl, key) {
 async function createScan(event) {
   const body = event.body ? JSON.parse(event.body) : {};
   const propertyId = sanitizeId(body.propertyId || body.id || 'prop');
+  const title = sanitizeText(body.title || 'Rently apartment scan');
   const style = sanitizeStyle(body.style);
   const contentType = (body.contentType || 'image/jpeg').toLowerCase();
+  const isVideo = contentType.startsWith('video/');
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 10);
   const scanId = `st_${ts}_${rand}`;
   const ext = contentType.includes('png') ? 'png'
     : contentType.includes('webp') ? 'webp'
     : contentType.includes('heic') ? 'heic'
+    : contentType.includes('mp4') ? 'mp4'
+    : contentType.includes('quicktime') ? 'mov'
+    : isVideo ? 'mp4'
     : 'jpg';
-  const srcKey = `staging-src/${propertyId}/${scanId}.${ext}`;
+  const folder = isVideo ? 'scan-src' : 'staging-src';
+  const srcKey = `${folder}/${propertyId}/${scanId}.${ext}`;
 
   const uploadUrl = await getSignedUrl(
     s3,
@@ -646,7 +1127,7 @@ async function createScan(event) {
     { expiresIn: 3600 },
   );
 
-  const meta = { scanId, propertyId, srcKey, style, contentType, provider: 'luma-staging', status: 'pending', createdAt: ts };
+  const meta = { scanId, propertyId, title, srcKey, style, contentType, provider: isVideo ? 'video-tour' : 'luma-staging', status: 'pending', createdAt: ts };
   await putScanMeta(scanId, meta);
   return json(200, { data: { scanId, uploadUrl } });
 }
@@ -655,13 +1136,46 @@ async function processScan(scanId) {
   const meta = await getScanMeta(scanId);
   if (!meta) return json(404, { message: 'Scan not found' });
 
+  // Already terminal — return cached result without re-processing.
+  if (meta.status === 'ready' || meta.status === 'failed') {
+    return scanResponse(meta);
+  }
+
+  // Video scan → build an immersive 360° viewer HTML page and return ready immediately.
+  const isVideo = (meta.contentType || '').toLowerCase().startsWith('video/');
+  if (isVideo) {
+    const videoUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${meta.srcKey}`;
+    const html = renderVideoViewerHtml({
+      title: meta.title || 'Rently Virtual Tour',
+      videoUrl,
+      propertyId: meta.propertyId,
+    });
+    const viewerKey = `scan-viewers/${meta.propertyId}/${scanId}.html`;
+    await s3.send(new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: viewerKey,
+      Body: html,
+      ContentType: 'text/html; charset=utf-8',
+      CacheControl: 'public, max-age=31536000',
+    }));
+    const viewerUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${viewerKey}`;
+    const updated = { ...meta, status: 'ready', viewerUrl, completedAt: Date.now() };
+    await putScanMeta(scanId, updated);
+    return scanResponse(updated);
+  }
+
+  // Image scan → Luma image_edit virtual staging.
   if (!LUMA_API_KEY) {
     const updated = { ...meta, status: 'failed', error: 'Staging is not configured (no LUMA_API_KEY).' };
     await putScanMeta(scanId, updated);
     return scanResponse(updated);
   }
 
-  const srcUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${meta.srcKey}`;
+  const srcUrl = await getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: S3_BUCKET, Key: meta.srcKey }),
+    { expiresIn: 3600 },
+  );
   try {
     const res = await fetch(`${LUMA_BASE}/generations`, {
       method: 'POST',
@@ -691,7 +1205,7 @@ async function processScan(scanId) {
     }
     const updated = { ...meta, generationId: data.id, srcUrl, status: 'processing', processedAt: Date.now() };
     await putScanMeta(scanId, updated);
-    return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image' } });
+    return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image', processingStage: 'staging' } });
   } catch (e) {
     console.warn('Luma create generation error', e.message);
     const updated = { ...meta, status: 'failed', error: e.message };
@@ -735,7 +1249,7 @@ async function getScan(scanId) {
           return scanResponse(updated);
         }
         // queued / processing
-        return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image' } });
+        return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image', processingStage: 'staging' } });
       }
       console.warn('Luma getScan poll HTTP', res.status);
     } catch (e) {
@@ -1006,4 +1520,646 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// ── Erik — personal assistant (Gemini) ───────────────────────────────────────
+
+const ASSISTANT_TOOL = {
+  functionDeclarations: [
+    {
+      name: 'create_property',
+      description:
+        'יוצר טיוטת מודעת דירה להשכרה — רק לאחר שנאספו כל הפרטים החיוניים מהמשתמש ולאחר שהמשתמש אישר במפורש שהפרטים נכונים. אין להמציא פרטים שלא נמסרו.',
+      parameters: {
+        type: 'object',
+        properties: {
+          city: { type: 'string', description: 'עיר' },
+          neighborhood: { type: 'string', description: 'שכונה (אופציונלי)' },
+          street: { type: 'string', description: 'שם הרחוב' },
+          streetNumber: { type: 'string', description: 'מספר הבית' },
+          rooms: { type: 'number', description: 'מספר חדרים (אפשר חצי, למשל 3.5)' },
+          price: { type: 'integer', description: 'מחיר חודשי בשקלים' },
+          sizeM2: { type: 'integer', description: 'גודל במ"ר (אם ידוע)' },
+          floor: { type: 'integer', description: 'קומה' },
+          totalFloors: { type: 'integer', description: 'כמה קומות בבניין (אם ידוע)' },
+          condition: { type: 'string', description: 'מצב הדירה: משופצת / חדשה / טובה / דורשת שיפוץ' },
+          entryDate: { type: 'string', description: 'תאריך כניסה בטקסט חופשי, למשל "מיידי" או "בעוד חודש"' },
+          description: { type: 'string', description: 'תיאור קצר ונעים של הדירה' },
+        },
+        required: ['city', 'street', 'rooms', 'price', 'floor'],
+      },
+    },
+  ],
+};
+
+// Required fields to publish a listing. Everything else is optional polish.
+const LISTING_REQUIRED = ['price', 'rooms', 'city'];
+
+function missingRequired(fields) {
+  return LISTING_REQUIRED.filter((k) => {
+    const v = fields[k];
+    return v === null || v === undefined || v === '' ||
+      (typeof v === 'number' && !(v > 0));
+  });
+}
+
+async function handleAssistantExtract(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const description = (body.description || '').toString().slice(0, 2000);
+  const current = (body.currentFields && typeof body.currentFields === 'object')
+    ? body.currentFields : {};
+
+  if (!GEMINI_API_KEY) {
+    return json(200, { fields: current, missing: missingRequired(current) });
+  }
+
+  const sys = 'אתה מחלץ פרטי דירה להשכרה מטקסט חופשי בעברית. החזר אך ורק JSON תקין '
+    + 'במבנה: {"fields":{"price":number|null,"rooms":number|null,"sizeM2":number|null,'
+    + '"city":string|null,"neighborhood":string|null,"street":string|null,'
+    + '"propertyType":string|null,"entryDate":string|null,"description":string},'
+    + '"suggestedTitle":string}. price=שכר דירה חודשי בשקלים. אל תמציא ערכים — '
+    + 'מה שלא מופיע בטקסט החזר null. description = תקציר נקי וקצר של הדירה.';
+  const contents = [{
+    role: 'user',
+    parts: [{ text: `תיאור הדירה: ${description}\nשדות ידועים כבר: ${JSON.stringify(current)}` }],
+  }];
+
+  try {
+    const data = await geminiGenerate(sys, contents);
+    const text = (data?.candidates?.[0]?.content?.parts || [])
+      .map((p) => p.text || '').join('');
+    const m = text.match(/\{[\s\S]*\}/);
+    const parsed = m ? JSON.parse(m[0]) : {};
+    const ex = (parsed.fields && typeof parsed.fields === 'object') ? parsed.fields : {};
+    // Merge: keep already-known values, fill from extraction (non-null only).
+    const fields = { ...current };
+    for (const [k, v] of Object.entries(ex)) {
+      if (v !== null && v !== undefined && v !== '') fields[k] = v;
+    }
+    return json(200, {
+      fields,
+      missing: missingRequired(fields),
+      suggestedTitle: (parsed.suggestedTitle || '').toString().slice(0, 80),
+    });
+  } catch (e) {
+    console.warn('assistant/extract', e.message);
+    return json(200, { fields: current, missing: missingRequired(current), busy: true });
+  }
+}
+
+async function geminiGenerate(systemText, contents, tools) {
+  let lastStatus = '';
+  for (const model of GEMINI_MODELS) {
+    const reqBody = {
+      systemInstruction: { parts: [{ text: systemText }] },
+      contents,
+      generationConfig: { temperature: 0.6, maxOutputTokens: 480 },
+    };
+    // "thinking" config only applies to the 2.5 thinking models; sending it to
+    // others can be rejected. Disable it where supported for low latency.
+    if (model.includes('2.5')) {
+      reqBody.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    }
+    if (tools) reqBody.tools = tools;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let res;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody),
+        });
+      } catch {
+        lastStatus = `${model}=net`;
+        break; // network error — try the next model
+      }
+      if (res.ok) return await res.json();
+      lastStatus = `${model}=${res.status}`;
+      // Overloaded/throttled — one quick retry, then move to the next model.
+      if (res.status === 429 || res.status === 500 || res.status === 503) {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        break;
+      }
+      // Other errors (e.g. 400/404) — this model won't work; try the next.
+      break;
+    }
+  }
+  throw new Error(`Gemini busy (${lastStatus})`);
+}
+
+async function loadOwnerProperties(uid) {
+  try {
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLES.properties.name,
+      IndexName: TABLES.properties.ownerIndex,
+      KeyConditionExpression: '#o = :o',
+      ExpressionAttributeNames: { '#o': 'ownerUserId' },
+      ExpressionAttributeValues: { ':o': String(uid) },
+      Limit: 50,
+    }));
+    return res.Items || [];
+  } catch (e) {
+    console.warn('loadOwnerProperties failed:', e.message);
+    return [];
+  }
+}
+
+async function loadUserProfile(uid) {
+  try {
+    const res = await ddb.send(new GetCommand({ TableName: TABLES.users.name, Key: { id: uid } }));
+    return res.Item || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildErikSystemPrompt(profile, properties) {
+  const name = profile && (profile.name || profile.ownerName)
+    ? String(profile.name || profile.ownerName).trim()
+    : '';
+  const isActive = (p) => p.isActive !== false && p.status !== 'inactive';
+  const active = properties.filter(isActive);
+  const lines = properties.slice(0, 10).map((p, i) => {
+    const addr = [p.street, p.streetNumber, p.city].filter(Boolean).join(' ');
+    const price = p.price ? `${p.price} ₪ לחודש` : 'ללא מחיר';
+    const st = isActive(p) ? 'פעילה' : 'לא פעילה';
+    return `  ${i + 1}. ${addr || 'דירה'} — ${p.rooms || '?'} חדרים, ${price} (${st})`;
+  });
+  const snapshot = properties.length === 0
+    ? 'למשתמש אין עדיין דירות מפורסמות.'
+    : `למשתמש ${properties.length} דירות (${active.length} פעילות):\n${lines.join('\n')}`;
+
+  return [
+    'אתה "אריק" — אדם אמיתי, חם ונחמד, שעוזר לבעלי דירות לפרסם דירה להשכרה באפליקציית Rently. אתה לא בוט ולא תוכנה — אתה פשוט אריק.',
+    'חוק ברזל בסגנון: כתוב עברית טבעית ואנושית לחלוטין, כמו בן אדם שמדבר בטלפון בנעימות. אסור להשתמש בכוכביות (* או **), בסימני עיצוב markdown, בכותרות, ברשימות עם מקפים או נקודות, או באימוג׳ים. לעולם אל תזכיר שאתה בינה מלאכותית, מודל, עוזר ממוחשב או תוכנה. רק טקסט רגיל, חם ואישי.',
+    'הקהל שלך הוא בעלי דירות מבוגרים (גיל 65 ומעלה) שאינם בקיאים בטכנולוגיה. דבר עברית פשוטה, ברורה ונעימה, במשפטים קצרים. בלי מילים באנגלית ובלי ז׳רגון.',
+    name ? `שם המשתמש הוא ${name}. אפשר לפנות אליו בשמו מדי פעם, בנימוס.` : '',
+    'פתיחת השיחה: בקש מבעל הדירה, בחום ובקצרה, לספר בכמה מילים על הדירה — איפה היא, כמה חדרים, וכל מה שירצה. הקשב היטב, וחלץ מהתיאור החופשי כמה שיותר פרטים בעצמך.',
+    'אחרי התיאור — שאל רק על הפרטים החיוניים שחסרים, ואחד 2-3 פרטים קצרים בשאלה אחת ידידותית (למשל: "מצוין! נשאר רק לדעת את הקומה והמחיר החודשי — מה הם?"). אל תשאל על מה שכבר נאמר, ואל תמתח את זה לשאלה-אחר-שאלה אם אפשר לקצר.',
+    'חשוב מאוד: הקלט מגיע מהמרת דיבור-לטקסט ולעיתים יש בו שגיאות, במיוחד במספרים בעברית. פרש בהיגיון רב: "ארבע 1000" או "ארבע אלף" פירושו 4000; "שלושת אלפים וחמש מאות" פירושו 3500; "אלפיים" פירושו 2000. אם מספר או פרט נשמע לא הגיוני או לא ברור — חזור עליו בעדינות לאישור ("רק לוודא — המחיר הוא ארבעת אלפים שקלים בחודש?") לפני שתמשיך.',
+    'מה אתה יכול לעשות: לעזור לפרסם דירה חדשה (לאסוף את הפרטים בשיחה), לתת תמונת מצב על הדירות הקיימות, ולהסביר בפשטות איך האפליקציה עובדת.',
+    'חמשת הפרטים החיוניים (חובה): עיר, רחוב ומספר בית, מספר חדרים, קומה, ומחיר חודשי. גודל במ"ר, מצב הדירה ותאריך כניסה הם רשות בלבד — אל תעכב בשבילם: אם בעל הדירה הזכיר אותם קח אותם, אחרת דלג. אם לא נמסר תאריך כניסה — הנח "מיידי".',
+    'המטרה החשובה ביותר: לסיים את כל התהליך מהר ובנעימים, תוך דקה עד שתיים. היה תכליתי, חם ומקצועי כמו סוכן שירות מעולה. תשובות קצרות מאוד — משפט אחד או שניים, בלי חזרות מיותרות. ברגע שיש את חמשת הפרטים החיוניים, אשר אותם במשפט קצר אחד, ואם המשתמש מאשר — קרא מיד ל-create_property.',
+    'כפתורי בחירה (חשוב לחוויית המשתמש!): כשאתה שואל שאלה שיש לה כמה תשובות נפוצות וקצרות — מצב הדירה, תאריך כניסה, מספר חדרים, או אישור כן/לא — הוסף בסוף ההודעה שורה נפרדת בדיוק בפורמט הזה: [[CHOICES: אפשרות1 | אפשרות2 | אפשרות3]] (בין 2 ל-5 אפשרויות קצרות מאוד, מילה-שתיים כל אחת). דוגמאות: למצב הדירה [[CHOICES: משופצת | חדשה | במצב טוב | דורשת שיפוץ]]; לתאריך כניסה [[CHOICES: מיידי | בעוד חודש | גמיש]]; לאישור פרטים [[CHOICES: כן, הכל נכון | יש טעות]]. אל תוסיף שורה כזו כשאין תשובות נפוצות (כתובת, מחיר חופשי). הכפתורים הם תוספת — תמיד כתוב גם את השאלה במילים.',
+    'רק כשיש לפחות עיר, רחוב, מספר חדרים, קומה ומחיר — ולאחר שחזרת על הפרטים והמשתמש אישר שהכל נכון — קרא לפונקציה create_property עם מה שנמסר. אל תמציא נתונים.',
+    'חשוב לגבי תמונות: ברגע שהפרטים אושרו — קרא מיד ל-create_property (אל תחכה לתמונה). מיד אחרי הקריאה האפליקציה תציג למשתמש כפתורים להוספת תמונה, ותדרוש לפחות תמונה אחת לפני הפרסום. אתה יכול להזכיר בעדינות "נוסיף תמונה אחת ונפרסם", אבל את התמונה המשתמש מוסיף באפליקציה, לא דרכך.',
+    'אם המשתמש מבקש "תמונת מצב" או "מה קורה עם הדירות שלי" — תן סיכום קצר וברור: כמה דירות יש, כמה פעילות.',
+    'אל תבטיח דברים שאינך יכול לבצע. אם משהו לא ברור — שאל שוב בעדינות. שמור על תשובות קצרות שקל להקשיב להן.',
+    'נתוני המשתמש הנוכחיים (לשימושך בלבד, אל תקריא את כל הרשימה אלא אם ביקשו):',
+    snapshot,
+  ].filter(Boolean).join('\n');
+}
+
+// Strip anything that looks like AI / markdown formatting so Erik reads like a
+// person — no asterisks (which TTS would read aloud), code ticks, headings, etc.
+function stripMarkup(s) {
+  return String(s || '')
+    .replace(/\*+/g, '')        // * and ** (bold/italic/bullets)
+    .replace(/`+/g, '')          // code ticks
+    .replace(/_{2,}/g, '')       // __underline__
+    .replace(/^#{1,6}\s*/gm, '') // markdown headings
+    .replace(/^\s*[-•]\s+/gm, '')// bullet markers
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// POST /notifications/register-token → store the caller's FCM device token.
+// Keyed by the verified uid so a caller can only register tokens to themselves.
+async function handleRegisterToken(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const token = (body.token || '').toString().trim();
+  if (!token) return json(400, { message: 'token is required' });
+  const platform = (body.platform || '').toString().trim() || 'unknown';
+  const now = new Date().toISOString();
+
+  let tokens = [];
+  try {
+    const existing = await ddb.send(new GetCommand({
+      TableName: DEVICE_TOKENS_TABLE, Key: { userId: uid },
+    }));
+    if (existing.Item && Array.isArray(existing.Item.tokens)) {
+      tokens = existing.Item.tokens;
+    }
+  } catch (e) { /* table may not exist yet — first write creates the row */ }
+
+  if (!tokens.includes(token)) tokens.push(token);
+  if (tokens.length > 10) tokens = tokens.slice(tokens.length - 10); // bound row size
+
+  await ddb.send(new PutCommand({
+    TableName: DEVICE_TOKENS_TABLE,
+    Item: { userId: uid, tokens, platform, updatedAt: now },
+  }));
+  return json(200, { ok: true, count: tokens.length });
+}
+
+// POST /match/leads → rank the tenants who liked the caller's properties by the
+// same two-sided model the client uses (landlord→tenant fit: affordability +
+// shared preferences + deal-breaker gates). Landlord-only.
+async function handleMatchLeads(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+
+  // 1. Landlord profile (their offer + requirements).
+  let landlordProfile = {};
+  try {
+    const r = await ddb.send(new GetCommand({
+      TableName: TABLES.users.name, Key: { id: uid },
+    }));
+    landlordProfile = r.Item || {};
+  } catch { /* no profile yet */ }
+  const landlordKeys = keysFor(landlordProfile.importantDetails, LANDLORD_TAG_KEYS);
+  const landlordDealKeys = keysFor(landlordProfile.dealBreakers, LANDLORD_TAG_KEYS);
+
+  // 2. The landlord's properties.
+  const props = [];
+  try {
+    const out = await ddb.send(new QueryCommand({
+      TableName: TABLES.properties.name,
+      IndexName: TABLES.properties.ownerIndex,
+      KeyConditionExpression: 'ownerUserId = :o',
+      ExpressionAttributeValues: { ':o': uid },
+      Limit: 100,
+    }));
+    for (const p of out.Items || []) props.push(p);
+  } catch (e) { console.warn('match/leads props', e.message); }
+
+  // 3. For each property, the tenants who liked it.
+  const likeRows = [];
+  for (const p of props) {
+    try {
+      const out = await ddb.send(new QueryCommand({
+        TableName: TABLES.property_likes.name,
+        IndexName: TABLES.property_likes.gsi.name,
+        KeyConditionExpression: 'propertyId = :p',
+        ExpressionAttributeValues: { ':p': p.id },
+        Limit: 100,
+      }));
+      for (const l of out.Items || []) likeRows.push({ like: l, property: p });
+    } catch { /* skip */ }
+  }
+
+  // 4. Score each (tenant, property) pair.
+  const profileCache = {};
+  const leads = [];
+  for (const { like, property } of likeRows) {
+    const tenantId = like.tenantId;
+    if (!tenantId) continue;
+    if (!(tenantId in profileCache)) {
+      try {
+        const r = await ddb.send(new GetCommand({
+          TableName: TABLES.users.name, Key: { id: tenantId },
+        }));
+        profileCache[tenantId] = r.Item || {};
+      } catch { profileCache[tenantId] = {}; }
+    }
+    const tp = profileCache[tenantId];
+    const tenantKeys = keysFor(tp.importantDetails, TENANT_TAG_KEYS);
+    const tenantDealKeys = keysFor(tp.dealBreakers, TENANT_TAG_KEYS);
+
+    const { score, reasons, conflicts } = scoreLandlordToTenant({
+      budgetMax: Number(tp.budgetMax) || 0,
+      price: Number(property.price) || 0,
+      tenantKeys, tenantDealKeys, landlordKeys, landlordDealKeys,
+    });
+
+    leads.push({
+      tenantId,
+      tenantName: like.tenantName || tp.name || 'מתעניין',
+      propertyId: property.id,
+      propertyTitle: property.street || property.city || '',
+      score,
+      excluded: conflicts.length > 0,
+      reasons,
+      conflicts,
+      likedAt: like.createdAt || null,
+    });
+  }
+
+  leads.sort((a, b) => b.score - a.score);
+  return json(200, { leads, count: leads.length });
+}
+
+function scoreLandlordToTenant({ budgetMax, price, tenantKeys, tenantDealKeys, landlordKeys, landlordDealKeys }) {
+  let fit = 60;
+  const reasons = [];
+  const conflicts = [];
+
+  if (budgetMax > 0 && price > 0) {
+    const ratio = budgetMax / price;
+    if (ratio >= 1.15) { fit += 10; reasons.push('תקציב נוח לשכר הדירה'); }
+    else if (ratio >= 1.0) { fit += 5; }
+    else { fit -= 18; conflicts.push('התקציב נמוך משכר הדירה'); }
+  }
+  for (const k of landlordDealKeys) {
+    if (tenantKeys.has(k)) fit += 6; else conflicts.push(`חסר: ${k}`);
+  }
+  for (const k of tenantDealKeys) {
+    if (!landlordKeys.has(k)) conflicts.push(`השוכר דורש: ${k}`);
+  }
+  const shared = [...tenantKeys].filter((k) => landlordKeys.has(k));
+  fit += shared.length * 4;
+  for (const k of shared) reasons.push(k);
+
+  fit -= conflicts.length * 28;
+  return { score: Math.max(0, Math.min(100, Math.round(fit))), reasons, conflicts };
+}
+
+// ── Rental contract handlers ───────────────────────────────────────────────
+function isContractParty(item, uid) {
+  return !!item && (item.landlordUserId === uid || item.tenantUserId === uid);
+}
+
+async function contractCreate(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+  const id = (body.id || '').toString();
+  if (!id) return json(400, { message: 'id required' });
+  // The creator must be a party; default the landlord to the caller.
+  if (body.landlordUserId !== uid && body.tenantUserId !== uid) {
+    body.landlordUserId = uid;
+  }
+  const now = new Date().toISOString();
+  const item = { ...body, id, createdAt: body.createdAt || now, updatedAt: now };
+  await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
+  return json(200, { item });
+}
+
+async function contractGet(event, cid) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  const r = await ddb.send(new GetCommand({
+    TableName: CONTRACTS_TABLE, Key: { id: cid },
+  }));
+  if (!r.Item || !isContractParty(r.Item, uid)) {
+    return json(404, { message: 'Not found' });
+  }
+  return json(200, { item: r.Item });
+}
+
+async function contractList(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  const items = [];
+  let lastKey;
+  do {
+    const out = await ddb.send(new ScanCommand({
+      TableName: CONTRACTS_TABLE,
+      FilterExpression: 'landlordUserId = :u OR tenantUserId = :u',
+      ExpressionAttributeValues: { ':u': uid },
+      ExclusiveStartKey: lastKey,
+    }));
+    for (const it of out.Items || []) items.push(it);
+    lastKey = out.LastEvaluatedKey;
+  } while (lastKey && items.length < 200);
+  items.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  return json(200, { items });
+}
+
+async function contractSign(event, cid) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let sig = {};
+  try { sig = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+  const role = (sig.role || '').toString();
+  if (role !== 'landlord' && role !== 'tenant') {
+    return json(400, { message: 'invalid role' });
+  }
+  const r = await ddb.send(new GetCommand({
+    TableName: CONTRACTS_TABLE, Key: { id: cid },
+  }));
+  const item = r.Item;
+  if (!item || !isContractParty(item, uid)) {
+    return json(404, { message: 'Not found' });
+  }
+  // The caller may only sign the role they actually are.
+  if (role === 'landlord' && item.landlordUserId !== uid) {
+    return json(403, { message: 'not the landlord of this contract' });
+  }
+  if (role === 'tenant' && item.tenantUserId !== uid) {
+    return json(403, { message: 'not the tenant of this contract' });
+  }
+  sig.signerUserId = uid; // the backend records who actually signed
+  if (role === 'landlord') item.landlordSignature = sig;
+  else item.tenantSignature = sig;
+  if (item.landlordSignature && item.tenantSignature) item.status = 'signed';
+  item.updatedAt = new Date().toISOString();
+  await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
+  return json(200, { item });
+}
+
+async function contractCancel(event, cid) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  const r = await ddb.send(new GetCommand({
+    TableName: CONTRACTS_TABLE, Key: { id: cid },
+  }));
+  const item = r.Item;
+  if (!item || item.landlordUserId !== uid) {
+    return json(403, { message: 'forbidden' });
+  }
+  item.status = 'cancelled';
+  item.updatedAt = new Date().toISOString();
+  await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
+  return json(200, { item });
+}
+
+async function handleAssistant(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!GEMINI_API_KEY) {
+    return json(200, { reply: 'העוזר האישי אינו זמין כרגע. אנא נסו שוב מאוחר יותר.', propertyDraft: null });
+  }
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+
+  const messages = Array.isArray(body.messages) ? body.messages.slice(-20) : [];
+  if (messages.length === 0) return json(400, { message: 'messages required' });
+
+  const [properties, profile] = await Promise.all([
+    loadOwnerProperties(uid),
+    loadUserProfile(uid),
+  ]);
+  const systemText = buildErikSystemPrompt(profile, properties);
+  const contents = messages
+    .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.text).slice(0, 2000) }],
+    }));
+
+  try {
+    const data = await geminiGenerate(systemText, contents, [ASSISTANT_TOOL]);
+    const cand = data.candidates && data.candidates[0];
+    const parts = (cand && cand.content && cand.content.parts) || [];
+    let reply = '';
+    let propertyDraft = null;
+    for (const p of parts) {
+      if (p.text) reply += p.text;
+      if (p.functionCall && p.functionCall.name === 'create_property') {
+        propertyDraft = p.functionCall.args || {};
+      }
+    }
+    reply = stripMarkup(reply);
+    // Pull out the optional [[CHOICES: a | b | c]] line → quick-reply chips.
+    let suggestions = [];
+    const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
+    if (cm) {
+      suggestions = cm[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 5);
+      reply = reply.replace(cm[0], '').trim();
+    }
+    if (!reply && propertyDraft) {
+      reply = 'הכנתי טיוטה של הדירה! עכשיו רק צריך להוסיף תמונה אחת של הדירה — '
+        + 'אפשר לצלם עכשיו או לבחור תמונה מהטלפון, ואז נפרסם.';
+    }
+    if (!reply) reply = 'סליחה, לא הבנתי. אפשר לחזור על זה שוב?';
+    return json(200, { reply, propertyDraft, suggestions });
+  } catch (e) {
+    console.warn('assistant error:', e.message);
+    return json(200, {
+      reply: 'סליחה, יש כרגע עומס קטן על העוזר. אפשר לנסות שוב בעוד רגע?',
+      propertyDraft: null,
+    });
+  }
+}
+
+// Mints a short-lived Gemini Live ephemeral token for a real-time voice session.
+// The token is locked server-side to Erik's model + persona + create_property
+// tool, so the client connects straight to the Live WebSocket without ever
+// seeing the API key and can't repurpose the session. Single use, valid 30 min,
+// must connect within 1 min. Stateless — nothing about the user is stored.
+async function handleAssistantLiveToken(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!GEMINI_LIVE_API_KEY) {
+    return json(503, { message: 'Live assistant not configured.' });
+  }
+
+  let properties = [];
+  let profile = null;
+  try {
+    [properties, profile] = await Promise.all([
+      loadOwnerProperties(uid),
+      loadUserProfile(uid),
+    ]);
+  } catch { /* context is best-effort */ }
+  const systemText = buildErikSystemPrompt(profile, properties);
+
+  const now = Date.now();
+  const expireTime = new Date(now + 30 * 60 * 1000).toISOString();
+  const newSessionExpireTime = new Date(now + 60 * 1000).toISOString();
+
+  const reqBody = {
+    uses: 1,
+    expireTime,
+    newSessionExpireTime,
+    bidiGenerateContentSetup: {
+      model: GEMINI_LIVE_MODEL,
+      generationConfig: { responseModalities: ['AUDIO'] },
+      systemInstruction: { parts: [{ text: systemText }] },
+      tools: [ASSISTANT_TOOL],
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
+    },
+  };
+
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${GEMINI_LIVE_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqBody),
+      },
+    );
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      console.warn('live-token error:', r.status, JSON.stringify(data).slice(0, 300));
+      return json(502, { message: 'Could not start live session.' });
+    }
+    const name = data.name || '';
+    return json(200, {
+      token: name,
+      model: GEMINI_LIVE_MODEL,
+      expireTime,
+    });
+  } catch (e) {
+    console.warn('live-token exception:', e.message);
+    return json(502, { message: 'Could not start live session.' });
+  }
+}
+
+// Gemini natural voice for Erik's reply. Returns base64 PCM (L16 mono) + the
+// sample rate; the client wraps it in a WAV header and plays it.
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
+const TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Sulafat'; // a warm voice
+
+async function handleAssistantTts(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!GEMINI_API_KEY) return json(200, { audio: null });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON.' }); }
+  const text = stripMarkup((body.text || '').toString()).slice(0, 1200);
+  if (!text) return json(400, { message: 'text required' });
+  const voice = (body.voice || TTS_VOICE).toString();
+
+  const reqBody = {
+    contents: [{ parts: [{ text }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+      },
+    },
+  };
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    let res;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqBody),
+      });
+      if (res.ok) break;
+      if (res.status === 429 || res.status === 500 || res.status === 503) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+      break;
+    }
+    if (!res || !res.ok) return json(200, { audio: null });
+    const data = await res.json();
+    const part = data.candidates?.[0]?.content?.parts?.[0];
+    const inline = part && part.inlineData;
+    if (!inline || !inline.data) return json(200, { audio: null });
+    let sampleRate = 24000;
+    const m = /rate=(\d+)/.exec(inline.mimeType || '');
+    if (m) sampleRate = parseInt(m[1], 10);
+    return json(200, { audio: inline.data, sampleRate });
+  } catch (e) {
+    console.warn('tts error:', e.message);
+    return json(200, { audio: null });
+  }
 }

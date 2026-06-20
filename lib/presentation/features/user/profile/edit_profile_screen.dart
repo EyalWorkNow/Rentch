@@ -2,12 +2,13 @@ import 'dart:io';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/storage_service.dart';
+import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -73,6 +74,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late double _rooms;
   late String _moveIn;
   late List<String> _details;
+  late List<String> _dealBreakers;
   late List<_PhotoEntry> _photos;
 
   bool _isSaving = false;
@@ -89,6 +91,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _rooms = p.desiredRooms;
     _moveIn = p.moveInWindow.isNotEmpty ? p.moveInWindow : 'גמיש';
     _details = List<String>.from(p.importantDetails);
+    _dealBreakers = List<String>.from(p.dealBreakers);
     _photos = p.photoUrls.map(_PhotoEntry.remote).toList();
   }
 
@@ -220,63 +223,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // ─── Details ────────────────────────────────────────────────────────────────
 
-  void _addDetail() {
-    showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        final ctrl = TextEditingController();
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-          title: const Text(
-            'הוספת פרט',
-            style:
-                TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900),
-          ),
-          content: TextField(
-            controller: ctrl,
-            autofocus: true,
-            textDirection: TextDirection.rtl,
-            decoration: InputDecoration(
-              hintText: 'לדוגמה: עם כלב, זוג…',
-              filled: true,
-              fillColor: AppColors.background,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.borderLight),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.primary, width: 2),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('ביטול',
-                  style: TextStyle(color: AppColors.textSecondary)),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-              child: const Text('הוספה'),
-            ),
-          ],
-        );
-      },
-    ).then((value) {
-      if (value != null && value.isNotEmpty) {
-        HapticFeedback.selectionClick();
-        setState(() => _details.add(value));
+  void _toggleDealBreaker(String tag) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_dealBreakers.contains(tag)) {
+        _dealBreakers.remove(tag);
+      } else {
+        _dealBreakers.add(tag);
       }
     });
+  }
+
+  void _openTagPicker() {
+    HapticFeedback.selectionClick();
+    final isLandlord = context.read<DatingProvider>().isLandlord;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _TagPickerSheet(
+        isLandlord: isLandlord,
+        selected: _details,
+        dealBreakers: _dealBreakers,
+        onToggleTag: (tag) {
+          HapticFeedback.selectionClick();
+          setState(() {
+            if (_details.contains(tag)) {
+              _details.remove(tag);
+              _dealBreakers.remove(tag);
+            } else {
+              _details.add(tag);
+            }
+          });
+        },
+        onToggleDealBreaker: _toggleDealBreaker,
+      ),
+    );
   }
 
   // ─── Save ───────────────────────────────────────────────────────────────────
@@ -299,6 +284,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       desiredRooms: _rooms,
       photoUrls: urls,
       importantDetails: _details,
+      dealBreakers:
+          _dealBreakers.where((tag) => _details.contains(tag)).toList(),
     );
 
     await context.read<DatingProvider>().updateTenantProfile(updated);
@@ -319,12 +306,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLandlord = context.read<DatingProvider>().isLandlord;
     return Scaffold(
       backgroundColor: AppColors.background,
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: _isSaving
-            ? const Center(
+            ? Center(
                 child: CircularProgressIndicator(color: AppColors.primary))
             : SizedBox(
                 height: 54,
@@ -406,12 +394,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: InputDecoration(
-                              labelText: 'שם מלא',
-                              hintText: 'שם וכינוי',
+                              labelText: isLandlord ? 'שם מלא / שם העסק' : 'שם מלא',
+                              hintText: isLandlord ? 'שם פרטי ומשפחה או שם העסק' : 'שם וכינוי',
                               labelStyle: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w600),
-                              suffixIcon: const RentchIcon(
+                              suffixIcon: RentlyIcon(
                                   IconsaxPlusLinear.profile_circle,
                                   size: 18,
                                   color: AppColors.primary),
@@ -431,7 +419,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                     color: AppColors.primary, width: 2),
                               ),
                             ),
@@ -446,8 +434,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: InputDecoration(
-                              labelText: 'עליי',
-                              hintText: 'תאר/י את עצמך לבעלי דירות...',
+                              labelText: isLandlord ? 'עליי / על הנכסים' : 'עליי',
+                              hintText: isLandlord ? 'תאר/י את עצמך או את הדירות שלך לשוכרים פוטנציאליים...' : 'תאר/י את עצמך לבעלי דירות...',
                               alignLabelWithHint: true,
                               labelStyle: const TextStyle(
                                   color: AppColors.textSecondary,
@@ -468,7 +456,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                     color: AppColors.primary, width: 2),
                               ),
                             ),
@@ -477,6 +465,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
 
+                    if (!isLandlord) ...[
                     // 2. Apartment preferences
                     _FormSection(
                       title: 'העדפות דירה',
@@ -496,7 +485,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                               child: Text(
                                 'תקציב מקסימאלי: ₪${_budget.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 18,
@@ -654,24 +643,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ],
                       ),
                     ),
+                  ],
 
-                    // 3. Important details for landlords
+                    // 3. Important details / tags for landlords/seekers
                     _FormSection(
-                      title: 'פרטים לבעלי דירות',
-                      icon: IconsaxPlusLinear.info_circle,
+                      title: isLandlord ? 'תגיות לשוכרים' : 'תגיות לבעלי דירות',
+                      icon: IconsaxPlusLinear.tag,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const Text(
+                            'בחר/י תגיות שמתארות אותך והעדפותיך. סמן/י תגית כ"דיל ברייקר" כדי שנציג התאמות שעונות עליה בלבד.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.5,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                          const SizedBox(height: 14),
                           if (_details.isNotEmpty) ...[
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
                               children: _details.map((d) {
+                                final tag = ProfileTagCatalog.tagFor(d,
+                                    isLandlord: isLandlord);
                                 return _DetailTag(
                                   label: d,
+                                  isDealBreaker: _dealBreakers.contains(d),
+                                  canBeDealBreaker: tag?.canBeDealBreaker ?? false,
+                                  onToggleDealBreaker: () =>
+                                      _toggleDealBreaker(d),
                                   onRemove: () {
                                     HapticFeedback.lightImpact();
-                                    setState(() => _details.remove(d));
+                                    setState(() {
+                                      _details.remove(d);
+                                      _dealBreakers.remove(d);
+                                    });
                                   },
                                 );
                               }).toList(),
@@ -679,7 +689,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             const SizedBox(height: 12),
                           ],
                           FilledButton.icon(
-                            onPressed: _addDetail,
+                            onPressed: _openTagPicker,
                             style: FilledButton.styleFrom(
                               backgroundColor:
                                   AppColors.primary.withValues(alpha: 0.12),
@@ -692,11 +702,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 9),
                             ),
-                            icon: const RentchIcon(IconsaxPlusLinear.add,
+                            icon: const RentlyIcon(IconsaxPlusLinear.add,
                                 size: 14),
-                            label: const Text(
-                              'הוסף פרט',
-                              style: TextStyle(
+                            label: Text(
+                              _details.isEmpty ? 'הוסף תגיות' : 'ערוך תגיות',
+                              style: const TextStyle(
                                   fontWeight: FontWeight.w700, fontSize: 13),
                             ),
                           ),
@@ -768,7 +778,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 56),
-                      RentchIcon(
+                      RentlyIcon(
                         IconsaxPlusLinear.profile_circle,
                         size: 72,
                         color: AppColors.primary.withValues(alpha: 0.6),
@@ -847,7 +857,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const RentchIcon(IconsaxPlusLinear.gallery,
+                        const RentlyIcon(IconsaxPlusLinear.gallery,
                             size: 13, color: Colors.white),
                         const SizedBox(width: 5),
                         Text(
@@ -882,7 +892,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        RentchIcon(IconsaxPlusLinear.edit_2,
+                        RentlyIcon(IconsaxPlusLinear.edit_2,
                             size: 14, color: Colors.white),
                         SizedBox(width: 6),
                         Text(
@@ -1135,7 +1145,7 @@ class _PhotoCell extends StatelessWidget {
                       color: AppColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Text(
+                    child: Text(
                       'תמונה ראשית',
                       style: TextStyle(
                         color: AppColors.primary,
@@ -1214,10 +1224,10 @@ class _AddPhotoCell extends StatelessWidget {
             strokeAlign: BorderSide.strokeAlignInside,
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            RentchIcon(IconsaxPlusLinear.add,
+            RentlyIcon(IconsaxPlusLinear.add,
                 color: AppColors.primary, size: 20),
             SizedBox(width: 8),
             Text(
@@ -1262,7 +1272,7 @@ class _ProfilePhotoWidget extends StatelessWidget {
   Widget _fallback() {
     return Container(
       color: AppColors.navy,
-      child: RentchIcon(
+      child: RentlyIcon(
         IconsaxPlusLinear.profile_circle,
         color: AppColors.primary.withValues(alpha: 0.5),
         size: 40,
@@ -1325,29 +1335,51 @@ class _SourceButton extends StatelessWidget {
 // ─── Detail tag chip ──────────────────────────────────────────────────────────
 
 class _DetailTag extends StatelessWidget {
-  const _DetailTag({required this.label, required this.onRemove});
+  const _DetailTag({
+    required this.label,
+    required this.onRemove,
+    this.isDealBreaker = false,
+    this.canBeDealBreaker = false,
+    this.onToggleDealBreaker,
+  });
 
   final String label;
   final VoidCallback onRemove;
+  final bool isDealBreaker;
+  final bool canBeDealBreaker;
+  final VoidCallback? onToggleDealBreaker;
 
   @override
   Widget build(BuildContext context) {
+    final accent = isDealBreaker ? AppColors.coral : AppColors.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
+        color: accent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Deal-breaker flag toggle (only for eligible tags).
+          if (canBeDealBreaker && onToggleDealBreaker != null) ...[
+            GestureDetector(
+              onTap: onToggleDealBreaker,
+              child: Icon(
+                isDealBreaker
+                    ? Icons.gpp_maybe_rounded
+                    : Icons.shield_outlined,
+                size: 15,
+                color: accent,
+              ),
+            ),
+            const SizedBox(width: 5),
+          ],
           Text(
             label,
-            style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: 13),
+            style: TextStyle(
+                color: accent, fontWeight: FontWeight.w700, fontSize: 13),
           ),
           const SizedBox(width: 6),
           GestureDetector(
@@ -1356,14 +1388,273 @@ class _DetailTag extends StatelessWidget {
               width: 18,
               height: 18,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.2),
+                color: accent.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              child:
-                  const Icon(Icons.close, size: 11, color: AppColors.primary),
+              child: Icon(Icons.close, size: 11, color: accent),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Searchable tag picker bottom sheet ───────────────────────────────────────
+
+class _TagPickerSheet extends StatefulWidget {
+  const _TagPickerSheet({
+    required this.isLandlord,
+    required this.selected,
+    required this.dealBreakers,
+    required this.onToggleTag,
+    required this.onToggleDealBreaker,
+  });
+
+  final bool isLandlord;
+  final List<String> selected;
+  final List<String> dealBreakers;
+  final void Function(String tag) onToggleTag;
+  final void Function(String tag) onToggleDealBreaker;
+
+  @override
+  State<_TagPickerSheet> createState() => _TagPickerSheetState();
+}
+
+class _TagPickerSheetState extends State<_TagPickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories =
+        ProfileTagCatalog.forRole(isLandlord: widget.isLandlord);
+    final query = _query.trim();
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (ctx, scrollCtrl) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'בחירת תגיות',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.navy,
+                    ),
+                  ),
+                ),
+              ),
+              // Search box
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: TextField(
+                  controller: _searchCtrl,
+                  textDirection: TextDirection.rtl,
+                  onChanged: (v) => setState(() => _query = v),
+                  style: const TextStyle(color: AppColors.navy, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'חיפוש תגית…',
+                    prefixIcon: const Icon(IconsaxPlusLinear.search_normal_1,
+                        size: 18, color: AppColors.textSecondary),
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppColors.background,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.borderLight),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: AppColors.borderLight),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                          BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.borderLight),
+              Expanded(
+                child: ListView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    for (final category in categories)
+                      ..._buildCategory(category, query),
+                    if (categories.every((c) =>
+                        _matchingTags(c, query).isEmpty))
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Text(
+                          'לא נמצאו תגיות תואמות',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: Text(
+                      'סיום (${widget.selected.length})',
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<ProfileTag> _matchingTags(ProfileTagCategory category, String query) {
+    if (query.isEmpty) return category.tags;
+    return category.tags
+        .where((tag) => tag.label.contains(query))
+        .toList();
+  }
+
+  List<Widget> _buildCategory(ProfileTagCategory category, String query) {
+    final tags = _matchingTags(category, query);
+    if (tags.isEmpty) return const [];
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
+        child: Text(
+          category.title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            color: AppColors.navy,
+          ),
+        ),
+      ),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: tags.map(_buildChip).toList(),
+      ),
+      const SizedBox(height: 14),
+    ];
+  }
+
+  // The selection lists are owned by the parent; toggling there mutates the
+  // shared list, so we also rebuild this sheet to reflect the new state.
+  void _toggleTag(String tag) {
+    widget.onToggleTag(tag);
+    setState(() {});
+  }
+
+  void _toggleDeal(String tag) {
+    widget.onToggleDealBreaker(tag);
+    setState(() {});
+  }
+
+  Widget _buildChip(ProfileTag tag) {
+    final selected = widget.selected.contains(tag.label);
+    final isDeal = widget.dealBreakers.contains(tag.label);
+    final accent = isDeal ? AppColors.coral : AppColors.primary;
+    return GestureDetector(
+      onTap: () => _toggleTag(tag.label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? accent.withValues(alpha: 0.12) : AppColors.background,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? accent : AppColors.borderLight,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.check_circle_rounded : Icons.add_circle_outline,
+              size: 15,
+              color: selected ? accent : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              tag.label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? accent : AppColors.navy,
+              ),
+            ),
+            // Inline deal-breaker toggle, only once the tag is selected.
+            if (selected && tag.canBeDealBreaker) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _toggleDeal(tag.label),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDeal
+                        ? AppColors.coral
+                        : AppColors.coral.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'דיל ברייקר',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: isDeal ? Colors.white : AppColors.coral,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

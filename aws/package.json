@@ -1,0 +1,13 @@
+{
+  "name": "rentch-backend-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Authorization + chat-privacy regression tests for the Rentch API Lambda router. Uses Node's built-in test runner with a stub ESM loader for the AWS SDK \u2014 no dependencies, no AWS account needed.",
+  "scripts": {
+    "test": "node --test test/router.test.mjs"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}

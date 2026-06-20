@@ -79,7 +79,7 @@ class ReviewRecord {
       targetId: json['targetId']?.toString() ?? '',
       reviewerUserId: json['reviewerUserId']?.toString() ?? '',
       reviewerRole: json['reviewerRole']?.toString() ?? '',
-      authorName: json['authorName']?.toString() ?? 'משתמש Rentch',
+      authorName: json['authorName']?.toString() ?? 'משתמש Rently',
       rating: rating.clamp(1, 5),
       text: json['text']?.toString() ?? '',
       matchId: json['matchId']?.toString() ?? '',

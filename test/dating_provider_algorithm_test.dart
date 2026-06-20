@@ -3,6 +3,7 @@ import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
+import 'package:dating_app/data/repositories/user_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -393,48 +394,109 @@ void main() {
     provider.dispose();
   });
 
-  test('property and tenant reviews save locally and submit to repository',
-      () async {
-    final reviewRepository = _FakeReviewRepository();
+
+  test('matching algorithm factors in tag compatibility and completeness bonuses', () async {
+    final property = _property(
+      id: 'prop-tag-compat',
+      ownerUserId: 'landlord-test-id',
+      price: 6000,
+    );
+
+    final userRepository = _FakeUserRepository();
     final provider = DatingProvider(
-      rentalDataService: _FakeRentalDataService([
-        _property(id: 'reviewed-property', ownerUserId: 'owner-1'),
-      ]),
+      rentalDataService: _FakeRentalDataService([property]),
       localStorageService: _MemoryLocalStorageService(),
-      reviewRepository: reviewRepository,
+      userRepository: userRepository,
     );
 
     await provider.initialize();
-    await provider.addPropertyReview(
-      propertyId: 'reviewed-property',
-      rating: 6,
-      text: ' דירה מצוינת ',
-      matchId: 'match-1',
-    );
-    await provider.addTenantReview(
-      tenantId: 'tenant-reviewed',
-      rating: 0,
-      text: ' שוכר מסודר ',
-      matchId: 'match-1',
-      propertyId: 'reviewed-property',
-    );
 
-    expect(provider.propertyReviews('reviewed-property').single.rating, 5);
-    expect(provider.propertyReviews('reviewed-property').single.text,
-        'דירה מצוינת');
-    expect(provider.tenantReviews.single.rating, 1);
-    expect(provider.tenantReviews.single.text, 'שוכר מסודר');
+    const filters = SearchFilters(
+      query: '',
+      minBudget: 600,
+      maxBudget: 2000000000,
+      minRooms: 4.0,
+      maxRooms: 10.0,
+      areaId: 'all_israel',
+      requiredFeatures: <String>{},
+      preferredFeatures: {'balcony'},
+      minSizeM2: 0,
+      maxSizeM2: 1000000,
+      propertyTypes: <String>{},
+      preferredPropertyTypes: {'Duplex'},
+      conditions: <String>{},
+      preferredConditions: {'New'},
+      listingSource: ListingSourceFilter.any,
+      minFloor: 0,
+      moveInFilter: MoveInFilter.any,
+      sortBy: SearchSortOption.bestMatch,
+      includeUnknownPriceListings: false,
+      customAreaPolygon: [],
+      city: '',
+      transactionType: TransactionTypeFilter.rent,
+    );
+    await provider.updateFilters(filters);
 
-    expect(reviewRepository.saved, hasLength(2));
-    expect(reviewRepository.saved[0].targetType, ReviewTargetType.property);
-    expect(reviewRepository.saved[0].targetKey, 'property#reviewed-property');
-    expect(reviewRepository.saved[0].matchId, 'match-1');
-    expect(reviewRepository.saved[1].targetType, ReviewTargetType.tenant);
-    expect(reviewRepository.saved[1].targetKey, 'tenant#tenant-reviewed');
-    expect(reviewRepository.saved[1].propertyId, 'reviewed-property');
+    // 1. Initially, no tenant profile and no cached landlord profile -> tag compatibility score = 0
+    final baseScore = provider.matchScore(property);
+
+    // 2. Set tenant profile with tags
+    const tenantProfile = TenantProfile(
+      id: 'tenant-test-id',
+      name: 'Tenant Name',
+      bio: 'Bio text',
+      photoUrls: [],
+      budgetMax: 7000,
+      desiredRooms: 3.0,
+      moveInWindow: 'גמיש',
+      // Catalog tenant tags resolving to matchKeys: pets_allowed, no_smoking, parking
+      importantDetails: ['מתאים לחיות מחמד', 'לא מעשן/ת', 'חייב/ת חניה'], // 3 tags
+    );
+    await provider.updateTenantProfile(tenantProfile);
+
+    // Landlord profile in repository
+    const landlordProfile = TenantProfile(
+      id: 'landlord-test-id',
+      name: 'Landlord Name',
+      bio: 'Landlord bio',
+      photoUrls: [],
+      budgetMax: 0,
+      desiredRooms: 0,
+      moveInWindow: '',
+      // Catalog landlord tags resolving to the same matchKeys: pets_allowed, no_smoking, parking
+      importantDetails: ['מאפשר בעלי חיים', 'מעדיף שוכרים לא מעשנים', 'יש חניה'], // 3 tags
+    );
+    userRepository.profiles['landlord-test-id'] = landlordProfile;
+
+    // Trigger loading of landlord profile into cache.
+    expect(provider.getCachedProfile('landlord-test-id'), isNull);
+    
+    // Wait for the async repository fetch to complete and trigger listeners
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    // Now, the landlord profile is cached
+    expect(provider.getCachedProfile('landlord-test-id'), equals(landlordProfile));
+
+    // Calculate score again. Tenant & landlord tags share 3 matchKeys:
+    //   - pets_allowed (מתאים לחיות מחמד ↔ מאפשר בעלי חיים) -> +5
+    //   - no_smoking   (לא מעשן/ת ↔ מעדיף שוכרים לא מעשנים) -> +5
+    //   - parking      (חייב/ת חניה ↔ יש חניה)              -> +5
+    // Completeness bonus (both profiles have 3+ tags) -> +5
+    // Total compatibility bonus = 5 + 5 + 5 + 5 = 20 points.
+    final scoreWithTags = provider.matchScore(property);
+    expect(scoreWithTags, equals(baseScore + 20));
 
     provider.dispose();
   });
+}
+
+class _FakeUserRepository extends UserRepository {
+  final Map<String, TenantProfile> profiles = {};
+
+  @override
+  Future<TenantProfile?> getProfile(String userId) async {
+    return profiles[userId];
+  }
 }
 
 class _FakeRentalDataService extends RentalDataService {

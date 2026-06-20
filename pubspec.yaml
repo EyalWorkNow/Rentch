@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+51
+version: 1.0.0+85
 
 environment:
   sdk: ^3.6.1
@@ -47,14 +47,29 @@ dependencies:
   image_picker: ^1.1.2
   path_provider: ^2.1.4
   crypto: ^3.0.3
+  # Ed25519 asymmetric signing for tamper-evident rental-contract signatures
+  # (pure Dart, no native deps). Private keys stay on-device (secure storage).
+  cryptography: ^2.7.0
   firebase_core: ^4.1.0
   firebase_auth: ^6.0.2
+  firebase_messaging: ^16.0.0
   google_sign_in: ^7.1.1
   sign_in_with_apple: ^6.1.4
   flutter_secure_storage: ^9.2.4
   video_player: ^2.9.2
+  # On-device transcode of iOS HEVC/.mov scans → H.264 mp4 (Teleport requires
+  # mp4 for 3D reconstruction; HEVC uploads fail processing).
+  video_compress: ^3.1.4
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+  speech_to_text: ^7.4.0
+  flutter_tts: ^4.2.5
+  audioplayers: ^6.7.1
+  # Gemini Live real-time voice: WebSocket + raw PCM mic capture + low-latency
+  # PCM playback (Erik's hands-free real-time conversation).
+  web_socket_channel: ^3.0.1
+  record: ^5.2.1
+  flutter_pcm_sound: ^3.1.6
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +91,8 @@ flutter_launcher_icons:
 
 dependency_overrides:
   device_info_plus: 11.3.0
+  record_linux: 2.1.0
+  record_platform_interface: 2.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -90,12 +107,70 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Typography: authentic SF Pro Rounded (Latin/digits) + authentic SF Hebrew
+  # Rounded (Hebrew, variable-weight) → the whole UI is genuine SF Rounded.
+  # Rubik kept as a final safety fallback.
+  fonts:
+    # SF Hebrew Rounded shipped as a single variable font (wght axis 1–1000),
+    # which Flutter registered only at weight 400 — so every Hebrew w500–w900
+    # rendered at 400 or as synthetic faux-bold, mismatched against the
+    # per-weight Latin SF Pro Rounded faces. Fix: real static instances cut from
+    # the variable font at each weight (fonttools instancer), so each weight is a
+    # genuine face the OS renders correctly on every platform.
+    - family: SF Hebrew Rounded
+      fonts:
+        - asset: assets/fonts/SF-Hebrew-Rounded-Light.ttf
+          weight: 300
+        - asset: assets/fonts/SF-Hebrew-Rounded-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/SF-Hebrew-Rounded-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SF-Hebrew-Rounded-Semibold.ttf
+          weight: 600
+        - asset: assets/fonts/SF-Hebrew-Rounded-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/SF-Hebrew-Rounded-Heavy.ttf
+          weight: 800
+        - asset: assets/fonts/SF-Hebrew-Rounded-Black.ttf
+          weight: 900
+    - family: SF Pro Rounded
+      fonts:
+        - asset: assets/fonts/SF-Pro-Rounded-Regular.otf
+          weight: 400
+        - asset: assets/fonts/SF-Pro-Rounded-Medium.otf
+          weight: 500
+        - asset: assets/fonts/SF-Pro-Rounded-Semibold.otf
+          weight: 600
+        - asset: assets/fonts/SF-Pro-Rounded-Bold.otf
+          weight: 700
+        - asset: assets/fonts/SF-Pro-Rounded-Heavy.otf
+          weight: 800
+        - asset: assets/fonts/SF-Pro-Rounded-Black.otf
+          weight: 900
+    - family: Rubik
+      fonts:
+        - asset: assets/fonts/Rubik-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Rubik-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Rubik-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Rubik-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Rubik-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Rubik-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Rubik-Black.ttf
+          weight: 900
+
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
     - assets/data/
-    - assets/images/rentch_logo.svg
-    - assets/images/rentch_logo_full.svg
+    - assets/audio/erik/
+    - assets/images/rently_logo.svg
+    - assets/images/rently_logo_full.svg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/services/apple_auth_service.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
@@ -11,9 +13,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -21,7 +24,7 @@ const _kScreenBg = Color(0xFFF0F4F7);
 const _kCardBg = Colors.white;
 const _kInputBorder = Color(0xFFDDE3EE);
 const _kInputFill = Color(0xFFF7F9FC);
-const _kPillBtn = AppColors.primary;
+Color get _kPillBtn => AppColors.primary;
 
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
 
@@ -444,6 +447,20 @@ class _LogoHeader extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
+            BreatheAnimation(
+              child: SvgPicture.asset(
+                'assets/images/rently_logo_with_text.svg',
+                height: logoHeight,
+                colorFilter:
+                    ColorFilter.mode(color, BlendMode.srcIn),
+                placeholderBuilder: (_) => Text('Rently',
+                    style: TextStyle(
+                        color: color,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1)),
+              ),
+            ),
             if (showBackButton)
               Positioned(
                 right: 0,
@@ -463,18 +480,6 @@ class _LogoHeader extends StatelessWidget {
                   ),
                 ),
               ),
-            SvgPicture.asset(
-              'assets/images/rentch_logo_with_text.svg',
-              height: logoHeight,
-              colorFilter:
-                  ColorFilter.mode(color, BlendMode.srcIn),
-              placeholderBuilder: (_) => Text('Rentch',
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1)),
-            ),
           ],
         ),
       ),
@@ -492,10 +497,10 @@ class _WideHero extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         SvgPicture.asset(
-          'assets/images/rentch_logo_with_text.svg',
+          'assets/images/rently_logo_with_text.svg',
           height: 48,
           colorFilter: const ColorFilter.mode(AppColors.navy, BlendMode.srcIn),
-          placeholderBuilder: (_) => const Text('Rentch',
+          placeholderBuilder: (_) => const Text('Rently',
               style: TextStyle(
                   color: AppColors.navy,
                   fontSize: 38,
@@ -513,7 +518,7 @@ class _WideHero extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         Text(
-          'Rentch מחבר שוכרים ומשכירים בחוויה חכמה, מהירה וברורה.',
+          'Rently מחבר שוכרים ומשכירים בחוויה חכמה, מהירה וברורה.',
           style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
@@ -738,11 +743,14 @@ class _SocialBtn extends StatelessWidget {
         ),
         child: loading
             ? Center(
-                child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: isDark ? Colors.white : AppColors.navy)))
+                child: ShineDecorator(
+                  child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: isDark ? Colors.white : AppColors.navy)),
+                ),
+              )
             : child,
       ),
     );
@@ -835,6 +843,14 @@ class _GuestModeDialog extends StatelessWidget {
                     color: AppColors.primary, // use primary brand color so it pops nicely on dark glass
                     onTap: () => Navigator.of(context).pop('landlord'),
                   ),
+                  const SizedBox(height: 12),
+                  _GuestRoleOption(
+                    title: 'אורח כמתווך נדל״ן',
+                    subtitle: 'ניהול נכסים, לידים והתאמות ללקוחות.',
+                    icon: IconsaxPlusLinear.briefcase,
+                    color: BrandPalette.broker.primary,
+                    onTap: () => Navigator.of(context).pop('broker'),
+                  ),
                 ],
               ),
             ),
@@ -900,7 +916,7 @@ class _SocialRoleDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'מה תפקידך ב-Rentch?',
+                    'מה תפקידך ב-Rently?',
                     style: TextStyle(
                         fontSize: 15,
                         height: 1.5,
@@ -990,7 +1006,7 @@ class _GuestRoleOption extends StatelessWidget {
                 ],
               ),
             ),
-            const RentchIcon(IconsaxPlusLinear.arrow_left_2, color: Colors.white, size: 16),
+            const RentlyIcon(IconsaxPlusLinear.arrow_left_2, color: Colors.white, size: 16),
           ]),
         ),
       ),
@@ -1026,6 +1042,7 @@ class _LoginTabState extends State<_LoginTab> {
   bool _appleLoading = false;
   bool _obscure = true;
   bool _rememberMe = false;
+  final _shakeCtrl = ShakeController();
 
   @override
   void dispose() {
@@ -1034,11 +1051,44 @@ class _LoginTabState extends State<_LoginTab> {
     super.dispose();
   }
 
+  Future<void> _showTerms() async {
+    await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'תנאי השימוש',
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      transitionDuration: const Duration(milliseconds: 360),
+      pageBuilder: (ctx, anim1, anim2) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(
+                  CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+              child: Material(
+                color: Colors.transparent,
+                child: _EulaSheet(
+                  onAccept: () => Navigator.pop(ctx, true),
+                  onDecline: () => Navigator.pop(ctx, false),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
     if (email.isEmpty || password.isEmpty) {
+      _shakeCtrl.shake();
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(
               duration: Duration(milliseconds: 2500),
@@ -1048,9 +1098,18 @@ class _LoginTabState extends State<_LoginTab> {
     setState(() => _loading = true);
     try {
       await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password);
+          .signInWithEmailAndPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 20));
       if (!mounted) return;
       final provider = context.read<DatingProvider>();
+      // Bind the session to the real Firebase UID and pull the user's stored
+      // profile + listings back from the backend. Social logins already do this
+      // via applyAuthenticatedIdentity; email login must too, otherwise a
+      // returning landlord never sees the properties they uploaded.
+      final displayName =
+          FirebaseAuth.instance.currentUser?.displayName ?? '';
+      await provider.applyAuthenticatedIdentity(
+          displayName: displayName, source: 'email');
       await provider.setUserRole(provider.userRole);
       if (mounted) widget.onLogin();
     } on FirebaseAuthException catch (e) {
@@ -1067,6 +1126,11 @@ class _LoginTabState extends State<_LoginTab> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           duration: const Duration(milliseconds: 2500),
           content: Text(msg)));
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 3000),
+          content: Text('אין חיבור לרשת. בדוק את החיבור לאינטרנט ונסה שוב.')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1281,37 +1345,40 @@ class _LoginTabState extends State<_LoginTab> {
                   const _OrDivider(isDark: true),
                   const SizedBox(height: 16),
 
-                  // Email
-                  const _FieldLabel(label: 'כתובת אימייל', isDark: true),
-                  const SizedBox(height: 4),
-                  _CleanTextField(
-                    controller: _emailCtrl,
-                    hint: 'name@example.com',
-                    keyboardType: TextInputType.emailAddress,
-                    textDirection: TextDirection.ltr,
-                    prefixIcon: IconsaxPlusLinear.sms,
-                    isDark: true,
-                  ),
-                  const SizedBox(height: 12),
+                  HorizontalShake(
+                    controller: _shakeCtrl,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Email
+                        const _FieldLabel(label: 'כתובת אימייל', isDark: true),
+                        const SizedBox(height: 4),
+                        _CleanTextField(
+                          controller: _emailCtrl,
+                          hint: 'name@example.com',
+                          keyboardType: TextInputType.emailAddress,
+                          textDirection: TextDirection.ltr,
+                          prefixIcon: IconsaxPlusLinear.sms,
+                          isDark: true,
+                        ),
+                        const SizedBox(height: 12),
 
-                  // Password
-                  const _FieldLabel(label: 'סיסמה', isDark: true),
-                  const SizedBox(height: 4),
-                  _CleanTextField(
-                    controller: _passwordCtrl,
-                    obscureText: _obscure,
-                    hint: '••••••••',
-                    prefixIcon: IconsaxPlusLinear.key,
-                    isDark: true,
-                    suffixIcon: GestureDetector(
-                      onTap: () => setState(() => _obscure = !_obscure),
-                      child: Icon(
-                        _obscure
-                            ? Icons.visibility_off_rounded
-                            : Icons.visibility_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                        // Password
+                        const _FieldLabel(label: 'סיסמה', isDark: true),
+                        const SizedBox(height: 4),
+                        _CleanTextField(
+                          controller: _passwordCtrl,
+                          obscureText: _obscure,
+                          hint: '••••••••',
+                          prefixIcon: IconsaxPlusLinear.key,
+                          isDark: true,
+                          suffixIcon: EyeMorphIcon(
+                            isObscured: _obscure,
+                            onTap: () => setState(() => _obscure = !_obscure),
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1379,6 +1446,35 @@ class _LoginTabState extends State<_LoginTab> {
                     loading: _loading,
                     onTap: _login,
                   ),
+                  const SizedBox(height: 14),
+
+                  // Terms of use — presented before login (App Store Guideline 1.2)
+                  Center(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          'בהתחברות אני מאשר/ת את ',
+                          style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500),
+                        ),
+                        GestureDetector(
+                          onTap: _showTerms,
+                          child: const Text(
+                            'תנאי השימוש',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                decoration: TextDecoration.underline),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
 
                   // Guest / Anonymous entry
@@ -1421,7 +1517,7 @@ class _LoginTabState extends State<_LoginTab> {
                                 fontWeight: FontWeight.w500)),
                         GestureDetector(
                           onTap: widget.onSwitchToRegister,
-                          child: const Text('הרשמה',
+                          child: Text('הרשמה',
                               style: TextStyle(
                                   color: AppColors.primary,
                                   fontSize: 14,
@@ -1634,36 +1730,32 @@ class _RegisterFlowState extends State<_RegisterFlow> {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
-      final credential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
-      final uid = credential.user?.uid ??
-          'user-${DateTime.now().millisecondsSinceEpoch}';
-
       if (!mounted) return;
       final provider = context.read<DatingProvider>();
       final name = _nameCtrl.text.trim();
-      final current = provider.tenantProfile;
-      await provider.updateTenantProfile(
-        (current ??
-                TenantProfile(
-                    id: uid,
-                    name: '',
-                    bio: '',
-                    photoUrls: [],
-                    budgetMax: 9000,
-                    desiredRooms: 2,
-                    moveInWindow: 'גמיש',
-                    importantDetails: []))
-            .copyWith(
-          name: name,
-          budgetMax: _budget,
-          desiredRooms: 2,
-          moveInWindow: 'גמיש',
-        ),
-      );
+      // Bind the profile to the real Firebase UID FIRST. Previously this used
+      // `(current ?? TenantProfile(id: uid)).copyWith(...)`, but since the
+      // provider seeds a default profile at startup, `current` was never null
+      // and copyWith preserved the shared constant id 'tenant-local' — so every
+      // email user (and all their uploads) ended up under the same owner id.
+      // applyAuthenticatedIdentity forces profile.id = uid before the draft
+      // property below is created, isolating each user's data correctly.
+      await provider.applyAuthenticatedIdentity(displayName: name, source: 'email');
+      final bound = provider.tenantProfile;
+      if (bound != null) {
+        await provider.updateTenantProfile(
+          bound.copyWith(
+            name: name,
+            budgetMax: _budget,
+            desiredRooms: 2,
+            moveInWindow: 'גמיש',
+          ),
+        );
+      }
       await provider.setUserRole(_role);
       final city = _cityCtrl.text.trim();
       if (_role == 'landlord' && city.isNotEmpty) {
@@ -1867,7 +1959,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                                       fontWeight: FontWeight.w500)),
                               GestureDetector(
                                 onTap: widget.onSwitchToLogin,
-                                child: const Text('התחברות',
+                                child: Text('התחברות',
                                     style: TextStyle(
                                         color: AppColors.primary,
                                         fontSize: 14,
@@ -1921,7 +2013,7 @@ class _EulaSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'תנאי השימוש ב-Rentch',
+              'תנאי השימוש ב-Rently',
               textAlign: TextAlign.center,
               style: TextStyle(
                   color: Colors.black,
@@ -1936,7 +2028,7 @@ class _EulaSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      'ברוך הבא ל-Rentch!\nבשימוש באפליקציה אתה מסכים לתנאים הבאים:',
+                      'ברוך הבא ל-Rently!\nבשימוש באפליקציה אתה מסכים לתנאים הבאים:',
                       style: TextStyle(
                           color: AppColors.navy,
                           fontWeight: FontWeight.w800,
@@ -2410,15 +2502,10 @@ class _StepEmailPassword extends StatelessWidget {
             hint: '••••••••',
             prefixIcon: IconsaxPlusLinear.key,
             isDark: isDark,
-            suffixIcon: GestureDetector(
+            suffixIcon: EyeMorphIcon(
+              isObscured: obscure,
               onTap: onToggleObscure,
-              child: Icon(
-                obscure
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                color: isDark ? Colors.white : AppColors.textSecondary,
-                size: 20,
-              ),
+              color: isDark ? Colors.white : AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 14),
@@ -2452,7 +2539,7 @@ class _StepEmailPassword extends StatelessWidget {
                   TextSpan(
                     style: TextStyle(
                         fontSize: 13, color: isDark ? Colors.white : AppColors.textSecondary),
-                    children: const [
+                    children: [
                       TextSpan(text: 'אני מסכים/ה ל'),
                       TextSpan(
                         text: 'תנאי השימוש',
@@ -2524,6 +2611,16 @@ class _StepRole extends StatelessWidget {
             accent: AppColors.navy,
             selected: selected == 'landlord',
             onTap: () => onSelect('landlord'),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 12),
+          _RoleCard(
+            icon: IconsaxPlusLinear.briefcase,
+            title: 'אני מתווך/ת נדל״ן',
+            subtitle: 'ניהול נכסים ולקוחות',
+            accent: BrandPalette.broker.primary,
+            selected: selected == 'broker',
+            onTap: () => onSelect('broker'),
             isDark: isDark,
           ),
         ],
@@ -2728,7 +2825,7 @@ class _CompactBudgetPicker extends StatelessWidget {
                     fontWeight: FontWeight.w700)),
             const Spacer(),
             Text('₪${_fmt(budget)}',
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -2841,11 +2938,13 @@ class _PillButton extends StatelessWidget {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         child: loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.4, color: Colors.white))
+            ? const ShineDecorator(
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.4, color: Colors.white)),
+              )
             : Text(label,
                 style:
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -2871,7 +2970,7 @@ class _FieldLabel extends StatelessWidget {
 
 // ─── Clean TextField ──────────────────────────────────────────────────────────
 
-class _CleanTextField extends StatelessWidget {
+class _CleanTextField extends StatefulWidget {
   const _CleanTextField({
     this.controller,
     this.hint,
@@ -2895,45 +2994,64 @@ class _CleanTextField extends StatelessWidget {
   final bool isDark;
 
   @override
+  State<_CleanTextField> createState() => _CleanTextFieldState();
+}
+
+class _CleanTextFieldState extends State<_CleanTextField> {
+  bool _isFocused = false;
+
+  @override
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: BorderSide(
-        color: isDark ? Colors.white.withOpacity(0.24) : AppColors.navy.withOpacity(0.08),
+        color: widget.isDark ? Colors.white.withOpacity(0.24) : AppColors.navy.withOpacity(0.08),
         width: 1.2,
       ),
     );
 
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      textDirection: textDirection,
-      obscureText: obscureText,
-      textCapitalization: textCapitalization,
-      style: TextStyle(
-          color: isDark ? Colors.white : AppColors.navy, fontSize: 15, fontWeight: FontWeight.w600),
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: isDark ? Colors.white : AppColors.textSecondary.withOpacity(0.7), size: 20)
-            : null,
-        suffixIcon: suffixIcon != null
-            ? Padding(
-                padding: const EdgeInsets.only(left: 12),
-                child: suffixIcon,
-              )
-            : null,
-        filled: true,
-        fillColor: isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.65),
-        hintStyle: TextStyle(
-            color: isDark ? Colors.white.withOpacity(0.45) : AppColors.textSecondary.withValues(alpha: 0.55),
-            fontWeight: FontWeight.w400),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        border: border,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
+    return Focus(
+      onFocusChange: (focused) {
+        setState(() {
+          _isFocused = focused;
+        });
+      },
+      child: GlowFocusDecorator(
+        isFocused: _isFocused,
+        borderRadius: 16.0,
+        glowColor: AppColors.primary,
+        child: TextField(
+          controller: widget.controller,
+          keyboardType: widget.keyboardType,
+          textDirection: widget.textDirection,
+          obscureText: widget.obscureText,
+          textCapitalization: widget.textCapitalization,
+          style: TextStyle(
+              color: widget.isDark ? Colors.white : AppColors.navy, fontSize: 15, fontWeight: FontWeight.w600),
+          decoration: InputDecoration(
+            hintText: widget.hint,
+            prefixIcon: widget.prefixIcon != null
+                ? Icon(widget.prefixIcon, color: widget.isDark ? Colors.white : AppColors.textSecondary.withOpacity(0.7), size: 20)
+                : null,
+            suffixIcon: widget.suffixIcon != null
+                ? Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: widget.suffixIcon,
+                  )
+                : null,
+            filled: true,
+            fillColor: widget.isDark ? Colors.white.withOpacity(0.12) : Colors.white.withOpacity(0.65),
+            hintStyle: TextStyle(
+                color: widget.isDark ? Colors.white.withOpacity(0.45) : AppColors.textSecondary.withValues(alpha: 0.55),
+                fontWeight: FontWeight.w400),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            border: border,
+            enabledBorder: border,
+            focusedBorder: border.copyWith(
+              borderSide: BorderSide(color: AppColors.primary, width: 1.8),
+            ),
+          ),
         ),
       ),
     );
@@ -3058,7 +3176,7 @@ class _StepPropertyDetails extends StatelessWidget {
                   color: AppColors.primary.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text('אופציונלי',
+                child: Text('אופציונלי',
                     style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 11,
@@ -3141,7 +3259,7 @@ class _RoomsStepper extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.primary,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
@@ -3292,7 +3410,7 @@ class _EulaSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w700,
                   fontSize: 13)),
@@ -3375,20 +3493,22 @@ class _WelcomePortal extends StatelessWidget {
                 // Top logo / branding
                 Align(
                   alignment: Alignment.center,
-                  child: SvgPicture.asset(
-                    'assets/images/rentch_logo_with_text.svg',
-                    height: 38,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.srcIn,
-                    ),
-                    placeholderBuilder: (_) => const Text(
-                      'Rentch',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1,
+                  child: BreatheAnimation(
+                    child: SvgPicture.asset(
+                      'assets/images/rently_logo_with_text.svg',
+                      height: 95,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
+                      placeholderBuilder: (_) => const Text(
+                        'Rently',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 65,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1,
+                        ),
                       ),
                     ),
                   ),

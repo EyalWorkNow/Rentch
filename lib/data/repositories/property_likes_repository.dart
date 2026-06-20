@@ -1,0 +1,152 @@
+import 'package:dating_app/core/config/app_config.dart';
+import 'package:dating_app/core/services/aws_client.dart';
+import 'package:flutter/foundation.dart';
+
+/// A tenant's "like" on a property, as seen by the landlord.
+class PropertyLike {
+  const PropertyLike({
+    required this.propertyId,
+    required this.tenantId,
+    required this.tenantName,
+    this.tenantPhotoUrl = '',
+    this.ownerUserId = '',
+    this.createdAt,
+  });
+
+  final String propertyId;
+  final String tenantId;
+  final String tenantName;
+  final String tenantPhotoUrl;
+  final String ownerUserId;
+  final DateTime? createdAt;
+
+  factory PropertyLike.fromRow(Map<String, dynamic> row) {
+    DateTime? parseDate(Object? v) =>
+        v is String ? DateTime.tryParse(v) : null;
+    return PropertyLike(
+      propertyId: row['propertyId']?.toString() ?? '',
+      tenantId: row['tenantId']?.toString() ?? '',
+      tenantName: row['tenantName']?.toString() ?? '',
+      tenantPhotoUrl: row['tenantPhotoUrl']?.toString() ?? '',
+      ownerUserId: row['ownerUserId']?.toString() ?? '',
+      createdAt: parseDate(row['createdAt']),
+    );
+  }
+}
+
+/// Cross-user "likes" on properties. A tenant who likes a property writes a row
+/// here (keyed by property + tenant); the property's landlord reads the rows for
+/// each of their properties to see who is interested. This is what makes a like
+/// from one device visible to the owner on another device.
+///
+/// The like routes hit the `property_likes` table (verified live). The backend
+/// key + table exist regardless of the optional analytics env, so this is gated
+/// only on the API gateway being configured.
+class PropertyLikesRepository {
+  PropertyLikesRepository({AwsApiClient? client})
+      : _api = client ?? AwsApiClient.instance;
+
+  final AwsApiClient _api;
+  static const String _path = '/property_likes';
+
+  bool get isConfigured => AppConfig.hasAwsCoreConfig;
+
+  static String _safe(String s) =>
+      s.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+
+  static String likeId(String propertyId, String tenantId) =>
+      'like_${_safe(propertyId)}_${_safe(tenantId)}';
+
+  Future<void> addLike({
+    required String propertyId,
+    required String ownerUserId,
+    required String tenantId,
+    required String tenantName,
+    String tenantPhotoUrl = '',
+    DateTime? at,
+  }) async {
+    if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
+    final id = likeId(propertyId, tenantId);
+    try {
+      await _api.post(_path, {
+        'id': id,
+        'propertyId': propertyId,
+        'ownerUserId': ownerUserId,
+        'tenantId': tenantId,
+        'tenantName': tenantName,
+        'tenantPhotoUrl': tenantPhotoUrl,
+        'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('PropertyLikesRepository.addLike failed: $e');
+    }
+  }
+
+  Future<void> removeLike({
+    required String propertyId,
+    required String tenantId,
+  }) async {
+    if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
+    try {
+      await _api.delete('$_path/${likeId(propertyId, tenantId)}');
+    } catch (e) {
+      if (kDebugMode) debugPrint('PropertyLikesRepository.removeLike failed: $e');
+    }
+  }
+
+  // ── Public engagement counts (views + likes) ────────────────────────────────
+
+  /// Records that [viewerId] viewed [propertyId]. Idempotent per viewer, so the
+  /// count reflects DISTINCT viewers.
+  Future<void> recordView({
+    required String propertyId,
+    required String viewerId,
+  }) async {
+    if (!isConfigured || propertyId.isEmpty || viewerId.isEmpty) return;
+    try {
+      await _api.post('/property_views', {
+        'id': 'view_${_safe(propertyId)}_${_safe(viewerId)}',
+        'propertyId': propertyId,
+        'userId': viewerId,
+        'viewedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('PropertyLikesRepository.recordView failed: $e');
+    }
+  }
+
+  Future<int> viewCount(String propertyId) => _count('/property_views', propertyId);
+  Future<int> likeCount(String propertyId) => _count('/property_likes', propertyId);
+
+  Future<int> _count(String path, String propertyId) async {
+    if (!isConfigured || propertyId.isEmpty) return 0;
+    try {
+      final res = await _api.get('$path/count', query: {'propertyId': propertyId});
+      final c = res['count'];
+      return c is num ? c.toInt() : 0;
+    } catch (e) {
+      if (kDebugMode) debugPrint('PropertyLikesRepository._count failed: $e');
+      return 0;
+    }
+  }
+
+  /// All tenants who liked [propertyId].
+  Future<List<PropertyLike>> likesForProperty(String propertyId) async {
+    if (!isConfigured || propertyId.isEmpty) return const [];
+    try {
+      final res = await _api.get(_path, query: {'propertyId': propertyId});
+      final items = res['items'];
+      if (items is! List) return const [];
+      return items
+          .whereType<Map>()
+          .map((e) => PropertyLike.fromRow(Map<String, dynamic>.from(e)))
+          .where((l) => l.tenantId.isNotEmpty)
+          .toList();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PropertyLikesRepository.likesForProperty failed: $e');
+      }
+      return const [];
+    }
+  }
+}

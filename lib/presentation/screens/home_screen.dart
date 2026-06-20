@@ -8,11 +8,13 @@ import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +24,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
   bool? _cachedIsLandlord;
 
   static const int _landlordSwipesTabIndex = 1;
@@ -44,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onTabTap(int index, DatingProvider provider) {
     HapticFeedback.selectionClick();
-    setState(() => _currentIndex = index);
+    provider.setTabIndex(index);
     final matchesIndex = provider.isLandlord ? 2 : 1;
     if (index == matchesIndex) {
       provider.markMatchesSeen();
@@ -58,10 +59,30 @@ class _HomeScreenState extends State<HomeScreen> {
         final isLandlord = provider.isLandlord;
         void openLandlordTab(int index) => _onTabTap(index, provider);
 
+        // On a role change, reset to the first tab — but NEVER call
+        // setTabIndex (which notifies listeners) during build. Doing so is the
+        // classic "notifyListeners during build" trap: in release it can pin the
+        // tab to 0 on every rebuild if the role ever flips (unstable async role
+        // load), which presents exactly as "the navbar won't switch pages".
+        // safeIndex clamping already prevents an out-of-range index, so this is
+        // purely the reset UX and is safe to defer to after the frame.
         if (_cachedIsLandlord != null && _cachedIsLandlord != isLandlord) {
-          _currentIndex = 0;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) provider.setTabIndex(0);
+          });
         }
         _cachedIsLandlord = isLandlord;
+
+        // Keep the landlord's incoming likes fresh (throttled in the provider),
+        // so a tenant's like shows up as a pending candidate without a relaunch.
+        if (isLandlord) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              provider.refreshIncomingLikes();
+              provider.refreshOwnedEngagement();
+            }
+          });
+        }
 
         // Global match detection — works regardless of which tab is active.
         final pendingMatch = provider.pendingMatchProperty;
@@ -94,98 +115,131 @@ class _HomeScreenState extends State<HomeScreen> {
               ];
 
         final items = isLandlord ? _landlordItems : _tenantItems;
-        final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+        final safeIndex = provider.currentTabIndex.clamp(0, screens.length - 1);
         final unseenCount = provider.unseenMatchCount;
 
         return Scaffold(
           extendBody: true,
-          body: IndexedStack(
-            key: ValueKey(isLandlord),
-            index: safeIndex,
-            children: screens,
+          // RepaintBoundary isolates the (often animating) body from the
+          // bottomNavigationBar's BackdropFilter, so body frames don't force the
+          // navbar to recomposite — keeps the bar responsive under load.
+          body: RepaintBoundary(
+            child: IndexedStack(
+              key: ValueKey(isLandlord),
+              index: safeIndex,
+              children: screens,
+            ),
           ),
           bottomNavigationBar: Theme(
             data: Theme.of(context).copyWith(
               canvasColor: Colors.transparent,
             ),
             child: SafeArea(
-              minimum: const EdgeInsets.only(bottom: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(100),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(100),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(100),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.25),
-                              width: 1.5,
-                            ),
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(100),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: List.generate(items.length, (index) {
-                              final item = items[index];
-                              final isSelected = index == safeIndex;
-                              final showBadge =
-                                  index == (isLandlord ? 2 : 1) &&
-                                      unseenCount > 0;
-                              final isCompact = items.length >= 5;
-                              final double circleSize =
-                                  isCompact ? 62.0 : 70.0;
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(100),
+                        child: BackdropFilter(
+                          // 20 blur gives a premium liquid glass refraction
+                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutCubic,
+                            padding: EdgeInsets.all(safeIndex != 0 ? 9.0 : 8.0),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.30),
+                                  Colors.black.withValues(alpha: 0.15),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.24),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(items.length, (index) {
+                                final item = items[index];
+                                final isSelected = index == safeIndex;
+                                final showBadge =
+                                    index == (isLandlord ? 2 : 1) &&
+                                        unseenCount > 0;
+                                final isCompact = items.length >= 5;
+                                final isNotDiscover = safeIndex != 0;
+                                final double circleSize = isCompact
+                                    ? (isNotDiscover ? 58.3 : 53.0)
+                                    : (isNotDiscover ? 66.0 : 60.0);
 
-                              return GestureDetector(
-                                onTap: () => _onTabTap(index, provider),
-                                behavior: HitTestBehavior.opaque,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 250),
-                                  curve: Curves.easeOutCubic,
-                                  width: circleSize,
-                                  height: circleSize,
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 1.0),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : const Color(0xFF1A1A1A),
-                                  ),
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            RentchIcon(
+                                return ScaleBounce(
+                                  key: Key('nav_tab_$index'),
+                                  onTap: () => _onTabTap(index, provider),
+                                  scaleDownTo: 0.90,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeOutCubic,
+                                    width: circleSize,
+                                    height: circleSize,
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 1.0),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : const Color(0xFF1A1A1A),
+                                      boxShadow: isSelected
+                                          ? [
+                                              BoxShadow(
+                                                color: AppColors.primary.withValues(alpha: 0.45),
+                                                blurRadius: 10,
+                                                spreadRadius: 2,
+                                              )
+                                            ]
+                                          : [],
+                                    ),
+                                    child: Center(
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          AnimatedScale(
+                                            scale: isSelected ? 1.15 : 1.0,
+                                            duration: const Duration(milliseconds: 300),
+                                            curve: Curves.elasticOut,
+                                            child: RentlyIcon(
                                               isSelected
                                                   ? item.activeIcon
                                                   : item.icon,
                                               color: Colors.white,
-                                              size: isCompact ? 24 : 28,
+                                              size: isCompact
+                                                  ? (isNotDiscover ? 26.0 : 24.0)
+                                                  : (isNotDiscover ? 31.0 : 28.0),
                                             ),
-                                            if (showBadge)
-                                              Positioned(
-                                                top: -4,
-                                                right: -4,
+                                          ),
+                                          if (showBadge)
+                                            Positioned(
+                                              top: -4,
+                                              right: -4,
+                                              child: ScaleBopBadge(
+                                                value: unseenCount,
                                                 child: Container(
                                                   constraints:
                                                       const BoxConstraints(
@@ -214,46 +268,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   ),
                                                 ),
                                               ),
-                                          ],
-                                        ),
-                                        AnimatedSize(
-                                          duration:
-                                              const Duration(milliseconds: 250),
-                                          curve: Curves.easeOutBack,
-                                          child: isSelected
-                                              ? Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          top: 2),
-                                                  child: Text(
-                                                    item.label,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize:
-                                                          isCompact ? 9 : 10.5,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      height: 1.1,
-                                                    ),
-                                                  ),
-                                                )
-                                              : const SizedBox.shrink(),
-                                        ),
-                                      ],
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              );
-                            }),
+                                );
+                              }),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

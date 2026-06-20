@@ -1873,7 +1873,7 @@ class _StepFeatures extends StatelessWidget {
       case 'מזגן בחדרי שינה':
         return Icons.bedroom_parent;
       case 'מכונת כביסה':
-        return Icons.washing_machine_outlined;
+        return Icons.local_laundry_service;
       case 'מקרר':
         return Icons.kitchen;
       case 'תנור':
@@ -1881,13 +1881,13 @@ class _StepFeatures extends StatelessWidget {
       case 'מדיח כלים':
         return Icons.dining_outlined;
       case 'בקרה חכמה בבית':
-        return Icons.smart_home_outlined;
+        return Icons.home;
       case 'חניה תת קרקעית':
-        return Icons.basement_outlined;
+        return Icons.terrain;
       case 'מערכת סאונד':
         return Icons.speaker_group_outlined;
       case 'כניסה פרטית':
-        return Icons.door_front_rounded;
+        return Icons.meeting_room;
       default:
         return Icons.star_border;
     }
@@ -4144,7 +4144,7 @@ class _DesignTemplatePicker extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(IconsaxPlusLinear.palette, size: 16, color: AppColors.primary),
+              Icon(IconsaxPlusLinear.colorfilter, size: 16, color: AppColors.primary),
               const SizedBox(width: 8),
               const Text('צבע מותאם',
                   style: TextStyle(

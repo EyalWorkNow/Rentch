@@ -3,6 +3,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -189,7 +190,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     Container(
                                       width: 50,
                                       height: 50,
-                                      decoration: const BoxDecoration(
+                                      decoration: BoxDecoration(
                                         color: AppColors.primary,
                                         shape: BoxShape.circle,
                                       ),
@@ -208,12 +209,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      SvgPicture.asset(
-                        'assets/images/rentch_logo.svg',
-                        height: 42,
-                        colorFilter: const ColorFilter.mode(
-                          Colors.white,
-                          BlendMode.srcIn,
+                      BreatheAnimation(
+                        child: SvgPicture.asset(
+                          'assets/images/rently_logo.svg',
+                          height: 42,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
                         ),
                       ),
                     ],

@@ -3,6 +3,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 // Order: ✕ X (left) | 3D Tour (center) | ♥ Heart (right, largest)
 class ActionButtons extends StatelessWidget {
@@ -26,18 +27,23 @@ class ActionButtons extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // ♥ Heart — like (right in RTL, matches swipe right direction)
-          _ActionButton(
-            icon: IconsaxPlusBold.heart,
-            tooltip: 'אהבתי דירה',
-            iconColor: AppColors.primary,
-            backgroundColor: Colors.white,
-            size: 72,
-            iconSize: 34,
-            onPressed: () {
-              HapticFeedback.mediumImpact();
-              onSwipeRight();
-            },
-            shadowColor: AppColors.primary,
+          PulseRing(
+            ringColor: AppColors.primary,
+            maxRadius: 10.0,
+            active: true,
+            child: _ActionButton(
+              icon: IconsaxPlusBold.heart,
+              tooltip: 'אהבתי דירה',
+              iconColor: AppColors.primary,
+              backgroundColor: Colors.white,
+              size: 72,
+              iconSize: 34,
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                onSwipeRight();
+              },
+              shadowColor: AppColors.primary,
+            ),
           ),
 
           // 3D Tour (center)

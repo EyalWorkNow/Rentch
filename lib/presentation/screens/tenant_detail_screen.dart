@@ -3,7 +3,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 
 class TenantDetailScreen extends StatefulWidget {
   const TenantDetailScreen({
@@ -89,7 +89,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                           fallback: Container(
                             color: AppColors.navy,
                             child: const Center(
-                              child: RentchIcon(
+                              child: RentlyIcon(
                                 IconsaxPlusLinear.profile_circle,
                                 size: 80,
                                 color: Colors.white24,
@@ -128,7 +128,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                     Container(
                       color: AppColors.navy,
                       child: const Center(
-                        child: RentchIcon(
+                        child: RentlyIcon(
                           IconsaxPlusLinear.profile_circle,
                           size: 100,
                           color: Colors.white24,
@@ -189,9 +189,9 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Row(
+                              Row(
                                 children: [
-                                  RentchIcon(
+                                  RentlyIcon(
                                     IconsaxPlusLinear.verify,
                                     size: 16,
                                     color: AppColors.primary,
@@ -369,7 +369,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                             ),
                             child: Row(
                               children: [
-                                const RentchIcon(
+                                const RentlyIcon(
                                   IconsaxPlusLinear.star_1,
                                   color: Color(0xFFF39C12),
                                   size: 14,
@@ -590,7 +590,7 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                   fallback: Container(
                     color: AppColors.navy,
                     child: const Center(
-                      child: RentchIcon(
+                      child: RentlyIcon(
                         IconsaxPlusLinear.building,
                         size: 40,
                         color: Colors.white24,
@@ -609,7 +609,7 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                       children: [
                         Text(
                           property.propertyType,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
@@ -629,7 +629,7 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const RentchIcon(
+                            const RentlyIcon(
                               IconsaxPlusLinear.building,
                               size: 13,
                               color: AppColors.textSecondary,
@@ -644,7 +644,7 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const RentchIcon(
+                            const RentlyIcon(
                               IconsaxPlusLinear.maximize_3,
                               size: 13,
                               color: AppColors.textSecondary,

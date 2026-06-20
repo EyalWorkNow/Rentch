@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
+import 'package:dating_app/core/services/teleport_3d_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -11,19 +12,17 @@ class Property3dScanService {
   Property3dScanService({
     String? backendUrl,
     String? provider,
-    String? preset,
     String? outputFormat,
     Duration apiTimeout = const Duration(seconds: 45),
   })  : _backendUrl = backendUrl ?? AppConfig.scan3dProxyUrl,
         _provider = provider ?? AppConfig.scan3dProvider,
-        _preset = preset ?? AppConfig.scan3dDefaultPreset,
         _outputFormat = outputFormat ?? AppConfig.scan3dOutputFormat,
         _apiTimeout = apiTimeout;
 
   final String _backendUrl;
   final String _provider;
-  final String _preset;
   final String _outputFormat;
+  final Teleport3dService _teleport = Teleport3dService();
   // Timeout for lightweight API calls (create/process/status).
   final Duration _apiTimeout;
 
@@ -79,52 +78,17 @@ class Property3dScanService {
       throw const Property3dScanException('Scan video file was not found.');
     }
 
-    final fileSize = await file.length();
-    final contentType = _contentTypeForPath(sanitizedPath);
-    final createPayload = {
-      'propertyId': propertyId,
-      'title': title.trim().isEmpty ? 'Rentch apartment scan' : title.trim(),
-      'contentType': contentType,
-      'fileSize': fileSize,
-      'provider': _provider,
-      'preset': _preset,
-      'output': {
-        'formats': [_outputFormat],
-      },
-    };
-
-    final created = await _jsonRequest(
-      'POST',
-      _resolve('/scans'),
-      body: createPayload,
-    );
-    final createdData = _data(created);
-    final scanId = _stringValue(
-      createdData,
-      const ['scanId', 'sceneId', 'id'],
-    );
-    final uploadUrl = _stringValue(createdData, const ['uploadUrl']);
-    if (scanId.isEmpty || uploadUrl.isEmpty) {
-      throw const Property3dScanException(
-        '3D scan backend did not return scanId/uploadUrl.',
+    // Build the real interactive 3D walkthrough with Varjo Teleport (chunked
+    // upload straight to S3, then asynchronous Gaussian-splat processing).
+    try {
+      return await _teleport.createCaptureFromVideo(
+        propertyId: propertyId,
+        name: title.trim().isEmpty ? 'Rently apartment' : title.trim(),
+        localVideoPath: sanitizedPath,
       );
+    } on TeleportException catch (e) {
+      throw Property3dScanException(e.message);
     }
-
-    await _uploadToPresignedUrl(
-      Uri.parse(uploadUrl),
-      file,
-      contentType: contentType,
-    );
-
-    await _jsonRequest('POST', _resolve('/scans/$scanId/process'));
-
-    final status = await _jsonRequest('GET', _resolve('/scans/$scanId'));
-    return _tourFromPayload(
-      status,
-      fallbackScanId: scanId,
-      sourceVideoUrl: sanitizedPath,
-      sizeBytes: fileSize,
-    );
   }
 
   /// Virtual staging ("הדמיה"): upload an apartment photo, run Luma uni-1
@@ -180,9 +144,11 @@ class Property3dScanService {
       contentType: contentType,
     );
 
-    await _jsonRequest('POST', _resolve('/scans/$scanId/process'));
+    final processResult = await _jsonRequest('POST', _resolve('/scans/$scanId/process'));
 
-    final status = await _jsonRequest('GET', _resolve('/scans/$scanId'));
+    final status = processResult.isNotEmpty
+        ? processResult
+        : await _jsonRequest('GET', _resolve('/scans/$scanId'));
     return _tourFromPayload(
       status,
       fallbackScanId: scanId,
@@ -192,6 +158,14 @@ class Property3dScanService {
   }
 
   Future<PropertyVirtualTour> refresh(PropertyVirtualTour tour) async {
+    // Teleport captures poll a different backend route.
+    if (tour.provider == Teleport3dService.provider) {
+      try {
+        return await _teleport.refresh(tour);
+      } on TeleportException {
+        return tour;
+      }
+    }
     if (!isConfigured || tour.id.trim().isEmpty) return tour;
     final status = await _jsonRequest('GET', _resolve('/scans/${tour.id}'));
     return _tourFromPayload(
@@ -388,17 +362,7 @@ class Property3dScanService {
       'training' || 'processing' || 'running' => PropertyTourStatus.processing,
       'queued' || 'created' || 'pending' || 'draft' => PropertyTourStatus.queued,
       'failed' || 'error' => PropertyTourStatus.failed,
-      _ => PropertyTourStatus.processing,
-    };
-  }
-
-  String _contentTypeForPath(String path) {
-    final ext = path.split('?').first.split('.').last.toLowerCase();
-    return switch (ext) {
-      'mov' => 'video/quicktime',
-      'm4v' => 'video/x-m4v',
-      'webm' => 'video/webm',
-      _ => 'video/mp4',
+      _ => PropertyTourStatus.failed,
     };
   }
 

@@ -21,7 +21,7 @@ import 'package:flutter/services.dart';
 // Subsequent launches read from Keychain (no dart-define needed).
 
 class ScaniverseService {
-  static const MethodChannel _channel = MethodChannel('com.rentch.scaniverse');
+  static const MethodChannel _channel = MethodChannel('com.rently.scaniverse');
   static const String _storageKey = 'spatial_api_key';
 
   final SecureStorageService _secure;

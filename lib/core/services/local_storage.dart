@@ -31,36 +31,69 @@ class LocalStorageService {
       defaultTargetPlatform == TargetPlatform.iOS ||
       defaultTargetPlatform == TargetPlatform.macOS;
 
+  // When the Keychain is unavailable (e.g. a build without the
+  // keychain-access-groups entitlement throws errSecMissingEntitlement / -34018,
+  // or the device Keychain is locked), every secure-storage call would throw and
+  // take the whole persistence layer — and therefore login/guest — down with it.
+  // Once we hit such a failure we flip this flag and transparently fall back to
+  // SharedPreferences so the app keeps working. Keychain stays the default when
+  // it is healthy.
+  static bool _keychainUnavailable = false;
+
   Future<String?> _readStateLocal(SharedPreferences prefs) async {
-    if (_useKeychain) {
-      // Try Keychain first; fall back to SharedPreferences for migration of
-      // existing users who were on an older version of the app.
-      final secure = await _secureStorage.read(key: _appStateKey);
-      if (secure != null) return secure;
-      final legacy = prefs.getString(_appStateKey);
-      if (legacy != null) {
-        // Migrate: write to Keychain, remove from plain storage.
-        await _secureStorage.write(key: _appStateKey, value: legacy);
-        await prefs.remove(_appStateKey);
+    if (_useKeychain && !_keychainUnavailable) {
+      try {
+        // Try Keychain first; fall back to SharedPreferences for migration of
+        // existing users who were on an older version of the app.
+        final secure = await _secureStorage.read(key: _appStateKey);
+        if (secure != null) return secure;
+        final legacy = prefs.getString(_appStateKey);
+        if (legacy != null) {
+          // Migrate: write to Keychain, remove from plain storage.
+          await _secureStorage.write(key: _appStateKey, value: legacy);
+          await prefs.remove(_appStateKey);
+        }
+        return legacy;
+      } catch (error) {
+        _onKeychainFailure('read', error);
+        // Fall through to the SharedPreferences read below.
       }
-      return legacy;
     }
     return prefs.getString(_appStateKey);
   }
 
   Future<void> _writeStateLocal(SharedPreferences prefs, String json) async {
-    if (_useKeychain) {
-      await _secureStorage.write(key: _appStateKey, value: json);
-    } else {
-      await prefs.setString(_appStateKey, json);
+    if (_useKeychain && !_keychainUnavailable) {
+      try {
+        await _secureStorage.write(key: _appStateKey, value: json);
+        return;
+      } catch (error) {
+        _onKeychainFailure('write', error);
+        // Fall through to SharedPreferences so the write is not lost.
+      }
     }
+    await prefs.setString(_appStateKey, json);
   }
 
   Future<void> _deleteStateLocal(SharedPreferences prefs) async {
-    if (_useKeychain) {
-      await _secureStorage.delete(key: _appStateKey);
+    if (_useKeychain && !_keychainUnavailable) {
+      try {
+        await _secureStorage.delete(key: _appStateKey);
+      } catch (error) {
+        _onKeychainFailure('delete', error);
+      }
     }
     await prefs.remove(_appStateKey);
+  }
+
+  void _onKeychainFailure(String action, Object error) {
+    _keychainUnavailable = true;
+    if (kDebugMode) {
+      debugPrint(
+        'LocalStorageService: Keychain $action failed ($error). '
+        'Falling back to SharedPreferences for app state.',
+      );
+    }
   }
 
   Future<Map<String, dynamic>?> loadAppState() async {
@@ -181,6 +214,11 @@ class LocalStorageService {
       tenantProfile['photoUrls'] = _remoteUrls(tenantProfile['photoUrls']);
     }
 
+    final brokerBranding = decoded['brokerBranding'];
+    if (brokerBranding is Map<String, dynamic>) {
+      brokerBranding['logoPath'] = _remoteUrlString(brokerBranding['logoPath']);
+    }
+
     final customProperties = decoded['customProperties'];
     if (customProperties is List) {
       for (final item in customProperties) {
@@ -216,6 +254,16 @@ class LocalStorageService {
       mergedTenant['photoUrls'] = _mergeUrls(
         mergedTenant['photoUrls'],
         localTenant['photoUrls'],
+      );
+    }
+
+    final localBrokerBranding = localState['brokerBranding'];
+    final mergedBrokerBranding = merged['brokerBranding'];
+    if (localBrokerBranding is Map &&
+        mergedBrokerBranding is Map<String, dynamic>) {
+      mergedBrokerBranding['logoPath'] = _mergeUrlString(
+        mergedBrokerBranding['logoPath'],
+        localBrokerBranding['logoPath'],
       );
     }
 

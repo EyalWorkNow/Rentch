@@ -4,10 +4,12 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 String _relativeTime(DateTime dt) {
   final diff = DateTime.now().difference(dt);
@@ -148,12 +150,27 @@ class _MatchesScreenState extends State<MatchesScreen> {
           body: SafeArea(
             bottom: false,
             child: provider.isLoading
-                ? const Center(
+                ? Center(
                     child: CircularProgressIndicator(color: AppColors.primary))
                 : allMatches.isEmpty
                     ? _EmptyMatches(isLandlord: provider.isLandlord)
                     : Column(
                         children: [
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                subtitleText,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
                           _MatchesToolbar(
                             controller: _searchCtrl,
                             query: _query,
@@ -268,7 +285,7 @@ class _MatchesToolbar extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(width: 10),
-                const RentchIcon(
+                const RentlyIcon(
                   IconsaxPlusLinear.search_normal,
                   size: 18,
                   color: Colors.grey,
@@ -298,17 +315,30 @@ class _MatchesToolbar extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (query.isNotEmpty)
-                  IconButton(
-                    icon: const RentchIcon(
-                      IconsaxPlusLinear.close_circle,
-                      size: 18,
-                      color: AppColors.textSecondary,
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: query.isNotEmpty ? 1.0 : 0.0,
+                  curve: Curves.easeOutBack,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 150),
+                    opacity: query.isNotEmpty ? 1.0 : 0.0,
+                    child: ScaleBounce(
+                      onTap: onClearQuery,
+                      scaleDownTo: 0.82,
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: RentlyIcon(
+                          IconsaxPlusLinear.close_circle,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
-                    onPressed: onClearQuery,
                   ),
-                GestureDetector(
+                ),
+                ScaleBounce(
                   onTap: onFilterTap,
+                  scaleDownTo: 0.88,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 40,
@@ -319,10 +349,17 @@ class _MatchesToolbar extends StatelessWidget {
                           : const Color(0xFFF2F4F5),
                       shape: BoxShape.circle,
                     ),
-                    child: RentchIcon(
-                      IconsaxPlusLinear.setting_4,
-                      size: 18,
-                      color: showFilters ? Colors.white : AppColors.navy,
+                    child: Center(
+                      child: AnimatedRotation(
+                        turns: showFilters ? 0.125 : 0.0,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutBack,
+                        child: RentlyIcon(
+                          IconsaxPlusLinear.setting_4,
+                          size: 18,
+                          color: showFilters ? Colors.white : AppColors.navy,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -404,19 +441,13 @@ class _FilterPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return FilterChipAnimated(
+      isSelected: isSelected,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      activeColor: AppColors.navy,
+      inactiveColor: Colors.white,
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.navy : Colors.white,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
-            width: 1,
-          ),
-        ),
         child: Text(
           label,
           style: TextStyle(
@@ -451,7 +482,7 @@ class _EmptyFilterResults extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(
+              child: RentlyIcon(
                 IconsaxPlusLinear.search_normal,
                 color: AppColors.primary,
                 size: 36,
@@ -479,11 +510,11 @@ class _EmptyFilterResults extends StatelessWidget {
             const SizedBox(height: 22),
             OutlinedButton.icon(
               onPressed: onClear,
-              icon: const RentchIcon(IconsaxPlusLinear.close_circle, size: 16),
+              icon: const RentlyIcon(IconsaxPlusLinear.close_circle, size: 16),
               label: const Text('נקה סינון'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
+                side: BorderSide(color: AppColors.primary),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -553,8 +584,9 @@ class _MatchCardState extends State<_MatchCard> {
         tenantName.isNotEmpty &&
         lastMessage.sender == tenantName;
 
-    return GestureDetector(
+    return ScaleBounce(
       onTap: widget.onTap,
+      scaleDownTo: 0.97,
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -569,298 +601,202 @@ class _MatchCardState extends State<_MatchCard> {
             )
           ],
         ),
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-                child: AspectRatio(
-                  aspectRatio: 1.45,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        SafeMedia(
-                          media: media,
-                          fallback: Container(
-                            color: AppColors.primaryLight2,
-                            child: const RentchIcon(
-                              IconsaxPlusLinear.building,
-                              color: AppColors.primary,
-                              size: 48,
-                            ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(5),
+              child: AspectRatio(
+                aspectRatio: 1.84,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      SafeMedia(
+                        media: media,
+                        fallback: Container(
+                          color: AppColors.primaryLight2,
+                          child: RentlyIcon(
+                            IconsaxPlusLinear.building,
+                            color: AppColors.primary,
+                            size: 48,
                           ),
-                          fit: BoxFit.cover,
                         ),
-                        // Floating Badge (Property Type) on top-right (RTL)
-                        Positioned(
-                          top: 14,
-                          right: 14,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 6,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              widget.property.propertyType,
-                              style: const TextStyle(
-                                color: AppColors.navy,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
+                        fit: BoxFit.cover,
+                      ),
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
                               ),
+                            ],
+                          ),
+                          child: Text(
+                            widget.property.propertyType,
+                            style: const TextStyle(
+                              color: AppColors.navy,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
                             ),
                           ),
                         ),
-                        // Floating Share Button on top-left (RTL) - Replacing the heart icon
-                        Positioned(
-                          top: 14,
-                          left: 14,
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 6,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const RentchIcon(
-                                IconsaxPlusLinear.send_2,
-                                color: AppColors.navy,
-                                size: 18,
+                      ),
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
                               ),
-                              onPressed: () {
-                                showPropertyShareSheet(
-                                    context, widget.property);
-                              },
+                            ],
+                          ),
+                          child: _FreshnessBadge(match: widget.match),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 10,
+                        left: 10,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const RentlyIcon(
+                              IconsaxPlusLinear.send_2,
+                              color: AppColors.navy,
+                              size: 16,
                             ),
+                            onPressed: () {
+                              showPropertyShareSheet(context, widget.property);
+                            },
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Info Section
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.property.street.isNotEmpty
-                                ? '${widget.property.street} ${widget.property.streetNumber}'
-                                : widget.property.address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.navy,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          widget.property.priceLabel,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.navy,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const RentchIcon(
-                          IconsaxPlusLinear.location,
-                          size: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            '${widget.property.city}, ${widget.property.neighborhood}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _FreshnessBadge(match: widget.match),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Row containing Chips & Expand Button
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _MockupChip(
-                                  icon: IconsaxPlusLinear.home,
-                                  label: '${widget.property.roomsLabel} חדרים',
-                                ),
-                                const SizedBox(width: 8),
-                                _MockupChip(
-                                  icon: IconsaxPlusLinear.maximize_3,
-                                  label: '${widget.property.sizeM2} מ״ר',
-                                ),
-                                const SizedBox(width: 8),
-                                _MockupChip(
-                                  icon: IconsaxPlusLinear.routing,
-                                  label: widget.property.features.firstOrNull ??
-                                      'מעלית',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Premium Expansion Toggle Button
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _isExpanded = !_isExpanded;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF2F7FA),
-                              shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: const Color(0xFFE2ECF1)),
-                            ),
-                            child: AnimatedRotation(
-                              turns: _isExpanded ? 0.5 : 0.0,
-                              duration: const Duration(milliseconds: 300),
-                              child: const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: AppColors.navy,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Conditionally animated expanded data
-                    if (_isExpanded) ...[
-                      const SizedBox(height: 16),
-                      _LastMessagePreview(message: lastMessage),
-                    ],
-                  ],
-                ),
-              ),
-              if (_isExpanded) ...[
-                const Divider(height: 1, color: Color(0xFFE2ECF1)),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  color: const Color(0xFFF8FCFE),
-                  child: Row(
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (awaitingReply)
-                              const _StatusChip(
-                                label: 'ממתין לתגובתך',
-                                color: Color(0xFFE67E22),
-                                icon: IconsaxPlusLinear.message_notif,
-                              ),
-                            _StatusChip(
-                              label: stage.label,
-                              color: stage.color,
-                              icon: stage.icon,
+                            Row(
+                              children: [
+                                const OnlineDotPulse(size: 8),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    widget.property.street.isNotEmpty
+                                        ? '${widget.property.street} ${widget.property.streetNumber}'
+                                        : widget.property.address,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.navy,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (widget.match.ownerSigned)
-                              const _StatusChip(
-                                label: 'בעלים חתם',
-                                color: Color(0xFF27AE60),
-                                icon: IconsaxPlusLinear.pen_tool,
+                            const SizedBox(height: 4),
+                            Text(
+                              '${widget.property.city}, ${widget.property.neighborhood}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                            if (widget.match.tenantSigned)
-                              const _StatusChip(
-                                label: 'שוכר חתם',
-                                color: Color(0xFF27AE60),
-                                icon: IconsaxPlusLinear.edit,
-                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'פתח שיחה',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            SizedBox(width: 6),
-                            RentchIcon(
-                              IconsaxPlusLinear.arrow_left,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                          ],
+                      const SizedBox(width: 12),
+                      Text(
+                        widget.property.priceLabel,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.navy,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ],
-          ),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _MockupChip(
+                          icon: IconsaxPlusLinear.home,
+                          label: '${widget.property.roomsLabel} חדרים',
+                        ),
+                        const SizedBox(width: 8),
+                        _MockupChip(
+                          icon: IconsaxPlusLinear.maximize_3,
+                          label: '${widget.property.sizeM2} מ״ר',
+                        ),
+                        const SizedBox(width: 8),
+                        _MockupChip(
+                          icon: IconsaxPlusLinear.routing,
+                          label: widget.property.features.firstOrNull ??
+                              'מעלית',
+                        ),
+                        const SizedBox(width: 8),
+                        _MockupChip(
+                          icon: IconsaxPlusLinear.wind,
+                          label: widget.property.features.length > 1
+                              ? widget.property.features[1]
+                              : 'ממוזגת',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -957,7 +893,7 @@ class _LastMessagePreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const RentchIcon(
+          RentlyIcon(
             IconsaxPlusLinear.message,
             size: 14,
             color: AppColors.primary,
@@ -1042,7 +978,7 @@ class _EmptyMatches extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(
+              child: RentlyIcon(
                 IconsaxPlusLinear.heart_tick,
                 color: AppColors.primary,
                 size: 40,

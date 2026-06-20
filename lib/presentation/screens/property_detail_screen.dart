@@ -1,18 +1,25 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/matching/match_models.dart';
+import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
+import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
+import 'package:dating_app/presentation/widgets/pulse_widget.dart';
+import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   const PropertyDetailScreen({
@@ -41,6 +48,17 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         final provider = context.read<DatingProvider>();
         _analyticsProvider = provider;
         provider.beginPropertyDetailView(widget.property.id);
+        // Record a real (distinct) view + pull live view/like counts.
+        provider.recordPropertyView(widget.property.id);
+        // If this listing's 3D tour is still "processing", re-check Teleport now
+        // so a finished/failed capture stops showing "בעיבוד" indefinitely.
+        provider.refreshPropertyTour(widget.property.id);
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // Landlord previewing their own listing — refresh the tour state too.
+        context.read<DatingProvider>().refreshPropertyTour(widget.property.id);
       });
     }
   }
@@ -79,6 +97,49 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             : '${p.propertyType} ב${p.city}';
         final reviews = provider.propertyReviews(p.id);
         final avgRating = provider.reviewAverage(reviews);
+        // Per-property design (chosen during listing creation) takes precedence
+        // over user-level broker branding, and applies for ANY viewer.
+        final propertyBranding = p.hasCustomDesign
+            ? BrokerBrandingConfig.fromJson({
+                'propertyTemplate': p.designTemplate,
+                if (p.designAccent != 0) ...{
+                  'accentColorValue': p.designAccent,
+                  'primaryColorValue': p.designAccent,
+                },
+              })
+            : null;
+        final branding = propertyBranding ?? provider.brokerBranding;
+        final useTemplate = propertyBranding != null ||
+            (provider.isBroker &&
+                provider.brokerBranding.propertyTemplate !=
+                    BrokerPropertyTemplate.rentlyClassic);
+
+        if (useTemplate &&
+            branding.propertyTemplate != BrokerPropertyTemplate.rentlyClassic) {
+          return _BrokerPropertyDetailTemplate(
+            property: p,
+            branding: branding,
+            controller: _pageController,
+            currentPage: _currentPage,
+            onPageChanged: (i) => _handleGalleryPageChanged(p.id, i),
+            reviews: reviews,
+            avgRating: avgRating,
+            hasVirtualTour: hasVirtualTour,
+            isLandlordPreview: widget.isLandlordPreview,
+            onBackTap: () => Navigator.of(context).pop(),
+            onShareTap: () => showPropertyShareSheet(context, p),
+            onLike: () {
+              context.read<DatingProvider>().likeProperty(p.id);
+              Navigator.of(context).pop();
+            },
+            onTour: () => openPropertyTour(context, p),
+            onEdit: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => EditPropertyScreen(property: p),
+              ),
+            ),
+          );
+        }
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -136,7 +197,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                     const SizedBox(height: 6),
                                     Row(
                                       children: [
-                                        const RentchIcon(
+                                        const RentlyIcon(
                                             IconsaxPlusLinear.location,
                                             size: 16,
                                             color: Color(0xFF64748B)),
@@ -188,55 +249,60 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            SizedBox(
-                              height: 105,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: media.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(width: 12),
-                                itemBuilder: (context, index) {
-                                  final item = media[index];
-                                  return GestureDetector(
-                                    onTap: () {
-                                      _pageController.animateToPage(
-                                        index,
-                                        duration:
-                                            const Duration(milliseconds: 300),
-                                        curve: Curves.easeInOut,
-                                      );
-                                    },
-                                    child: Column(
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                          child: SizedBox(
-                                            width: 100,
-                                            height: 70,
-                                            child: SafeMedia(
-                                              media: item,
-                                              fit: BoxFit.cover,
-                                              fallback:
-                                                  _ImageFallback(city: p.city),
+                            FadeSlideEntrance(
+                              duration: const Duration(milliseconds: 450),
+                              offset: const Offset(0.0, 30.0),
+                              child: SizedBox(
+                                height: 105,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: media.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (context, index) {
+                                    final item = media[index];
+                                    return ScaleBounce(
+                                      onTap: () {
+                                        _pageController.animateToPage(
+                                          index,
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                        );
+                                      },
+                                      scaleDownTo: 0.90,
+                                      child: Column(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            child: SizedBox(
+                                              width: 100,
+                                              height: 70,
+                                              child: SafeMedia(
+                                                media: item,
+                                                fit: BoxFit.cover,
+                                                fallback:
+                                                    _ImageFallback(city: p.city),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          item.isVideo
-                                              ? 'סרטון'
-                                              : 'תמונה ${index + 1}',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF64748B),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            item.isVideo
+                                                ? 'סרטון'
+                                                : 'תמונה ${index + 1}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF64748B),
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -297,6 +363,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           ],
 
                           // Owners Section
+                          if (!widget.isLandlordPreview)
+                            _SectionCardShell(
+                              title: 'למה ההתאמה הזו',
+                              icon: IconsaxPlusLinear.flash_1,
+                              child: _MatchInsightCard(property: p),
+                            ),
+
                           _SectionCardShell(
                             title: 'בעל הנכס',
                             icon: IconsaxPlusLinear.profile_2user,
@@ -357,8 +430,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               Positioned(
                 bottom: MediaQuery.of(context).padding.bottom + 85,
                 left: 20,
-                child: GestureDetector(
+                child: ScaleBounce(
                   onTap: () => showPropertyShareSheet(context, p),
+                  scaleDownTo: 0.88,
                   child: Container(
                     width: 54,
                     height: 54,
@@ -374,10 +448,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         ),
                       ],
                     ),
-                    child: const RentchIcon(
-                      IconsaxPlusLinear.export_2,
-                      color: Colors.black,
-                      size: 24,
+                    child: const Center(
+                      child: RentlyIcon(
+                        IconsaxPlusLinear.export_2,
+                        color: Colors.black,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
@@ -527,8 +603,9 @@ class _ImageGallery extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Back Button (Mockup style circular white)
-              GestureDetector(
+              ScaleBounce(
                 onTap: onBackTap,
+                scaleDownTo: 0.88,
                 child: Container(
                   width: 44,
                   height: 44,
@@ -543,7 +620,7 @@ class _ImageGallery extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const RentchIcon(
+                  child: const RentlyIcon(
                     IconsaxPlusLinear.arrow_right_3,
                     color: Color(0xFF0F172A),
                     size: 20,
@@ -551,8 +628,9 @@ class _ImageGallery extends StatelessWidget {
                 ),
               ),
               // Share Button (Mockup style circular white)
-              GestureDetector(
+              ScaleBounce(
                 onTap: onShareTap,
+                scaleDownTo: 0.88,
                 child: Container(
                   width: 44,
                   height: 44,
@@ -567,7 +645,7 @@ class _ImageGallery extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const RentchIcon(
+                  child: const RentlyIcon(
                     IconsaxPlusLinear.export_2,
                     color: Color(0xFF0F172A),
                     size: 20,
@@ -635,6 +713,1361 @@ class _ImageGallery extends StatelessWidget {
   }
 }
 
+class _BrokerPropertyDetailTemplate extends StatelessWidget {
+  const _BrokerPropertyDetailTemplate({
+    required this.property,
+    required this.branding,
+    required this.controller,
+    required this.currentPage,
+    required this.onPageChanged,
+    required this.reviews,
+    required this.avgRating,
+    required this.hasVirtualTour,
+    required this.isLandlordPreview,
+    required this.onBackTap,
+    required this.onShareTap,
+    required this.onLike,
+    required this.onTour,
+    required this.onEdit,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+  final PageController controller;
+  final int currentPage;
+  final ValueChanged<int> onPageChanged;
+  final List<AppReview> reviews;
+  final double avgRating;
+  final bool hasVirtualTour;
+  final bool isLandlordPreview;
+  final VoidCallback onBackTap;
+  final VoidCallback onShareTap;
+  final VoidCallback onLike;
+  final VoidCallback onTour;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = switch (branding.propertyTemplate) {
+      BrokerPropertyTemplate.acidHero => _buildAcidHero(context),
+      BrokerPropertyTemplate.dashboardGlass => _buildDashboardGlass(context),
+      BrokerPropertyTemplate.estateCard => _buildEstateCard(context),
+      BrokerPropertyTemplate.galleryEditorial => _buildGalleryEditorial(context),
+      BrokerPropertyTemplate.cinematicGlass => _buildCinematicGlass(context),
+      BrokerPropertyTemplate.rentlyClassic => _buildGalleryEditorial(context),
+    };
+
+    return Scaffold(
+      backgroundColor: _pageBackground,
+      body: Stack(
+        children: [
+          content,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _BottomBar(
+              property: property,
+              hasVirtualTour: hasVirtualTour,
+              isLandlordPreview: isLandlordPreview,
+              onLike: onLike,
+              onTour: onTour,
+              onEdit: onEdit,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color get _pageBackground => switch (branding.propertyTemplate) {
+        BrokerPropertyTemplate.acidHero => Color.alphaBlend(
+            branding.accentColor.withValues(alpha: 0.18),
+            const Color(0xFFF7FAF2),
+          ),
+        BrokerPropertyTemplate.dashboardGlass => const Color(0xFFEAF2F0),
+        BrokerPropertyTemplate.estateCard => const Color(0xFFF5F6F8),
+        BrokerPropertyTemplate.galleryEditorial => Colors.white,
+        BrokerPropertyTemplate.cinematicGlass => branding.secondaryColor,
+        BrokerPropertyTemplate.rentlyClassic => Colors.white,
+      };
+
+  Widget _buildAcidHero(BuildContext context) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              22,
+              MediaQuery.of(context).padding.top + 14,
+              22,
+              124,
+            ),
+            child: Column(
+              children: [
+                _TemplateTopBar(
+                  branding: branding,
+                  title: property.ownerName,
+                  dark: false,
+                  onBackTap: onBackTap,
+                  onShareTap: onShareTap,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  property.address,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: branding.secondaryColor,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${property.city} · ${property.transactionLabel}',
+                  style: TextStyle(
+                    color: branding.secondaryColor.withValues(alpha: 0.68),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _TemplateHeroMedia(
+                  property: property,
+                  controller: controller,
+                  currentPage: currentPage,
+                  onPageChanged: onPageChanged,
+                  height: 320,
+                  radius: 34,
+                  overlay: _AcidHeroOverlay(
+                    property: property,
+                    branding: branding,
+                    avgRating: avgRating,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _GlassFilterPill(
+                        icon: IconsaxPlusLinear.layer,
+                        label: property.floor.isEmpty
+                            ? property.propertyType
+                            : 'קומה ${property.floor}',
+                        branding: branding,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _RoundTemplateButton(
+                      icon: IconsaxPlusLinear.location,
+                      onTap: () {},
+                      color: branding.secondaryColor,
+                    ),
+                    const SizedBox(width: 10),
+                    _RoundTemplateButton(
+                      icon: IconsaxPlusLinear.export_2,
+                      onTap: onShareTap,
+                      color: branding.secondaryColor,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _AcidPriceCard(property: property, branding: branding),
+                const SizedBox(height: 18),
+                _TemplateFactsWrap(property: property, branding: branding),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDashboardGlass(BuildContext context) {
+    final signals = property.marketSignals;
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              18,
+              MediaQuery.of(context).padding.top + 12,
+              18,
+              124,
+            ),
+            child: Transform.rotate(
+              angle: -0.018,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.64),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+                ),
+                child: Transform.rotate(
+                  angle: 0.018,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _TemplateTopBar(
+                        branding: branding,
+                        title: '',
+                        dark: false,
+                        onBackTap: onBackTap,
+                        onShareTap: onShareTap,
+                      ),
+                      const SizedBox(height: 18),
+                      _TemplateHeroMedia(
+                        property: property,
+                        controller: controller,
+                        currentPage: currentPage,
+                        onPageChanged: onPageChanged,
+                        height: 250,
+                        radius: 18,
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              property.address,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: branding.secondaryColor,
+                                fontSize: 25,
+                                fontWeight: FontWeight.w900,
+                                height: 1.04,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _RoundTemplateButton(
+                            icon: IconsaxPlusLinear.heart,
+                            onTap: onLike,
+                            color: branding.primaryColor,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${property.priceLabel} · ${property.priceSuffixLabel}',
+                        style: TextStyle(
+                          color: branding.secondaryColor.withValues(alpha: 0.58),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MarketMetricCard(
+                              icon: IconsaxPlusLinear.eye,
+                              label: 'צפיות',
+                              value: _compactNumber(
+                                signals.views + signals.detailViews,
+                              ),
+                              branding: branding,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _MarketMetricCard(
+                              icon: IconsaxPlusLinear.heart,
+                              label: 'שמירות',
+                              value: _compactNumber(signals.saves),
+                              branding: branding,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      _TemplateFactsWrap(property: property, branding: branding),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEstateCard(BuildContext context) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              0,
+              MediaQuery.of(context).padding.top,
+              0,
+              120,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 510,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _TemplateHeroMedia(
+                          property: property,
+                          controller: controller,
+                          currentPage: currentPage,
+                          onPageChanged: onPageChanged,
+                          height: 510,
+                          radius: 0,
+                          alignment: Alignment.center,
+                        ),
+                      ),
+                      Positioned(
+                        top: 18,
+                        left: 20,
+                        right: 20,
+                        child: _TemplateTopBar(
+                          branding: branding,
+                          title: '',
+                          dark: true,
+                          onBackTap: onBackTap,
+                          onShareTap: onShareTap,
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(32),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      property.priceLabel,
+                                      style: TextStyle(
+                                        color: branding.secondaryColor,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  if (property.isNewListing)
+                                    _StatusCapsule(
+                                      label: 'חדש',
+                                      fg: branding.primaryColor,
+                                      bg: branding.primaryColor
+                                          .withValues(alpha: 0.10),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Icon(
+                                    IconsaxPlusLinear.location,
+                                    size: 16,
+                                    color: branding.primaryColor,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      property.address,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              _TemplateFactsWrap(
+                                property: property,
+                                branding: branding,
+                                dense: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (reviews.isNotEmpty) ...[
+                        _ReviewsPreviewSection(reviews: reviews),
+                        const SizedBox(height: 22),
+                      ],
+                      _FeatureWrap(features: property.features.take(8).toList()),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGalleryEditorial(BuildContext context) {
+    final images = property.media;
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              0,
+              MediaQuery.of(context).padding.top,
+              0,
+              124,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 385,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _TemplateHeroMedia(
+                          property: property,
+                          controller: controller,
+                          currentPage: currentPage,
+                          onPageChanged: onPageChanged,
+                          height: 385,
+                          radius: 0,
+                        ),
+                      ),
+                      Positioned(
+                        top: 18,
+                        left: 20,
+                        right: 20,
+                        child: _TemplateTopBar(
+                          branding: branding,
+                          title: '',
+                          dark: true,
+                          onBackTap: onBackTap,
+                          onShareTap: onShareTap,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (images.length > 1)
+                  SizedBox(
+                    height: 92,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: images.length.clamp(0, 5).toInt(),
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (_, index) => GestureDetector(
+                        onTap: () => controller.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOut,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(13),
+                          child: SizedBox(
+                            width: 94,
+                            height: 66,
+                            child: SafeMedia(
+                              media: images[index],
+                              fit: BoxFit.cover,
+                              fallback: _ImageFallback(city: property.city),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              property.street.isNotEmpty
+                                  ? '${property.propertyType} ב${property.street}'
+                                  : property.address,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: branding.secondaryColor,
+                                fontSize: 25,
+                                fontWeight: FontWeight.w900,
+                                height: 1.08,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: onShareTap,
+                            icon: const RentlyIcon(IconsaxPlusLinear.export_2),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _StatusCapsule(
+                        label: property.transactionLabel,
+                        fg: branding.secondaryColor,
+                        bg: const Color(0xFFF3F4F6),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${property.priceLabel}${property.transactionType == PropertyTransactionType.rent ? '/חודש' : ''}',
+                              style: TextStyle(
+                                color: branding.secondaryColor,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          FilledButton(
+                            onPressed: onTour,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: branding.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 22,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: const Text(
+                              'Book Now',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'About this Home',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _propertyDescription,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          height: 1.45,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCinematicGlass(BuildContext context) {
+    final darkText = Colors.white.withValues(alpha: 0.84);
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: SafeMedia(
+            media: property.primaryMedia ??
+                const PropertyMedia(url: '', type: PropertyMediaType.image),
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            fallback: _ImageFallback(city: property.city),
+          ),
+        ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.30),
+                  branding.secondaryColor.withValues(alpha: 0.52),
+                  branding.secondaryColor.withValues(alpha: 0.90),
+                ],
+              ),
+            ),
+          ),
+        ),
+        CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  18,
+                  MediaQuery.of(context).padding.top + 14,
+                  18,
+                  126,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TemplateTopBar(
+                      branding: branding,
+                      title: 'Details',
+                      dark: true,
+                      onBackTap: onBackTap,
+                      onShareTap: onShareTap,
+                    ),
+                    SizedBox(height: MediaQuery.sizeOf(context).height * 0.42),
+                    if (property.media.length > 1)
+                      SizedBox(
+                        height: 82,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: property.media.length.clamp(0, 3).toInt(),
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (_, index) => ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 124,
+                              child: SafeMedia(
+                                media: property.media[index],
+                                fit: BoxFit.cover,
+                                fallback: _ImageFallback(city: property.city),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 18),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Previews',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: List.generate(
+                                        5,
+                                        (index) => const Padding(
+                                          padding: EdgeInsets.only(left: 3),
+                                          child: Icon(
+                                            IconsaxPlusLinear.star_1,
+                                            color: Color(0xFFFFC233),
+                                            size: 15,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _StatusCapsule(
+                                label: property.priceLabel,
+                                fg: branding.secondaryColor,
+                                bg: Colors.white,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      property.address,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _propertyDescription,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: darkText,
+                        fontSize: 14,
+                        height: 1.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String get _propertyDescription {
+    final featureText = property.features.take(3).join(', ');
+    final base =
+        '${property.propertyType} ${property.transactionLabel} ב${property.city}, ${property.roomsLabel} חדרים ו-${property.sizeM2} מ"ר';
+    if (featureText.isEmpty) return base;
+    return '$base. כולל $featureText.';
+  }
+}
+
+class _TemplateHeroMedia extends StatelessWidget {
+  const _TemplateHeroMedia({
+    required this.property,
+    required this.controller,
+    required this.currentPage,
+    required this.onPageChanged,
+    required this.height,
+    required this.radius,
+    this.overlay,
+    this.alignment = Alignment.topCenter,
+  });
+
+  final RentalProperty property;
+  final PageController controller;
+  final int currentPage;
+  final ValueChanged<int> onPageChanged;
+  final double height;
+  final double radius;
+  final Widget? overlay;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = property.media;
+    final safeCurrent =
+        media.isEmpty ? 0 : currentPage.clamp(0, media.length - 1).toInt();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: SizedBox(
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            media.isEmpty
+                ? _ImageFallback(city: property.city)
+                : PageView.builder(
+                    controller: controller,
+                    onPageChanged: onPageChanged,
+                    itemCount: media.length,
+                    itemBuilder: (_, index) => SafeMedia(
+                      media: media[index],
+                      fit: BoxFit.cover,
+                      alignment: alignment,
+                      fallback: _ImageFallback(city: property.city),
+                      videoMode: SafeVideoDisplayMode.playback,
+                    ),
+                  ),
+            if (overlay != null) overlay!,
+            if (media.length > 1)
+              Positioned(
+                bottom: 12,
+                left: 0,
+                right: 0,
+                child: _CarouselDots(count: media.length, current: safeCurrent),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateTopBar extends StatelessWidget {
+  const _TemplateTopBar({
+    required this.branding,
+    required this.title,
+    required this.dark,
+    required this.onBackTap,
+    required this.onShareTap,
+  });
+
+  final BrokerBrandingConfig branding;
+  final String title;
+  final bool dark;
+  final VoidCallback onBackTap;
+  final VoidCallback onShareTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = dark ? Colors.white : branding.secondaryColor;
+    return Row(
+      children: [
+        _RoundTemplateButton(
+          icon: IconsaxPlusLinear.arrow_right,
+          onTap: onBackTap,
+          color: fg,
+          translucent: dark,
+        ),
+        Expanded(
+          child: Center(
+            child: title.isEmpty
+                ? _BrandLogoMark(branding: branding, compact: true)
+                : Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+          ),
+        ),
+        _RoundTemplateButton(
+          icon: IconsaxPlusLinear.export_2,
+          onTap: onShareTap,
+          color: fg,
+          translucent: dark,
+        ),
+      ],
+    );
+  }
+}
+
+class _RoundTemplateButton extends StatelessWidget {
+  const _RoundTemplateButton({
+    required this.icon,
+    required this.onTap,
+    required this.color,
+    this.translucent = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color color;
+  final bool translucent;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.88,
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: translucent ? 14 : 0,
+            sigmaY: translucent ? 14 : 0,
+          ),
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: translucent
+                  ? Colors.white.withValues(alpha: 0.20)
+                  : Colors.white.withValues(alpha: 0.82),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: translucent
+                    ? Colors.white.withValues(alpha: 0.24)
+                    : Colors.black.withValues(alpha: 0.06),
+              ),
+            ),
+            child: Icon(icon, color: color, size: 21),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandLogoMark extends StatelessWidget {
+  const _BrandLogoMark({
+    required this.branding,
+    this.compact = false,
+  });
+
+  final BrokerBrandingConfig branding;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = compact ? 42.0 : 58.0;
+    final fallback = Container(
+      color: Colors.white,
+      child: Icon(
+        Icons.business_rounded,
+        color: branding.primaryColor,
+        size: compact ? 19 : 25,
+      ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.36),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: branding.hasLogo
+            ? SafeImage(source: branding.logoPath, fallback: fallback)
+            : fallback,
+      ),
+    );
+  }
+}
+
+class _AcidHeroOverlay extends StatelessWidget {
+  const _AcidHeroOverlay({
+    required this.property,
+    required this.branding,
+    required this.avgRating,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+  final double avgRating;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          bottom: 22,
+          right: 22,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 11, 16, 11),
+                decoration: BoxDecoration(
+                  color: branding.secondaryColor.withValues(alpha: 0.46),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: branding.accentColor,
+                      child: Text(
+                        property.ownerName.isEmpty ? '?' : property.ownerName[0],
+                        style: TextStyle(
+                          color: branding.secondaryColor,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          property.ownerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          avgRating > 0
+                              ? '${avgRating.toStringAsFixed(1)} דירוג'
+                              : 'מתווך נדל״ן',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 22,
+          left: 22,
+          child: Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              color: branding.secondaryColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Center(
+              child: Text(
+                '${property.sizeM2}\nמ״ר',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: branding.accentColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GlassFilterPill extends StatelessWidget {
+  const _GlassFilterPill({
+    required this.icon,
+    required this.label,
+    required this.branding,
+  });
+
+  final IconData icon;
+  final String label;
+  final BrokerBrandingConfig branding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 62,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.60),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: branding.secondaryColor, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: branding.secondaryColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AcidPriceCard extends StatelessWidget {
+  const _AcidPriceCard({
+    required this.property,
+    required this.branding,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            property.propertyType,
+            style: TextStyle(
+              color: branding.secondaryColor,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                property.priceLabel,
+                style: TextStyle(
+                  color: branding.secondaryColor,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  property.priceSuffixLabel,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateFactsWrap extends StatelessWidget {
+  const _TemplateFactsWrap({
+    required this.property,
+    required this.branding,
+    this.dense = false,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final facts = [
+      _TemplateFact(IconsaxPlusLinear.building, '${property.roomsLabel} חדרים'),
+      _TemplateFact(IconsaxPlusLinear.maximize_3, '${property.sizeM2} מ״ר'),
+      if (property.floor.isNotEmpty)
+        _TemplateFact(IconsaxPlusLinear.layer, 'קומה ${property.floor}'),
+      if (property.condition.isNotEmpty)
+        _TemplateFact(IconsaxPlusLinear.star, property.condition),
+    ];
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: facts
+          .map(
+            (fact) => Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: dense ? 12 : 15,
+                vertical: dense ? 9 : 12,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.07)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(fact.icon, size: 16, color: branding.primaryColor),
+                  const SizedBox(width: 7),
+                  Text(
+                    fact.label,
+                    style: TextStyle(
+                      color: branding.secondaryColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _TemplateFact {
+  const _TemplateFact(this.icon, this.label);
+  final IconData icon;
+  final String label;
+}
+
+class _MarketMetricCard extends StatelessWidget {
+  const _MarketMetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.branding,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final BrokerBrandingConfig branding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 126,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.64)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: branding.secondaryColor.withValues(alpha: 0.48)),
+          const Spacer(),
+          Text(
+            label,
+            style: TextStyle(
+              color: branding.secondaryColor.withValues(alpha: 0.65),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              color: branding.secondaryColor,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              height: 0.95,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusCapsule extends StatelessWidget {
+  const _StatusCapsule({
+    required this.label,
+    required this.fg,
+    required this.bg,
+  });
+
+  final String label;
+  final Color fg;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewsPreviewSection extends StatelessWidget {
+  const _ReviewsPreviewSection({required this.reviews});
+
+  final List<AppReview> reviews;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Reviews',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 150,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: reviews.length.clamp(0, 4).toInt(),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, index) => SizedBox(
+              width: 230,
+              child: _ReviewTile(review: reviews[index]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _compactNumber(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
+  return value.toString();
+}
+
 class _CarouselDots extends StatelessWidget {
   const _CarouselDots({required this.count, required this.current});
   final int count;
@@ -646,17 +2079,22 @@ class _CarouselDots extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(count, (i) {
         final active = i == current;
-        return AnimatedContainer(
+        return AnimatedScale(
+          scale: active ? 1.35 : 1.0,
           duration: const Duration(milliseconds: 220),
-          curve: Curves.easeInOut,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: active ? 22 : 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.primary
-                : Colors.white.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(4),
+          curve: Curves.easeOutBack,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: active ? 20 : 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.primary
+                  : Colors.white.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
         );
       }),
@@ -676,7 +2114,7 @@ class _ImageFallback extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const RentchIcon(IconsaxPlusLinear.building,
+            const RentlyIcon(IconsaxPlusLinear.building,
                 size: 64, color: Colors.white30),
             if (city.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -899,7 +2337,7 @@ class _OwnerCard extends StatelessWidget {
                               color: Colors.white,
                               shape: BoxShape.circle,
                             ),
-                            child: const RentchIcon(
+                            child: const RentlyIcon(
                               IconsaxPlusLinear.verify,
                               size: 16,
                               color: Color(0xFF13BEC9),
@@ -946,7 +2384,7 @@ class _OwnerCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const RentchIcon(
+                          const RentlyIcon(
                             IconsaxPlusLinear.star_1,
                             size: 14,
                             color: Color(0xFFCA8A04),
@@ -1024,11 +2462,11 @@ class _OwnerCard extends StatelessWidget {
                     onTap: () => _showOwnerSheet(context, property, reviews),
                     child: Row(
                       children: [
-                        const RentchIcon(IconsaxPlusLinear.profile_circle,
+                        const RentlyIcon(IconsaxPlusLinear.profile_circle,
                             size: 16, color: Color(0xFF13BEC9)),
                         const SizedBox(width: 6),
                         const Text(
-                          'פרופיל משכיר וביקורות',
+                          'פרופיל משכיר',
                           style: TextStyle(
                             color: Color(0xFF13BEC9),
                             fontWeight: FontWeight.w700,
@@ -1047,7 +2485,7 @@ class _OwnerCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const RentchIcon(
+                  const RentlyIcon(
                     IconsaxPlusLinear.arrow_left,
                     size: 14,
                     color: Color(0xFF13BEC9),
@@ -1159,7 +2597,7 @@ class _OwnerProfileSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const RentchIcon(IconsaxPlusLinear.star_1,
+                            const RentlyIcon(IconsaxPlusLinear.star_1,
                                 size: 14, color: Color(0xFFE8A84A)),
                             const SizedBox(width: 4),
                             Text(
@@ -1179,43 +2617,6 @@ class _OwnerProfileSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          if (reviews.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  'ביקורות (${reviews.length})',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.navy,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.35,
-              ),
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                shrinkWrap: true,
-                itemCount: reviews.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) => _ReviewTile(review: reviews[i]),
-              ),
-            ),
-          ] else ...[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 28),
-              child: Text(
-                'עוד אין ביקורות על המשכיר הזה.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1472,31 +2873,35 @@ class _FeatureWrap extends StatelessWidget {
       runSpacing: 8,
       children: features.map((f) {
         final icon = _getFeatureIcon(f);
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: const Color(0xFF13BEC9),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                f,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF334155),
+        return ScaleBounce(
+          onTap: () {},
+          scaleDownTo: 0.94,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color: const Color(0xFF13BEC9),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  f,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -1652,7 +3057,7 @@ class _MapSection extends StatelessWidget {
                                   offset: Offset(0, 4)),
                             ],
                           ),
-                          child: const RentchIcon(IconsaxPlusLinear.building,
+                          child: const RentlyIcon(IconsaxPlusLinear.building,
                               color: Colors.white, size: 20),
                         ),
                       ),
@@ -1674,7 +3079,7 @@ class _MapSection extends StatelessWidget {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      RentchIcon(IconsaxPlusLinear.export_2,
+                      RentlyIcon(IconsaxPlusLinear.export_2,
                           size: 13, color: Colors.white),
                       SizedBox(width: 5),
                       Text(
@@ -1741,54 +3146,68 @@ class _BottomBar extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: isLandlordPreview
-                    ? OutlinedButton.icon(
-                        onPressed: onEdit,
-                        icon: const RentchIcon(IconsaxPlusLinear.edit, size: 18),
-                        label: const Text('עריכת נכס',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0F172A),
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                child: ScaleBounce(
+                  onTap: isLandlordPreview ? onEdit : onLike,
+                  scaleDownTo: 0.94,
+                  child: isLandlordPreview
+                      ? OutlinedButton.icon(
+                          onPressed: onEdit,
+                          icon: const RentlyIcon(IconsaxPlusLinear.edit, size: 18),
+                          label: const Text('עריכת נכס',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0F172A),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: onLike,
+                          icon: const RentlyIcon(IconsaxPlusLinear.heart, size: 18),
+                          label: const Text('אהבתי',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0F172A),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
                         ),
-                      )
-                    : OutlinedButton.icon(
-                        onPressed: onLike,
-                        icon: const RentchIcon(IconsaxPlusLinear.heart, size: 18),
-                        label: const Text('אהבתי',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0F172A),
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: PulseWidget(
+                  scaleUpTo: 1.05,
+                  duration: const Duration(milliseconds: 1600),
+                  child: ScaleBounce(
+                    onTap: onTour,
+                    scaleDownTo: 0.95,
+                    child: ShineDecorator(
+                      child: FilledButton.icon(
+                        onPressed: onTour,
+                        icon: const Icon(Icons.view_in_ar_rounded, size: 18),
+                        label: Text(
+                          hasVirtualTour
+                              ? 'סיור תלת־ממדי'
+                              : isProcessing
+                                  ? 'סריקה בהכנה'
+                                  : 'בקש סיור תלת־ממדי',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF13BEC9),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: onTour,
-                  icon: const Icon(Icons.view_in_ar_rounded, size: 18),
-                  label: Text(
-                    hasVirtualTour
-                        ? 'סיור תלת־ממדי'
-                        : isProcessing
-                            ? 'סריקה בהכנה'
-                            : 'בקש סיור תלת־ממדי',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF13BEC9),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
               ),
@@ -1887,7 +3306,7 @@ class _OverviewCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const RentchIcon(
+                        RentlyIcon(
                           IconsaxPlusLinear.location,
                           size: 16,
                           color: AppColors.primary,
@@ -1965,7 +3384,7 @@ class _OverviewCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const RentchIcon(
+                  const RentlyIcon(
                     IconsaxPlusLinear.arrow_left_2,
                     color: Colors.white,
                     size: 18,
@@ -2114,6 +3533,7 @@ class _TourUnavailableSheet extends StatelessWidget {
     final tour = property.virtualTour;
     final hasSource = tour?.hasSourceCapture == true;
     final isProcessing = tour?.isProcessing == true;
+    final hasFailed = tour?.hasFailed == true;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -2144,23 +3564,29 @@ class _TourUnavailableSheet extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: AppColors.primaryLight2,
+              color: hasFailed
+                  ? AppColors.coral.withValues(alpha: 0.12)
+                  : AppColors.primaryLight2,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(
-              Icons.view_in_ar_rounded,
-              color: AppColors.primary,
+            child: Icon(
+              hasFailed
+                  ? Icons.error_outline_rounded
+                  : Icons.view_in_ar_rounded,
+              color: hasFailed ? AppColors.coral : AppColors.primary,
               size: 28,
             ),
           ),
           const SizedBox(height: 14),
           Text(
-            isProcessing
-                ? 'סריקת ה־3D עדיין בעיבוד'
-                : hasSource
-                    ? 'הסריקה נשמרה ומחכה לעיבוד'
-                    : 'עדיין אין סיור תלת־ממדי לנכס הזה',
-            style: TextStyle(
+            hasFailed
+                ? 'הסריקה התלת־ממדית נכשלה'
+                : isProcessing
+                    ? 'סריקת ה־3D בעיבוד'
+                    : hasSource
+                        ? 'הסריקה בתור לעיבוד'
+                        : 'עדיין אין סיור תלת־ממדי לנכס הזה',
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
               color: AppColors.navy,
@@ -2168,24 +3594,48 @@ class _TourUnavailableSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            isProcessing
-                ? _processingCopy(tour)
-                : hasSource
-                    ? 'בעל הדירה כבר צילם וידאו סריקה, אבל backend הסריקות עדיין לא מחובר לעיבוד בענן.'
-                    : 'כדי לפתוח הליכה חופשית בתוך הדירה צריך שתהיה סריקה או וידאו ייעודי של הנכס. כרגע אפשר להמשיך דרך התמונות והמודעה המקורית.',
+            hasFailed
+                ? 'העיבוד לא הצליח לשחזר את הדירה מהסרטון. לרוב זה קורה כשהצילום מהיר מדי או חלקי. צלמו שוב לאט, סובבו סביב כל חדר וודאו תאורה טובה — ונסו להעלות מחדש.'
+                : isProcessing
+                    ? _processingCopy(tour)
+                    : hasSource
+                        ? 'בעל הדירה צילם את הדירה וממתין שהעיבוד יתחיל. הסיור יהיה זמין בקרוב.'
+                        : 'כדי לפתוח הליכה חופשית בתוך הדירה צריך שתהיה סריקה או וידאו ייעודי של הנכס. כרגע אפשר להמשיך דרך התמונות והמודעה המקורית.',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 14,
               height: 1.55,
             ),
           ),
+          if (isProcessing) ...[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                minHeight: 6,
+                backgroundColor: AppColors.primaryLight2,
+                color: AppColors.primary,
+                value: tour?.processingProgress != null
+                    ? (tour!.processingProgress! / 100.0)
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _processingEta(tour),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const RentchIcon(IconsaxPlusLinear.close_circle),
+                  icon: const RentlyIcon(IconsaxPlusLinear.close_circle),
                   label: const Text('סגור'),
                 ),
               ),
@@ -2201,7 +3651,7 @@ class _TourUnavailableSheet extends StatelessWidget {
                             mode: LaunchMode.externalApplication,
                           );
                         },
-                  icon: const RentchIcon(IconsaxPlusLinear.export_2),
+                  icon: const RentlyIcon(IconsaxPlusLinear.export_2),
                   label: const Text('פתח מודעה'),
                 ),
               ),
@@ -2213,11 +3663,26 @@ class _TourUnavailableSheet extends StatelessWidget {
   }
 
   String _processingCopy(PropertyVirtualTour? tour) {
+    final stage = tour?.processingStage.trim().toLowerCase() ?? '';
     final progress = tour?.processingProgress;
     if (progress != null) {
-      return 'העיבוד בענן הגיע ל־$progress%. כשה־viewer יהיה מוכן, הכפתור יפתח סיור אינטראקטיבי.';
+      return 'שלב עיבוד: $progress% הושלם. כשיהיה מוכן, הכפתור יפתח סיור אינטראקטיבי.';
     }
-    return 'העיבוד בענן פעיל. כשה־viewer יהיה מוכן, הכפתור יפתח סיור אינטראקטיבי בלי להוריד קובץ כבד מראש.';
+    return switch (stage) {
+      'pending' => 'הסריקה ממתינה לתור בשרת. בדרך כלל מתחיל תוך דקה.',
+      'staging' => 'מנתח את חללי הדירה ובונה את סביבת ה־3D. עוד כמה דקות.',
+      'complete' => 'העיבוד הסתיים, ה־viewer מוכן לפתיחה.',
+      _ => 'העיבוד בענן פעיל. כשה־viewer יהיה מוכן, הכפתור יפתח סיור אינטראקטיבי.',
+    };
+  }
+
+  String _processingEta(PropertyVirtualTour? tour) {
+    final stage = tour?.processingStage.trim().toLowerCase() ?? '';
+    return switch (stage) {
+      'pending' => 'זמן משוער: 1–3 דקות',
+      'staging' => 'זמן משוער: 2–5 דקות',
+      _ => 'זמן משוער: כמה דקות',
+    };
   }
 }
 
@@ -2339,8 +3804,32 @@ class _InteractiveTourScreen extends StatelessWidget {
   final RentalProperty property;
   final PropertyVirtualTour tour;
 
+  // Luma virtual-staging returns an AI image, not an interactive 3D asset.
+  // Detect that so we render it inline as a visualization instead of the
+  // "interactive tour" placeholder (which is meant for video/real-3D viewers).
+  bool get _isImageVisualization {
+    final f = tour.format.trim().toLowerCase();
+    if (f == 'image') return true;
+    if (f == 'video' || f == 'glb' || f == 'gltf' || f == 'usdz' ||
+        f == 'splat' || f == 'mesh' || f == '3d') {
+      return false;
+    }
+    final u = (tour.previewImageUrl.trim().isNotEmpty
+            ? tour.previewImageUrl
+            : tour.viewerUrl)
+        .trim()
+        .toLowerCase()
+        .split('?')
+        .first;
+    return u.endsWith('.png') ||
+        u.endsWith('.jpg') ||
+        u.endsWith('.jpeg') ||
+        u.endsWith('.webp');
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isImageVisualization) return _buildImageVisualization(context);
     final quality = tour.qualityScore == null
         ? null
         : (tour.qualityScore! * 100).clamp(0, 100).round();
@@ -2444,7 +3933,7 @@ class _InteractiveTourScreen extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () => _openViewer(context, tour.viewerUrl),
-                  icon: const RentchIcon(IconsaxPlusLinear.export_2),
+                  icon: const RentlyIcon(IconsaxPlusLinear.export_2),
                   label: const Text('פתח סיור אינטראקטיבי'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -2457,6 +3946,95 @@ class _InteractiveTourScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // Renders the AI-staged image inline (pinch-to-zoom), with explicit
+  // loading/error states. Used for Luma "הדמיה" results so the user sees the
+  // visualization in-app rather than a 3D-tour placeholder + external browser.
+  Widget _buildImageVisualization(BuildContext context) {
+    final url = tour.previewImageUrl.trim().isNotEmpty
+        ? tour.previewImageUrl.trim()
+        : tour.viewerUrl.trim();
+    return Scaffold(
+      backgroundColor: const Color(0xFF061C2D),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: url.isEmpty
+                  ? const Center(
+                      child: Icon(Icons.broken_image_rounded,
+                          color: Colors.white38, size: 54),
+                    )
+                  : InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: Center(
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.6, color: Colors.white),
+                            );
+                          },
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.broken_image_rounded,
+                                    color: Colors.white38, size: 54),
+                                SizedBox(height: 10),
+                                Text('לא ניתן לטעון את ההדמיה',
+                                    style: TextStyle(color: Colors.white60)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+            Positioned(
+              top: 12,
+              left: 18,
+              right: 18,
+              child: Row(
+                children: [
+                  _FloatingNavBtn(
+                    icon: IconsaxPlusLinear.arrow_right,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome_rounded,
+                            size: 16, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('הדמיית AI',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2512,72 +4090,19 @@ class _PropertySignalStrip extends StatelessWidget {
   final RentalProperty property;
 
   static bool shouldShow(BuildContext context, RentalProperty property) {
-    final provider = context.read<DatingProvider>();
-    final isGuest = provider.isGuestMode;
-    final properties = provider.filteredProperties;
-    final isFirst = isGuest && properties.isNotEmpty && property.id == properties.first.id;
-    final isSecond = isGuest && properties.length > 1 && property.id == properties[1].id;
-
-    if (isFirst || isSecond) return true;
-
     final signals = property.marketSignals;
     return property.isVerifiedListing ||
         property.isNewListing ||
+        signals.views > 0 ||
+        signals.likes > 0 ||
         signals.liveViewers > 0 ||
         signals.likesTodayFor(DateTime.now()) > 0;
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<DatingProvider>();
-    final isGuest = provider.isGuestMode;
-    final properties = provider.filteredProperties;
-    final isFirst = isGuest && properties.isNotEmpty && property.id == properties.first.id;
-    final isSecond = isGuest && properties.length > 1 && property.id == properties[1].id;
-
-    if (isFirst) {
-      return Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: const [
-          _PropertySignalChip(
-            icon: IconsaxPlusLinear.eye,
-            label: '245 צפו',
-            color: Color(0xFF22C55E),
-          ),
-          _PropertySignalChip(
-            icon: IconsaxPlusLinear.heart,
-            label: '84 אהבו',
-            color: Color(0xFFFF5A67),
-          ),
-        ],
-      );
-    }
-
-    if (isSecond) {
-      return Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: const [
-          _PropertySignalChip(
-            icon: Icons.flash_on_rounded,
-            label: 'דירה חדשה!',
-            color: Color(0xFFEF4444),
-          ),
-          _PropertySignalChip(
-            icon: IconsaxPlusLinear.heart,
-            label: '47 אהבו',
-            color: Color(0xFFFF5A67),
-          ),
-          _PropertySignalChip(
-            icon: IconsaxPlusLinear.people,
-            label: '3 צופים עכשיו',
-            color: Color(0xFF22C55E),
-          ),
-        ],
-      );
-    }
-
+    // Watch so the strip refreshes when real view/like counts arrive.
+    context.watch<DatingProvider>();
     final signals = property.marketSignals;
     final likesToday = signals.likesTodayFor(DateTime.now());
 
@@ -2585,6 +4110,18 @@ class _PropertySignalStrip extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
+        if (signals.views > 0)
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.eye,
+            label: '${signals.views} צפו',
+            color: const Color(0xFF22C55E),
+          ),
+        if (signals.likes > 0)
+          _PropertySignalChip(
+            icon: IconsaxPlusLinear.heart,
+            label: '${signals.likes} אהבו',
+            color: const Color(0xFFFF5A67),
+          ),
         if (property.isVerifiedListing)
           const _PropertySignalChip(
             icon: IconsaxPlusLinear.verify,
@@ -2592,24 +4129,30 @@ class _PropertySignalStrip extends StatelessWidget {
             color: Color(0xFF13BEC9),
           ),
         if (property.isNewListing)
-          const _PropertySignalChip(
-            icon: IconsaxPlusLinear.flash_1,
-            label: 'חדש · היה מהראשונים',
-            color: Color(0xFF13BEC9),
+          const SignalStripPulse(
+            child: _PropertySignalChip(
+              icon: IconsaxPlusLinear.flash_1,
+              label: 'דירה הועלתה לאחרונה',
+              color: Color(0xFF13BEC9),
+            ),
           ),
         if (signals.liveViewers > 0)
-          _PropertySignalChip(
-            icon: IconsaxPlusLinear.eye,
-            label: signals.liveViewers == 1
-                ? 'מסתכל עכשיו'
-                : '${signals.liveViewers} מסתכלים עכשיו',
-            color: const Color(0xFF22C55E),
+          SignalStripPulse(
+            child: _PropertySignalChip(
+              icon: IconsaxPlusLinear.eye,
+              label: signals.liveViewers == 1
+                  ? 'מסתכל עכשיו'
+                  : '${signals.liveViewers} מסתכלים עכשיו',
+              color: const Color(0xFF22C55E),
+            ),
           ),
         if (likesToday > 0)
-          _PropertySignalChip(
-            icon: IconsaxPlusLinear.heart,
-            label: '$likesToday אהבו היום',
-            color: const Color(0xFFFF5A67),
+          SignalStripPulse(
+            child: _PropertySignalChip(
+              icon: IconsaxPlusLinear.heart,
+              label: '$likesToday אהבו היום',
+              color: const Color(0xFFFF5A67),
+            ),
           ),
       ],
     );
@@ -2639,7 +4182,7 @@ class _PropertySignalChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RentchIcon(icon, size: 15, color: color),
+          RentlyIcon(icon, size: 15, color: color),
           const SizedBox(width: 6),
           Text(
             label,
@@ -2672,26 +4215,41 @@ class _PropertyFactsCard extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _FactItemCard(
-                IconsaxPlusLinear.building,
-                property.roomsLabel,
-                'חדרים',
+              child: FadeSlideEntrance(
+                delay: Duration.zero,
+                duration: const Duration(milliseconds: 400),
+                offset: const Offset(0.0, 25.0),
+                child: _FactItemCard(
+                  IconsaxPlusLinear.building,
+                  property.roomsLabel,
+                  'חדרים',
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _FactItemCard(
-                IconsaxPlusLinear.maximize_3,
-                '${property.sizeM2}',
-                'שטח במ"ר',
+              child: FadeSlideEntrance(
+                delay: const Duration(milliseconds: 60),
+                duration: const Duration(milliseconds: 400),
+                offset: const Offset(0.0, 25.0),
+                child: _FactItemCard(
+                  IconsaxPlusLinear.maximize_3,
+                  '${property.sizeM2}',
+                  'שטח במ"ר',
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _FactItemCard(
-                IconsaxPlusLinear.layer,
-                property.floor.isNotEmpty ? property.floor : '-',
-                'קומה',
+              child: FadeSlideEntrance(
+                delay: const Duration(milliseconds: 120),
+                duration: const Duration(milliseconds: 400),
+                offset: const Offset(0.0, 25.0),
+                child: _FactItemCard(
+                  IconsaxPlusLinear.layer,
+                  property.floor.isNotEmpty ? property.floor : '-',
+                  'קומה',
+                ),
               ),
             ),
           ],
@@ -2701,28 +4259,43 @@ class _PropertyFactsCard extends StatelessWidget {
           children: [
             Expanded(
               flex: 2,
-              child: _FactItemCard(
-                IconsaxPlusLinear.magicpen,
-                property.condition.isNotEmpty ? property.condition : 'רגיל',
-                'מצב הנכס',
+              child: FadeSlideEntrance(
+                delay: const Duration(milliseconds: 180),
+                duration: const Duration(milliseconds: 400),
+                offset: const Offset(0.0, 25.0),
+                child: _FactItemCard(
+                  IconsaxPlusLinear.magicpen,
+                  property.condition.isNotEmpty ? property.condition : 'רגיל',
+                  'מצב הנכס',
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               flex: 1,
-              child: _FactItemCard(
-                IconsaxPlusLinear.car,
-                hasParking ? 'יש' : 'אין',
-                'חנייה',
+              child: FadeSlideEntrance(
+                delay: const Duration(milliseconds: 240),
+                duration: const Duration(milliseconds: 400),
+                offset: const Offset(0.0, 25.0),
+                child: _FactItemCard(
+                  IconsaxPlusLinear.car,
+                  hasParking ? 'יש' : 'אין',
+                  'חנייה',
+                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               flex: 1,
-              child: _FactItemCard(
-                Icons.elevator_outlined,
-                hasElevator ? 'יש' : 'אין',
-                'מעלית',
+              child: FadeSlideEntrance(
+                delay: const Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 400),
+                offset: const Offset(0.0, 25.0),
+                child: _FactItemCard(
+                  Icons.elevator_outlined,
+                  hasElevator ? 'יש' : 'אין',
+                  'מעלית',
+                ),
               ),
             ),
           ],
@@ -2867,7 +4440,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const RentchIcon(
+                          const RentlyIcon(
                             IconsaxPlusLinear.star_1,
                             size: 12,
                             color: Color(0xFFCA8A04),
@@ -2904,6 +4477,136 @@ class _HorizontalReviewsList extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+// ─── Match insight ("why this match") ─────────────────────────────────────────
+
+class _MatchInsightCard extends StatelessWidget {
+  const _MatchInsightCard({required this.property});
+  final RentalProperty property;
+
+  (Color, Color) _tierColors(MatchTier tier) => switch (tier) {
+        MatchTier.perfect => (const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+        MatchTier.excellent => (AppColors.primary, AppColors.primaryLight2),
+        MatchTier.good => (const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+        MatchTier.fair => (const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+        MatchTier.weak => (AppColors.textSecondary, const Color(0xFFF1F5F9)),
+      };
+
+  IconData _reasonIcon(MatchReasonKind kind) => switch (kind) {
+        MatchReasonKind.budget => IconsaxPlusLinear.money_recive,
+        MatchReasonKind.location => IconsaxPlusLinear.location,
+        MatchReasonKind.rooms => IconsaxPlusLinear.home_2,
+        MatchReasonKind.size => IconsaxPlusLinear.maximize_3,
+        MatchReasonKind.timing => IconsaxPlusLinear.calendar_1,
+        MatchReasonKind.amenity => IconsaxPlusLinear.flash_1,
+        MatchReasonKind.lifestyle => IconsaxPlusLinear.heart,
+        MatchReasonKind.quality => IconsaxPlusLinear.verify,
+        MatchReasonKind.mutualInterest => IconsaxPlusLinear.people,
+        MatchReasonKind.dealBreaker => IconsaxPlusLinear.warning_2,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final outcome = context.read<DatingProvider>().matchOutcome(property);
+    final (fg, bg) = _tierColors(outcome.tier);
+    final positives = outcome.positives.take(4).toList();
+    final concerns = outcome.concerns.take(2).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Score + tier header
+        Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+              child: Center(
+                child: Text(
+                  '${outcome.score}',
+                  style: TextStyle(
+                      color: fg, fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(outcome.tier.label,
+                    style: TextStyle(
+                        color: fg, fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(
+                  outcome.hasTwoSidedSignal
+                      ? 'דירוג הדדי — מתחשב גם בהעדפות בעל הדירה'
+                      : 'לפי ההעדפות שלך',
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        for (final r in positives)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(_reasonIcon(r.kind),
+                      size: 14, color: AppColors.primary),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(r.label,
+                      style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600)),
+                ),
+                const Icon(Icons.check_circle_rounded,
+                    size: 16, color: Color(0xFF16A34A)),
+              ],
+            ),
+          ),
+        for (final r in concerns)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: AppColors.coral.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(_reasonIcon(r.kind),
+                      size: 14, color: AppColors.coral),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(r.label,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

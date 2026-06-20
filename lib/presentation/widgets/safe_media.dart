@@ -5,7 +5,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:video_player/video_player.dart';
 
 enum SafeVideoDisplayMode {
@@ -204,7 +204,7 @@ class _VideoMediaPlayerState extends State<_VideoMediaPlayer> {
                       color: Colors.black.withValues(alpha: 0.42),
                       shape: BoxShape.circle,
                     ),
-                    child: const RentchIcon(
+                    child: const RentlyIcon(
                       IconsaxPlusLinear.play,
                       color: Colors.white,
                       size: 24,
@@ -238,7 +238,7 @@ class _VideoOverlayBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RentchIcon(
+          RentlyIcon(
             IconsaxPlusLinear.video,
             color: Colors.white,
             size: compact ? 12 : 15,

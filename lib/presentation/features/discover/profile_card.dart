@@ -7,7 +7,7 @@ import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 
 class ProfileCard extends StatefulWidget {
@@ -65,6 +65,12 @@ class _ProfileCardState extends State<ProfileCard> {
     );
   }
 
+  /// Double-tap anywhere on the card to "like" it (swipes it right).
+  void _likeCard(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    context.read<DatingProvider>().swipePropertyRight();
+  }
+
   Future<void> _showSendOptions() async {
     HapticFeedback.selectionClick();
     await showPropertyShareSheet(context, p);
@@ -95,9 +101,15 @@ class _ProfileCardState extends State<ProfileCard> {
     final isFirst = isGuest && properties.isNotEmpty && p.id == properties.first.id;
     final isSecond = isGuest && properties.length > 1 && p.id == properties[1].id;
 
+    final dragFactor = (widget.horizontalOffsetPercentage.abs() / 100.0).clamp(0.0, 1.0);
+    final blurRadius = 18.0 + (14.0 * dragFactor);
+    final spreadRadius = 2.0 + (2.0 * dragFactor);
+    final shadowOffset = Offset(0, 6.0 + (10.0 * dragFactor));
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
@@ -106,10 +118,10 @@ class _ProfileCardState extends State<ProfileCard> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 18,
-              spreadRadius: 2,
-              offset: const Offset(0, 6),
+              color: Colors.black.withValues(alpha: 0.28 + (0.05 * dragFactor)),
+              blurRadius: blurRadius,
+              spreadRadius: spreadRadius,
+              offset: shadowOffset,
             ),
             // Outward glass glow/reflection
             BoxShadow(
@@ -203,6 +215,7 @@ class _ProfileCardState extends State<ProfileCard> {
                 height: MediaQuery.sizeOf(context).height * 0.28,
                 child: GestureDetector(
                   onTap: () => _openDetail(context),
+                  onDoubleTap: () => _likeCard(context),
                   behavior: HitTestBehavior.translucent,
                 ),
               ),
@@ -219,157 +232,116 @@ class _ProfileCardState extends State<ProfileCard> {
                   ),
                 ),
 
-              // Top row: agency badge + send/more buttons
-              Positioned(
-                top: hasMultiple ? 26 : 16,
-                right: 16,
-                left: 16,
-                child: Row(
-                  children: [
-                    _AgencyBadge(agencyListing: p.agencyListing),
-                    if (p.isVerifiedListing) ...[
-                      const SizedBox(width: 8),
-                      const _VerifiedListingBadge(),
-                    ],
-                    if (p.hasReadyVirtualTour) ...[
-                      const SizedBox(width: 8),
-                      const _TourReadyBadge(),
-                    ],
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: _showSendOptions,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.42),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
-                          ),
-                        ),
-                        child: const RentchIcon(
-                          IconsaxPlusLinear.send_2,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => _showMoreOptions(context),
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.42),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.more_vert,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-              // Swipe labels
-              if (isLiking || isPassing)
+
+              // Swipe labels with smooth scale-in and fade-in stamp animation
+              if (widget.horizontalOffsetPercentage != 0)
                 Positioned(
-                  top: 28,
-                  left: isPassing ? 22 : null,
-                  right: isLiking ? 22 : null,
+                  top: 50,
+                  left: widget.horizontalOffsetPercentage < 0 ? 24 : null,
+                  right: widget.horizontalOffsetPercentage > 0 ? 24 : null,
                   child: Transform.rotate(
-                    angle: isLiking ? -0.15 : 0.15,
-                    child: _SwipeBadge(
-                      label: isLiking ? '♥ מתאים' : 'דלג',
-                      color: isLiking ? AppColors.primary : AppColors.coral,
+                    angle: widget.horizontalOffsetPercentage > 0 ? -0.18 : 0.18,
+                    child: Opacity(
+                      opacity: (widget.horizontalOffsetPercentage.abs() / 30.0).clamp(0.0, 1.0),
+                      child: Transform.scale(
+                        scale: (widget.horizontalOffsetPercentage.abs() / 40.0).clamp(0.85, 1.2),
+                        child: _SwipeBadge(
+                          label: widget.horizontalOffsetPercentage > 0 ? '♥ מתאים' : 'דלג',
+                          color: widget.horizontalOffsetPercentage > 0 ? AppColors.primary : AppColors.coral,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               // Content overlay (bottom layout directly on the dark gradient)
               Positioned(
-                left: 16,
-                right: 16,
-                bottom: 128,
+                left: 0,
+                right: 0,
+                bottom: 120,
                 child: GestureDetector(
                   onTap: () => _openDetail(context),
+                  onDoubleTap: () => _likeCard(context),
                   behavior: HitTestBehavior.opaque,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          if (priceCtx != PriceContext.average)
-                            _PriceContextBadge(ctx: priceCtx)
-                          else
-                            const SizedBox.shrink(),
-                          if (score > 0)
-                            _MatchScoreBadge(score: score)
-                          else
-                            const SizedBox.shrink(),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (priceCtx != PriceContext.average)
+                              _PriceContextBadge(ctx: priceCtx)
+                            else
+                              const SizedBox.shrink(),
+                            if (score > 0)
+                              _MatchScoreBadge(score: score)
+                            else
+                              const SizedBox.shrink(),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            p.priceLabel,
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              height: 1.1,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            p.priceSuffixLabel,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          RentchIcon(
-                            IconsaxPlusLinear.location,
-                            size: 14,
-                            color: Colors.white.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              p.address,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              p.priceLabel,
                               style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1.1,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Text(
+                              p.priceSuffixLabel,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            RentlyIcon(
+                              IconsaxPlusLinear.location,
+                              size: 14,
+                              color: Colors.white.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                p.address,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
                             _StatPill(
@@ -439,7 +411,7 @@ class _ImageFallback extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            RentchIcon(
+            RentlyIcon(
               IconsaxPlusLinear.building,
               size: 64,
               color: AppColors.primary.withValues(alpha: 0.5),
@@ -478,7 +450,7 @@ class _ImageDots extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const RentchIcon(IconsaxPlusLinear.gallery,
+          const RentlyIcon(IconsaxPlusLinear.gallery,
               size: 12, color: Colors.white),
           const SizedBox(width: 4),
           Text(
@@ -701,7 +673,7 @@ class _FeatureTag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.primaryLight,
           fontWeight: FontWeight.w700,
           fontSize: 11,
@@ -732,7 +704,7 @@ class _MatchScoreBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RentchIcon(IconsaxPlusLinear.star_1, size: 11, color: color),
+          RentlyIcon(IconsaxPlusLinear.star_1, size: 11, color: color),
           const SizedBox(width: 4),
           Text(
             '$score% התאמה',

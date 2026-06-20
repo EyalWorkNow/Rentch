@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Dating App</string>
+	<string>Rently</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>dating_app</string>
+	<string>Rently</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -44,7 +44,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>נדרשת גישה למצלמה לצילום תמונות ווידאו של הנכס</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>נדרשת גישה למיקרופון לצילום וידאו של הנכס</string>
+	<string>נדרשת גישה למיקרופון כדי לדבר עם העוזר האישי ולצלם וידאו של הנכס</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>נדרשת הרשאת זיהוי דיבור כדי שתוכל לדבר עם העוזר האישי אריק בעברית</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

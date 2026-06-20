@@ -1,8 +1,12 @@
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/constants/brand_palette.dart';
+import 'package:dating_app/core/services/push_notification_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
+import 'package:dating_app/core/widgets/ipad_frame.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/onboarding_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:dating_app/firebase_options.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +28,19 @@ void main() async {
       // Never rethrow on launch — Firebase Auth can still recover later.
       debugPrint('Firebase initialization skipped: $error');
     }
+
+    // Push notifications (e.g. "your 3D tour is ready"). Fail-soft: handlers are
+    // wired once, and the device token is (re)registered with the backend
+    // whenever a user is signed in, so the server-side tour poller can reach
+    // them while the app is closed.
+    try {
+      await PushNotificationService.instance.initialize();
+      FirebaseAuth.instance.authStateChanges().listen((user) {
+        if (user != null) PushNotificationService.instance.registerForUser();
+      });
+    } catch (error) {
+      debugPrint('Push notifications skipped: $error');
+    }
   }
 
   // Scaniverse is optional; a failure must not block launch.
@@ -39,38 +56,53 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(const RentchApp());
+  runApp(const RentlyApp());
 }
 
-class RentchApp extends StatelessWidget {
-  const RentchApp({super.key});
+class RentlyApp extends StatelessWidget {
+  const RentlyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       lazy: false,
       create: (_) => DatingProvider()..initialize(),
-      child: MaterialApp(
-        title: 'Rentch',
-        debugShowCheckedModeBanner: false,
-        theme: _buildTheme(),
-        builder: (context, child) {
-          return Directionality(
-            textDirection: TextDirection.rtl,
-            child: child ?? const SizedBox.shrink(),
+      child: Consumer<DatingProvider>(
+        builder: (context, provider, _) {
+          // Real-estate brokers get their own accent identity; everyone else
+          // keeps the signature teal. Swap the global brand accent first so the
+          // 380+ `AppColors.primary` references across the app repaint in the
+          // broker's indigo, then theme + rebuild on top.
+          AppColors.applyRole(provider.userRole);
+          final palette = BrandPalette.forRole(provider.userRole);
+          return MaterialApp(
+            title: 'Rently',
+            debugShowCheckedModeBanner: false,
+            theme: _buildTheme(palette),
+            builder: (context, child) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: IpadFrame(child: child ?? const SizedBox.shrink()),
+              );
+            },
+            home: const OnboardingScreen(),
           );
         },
-        home: const OnboardingScreen(),
       ),
     );
   }
 
-  ThemeData _buildTheme() {
+  ThemeData _buildTheme(BrandPalette palette) {
     return ThemeData(
       useMaterial3: true,
+      // Authentic SF Pro Rounded for Latin/digits; authentic SF Hebrew Rounded
+      // renders the Hebrew glyphs SF Pro Rounded lacks → genuinely SF Rounded
+      // end-to-end. Rubik is a final safety fallback.
+      fontFamily: 'SF Pro Rounded',
+      fontFamilyFallback: const ['SF Hebrew Rounded', 'Rubik'],
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
-        primary: AppColors.primary,
+        seedColor: palette.primary,
+        primary: palette.primary,
         secondary: AppColors.coral,
         surface: AppColors.surface,
       ),
@@ -89,8 +121,8 @@ class RentchApp extends StatelessWidget {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.primaryLight2,
-        selectedColor: AppColors.primary,
+        backgroundColor: palette.primaryLight2,
+        selectedColor: palette.primary,
         labelStyle: const TextStyle(
           color: AppColors.navy,
           fontWeight: FontWeight.w700,
@@ -107,15 +139,15 @@ class RentchApp extends StatelessWidget {
           side: const BorderSide(color: AppColors.borderLight),
         ),
       ),
-      sliderTheme: const SliderThemeData(
-        activeTrackColor: AppColors.primary,
-        thumbColor: AppColors.primary,
-        inactiveTrackColor: Color(0xFFD0EDF0),
-        overlayColor: Color(0x2213BEC9),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: palette.primary,
+        thumbColor: palette.primary,
+        inactiveTrackColor: const Color(0xFFD0EDF0),
+        overlayColor: palette.primary.withValues(alpha: 0.13),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: palette.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
@@ -141,7 +173,7 @@ class RentchApp extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: palette.primary, width: 2),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

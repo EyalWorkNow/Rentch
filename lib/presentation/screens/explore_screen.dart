@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -60,7 +60,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const RentchIcon(
+                  RentlyIcon(
                     IconsaxPlusLinear.profile_2user,
                     size: 15,
                     color: AppColors.primary,
@@ -68,7 +68,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   const SizedBox(width: 6),
                   Text(
                     'מועמדים',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
@@ -84,7 +84,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ),
                       child: Text(
                         '${safeIndex + 1}/$total',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: AppColors.primary,
@@ -109,7 +109,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          RentchIcon(
+                          RentlyIcon(
                             IconsaxPlusLinear.shield_tick,
                             size: 13,
                             color: _trustColor(provider.trustScore),
@@ -131,85 +131,186 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ],
           ),
           body: provider.isLoading || tenant == null
-              ? const Center(
+              ? Center(
                   child: CircularProgressIndicator(color: AppColors.primary))
-              : leads.isEmpty
-                  ? const _EmptyOwnerQueue()
-                  : SafeArea(
-                      bottom: false,
-                      child: Stack(
-                        children: [
-                          // Full-height card swiper
-                          Positioned.fill(
-                            child: CardSwiper(
-                              key: ValueKey(leads.map((p) => p.id).join('-')),
-                              controller: provider.ownerSwiperController,
-                              cardsCount: leads.length,
-                              padding: const EdgeInsets.fromLTRB(10, 6, 10, 150),
-                              scale: 0.93,
-                              threshold: 38,
-                              maxAngle: 16,
-                              isLoop: false,
-                              numberOfCardsDisplayed: math.min(3, leads.length),
-                              backCardOffset: const Offset(0, 20),
-                              allowedSwipeDirection: const AllowedSwipeDirection.only(
-                                left: true,
-                                right: true,
-                                up: true,
-                              ),
-                              onSwipe: (prev, current, dir) {
-                                if (current != null && mounted) {
-                                  setState(() => _currentIndex = current);
-                                }
-                                return provider.handleOwnerSwipe(prev, current, dir);
-                              },
-                              cardBuilder: (context, index, hOffset, vOffset) {
-                                if (index < 0 || index >= leads.length) {
-                                  return const SizedBox.shrink();
-                                }
-                                return _LeadCard(
-                                  tenant: tenant,
-                                  property: leads[index],
-                                  reviews: provider.tenantReviews,
-                                  hOffset: hOffset,
-                                );
-                              },
-                            ),
-                          ),
-
-                          // Floating centered action buttons
-                          Positioned(
-                            bottom: 165,
-                            left: 0,
-                            right: 0,
-                            child: _ActionButtons(
-                              onReject: () {
-                                HapticFeedback.mediumImpact();
-                                provider.ownerSwipeLeft();
-                              },
-                              onAccept: () {
-                                HapticFeedback.heavyImpact();
-                                provider.ownerSwipeRight();
-                              },
-                              onInfo: () {
-                                if (leads.isEmpty || safeIndex >= leads.length) return;
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => TenantDetailScreen(
-                                      tenant: tenant,
-                                      property: leads[safeIndex],
-                                      reviews: provider.tenantReviews,
+              : SafeArea(
+                  bottom: false,
+                  child: Column(
+                    children: [
+                      _buildAutoLikeCard(provider),
+                      Expanded(
+                        child: leads.isEmpty
+                            ? const _EmptyOwnerQueue()
+                            : Stack(
+                                children: [
+                                  // Full-height card swiper
+                                  Positioned.fill(
+                                    child: CardSwiper(
+                                      key: ValueKey(leads.map((p) => p.id).join('-')),
+                                      controller: provider.ownerSwiperController,
+                                      cardsCount: leads.length,
+                                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 150),
+                                      scale: 0.93,
+                                      threshold: 38,
+                                      maxAngle: 16,
+                                      isLoop: false,
+                                      numberOfCardsDisplayed: math.min(3, leads.length),
+                                      backCardOffset: const Offset(0, 20),
+                                      allowedSwipeDirection: const AllowedSwipeDirection.only(
+                                        left: true,
+                                        right: true,
+                                        up: true,
+                                      ),
+                                      onSwipe: (prev, current, dir) {
+                                        if (current != null && mounted) {
+                                          setState(() => _currentIndex = current);
+                                        }
+                                        return provider.handleOwnerSwipe(prev, current, dir);
+                                      },
+                                      cardBuilder: (context, index, hOffset, vOffset) {
+                                        if (index < 0 || index >= leads.length) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return _LeadCard(
+                                          tenant: tenant,
+                                          property: leads[index],
+                                          reviews: provider.tenantReviews,
+                                          hOffset: hOffset,
+                                        );
+                                      },
                                     ),
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+
+                                  // Floating centered action buttons
+                                  Positioned(
+                                    bottom: 165,
+                                    left: 0,
+                                    right: 0,
+                                    child: _ActionButtons(
+                                      onReject: () {
+                                        HapticFeedback.mediumImpact();
+                                        provider.ownerSwipeLeft();
+                                      },
+                                      onAccept: () {
+                                        HapticFeedback.heavyImpact();
+                                        provider.ownerSwipeRight();
+                                      },
+                                      onInfo: () {
+                                        if (leads.isEmpty || safeIndex >= leads.length) return;
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => TenantDetailScreen(
+                                              tenant: tenant,
+                                              property: leads[safeIndex],
+                                              reviews: provider.tenantReviews,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
         );
       },
+    );
+  }
+
+  Widget _buildAutoLikeCard(DatingProvider provider) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 12, 18, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: provider.autoLikeEnabled
+              ? [
+                  AppColors.primary.withOpacity(0.08),
+                  const Color(0xFF13BEC9).withOpacity(0.04),
+                ]
+              : [
+                  Colors.white.withOpacity(0.9),
+                  Colors.white.withOpacity(0.95),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: provider.autoLikeEnabled
+              ? AppColors.primary.withOpacity(0.3)
+              : const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: provider.autoLikeEnabled
+                ? AppColors.primary.withOpacity(0.08)
+                : Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: provider.autoLikeEnabled
+                  ? AppColors.primary.withOpacity(0.12)
+                  : const Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              IconsaxPlusBold.flash,
+              color: provider.autoLikeEnabled ? AppColors.primary : AppColors.textSecondary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'לייק אוטומטי',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.navy,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'אישור אוטומטי של שוכרים שהתעניינו בנכס שלך',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary.withOpacity(0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch.adaptive(
+            value: provider.autoLikeEnabled,
+            activeColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withOpacity(0.3),
+            inactiveThumbColor: const Color(0xFF94A3B8),
+            inactiveTrackColor: const Color(0xFFE2E8F0),
+            onChanged: (val) {
+              HapticFeedback.mediumImpact();
+              provider.toggleAutoLike();
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -316,7 +417,7 @@ class _LeadCardState extends State<_LeadCard> {
                   fallback: Container(
                     color: AppColors.navy,
                     child: const Center(
-                      child: RentchIcon(
+                      child: RentlyIcon(
                         IconsaxPlusLinear.profile_circle,
                         size: 80,
                         color: Colors.white24,
@@ -442,7 +543,7 @@ class _LeadCardState extends State<_LeadCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             IconsaxPlusLinear.shield_tick,
                             color: AppColors.primary,
                             size: 13,
@@ -669,7 +770,7 @@ class _LikedPropertyBox extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: RentchIcon(
+                  child: RentlyIcon(
                     IconsaxPlusLinear.heart,
                     size: 16,
                     color: Color(0xFF5AD4DC),
@@ -933,7 +1034,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(
+              child: RentlyIcon(
                 IconsaxPlusLinear.profile_2user,
                 color: AppColors.primary,
                 size: 42,
@@ -970,7 +1071,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const AddPropertyScreen()),
                   ),
-                  icon: const RentchIcon(IconsaxPlusLinear.add_square, size: 17),
+                  icon: const RentlyIcon(IconsaxPlusLinear.add_square, size: 17),
                   label: const Text('הוסף נכס עכשיו'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -986,7 +1087,7 @@ class _EmptyOwnerQueue extends StatelessWidget {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const MatchesScreen()),
                   ),
-                  icon: const RentchIcon(IconsaxPlusLinear.message, size: 17),
+                  icon: const RentlyIcon(IconsaxPlusLinear.message, size: 17),
                   label: const Text('עבור לשיחות'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,

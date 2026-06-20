@@ -13,7 +13,9 @@ class SecurityConfig {
 
   // ── File upload limits ────────────────────────────────────────────────────────
   static const int maxImageSizeBytes = 10 * 1024 * 1024; // 10 MB
-  static const int maxVideoSizeBytes = 80 * 1024 * 1024; // 80 MB
+  // 3D-scan walkthroughs (Teleport) are minute-long videos and routinely exceed
+  // 80 MB; Teleport + the chunked S3 upload handle large files, so allow 400 MB.
+  static const int maxVideoSizeBytes = 400 * 1024 * 1024; // 400 MB
   static const int maxFileSizeBytes = maxImageSizeBytes;
   static const int maxPropertyMediaItems = 8;
   static const Set<String> allowedImageExtensions = {
@@ -44,10 +46,10 @@ class SecurityConfig {
   static const int maxImageUploadsPerSession = 30;
 
   // ── Property value bounds (server-side enforcement must mirror these) ─────────
-  static const int minPropertyPrice = 500;
-  static const int maxPropertyPrice = 100000;
-  static const double minRooms = 0.5;
-  static const double maxRooms = 20.0;
+  static const int minPropertyPrice = 0;
+  static const int maxPropertyPrice = 150000;
+  static const double minRooms = 0;
+  static const double maxRooms = 50.0;
   static const int minSizeM2 = 10;
   static const int maxSizeM2 = 1000;
 

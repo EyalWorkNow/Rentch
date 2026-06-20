@@ -8,6 +8,8 @@
     <string>ARFSXMWT96</string>
     <key>signingStyle</key>
     <string>automatic</string>
+    <key>allowProvisioningUpdates</key>
+    <true/>
     <key>uploadBitcode</key>
     <false/>
     <key>uploadSymbols</key>

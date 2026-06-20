@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 
     static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
-            name: "com.rentch.scaniverse",
+            name: "com.rently.scaniverse",
             binaryMessenger: registrar.messenger()
         )
         let instance = ScaniversePlugin()

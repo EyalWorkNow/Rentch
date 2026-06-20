@@ -200,12 +200,22 @@ class RentalDataService {
   }
 
   // ── Row mapping ───────────────────────────────────────────────────────────────
-
   RentalProperty _propertyFromRow(Map<String, dynamic> data) {
-    final media = _decodeMedia(data['media']);
+    var media = _decodeMedia(data['media']);
+    final imageUrls = _decodeStringList(data['imageUrls']);
+    final videoUrls = _decodeStringList(data['videoUrls']);
+
+    if (media.isEmpty && (imageUrls.isNotEmpty || videoUrls.isNotEmpty)) {
+      media = [
+        ...imageUrls.map((url) => {'url': url, 'type': 'image'}),
+        ...videoUrls.map((url) => {'url': url, 'type': 'video'}),
+      ];
+    }
+
     final virtualTour = _decodeVirtualTour(data);
     final features = _decodeJsonValue(data['features']);
     final featureLabels = _decodeStringList(data['featureLabels']);
+
     return RentalProperty.fromJson({
       'id': data['propertyId'] ?? '',
       'sourceUrl': data['sourceUrl'] ?? data['url'] ?? '',
@@ -238,6 +248,7 @@ class RentalDataService {
           .map((item) => item['url'] as String)
           .toList(),
       'transactionType': data['transactionType']?.toString() ?? 'rent',
+      'isActive': data['status']?.toString() != 'paused',
       'model3d': _decodeJsonMap(data['model3d']),
       'legal': _decodeJsonMap(data['legal']),
       'priceHistory': _decodeJsonList(data['priceHistory']),
@@ -251,7 +262,6 @@ class RentalDataService {
       if (virtualTour != null) 'virtualTour': virtualTour,
     });
   }
-
   List<String> _decodeStringList(Object? rawValue) {
     if (rawValue is List) {
       return rawValue.whereType<String>().toList();

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class RentchIcon extends StatefulWidget {
-  const RentchIcon(
+class RentlyIcon extends StatefulWidget {
+  const RentlyIcon(
     this.icon, {
     super.key,
     this.size,
@@ -31,10 +31,10 @@ class RentchIcon extends StatefulWidget {
   final BlendMode? blendMode;
 
   @override
-  State<RentchIcon> createState() => _RentchIconState();
+  State<RentlyIcon> createState() => _RentlyIconState();
 }
 
-class _RentchIconState extends State<RentchIcon>
+class _RentlyIconState extends State<RentlyIcon>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
@@ -56,7 +56,7 @@ class _RentchIconState extends State<RentchIcon>
   }
 
   @override
-  void didUpdateWidget(covariant RentchIcon oldWidget) {
+  void didUpdateWidget(covariant RentlyIcon oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.icon != widget.icon ||
         oldWidget.color != widget.color ||
