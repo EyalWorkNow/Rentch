@@ -846,6 +846,8 @@ class _FiltersSheet extends StatefulWidget {
 class _FiltersSheetState extends State<_FiltersSheet> {
   static const Duration _doubleTapWindow = Duration(milliseconds: 260);
   late final TextEditingController _locationCtrl;
+  late final TextEditingController _minRoomsCtrl;
+  late final TextEditingController _maxRoomsCtrl;
   Timer? _pendingPriorityTimer;
   String? _pendingPriorityKey;
   late SearchFilters _draftFilters;
@@ -863,6 +865,20 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     _visibleCount = widget.provider.filteredCountFor(_draftFilters);
     _markerPreview = widget.provider.previewFilteredProperties(_draftFilters);
     _locationCtrl = TextEditingController(text: widget.provider.filters.city);
+    _minRoomsCtrl = TextEditingController(
+      text: _draftFilters.minRooms == 0
+          ? ''
+          : (_draftFilters.minRooms % 1 == 0
+              ? _draftFilters.minRooms.toInt().toString()
+              : _draftFilters.minRooms.toString()),
+    );
+    _maxRoomsCtrl = TextEditingController(
+      text: _draftFilters.maxRooms >= 10
+          ? ''
+          : (_draftFilters.maxRooms % 1 == 0
+              ? _draftFilters.maxRooms.toInt().toString()
+              : _draftFilters.maxRooms.toString()),
+    );
     widget.provider.addListener(_refreshMarkers);
   }
 
@@ -881,6 +897,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     _commitDraftIfNeeded();
     _pendingPriorityTimer?.cancel();
     _locationCtrl.dispose();
+    _minRoomsCtrl.dispose();
+    _maxRoomsCtrl.dispose();
     super.dispose();
   }
 
@@ -1138,6 +1156,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     );
     setState(() {
       _locationCtrl.clear();
+      _minRoomsCtrl.clear();
+      _maxRoomsCtrl.clear();
       _draftFilters = resetFilters;
       _visibleCount = provider.filteredCountFor(resetFilters);
       _markerPreview = provider.previewFilteredProperties(resetFilters);
@@ -1501,30 +1521,108 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         ),
                         const SizedBox(height: 12),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            for (int i = 0; i <= 5; i++) ...[
-                              _CircleSelectorButton(
-                                label: i == 0 ? 'הכל' : '$i+',
-                                isSelected: i == 0
-                                    ? (f.minRooms == 0 && f.maxRooms == 10)
-                                    : (f.minRooms == i.toDouble()),
-                                onTap: () {
-                                  if (i == 0) {
-                                    _setDraftFilters(
-                                      f.copyWith(minRooms: 0, maxRooms: 10),
-                                      provider,
-                                    );
-                                  } else {
-                                    _setDraftFilters(
-                                      f.copyWith(
-                                          minRooms: i.toDouble(), maxRooms: 10),
-                                      provider,
-                                    );
-                                  }
-                                },
+                            Expanded(
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: f.minRooms > 0
+                                        ? AppColors.primary
+                                        : const Color(0xFFE2ECF1),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: TextField(
+                                  controller: _minRoomsCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.navy,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'מ-',
+                                    hintStyle: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  onChanged: (v) {
+                                    if (v.isEmpty) {
+                                      _setDraftFilters(f.copyWith(minRooms: 0.0), provider);
+                                      return;
+                                    }
+                                    final min = double.tryParse(v);
+                                    if (min != null) {
+                                      _setDraftFilters(f.copyWith(minRooms: min.clamp(0.0, 20.0)), provider);
+                                    }
+                                  },
+                                ),
                               ),
-                            ]
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                '—',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: f.maxRooms < 10
+                                        ? AppColors.primary
+                                        : const Color(0xFFE2ECF1),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: TextField(
+                                  controller: _maxRoomsCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.navy,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'עד',
+                                    hintStyle: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  onChanged: (v) {
+                                    if (v.isEmpty) {
+                                      _setDraftFilters(f.copyWith(maxRooms: 10.0), provider);
+                                      return;
+                                    }
+                                    final max = double.tryParse(v);
+                                    if (max != null) {
+                                      _setDraftFilters(f.copyWith(maxRooms: max.clamp(0.0, 20.0)), provider);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 24),
@@ -4331,7 +4429,20 @@ IconData _listingSourceIcon(ListingSourceFilter source) {
 
 IconData _featureIcon(String feature) {
   final lower = feature.trim().toLowerCase();
-  if (lower.contains('חניה')) return IconsaxPlusLinear.routing;
+  if (lower.contains('מצלמות') || lower.contains('cctv')) return IconsaxPlusLinear.camera;
+  if (lower.contains('אזעקה')) return IconsaxPlusLinear.shield_tick;
+  if (lower.contains('אינטרקום')) return IconsaxPlusLinear.call;
+  if (lower.contains('חשמל')) return IconsaxPlusLinear.flash;
+  if (lower.contains('מים')) return IconsaxPlusLinear.layer;
+  if (lower.contains('אור טבעי') || lower.contains('natural_light')) return IconsaxPlusLinear.sun_1;
+  if (lower.contains('אזור שקט') || lower.contains('quiet')) return IconsaxPlusLinear.heart;
+  if (lower.contains('חיות')) return IconsaxPlusLinear.heart;
+  if (lower.contains('חניה') || lower.contains('parking')) return IconsaxPlusLinear.routing;
+  if (lower.contains('כניסה מאובטחת') || lower.contains('secure_entrance')) return IconsaxPlusLinear.lock;
+  if (lower.contains('תחבורה ציבורית') || lower.contains('public_transport')) return IconsaxPlusLinear.bus;
+  if (lower.contains('ריהוט') || lower.contains('מרוהטת')) {
+    return IconsaxPlusLinear.home;
+  }
   if (lower.contains('מעלית')) return IconsaxPlusLinear.buildings;
   if (lower.contains('ממ"ד') || lower.contains('ממד')) {
     return IconsaxPlusLinear.shield_tick;
@@ -4341,16 +4452,12 @@ IconData _featureIcon(String feature) {
   }
   if (lower.contains('מרפסת')) return IconsaxPlusLinear.layer;
   if (lower.contains('מחסן')) return IconsaxPlusLinear.lock;
-  if (lower.contains('ריהוט') || lower.contains('מרוהטת')) {
-    return IconsaxPlusLinear.home;
-  }
-  if (lower.contains('חיות')) return IconsaxPlusLinear.heart;
   if (lower.contains('סורגים')) return IconsaxPlusLinear.lock;
   if (lower.contains('נגישות')) return IconsaxPlusLinear.profile_circle;
   if (lower.contains('גינה') || lower.contains('חצר')) {
     return IconsaxPlusLinear.map;
   }
-  if (lower.contains('שומר') || lower.contains('אבטחה')) {
+  if (lower.contains('שומר')) {
     return IconsaxPlusLinear.shield_tick;
   }
   if (lower.contains('משופצת') || lower.contains('משופץ')) {

@@ -352,12 +352,13 @@ class DatingProvider extends ChangeNotifier {
   List<String> get availableFeatures {
     final cached = _availableFeaturesCache;
     if (cached != null) return cached;
-    final features = <String>{};
+    final allCatalogFeatures = PropertyFeatureCatalog.allLabels.toSet();
+    final propertiesFeatures = <String>{};
     for (final property in _allProperties) {
-      features.addAll(property.features);
+      propertiesFeatures.addAll(property.features);
     }
-    final sorted = features.toList()..sort();
-    return _availableFeaturesCache = sorted;
+    final combined = {...allCatalogFeatures, ...propertiesFeatures}.toList()..sort();
+    return _availableFeaturesCache = combined;
   }
 
   List<String> get availablePropertyTypes {

@@ -1981,6 +1981,66 @@ const List<PropertyFeatureDefinition> _propertyFeatureCatalog = [
     label: 'כניסה פרטית',
     aliases: ['private_entrance'],
   ),
+  PropertyFeatureDefinition(
+    key: 'cctv',
+    label: 'מצלמות אבטחה',
+    aliases: ['cctv', 'security_camera', 'camera'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'alarmSystem',
+    label: 'מערכת אזעקה',
+    aliases: ['alarm', 'alarm_system', 'security_system'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'intercom',
+    label: 'אינטרקום',
+    aliases: ['intercom', 'buzzer', 'video_intercom'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'electricity',
+    label: 'חשמל כלול',
+    aliases: ['electricity', 'utilities_included'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'water',
+    label: 'מים כלולים',
+    aliases: ['water', 'water_included'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'naturalLight',
+    label: 'אור טבעי',
+    aliases: ['natural_light', 'sunlight', 'bright'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'quietArea',
+    label: 'אזור שקט',
+    aliases: ['quiet', 'quiet_area', 'peaceful'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'petFriendly',
+    label: 'מתאים לחיות מחמד',
+    aliases: ['pet_friendly', 'pets_allowed', 'animals'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'parking',
+    label: 'חניה מוצמדת',
+    aliases: ['covered_parking', 'parking_spot'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'secureEntrance',
+    label: 'כניסה מאובטחת',
+    aliases: ['secure_entrance', 'gated', 'gated_community'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'publicTransport',
+    label: 'קרוב לתחבורה ציבורית',
+    aliases: ['public_transport', 'bus', 'train', 'transit'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'furnished',
+    label: 'ריהוט אופציונלי',
+    aliases: ['optional_furniture', 'furniture_negotiable'],
+  ),
 ];
 
 final Map<String, PropertyFeatureDefinition> _featureDefinitionByKey = {
