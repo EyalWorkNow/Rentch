@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -7,8 +9,11 @@ import 'package:dating_app/presentation/screens/add_property_screen.dart'
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
+import 'package:dating_app/presentation/widgets/pulse_widget.dart';
 import 'package:provider/provider.dart';
 
 class LandlordPropertiesScreen extends StatefulWidget {
@@ -28,9 +33,31 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
       'all'; // 'all', 'expensive', 'rooms3', 'agency', 'private'
   String _sortBy = 'recent'; // 'recent', 'price_asc', 'price_desc', 'rooms'
   final _searchCtrl = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _fabExpanded = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_scrollListener);
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+      if (_fabExpanded) {
+        setState(() => _fabExpanded = false);
+      }
+    } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
+      if (!_fabExpanded) {
+        setState(() => _fabExpanded = true);
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -287,7 +314,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
             toolbarHeight: 64,
             leading: canPop
                 ? IconButton(
-                    icon: const RentchIcon(IconsaxPlusLinear.arrow_right,
+                    icon: const RentlyIcon(IconsaxPlusLinear.arrow_right,
                         color: AppColors.navy),
                     onPressed: () => Navigator.of(context).pop(),
                   )
@@ -316,16 +343,18 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
           ),
           floatingActionButton: Padding(
             padding: const EdgeInsets.only(bottom: _floatingActionBottomInset),
-            child: InkWell(
+            child: ScaleBounce(
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const AddPropertyScreen(),
                 ),
               ),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
+              scaleDownTo: 0.90,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
                 height: 38,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: EdgeInsets.symmetric(horizontal: _fabExpanded ? 12 : 11),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(12),
@@ -337,23 +366,25 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    RentchIcon(
+                    const RentlyIcon(
                       IconsaxPlusLinear.add,
                       color: Colors.white,
                       size: 16,
                     ),
-                    SizedBox(width: 4),
-                    Text(
-                      'הוספה',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
+                    if (_fabExpanded) ...[
+                      const SizedBox(width: 4),
+                      const Text(
+                        'הוספה',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -361,7 +392,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
           body: provider.isLoading
-              ? const Center(
+              ? Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 )
               : SafeArea(
@@ -396,7 +427,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                 child: Row(
                                   children: [
                                     const SizedBox(width: 10),
-                                    const RentchIcon(
+                                    const RentlyIcon(
                                       IconsaxPlusLinear.search_normal,
                                       size: 18,
                                       color: Colors.grey,
@@ -432,7 +463,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                     ),
                                     if (_query.isNotEmpty)
                                       IconButton(
-                                        icon: const RentchIcon(
+                                        icon: const RentlyIcon(
                                           IconsaxPlusLinear.close_circle,
                                           size: 18,
                                           color: AppColors.textSecondary,
@@ -471,7 +502,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                         ]
                                       : null,
                                 ),
-                                child: RentchIcon(
+                                child: RentlyIcon(
                                   IconsaxPlusLinear.filter,
                                   size: 20,
                                   color: hasActiveFilterOrSort
@@ -565,6 +596,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                     onClear: _clearSearchAndFilters,
                                   )
                                 : ListView.separated(
+                                    controller: _scrollController,
                                     padding: const EdgeInsets.fromLTRB(
                                         16, 0, 16, _listBottomInset),
                                     itemBuilder: (context, index) {
@@ -573,15 +605,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                           .where((m) =>
                                               m.propertyId == property.id)
                                           .length;
-                                      return GestureDetector(
-                                        onTap: () => Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => PropertyDetailScreen(
-                                              property: property,
-                                              isLandlordPreview: true,
-                                            ),
-                                          ),
-                                        ),
+                                      return StaggeredEntrance(
+                                        index: index,
                                         child: _PropertyManageCard(
                                           property: property,
                                           matchCount: matchCount,
@@ -594,6 +619,14 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                             MaterialPageRoute(
                                               builder: (_) => EditPropertyScreen(
                                                   property: property),
+                                            ),
+                                          ),
+                                          onPreview: () => Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => PropertyDetailScreen(
+                                                property: property,
+                                                isLandlordPreview: true,
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -621,12 +654,14 @@ class _PropertyManageCard extends StatelessWidget {
     required this.matchCount,
     required this.onRemove,
     required this.onEdit,
+    required this.onPreview,
   });
 
   final RentalProperty property;
   final int matchCount;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
+  final VoidCallback onPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -747,32 +782,64 @@ class _PropertyManageCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Actions Row (Circular Edit and Status Indicator)
+                    // Actions Row (Preview, Edit and Status Indicator)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Edit Button (Glassmorphic White Circle)
-                        ClipOval(
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withValues(alpha: 0.18),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.20),
-                                  width: 1,
+                        // Preview Button (Glassmorphic White Circle)
+                        ScaleBounce(
+                          onTap: onPreview,
+                          scaleDownTo: 0.88,
+                          child: ClipOval(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.20),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: RentlyIcon(
+                                    IconsaxPlusLinear.eye,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: onEdit,
-                                icon: const RentchIcon(
-                                  IconsaxPlusLinear.edit_2,
-                                  color: Colors.white,
-                                  size: 18,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Edit Button (Glassmorphic White Circle)
+                        ScaleBounce(
+                          onTap: onEdit,
+                          scaleDownTo: 0.88,
+                          child: ClipOval(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.20),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: RentlyIcon(
+                                    IconsaxPlusLinear.edit_2,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                                 ),
                               ),
                             ),
@@ -800,16 +867,25 @@ class _PropertyManageCard extends StatelessWidget {
                                 ),
                               ),
                               child: Center(
-                                child: Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: property.isActive
-                                        ? AppColors.success
-                                        : Colors.white60,
-                                  ),
-                                ),
+                                child: property.isActive
+                                    ? PulseWidget(
+                                        child: Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.white60,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -846,7 +922,7 @@ class _PropertyThumb extends StatelessWidget {
 
   Widget _fallback() => Container(
         color: AppColors.primaryLight2,
-        child: const RentchIcon(
+        child: RentlyIcon(
           IconsaxPlusLinear.building,
           size: 42,
           color: AppColors.primary,
@@ -926,7 +1002,7 @@ class _EmptyPropertiesState extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(
+              child: RentlyIcon(
                 IconsaxPlusLinear.buildings,
                 size: 36,
                 color: AppColors.primary,
@@ -978,7 +1054,7 @@ class _EmptyFilteredState extends StatelessWidget {
                 color: AppColors.textSecondary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const RentchIcon(
+              child: const RentlyIcon(
                 IconsaxPlusLinear.search_normal,
                 size: 30,
                 color: AppColors.textSecondary,
@@ -1043,8 +1119,9 @@ class _FilterPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return ScaleBounce(
       onTap: onTap,
+      scaleDownTo: 0.94,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1068,3 +1145,71 @@ class _FilterPill extends StatelessWidget {
     );
   }
 }
+
+class StaggeredEntrance extends StatefulWidget {
+  const StaggeredEntrance({
+    super.key,
+    required this.index,
+    required this.child,
+  });
+  final int index;
+  final Widget child;
+
+  @override
+  State<StaggeredEntrance> createState() => _StaggeredEntranceState();
+}
+
+class _StaggeredEntranceState extends State<StaggeredEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacityAnimation;
+  late final Animation<double> _slideAnimation;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _slideAnimation = Tween<double>(begin: 32.0, end: 0.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+
+    final delayMs = math.min(widget.index * 60, 400);
+    _timer = Timer(Duration(milliseconds: delayMs), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacityAnimation.value,
+          child: Transform.translate(
+            offset: Offset(0, _slideAnimation.value),
+            child: child,
+          ),
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+

@@ -272,7 +272,6 @@ class PropertyModel3d {
     this.spzUrl = '',
     this.plyUrl = '',
     this.textureFolder = '',
-    this.floorPlanUrl = '',
     this.assets = const [],
     this.modelQualityScore,
     this.scanDate,
@@ -286,7 +285,6 @@ class PropertyModel3d {
   final String spzUrl;
   final String plyUrl;
   final String textureFolder;
-  final String floorPlanUrl;
   final List<PropertyModelAsset> assets;
   final int? modelQualityScore;
   final DateTime? scanDate;
@@ -300,7 +298,6 @@ class PropertyModel3d {
       spzUrl.trim().isNotEmpty ||
       plyUrl.trim().isNotEmpty ||
       textureFolder.trim().isNotEmpty ||
-      floorPlanUrl.trim().isNotEmpty ||
       assets.isNotEmpty;
 
   PropertyModel3d copyWith({
@@ -312,7 +309,6 @@ class PropertyModel3d {
     String? spzUrl,
     String? plyUrl,
     String? textureFolder,
-    String? floorPlanUrl,
     List<PropertyModelAsset>? assets,
     int? modelQualityScore,
     DateTime? scanDate,
@@ -326,7 +322,6 @@ class PropertyModel3d {
       spzUrl: spzUrl ?? this.spzUrl,
       plyUrl: plyUrl ?? this.plyUrl,
       textureFolder: textureFolder ?? this.textureFolder,
-      floorPlanUrl: floorPlanUrl ?? this.floorPlanUrl,
       assets: assets ?? this.assets,
       modelQualityScore: modelQualityScore ?? this.modelQualityScore,
       scanDate: scanDate ?? this.scanDate,
@@ -344,7 +339,6 @@ class PropertyModel3d {
       spzUrl: json['spzUrl']?.toString() ?? '',
       plyUrl: json['plyUrl']?.toString() ?? '',
       textureFolder: json['textureFolder']?.toString() ?? '',
-      floorPlanUrl: json['floorPlanUrl']?.toString() ?? '',
       assets: rawAssets
           .whereType<Map>()
           .map((item) =>
@@ -374,7 +368,6 @@ class PropertyModel3d {
       'spzUrl': spzUrl,
       'plyUrl': plyUrl,
       'textureFolder': textureFolder,
-      'floorPlanUrl': floorPlanUrl,
       'assets': assets.map((item) => item.toJson()).toList(),
       'modelQualityScore': modelQualityScore,
       'scanDate': scanDate == null ? null : _formatDateOnly(scanDate!),
@@ -733,6 +726,8 @@ class RentalProperty {
     PropertyMarketSignals? marketSignals,
     PropertyVerification? verification,
     this.isActive = true,
+    this.designTemplate = '',
+    this.designAccent = 0,
     this.createdAt,
   })  : sourceUrl = sourceUrl.isNotEmpty ? sourceUrl : (url ?? ''),
         featureFlags = featureFlags ?? PropertyFeatureSet.fromJson(features),
@@ -782,7 +777,16 @@ class RentalProperty {
   final PropertyMarketSignals marketSignals;
   final PropertyVerification verification;
   final bool isActive;
+
+  /// Per-property page design: a `BrokerPropertyTemplate.id` chosen during
+  /// listing creation (empty = default Rently layout), plus an optional accent
+  /// colour (ARGB int, 0 = template default). Lets every listing pick its own
+  /// detail-page look without depending on user-level broker branding.
+  final String designTemplate;
+  final int designAccent;
   final DateTime? createdAt;
+
+  bool get hasCustomDesign => designTemplate.trim().isNotEmpty;
 
   String get url => sourceUrl;
   static const Duration newListingWindow = Duration(hours: 252);
@@ -871,6 +875,8 @@ class RentalProperty {
     PropertyMarketSignals? marketSignals,
     PropertyVerification? verification,
     bool? isActive,
+    String? designTemplate,
+    int? designAccent,
     DateTime? createdAt,
   }) {
     return RentalProperty(
@@ -904,6 +910,8 @@ class RentalProperty {
       marketSignals: marketSignals ?? this.marketSignals,
       verification: verification ?? this.verification,
       isActive: isActive ?? this.isActive,
+      designTemplate: designTemplate ?? this.designTemplate,
+      designAccent: designAccent ?? this.designAccent,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -990,12 +998,15 @@ class RentalProperty {
           const PropertyMarketSignals(),
       verification: _parsePropertyVerification(json),
       isActive: json['isActive'] as bool? ?? true,
+      designTemplate: json['designTemplate']?.toString() ?? '',
+      designAccent: _optionalInt(json['designAccent']) ?? 0,
       createdAt: _optionalDate(
-        json['createdAt'] ??
-            json['postedAt'] ??
-            json['uploadedAt'] ??
-            json[r'$createdAt'],
-      ),
+            json['createdAt'] ??
+                json['postedAt'] ??
+                json['uploadedAt'] ??
+                json[r'$createdAt'],
+          ) ??
+          _generateDeterministicMockDate(json['id']?.toString() ?? ''),
     );
   }
 
@@ -1038,6 +1049,8 @@ class RentalProperty {
       'verificationVideoUrl': verification.videoUrl,
       'verifiedAt': verification.capturedAt?.toUtc().toIso8601String(),
       'isActive': isActive,
+      'designTemplate': designTemplate,
+      'designAccent': designAccent,
       'createdAt': createdAt?.toUtc().toIso8601String(),
     };
   }
@@ -1053,6 +1066,7 @@ class TenantProfile {
     required this.desiredRooms,
     required this.moveInWindow,
     required this.importantDetails,
+    this.dealBreakers = const [],
   });
 
   final String id;
@@ -1063,6 +1077,12 @@ class TenantProfile {
   final double desiredRooms;
   final String moveInWindow;
   final List<String> importantDetails;
+
+  /// Subset of profile preferences the user flagged as non-negotiable. The
+  /// matching algorithm treats a missing counterpart on the other side as a
+  /// heavy penalty (effectively excluding the match) rather than just a lost
+  /// bonus. Defaults to empty for backward compatibility with stored profiles.
+  final List<String> dealBreakers;
 
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
@@ -1075,6 +1095,7 @@ class TenantProfile {
     double? desiredRooms,
     String? moveInWindow,
     List<String>? importantDetails,
+    List<String>? dealBreakers,
   }) {
     return TenantProfile(
       id: id ?? this.id,
@@ -1085,6 +1106,7 @@ class TenantProfile {
       desiredRooms: desiredRooms ?? this.desiredRooms,
       moveInWindow: moveInWindow ?? this.moveInWindow,
       importantDetails: importantDetails ?? this.importantDetails,
+      dealBreakers: dealBreakers ?? this.dealBreakers,
     );
   }
 
@@ -1101,6 +1123,9 @@ class TenantProfile {
       importantDetails: List<String>.from(
         json['importantDetails'] as List<dynamic>? ?? const [],
       ),
+      dealBreakers: List<String>.from(
+        json['dealBreakers'] as List<dynamic>? ?? const [],
+      ),
     );
   }
 
@@ -1114,6 +1139,7 @@ class TenantProfile {
       'desiredRooms': desiredRooms,
       'moveInWindow': moveInWindow,
       'importantDetails': importantDetails,
+      'dealBreakers': dealBreakers,
     };
   }
 }
@@ -1130,15 +1156,21 @@ class SearchArea {
   final String name;
   final LatLng center;
   final List<LatLng> polygon;
+  List<List<LatLng>> get polygons => splitCustomAreaPolygons(polygon);
 
   factory SearchArea.custom({
     required List<LatLng> polygon,
     String id = 'custom_area',
     String name = 'אזור שסומן ידנית',
   }) {
-    final safePolygon = polygon.isEmpty
+    final rawPolygon = polygon.isEmpty
         ? const [LatLng(32.07, 34.78)]
         : List<LatLng>.from(polygon);
+    final actualPoints = splitCustomAreaPolygons(rawPolygon)
+        .expand((segment) => segment)
+        .toList();
+    final safePolygon =
+        actualPoints.isEmpty ? const [LatLng(32.07, 34.78)] : actualPoints;
     final avgLat =
         safePolygon.fold<double>(0, (sum, point) => sum + point.latitude) /
             safePolygon.length;
@@ -1149,27 +1181,70 @@ class SearchArea {
       id: id,
       name: name,
       center: LatLng(avgLat, avgLon),
-      polygon: safePolygon,
+      polygon: rawPolygon,
     );
   }
 
   bool contains(LatLng point) {
-    if (polygon.length < 3) return false;
-    var inside = false;
-    for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      final xi = polygon[i].longitude;
-      final yi = polygon[i].latitude;
-      final xj = polygon[j].longitude;
-      final yj = polygon[j].latitude;
-      final intersects = ((yi > point.latitude) != (yj > point.latitude)) &&
-          (point.longitude <
-              (xj - xi) * (point.latitude - yi) / (yj - yi + 0.0) + xi);
-      if (intersects) {
-        inside = !inside;
+    for (final polygon in polygons) {
+      if (polygon.length < 3) continue;
+      var inside = false;
+      for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        final xi = polygon[i].longitude;
+        final yi = polygon[i].latitude;
+        final xj = polygon[j].longitude;
+        final yj = polygon[j].latitude;
+        final intersects = ((yi > point.latitude) != (yj > point.latitude)) &&
+            (point.longitude <
+                (xj - xi) * (point.latitude - yi) / (yj - yi + 0.0) + xi);
+        if (intersects) {
+          inside = !inside;
+        }
+      }
+      if (inside) {
+        return true;
       }
     }
-    return inside;
+    return false;
   }
+}
+
+const LatLng customAreaPolygonSeparator = LatLng(91, 181);
+
+bool isCustomAreaPolygonSeparator(LatLng point) {
+  return point.latitude == customAreaPolygonSeparator.latitude &&
+      point.longitude == customAreaPolygonSeparator.longitude;
+}
+
+List<List<LatLng>> splitCustomAreaPolygons(List<LatLng> points) {
+  final polygons = <List<LatLng>>[];
+  var current = <LatLng>[];
+  for (final point in points) {
+    if (isCustomAreaPolygonSeparator(point)) {
+      if (current.isNotEmpty) {
+        polygons.add(current);
+        current = <LatLng>[];
+      }
+      continue;
+    }
+    current.add(point);
+  }
+  if (current.isNotEmpty) {
+    polygons.add(current);
+  }
+  return polygons;
+}
+
+List<LatLng> joinCustomAreaPolygons(List<List<LatLng>> polygons) {
+  final encoded = <LatLng>[];
+  for (final polygon in polygons) {
+    if (polygon.isEmpty) continue;
+    if (encoded.isNotEmpty) {
+      encoded.add(customAreaPolygonSeparator);
+    }
+    encoded.addAll(polygon);
+  }
+  return encoded;
 }
 
 enum FilterPriority { none, preferred, required }
@@ -1250,7 +1325,8 @@ class SearchFilters {
   final TransactionTypeFilter transactionType;
 
   bool get hasQuery => query.trim().isNotEmpty;
-  bool get hasCustomArea => customAreaPolygon.length >= 3;
+  bool get hasCustomArea => splitCustomAreaPolygons(customAreaPolygon)
+      .any((polygon) => polygon.length >= 3);
 
   FilterPriority featureState(String feature) {
     return _priorityState(
@@ -1850,6 +1926,61 @@ const List<PropertyFeatureDefinition> _propertyFeatureCatalog = [
     label: 'מרחב מוגן קומתי',
     aliases: ['floor_level_shelter'],
   ),
+  PropertyFeatureDefinition(
+    key: 'basement',
+    label: 'מרתף',
+    aliases: ['cellar', 'basement'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'centralHeating',
+    label: 'חימום מרכזי',
+    aliases: ['heating', 'central_heating'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'bedroomAc',
+    label: 'מזגן בחדרי שינה',
+    aliases: ['bedroom_ac', 'air_conditioning_bedrooms'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'washingMachine',
+    label: 'מכונת כביסה',
+    aliases: ['washing_machine'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'refrigerator',
+    label: 'מקרר',
+    aliases: ['fridge', 'refrigerator'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'oven',
+    label: 'תנור',
+    aliases: ['oven', 'stove'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'dishwasher',
+    label: 'מדיח כלים',
+    aliases: ['dishwasher', 'dish_washer'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'smartHome',
+    label: 'בקרה חכמה בבית',
+    aliases: ['smart_home', 'home_automation'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'undergroundParking',
+    label: 'חניה תת קרקעית',
+    aliases: ['underground_parking', 'basement_parking'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'soundSystem',
+    label: 'מערכת סאונד',
+    aliases: ['sound_system', 'audio_system'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'privateEntrance',
+    label: 'כניסה פרטית',
+    aliases: ['private_entrance'],
+  ),
 ];
 
 final Map<String, PropertyFeatureDefinition> _featureDefinitionByKey = {
@@ -2193,6 +2324,15 @@ DateTime? _optionalDate(Object? value) {
   if (value == null) return null;
   if (value is DateTime) return value;
   return DateTime.tryParse(value.toString());
+}
+
+DateTime _generateDeterministicMockDate(String id) {
+  final hash = id.hashCode.abs();
+  // Distribute the listing age between 0 and 29 days.
+  // If hash % 30 < 8, age is < 8 days, which is within the 10.5 days window.
+  final daysAgo = hash % 30;
+  final hoursAgo = hash % 24;
+  return DateTime.now().subtract(Duration(days: daysAgo, hours: hoursAgo));
 }
 
 bool _asBoolFlag(Object? value) {

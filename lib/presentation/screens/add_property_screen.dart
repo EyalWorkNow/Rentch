@@ -9,17 +9,20 @@ import 'package:dating_app/core/services/property_3d_scan_service.dart';
 import 'package:dating_app/core/services/scaniverse_asset_import_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/core/services/storage_service.dart';
+import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rentch_icon.dart';
+import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:video_compress/video_compress.dart';
 
 class _PropertyMediaDraft {
   _PropertyMediaDraft({
@@ -74,7 +77,12 @@ PropertyLegal _buildPropertyLegal({
 }
 
 class AddPropertyScreen extends StatefulWidget {
-  const AddPropertyScreen({super.key});
+  const AddPropertyScreen({super.key, this.initialDraft});
+
+  /// Optional pre-fill from Erik (the personal assistant): collected fields such
+  /// as city / street / rooms / price / floor / size / condition / entryDate.
+  /// The landlord just reviews, adds photos and publishes via the normal flow.
+  final Map<String, dynamic>? initialDraft;
 
   @override
   State<AddPropertyScreen> createState() => _AddPropertyScreenState();
@@ -106,14 +114,19 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   double _rooms = 3;
   String _propertyType = 'דירה';
   String _condition = 'תקין';
+  String _designTemplate = '';
+  int _designAccent = 0;
   bool _agencyListing = false;
   final Set<String> _selectedFeatures = {};
   bool _isSaving = false;
   bool _isSubmittingTour = false;
+  bool _isScanSubmitting = false;
   bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
+  PropertyVirtualTour? _scanTourDraft;
   PropertyModel3d? _model3dDraft;
-  Timer? _pollTimer;
+  Timer? _scanPollTimer;
+  int _scanPollCount = 0;
   String? _stagingProgress;
   bool _wantsVerifiedListing = false;
   String _verificationVideoUrl = '';
@@ -124,8 +137,42 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   bool _aiTrainingAllowed = false;
 
   @override
+  void initState() {
+    super.initState();
+    _applyInitialDraft(widget.initialDraft);
+  }
+
+  // Pre-fill the form from Erik's collected draft so an older landlord only has
+  // to review and add photos. All values are optional and defensively parsed.
+  void _applyInitialDraft(Map<String, dynamic>? d) {
+    if (d == null || d.isEmpty) return;
+    String s(Object? v) => v == null ? '' : v.toString().trim();
+    if (s(d['city']).isNotEmpty) _cityCtrl.text = s(d['city']);
+    if (s(d['neighborhood']).isNotEmpty) {
+      _neighborhoodCtrl.text = s(d['neighborhood']);
+    }
+    if (s(d['street']).isNotEmpty) _streetCtrl.text = s(d['street']);
+    if (s(d['streetNumber']).isNotEmpty) {
+      _streetNumCtrl.text = s(d['streetNumber']).replaceAll(RegExp(r'[^0-9]'), '');
+    }
+    if (s(d['floor']).isNotEmpty) _floorCtrl.text = s(d['floor']);
+    if (s(d['totalFloors']).isNotEmpty) {
+      _totalFloorsCtrl.text = s(d['totalFloors']);
+    }
+    if (s(d['sizeM2']).isNotEmpty) {
+      _sizeCtrl.text = s(d['sizeM2']).replaceAll(RegExp(r'[^0-9]'), '');
+    }
+    if (s(d['entryDate']).isNotEmpty) _entryDateCtrl.text = s(d['entryDate']);
+    final rooms = d['rooms'];
+    if (rooms is num) _rooms = (rooms.toDouble() * 2).round() / 2;
+    final price = d['price'];
+    if (price is num && price > 0) _price = (price / 100).round() * 100;
+    if (s(d['condition']).isNotEmpty) _condition = s(d['condition']);
+  }
+
+  @override
   void dispose() {
-    _stopTourPolling();
+    _stopScanPolling();
     _pageCtrl.dispose();
     _cityCtrl.dispose();
     _neighborhoodCtrl.dispose();
@@ -141,37 +188,85 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     super.dispose();
   }
 
-  void _startTourPolling() {
-    _stopTourPolling();
-    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-      final tour = _virtualTourDraft;
-      if (tour == null) { _stopTourPolling(); return; }
+  void _startScanPolling() {
+    _stopScanPolling();
+    _scanPollCount = 0;
+    _scanPollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      final tour = _scanTourDraft;
+      if (tour == null) { _stopScanPolling(); return; }
       if (tour.status == PropertyTourStatus.ready || tour.status == PropertyTourStatus.failed) {
-        _stopTourPolling(); return;
+        _stopScanPolling(); return;
+      }
+      _scanPollCount++;
+      if (_scanPollCount > 20) {
+        _stopScanPolling();
+        if (!mounted) return;
+        // Teleport's Gaussian-splat processing takes ~1 hour, far longer than
+        // this in-screen poll — so keep it "processing" (not failed). The tour
+        // is saved with the capture id and appears automatically once ready.
+        final isTeleport = tour.provider == 'teleport';
+        setState(() {
+          _scanTourDraft = _scanTourDraft?.copyWith(
+            status: isTeleport
+                ? PropertyTourStatus.processing
+                : PropertyTourStatus.failed,
+            processingStage: isTeleport
+                ? 'הסיור התלת־ממדי בעיבוד (בערך שעה). אפשר לשמור את הדירה — הוא יופיע אוטומטית כשיהיה מוכן.'
+                : '',
+            errorMessage: isTeleport
+                ? ''
+                : 'עיבוד הסריקה לקח יותר מדי זמן. נסה שוב מאוחר יותר.',
+            updatedAt: DateTime.now().toUtc(),
+          );
+        });
+        return;
       }
       try {
         final updated = await _scanService.refresh(tour);
-        if (!mounted) { _stopTourPolling(); return; }
-        setState(() => _virtualTourDraft = updated);
+        if (!mounted) { _stopScanPolling(); return; }
+        setState(() => _scanTourDraft = updated);
         if (updated.status == PropertyTourStatus.ready || updated.status == PropertyTourStatus.failed) {
-          _stopTourPolling();
+          _stopScanPolling();
         }
-      } catch (_) {}
+      } catch (e) {
+        if (!mounted) { _stopScanPolling(); return; }
+        if (_scanPollCount >= 20) {
+          _stopScanPolling();
+          setState(() {
+            _scanTourDraft = _scanTourDraft?.copyWith(
+              status: PropertyTourStatus.failed,
+              errorMessage: 'שגיאה בבדיקת סטטוס הסריקה. נסה שוב.',
+              updatedAt: DateTime.now().toUtc(),
+            );
+          });
+        }
+      }
     });
   }
 
-  void _stopTourPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
+  void _stopScanPolling() {
+    _scanPollTimer?.cancel();
+    _scanPollTimer = null;
   }
 
   bool _validateCurrentStep() {
     switch (_step) {
       case 0:
-        return _cityCtrl.text.trim().isNotEmpty &&
-            _streetCtrl.text.trim().isNotEmpty;
+        final city = _cityCtrl.text.trim();
+        final street = _streetCtrl.text.trim();
+        if (city.isEmpty || street.isEmpty) return false;
+        if (city.length < 2 || street.length < 2) return false;
+        return true;
       case 1:
-        return _sizeCtrl.text.trim().isNotEmpty;
+        final size = int.tryParse(_sizeCtrl.text.trim()) ?? 0;
+        return size > 0 &&
+            _price > 0 &&
+            _rooms > 0;
+      case 3:
+        if (_wantsVerifiedListing) {
+          return _verificationVideoUrl.isNotEmpty;
+        }
+        return _mediaDrafts.any((draft) => draft.controller.text.trim().isNotEmpty);
       default:
         return true;
     }
@@ -229,10 +324,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         folderName: 'property_photos',
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
-      _assignPickedMedia(
-        remoteUrl ?? localPath,
-        PropertyMediaType.image,
-      );
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        _showMediaError('שגיאה בהעלאת התמונה לשרת. בדוק את החיבור לאינטרנט ונסה שוב.');
+        return;
+      }
+      _assignPickedMedia(remoteUrl, PropertyMediaType.image);
     } on StorageException catch (error) {
       _showMediaError(error.message);
     }
@@ -255,10 +351,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         folderName: 'property_videos',
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
-      _assignPickedMedia(
-        remoteUrl ?? localPath,
-        PropertyMediaType.video,
-      );
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        _showMediaError('שגיאה בהעלאת הוידאו לשרת. בדוק את החיבור לאינטרנט ונסה שוב.');
+        return;
+      }
+      _assignPickedMedia(remoteUrl, PropertyMediaType.video);
     } on StorageException catch (error) {
       _showMediaError(error.message);
     }
@@ -270,6 +367,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
       return;
     }
+    // A successful 3D reconstruction depends entirely on capture quality — the
+    // #1 cause of a failed Teleport scan is a video that's too fast/partial to
+    // rebuild the room. Show the technique guide before recording.
+    if (source == ImageSource.camera) {
+      final proceed = await showScanCaptureGuide(context);
+      if (proceed != true) return;
+    }
+
     try {
       final file = await _picker.pickVideo(
         source: source,
@@ -278,7 +383,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (file == null) return;
 
       final rawSize = await file.length();
-      if (rawSize > 150 * 1024 * 1024) {
+      if (rawSize > 400 * 1024 * 1024) {
         _showMediaError(
           'הסרטון גדול מדי (${(rawSize / 1024 / 1024).toStringAsFixed(0)} MB). '
           'צלם סרטון קצר יותר של עד 60 שניות.',
@@ -286,12 +391,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         return;
       }
 
-      setState(() => _isSubmittingTour = true);
+      setState(() => _isScanSubmitting = true);
+      // Teleport's 3D reconstruction requires an H.264 mp4; iOS records HEVC
+      // .mov which fails processing. Transcode on-device first (fail-soft —
+      // if it fails we upload the original rather than block the user).
+      final mp4Path = await transcodeScanToMp4(file.path);
+      final scanFile = mp4Path != null ? XFile(mp4Path) : file;
       final localPath = await _storageService.saveVideoLocally(
-        file,
+        scanFile,
         folderName: 'property_scan_videos',
       );
-      final sizeBytes = await file.length();
+      final sizeBytes = await scanFile.length();
       final captured = _scanService.localCapture(
         propertyId: _draftPropertyId,
         localVideoPath: localPath,
@@ -300,9 +410,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
       if (!_scanService.isConfigured) {
         setState(() {
-          _virtualTourDraft = captured;
-          _model3dDraft = null;
-          _isSubmittingTour = false;
+          _scanTourDraft = captured;
+          _isScanSubmitting = false;
         });
         _showMediaError(
           'הסריקה נשמרה כטיוטה. כדי לשלוח לעיבוד צריך להגדיר RENTCH_3D_SCAN_PROXY_URL.',
@@ -311,11 +420,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       }
 
       setState(() {
-        _virtualTourDraft = captured.copyWith(
+        _scanTourDraft = captured.copyWith(
           status: PropertyTourStatus.uploading,
           updatedAt: DateTime.now().toUtc(),
         );
-        _model3dDraft = null;
       });
 
       final submitted = await _scanService.submitScanVideo(
@@ -326,31 +434,30 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = submitted;
-        _model3dDraft = null;
-        _isSubmittingTour = false;
+        _scanTourDraft = submitted;
+        _isScanSubmitting = false;
       });
       if (submitted.status == PropertyTourStatus.processing ||
           submitted.status == PropertyTourStatus.queued) {
-        _startTourPolling();
+        _startScanPolling();
       }
     } on Property3dScanException catch (error) {
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = _virtualTourDraft?.copyWith(
+        _scanTourDraft = _scanTourDraft?.copyWith(
           status: PropertyTourStatus.captured,
           updatedAt: DateTime.now().toUtc(),
         );
-        _isSubmittingTour = false;
+        _isScanSubmitting = false;
       });
       _showMediaError(error.message);
     } on StorageException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError(error.message);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError('סריקת ה־3D נכשלה: $error');
     }
   }
@@ -371,8 +478,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     );
     if (scan == null || !mounted) return;
     setState(() {
-      _virtualTourDraft = service.tourFromScan(scan);
-      _model3dDraft = null;
+      _scanTourDraft = service.tourFromScan(scan);
     });
   }
 
@@ -383,28 +489,28 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       return;
     }
     try {
-      setState(() => _isSubmittingTour = true);
+      setState(() => _isScanSubmitting = true);
       final imported = await _scaniverseImportService.importExportedModel(
         propertyId: _draftPropertyId,
         title: _scanTitle(),
       );
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = imported.tour;
+        _scanTourDraft = imported.tour;
         _model3dDraft = imported.model3d;
-        _isSubmittingTour = false;
+        _isScanSubmitting = false;
       });
     } on ScaniverseAssetImportException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError(error.message);
     } on ScaniverseException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError(error.message);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError('ייבוא מודל מ-Scaniverse נכשל: $error');
     }
   }
@@ -456,7 +562,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (street.isNotEmpty) street,
       if (city.isNotEmpty) city,
     ];
-    return parts.isEmpty ? 'Rentch apartment scan' : parts.join(', ');
+    return parts.isEmpty ? 'Rently apartment scan' : parts.join(', ');
   }
 
   void _assignPickedMedia(String path, PropertyMediaType type) {
@@ -515,6 +621,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       _verificationVideoUrl = '';
       _verificationCapturedAt = null;
       _virtualTourDraft = null;
+      _scanTourDraft = null;
       _model3dDraft = null;
       _resetMediaDrafts();
     });
@@ -572,6 +679,26 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
     if (city.isEmpty || street.isEmpty || size == 0) return;
 
+    // Guideline 1.2: reject listings whose free-text fields contain
+    // objectionable content before it is published.
+    final freeText = [
+      _cityCtrl.text,
+      _streetCtrl.text,
+      _neighborhoodCtrl.text,
+      _floorCtrl.text,
+      _entryDateCtrl.text,
+    ].join(' ');
+    if (InputSanitizer.containsObjectionableContent(freeText)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: Duration(milliseconds: 3000),
+          content: Text('הטקסט מכיל תוכן לא הולם. אנא תקנו ונסו שוב.'),
+          backgroundColor: AppColors.coral,
+        ),
+      );
+      return;
+    }
+
     final sanitizedVerificationVideoUrl =
         InputSanitizer.sanitizeMediaUrl(_verificationVideoUrl);
     if (_wantsVerifiedListing &&
@@ -590,99 +717,120 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
     setState(() => _isSaving = true);
 
-    final media = _wantsVerifiedListing
-        ? [
-            PropertyMedia(
-              url: sanitizedVerificationVideoUrl!,
-              type: PropertyMediaType.video,
-            ),
-          ]
-        : _mediaDrafts
-            .map((draft) {
-              final sanitized =
-                  InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
-              if (sanitized == null || sanitized.isEmpty) return null;
-              return PropertyMedia(url: sanitized, type: draft.type);
-            })
-            .whereType<PropertyMedia>()
-            .toList();
-    final verification = _wantsVerifiedListing
-        ? PropertyVerification.cameraVideo(
-            videoUrl: sanitizedVerificationVideoUrl!,
-            capturedAt: _verificationCapturedAt ?? DateTime.now().toUtc(),
-          )
-        : const PropertyVerification();
-    final sanitizedPrice = InputSanitizer.clampPrice(_price);
-    final transactionType = PropertyTransactionType.rent;
-    final priceHistory = sanitizedPrice > 0
-        ? [
-            PropertyPricePoint(
-              date: DateTime.now().toUtc(),
-              price: sanitizedPrice,
-              transactionType: transactionType,
-            ),
-          ]
-        : const <PropertyPricePoint>[];
-    final legal = _buildPropertyLegal(
-      acceptedTerms: _acceptedPropertyTerms,
-      thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
-      commercialSaleAllowed: _commercialSaleAllowed,
-      aiTrainingAllowed: _aiTrainingAllowed,
-    );
-
-    double lat = 32.0853;
-    double lon = 34.7818;
     try {
-      final addressParts = <String>[
-        if (street.isNotEmpty) street,
-        if (_streetNumCtrl.text.trim().isNotEmpty) _streetNumCtrl.text.trim(),
-        if (city.isNotEmpty) city,
-        'ישראל',
-      ];
-      final locations = await locationFromAddress(addressParts.join(', '));
-      if (locations.isNotEmpty) {
-        lat = locations.first.latitude;
-        lon = locations.first.longitude;
+      final media = _wantsVerifiedListing
+          ? [
+              PropertyMedia(
+                url: sanitizedVerificationVideoUrl!,
+                type: PropertyMediaType.video,
+              ),
+            ]
+          : _mediaDrafts
+              .map((draft) {
+                final sanitized =
+                    InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
+                if (sanitized == null || sanitized.isEmpty) return null;
+                return PropertyMedia(url: sanitized, type: draft.type);
+              })
+              .whereType<PropertyMedia>()
+              .toList();
+      final verification = _wantsVerifiedListing
+          ? PropertyVerification.cameraVideo(
+              videoUrl: sanitizedVerificationVideoUrl!,
+              capturedAt: _verificationCapturedAt ?? DateTime.now().toUtc(),
+            )
+          : const PropertyVerification();
+      final sanitizedPrice = InputSanitizer.clampPrice(_price);
+      final transactionType = PropertyTransactionType.rent;
+      final priceHistory = sanitizedPrice > 0
+          ? [
+              PropertyPricePoint(
+                date: DateTime.now().toUtc(),
+                price: sanitizedPrice,
+                transactionType: transactionType,
+              ),
+            ]
+          : const <PropertyPricePoint>[];
+      final legal = _buildPropertyLegal(
+        acceptedTerms: _acceptedPropertyTerms,
+        thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+        commercialSaleAllowed: _commercialSaleAllowed,
+        aiTrainingAllowed: _aiTrainingAllowed,
+      );
+
+      double lat = 32.0853;
+      double lon = 34.7818;
+      bool geocodingFailed = false;
+      try {
+        final addressParts = <String>[
+          if (street.isNotEmpty) street,
+          if (_streetNumCtrl.text.trim().isNotEmpty) _streetNumCtrl.text.trim(),
+          if (city.isNotEmpty) city,
+          'ישראל',
+        ];
+        final locations = await locationFromAddress(addressParts.join(', '));
+        if (locations.isNotEmpty) {
+          lat = locations.first.latitude;
+          lon = locations.first.longitude;
+        } else {
+          geocodingFailed = true;
+        }
+      } catch (_) {
+        geocodingFailed = true;
       }
-    } catch (_) {}
+      if (geocodingFailed && kDebugMode) {
+        debugPrint('Property geocoding failed for: $street, $city');
+      }
 
-    final property = RentalProperty(
-      id: _draftPropertyId,
-      sourceUrl: '',
-      price: sanitizedPrice,
-      rooms: InputSanitizer.clampRooms(_rooms),
-      sizeM2: InputSanitizer.clampSize(size),
-      floor: InputSanitizer.sanitizeText(_floorCtrl.text.trim(), maxLength: 10),
-      totalFloors: InputSanitizer.sanitizeText(_totalFloorsCtrl.text.trim(),
-          maxLength: 10),
-      city: city,
-      neighborhood: InputSanitizer.sanitizeAddress(_neighborhoodCtrl.text),
-      street: street,
-      streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
-      lat: lat,
-      lon: lon,
-      propertyType: _propertyType,
-      entryDate: InputSanitizer.sanitizeText(_entryDateCtrl.text.trim(),
-          maxLength: 20),
-      condition: _condition,
-      ownerName:
-          context.read<DatingProvider>().tenantProfile?.name ?? 'בעל הדירה',
-      agencyListing: _agencyListing,
-      features: _selectedFeatures.toList(),
-      media: media,
-      transactionType: transactionType,
-      virtualTour: _virtualTourDraft,
-      model3d: _model3dDraft,
-      legal: legal,
-      priceHistory: priceHistory,
-      verification: verification,
-      createdAt: DateTime.now(),
-    );
+      final property = RentalProperty(
+        id: _draftPropertyId,
+        sourceUrl: '',
+        price: sanitizedPrice,
+        rooms: InputSanitizer.clampRooms(_rooms),
+        sizeM2: InputSanitizer.clampSize(size),
+        floor: InputSanitizer.sanitizeText(_floorCtrl.text.trim(), maxLength: 10),
+        totalFloors: InputSanitizer.sanitizeText(_totalFloorsCtrl.text.trim(),
+            maxLength: 10),
+        city: city,
+        neighborhood: InputSanitizer.sanitizeAddress(_neighborhoodCtrl.text),
+        street: street,
+        streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
+        lat: lat,
+        lon: lon,
+        propertyType: _propertyType,
+        entryDate: InputSanitizer.sanitizeText(_entryDateCtrl.text.trim(),
+            maxLength: 20),
+        condition: _condition,
+        ownerName:
+            context.read<DatingProvider>().tenantProfile?.name ?? 'בעל הדירה',
+        agencyListing: _agencyListing,
+        features: _selectedFeatures.toList(),
+        media: media,
+        transactionType: transactionType,
+        virtualTour: _scanTourDraft ?? _virtualTourDraft,
+        model3d: _model3dDraft,
+        legal: legal,
+        priceHistory: priceHistory,
+        verification: verification,
+        designTemplate: _designTemplate,
+        designAccent: _designAccent,
+        createdAt: DateTime.now(),
+      );
 
-    await context.read<DatingProvider>().addLandlordProperty(property);
+      await context.read<DatingProvider>().addLandlordProperty(property);
 
-    if (!mounted) return;
-    Navigator.of(context).pop();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(milliseconds: 3000),
+        content: Text('שגיאה בשמירת הנכס. נסה שוב.'),
+        backgroundColor: AppColors.coral,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   // ── AI virtual staging ("הדמיה") ────────────────────────────────────────────
@@ -738,7 +886,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           );
           final result = await _awaitStagingReady(submitted);
           if (result != null && result.status == PropertyTourStatus.ready) {
-            _addStagedToMedia(result, announce: false);
             lastReady = result;
             done++;
           }
@@ -759,8 +906,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           duration: const Duration(milliseconds: 3000),
           backgroundColor: AppColors.primary,
           content: Text(done == 1
-              ? '✨ ההדמיה נוצרה ונוספה לתמונות הדירה!'
-              : '✨ נוצרו $done הדמיות ונוספו לתמונות הדירה!'),
+              ? '✨ ההדמיה נוצרה! אפשר לראות אותה בלשונית ההדמיה.'
+              : '✨ נוצרו $done הדמיות! אפשר לראות אותן בלשונית ההדמיה.'),
         ));
       } else {
         _showMediaError(
@@ -826,7 +973,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     }
     if (announce && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           duration: Duration(milliseconds: 2800),
           content: Text('✨ ההדמיה נוצרה ונוספה לתמונות הדירה!'),
           backgroundColor: AppColors.primary,
@@ -845,7 +992,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           backgroundColor: AppColors.navy,
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
-            icon: const RentchIcon(IconsaxPlusLinear.arrow_right,
+            icon: const RentlyIcon(IconsaxPlusLinear.arrow_right,
                 color: Colors.white),
             onPressed: _prev,
           ),
@@ -886,13 +1033,18 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               propertyType: _propertyType,
               condition: _condition,
               agencyListing: _agencyListing,
+              designTemplate: _designTemplate,
+              designAccent: _designAccent,
               onPriceChanged: (v) =>
-                  setState(() => _price = (v / 100).round() * 100),
+                  setState(() => _price = v.round()),
               onRoomsChanged: (v) =>
                   setState(() => _rooms = (v * 2).round() / 2),
               onTypeChanged: (v) => setState(() => _propertyType = v!),
               onConditionChanged: (v) => setState(() => _condition = v!),
               onAgencyChanged: (v) => setState(() => _agencyListing = v),
+              onDesignTemplateChanged: (v) =>
+                  setState(() => _designTemplate = v),
+              onDesignAccentChanged: (v) => setState(() => _designAccent = v),
             ),
             _StepFeatures(
               allFeatures: _propertyFeatureLabels,
@@ -909,6 +1061,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               mediaDrafts: _mediaDrafts,
               virtualTourDraft: _virtualTourDraft,
               isSubmittingTour: _isSubmittingTour,
+              scanTourDraft: _scanTourDraft,
+              isScanSubmitting: _isScanSubmitting,
               isScanBackendConfigured: _scanService.isConfigured,
               wantsVerifiedListing: _wantsVerifiedListing,
               verificationVideoUrl: _verificationVideoUrl,
@@ -933,6 +1087,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               onImportScaniverseAssets: _importScaniverseAssets,
               onClearVirtualTour: () => setState(() {
                 _virtualTourDraft = null;
+              }),
+              onClearScan: () => setState(() {
+                _scanTourDraft = null;
                 _model3dDraft = null;
               }),
               acceptedTerms: _acceptedPropertyTerms,
@@ -1100,7 +1257,7 @@ class _WizardNavBar extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: onPrev,
-                icon: const RentchIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
+                icon: const RentlyIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
                 label: const Text('חזרה'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.navy,
@@ -1237,7 +1394,7 @@ class _EditPropertyFooter extends StatelessWidget {
               const Spacer(),
               TextButton.icon(
                 onPressed: onDelete,
-                icon: const RentchIcon(IconsaxPlusLinear.trash,
+                icon: const RentlyIcon(IconsaxPlusLinear.trash,
                     color: AppColors.coral, size: 16),
                 label: const Text(
                   'מחיקת נכס',
@@ -1263,7 +1420,7 @@ class _EditPropertyFooter extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: onPrev,
-                    icon: const RentchIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
+                    icon: const RentlyIcon(IconsaxPlusLinear.arrow_right, size: 16, color: AppColors.navy),
                     label: const Text('חזרה'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.navy,
@@ -1308,6 +1465,8 @@ class _EditPropertyFooter extends StatelessWidget {
         ],
       ),
     );
+  }
+}
 
 // ─── Step 1: Location ─────────────────────────────────────────────────────────
 
@@ -1418,12 +1577,12 @@ class _StepLocationState extends State<_StepLocation> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.primary, width: 1),
+              side: BorderSide(color: AppColors.primary, width: 1),
             ),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
           icon: _isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
@@ -1431,7 +1590,7 @@ class _StepLocationState extends State<_StepLocation> {
                     color: AppColors.primary,
                   ),
                 )
-              : const RentchIcon(IconsaxPlusLinear.gps, size: 18),
+              : const RentlyIcon(IconsaxPlusLinear.gps, size: 18),
           label: Text(
             _isLoading ? 'מזהה מיקום...' : 'זהה מיקום אוטומטית לפי ה-GPS',
             style: const TextStyle(
@@ -1495,11 +1654,15 @@ class _StepDetails extends StatelessWidget {
     required this.propertyType,
     required this.condition,
     required this.agencyListing,
+    required this.designTemplate,
+    required this.designAccent,
     required this.onPriceChanged,
     required this.onRoomsChanged,
     required this.onTypeChanged,
     required this.onConditionChanged,
     required this.onAgencyChanged,
+    required this.onDesignTemplateChanged,
+    required this.onDesignAccentChanged,
   });
 
   final int price;
@@ -1511,15 +1674,18 @@ class _StepDetails extends StatelessWidget {
   final String propertyType;
   final String condition;
   final bool agencyListing;
+  final String designTemplate;
+  final int designAccent;
   final ValueChanged<double> onPriceChanged;
   final ValueChanged<double> onRoomsChanged;
   final ValueChanged<String?> onTypeChanged;
   final ValueChanged<String?> onConditionChanged;
   final ValueChanged<bool> onAgencyChanged;
+  final ValueChanged<String> onDesignTemplateChanged;
+  final ValueChanged<int> onDesignAccentChanged;
 
   @override
   Widget build(BuildContext context) {
-    final roomsLabel = rooms % 1 == 0 ? rooms.toInt().toString() : '$rooms';
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
@@ -1532,23 +1698,24 @@ class _StepDetails extends StatelessWidget {
         _FormCard(
           child: Column(
             children: [
-              _SliderRow(
+              _SliderWithEntry(
                 label: 'מחיר לחודש',
-                displayValue: _fmtPrice(price),
                 value: price.toDouble(),
-                min: 1000,
-                max: 25000,
-                divisions: 240,
+                min: 0,
+                max: 150000,
+                divisions: 300,
+                unitPrefix: '₪',
                 onChanged: onPriceChanged,
               ),
               const SizedBox(height: 10),
-              _SliderRow(
+              _SliderWithEntry(
                 label: 'מספר חדרים',
-                displayValue: roomsLabel,
                 value: rooms,
-                min: 1,
-                max: 6,
-                divisions: 10,
+                min: 0,
+                max: 50,
+                divisions: 100,
+                unitSuffix: 'חד׳',
+                allowDecimals: true,
                 onChanged: onRoomsChanged,
               ),
               const SizedBox(height: 14),
@@ -1627,6 +1794,13 @@ class _StepDetails extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 18),
+        _DesignTemplatePicker(
+          selectedTemplate: designTemplate,
+          accent: designAccent,
+          onTemplateChanged: onDesignTemplateChanged,
+          onAccentChanged: onDesignAccentChanged,
+        ),
       ],
     );
   }
@@ -1692,6 +1866,28 @@ class _StepFeatures extends StatelessWidget {
         return Icons.shield_outlined;
       case 'מרחב מוגן קומתי':
         return Icons.domain_disabled;
+      case 'מרתף':
+        return Icons.foundation;
+      case 'חימום מרכזי':
+        return Icons.local_fire_department_outlined;
+      case 'מזגן בחדרי שינה':
+        return Icons.bedroom_parent;
+      case 'מכונת כביסה':
+        return Icons.washing_machine_outlined;
+      case 'מקרר':
+        return Icons.kitchen;
+      case 'תנור':
+        return Icons.restaurant_outlined;
+      case 'מדיח כלים':
+        return Icons.dining_outlined;
+      case 'בקרה חכמה בבית':
+        return Icons.smart_home_outlined;
+      case 'חניה תת קרקעית':
+        return Icons.basement_outlined;
+      case 'מערכת סאונד':
+        return Icons.speaker_group_outlined;
+      case 'כניסה פרטית':
+        return Icons.door_front_rounded;
       default:
         return Icons.star_border;
     }
@@ -1712,20 +1908,50 @@ class _StepFeatures extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (selectedFeatures.isNotEmpty) ...[
-                Text(
-                  '${selectedFeatures.length} נבחרו',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (selectedFeatures.isNotEmpty)
+                    Text(
+                      '${selectedFeatures.length} נבחרו מתוך ${allFeatures.length}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    )
+                  else
+                    Text(
+                      'בחר מאפיינים (${allFeatures.length} אפשרויות)',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (selectedFeatures.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${(selectedFeatures.length / allFeatures.length * 100).toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: 10,
                 children: allFeatures.map((f) {
                   final selected = selectedFeatures.contains(f);
                   return GestureDetector(
@@ -1783,6 +2009,8 @@ class _StepPhotos extends StatelessWidget {
     required this.mediaDrafts,
     required this.virtualTourDraft,
     required this.isSubmittingTour,
+    required this.scanTourDraft,
+    required this.isScanSubmitting,
     required this.isScanBackendConfigured,
     required this.wantsVerifiedListing,
     required this.verificationVideoUrl,
@@ -1800,6 +2028,7 @@ class _StepPhotos extends StatelessWidget {
     this.onLinkScaniverse,
     required this.onImportScaniverseAssets,
     required this.onClearVirtualTour,
+    required this.onClearScan,
     required this.acceptedTerms,
     required this.onAcceptedTermsChanged,
     required this.thirdPartyTransferAllowed,
@@ -1816,6 +2045,8 @@ class _StepPhotos extends StatelessWidget {
   final List<_PropertyMediaDraft> mediaDrafts;
   final PropertyVirtualTour? virtualTourDraft;
   final bool isSubmittingTour;
+  final PropertyVirtualTour? scanTourDraft;
+  final bool isScanSubmitting;
   final bool isScanBackendConfigured;
   final bool wantsVerifiedListing;
   final String verificationVideoUrl;
@@ -1833,6 +2064,7 @@ class _StepPhotos extends StatelessWidget {
   final VoidCallback? onLinkScaniverse;
   final VoidCallback onImportScaniverseAssets;
   final VoidCallback onClearVirtualTour;
+  final VoidCallback onClearScan;
   final bool acceptedTerms;
   final ValueChanged<bool> onAcceptedTermsChanged;
   final bool thirdPartyTransferAllowed;
@@ -2079,6 +2311,19 @@ class _StepPhotos extends StatelessWidget {
                     onClear: onClearVirtualTour,
                   ),
                 ],
+                const SizedBox(height: 18),
+                const Divider(height: 1, color: AppColors.borderLight),
+                const SizedBox(height: 16),
+                _Scan3dPanel(
+                  tour: scanTourDraft,
+                  isSubmitting: isScanSubmitting,
+                  isBackendConfigured: isScanBackendConfigured,
+                  onPickFromCamera: onPickScanFromCamera,
+                  onPickFromGallery: onPickScanFromGallery,
+                  onLinkScaniverse: onLinkScaniverse,
+                  onImportScaniverseAssets: onImportScaniverseAssets,
+                  onClear: onClearScan,
+                ),
               ],
               const SizedBox(height: 16),
               _PropertyRightsPanel(
@@ -2133,8 +2378,8 @@ class _VerifiedListingPanel extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(
-                child: RentchIcon(
+              child: Center(
+                child: RentlyIcon(
                   IconsaxPlusLinear.verify,
                   color: AppColors.primary,
                   size: 19,
@@ -2205,7 +2450,7 @@ class _VerifiedListingPanel extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const RentchIcon(IconsaxPlusLinear.video_play, size: 17),
+                  : const RentlyIcon(IconsaxPlusLinear.video_play, size: 17),
               label: Text(
                 isCapturingVerification ? 'פותח מצלמה...' : 'צלם וידאו אימות',
               ),
@@ -2266,8 +2511,8 @@ class _VerificationVideoPreview extends StatelessWidget {
                 videoMode: SafeVideoDisplayMode.iconOnly,
                 fallback: Container(
                   color: AppColors.primary.withValues(alpha: 0.12),
-                  child: const Center(
-                    child: RentchIcon(
+                  child: Center(
+                    child: RentlyIcon(
                       IconsaxPlusLinear.video_tick,
                       color: AppColors.primary,
                       size: 24,
@@ -2306,7 +2551,7 @@ class _VerificationVideoPreview extends StatelessWidget {
                     OutlinedButton.icon(
                       onPressed: isCapturing ? null : onReplace,
                       icon:
-                          const RentchIcon(IconsaxPlusLinear.refresh, size: 14),
+                          const RentlyIcon(IconsaxPlusLinear.refresh, size: 14),
                       label: const Text('צלם מחדש'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.navy,
@@ -2347,10 +2592,10 @@ class _VerifiedMediaLockNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RentchIcon(
+          RentlyIcon(
             IconsaxPlusLinear.lock,
             color: AppColors.primary,
             size: 18,
@@ -2504,10 +2749,10 @@ class _MediaGridItem extends StatelessWidget {
               color: AppColors.background,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                RentchIcon(
+                RentlyIcon(
                   IconsaxPlusLinear.add_square,
                   color: AppColors.primary,
                   size: 26,
@@ -3005,7 +3250,7 @@ class _StagingPanelState extends State<_StagingPanel> {
       ),
       child: Column(
         children: [
-          const SizedBox(
+          SizedBox(
             width: 26,
             height: 26,
             child: CircularProgressIndicator(
@@ -3046,7 +3291,7 @@ class _StagingPanelState extends State<_StagingPanel> {
                 return Container(
                   color: AppColors.background,
                   alignment: Alignment.center,
-                  child: const CircularProgressIndicator(
+                  child: CircularProgressIndicator(
                       strokeWidth: 2.4, color: AppColors.primary),
                 );
               },
@@ -3067,7 +3312,7 @@ class _StagingPanelState extends State<_StagingPanel> {
             SizedBox(width: 6),
             Expanded(
               child: Text(
-                'ההדמיה נוספה לתמונות הדירה',
+                'ההדמיה נשמרה ותוצג בלשונית ההדמיה של הדירה',
                 style: TextStyle(
                     color: Color(0xFF16A34A),
                     fontSize: 13,
@@ -3081,7 +3326,7 @@ class _StagingPanelState extends State<_StagingPanel> {
           onPressed: widget.onClear,
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primary,
-            side: const BorderSide(color: AppColors.primary),
+            side: BorderSide(color: AppColors.primary),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             minimumSize: const Size.fromHeight(46),
@@ -3252,7 +3497,7 @@ class _ScanActions extends StatelessWidget {
                           : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                RentchIcon(IconsaxPlusLinear.video_play,
+                                RentlyIcon(IconsaxPlusLinear.video_play,
                                     color: Colors.white, size: 18),
                                 SizedBox(width: 8),
                                 Text(
@@ -3295,7 +3540,7 @@ class _ScanActions extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          RentchIcon(IconsaxPlusLinear.video,
+                          RentlyIcon(IconsaxPlusLinear.video,
                               color: AppColors.navy, size: 18),
                           SizedBox(width: 8),
                           Text(
@@ -3331,7 +3576,7 @@ class _ScanActions extends StatelessWidget {
                   border: Border.all(
                       color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.view_in_ar_rounded,
@@ -3438,7 +3683,7 @@ class _ScanStatusCard extends StatelessWidget {
               if (tour.processingProgress != null)
                 Text(
                   '${tour.processingProgress}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
@@ -3461,7 +3706,7 @@ class _ScanStatusCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: isSubmitting ? null : onReplace,
-                  icon: const RentchIcon(IconsaxPlusLinear.refresh, size: 16),
+                  icon: const RentlyIcon(IconsaxPlusLinear.refresh, size: 16),
                   label: const Text('החלף סריקה'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,
@@ -3625,30 +3870,84 @@ class _Field extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
     );
   }
 }
 
-class _SliderRow extends StatelessWidget {
-  const _SliderRow({
+/// Slider with a tappable numeric field so the value can be set by dragging OR
+/// typed freely (precise amounts the slider's coarse steps can't reach). The
+/// typed value is clamped to [min, max].
+class _SliderWithEntry extends StatefulWidget {
+  const _SliderWithEntry({
     required this.label,
-    required this.displayValue,
     required this.value,
     required this.min,
     required this.max,
     required this.divisions,
     required this.onChanged,
+    this.unitPrefix = '',
+    this.unitSuffix = '',
+    this.allowDecimals = false,
   });
   final String label;
-  final String displayValue;
   final double value;
   final double min;
   final double max;
   final int divisions;
   final ValueChanged<double> onChanged;
+  final String unitPrefix;
+  final String unitSuffix;
+  final bool allowDecimals;
+
+  @override
+  State<_SliderWithEntry> createState() => _SliderWithEntryState();
+}
+
+class _SliderWithEntryState extends State<_SliderWithEntry> {
+  late final TextEditingController _ctrl;
+  final FocusNode _focus = FocusNode();
+
+  String _fmt(double v) => widget.allowDecimals
+      ? (v % 1 == 0 ? v.toInt().toString() : v.toString())
+      : v.round().toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: _fmt(widget.value));
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _commit();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SliderWithEntry old) {
+    super.didUpdateWidget(old);
+    if (!_focus.hasFocus && widget.value != old.value) {
+      _ctrl.text = _fmt(widget.value);
+    }
+  }
+
+  void _commit() {
+    final parsed = double.tryParse(_ctrl.text.trim().replaceAll(',', ''));
+    if (parsed == null) {
+      _ctrl.text = _fmt(widget.value);
+      return;
+    }
+    final clamped = parsed.clamp(widget.min, widget.max).toDouble();
+    widget.onChanged(clamped);
+    _ctrl.text = _fmt(clamped);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3656,17 +3955,65 @@ class _SliderRow extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(label,
+            Text(widget.label,
                 style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600)),
             const Spacer(),
-            Text(displayValue,
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primary)),
+            Container(
+              constraints: const BoxConstraints(minWidth: 88, maxWidth: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.unitPrefix.isNotEmpty)
+                    Text(widget.unitPrefix,
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primary)),
+                  Flexible(
+                    child: TextField(
+                      controller: _ctrl,
+                      focusNode: _focus,
+                      textAlign: TextAlign.center,
+                      keyboardType: widget.allowDecimals
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.number,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _commit(),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(widget.allowDecimals ? r'[0-9.]' : r'[0-9]'),
+                        ),
+                      ],
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary),
+                    ),
+                  ),
+                  if (widget.unitSuffix.isNotEmpty)
+                    Text(' ${widget.unitSuffix}',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
           ],
         ),
         SliderTheme(
@@ -3678,14 +4025,330 @@ class _SliderRow extends StatelessWidget {
             trackHeight: 3,
           ),
           child: Slider(
-            value: value.clamp(min, max),
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
+            value: widget.value.clamp(widget.min, widget.max),
+            min: widget.min,
+            max: widget.max,
+            divisions: widget.divisions,
+            onChanged: (v) {
+              if (_focus.hasFocus) _focus.unfocus();
+              widget.onChanged(v);
+            },
           ),
         ),
       ],
+    );
+  }
+}
+
+/// In-flow picker for the property page DESIGN: choose one of the 6 detail-page
+/// templates + an optional accent colour, stored per-listing. Each listing can
+/// look different without touching user-level broker branding.
+class _DesignTemplatePicker extends StatelessWidget {
+  const _DesignTemplatePicker({
+    required this.selectedTemplate,
+    required this.accent,
+    required this.onTemplateChanged,
+    required this.onAccentChanged,
+  });
+
+  final String selectedTemplate;
+  final int accent;
+  final ValueChanged<String> onTemplateChanged;
+  final ValueChanged<int> onAccentChanged;
+
+  static const _hebLabels = {
+    'rently_classic': 'קלאסי',
+    'acid_hero': 'אורה',
+    'dashboard_glass': 'לוח שוק',
+    'estate_card': 'כרטיס נכס',
+    'gallery_editorial': 'גלריה',
+    'cinematic_glass': 'קולנועי',
+  };
+
+  static const _defaultAccent = 0xFF13BEC9;
+
+  static const _accentPresets = <int>[
+    0xFF13BEC9,
+    0xFF6C5CE7,
+    0xFFECFF74,
+    0xFFFF6B6B,
+    0xFF2ECC71,
+    0xFFFFA94D,
+  ];
+
+  static List<Color> _previewColors(String id) => switch (id) {
+        'acid_hero' => const [Color(0xFF111827), Color(0xFFECFF74)],
+        'dashboard_glass' => const [Color(0xFFEAF2F0), Color(0xFF13BEC9)],
+        'estate_card' => const [Color(0xFFF5F6F8), Color(0xFF6C5CE7)],
+        'gallery_editorial' => const [Colors.white, Color(0xFF111827)],
+        'cinematic_glass' => const [Color(0xFF0B1220), Color(0xFF8B5CF6)],
+        _ => const [Colors.white, Color(0xFF13BEC9)],
+      };
+
+  static BrokerPropertyTemplate _templateFromId(String id) {
+    for (final t in BrokerPropertyTemplate.values) {
+      if (t.id == id) return t;
+    }
+    return BrokerPropertyTemplate.rentlyClassic;
+  }
+
+  bool _isSelected(String id) {
+    final effectiveTemplate = selectedTemplate.isEmpty ? 'rently_classic' : selectedTemplate;
+    return effectiveTemplate == id;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final templates = BrokerPropertyTemplate.values;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final crossAxisCount = isMobile ? 2 : 3;
+
+    return _FormCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(IconsaxPlusLinear.brush_4,
+                  size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Text('עיצוב דף הדירה',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.navy)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text('בחרו תבנית לדף הנכס וצבע מותאם אישית',
+              style:
+                  TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: crossAxisCount,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.85,
+            children: [
+              for (final t in templates)
+                _TemplateChip(
+                  label: _hebLabels[t.id] ?? t.title,
+                  colors: _previewColors(t.id),
+                  selected: _isSelected(t.id),
+                  onTap: () => onTemplateChanged(t.id),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(IconsaxPlusLinear.palette, size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              const Text('צבע מותאם',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.navy)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _AccentDot(
+                value: _defaultAccent,
+                selected: accent == _defaultAccent || accent == 0,
+                onTap: () => onAccentChanged(_defaultAccent),
+                label: 'ברירת מחדל',
+              ),
+              for (final c in _accentPresets.where((color) => color != _defaultAccent))
+                _AccentDot(
+                  value: c,
+                  selected: accent == c,
+                  onTap: () => onAccentChanged(c),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateChip extends StatelessWidget {
+  const _TemplateChip({
+    required this.label,
+    required this.colors,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final List<Color> colors;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected ? AppColors.primary : AppColors.borderLight,
+                  width: selected ? 2.5 : 1.5,
+                ),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: colors,
+                ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+              ),
+              child: Stack(
+                children: [
+                  // Bottom accent bar
+                  Positioned(
+                    left: 10,
+                    right: 10,
+                    bottom: 10,
+                    child: Container(
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: colors.last.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(3.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.last.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Check icon when selected
+                  if (selected)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.4),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: const Icon(Icons.check,
+                            size: 14, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected ? AppColors.primary : AppColors.navy,
+                height: 1.2,
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccentDot extends StatelessWidget {
+  const _AccentDot({
+    required this.value,
+    required this.selected,
+    required this.onTap,
+    this.label = '',
+  });
+
+  final int value;
+  final bool selected;
+  final VoidCallback onTap;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Color(value),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? AppColors.primary : AppColors.borderLight,
+                width: selected ? 2.4 : 1.5,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: Color(value).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : [],
+            ),
+            child: selected
+                ? const Icon(Icons.check, size: 18, color: Colors.white)
+                : null,
+          ),
+          if (label.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -3724,12 +4387,12 @@ class _DropdownRow extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
       style: const TextStyle(
           color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
-      icon: const RentchIcon(IconsaxPlusLinear.arrow_down,
+      icon: const RentlyIcon(IconsaxPlusLinear.arrow_down,
           size: 16, color: AppColors.textSecondary),
       dropdownColor: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -3739,17 +4402,6 @@ class _DropdownRow extends StatelessWidget {
       onChanged: onChanged,
     );
   }
-}
-
-String _fmtPrice(int value) {
-  final raw = value.toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < raw.length; i++) {
-    final remaining = raw.length - i;
-    buffer.write(raw[i]);
-    if (remaining > 1 && remaining % 3 == 1) buffer.write(',');
-  }
-  return '₪$buffer';
 }
 
 // ─── Edit Property Screen ─────────────────────────────────────────────────────
@@ -3788,13 +4440,18 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late String _propertyType;
   late String _condition;
   late bool _agencyListing;
+  late String _designTemplate;
+  late int _designAccent;
   late final Set<String> _selectedFeatures;
   bool _isSaving = false;
   bool _isSubmittingTour = false;
+  bool _isScanSubmitting = false;
   bool _isCapturingVerification = false;
   PropertyVirtualTour? _virtualTourDraft;
+  PropertyVirtualTour? _scanTourDraft;
   PropertyModel3d? _model3dDraft;
-  Timer? _pollTimer;
+  Timer? _scanPollTimer;
+  int _scanPollCount = 0;
   late bool _wantsVerifiedListing;
   late String _verificationVideoUrl;
   DateTime? _verificationCapturedAt;
@@ -3830,8 +4487,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _propertyType = p.propertyType;
     _condition = p.condition.isNotEmpty ? p.condition : 'תקין';
     _agencyListing = p.agencyListing;
+    _designTemplate = p.designTemplate;
+    _designAccent = p.designAccent;
     _selectedFeatures = Set<String>.from(p.features);
     _virtualTourDraft = p.virtualTour;
+    _scanTourDraft = null;
     _model3dDraft = p.model3d;
     _wantsVerifiedListing = p.isVerifiedListing;
     _verificationVideoUrl = p.verification.videoUrl;
@@ -3848,7 +4508,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
   @override
   void dispose() {
-    _stopTourPolling();
+    _stopScanPolling();
     _pageCtrl.dispose();
     _cityCtrl.dispose();
     _neighborhoodCtrl.dispose();
@@ -3864,37 +4524,85 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     super.dispose();
   }
 
-  void _startTourPolling() {
-    _stopTourPolling();
-    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-      final tour = _virtualTourDraft;
-      if (tour == null) { _stopTourPolling(); return; }
+  void _startScanPolling() {
+    _stopScanPolling();
+    _scanPollCount = 0;
+    _scanPollTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      final tour = _scanTourDraft;
+      if (tour == null) { _stopScanPolling(); return; }
       if (tour.status == PropertyTourStatus.ready || tour.status == PropertyTourStatus.failed) {
-        _stopTourPolling(); return;
+        _stopScanPolling(); return;
+      }
+      _scanPollCount++;
+      if (_scanPollCount > 20) {
+        _stopScanPolling();
+        if (!mounted) return;
+        // Teleport's Gaussian-splat processing takes ~1 hour, far longer than
+        // this in-screen poll — so keep it "processing" (not failed). The tour
+        // is saved with the capture id and appears automatically once ready.
+        final isTeleport = tour.provider == 'teleport';
+        setState(() {
+          _scanTourDraft = _scanTourDraft?.copyWith(
+            status: isTeleport
+                ? PropertyTourStatus.processing
+                : PropertyTourStatus.failed,
+            processingStage: isTeleport
+                ? 'הסיור התלת־ממדי בעיבוד (בערך שעה). אפשר לשמור את הדירה — הוא יופיע אוטומטית כשיהיה מוכן.'
+                : '',
+            errorMessage: isTeleport
+                ? ''
+                : 'עיבוד הסריקה לקח יותר מדי זמן. נסה שוב מאוחר יותר.',
+            updatedAt: DateTime.now().toUtc(),
+          );
+        });
+        return;
       }
       try {
         final updated = await _scanService.refresh(tour);
-        if (!mounted) { _stopTourPolling(); return; }
-        setState(() => _virtualTourDraft = updated);
+        if (!mounted) { _stopScanPolling(); return; }
+        setState(() => _scanTourDraft = updated);
         if (updated.status == PropertyTourStatus.ready || updated.status == PropertyTourStatus.failed) {
-          _stopTourPolling();
+          _stopScanPolling();
         }
-      } catch (_) {}
+      } catch (e) {
+        if (!mounted) { _stopScanPolling(); return; }
+        if (_scanPollCount >= 20) {
+          _stopScanPolling();
+          setState(() {
+            _scanTourDraft = _scanTourDraft?.copyWith(
+              status: PropertyTourStatus.failed,
+              errorMessage: 'שגיאה בבדיקת סטטוס הסריקה. נסה שוב.',
+              updatedAt: DateTime.now().toUtc(),
+            );
+          });
+        }
+      }
     });
   }
 
-  void _stopTourPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
+  void _stopScanPolling() {
+    _scanPollTimer?.cancel();
+    _scanPollTimer = null;
   }
 
   bool _validateCurrentStep() {
     switch (_step) {
       case 0:
-        return _cityCtrl.text.trim().isNotEmpty &&
-            _streetCtrl.text.trim().isNotEmpty;
+        final city = _cityCtrl.text.trim();
+        final street = _streetCtrl.text.trim();
+        if (city.isEmpty || street.isEmpty) return false;
+        if (city.length < 2 || street.length < 2) return false;
+        return true;
       case 1:
-        return _sizeCtrl.text.trim().isNotEmpty;
+        final size = int.tryParse(_sizeCtrl.text.trim()) ?? 0;
+        return size > 0 &&
+            _price > 0 &&
+            _rooms > 0;
+      case 3:
+        if (_wantsVerifiedListing) {
+          return _verificationVideoUrl.isNotEmpty;
+        }
+        return _mediaDrafts.any((draft) => draft.controller.text.trim().isNotEmpty);
       default:
         return true;
     }
@@ -3985,6 +4693,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
       return;
     }
+    // A successful 3D reconstruction depends entirely on capture quality — the
+    // #1 cause of a failed Teleport scan is a video that's too fast/partial to
+    // rebuild the room. Show the technique guide before recording.
+    if (source == ImageSource.camera) {
+      final proceed = await showScanCaptureGuide(context);
+      if (proceed != true) return;
+    }
+
     try {
       final file = await _picker.pickVideo(
         source: source,
@@ -3993,7 +4709,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (file == null) return;
 
       final rawSize = await file.length();
-      if (rawSize > 150 * 1024 * 1024) {
+      if (rawSize > 400 * 1024 * 1024) {
         _showMediaError(
           'הסרטון גדול מדי (${(rawSize / 1024 / 1024).toStringAsFixed(0)} MB). '
           'צלם סרטון קצר יותר של עד 60 שניות.',
@@ -4001,12 +4717,17 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         return;
       }
 
-      setState(() => _isSubmittingTour = true);
+      setState(() => _isScanSubmitting = true);
+      // Teleport's 3D reconstruction requires an H.264 mp4; iOS records HEVC
+      // .mov which fails processing. Transcode on-device first (fail-soft —
+      // if it fails we upload the original rather than block the user).
+      final mp4Path = await transcodeScanToMp4(file.path);
+      final scanFile = mp4Path != null ? XFile(mp4Path) : file;
       final localPath = await _storageService.saveVideoLocally(
-        file,
+        scanFile,
         folderName: 'property_scan_videos',
       );
-      final sizeBytes = await file.length();
+      final sizeBytes = await scanFile.length();
       final captured = _scanService.localCapture(
         propertyId: widget.property.id,
         localVideoPath: localPath,
@@ -4015,9 +4736,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
       if (!_scanService.isConfigured) {
         setState(() {
-          _virtualTourDraft = captured;
-          _model3dDraft = null;
-          _isSubmittingTour = false;
+          _scanTourDraft = captured;
+          _isScanSubmitting = false;
         });
         _showMediaError(
           'הסריקה נשמרה כטיוטה. כדי לשלוח לעיבוד צריך להגדיר RENTCH_3D_SCAN_PROXY_URL.',
@@ -4026,11 +4746,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       }
 
       setState(() {
-        _virtualTourDraft = captured.copyWith(
+        _scanTourDraft = captured.copyWith(
           status: PropertyTourStatus.uploading,
           updatedAt: DateTime.now().toUtc(),
         );
-        _model3dDraft = null;
       });
 
       final submitted = await _scanService.submitScanVideo(
@@ -4041,31 +4760,30 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = submitted;
-        _model3dDraft = null;
-        _isSubmittingTour = false;
+        _scanTourDraft = submitted;
+        _isScanSubmitting = false;
+      });
       if (submitted.status == PropertyTourStatus.processing ||
           submitted.status == PropertyTourStatus.queued) {
-        _startTourPolling();
+        _startScanPolling();
       }
-      });
     } on Property3dScanException catch (error) {
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = _virtualTourDraft?.copyWith(
+        _scanTourDraft = _scanTourDraft?.copyWith(
           status: PropertyTourStatus.captured,
           updatedAt: DateTime.now().toUtc(),
         );
-        _isSubmittingTour = false;
+        _isScanSubmitting = false;
       });
       _showMediaError(error.message);
     } on StorageException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError(error.message);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError('סריקת ה־3D נכשלה: $error');
     }
   }
@@ -4086,8 +4804,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     );
     if (scan == null || !mounted) return;
     setState(() {
-      _virtualTourDraft = service.tourFromScan(scan);
-      _model3dDraft = null;
+      _scanTourDraft = service.tourFromScan(scan);
     });
   }
 
@@ -4098,28 +4815,28 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       return;
     }
     try {
-      setState(() => _isSubmittingTour = true);
+      setState(() => _isScanSubmitting = true);
       final imported = await _scaniverseImportService.importExportedModel(
         propertyId: widget.property.id,
         title: _scanTitle(),
       );
       if (!mounted) return;
       setState(() {
-        _virtualTourDraft = imported.tour;
+        _scanTourDraft = imported.tour;
         _model3dDraft = imported.model3d;
-        _isSubmittingTour = false;
+        _isScanSubmitting = false;
       });
     } on ScaniverseAssetImportException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError(error.message);
     } on ScaniverseException catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError(error.message);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _isSubmittingTour = false);
+      setState(() => _isScanSubmitting = false);
       _showMediaError('ייבוא מודל מ-Scaniverse נכשל: $error');
     }
   }
@@ -4171,7 +4888,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (street.isNotEmpty) street,
       if (city.isNotEmpty) city,
     ];
-    return parts.isEmpty ? 'Rentch apartment scan' : parts.join(', ');
+    return parts.isEmpty ? 'Rently apartment scan' : parts.join(', ');
   }
 
   void _assignPickedMedia(String path, PropertyMediaType type) {
@@ -4230,6 +4947,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       _verificationVideoUrl = '';
       _verificationCapturedAt = null;
       _virtualTourDraft = null;
+      _scanTourDraft = null;
       _model3dDraft = null;
       _resetMediaDrafts();
     });
@@ -4290,96 +5008,109 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
     setState(() => _isSaving = true);
 
-    final media = _wantsVerifiedListing
-        ? [
-            PropertyMedia(
-              url: sanitizedVerificationVideoUrl!,
-              type: PropertyMediaType.video,
-            ),
-          ]
-        : _mediaDrafts
-            .map((draft) {
-              final sanitized =
-                  InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
-              if (sanitized == null || sanitized.isEmpty) return null;
-              return PropertyMedia(url: sanitized, type: draft.type);
-            })
-            .whereType<PropertyMedia>()
-            .toList();
-    final verification = _wantsVerifiedListing
-        ? PropertyVerification.cameraVideo(
-            videoUrl: sanitizedVerificationVideoUrl!,
-            capturedAt: _verificationCapturedAt ??
-                widget.property.verification.capturedAt ??
-                DateTime.now().toUtc(),
-          )
-        : const PropertyVerification();
-    final sanitizedPrice = InputSanitizer.clampPrice(_price);
-    final transactionType = widget.property.transactionType;
-    final nextHistory = [
-      ...widget.property.priceHistory,
-      if (sanitizedPrice > 0 &&
-          (widget.property.priceHistory.isEmpty ||
-              widget.property.priceHistory.last.price != sanitizedPrice ||
-              widget.property.priceHistory.last.transactionType !=
-                  transactionType))
-        PropertyPricePoint(
-          date: DateTime.now().toUtc(),
-          price: sanitizedPrice,
-          transactionType: transactionType,
+    try {
+      final media = _wantsVerifiedListing
+          ? [
+              PropertyMedia(
+                url: sanitizedVerificationVideoUrl!,
+                type: PropertyMediaType.video,
+              ),
+            ]
+          : _mediaDrafts
+              .map((draft) {
+                final sanitized =
+                    InputSanitizer.sanitizeMediaUrl(draft.controller.text.trim());
+                if (sanitized == null || sanitized.isEmpty) return null;
+                return PropertyMedia(url: sanitized, type: draft.type);
+              })
+              .whereType<PropertyMedia>()
+              .toList();
+      final verification = _wantsVerifiedListing
+          ? PropertyVerification.cameraVideo(
+              videoUrl: sanitizedVerificationVideoUrl!,
+              capturedAt: _verificationCapturedAt ??
+                  widget.property.verification.capturedAt ??
+                  DateTime.now().toUtc(),
+            )
+          : const PropertyVerification();
+      final sanitizedPrice = InputSanitizer.clampPrice(_price);
+      final transactionType = widget.property.transactionType;
+      final nextHistory = [
+        ...widget.property.priceHistory,
+        if (sanitizedPrice > 0 &&
+            (widget.property.priceHistory.isEmpty ||
+                widget.property.priceHistory.last.price != sanitizedPrice ||
+                widget.property.priceHistory.last.transactionType !=
+                    transactionType))
+          PropertyPricePoint(
+            date: DateTime.now().toUtc(),
+            price: sanitizedPrice,
+            transactionType: transactionType,
+          ),
+      ];
+      final legal = _buildPropertyLegal(
+        acceptedTerms: _acceptedPropertyTerms,
+        thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
+        commercialSaleAllowed: _commercialSaleAllowed,
+        aiTrainingAllowed: _aiTrainingAllowed,
+        existing: widget.property.legal,
+      );
+
+      final updated = RentalProperty(
+        id: widget.property.id,
+        sourceUrl: widget.property.sourceUrl,
+        price: sanitizedPrice,
+        rooms: _rooms,
+        sizeM2: size,
+        floor: _floorCtrl.text.trim(),
+        totalFloors: _totalFloorsCtrl.text.trim(),
+        city: city,
+        neighborhood: _neighborhoodCtrl.text.trim(),
+        street: street,
+        streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
+        lat: widget.property.lat,
+        lon: widget.property.lon,
+        propertyType: _propertyType,
+        entryDate: _entryDateCtrl.text.trim(),
+        condition: _condition,
+        ownerName: widget.property.ownerName,
+        agencyListing: _agencyListing,
+        features: _selectedFeatures.toList(),
+        media: media,
+        transactionType: transactionType,
+        virtualTour: _scanTourDraft ?? _virtualTourDraft,
+        model3d: _model3dDraft,
+        legal: legal,
+        priceHistory: nextHistory,
+        marketSignals: widget.property.marketSignals,
+        verification: verification,
+        isActive: _isActive,
+        designTemplate: _designTemplate,
+        designAccent: _designAccent,
+        createdAt: widget.property.createdAt,
+      );
+
+      await context.read<DatingProvider>().updateLandlordProperty(updated);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: Duration(milliseconds: 2500),
+          content: Text('הנכס עודכן בהצלחה'),
+          backgroundColor: Color(0xFF1B9C6A),
         ),
-    ];
-    final legal = _buildPropertyLegal(
-      acceptedTerms: _acceptedPropertyTerms,
-      thirdPartyTransferAllowed: _thirdPartyTransferAllowed,
-      commercialSaleAllowed: _commercialSaleAllowed,
-      aiTrainingAllowed: _aiTrainingAllowed,
-      existing: widget.property.legal,
-    );
-
-    final updated = RentalProperty(
-      id: widget.property.id,
-      sourceUrl: widget.property.sourceUrl,
-      price: sanitizedPrice,
-      rooms: _rooms,
-      sizeM2: size,
-      floor: _floorCtrl.text.trim(),
-      totalFloors: _totalFloorsCtrl.text.trim(),
-      city: city,
-      neighborhood: _neighborhoodCtrl.text.trim(),
-      street: street,
-      streetNumber: int.tryParse(_streetNumCtrl.text.trim()) ?? -1,
-      lat: widget.property.lat,
-      lon: widget.property.lon,
-      propertyType: _propertyType,
-      entryDate: _entryDateCtrl.text.trim(),
-      condition: _condition,
-      ownerName: widget.property.ownerName,
-      agencyListing: _agencyListing,
-      features: _selectedFeatures.toList(),
-      media: media,
-      transactionType: transactionType,
-      virtualTour: _virtualTourDraft,
-      model3d: _model3dDraft,
-      legal: legal,
-      priceHistory: nextHistory,
-      marketSignals: widget.property.marketSignals,
-      verification: verification,
-      isActive: _isActive,
-      createdAt: widget.property.createdAt,
-    );
-
-    await context.read<DatingProvider>().updateLandlordProperty(updated);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        duration: Duration(milliseconds: 2500),
-        content: Text('הנכס עודכן בהצלחה'),
-        backgroundColor: Color(0xFF1B9C6A),
-      ),
-    );
-    Navigator.of(context).pop();
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(milliseconds: 3000),
+        content: Text('שגיאה בעדכון הנכס. נסה שוב.'),
+        backgroundColor: AppColors.coral,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -4390,7 +5121,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         backgroundColor: AppColors.navy,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const RentchIcon(IconsaxPlusLinear.arrow_right,
+          icon: const RentlyIcon(IconsaxPlusLinear.arrow_right,
               color: Colors.white),
           onPressed: _prev,
         ),
@@ -4430,13 +5161,19 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   propertyType: _propertyType,
                   condition: _condition,
                   agencyListing: _agencyListing,
+                  designTemplate: _designTemplate,
+                  designAccent: _designAccent,
                   onPriceChanged: (v) =>
-                      setState(() => _price = (v / 100).round() * 100),
+                      setState(() => _price = v.round()),
                   onRoomsChanged: (v) =>
                       setState(() => _rooms = (v * 2).round() / 2),
                   onTypeChanged: (v) => setState(() => _propertyType = v!),
                   onConditionChanged: (v) => setState(() => _condition = v!),
                   onAgencyChanged: (v) => setState(() => _agencyListing = v),
+                  onDesignTemplateChanged: (v) =>
+                      setState(() => _designTemplate = v),
+                  onDesignAccentChanged: (v) =>
+                      setState(() => _designAccent = v),
                 ),
                 _StepFeatures(
                   allFeatures: _propertyFeatureLabels,
@@ -4453,6 +5190,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   mediaDrafts: _mediaDrafts,
                   virtualTourDraft: _virtualTourDraft,
                   isSubmittingTour: _isSubmittingTour,
+                  scanTourDraft: _scanTourDraft,
+                  isScanSubmitting: _isScanSubmitting,
                   isScanBackendConfigured: _scanService.isConfigured,
                   wantsVerifiedListing: _wantsVerifiedListing,
                   verificationVideoUrl: _verificationVideoUrl,
@@ -4479,6 +5218,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   onImportScaniverseAssets: _importScaniverseAssets,
                   onClearVirtualTour: () => setState(() {
                     _virtualTourDraft = null;
+                  }),
+                  onClearScan: () => setState(() {
+                    _scanTourDraft = null;
                     _model3dDraft = null;
                   }),
                   acceptedTerms: _acceptedPropertyTerms,
@@ -4509,7 +5251,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         total: 4,
         isLoading: _isSaving,
         saveLabel: 'עדכון הנכס',
-        onNext: _save,
+        onNext: _next,
         onPrev: _prev,
         isActive: _isActive,
         onActiveChanged: (value) => setState(() => _isActive = value),
@@ -4645,7 +5387,7 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
                       color: AppColors.primaryLight2,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.view_in_ar_rounded,
                       color: AppColors.primary,
                       size: 20,
@@ -4688,7 +5430,7 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
 
   Widget _buildBody(ScrollController ctrl) {
     if (_loading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -4795,7 +5537,7 @@ class _ScanTile extends StatelessWidget {
                   color: AppColors.primaryLight2,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.view_in_ar_rounded,
                   color: AppColors.primary,
                   size: 26,
@@ -4853,7 +5595,7 @@ class _ScanTile extends StatelessWidget {
                 ),
               ),
               if (isReady)
-                const RentchIcon(
+                RentlyIcon(
                   IconsaxPlusLinear.arrow_left,
                   size: 16,
                   color: AppColors.primary,
@@ -4864,4 +5606,165 @@ class _ScanTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Transcodes a scan video to an H.264 mp4 for Teleport, which rejects the
+/// HEVC/.mov files iOS records (they upload fine but fail reconstruction).
+/// [VideoQuality.HighestQuality] preserves the detail the 3D pipeline needs.
+/// Fail-soft: returns null so the caller uploads the original if transcoding
+/// is unavailable rather than blocking the scan.
+Future<String?> transcodeScanToMp4(String inputPath) async {
+  try {
+    final info = await VideoCompress.compressVideo(
+      inputPath,
+      quality: VideoQuality.HighestQuality,
+      deleteOrigin: false,
+      includeAudio: true,
+    );
+    final out = info?.path;
+    if (out != null && out.trim().isNotEmpty) return out;
+  } catch (error) {
+    debugPrint('transcodeScanToMp4 failed: $error');
+  }
+  return null;
+}
+
+/// Pre-recording guide for a 3D apartment scan. Teleport's Gaussian-splat
+/// reconstruction only succeeds on a steady, overlapping walkthrough that
+/// covers the whole space — a quick pan or partial clip fails to rebuild and
+/// comes back as a failed scan. Returns true when the user chooses to record.
+Future<bool?> showScanCaptureGuide(BuildContext context) {
+  const tips = <(IconData, String, String)>[
+    (
+      IconsaxPlusLinear.timer_1,
+      'צלמו לאט ויציב',
+      'הזיזו את הטלפון באיטיות וברציפות, בלי טלטולים — תנועה מהירה גורמת לטשטוש והסריקה נכשלת.',
+    ),
+    (
+      IconsaxPlusLinear.rotate_left_1,
+      'הקיפו כל חדר',
+      'עברו סביב כל חדר וצלמו את הקירות, הפינות והרהיטים מכמה זוויות עם חפיפה ביניהן.',
+    ),
+    (
+      IconsaxPlusLinear.sun_1,
+      'תאורה טובה',
+      'הדליקו אורות ופתחו וילונות. חדר חשוך או נגד-אור פוגע בשחזור התלת-ממדי.',
+    ),
+    (
+      IconsaxPlusLinear.video,
+      'כל הדירה, 30–60 שניות',
+      'התחילו מהכניסה ועברו בין כל החללים ברצף אחד עד 60 שניות, בלי לדלג על חדרים.',
+    ),
+  ];
+  return showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: Colors.white,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'איך מצלמים סריקת 3D מוצלחת',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: AppColors.navy,
+              ),
+            ),
+            const SizedBox(height: 14),
+            for (final tip in tips)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(tip.$1, size: 19, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tip.$2,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navy,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            tip.$3,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const RentlyIcon(IconsaxPlusLinear.video, size: 18),
+                label: const Text(
+                  'הבנתי, התחל צילום',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text(
+                'ביטול',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
