@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:dating_app/core/search/advanced_matcher.dart';
+import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // Helper for fuzzy locality matching
@@ -453,9 +454,32 @@ class SmartSearch {
     return scored.take(limit).toList();
   }
 
-  // Advanced ranking using multi-dimensional user intent + property vectors.
-  // Produces explainable match scores and handles complex user preferences.
+  // Advanced ranking. Delegates to the 4-part RecommendationEngine
+  // (lib/core/search/engine/) — a hybrid cascade of hedonic value modeling,
+  // Bayesian preference inference, MAUT+TOPSIS+cosine+GBM scoring, and
+  // MMR/exploration re-ranking. Falls back to the legacy matcher on any error so
+  // search never breaks.
   static List<ScoredProperty> rankAdvanced(
+    List<RentalProperty> props,
+    SearchQuery q, {
+    int limit = 10,
+  }) {
+    if (props.isEmpty) return [];
+    try {
+      final scored = RecommendationEngine.recommendAsScored(
+        candidates: props,
+        query: q,
+        limit: limit,
+      );
+      if (scored.isNotEmpty) return scored;
+    } catch (_) {
+      // fall through to the legacy matcher below
+    }
+    return _rankAdvancedLegacy(props, q, limit: limit);
+  }
+
+  // Legacy multi-dimensional matcher, retained as a resilient fallback.
+  static List<ScoredProperty> _rankAdvancedLegacy(
     List<RentalProperty> props,
     SearchQuery q, {
     int limit = 10,
