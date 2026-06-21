@@ -238,6 +238,11 @@ class GradientBoostedScorer {
     // amenities richness
     _Stump('weighted_amenity_score', 0.6, 0.45, 0.0),
     _Stump('condition_score', 0.8, 0.3, 0.0),
+    // livability (real gov data)
+    _Stump('safety', 0.6, 0.4, -0.15), // safer area boosts; unsafe penalizes
+    _Stump('safety', 0.3, 0.0, -0.45), // strong penalty for high-crime areas
+    _Stump('school_access', 0.55, 0.25, 0.0), // education density
+    _Stump('health_access', 0.5, 0.18, 0.0), // health facilities nearby
   ];
 
   // Interaction multipliers: AND-style boosts that pure stumps miss.
@@ -257,6 +262,12 @@ class GradientBoostedScorer {
     // overpriced AND being skipped is doubly bad
     if (pfv.get('hedonic_residual') < -0.3 && pfv.get('skip_ratio') > 0.6) {
       logit -= 0.7;
+    }
+    // family sweet-spot: safe + lots of schools + child-heavy demographics
+    if (pfv.get('safety') > 0.6 &&
+        pfv.get('school_access') > 0.5 &&
+        pfv.get('demo_child') > 0.55) {
+      logit += 0.5;
     }
     return logit;
   }

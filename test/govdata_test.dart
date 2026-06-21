@@ -104,6 +104,42 @@ void main() {
     expect(residual > 0.2, true);
   });
 
+  test('crime → safety score is real, ranged and discriminative', () {
+    final counts = GovData.instance.crimeCounts('תל אביב');
+    expect(counts, isNotNull);
+    expect(counts![0] > 1000, true); // total recorded offences
+    final tlv = GovData.instance.safetyScore('תל אביב');
+    final jlm = GovData.instance.safetyScore('ירושלים');
+    expect(tlv, isNotNull);
+    expect(jlm, isNotNull);
+    expect(tlv! >= 0 && tlv <= 1, true);
+    expect(tlv != jlm, true); // per-capita rates differ → discriminative
+  });
+
+  test('demographics resolve with sane shares', () {
+    final d = GovData.instance.demographics('תל אביב');
+    expect(d, isNotNull);
+    expect(d!['pop']! > 300000, true);
+    final sum = d['youngShare']! + d['childShare']! + d['seniorShare']!;
+    expect((sum - 1.0).abs() < 0.06, true); // shares ≈ 1
+  });
+
+  test('school density + health + air-quality signals work', () {
+    // central Tel Aviv has many education institutions
+    expect(GovData.instance.schoolDensityScore(32.0775, 34.7874) > 0.2, true);
+    expect(GovData.instance.healthAccessScore('תל אביב') > 0, true);
+    final airKm = GovData.instance.nearestAirStationKm(32.0775, 34.7874);
+    expect(airKm, isNotNull);
+    expect(airKm! < 25, true);
+  });
+
+  test('cross-dataset name join is robust (police vs registry spelling)', () {
+    // police spells it "תל אביב יפו"; registry "תל אביב - יפו"; user "תל אביב"
+    expect(GovData.instance.crimeCounts('תל אביב'), isNotNull);
+    expect(GovData.instance.crimeCounts('תל אביב יפו'), isNotNull);
+    expect(GovData.instance.crimeCounts('תל אביב - יפו'), isNotNull);
+  });
+
   test('engine end-to-end uses gov data (neighbourhood quality flows through)',
       () {
     // Two otherwise-identical listings; only the locality (and thus its real

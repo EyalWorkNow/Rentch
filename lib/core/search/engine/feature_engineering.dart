@@ -25,6 +25,7 @@
 import 'dart:math' as math;
 
 import 'package:dating_app/core/govdata/geo_intelligence.dart';
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/govdata/market_intelligence.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
@@ -844,6 +845,18 @@ class FeatureEngineer {
             0.3 * ((imageCount + videoCount * 2) / 8.0).clamp(0.0, 1.0) +
             0.2 * (p.hasReadyVirtualTour || p.hasModel3d ? 1.0 : 0.0))
         .clamp(0.0, 1.0);
+
+    // ── livability (real gov data: crime, schools, demographics, health, air) ──
+    final gov = GovData.instance;
+    f['safety'] = gov.safetyScore(p.city) ?? 0.5; // 1 = safest (per-capita crime)
+    f['school_access'] = gov.schoolDensityScore(p.lat, p.lon);
+    f['health_access'] = gov.healthAccessScore(p.city);
+    final demo = gov.demographics(p.city);
+    f['demo_young'] = demo?['youngShare'] ?? 0.5; // working-age share (20-64)
+    f['demo_child'] = demo?['childShare'] ?? 0.5; // 0-19 share (family areas)
+    f['demo_senior'] = demo?['seniorShare'] ?? 0.5;
+    final airKm = gov.nearestAirStationKm(p.lat, p.lon);
+    f['air_station_km'] = airKm ?? 99.0; // coarse environmental-monitoring proxy
 
     // sanitize: replace any NaN/Inf with neutral 0
     for (final key in f.keys.toList()) {

@@ -167,6 +167,7 @@ class Explainer {
   static const Map<String, String> _dimLabel = {
     'location': 'מיקום',
     'neighborhood': 'אזור איכותי',
+    'safety': 'בטיחות',
     'budget': 'תקציב',
     'value': 'תמורה למחיר',
     'size': 'גודל',
@@ -208,6 +209,15 @@ class Explainer {
     // location & neighbourhood quality (CBS socioeconomic cluster)
     if (pfv.centrality > 0.78) chips.add('מיקום מרכזי');
     if (pfv.get('socioeconomic') > 0.78) chips.add('אזור מבוקש');
+
+    // livability (real gov data)
+    if (pfv.get('safety') > 0.7) chips.add('אזור בטוח יחסית');
+    if (pfv.get('school_access') > 0.6) chips.add('קרוב למוסדות חינוך');
+    if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
+      chips.add('שכונה צעירה');
+    } else if (pfv.get('demo_child') > 0.6) {
+      chips.add('שכונה משפחתית');
+    }
 
     // requested amenities that matched
     final matched = <String>[];

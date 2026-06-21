@@ -32,6 +32,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 const List<String> kScoringDimensions = [
   'location',
   'neighborhood', // CBS socioeconomic quality of the locality (gov data)
+  'safety', // per-capita crime safety (police data)
   'budget',
   'value',
   'size',
@@ -399,6 +400,8 @@ class UserPreferenceModel {
         return pfv.centrality;
       case 'neighborhood':
         return pfv.get('socioeconomic', 0.5);
+      case 'safety':
+        return pfv.get('safety', 0.5);
       case 'budget':
         return pfv.property.price.toDouble();
       case 'value':
@@ -486,6 +489,7 @@ class PreferenceModelBuilder {
   static const Map<String, double> _priorMean = {
     'location': 0.55,
     'neighborhood': 0.35,
+    'safety': 0.5,
     'budget': 0.85,
     'value': 0.6,
     'size': 0.6,
@@ -572,6 +576,17 @@ class PreferenceModelBuilder {
       sharpen('trust', 0.6, 1.5);
     }
 
+    // persona-aware sharpening from the free text: families weight safety &
+    // neighbourhood; everyone gets a mild safety prior bump (universally valued).
+    final raw = query.rawText;
+    final familyPersona = RegExp(r'משפח|ילד|ילדים|בית ספר').hasMatch(raw);
+    if (familyPersona) {
+      sharpen('safety', 0.9, 4.0);
+      sharpen('neighborhood', 0.7, 2.0);
+    } else {
+      sharpen('safety', 0.6, 1.0); // soft default — safety still counts
+    }
+
     // ── utilities per dimension ──────────────────────────────────────────────
     final elasticity = cheap ? 0.1 : (query.maxPrice != null ? 0.35 : 0.55);
 
@@ -590,6 +605,9 @@ class PreferenceModelBuilder {
       'neighborhood': cheap
           ? const ConstantUtility(0.55)
           : const SigmoidThresholdUtility(0.4, 4.0),
+      // safety: higher is always better, with a gentle floor so a single
+      // low-safety area isn't fatal.
+      'safety': const SigmoidThresholdUtility(0.35, 4.5),
       'budget': BudgetUtility(maxBudget, elasticity,
           minBudget: (minBudget ?? 0).toDouble()),
       'value': const LinearUtility(),
