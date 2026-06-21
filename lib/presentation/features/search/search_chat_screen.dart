@@ -58,6 +58,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   int _userTurns = 0;
   bool _searched = false;
   bool _busy = false;
+  bool _listening = false;
   bool? _consent;
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
@@ -263,6 +264,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   @override
   void dispose() {
+    if (_listening) _service.stopListening();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -270,8 +272,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   // ── conversation ──────────────────────────────────────────────────────────
 
+  // Explicit "show me now" intent only — must NOT match the common word
+  // "מחפש" (which contains "חפש"), so נועה still asks her refining question first.
   bool _wantsResultsNow(String t) => RegExp(
-        r'תראה|הצג|חפש|מצא|דירות עכשיו|בוא נראה|show|search',
+        r'תראה לי|תראי לי|הצג|בוא נראה|בואי נראה|תמצא לי|תמצאי לי|show me',
       ).hasMatch(t);
 
   Future<void> _send(String raw) async {
@@ -322,8 +326,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           _messages.add(_ChatMsg(
             role: 'assistant',
             text: anyExact
-                ? 'הנה כמה דירות שממש מתאימות לך 🎯'
-                : 'אין התאמה מושלמת כרגע, אבל אלה הכי קרובות עבורך:',
+                ? 'מצאתי ${results.length} דירות שמתאימות לך 🎯'
+                : 'אלה הכי קרובות למה שחיפשת 👇',
             scored: results,
             chips: _refineChips(),
           ));
@@ -526,16 +530,23 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         body: Column(children: [
           _criteriaBar(),
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-              itemCount: _messages.length + (_busy ? 1 : 0),
-              itemBuilder: (_, i) {
-                if (i >= _messages.length) return const _Typing();
-                final isLast = i == _messages.length - 1;
-                final bubble = _bubble(_messages[i]);
-                return isLast ? _FadeSlideIn(child: bubble) : bubble;
-              },
+            // Tap anywhere on the conversation to dismiss the keyboard.
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: ListView.builder(
+                controller: _scroll,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+                itemCount: _messages.length + (_busy ? 1 : 0),
+                itemBuilder: (_, i) {
+                  if (i >= _messages.length) return const _Typing();
+                  final isLast = i == _messages.length - 1;
+                  final bubble = _bubble(_messages[i]);
+                  return isLast ? _FadeSlideIn(child: bubble) : bubble;
+                },
+              ),
             ),
           ),
           _inputBar(),
@@ -651,44 +662,101 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
+  // Voice dictation (he-IL) — fills the input as you speak; tap again to stop.
+  Future<void> _toggleMic() async {
+    if (_listening) {
+      await _service.stopListening();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    setState(() => _listening = true);
+    try {
+      await _service.startListening(
+        onResult: (text, isFinal) {
+          if (!mounted) return;
+          setState(() {
+            _input.text = text;
+            _input.selection =
+                TextSelection.collapsed(offset: _input.text.length);
+            if (isFinal) _listening = false;
+          });
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _listening = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('לא ניתן להפעיל מיקרופון — בדוק שההרשאה אושרה.')));
+    }
+  }
+
   Widget _inputBar() {
     return SafeArea(
       top: false,
       child: Container(
         color: AppColors.background,
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _input,
-              textInputAction: TextInputAction.send,
-              onSubmitted: _send,
-              decoration: InputDecoration(
-                hintText: 'ספר לי במילים שלך...',
-                filled: true,
-                fillColor: const Color(0xFFEDF1F5),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            GestureDetector(
+              onTap: _toggleMic,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                    color: _listening
+                        ? AppColors.coral
+                        : const Color(0xFFEDF1F5),
+                    shape: BoxShape.circle),
+                child: Icon(_listening ? Icons.stop_rounded : Icons.mic_none,
+                    color:
+                        _listening ? Colors.white : AppColors.textSecondary,
+                    size: 22),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 130),
+                // WhatsApp-style: grows with content, wraps lines, Enter = newline.
+                child: TextField(
+                  controller: _input,
+                  minLines: 1,
+                  maxLines: 5,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: _listening
+                        ? 'מקשיבה... דבר 🎙️'
+                        : 'ספר לי במילים שלך...',
+                    filled: true,
+                    fillColor: const Color(0xFFEDF1F5),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => _send(_input.text),
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                  color: AppColors.primary, shape: BoxShape.circle),
-              child: Icon(IconsaxPlusLinear.send_1,
-                  color: AppColors.textOnPrimary, size: 22),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => _send(_input.text),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                    color: AppColors.primary, shape: BoxShape.circle),
+                child: Icon(IconsaxPlusLinear.send_1,
+                    color: AppColors.textOnPrimary, size: 20),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }

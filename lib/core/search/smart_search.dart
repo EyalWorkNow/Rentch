@@ -68,14 +68,21 @@ class SmartSearch {
     final rm = RegExp(r'(\d+(?:\.\d)?)\s*(?:חדר|חדרים|חד)').firstMatch(text);
     if (rm != null) rooms = double.tryParse(rm.group(1)!) ?? rooms;
 
-    // budget — largest plausible rent figure, or llm
-    int? price = _toInt(llm['price']);
-    final nums = RegExp(r'\d[\d,]{2,}')
-        .allMatches(text)
-        .map((m) => int.tryParse(m.group(0)!.replaceAll(',', '')) ?? 0)
-        .where((n) => n >= 1500 && n <= 60000)
-        .toList();
-    if (nums.isNotEmpty) price = nums.reduce(math.max);
+    // budget — handles "7 אלף", "7 וחצי אלף", "7,500", "7500", or llm.
+    int? price;
+    final elef = RegExp(r'(\d+)\s*(וחצי\s*)?(?:אלף|אלפים)').firstMatch(text);
+    if (elef != null) {
+      price = (int.tryParse(elef.group(1)!) ?? 0) * 1000 +
+          (elef.group(2) != null ? 500 : 0);
+    } else {
+      final nums = RegExp(r'\d[\d,]{2,}')
+          .allMatches(text)
+          .map((m) => int.tryParse(m.group(0)!.replaceAll(',', '')) ?? 0)
+          .where((n) => n >= 1500 && n <= 60000)
+          .toList();
+      if (nums.isNotEmpty) price = nums.reduce(math.max);
+    }
+    price ??= _toInt(llm['price']);
 
     // city
     String? city = _str(llm['city']);
@@ -122,6 +129,9 @@ class SmartSearch {
   static ScoredProperty _score(RentalProperty p, SearchQuery q) {
     double s = 1;
     final tags = <String>[];
+    // "exact" reflects only the essentials the user clearly stated: location,
+    // budget, and size. Amenities/pets/train are soft boosts (the data for them
+    // is sparse), so they never flag a result as a non-match.
     bool exact = true;
 
     if (q.city != null) {
@@ -129,7 +139,7 @@ class SmartSearch {
       if (hay.contains(q.city!)) {
         s += 5;
       } else {
-        s -= 3;
+        s -= 4;
         exact = false;
       }
     }
@@ -139,50 +149,48 @@ class SmartSearch {
         s += 3;
       } else {
         final over = (p.price - q.maxPrice!) / q.maxPrice!;
-        s -= over > 0.5 ? 4 : over * 6;
-        if (over > 0.1) exact = false;
+        s -= over > 0.5 ? 5 : over * 6;
+        if (over > 0.1) exact = false; // meaningfully over budget
       }
     }
 
     if (q.minRooms != null) {
       final diff = p.rooms - q.minRooms!;
-      if (diff >= 0 && diff <= 1) {
+      if (diff.abs() <= 0.5) {
         s += 3;
-      } else if (diff.abs() <= 0.5) {
-        s += 2;
+      } else if (diff > 0) {
+        s += 1.5; // more rooms than asked — still good
       } else {
-        s -= (p.rooms < q.minRooms! ? 1.5 : 0.5) * diff.abs();
-        if (p.rooms < q.minRooms!) exact = false;
+        s -= 1.0 * diff.abs();
+        if (diff < -0.5) exact = false; // clearly too small
       }
     }
 
+    // Amenities — soft boosts only.
     for (final key in q.amenities) {
       if (p.featureFlags.isEnabled(key)) {
         s += 2;
         tags.add(amenityTag(key));
       } else {
-        s -= 0.7;
-        exact = false;
+        s -= 0.4;
       }
     }
 
+    // Train proximity — soft boost.
     double? trainKm;
     if (p.lat != 0 && p.lon != 0) {
       trainKm = _nearestStationKm(p.lat, p.lon);
       if (q.nearTrain && trainKm != null) {
         if (trainKm < 1.0) {
-          s += 5;
+          s += 4;
           tags.add('🚉 ~${(trainKm * 12).round()} דק׳ מהרכבת');
         } else if (trainKm < 2.5) {
-          s += 2.5;
+          s += 2;
           tags.add('🚉 ${trainKm.toStringAsFixed(1)} ק״מ מהרכבת');
         } else {
-          s -= trainKm > 5 ? 3 : 1;
-          exact = false;
+          s -= 1;
         }
       }
-    } else if (q.nearTrain) {
-      exact = false;
     }
 
     if (p.isVerifiedListing) s += 0.5;
