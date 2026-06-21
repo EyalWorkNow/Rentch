@@ -108,34 +108,37 @@ class _ProfileCardState extends State<ProfileCard> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.16),
-            width: 1.5,
+      child: GestureDetector(
+        onTap: () => _openDetail(context),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.16),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.28 + (0.05 * dragFactor)),
+                blurRadius: blurRadius,
+                spreadRadius: spreadRadius,
+                offset: shadowOffset,
+              ),
+              // Outward glass glow/reflection
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.08),
+                blurRadius: 8,
+                spreadRadius: -1,
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28 + (0.05 * dragFactor)),
-              blurRadius: blurRadius,
-              spreadRadius: spreadRadius,
-              offset: shadowOffset,
-            ),
-            // Outward glass glow/reflection
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.08),
-              blurRadius: 8,
-              spreadRadius: -1,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16.5),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16.5),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
               // Background image — AnimatedSwitcher crossfades between images
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 220),
@@ -374,6 +377,7 @@ class _ProfileCardState extends State<ProfileCard> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

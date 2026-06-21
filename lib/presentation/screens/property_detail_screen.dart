@@ -98,7 +98,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         final reviews = provider.propertyReviews(p.id);
         final avgRating = provider.reviewAverage(reviews);
         // Per-property design (chosen during listing creation) takes precedence
-        // over user-level broker branding, and applies for ANY viewer.
+        // over user-level broker branding, and applies for ANY viewer (not just owner).
         final propertyBranding = p.hasCustomDesign
             ? BrokerBrandingConfig.fromJson({
                 'propertyTemplate': p.designTemplate,
@@ -109,13 +109,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               })
             : null;
         final branding = propertyBranding ?? provider.brokerBranding;
+        // Use property template if it exists (any viewer), OR if viewer is broker with custom branding
         final useTemplate = propertyBranding != null ||
             (provider.isBroker &&
                 provider.brokerBranding.propertyTemplate !=
                     BrokerPropertyTemplate.rentlyClassic);
 
-        if (useTemplate &&
-            branding.propertyTemplate != BrokerPropertyTemplate.rentlyClassic) {
+        // Always show template if property has custom design (applies to all viewers)
+        if (p.hasCustomDesign ||
+            (useTemplate && branding.propertyTemplate != BrokerPropertyTemplate.rentlyClassic)) {
           return _BrokerPropertyDetailTemplate(
             property: p,
             branding: branding,
