@@ -317,7 +317,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final shouldSearch =
         hasIntent && (_searched || _wantsResultsNow(text) || _userTurns >= 2 || nextQ == null);
 
-    final warm = await _warmReply(searching: shouldSearch);
+    final warm = _warmReply(searching: shouldSearch);
 
     List<ScoredProperty> results = const [];
     bool anyExact = false;
@@ -375,18 +375,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   }
 
   int _warmIdx = 0;
-  Future<String> _warmReply({required bool searching}) async {
-    // Try Gemini for a natural reply; fall back to warm, varied copy.
-    try {
-      final history = _messages
-          .where((m) => !m.isConsent && m.text.isNotEmpty)
-          .map((m) => AssistantTurn(role: m.role, text: m.text))
-          .toList();
-      final reply = await _service.chat(history);
-      final t = reply.reply.trim();
-      if (t.isNotEmpty && t.length < 240) return t;
-    } catch (_) {}
-
+  // Warm, tenant-appropriate tone (the /assistant chat endpoint is tuned for the
+  // landlord "Erik" persona, so we don't use it here). The server intelligence
+  // for נועה is /assistant/extract (Gemini), called in _send.
+  String _warmReply({required bool searching}) {
     if (searching) {
       const lines = [
         'יאללה, תן לי רגע לרוץ על האפשרויות בשבילך... ✨',
