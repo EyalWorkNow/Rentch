@@ -707,21 +707,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Voice-conversation button → opens the big, clear visualizer.
+              // Send — on the right (first child in RTL).
               GestureDetector(
-                onTap: _openVoice,
+                onTap: () => _send(_input.text),
                 child: Container(
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                        colors: [AppColors.primary, AppColors.primaryLight],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.graphic_eq,
-                      color: Colors.white, size: 24),
+                      color: AppColors.primary, shape: BoxShape.circle),
+                  child: Icon(IconsaxPlusLinear.send_1,
+                      color: AppColors.textOnPrimary, size: 20),
                 ),
               ),
               const SizedBox(width: 6),
@@ -748,15 +743,21 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 ),
               ),
               const SizedBox(width: 6),
+              // Voice-conversation button → opens the big, clear visualizer.
               GestureDetector(
-                onTap: () => _send(_input.text),
+                onTap: _openVoice,
                 child: Container(
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                      color: AppColors.primary, shape: BoxShape.circle),
-                  child: Icon(IconsaxPlusLinear.send_1,
-                      color: AppColors.textOnPrimary, size: 20),
+                    gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.graphic_eq,
+                      color: Colors.white, size: 24),
                 ),
               ),
             ],
