@@ -1523,48 +1523,57 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         Row(
                           children: [
                             Expanded(
-                              child: Container(
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: f.minRooms > 0
-                                        ? AppColors.primary
-                                        : const Color(0xFFE2ECF1),
-                                  ),
+                              child: TextField(
+                                controller: _minRoomsCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.navy,
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: TextField(
-                                  controller: _minRoomsCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.navy,
-                                  ),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: 'מ-',
-                                    hintStyle: TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w500,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: f.minRooms > 0
+                                          ? AppColors.primary
+                                          : const Color(0xFFE2ECF1),
                                     ),
                                   ),
-                                  onChanged: (v) {
-                                    if (v.isEmpty) {
-                                      _setDraftFilters(f.copyWith(minRooms: 0.0), provider);
-                                      return;
-                                    }
-                                    final min = double.tryParse(v);
-                                    if (min != null) {
-                                      _setDraftFilters(f.copyWith(minRooms: min.clamp(0.0, 20.0)), provider);
-                                    }
-                                  },
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: f.minRooms > 0
+                                          ? AppColors.primary
+                                          : const Color(0xFFE2ECF1),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
+                                  hintText: 'מ-',
+                                  hintStyle: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
+                                onChanged: (v) {
+                                  if (v.isEmpty) {
+                                    _setDraftFilters(f.copyWith(minRooms: 0.0), provider);
+                                    return;
+                                  }
+                                  final min = double.tryParse(v);
+                                  if (min != null) {
+                                    _setDraftFilters(f.copyWith(minRooms: min.clamp(0.0, 20.0)), provider);
+                                  }
+                                },
                               ),
                             ),
                             const Padding(
@@ -1579,48 +1588,57 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               ),
                             ),
                             Expanded(
-                              child: Container(
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: f.maxRooms < 10
-                                        ? AppColors.primary
-                                        : const Color(0xFFE2ECF1),
-                                  ),
+                              child: TextField(
+                                controller: _maxRoomsCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.navy,
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: TextField(
-                                  controller: _maxRoomsCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.navy,
-                                  ),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    hintText: 'עד',
-                                    hintStyle: TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w500,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: f.maxRooms < 10
+                                          ? AppColors.primary
+                                          : const Color(0xFFE2ECF1),
                                     ),
                                   ),
-                                  onChanged: (v) {
-                                    if (v.isEmpty) {
-                                      _setDraftFilters(f.copyWith(maxRooms: 10.0), provider);
-                                      return;
-                                    }
-                                    final max = double.tryParse(v);
-                                    if (max != null) {
-                                      _setDraftFilters(f.copyWith(maxRooms: max.clamp(0.0, 20.0)), provider);
-                                    }
-                                  },
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: f.maxRooms < 10
+                                          ? AppColors.primary
+                                          : const Color(0xFFE2ECF1),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
+                                  hintText: 'עד',
+                                  hintStyle: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
+                                onChanged: (v) {
+                                  if (v.isEmpty) {
+                                    _setDraftFilters(f.copyWith(maxRooms: 10.0), provider);
+                                    return;
+                                  }
+                                  final max = double.tryParse(v);
+                                  if (max != null) {
+                                    _setDraftFilters(f.copyWith(maxRooms: max.clamp(0.0, 20.0)), provider);
+                                  }
+                                },
                               ),
                             ),
                           ],
