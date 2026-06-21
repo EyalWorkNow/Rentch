@@ -95,11 +95,10 @@ class RentlyApp extends StatelessWidget {
   ThemeData _buildTheme(BrandPalette palette) {
     return ThemeData(
       useMaterial3: true,
-      // Authentic SF Pro Rounded for Latin/digits; authentic SF Hebrew Rounded
-      // renders the Hebrew glyphs SF Pro Rounded lacks → genuinely SF Rounded
-      // end-to-end. Rubik is a final safety fallback.
-      fontFamily: 'SF Pro Rounded',
-      fontFamilyFallback: const ['SF Hebrew Rounded', 'Rubik'],
+      // SF Hebrew Rounded primary (Hebrew text + all Latin via SF Pro Rounded
+      // weight instances); SF Pro Rounded for pure-Latin contexts; Rubik fallback.
+      fontFamily: 'SF Hebrew Rounded',
+      fontFamilyFallback: const ['SF Pro Rounded', 'Rubik'],
       colorScheme: ColorScheme.fromSeed(
         seedColor: palette.primary,
         primary: palette.primary,
