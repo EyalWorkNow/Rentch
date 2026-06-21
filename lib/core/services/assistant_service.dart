@@ -204,7 +204,7 @@ class AssistantService {
     }
   }
 
-  Future<AssistantReply> chat(List<AssistantTurn> turns) async {
+  Future<AssistantReply> chat(List<AssistantTurn> turns, {String? mode}) async {
     if (!isConfigured) {
       throw const AssistantException('העוזר האישי אינו זמין כרגע.');
     }
@@ -224,6 +224,7 @@ class AssistantService {
       } catch (_) {}
       request.write(jsonEncode({
         'messages': turns.map((t) => t.toRequestJson()).toList(),
+        if (mode != null) 'mode': mode,
       }));
       final response = await request.close().timeout(_timeout);
       final raw = await utf8.decoder.bind(response).join().timeout(_timeout);

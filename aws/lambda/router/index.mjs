@@ -1994,6 +1994,13 @@ async function handleAssistant(event) {
   const messages = Array.isArray(body.messages) ? body.messages.slice(-20) : [];
   if (messages.length === 0) return json(400, { message: 'messages required' });
 
+  // נועה — the tenant apartment-search assistant. Separate warm persona, no
+  // owner-property load and no listing-creation tool. Additive: the landlord
+  // "Erik" flow below is untouched.
+  if (body.mode === 'tenant_search') {
+    return await handleTenantSearchChat(messages);
+  }
+
   const [properties, profile] = await Promise.all([
     loadOwnerProperties(uid),
     loadUserProfile(uid),
@@ -2039,6 +2046,54 @@ async function handleAssistant(event) {
       propertyDraft: null,
     });
   }
+}
+
+// ── נועה — tenant apartment-search chat (warm, separate from Erik) ────────────
+// Conversational layer only: helps a renter describe what they want; the app
+// runs the actual catalogue search and shows result cards. No listing tool.
+async function handleTenantSearchChat(messages) {
+  const systemText = buildTenantSearchSystemPrompt();
+  const contents = messages
+    .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.text).slice(0, 2000) }],
+    }));
+  try {
+    const data = await geminiGenerate(systemText, contents);
+    const cand = data.candidates && data.candidates[0];
+    const parts = (cand && cand.content && cand.content.parts) || [];
+    let reply = '';
+    for (const p of parts) if (p.text) reply += p.text;
+    reply = stripMarkup(reply);
+    let suggestions = [];
+    const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
+    if (cm) {
+      suggestions = cm[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 5);
+      reply = reply.replace(cm[0], '').trim();
+    }
+    if (!reply) reply = 'ספר לי עוד קצת על מה שאתה מחפש, ואני כבר אדאג לדייק 🙂';
+    return json(200, { reply, suggestions, propertyDraft: null });
+  } catch (e) {
+    console.warn('tenant assistant error:', e.message);
+    return json(200, {
+      reply: 'יש עומס קטן כרגע על העוזר, ננסה שוב בעוד רגע?',
+      suggestions: [],
+      propertyDraft: null,
+    });
+  }
+}
+
+function buildTenantSearchSystemPrompt() {
+  return [
+    'את "נועה" — בן אדם אמיתי, חמה ונחמדה, שעוזרת לאנשים למצוא דירה להשכרה באפליקציית Rently. את לא בוט ולא תוכנה — את פשוט נועה. לעולם אל תזכירי שאת בינה מלאכותית, מודל או תוכנה.',
+    'סגנון: עברית טבעית, חמה ומשוחררת, כמו חברה שמבינה עניין. משפטים קצרים (שורה־שתיים), בלי רובוטיות, בלי ז׳רגון, בלי כוכביות או markdown. מותר אימוג׳י אחד פה ושם, בטעם.',
+    'המטרה: להבין מה האדם באמת מחפש ולגרום לו להרגיש שמקשיבים לו. תני לו לספר על עצמו במילים שלו — אזור, תקציב, כמה חדרים, אורח חיים, חיות מחמד, קרבה לעבודה או לתחבורה, ומה חשוב לו.',
+    'אל תרוצי ישר להציע — קודם שקפי בחום מה הבנת, ושאלי שאלה אחת קצרה ועדינה כדי להכיר אותו יותר (לא חקירה, שאלה אחת בכל פעם). כשכבר יש מספיק מידע (אזור או תקציב או חדרים, או בקשה ברורה) — אמרי בחום שאת בודקת מה הכי מתאים, כי האפליקציה תציג לו את הדירות. אל תמציאי דירות, כתובות או מחירים ספציפיים בעצמך.',
+    'הקלט עלול להיות מסורבל או לא ברור — פרשי בהיגיון, וכשמשהו לא ברור שאלי בעדינות.',
+    'כפתורי בחירה: כשיש שאלה עם כמה תשובות נפוצות קצרות (תקציב, מספר חדרים, אווירת שכונה, כן/לא) — הוסיפי בסוף שורה נפרדת בדיוק בפורמט: [[CHOICES: אפשרות1 | אפשרות2 | אפשרות3]] (2 עד 5 אפשרויות קצרות מאוד). תמיד כתבי גם את השאלה במילים. אל תוסיפי שורה כזו כשאין תשובות נפוצות.',
+    'תשובות קצרות מאוד, חמות ולעניין. בלי הבטחות שאי אפשר לקיים.',
+  ].join('\n');
 }
 
 // Mints a short-lived Gemini Live ephemeral token for a real-time voice session.

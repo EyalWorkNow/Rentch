@@ -62,13 +62,6 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
 
-  // Gentle persona-building questions, asked one at a time.
-  static const _personaQuestions = <(String, String)>[
-    ('household', 'רגע לפני שנצלול — זה בשבילך לבד, לזוג, או עם שותפים? 🙂'),
-    ('vibe', 'ומה הכי חשוב לך בסביבה — שקט וירוק, קרוב לעבודה/ללימודים, או דווקא בלב העניינים?'),
-    ('timing', 'מתי בערך בא לך להיכנס? אין שום לחץ, רק שאדע לסנן נכון.'),
-  ];
-
   static const _starterChips = [
     '3 חדרים בתל אביב עד 7000, עם מרפסת',
     'ליד הרכבת, משופצת, לזוג עם כלב',
@@ -99,7 +92,6 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _query = SearchQuery();
       _userTurns = 0;
       _searched = false;
-      _pendingPersonaKey = null;
       _messages.add(_greetingMsg());
     });
     _scrollToEnd();
@@ -297,13 +289,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     });
     _scrollToEnd();
 
-    // Store the answer to the last persona question we asked, if any.
-    if (_pendingPersonaKey != null) {
-      _persona[_pendingPersonaKey!] = text;
-      _pendingPersonaKey = null;
-    }
-
-    // Structured extraction (LLM) augments the on-device keyword parser.
+    // Criteria understanding: server Gemini (/assistant/extract) + on-device parser.
     Map<String, dynamic> llm = const {};
     try {
       final r = await _service.extractPropertyFields(text, currentFields: {});
@@ -311,13 +297,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     } catch (_) {}
     _query = _merge(_query, SmartSearch.parse(text, llm: llm));
 
-    // Decide: keep getting to know them, or show listings.
-    final hasIntent = !_query.isEmpty;
-    final nextQ = _nextPersonaQuestion();
-    final shouldSearch =
-        hasIntent && (_searched || _wantsResultsNow(text) || _userTurns >= 2 || nextQ == null);
-
-    final warm = _warmReply(searching: shouldSearch);
+    // Warm conversational reply from server נועה (Gemini, tenant_search mode).
+    final sr = await _serverReply();
+    final shouldSearch = !_query.isEmpty &&
+        (_searched || _wantsResultsNow(text) || _userTurns >= 2);
 
     List<ScoredProperty> results = const [];
     bool anyExact = false;
@@ -328,30 +311,19 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
     if (!mounted) return;
     setState(() {
-      _messages.add(_ChatMsg(role: 'assistant', text: warm));
-
-      if (!shouldSearch) {
-        // Give them room to explain — ask one gentle follow-up.
-        if (nextQ != null) {
-          _pendingPersonaKey = nextQ.$1;
-          _messages.add(_ChatMsg(role: 'assistant', text: nextQ.$2));
-        }
-      } else {
-        _messages.add(_ChatMsg(
-          role: 'assistant',
-          text: '🔎 אז ככה הבנתי אותך:\n${_query.describe()}',
-        ));
+      _messages.add(_ChatMsg(role: 'assistant', text: sr.$1, chips: sr.$2));
+      if (shouldSearch) {
         if (results.isEmpty) {
           _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'עוד לא צף לי משהו מושלם — בוא ננסה אזור אחר או תקציב קצת גמיש?',
+            text: 'עוד לא צף לי משהו מדויק — ננסה אזור אחר או תקציב גמיש יותר?',
           ));
         } else {
           _messages.add(_ChatMsg(
             role: 'assistant',
             text: anyExact
-                ? 'מצאתי כמה דירות שממש מתאימות לך 🎯'
-                : 'אין התאמה מושלמת ברגע זה, אבל אלה הכי קרובות עבורך:',
+                ? 'הנה כמה דירות שממש מתאימות לך 🎯'
+                : 'אין התאמה מושלמת כרגע, אבל אלה הכי קרובות עבורך:',
             scored: results,
             chips: _refineChips(),
           ));
@@ -365,32 +337,28 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (shouldSearch && results.isNotEmpty) _maybeCapturePersona(results.length);
   }
 
-  String? _pendingPersonaKey;
-
-  (String, String)? _nextPersonaQuestion() {
-    for (final q in _personaQuestions) {
-      if (!_persona.containsKey(q.$1)) return q;
-    }
-    return null;
+  // Warm conversational reply from server נועה (Gemini, tenant_search mode);
+  // returns (replyText, quick-reply suggestions). Falls back to local copy if
+  // the server is unavailable (the on-device search still works regardless).
+  Future<(String, List<String>)> _serverReply() async {
+    try {
+      final history = _messages
+          .where((m) => !m.isConsent && m.text.isNotEmpty && m.scored.isEmpty)
+          .map((m) => AssistantTurn(role: m.role, text: m.text))
+          .toList();
+      final reply = await _service.chat(history, mode: 'tenant_search');
+      final t = reply.reply.trim();
+      if (t.isNotEmpty) return (t, reply.suggestions);
+    } catch (_) {}
+    return (_warmFallback(), const <String>[]);
   }
 
   int _warmIdx = 0;
-  // Warm, tenant-appropriate tone (the /assistant chat endpoint is tuned for the
-  // landlord "Erik" persona, so we don't use it here). The server intelligence
-  // for נועה is /assistant/extract (Gemini), called in _send.
-  String _warmReply({required bool searching}) {
-    if (searching) {
-      const lines = [
-        'יאללה, תן לי רגע לרוץ על האפשרויות בשבילך... ✨',
-        'אהבתי. בוא נראה מה מצאתי שמתאים לך 👇',
-        'סבבה, יש לי תמונה טובה — הנה מה שעולה לי:',
-      ];
-      return lines[(_warmIdx++) % lines.length];
-    }
+  String _warmFallback() {
     const lines = [
-      'כיף, נשמע שיש לך כיוון 🙌',
-      'הבנתי אותך, תודה ששיתפת.',
-      'מגניב, זה עוזר לי להכיר אותך טוב יותר.',
+      'כיף, נשמע שיש לך כיוון 🙌 ספר לי עוד קצת — אזור, תקציב, כמה חדרים?',
+      'הבנתי אותך. מה הכי חשוב לך בדירה או בשכונה?',
+      'אהבתי. רוצה שאראה לך כבר כמה אפשרויות, או שנחדד עוד קצת?',
     ];
     return lines[(_warmIdx++) % lines.length];
   }

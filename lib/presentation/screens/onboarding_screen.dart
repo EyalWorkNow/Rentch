@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
+import 'package:dating_app/presentation/screens/home_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
@@ -117,6 +119,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
               const Positioned.fill(child: _OnboardingScrim()),
+              // Debug-only shortcut: skip onboarding/login straight to home so
+              // the AI assistant "נועה" can be tried immediately. Never shipped
+              // (kDebugMode is false in release builds).
+              if (kDebugMode)
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: SafeArea(
+                    child: Material(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                              builder: (_) => const HomeScreen()),
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          child: Text('DEBUG → נועה',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
