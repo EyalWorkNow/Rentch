@@ -161,24 +161,26 @@ class RentlyApp extends StatelessWidget {
         ),
       ),
       // Clean, soft, rounded text fields app-wide — matching the AI assistant's
-      // floating input look.
+      // input: a light-gray, borderless, rounded pill that reads well on any
+      // background (no flat white-on-white boxes, no hard borders).
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: const Color(0xFFF1F5F8),
+        hintStyle: const TextStyle(color: AppColors.textDisabled),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(color: palette.primary, width: 2),
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: palette.primary, width: 1.5),
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
