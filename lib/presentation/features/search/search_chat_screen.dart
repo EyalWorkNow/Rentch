@@ -105,21 +105,30 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   Widget _criteriaBar() {
     if (_query.isEmpty) return const SizedBox.shrink();
     final items = <Widget>[];
+    if (_query.neighborhood != null) {
+      items.add(_removableChip('📍 ${_query.neighborhood}',
+          () => _drop(neighborhood: true)));
+    }
     if (_query.city != null) {
       items.add(_removableChip('📍 ${_query.city}', () => _drop(city: true)));
     }
-    if (_query.minRooms != null) {
-      final r = _query.minRooms! % 1 == 0
-          ? _query.minRooms!.toInt().toString()
-          : _query.minRooms!.toString();
-      items.add(_removableChip('🛏️ $r+ חד׳', () => _drop(rooms: true)));
+    if (_query.propertyType != null) {
+      items.add(_removableChip('🏠 ${_query.propertyType}',
+          () => _drop(propertyType: true)));
     }
-    if (_query.maxPrice != null) {
+    if (_query.minRooms != null || _query.maxRooms != null) {
       items.add(
-          _removableChip('💰 עד ₪${_money(_query.maxPrice!)}', () => _drop(price: true)));
+          _removableChip('🛏️ ${_roomsChipLabel()} חד׳', () => _drop(rooms: true)));
+    }
+    if (_query.minPrice != null || _query.maxPrice != null) {
+      items.add(
+          _removableChip('💰 ${_priceChipLabel()}', () => _drop(price: true)));
     }
     if (_query.nearTrain) {
       items.add(_removableChip('🚉 ליד הרכבת', () => _drop(train: true)));
+    }
+    if (_query.cheapPreference) {
+      items.add(_removableChip('🏷️ הכי משתלם', () => _drop(cheap: true)));
     }
     for (final a in _query.amenities) {
       items.add(_removableChip(SmartSearch.amenityTag(a), () => _drop(amenity: a)));
@@ -165,19 +174,42 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
+  String _roomsChipLabel() {
+    String f(double r) => r % 1 == 0 ? r.toInt().toString() : r.toString();
+    final lo = _query.minRooms, hi = _query.maxRooms;
+    if (lo != null && hi != null) return lo == hi ? f(lo) : '${f(lo)}-${f(hi)}';
+    if (lo != null) return '${f(lo)}+';
+    return 'עד ${f(hi!)}';
+  }
+
+  String _priceChipLabel() {
+    final lo = _query.minPrice, hi = _query.maxPrice;
+    if (lo != null && hi != null) return '₪${_money(lo)}–${_money(hi)}';
+    if (hi != null) return 'עד ₪${_money(hi)}';
+    return 'מ-₪${_money(lo!)}';
+  }
+
   void _drop(
       {bool city = false,
+      bool neighborhood = false,
       bool rooms = false,
       bool price = false,
+      bool propertyType = false,
       bool train = false,
+      bool cheap = false,
       String? amenity}) {
     setState(() {
       _query = SearchQuery(
         city: city ? null : _query.city,
+        neighborhood: neighborhood ? null : _query.neighborhood,
+        minPrice: price ? null : _query.minPrice,
         maxPrice: price ? null : _query.maxPrice,
         minRooms: rooms ? null : _query.minRooms,
+        maxRooms: rooms ? null : _query.maxRooms,
+        propertyType: propertyType ? null : _query.propertyType,
         amenities: {..._query.amenities}..removeWhere((k) => k == amenity),
         nearTrain: train ? false : _query.nearTrain,
+        cheapPreference: cheap ? false : _query.cheapPreference,
         rawText: _query.rawText,
       );
     });
@@ -404,10 +436,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   SearchQuery _merge(SearchQuery a, SearchQuery b) => SearchQuery(
         city: b.city ?? a.city,
+        neighborhood: b.neighborhood ?? a.neighborhood,
+        minPrice: b.minPrice ?? a.minPrice,
         maxPrice: b.maxPrice ?? a.maxPrice,
         minRooms: b.minRooms ?? a.minRooms,
+        maxRooms: b.maxRooms ?? a.maxRooms,
+        propertyType: b.propertyType ?? a.propertyType,
         amenities: {...a.amenities, ...b.amenities},
         nearTrain: a.nearTrain || b.nearTrain,
+        cheapPreference: a.cheapPreference || b.cheapPreference,
         rawText: '${a.rawText} ${b.rawText}'.trim(),
       );
 

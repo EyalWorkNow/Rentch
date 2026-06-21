@@ -2,39 +2,72 @@ import 'dart:math' as math;
 
 import 'package:dating_app/data/models/rental_models.dart';
 
-// Parsed intent from a free-text request like:
-//   "דירה ליד הרכבת, משופצת, 3 חדרים, לזוג עם כלבה, בלי ילדים"
+// Parsed intent from a free-text request, e.g.:
+//   "סטודיו משופץ בפלורנטין עד 6000, ידידותי לכלב, קרוב לרכבת"
+//   "דירת 3-4 חדרים לזוג בין 5000 ל-7000 במרכז תל אביב"
 class SearchQuery {
   SearchQuery({
     this.city,
+    this.neighborhood,
+    this.minPrice,
     this.maxPrice,
     this.minRooms,
+    this.maxRooms,
+    this.propertyType,
     Set<String>? amenities,
     this.nearTrain = false,
+    this.cheapPreference = false,
     this.rawText = '',
   }) : amenities = amenities ?? <String>{};
 
   final String? city;
+  final String? neighborhood;
+  final int? minPrice;
   final int? maxPrice;
   final double? minRooms;
+  final double? maxRooms;
+  final String? propertyType; // normalised, matched against RentalProperty.propertyType
   final Set<String> amenities; // PropertyFeatureSet keys, e.g. feat_pets
   final bool nearTrain;
+  final bool cheapPreference; // user asked for "the cheapest"
   final String rawText;
 
   bool get isEmpty =>
       city == null &&
+      neighborhood == null &&
+      minPrice == null &&
       maxPrice == null &&
       minRooms == null &&
+      maxRooms == null &&
+      propertyType == null &&
       amenities.isEmpty &&
       !nearTrain;
 
-  // Human summary of what we understood — shown back to the user for trust.
+  // Enough was understood on-device that we can skip the (slower) model call.
+  bool get hasEssentials =>
+      city != null ||
+      neighborhood != null ||
+      maxPrice != null ||
+      minPrice != null ||
+      minRooms != null ||
+      propertyType != null;
+
   String describe() {
     final parts = <String>[];
-    if (city != null) parts.add('📍 $city');
-    if (minRooms != null) parts.add('🛏️ ${_roomsLabel(minRooms!)} חד׳');
-    if (maxPrice != null) parts.add('💰 עד ₪${_money(maxPrice!)}');
+    if (neighborhood != null) {
+      parts.add('📍 $neighborhood${city != null ? ', $city' : ''}');
+    } else if (city != null) {
+      parts.add('📍 $city');
+    }
+    if (propertyType != null) parts.add('🏠 $propertyType');
+    if (minRooms != null || maxRooms != null) {
+      parts.add('🛏️ ${_roomsRangeLabel(minRooms, maxRooms)} חד׳');
+    }
+    if (minPrice != null || maxPrice != null) {
+      parts.add('💰 ${_priceRangeLabel(minPrice, maxPrice)}');
+    }
     if (nearTrain) parts.add('🚉 ליד הרכבת');
+    if (cheapPreference) parts.add('🏷️ הכי משתלם');
     for (final a in amenities) {
       parts.add(SmartSearch.amenityTag(a));
     }
@@ -48,43 +81,109 @@ class ScoredProperty {
   final double score;
   final List<String> tags;
   final double? trainKm;
-  final bool exact; // meets the hard must-haves
+  final bool exact;
 }
 
-// Lenient, ranked apartment matcher. Never dead-ends: it scores the whole
-// catalogue and returns the best matches, so a legitimate request that exists
-// in the data always surfaces (ranked first), and a near-miss still gets the
-// closest options instead of "no results".
-//
-// ponytail: train proximity uses a static list of major Israel Railways
-// stations + Haversine — no transit API needed. Coordinates are approximate;
-// swap for a real GTFS/stations feed if precision matters.
+// Smarter, more flexible matcher. Reads free Hebrew text into a rich query
+// (ranges, neighborhoods, property type, persona hints), then ranks the whole
+// catalogue with weighted scoring that also rewards popular and fresh listings.
+// Never dead-ends — always returns the best matches.
 class SmartSearch {
   static SearchQuery parse(String text, {Map<String, dynamic> llm = const {}}) {
     final t = text.toLowerCase();
 
-    // rooms — "3 חדרים" / "3 חד׳" / llm
-    double? rooms = _toDouble(llm['rooms']);
-    final rm = RegExp(r'(\d+(?:\.\d)?)\s*(?:חדר|חדרים|חד)').firstMatch(text);
-    if (rm != null) rooms = double.tryParse(rm.group(1)!) ?? rooms;
-
-    // budget — handles "7 אלף", "7 וחצי אלף", "7,500", "7500", or llm.
-    int? price;
-    final elef = RegExp(r'(\d+)\s*(וחצי\s*)?(?:אלף|אלפים)').firstMatch(text);
-    if (elef != null) {
-      price = (int.tryParse(elef.group(1)!) ?? 0) * 1000 +
-          (elef.group(2) != null ? 500 : 0);
+    // ── rooms (range / half / studio / "+") ─────────────────────────────────
+    double? minRooms;
+    double? maxRooms;
+    final roomRange = RegExp(r'(\d(?:\.\d)?)\s*[-־–]\s*(\d(?:\.\d)?)\s*(?:חדר|חד)')
+        .firstMatch(text);
+    final roomBetween =
+        RegExp(r'בין\s*(\d(?:\.\d)?)\s*ל[-־]?\s*(\d(?:\.\d)?)\s*(?:חדר|חד)')
+            .firstMatch(text);
+    if (roomRange != null || roomBetween != null) {
+      final m = roomRange ?? roomBetween!;
+      minRooms = double.tryParse(m.group(1)!);
+      maxRooms = double.tryParse(m.group(2)!);
     } else {
-      final nums = RegExp(r'\d[\d,]{2,}')
-          .allMatches(text)
-          .map((m) => int.tryParse(m.group(0)!.replaceAll(',', '')) ?? 0)
-          .where((n) => n >= 1500 && n <= 60000)
-          .toList();
-      if (nums.isNotEmpty) price = nums.reduce(math.max);
+      final half =
+          RegExp(r'(\d|אחד|שני|שתי|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה)\s*וחצי')
+              .firstMatch(text);
+      final single =
+          RegExp(r'(\d(?:\.\d)?)\s*(?:חדר|חדרים|חד)').firstMatch(text);
+      if (half != null) {
+        minRooms = (_wordToNum(half.group(1)!) ?? 0) + 0.5;
+      } else if (single != null) {
+        minRooms = double.tryParse(single.group(1)!);
+      }
+      // "3+" → open-ended max (just a min).
+      if (single != null && RegExp(r'\d\s*\+').hasMatch(text)) {
+        maxRooms = null;
+      }
     }
-    price ??= _toInt(llm['price']);
+    minRooms ??= _toDouble(llm['rooms']);
 
-    // city
+    // ── property type ───────────────────────────────────────────────────────
+    String? propertyType;
+    for (final entry in _propertyTypes.entries) {
+      if (entry.value.any((w) => t.contains(w))) {
+        propertyType = entry.key;
+        break;
+      }
+    }
+    // studio / sub-unit imply a small place
+    if (propertyType == 'סטודיו' || propertyType == 'יחידת דיור') {
+      minRooms ??= 1;
+      maxRooms ??= 2;
+    }
+
+    // ── budget (range / around / max / min, with "אלף") ─────────────────────
+    int? minPrice;
+    int? maxPrice;
+    int? amount(String s) {
+      final e = RegExp(r'(\d+)\s*(וחצי\s*)?(?:אלף|אלפים)').firstMatch(s);
+      if (e != null) {
+        return (int.tryParse(e.group(1)!) ?? 0) * 1000 +
+            (e.group(2) != null ? 500 : 0);
+      }
+      final n = RegExp(r'\d[\d,]{2,}').firstMatch(s.replaceAll(',', ''));
+      return n != null ? int.tryParse(n.group(0)!) : null;
+    }
+
+    final between = RegExp(r'בין\s*(.{1,12}?)\s*ל[-־]?\s*(.{1,12}?)(?:\s|$|,)')
+        .firstMatch(text);
+    final around = RegExp(r'(?:בערך|סביב|כ[-־]|בסביבות)\s*(.{1,12}?)(?:\s|$|,)')
+        .firstMatch(text);
+    final upto = RegExp(r'(?:עד|מקסימום|מקס|לכל היותר|מתחת ל[-־]?)\s*(.{1,12}?)(?:\s|$|,)')
+        .firstMatch(text);
+    final from = RegExp(r'(?:מ[-־]|לפחות|מעל|החל מ[-־]?)\s*(.{1,12}?)(?:\s|$|,)')
+        .firstMatch(text);
+
+    if (between != null) {
+      minPrice = amount(between.group(1)!);
+      maxPrice = amount(between.group(2)!);
+    } else if (around != null) {
+      final a = amount(around.group(1)!);
+      if (a != null && a >= 1500) {
+        minPrice = (a * 0.85).round();
+        maxPrice = (a * 1.15).round();
+      }
+    } else {
+      if (upto != null) maxPrice = amount(upto.group(1)!);
+      if (from != null) minPrice = amount(from.group(1)!);
+      // bare number with a price hint
+      if (maxPrice == null && minPrice == null) {
+        final any = amount(text);
+        if (any != null && any >= 1500 && any <= 60000) maxPrice = any;
+      }
+    }
+    // sanity: drop tiny values that aren't budgets (e.g. room counts)
+    if (minPrice != null && minPrice < 1500) minPrice = null;
+    if (maxPrice != null && maxPrice < 1500) maxPrice = null;
+    maxPrice ??= _toInt(llm['price']);
+
+    final cheap = RegExp(r'זול|משתלם|במחיר טוב|כמה שפחות').hasMatch(text);
+
+    // ── city & neighborhood ─────────────────────────────────────────────────
     String? city = _str(llm['city']);
     for (final c in _cities) {
       if (text.contains(c)) {
@@ -92,8 +191,15 @@ class SmartSearch {
         break;
       }
     }
+    String? neighborhood;
+    for (final n in _neighborhoods) {
+      if (text.contains(n)) {
+        neighborhood = n;
+        break;
+      }
+    }
 
-    // amenities (Hebrew keywords + llm feat_ flags)
+    // ── amenities (keywords + llm flags) ─────────────────────────────────────
     final amenities = <String>{};
     _amenityKeywords.forEach((key, words) {
       if (words.any((w) => t.contains(w.toLowerCase()))) amenities.add(key);
@@ -104,14 +210,32 @@ class SmartSearch {
 
     final nearTrain = const [
       'רכבת', 'תחנת רכבת', 'ליד הרכבת', 'קרוב לרכבת', 'train', 'railway'
-    ].any((w) => text.contains(w) || t.contains(w));
+    ].any((w) => text.contains(w));
+
+    // ── persona soft defaults (only when rooms not stated) ──────────────────
+    if (minRooms == null && maxRooms == null) {
+      if (RegExp(r'סטודנט').hasMatch(text)) {
+        minRooms = 1;
+        maxRooms = 2;
+      } else if (RegExp(r'משפח|ילד').hasMatch(text)) {
+        minRooms = 3;
+      } else if (RegExp(r'\bזוג\b|זוגי|בני זוג').hasMatch(text)) {
+        minRooms = 2;
+        maxRooms = 3;
+      }
+    }
 
     return SearchQuery(
       city: city,
-      maxPrice: price,
-      minRooms: rooms,
+      neighborhood: neighborhood,
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      minRooms: minRooms,
+      maxRooms: maxRooms,
+      propertyType: propertyType,
       amenities: amenities,
       nearTrain: nearTrain,
+      cheapPreference: cheap,
       rawText: text,
     );
   }
@@ -119,7 +243,7 @@ class SmartSearch {
   static List<ScoredProperty> rank(
     List<RentalProperty> props,
     SearchQuery q, {
-    int limit = 8,
+    int limit = 10,
   }) {
     final scored = props.map((p) => _score(p, q)).toList()
       ..sort((a, b) => b.score.compareTo(a.score));
@@ -129,13 +253,21 @@ class SmartSearch {
   static ScoredProperty _score(RentalProperty p, SearchQuery q) {
     double s = 1;
     final tags = <String>[];
-    // "exact" reflects only the essentials the user clearly stated: location,
-    // budget, and size. Amenities/pets/train are soft boosts (the data for them
-    // is sparse), so they never flag a result as a non-match.
+    // "exact" = the essentials the user stated (place / budget / size / type).
     bool exact = true;
 
+    // location
+    final hay = '${p.city} ${p.neighborhood} ${p.street}';
+    if (q.neighborhood != null) {
+      if (hay.contains(q.neighborhood!)) {
+        s += 7;
+        tags.add('📍 ${p.neighborhood.isNotEmpty ? p.neighborhood : q.neighborhood}');
+      } else {
+        s -= 3;
+        exact = false;
+      }
+    }
     if (q.city != null) {
-      final hay = '${p.city} ${p.neighborhood} ${p.street}';
       if (hay.contains(q.city!)) {
         s += 5;
       } else {
@@ -144,29 +276,51 @@ class SmartSearch {
       }
     }
 
-    if (q.maxPrice != null && p.price > 0) {
-      if (p.price <= q.maxPrice!) {
+    // property type
+    if (q.propertyType != null) {
+      if (p.propertyType.contains(q.propertyType!) ||
+          q.propertyType!.contains(p.propertyType)) {
         s += 3;
       } else {
-        final over = (p.price - q.maxPrice!) / q.maxPrice!;
-        s -= over > 0.5 ? 5 : over * 6;
-        if (over > 0.1) exact = false; // meaningfully over budget
+        s -= 1.5;
+        exact = false;
       }
     }
 
-    if (q.minRooms != null) {
-      final diff = p.rooms - q.minRooms!;
-      if (diff.abs() <= 0.5) {
-        s += 3;
-      } else if (diff > 0) {
-        s += 1.5; // more rooms than asked — still good
-      } else {
-        s -= 1.0 * diff.abs();
-        if (diff < -0.5) exact = false; // clearly too small
+    // budget (min/max range)
+    if (p.price > 0) {
+      if (q.maxPrice != null) {
+        if (p.price <= q.maxPrice!) {
+          s += 3;
+        } else {
+          final over = (p.price - q.maxPrice!) / q.maxPrice!;
+          s -= over > 0.5 ? 5 : over * 6;
+          if (over > 0.1) exact = false;
+        }
+      }
+      if (q.minPrice != null && p.price < q.minPrice!) {
+        s -= 1.5; // below the floor (e.g. range) — mild
+      }
+      if (q.cheapPreference && q.maxPrice != null && q.maxPrice! > 0) {
+        s += (1 - (p.price / q.maxPrice!)).clamp(0.0, 1.0) * 2;
       }
     }
 
-    // Amenities — soft boosts only.
+    // rooms (min/max range)
+    if (q.minRooms != null || q.maxRooms != null) {
+      final lo = q.minRooms ?? 0;
+      final hi = q.maxRooms ?? 99;
+      if (p.rooms >= lo - 0.5 && p.rooms <= hi + 0.5) {
+        s += 3;
+      } else if (p.rooms < lo) {
+        s -= 1.2 * (lo - p.rooms);
+        exact = false;
+      } else {
+        s -= 0.5 * (p.rooms - hi); // a bit bigger than asked — minor
+      }
+    }
+
+    // amenities — soft boosts
     for (final key in q.amenities) {
       if (p.featureFlags.isEnabled(key)) {
         s += 2;
@@ -176,7 +330,7 @@ class SmartSearch {
       }
     }
 
-    // Train proximity — soft boost.
+    // train proximity — soft boost
     double? trainKm;
     if (p.lat != 0 && p.lon != 0) {
       trainKm = _nearestStationKm(p.lat, p.lon);
@@ -193,9 +347,27 @@ class SmartSearch {
       }
     }
 
+    // smarter tie-breakers: popularity + freshness + verified
+    s += _popularityBoost(p.marketSignals);
+    s += _freshnessBoost(p.createdAt);
     if (p.isVerifiedListing) s += 0.5;
 
     return ScoredProperty(p, s, tags, trainKm, exact);
+  }
+
+  // Small boost (0..~1.2) from real engagement — surfaces listings people act on.
+  static double _popularityBoost(PropertyMarketSignals m) {
+    final pop = m.views + m.likes * 3 + m.saves * 4 + m.contactRequests * 6;
+    if (pop <= 0) return 0;
+    return (math.log(1 + pop) / math.log(1 + 600)).clamp(0.0, 1.0) * 1.2;
+  }
+
+  // Newer listings get a gentle lift (decays over ~30 days).
+  static double _freshnessBoost(DateTime? createdAt) {
+    if (createdAt == null) return 0;
+    final days = DateTime.now().difference(createdAt).inDays;
+    if (days < 0) return 0;
+    return (1 - days / 30).clamp(0.0, 1.0) * 0.8;
   }
 
   // ── train stations (approx coords) ─────────────────────────────────────────
@@ -250,20 +422,32 @@ class SmartSearch {
 
   // ── keyword maps ────────────────────────────────────────────────────────────
   static const Map<String, List<String>> _amenityKeywords = {
-    'feat_renovated': ['משופצ', 'שיפוץ', 'renovated'],
+    'feat_renovated': ['משופצ', 'שיפוץ', 'חדשה', 'renovated'],
     'feat_pets': ['כלב', 'כלבה', 'חתול', 'חיית מחמד', 'חיות מחמד', 'pet', 'dog'],
     'feat_parking': ['חניה', 'חנייה', 'parking'],
-    'feat_balcony': ['מרפסת', 'balcony'],
+    'feat_balcony': ['מרפסת', 'מרפסות', 'balcony'],
     'feat_elevator': ['מעלית', 'elevator'],
-    'feat_furnished': ['מרוהט', 'ריהוט', 'furnished'],
-    'feat_mamad': ['ממ"ד', 'ממד', 'ממ״ד', 'mamad', 'shelter'],
-    'feat_garden': ['גינה', 'גינת', 'garden'],
-    'feat_air': ['מזגן', 'מיזוג', 'ac'],
+    'feat_furnished': ['מרוהט', 'ריהוט', 'מאובזר', 'furnished'],
+    'feat_mamad': ['ממ"ד', 'ממד', 'ממ״ד', 'מקלט', 'mamad', 'shelter'],
+    'feat_garden': ['גינה', 'גינת', 'חצר', 'garden'],
+    'feat_air': ['מזגן', 'מיזוג', 'ממוזג', 'ac'],
     'feat_pool': ['בריכה', 'pool'],
     'feat_gym': ['חדר כושר', 'כושר', 'gym'],
     'feat_storage': ['מחסן', 'storage'],
+    'feat_sun': ['שמש', 'מואר', 'אור'],
     'feat_safe': ['ממוגן', 'סורגים'],
-    'feat_furnished_equipped': ['מאובזר'],
+    'feat_internet': ['אינטרנט', 'סיבים', 'wifi'],
+    'feat_laundry': ['מכונת כביסה', 'כביסה'],
+  };
+
+  static const Map<String, List<String>> _propertyTypes = {
+    'סטודיו': ['סטודיו', 'studio'],
+    'יחידת דיור': ['יחידת דיור', 'יחידה'],
+    'דירת גן': ['דירת גן', 'גן '],
+    'פנטהאוז': ['פנטהאוז', 'פנטהאוס', 'penthouse'],
+    'דופלקס': ['דופלקס', 'duplex'],
+    'גג': ['דירת גג', 'גג'],
+    'דירה': ['דירה', 'apartment'],
   };
 
   static const List<String> _cities = [
@@ -271,6 +455,16 @@ class SmartSearch {
     'רעננה', 'כפר סבא', 'ראשון לציון', 'פתח תקווה', 'באר שבע', 'רחובות',
     'אשדוד', 'אשקלון', 'מודיעין', 'חולון', 'בת ים', 'רמת השרון', 'בני ברק',
     'לוד', 'רמלה', 'גבעת שמואל', 'קריית אונו', 'אור יהודה', 'הוד השרון',
+  ];
+
+  // Well-known neighborhoods — narrows results within a city when mentioned.
+  static const List<String> _neighborhoods = [
+    'פלורנטין', 'נווה צדק', 'רוטשילד', 'כרם התימנים', 'לב העיר', 'הצפון הישן',
+    'הצפון החדש', 'רמת אביב', 'בבלי', 'יד אליהו', 'רמת החייל', 'שפירא',
+    'נחלת יצחק', 'תל ברוך', 'אפקה', 'מונטיפיורי', 'הקריה', 'נווה שאנן',
+    'רחביה', 'בקעה', 'נחלאות', 'תלפיות', 'קטמון', 'גילה', 'פסגת זאב',
+    'הדר', 'כרמל', 'נווה שאנן', 'ואדי ניסנס', 'רמות', 'קרית חיים',
+    'רמת אביב ג', 'גבעת שמואל', 'מרכז העיר',
   ];
 
   static String amenityTag(String key) {
@@ -299,8 +493,14 @@ class SmartSearch {
         return '🏋️ חדר כושר';
       case 'feat_storage':
         return '📦 מחסן';
+      case 'feat_sun':
+        return '☀️ מואר';
       case 'feat_safe':
         return '🔒 ממוגן';
+      case 'feat_internet':
+        return '🌐 אינטרנט';
+      case 'feat_laundry':
+        return '🧺 כביסה';
       default:
         return key.replaceFirst('feat_', '');
     }
@@ -327,12 +527,28 @@ class SmartSearch {
     return s.isEmpty ? null : double.tryParse(s);
   }
 
+  static double? _wordToNum(String w) {
+    const map = {
+      'אחד': 1, 'אחת': 1, 'שני': 2, 'שתי': 2, 'שניים': 2, 'שתיים': 2,
+      'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4, 'חמש': 5, 'חמישה': 5,
+    };
+    return map[w]?.toDouble() ?? double.tryParse(w);
+  }
+
   static bool _truthy(dynamic v) =>
       v == true || v == 1 || v == '1' || v.toString().toLowerCase() == 'true';
 }
 
-String _roomsLabel(double r) =>
-    r % 1 == 0 ? r.toInt().toString() : r.toString();
+String _roomsRangeLabel(double? lo, double? hi) {
+  String f(double r) => r % 1 == 0 ? r.toInt().toString() : r.toString();
+  if (lo != null && hi != null) return lo == hi ? f(lo) : '${f(lo)}-${f(hi)}';
+  if (lo != null) return '${f(lo)}+';
+  return 'עד ${f(hi!)}';
+}
 
-String _money(int v) => v.toString().replaceAllMapped(
-    RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+String _priceRangeLabel(int? lo, int? hi) {
+  String m(int v) => '₪${v.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (x) => '${x[1]},')}';
+  if (lo != null && hi != null) return '${m(lo)}–${m(hi)}';
+  if (hi != null) return 'עד ${m(hi)}';
+  return 'מ-${m(lo!)}';
+}

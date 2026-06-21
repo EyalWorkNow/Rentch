@@ -35,6 +35,43 @@ void main() {
     expect(SmartSearch.parse('עד 7 אלף בחיפה').maxPrice, 7000);
   });
 
+  test('budget range "בין X ל-Y"', () {
+    final q = SmartSearch.parse('דירה בין 5000 ל-7000 בתל אביב');
+    expect(q.minPrice, 5000);
+    expect(q.maxPrice, 7000);
+  });
+
+  test('budget "בערך" → window', () {
+    final q = SmartSearch.parse('משהו בערך 6000 בחיפה');
+    expect(q.minPrice, 5100);
+    expect(q.maxPrice, 6900);
+  });
+
+  test('rooms range "3-4"', () {
+    final q = SmartSearch.parse('דירת 3-4 חדרים');
+    expect(q.minRooms, 3);
+    expect(q.maxRooms, 4);
+  });
+
+  test('half rooms "שלוש וחצי"', () {
+    expect(SmartSearch.parse('דירה שלוש וחצי חדרים').minRooms, 3.5);
+  });
+
+  test('neighborhood + property type + studio sizing', () {
+    final q = SmartSearch.parse('סטודיו בפלורנטין עד 5000');
+    expect(q.neighborhood, 'פלורנטין');
+    expect(q.propertyType, 'סטודיו');
+    expect(q.maxRooms, 2); // studio capped
+    expect(q.maxPrice, 5000);
+  });
+
+  test('persona: student defaults to small when rooms unstated', () {
+    final q = SmartSearch.parse('אני סטודנט מחפש משהו זול בבאר שבע');
+    expect(q.minRooms, 1);
+    expect(q.maxRooms, 2);
+    expect(q.cheapPreference, true);
+  });
+
   test('empty when nothing concrete', () {
     expect(SmartSearch.parse('שלום מה נשמע').isEmpty, true);
   });
