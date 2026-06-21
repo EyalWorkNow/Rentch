@@ -139,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         child: const Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 10, vertical: 6),
-                          child: Text('DEBUG → נועה',
+                          child: Text('DEBUG → אתי',
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,

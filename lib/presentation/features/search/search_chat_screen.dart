@@ -25,7 +25,7 @@ class SearchChatScreen extends StatefulWidget {
   State<SearchChatScreen> createState() => _SearchChatScreenState();
 }
 
-const _botName = 'נועה';
+const _botName = 'אתי';
 
 class _ChatMsg {
   _ChatMsg({
@@ -58,7 +58,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   int _userTurns = 0;
   bool _searched = false;
   bool _busy = false;
-  bool _listening = false;
+  String _lastReply = ''; // last assistant text, for the voice visualizer to speak
   bool? _consent;
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
@@ -264,10 +264,32 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   @override
   void dispose() {
-    if (_listening) _service.stopListening();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  // Opens the full-screen voice conversation (big, clear visualizer). Speaking
+  // and listening happen there; results flow into the chat behind it.
+  Future<void> _openVoice() async {
+    FocusScope.of(context).unfocus();
+    await Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _VoiceVisualizer(
+        service: _service,
+        onUtterance: _processVoiceUtterance,
+      ),
+    ));
+    _scrollToEnd();
+  }
+
+  // Runs a spoken sentence through the same pipeline as typed input and returns
+  // אתי's reply text (for the visualizer to read aloud).
+  Future<String> _processVoiceUtterance(String transcript) async {
+    await _send(transcript);
+    return _lastReply.isEmpty
+        ? 'ספר לי עוד קצת על מה שאתה מחפש'
+        : _lastReply;
   }
 
   // ── conversation ──────────────────────────────────────────────────────────
@@ -314,6 +336,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
 
     if (!mounted) return;
+    _lastReply = sr.$1;
     setState(() {
       _messages.add(_ChatMsg(role: 'assistant', text: sr.$1, chips: sr.$2));
       if (shouldSearch) {
@@ -662,100 +685,82 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
-  // Voice dictation (he-IL) — fills the input as you speak; tap again to stop.
-  Future<void> _toggleMic() async {
-    if (_listening) {
-      await _service.stopListening();
-      if (mounted) setState(() => _listening = false);
-      return;
-    }
-    setState(() => _listening = true);
-    try {
-      await _service.startListening(
-        onResult: (text, isFinal) {
-          if (!mounted) return;
-          setState(() {
-            _input.text = text;
-            _input.selection =
-                TextSelection.collapsed(offset: _input.text.length);
-            if (isFinal) _listening = false;
-          });
-        },
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _listening = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('לא ניתן להפעיל מיקרופון — בדוק שההרשאה אושרה.')));
-    }
-  }
-
   Widget _inputBar() {
     return SafeArea(
       top: false,
-      child: Container(
-        color: AppColors.background,
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            GestureDetector(
-              onTap: _toggleMic,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: _listening
-                        ? AppColors.coral
-                        : const Color(0xFFEDF1F5),
-                    shape: BoxShape.circle),
-                child: Icon(_listening ? Icons.stop_rounded : Icons.mic_none,
-                    color:
-                        _listening ? Colors.white : AppColors.textSecondary,
-                    size: 22),
+      // Floating, rounded, detached ≥13px from every edge.
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(13, 6, 13, 13),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.borderLight),
+            boxShadow: [
+              BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6)),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Voice-conversation button → opens the big, clear visualizer.
+              GestureDetector(
+                onTap: _openVoice,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.graphic_eq,
+                      color: Colors.white, size: 24),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 130),
-                // WhatsApp-style: grows with content, wraps lines, Enter = newline.
-                child: TextField(
-                  controller: _input,
-                  minLines: 1,
-                  maxLines: 5,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    hintText: _listening
-                        ? 'מקשיבה... דבר 🎙️'
-                        : 'ספר לי במילים שלך...',
-                    filled: true,
-                    fillColor: const Color(0xFFEDF1F5),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: BorderSide.none,
+              const SizedBox(width: 6),
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 130),
+                  // WhatsApp-style: grows with content, wraps lines.
+                  child: TextField(
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 5,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: const TextStyle(fontSize: 15),
+                    decoration: const InputDecoration(
+                      hintText: 'ספר לי במילים שלך...',
+                      isCollapsed: true,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+                      border: InputBorder.none,
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => _send(_input.text),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: AppColors.primary, shape: BoxShape.circle),
-                child: Icon(IconsaxPlusLinear.send_1,
-                    color: AppColors.textOnPrimary, size: 20),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _send(_input.text),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                      color: AppColors.primary, shape: BoxShape.circle),
+                  child: Icon(IconsaxPlusLinear.send_1,
+                      color: AppColors.textOnPrimary, size: 20),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1087,6 +1092,228 @@ class _TypingState extends State<_Typing>
         decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.7),
             shape: BoxShape.circle),
+      ),
+    );
+  }
+}
+
+// ── Voice conversation visualizer ─────────────────────────────────────────────
+// Big, calm, high-contrast full-screen voice mode — designed to be obvious for
+// older users. One large pulsing orb that reacts to the voice; clear status text;
+// tap the orb to talk, אתי listens, thinks, then answers out loud.
+enum _VoiceState { idle, listening, thinking, speaking }
+
+class _VoiceVisualizer extends StatefulWidget {
+  const _VoiceVisualizer({required this.service, required this.onUtterance});
+  final AssistantService service;
+  final Future<String> Function(String transcript) onUtterance;
+
+  @override
+  State<_VoiceVisualizer> createState() => _VoiceVisualizerState();
+}
+
+class _VoiceVisualizerState extends State<_VoiceVisualizer>
+    with SingleTickerProviderStateMixin {
+  _VoiceState _state = _VoiceState.idle;
+  String _transcript = '';
+  String _reply = 'שלום! אני אתי 👋\nלחצו על העיגול ופשוט דברו איתי.';
+  double _level = 0; // 0..1 smoothed mic level
+  late final AnimationController _pulse =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))
+        ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    widget.service.stopListening();
+    widget.service.stopSpeaking();
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onOrbTap() async {
+    if (_state == _VoiceState.listening) {
+      await widget.service.stopListening();
+      return;
+    }
+    if (_state == _VoiceState.thinking || _state == _VoiceState.speaking) return;
+    await _startListening();
+  }
+
+  Future<void> _startListening() async {
+    setState(() {
+      _state = _VoiceState.listening;
+      _transcript = '';
+    });
+    try {
+      await widget.service.startListening(
+        onResult: (text, isFinal) {
+          if (!mounted) return;
+          setState(() => _transcript = text);
+          if (isFinal) _handleUtterance(text);
+        },
+        onSoundLevelChange: (lvl) {
+          if (!mounted) return;
+          // speech_to_text level is roughly -2..10; normalise to 0..1.
+          final n = ((lvl + 2) / 12).clamp(0.0, 1.0);
+          setState(() => _level = _level * 0.6 + n * 0.4);
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _state = _VoiceState.idle;
+        _reply = 'לא הצלחתי להפעיל את המיקרופון. בדקו שאישרתם הרשאה.';
+      });
+    }
+  }
+
+  Future<void> _handleUtterance(String text) async {
+    await widget.service.stopListening();
+    if (text.trim().isEmpty) {
+      if (mounted) setState(() => _state = _VoiceState.idle);
+      return;
+    }
+    setState(() {
+      _state = _VoiceState.thinking;
+      _level = 0;
+    });
+    final reply = await widget.onUtterance(text);
+    if (!mounted) return;
+    setState(() {
+      _reply = reply;
+      _state = _VoiceState.speaking;
+    });
+    try {
+      await widget.service.speak(reply);
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _state = _VoiceState.idle);
+  }
+
+  ({String label, Color color}) get _statusInfo {
+    switch (_state) {
+      case _VoiceState.listening:
+        return (label: 'מקשיבה לך...', color: AppColors.primary);
+      case _VoiceState.thinking:
+        return (label: 'רגע, חושבת...', color: AppColors.warning);
+      case _VoiceState.speaking:
+        return (label: 'אתי מדברת', color: AppColors.success);
+      case _VoiceState.idle:
+        return (label: 'לחצו על העיגול כדי לדבר', color: AppColors.textSecondary);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final info = _statusInfo;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0B2138), // calm deep navy
+        body: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              // status
+              Text(info.label,
+                  style: TextStyle(
+                      color: info.color,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 36),
+              // the orb
+              GestureDetector(
+                onTap: _onOrbTap,
+                child: AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (_, __) {
+                    final base = _state == _VoiceState.listening
+                        ? 0.5 + _level * 0.9
+                        : (_state == _VoiceState.speaking ? 0.55 : 0.35);
+                    final scale = 1.0 + base * (0.10 + 0.10 * _pulse.value);
+                    final ring = 150.0 * scale;
+                    return SizedBox(
+                      width: 300,
+                      height: 300,
+                      child: Center(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: ring + 70,
+                              height: ring + 70,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: info.color.withValues(alpha: 0.10),
+                              ),
+                            ),
+                            Container(
+                              width: ring,
+                              height: ring,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    info.color,
+                                    info.color.withValues(alpha: 0.6)
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: info.color.withValues(alpha: 0.45),
+                                      blurRadius: 40,
+                                      spreadRadius: 6),
+                                ],
+                              ),
+                              child: Icon(
+                                _state == _VoiceState.speaking
+                                    ? Icons.volume_up_rounded
+                                    : Icons.mic_rounded,
+                                color: Colors.white,
+                                size: 64,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 40),
+              // transcript / reply
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Text(
+                  _state == _VoiceState.listening && _transcript.isNotEmpty
+                      ? _transcript
+                      : _reply,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 19, height: 1.5),
+                ),
+              ),
+              const Spacer(),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text('סגרו כדי לחזור לצ׳אט ולראות את הדירות',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
