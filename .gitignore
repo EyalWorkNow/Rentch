@@ -60,3 +60,4 @@ AWSCLIV2.pkg
 # Xcode SwiftPM caches
 ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 ios/Runner.xcworkspace/xcshareddata/swiftpm/
+firebase-service-account.json
