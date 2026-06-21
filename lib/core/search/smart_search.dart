@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // Parsed intent from a free-text request, e.g.:
@@ -245,10 +246,112 @@ class SmartSearch {
     SearchQuery q, {
     int limit = 10,
   }) {
+    // Use advanced multi-dimensional matching if query has enough signal;
+    // fall back to simpler scoring if vague.
+    if (q.hasEssentials && props.isNotEmpty) {
+      return rankAdvanced(props, q, limit: limit);
+    }
     final scored = props.map((p) => _score(p, q)).toList()
       ..sort((a, b) => b.score.compareTo(a.score));
     return scored.take(limit).toList();
   }
+
+  // Advanced ranking using multi-dimensional user intent + property vectors.
+  // Produces explainable match scores and handles complex user preferences.
+  static List<ScoredProperty> rankAdvanced(
+    List<RentalProperty> props,
+    SearchQuery q, {
+    int limit = 10,
+  }) {
+    if (props.isEmpty) return [];
+
+    // Market statistics for normalization
+    final medianPrice =
+        props.map((p) => p.price).fold<double>(0, (a, b) => a + b) /
+            props.length;
+    final minRooms = props.map((p) => p.rooms).reduce(math.min);
+    final maxRooms = props.map((p) => p.rooms).reduce(math.max);
+
+    // Build user intent vector from query
+    final userIntent = AdvancedMatcher.buildUserIntent(
+      statedCityPreference: q.city != null,
+      budgetStated: q.minPrice != null || q.maxPrice != null,
+      roomsRangeStated: q.minRooms != null || q.maxRooms != null,
+      minPrice: q.minPrice?.toDouble(),
+      maxPrice: q.maxPrice?.toDouble(),
+      amenityDemanding: q.amenities.length > 2,
+      amenitiesCount: q.amenities.length,
+      nearTrainRequired: q.nearTrain,
+      cheapPreference: q.cheapPreference,
+      urgentTone: false, // could infer from rawText
+      flexibleTone: false, // could infer from rawText
+    );
+
+    // Score each property
+    final matches = <({ScoredProperty scored, MatchScore detail})>[];
+    for (final prop in props) {
+      final propVec = AdvancedMatcher.buildPropertyVector(
+        prop,
+        minRoomMarket: minRooms,
+        maxRoomMarket: maxRooms,
+        medianPriceMarket: medianPrice,
+        totalProperties: props.length,
+      );
+
+      final meetsHardConstraints = _checksConstraints(prop, q);
+      final hasRequestedAmenities = _hasAmenities(prop, q);
+      final transitProx = q.nearTrain && (AdvancedMatcher.nearestStationKm(prop.lat, prop.lon) ?? 10) < 2.5;
+
+      final matchDetail = AdvancedMatcher.scoreMatch(
+        userIntent,
+        propVec,
+        meetsHardConstraints: meetsHardConstraints,
+        hasRequestedAmenities: hasRequestedAmenities,
+        transitProximity: transitProx,
+      );
+
+      matches.add((
+        scored: ScoredProperty(
+          prop,
+          matchDetail.totalScore / 100,
+          [],
+          AdvancedMatcher.nearestStationKm(prop.lat, prop.lon),
+          meetsHardConstraints,
+        ),
+        detail: matchDetail,
+      ));
+    }
+
+    // Sort by score (descending) and extract top N
+    matches.sort((a, b) => b.detail.totalScore.compareTo(a.detail.totalScore));
+    return matches.take(limit).map((m) {
+      // Augment tags with explanation from advanced matcher
+      final tags = [...m.scored.tags];
+      if (m.detail.explanation.isNotEmpty) {
+        tags.insert(0, '✨ ${m.detail.explanation}');
+      }
+      tags.insert(0, '${m.detail.fitPct}% fit');
+      return ScoredProperty(
+        m.scored.property,
+        m.scored.score,
+        tags,
+        m.scored.trainKm,
+        m.scored.exact,
+      );
+    }).toList();
+  }
+
+  static bool _checksConstraints(RentalProperty p, SearchQuery q) {
+    if (q.city != null && !p.city.contains(q.city!)) return false;
+    if (q.maxPrice != null && p.price > q.maxPrice!) return false;
+    if (q.minPrice != null && p.price < q.minPrice!) return false;
+    if (q.minRooms != null && p.rooms < q.minRooms!) return false;
+    if (q.maxRooms != null && p.rooms > q.maxRooms!) return false;
+    return true;
+  }
+
+  static bool _hasAmenities(RentalProperty p, SearchQuery q) =>
+      q.amenities.any((a) => p.featureFlags.isEnabled(a));
 
   static ScoredProperty _score(RentalProperty p, SearchQuery q) {
     double s = 1;
