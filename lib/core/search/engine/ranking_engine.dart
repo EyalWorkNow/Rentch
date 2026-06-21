@@ -232,6 +232,9 @@ class GradientBoostedScorer {
     // location & access
     _Stump('centrality', 0.75, 0.4, 0.0),
     _Stump('transit_access', 0.5, 0.35, 0.0),
+    _Stump('transit_density', 0.55, 0.3, 0.0), // real gov stop-density
+    _Stump('socioeconomic', 0.66, 0.3, 0.0), // CBS cluster quality
+    _Stump('rail_access', 0.5, 0.25, 0.0), // near rail/light-rail
     // amenities richness
     _Stump('weighted_amenity_score', 0.6, 0.45, 0.0),
     _Stump('condition_score', 0.8, 0.3, 0.0),

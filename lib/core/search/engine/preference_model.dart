@@ -31,6 +31,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 // utilities and attributions stay aligned.
 const List<String> kScoringDimensions = [
   'location',
+  'neighborhood', // CBS socioeconomic quality of the locality (gov data)
   'budget',
   'value',
   'size',
@@ -396,6 +397,8 @@ class UserPreferenceModel {
     switch (dim) {
       case 'location':
         return pfv.centrality;
+      case 'neighborhood':
+        return pfv.get('socioeconomic', 0.5);
       case 'budget':
         return pfv.property.price.toDouble();
       case 'value':
@@ -482,6 +485,7 @@ class PreferenceModelBuilder {
   // Prior importance of each dimension before any user signal.
   static const Map<String, double> _priorMean = {
     'location': 0.55,
+    'neighborhood': 0.35,
     'budget': 0.85,
     'value': 0.6,
     'size': 0.6,
@@ -547,9 +551,11 @@ class PreferenceModelBuilder {
     }
     if (query.city != null && query.city!.trim().isNotEmpty) {
       sharpen('location', 0.9, 5.0);
+      sharpen('neighborhood', 0.6, 1.5); // naming a place ⇒ character matters
     }
     if (query.neighborhood != null && query.neighborhood!.trim().isNotEmpty) {
       sharpen('location', 0.95, 6.0);
+      sharpen('neighborhood', 0.7, 2.0);
     }
     if (desiredRoomsLo != null || desiredRoomsHi != null) {
       sharpen('size', 0.85, 4.0);
@@ -579,6 +585,11 @@ class PreferenceModelBuilder {
       'location': query.city != null
           ? const SigmoidThresholdUtility(0.45, 6.0)
           : const LinearUtility(),
+      // socioeconomic quality: gentle reward for mid+ clusters; cheap-seekers
+      // shouldn't be penalized for affordable areas, so keep it soft.
+      'neighborhood': cheap
+          ? const ConstantUtility(0.55)
+          : const SigmoidThresholdUtility(0.4, 4.0),
       'budget': BudgetUtility(maxBudget, elasticity,
           minBudget: (minBudget ?? 0).toDouble()),
       'value': const LinearUtility(),

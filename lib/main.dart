@@ -1,5 +1,6 @@
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/push_notification_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
@@ -48,6 +49,15 @@ void main() async {
     await ScaniverseService.instance.initialize();
   } catch (error) {
     debugPrint('Scaniverse initialization skipped: $error');
+  }
+
+  // Load the gov-data reference layer (localities/transit/socioeconomic/market)
+  // for the recommendation engine. Fully fail-soft: the engine falls back to
+  // built-in heuristics if the assets can't be read.
+  try {
+    await GovData.instance.init();
+  } catch (error) {
+    debugPrint('GovData init skipped: $error');
   }
 
   SystemChrome.setSystemUIOverlayStyle(

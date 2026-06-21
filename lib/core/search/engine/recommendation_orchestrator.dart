@@ -166,6 +166,7 @@ class Explainer {
 
   static const Map<String, String> _dimLabel = {
     'location': 'מיקום',
+    'neighborhood': 'אזור איכותי',
     'budget': 'תקציב',
     'value': 'תמורה למחיר',
     'size': 'גודל',
@@ -194,17 +195,19 @@ class Explainer {
       chips.add('₪${p.pricePerSquareMeter}/מ״ר — נמוך לאזור');
     }
 
-    // transit
-    if (pfv.transitAccess > 0.5) {
-      final km = pfv.get('transit_km');
-      if (km < 30) {
-        final mins = (km / 0.075).round().clamp(1, 60); // ~walking proxy
-        chips.add('כ-$mins דק׳ מהרכבת');
-      }
+    // transit — real gov-data signals
+    final railKm = pfv.get('rail_km', 99);
+    if (railKm < 1.2) {
+      chips.add('צמוד לרכבת');
+    } else if (railKm < 3.0) {
+      chips.add('כ-${railKm.toStringAsFixed(1)} ק״מ מהרכבת');
+    } else if (pfv.get('transit_density') > 0.6) {
+      chips.add('מחובר היטב לתחבורה');
     }
 
-    // location
+    // location & neighbourhood quality (CBS socioeconomic cluster)
     if (pfv.centrality > 0.78) chips.add('מיקום מרכזי');
+    if (pfv.get('socioeconomic') > 0.78) chips.add('אזור מבוקש');
 
     // requested amenities that matched
     final matched = <String>[];
@@ -331,7 +334,10 @@ class RecommendationEngine {
       ranked,
       limit: limit,
       lambda: diversityLambda,
-    );
+    )
+      // MMR diversifies the SELECTED set; present it in descending fit order so
+      // the displayed % is monotonic (no "82% above 85%" confusion).
+      ..sort((a, b) => b.score.compareTo(a.score));
 
     // model confidence: how much intent we captured + behavioral confidence
     final intentCoverage =

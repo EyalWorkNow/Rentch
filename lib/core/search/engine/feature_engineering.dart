@@ -24,6 +24,8 @@
 
 import 'dart:math' as math;
 
+import 'package:dating_app/core/govdata/geo_intelligence.dart';
+import 'package:dating_app/core/govdata/market_intelligence.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -603,36 +605,11 @@ class MarketContext {
   }
 }
 
-// City desirability prior (centrality when geo coords are missing).
-const Map<String, double> _cityCentralityPrior = {
-  'תל אביב': 0.97,
-  'תל אביב-יפו': 0.97,
-  'רמת גן': 0.9,
-  'גבעתיים': 0.9,
-  'הרצליה': 0.82,
-  'גבעת שמואל': 0.78,
-  'בני ברק': 0.7,
-  'ירושלים': 0.8,
-  'חיפה': 0.74,
-  'ראשון לציון': 0.7,
-  'פתח תקווה': 0.68,
-  'רעננה': 0.72,
-  'כפר סבא': 0.68,
-  'נתניה': 0.6,
-  'באר שבע': 0.5,
-  'אשדוד': 0.55,
-  'אשקלון': 0.5,
-};
-
-/// Centrality in [0,1] blending geographic proximity-to-CBD with a city prior.
-double _centralityScore(double lat, double lon, String city) {
-  final cbd = IsraelGeoIndex.nearestCbdKm(lat, lon);
-  final cityPrior = _cityCentralityPrior[city.trim()] ?? 0.45;
-  if (cbd == null) return cityPrior;
-  // 1.0 at a CBD, decaying with a 6km scale.
-  final geo = math.exp(-cbd / 6.0);
-  return (0.55 * geo + 0.45 * cityPrior).clamp(0.0, 1.0);
-}
+/// Centrality in [0,1]. Delegates to the gov-data composite (socioeconomic +
+/// transit density + city prior); GeoIntelligence falls back to the city prior
+/// when GovData isn't loaded.
+double _centralityScore(double lat, double lon, String city) =>
+    GeoIntelligence.centrality(lat, lon, city);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // PropertyFeatureVector — the engineered representation
@@ -716,17 +693,18 @@ class FeatureEngineer {
   ) {
     final f = <String, double>{};
 
-    // ── geospatial ───────────────────────────────────────────────────────────
-    final stationKm = IsraelGeoIndex.nearestStationKm(p.lat, p.lon);
-    final cbdKm = IsraelGeoIndex.nearestCbdKm(p.lat, p.lon);
+    // ── geospatial (real gov-data: 33,937 transit stops + rail + SES) ─────────
+    final transit = GeoIntelligence.transit(p.lat, p.lon);
     final uniKm = IsraelGeoIndex.nearestUniversityKm(p.lat, p.lon);
     final coastKm = IsraelGeoIndex.coastKm(p.lat, p.lon);
 
     f['centrality'] = _centralityScore(p.lat, p.lon, p.city);
-    f['transit_access'] =
-        IsraelGeoIndex.proximityKernel(stationKm, scaleKm: 1.5);
-    f['transit_km'] = stationKm ?? 99.0;
-    f['cbd_access'] = IsraelGeoIndex.proximityKernel(cbdKm, scaleKm: 6.0);
+    f['transit_access'] = transit.combined;
+    f['transit_density'] = transit.densityScore;
+    f['rail_access'] = transit.railAccess;
+    f['rail_km'] = transit.railKm ?? 99.0;
+    f['transit_km'] = transit.railKm ?? 99.0; // back-compat alias
+    f['socioeconomic'] = GeoIntelligence.socioeconomicScore(p.city);
     f['university_access'] =
         IsraelGeoIndex.proximityKernel(uniKm, scaleKm: 3.0);
     f['coast_access'] = IsraelGeoIndex.proximityKernel(coastKm, scaleKm: 3.0);
@@ -741,20 +719,42 @@ class FeatureEngineer {
         pps > 0 ? mkt.pricePerSqmPercentile(pps) : 0.5;
     f['price_per_room'] = p.rooms > 0 ? p.price / p.rooms : p.price.toDouble();
 
-    final residual = mkt.hedonic.isFitted
+    // live OLS hedonic residual (unbiased, high-variance on small samples)
+    final liveResidual = mkt.hedonic.isFitted
         ? mkt.hedonic.valueResidual(p, f['centrality']!)
         : _fallbackValueResidual(p, mkt);
+    // gov ₪/m²-anchored residual (biased, stable) via empirical-Bayes shrinkage
+    final liveFair = mkt.hedonic.isFitted
+        ? mkt.hedonic.predictPrice(p, f['centrality']!)
+        : null;
+    final govResidual = MarketIntelligence.govValueResidual(
+      price: p.price,
+      liveFair: liveFair,
+      city: p.city,
+      sizeM2: p.sizeM2,
+      marketSize: mkt.size,
+    );
+    final hasAnchor = MarketIntelligence.hasAnchor(p.city, p.sizeM2);
+    // blend: when a real gov anchor exists, average the two; else pure live
+    final residual = hasAnchor ? (0.5 * liveResidual + 0.5 * govResidual) : liveResidual;
     f['hedonic_residual'] = residual; // [-1,1] positive = underpriced
+    f['gov_value_residual'] = govResidual;
     // value_score: map residual + ppsqm-percentile into [0,1] (higher = better deal)
     final ppsValue = pps > 0 ? (1.0 - mkt.pricePerSqmPercentile(pps)) : 0.5;
     f['value_score'] = (0.6 * ((residual + 1) / 2) + 0.4 * ppsValue)
         .clamp(0.0, 1.0);
 
-    // affordability vs the property's own city market
-    final cityMed = mkt.cityMedianPrice[p.city];
-    f['affordability_local'] = (cityMed != null && cityMed > 0 && p.price > 0)
-        ? (1.0 - ((p.price / cityMed) - 1).clamp(-1.0, 1.0)) / 1.0
-        : 0.5;
+    // affordability: prefer the gov per-locality norm; fall back to the live
+    // candidate-set city median.
+    if (hasAnchor) {
+      f['affordability_local'] =
+          MarketIntelligence.affordabilityVsLocal(p.price, p.city, p.sizeM2);
+    } else {
+      final cityMed = mkt.cityMedianPrice[p.city];
+      f['affordability_local'] = (cityMed != null && cityMed > 0 && p.price > 0)
+          ? (1.0 - ((p.price / cityMed) - 1).clamp(-1.0, 1.0))
+          : 0.5;
+    }
 
     // ── size / space ─────────────────────────────────────────────────────────
     f['rooms'] = p.rooms;
