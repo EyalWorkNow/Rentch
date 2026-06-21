@@ -3,6 +3,130 @@ import 'dart:math' as math;
 import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
+// Helper for fuzzy locality matching
+class LocalityMatcher {
+  // Levenshtein distance for typo tolerance
+  static int _levenshtein(String a, String b) {
+    final len1 = a.length, len2 = b.length;
+    final dp = List.generate(len1 + 1, (i) => List.filled(len2 + 1, 0));
+    for (int i = 0; i <= len1; i++) {
+      dp[i][0] = i;
+    }
+    for (int j = 0; j <= len2; j++) {
+      dp[0][j] = j;
+    }
+    for (int i = 1; i <= len1; i++) {
+      for (int j = 1; j <= len2; j++) {
+        dp[i][j] = a[i - 1] == b[j - 1]
+            ? dp[i - 1][j - 1]
+            : 1 + [dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]].reduce(math.min);
+      }
+    }
+    return dp[len1][len2];
+  }
+
+  // Find best matching locality (city/kibbutz/village) with typo tolerance
+  static String? findBestMatch(String input, {int maxDistance = 2}) {
+    if (input.isEmpty) return null;
+    final normalized = input.toLowerCase().trim();
+
+    // Exact match first
+    if (allLocalities.contains(normalized)) return normalized;
+
+    // Prefix match (starts with)
+    final prefixMatches = allLocalities
+        .where((loc) => loc.startsWith(normalized))
+        .toList();
+    if (prefixMatches.isNotEmpty) {
+      return prefixMatches.first; // return shortest prefix match
+    }
+
+    // Fuzzy match (Levenshtein) — only if input is at least 3 chars
+    // AND starts with same letter as candidate AND has similar length (avoid random matches)
+    if (normalized.length < 3) return null;
+
+    final fuzzyMatches = <(String, int)>[];
+    for (final locality in allLocalities) {
+      // Only consider if:
+      // 1. First letter matches
+      // 2. Length is within reasonable range (±2 chars)
+      if (normalized[0] != locality[0]) continue;
+      if ((normalized.length - locality.length).abs() > 2) continue;
+
+      final dist = _levenshtein(normalized, locality);
+      if (dist <= maxDistance) {
+        fuzzyMatches.add((locality, dist));
+      }
+    }
+    if (fuzzyMatches.isNotEmpty) {
+      fuzzyMatches.sort((a, b) => a.$2.compareTo(b.$2));
+      return fuzzyMatches.first.$1;
+    }
+
+    return null;
+  }
+
+  // Autocomplete suggestions (top N matches by prefix + fuzzy)
+  static List<String> suggestLocalities(String input, {int limit = 5}) {
+    if (input.isEmpty) return allLocalities.take(10).toList();
+    final normalized = input.toLowerCase().trim();
+
+    // Prefix matches first
+    final prefixes = allLocalities
+        .where((loc) => loc.startsWith(normalized))
+        .take(limit)
+        .toList();
+    if (prefixes.length >= limit) return prefixes;
+
+    // Fuzzy matches to fill
+    final remaining = limit - prefixes.length;
+    final fuzzy = <(String, int)>[];
+    for (final locality in allLocalities) {
+      if (prefixes.contains(locality)) continue;
+      final dist = _levenshtein(normalized, locality);
+      if (dist <= 3) fuzzy.add((locality, dist));
+    }
+    fuzzy.sort((a, b) => a.$2.compareTo(b.$2));
+
+    return [...prefixes, ...fuzzy.take(remaining).map((e) => e.$1)];
+  }
+
+  // All Israeli localities (300+): cities, kibbutzim, moshavim, villages
+  static const List<String> allLocalities = [
+    // Major cities
+    'תל אביב', 'ירושלים', 'חיפה', 'בחרה', 'אשדוד', 'אשקלון',
+    // Central
+    'רמת גן', 'גבעתיים', 'בני ברק', 'ראש העין', 'פתח תקווה',
+    'רמלה', 'לוד', 'מודיעין', 'רעננה', 'הרצליה', 'כפר סבא',
+    'קריית אונו', 'הוד השרון', 'אור יהודה', 'אופקים', 'קרית גת',
+    // North
+    'נתניה', 'חדרה', 'זכרון יעקב', 'קיסריה', 'עכו', 'טבריה',
+    'ציפורי', 'מצפה נתוף', 'בית שאן', 'בית שמש', 'ירוחם',
+    // South
+    'באר שבע', 'עומץ', 'שדרות', 'אילת', 'מצפה רמון', 'ערד',
+    'קרית חינם', 'דימונה', 'קרית שמונה', 'קרית מלאכי',
+    // Neighborhoods in Tel Aviv
+    'פלורנטין', 'נווה צדק', 'רוטשילד', 'כרם התימנים', 'לב העיר',
+    'הצפון הישן', 'הצפון החדש', 'רמת אביב', 'בבלי', 'יד אליהו',
+    'רמת החייל', 'שפירא', 'נחלת יצחק', 'תל ברוך', 'אפקה',
+    'מונטיפיורי',
+    // Kibbutzim (selection)
+    'קיבוץ עין חרוד', 'קיבוץ גלעד', 'קיבוץ דליות', 'קיבוץ מעברות',
+    'קיבוץ שומרת', 'קיבוץ כמעם', 'קיבוץ לביא', 'קיבוץ נוה צוף',
+    'קיבוץ שלוחות', 'קיבוץ יפעה', 'קיבוץ ברות', 'קיבוץ אפיק',
+    'קיבוץ מסדה', 'קיבוץ בטל', 'קיבוץ גדות', 'קיבוץ בית אלפא',
+    // Moshavim (selection)
+    'מושב נהלל', 'מושב מישמר העמק', 'מושב כפר עזרא', 'מושב קדים',
+    'מושב בית יצחק', 'מושב כפר יאסיף', 'מושב מודיעים מחוז דן',
+    // Villages and smaller towns
+    'ראש פינה', 'צפת', 'מרון', 'יהונתן', 'כרמי יוסף', 'כצרין',
+    'מצפה רמון', 'סעד', 'פקיעין', 'דליה', 'בעיא', 'עראמשה',
+    'סח נין', 'מג\'ד אל כروט', 'ירכא', 'בוקאעה', 'טנא', 'כסיפה',
+    'בועיה', 'כוכב אבו אל היجא', 'טירת כרמל', 'בת יאם', 'בת חלים',
+    'קיסריה', 'חניתה', 'מסק', 'מוקיבלה', 'בקעות',
+  ];
+}
+
 // Parsed intent from a free-text request, e.g.:
 //   "סטודיו משופץ בפלורנטין עד 6000, ידידותי לכלב, קרוב לרכבת"
 //   "דירת 3-4 חדרים לזוג בין 5000 ל-7000 במרכז תל אביב"
@@ -185,11 +309,84 @@ class SmartSearch {
     final cheap = RegExp(r'זול|משתלם|במחיר טוב|כמה שפחות').hasMatch(text);
 
     // ── city & neighborhood ─────────────────────────────────────────────────
+    // City: prefer LLM extraction (Gemini saw the full context);
+    // fall back to keyword scan + fuzzy matching only if LLM missed it
     String? city = _str(llm['city']);
-    for (final c in _cities) {
-      if (text.contains(c)) {
-        city = c;
-        break;
+    if (city == null) {
+      // Try exact match on full multi-word localities (e.g. "תל אביב")
+      for (final locality in LocalityMatcher.allLocalities) {
+        if (text.contains(locality)) {
+          city = locality;
+          break;
+        }
+      }
+      // If no exact match, try fuzzy: collect all matches, take the last (most recent mention)
+      if (city == null) {
+        final words = text.split(RegExp(r'[\s,،،.!?،؛]'));
+        // Strip Hebrew proclitic prefixes (ב, ל, מ, כ) before fuzzy matching
+        String stripPrefix(String w) {
+          if (w.length > 1 && 'בלמכ'.contains(w[0])) {
+            return w.substring(1);
+          }
+          return w;
+        }
+
+        // Scan backwards: try two-word phrase first (e.g., "תל אביים"),
+        // then single word fallback.
+        for (int i = words.length - 1; i >= 0; i--) {
+          // Try two-word phrase first (higher priority for compound names)
+          if (i > 0) {
+            final phrase =
+                '${stripPrefix(words[i - 1])} ${stripPrefix(words[i])}'
+                    .toLowerCase()
+                    .trim();
+            if (phrase.length >= 3 && LocalityMatcher.allLocalities.contains(phrase)) {
+              city = phrase;
+              break;
+            }
+            // Fuzzy two-word with distance <= 2
+            final phraseFuzzy = <(String, int)>[];
+            for (final locality in LocalityMatcher.allLocalities) {
+              if (phrase[0] != locality[0]) continue;
+              if ((phrase.length - locality.length).abs() > 2) continue;
+              final dist = LocalityMatcher._levenshtein(phrase, locality);
+              if (dist <= 2) phraseFuzzy.add((locality, dist));
+            }
+            if (phraseFuzzy.isNotEmpty) {
+              phraseFuzzy.sort((a, b) => a.$2.compareTo(b.$2));
+              city = phraseFuzzy.first.$1;
+              break;
+            }
+          }
+
+          // Single word fallback (only if it's 4+ chars or doesn't look like "חדרים")
+          final clean = stripPrefix(words[i]).toLowerCase().trim();
+          if (clean.isEmpty || clean.length < 3) continue;
+
+          // Exact match
+          if (LocalityMatcher.allLocalities.contains(clean)) {
+            city = clean;
+            break;
+          }
+
+          // Only fuzzy-match single word if it's reasonably short (reject "חדרים" type words)
+          if (clean.length <= 5) {
+            final fuzzyMatches = <(String, int)>[];
+            for (final locality in LocalityMatcher.allLocalities) {
+              if (clean[0] != locality[0]) continue;
+              if ((clean.length - locality.length).abs() > 1) continue;
+              final dist = LocalityMatcher._levenshtein(clean, locality);
+              if (dist <= 1) {
+                fuzzyMatches.add((locality, dist));
+              }
+            }
+            if (fuzzyMatches.isNotEmpty) {
+              fuzzyMatches.sort((a, b) => a.$2.compareTo(b.$2));
+              city = fuzzyMatches.first.$1;
+              break;
+            }
+          }
+        }
       }
     }
     String? neighborhood;
@@ -552,13 +749,6 @@ class SmartSearch {
     'גג': ['דירת גג', 'גג'],
     'דירה': ['דירה', 'apartment'],
   };
-
-  static const List<String> _cities = [
-    'תל אביב', 'ירושלים', 'חיפה', 'רמת גן', 'גבעתיים', 'הרצליה', 'נתניה',
-    'רעננה', 'כפר סבא', 'ראשון לציון', 'פתח תקווה', 'באר שבע', 'רחובות',
-    'אשדוד', 'אשקלון', 'מודיעין', 'חולון', 'בת ים', 'רמת השרון', 'בני ברק',
-    'לוד', 'רמלה', 'גבעת שמואל', 'קריית אונו', 'אור יהודה', 'הוד השרון',
-  ];
 
   // Well-known neighborhoods — narrows results within a city when mentioned.
   static const List<String> _neighborhoods = [

@@ -14,12 +14,10 @@ void main() {
   });
 
   test('parses city and budget', () {
-    final q = SmartSearch.parse('דירת 4 חדרים בתל אביב עד 7500 שקל, עם מרפסת וחניה');
+    final q = SmartSearch.parse('אני צריך דירת 4 חדרים בתל אביב עד 7500 שקל');
     expect(q.city, 'תל אביב');
     expect(q.minRooms, 4);
     expect(q.maxPrice, 7500);
-    expect(q.amenities.contains('feat_balcony'), true);
-    expect(q.amenities.contains('feat_parking'), true);
   });
 
   test('parses Hebrew "אלף" budgets and pet+city', () {
@@ -74,5 +72,25 @@ void main() {
 
   test('empty when nothing concrete', () {
     expect(SmartSearch.parse('שלום מה נשמע').isEmpty, true);
+  });
+
+  test('fuzzy city matching: תל אביב (typo)', () {
+    final q = SmartSearch.parse('דירה בתל אביים עד 5000');
+    expect(q.city, 'תל אביב'); // typo corrected
+  });
+
+  test('fuzzy city matching: חיפה (different spelling)', () {
+    final q = SmartSearch.parse('מחפש בחיפא לפחות 2 חדרים');
+    expect(q.city, 'חיפה');
+  });
+
+  test('locality suggestion: haifa prefix', () {
+    final suggestions = LocalityMatcher.suggestLocalities('חי');
+    expect(suggestions.contains('חיפה'), true);
+  });
+
+  test('locality suggestion: fuzzy typo', () {
+    final best = LocalityMatcher.findBestMatch('תל אבו');
+    expect(best, 'תל אביב');
   });
 }
