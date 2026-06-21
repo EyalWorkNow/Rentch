@@ -219,6 +219,10 @@ class DatingProvider extends ChangeNotifier {
     ];
   }
 
+  // Full real catalog (base + landlord-added) for the AI search assistant to
+  // rank over — independent of the discover-feed filter state.
+  List<RentalProperty> get allProperties => _allProperties;
+
   bool _isDiscoverableCustomProperty(RentalProperty property) {
     if (_isGuestDemoProperty(property)) return _isGuestMode;
     final ownerUserId = property.ownerUserId.trim();

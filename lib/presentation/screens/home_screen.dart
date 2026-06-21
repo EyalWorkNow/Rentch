@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
@@ -111,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
             : const <Widget>[
                 DiscoverScreen(),
                 MatchesScreen(),
+                SearchChatScreen(),
                 ProfileScreen()
               ];
 
@@ -301,6 +303,11 @@ const _tenantItems = [
     label: 'התאמות',
     icon: IconsaxPlusLinear.message,
     activeIcon: IconsaxPlusLinear.message,
+  ),
+  _NavItem(
+    label: 'חיפוש חכם',
+    icon: IconsaxPlusLinear.search_normal_1,
+    activeIcon: IconsaxPlusLinear.search_normal_1,
   ),
   _NavItem(
     label: 'פרופיל',

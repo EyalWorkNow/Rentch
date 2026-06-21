@@ -1,3 +1,4 @@
+import 'package:dating_app/presentation/features/search/search_assistant_screen.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
@@ -9,6 +10,7 @@ class Routes {
   static const String matches = '/matches';
   static const String explore = '/explore';
   static const String profile = '/profile';
+  static const String searchAssistant = '/search-assistant';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -20,6 +22,9 @@ class Routes {
         return MaterialPageRoute(builder: (_) => const ExploreScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case searchAssistant:
+        return MaterialPageRoute(
+            builder: (_) => const SearchAssistantScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
