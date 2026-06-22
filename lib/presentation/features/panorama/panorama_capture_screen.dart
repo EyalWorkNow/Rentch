@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
@@ -60,6 +61,14 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       final picked =
           await _picker.pickImage(source: source, imageQuality: 90);
       if (picked == null) return;
+      // A true Photo Sphere is equirectangular (~2:1). Warn (don't block) if the
+      // image isn't, since it will look distorted in the 360° viewer.
+      final aspect = await _imageAspect(picked.path);
+      if (!mounted) return;
+      if (aspect != null && (aspect < 1.85 || aspect > 2.2)) {
+        final proceed = await _warnNotSpherical(aspect);
+        if (proceed != true) return;
+      }
       if (!mounted) return;
       final label = await _askLabel('נקודה ${_nodes.length + 1}');
       if (label == null) return;
@@ -84,6 +93,48 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     } catch (_) {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  // Width/height ratio of an image file (null if it can't be decoded).
+  Future<double?> _imageAspect(String path) async {
+    try {
+      final bytes = await File(path).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final w = frame.image.width, h = frame.image.height;
+      frame.image.dispose();
+      return h > 0 ? w / h : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool?> _warnNotSpherical(double aspect) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('זו לא תמונה כדורית',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+        content: Text(
+          'התמונה ביחס ${aspect.toStringAsFixed(1)}:1, אבל סיור 360° תקין צריך '
+          'תמונה כדורית ביחס 2:1 (מצב «כדור תמונה» / Photo Sphere). אם תוסיף '
+          'אותה, ייתכן שהסיור ייראה מעוות.',
+          style: const TextStyle(color: Color(0xFF475569), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('ביטול')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('הוסף בכל זאת'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<String?> _askLabel(String fallback) async {
@@ -244,16 +295,20 @@ class _Instructions extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: RichText(
-              text: const TextSpan(
-                style: TextStyle(
+              text: TextSpan(
+                style: const TextStyle(
                     color: AppColors.navy, fontSize: 13, height: 1.45),
                 children: [
-                  TextSpan(
-                      text: 'איך מצלמים סיור 360°:\n',
+                  const TextSpan(
+                      text: 'איך מצלמים סיור 360° (כדור תמונה):\n',
                       style: TextStyle(fontWeight: FontWeight.w900)),
                   TextSpan(
                       text:
-                          '1. עמוד במרכז כל חדר.\n2. פתח במצלמה את מצב «פנורמה» וצלם סיבוב מלא סביבך.\n3. הוסף את התמונה כאן ותן לה שם (סלון, מטבח…).\n4. חזור על זה בכל נקודה — המערכת תקשר ביניהן לסיור הליכה.'),
+                          '1. עמוד במרכז כל חדר.\n2. במצלמה בחר מצב «כדור תמונה» / Photo Sphere, וצלם את כל הנקודות שהמערכת מסמנת — כולל למעלה ולמטה. כך נוצרת תמונה כדורית מלאה (360°).\n3. הוסף את התמונה כאן ותן לה שם (סלון, מטבח…).\n4. חזור בכל נקודה — נקשר ביניהן לסיור הליכה.\n'),
+                  TextSpan(
+                      text: 'טיפ: «פנורמה» אופקית רגילה לא מספיקה — צריך «כדור תמונה» לכיסוי מלא.',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: AppColors.primary)),
                 ],
               ),
             ),
