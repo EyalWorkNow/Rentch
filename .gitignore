@@ -61,3 +61,5 @@ AWSCLIV2.pkg
 ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 ios/Runner.xcworkspace/xcshareddata/swiftpm/
 firebase-service-account.json
+ios/build/
+build/

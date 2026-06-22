@@ -5,7 +5,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
-import 'package:dating_app/presentation/features/panorama/streetview_capture_screen.dart';
+import 'package:dating_app/presentation/features/panorama/camera360_capture_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -138,11 +138,11 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
   }
 
-  // Guided AR capture (Photo-Sphere style) → returns a composed panorama path.
+  // Guided 360° capture via the camera_360 plugin (real OpenCV stitching).
   Future<void> _addArPoint() async {
     if (_busy) return;
     final path = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const StreetViewCaptureScreen()),
+      MaterialPageRoute(builder: (_) => const Camera360CaptureScreen()),
     );
     if (path == null || !mounted) return;
     final label = await _askLabel('נקודה ${_nodes.length + 1}');
@@ -153,7 +153,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       final remote = await AwsApiClient.instance.uploadFile(
         path,
         folder: 'panoramas',
-        contentType: 'image/png',
+        contentType: 'image/jpeg',
       );
       if (remote != null && remote.isNotEmpty) url = remote;
     } catch (_) {}
