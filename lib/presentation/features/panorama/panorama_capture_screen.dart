@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_tour_view.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -195,7 +195,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
           if (_nodes.length >= 2)
             TextButton(
               onPressed: () =>
-                  PanoramaTourView.open(context, _buildTour(), title: 'תצוגה מקדימה'),
+                  PanoramaExperienceView.open(context, _buildTour(),
+                      title: 'תצוגה מקדימה'),
               child: const Text('תצוגה מקדימה'),
             ),
         ],

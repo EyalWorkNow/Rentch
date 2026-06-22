@@ -1,6 +1,6 @@
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_tour_view.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,21 +76,19 @@ void main() {
   // Network images can't load in the headless test binding (they throw); we
   // drain those image exceptions and verify the *navigation logic* (title +
   // point selector) which is independent of the GL panorama render.
-  testWidgets('360 viewer builds and switches active point', (tester) async {
-    await tester.pumpWidget(_wrap(PanoramaTourView(tour: _twoNodeTour())));
+  testWidgets('360 experience builds and walks between points', (tester) async {
+    await tester.pumpWidget(_wrap(PanoramaExperienceView(tour: _twoNodeTour())));
     await tester.pump();
-    // consume any image-load exceptions from the unreachable network images
-    tester.takeException();
+    tester.takeException(); // unreachable network images throw in the test binding
 
-    // title shows the first point
     expect(find.textContaining('· סלון'), findsOneWidget);
-    // point selector exposes both points
     expect(find.text('סלון'), findsWidgets);
     expect(find.text('מטבח'), findsWidgets);
 
-    // tap the second point → active node switches (title updates)
+    // tap the second room → transition runs and the active node switches
     await tester.tap(find.text('מטבח').last);
-    await tester.pump();
+    await tester.pump(); // kick off the transition
+    await tester.pump(const Duration(milliseconds: 700)); // let it settle
     tester.takeException();
     expect(find.textContaining('· מטבח'), findsOneWidget);
   });
