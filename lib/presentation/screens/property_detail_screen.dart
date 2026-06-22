@@ -19,6 +19,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_tour_view.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
@@ -91,7 +92,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       builder: (context, provider, _) {
         final p = provider.propertyById(widget.property.id) ?? widget.property;
         final media = p.media;
-        final hasVirtualTour = p.hasReadyVirtualTour || p.videoUrls.isNotEmpty;
+        final hasVirtualTour =
+            p.hasReadyVirtualTour || p.videoUrls.isNotEmpty || p.hasPanoramaTour;
         final title = p.street.isNotEmpty
             ? '${p.propertyType} ב${p.street} ${p.streetNumber}'
             : '${p.propertyType} ב${p.city}';
@@ -2245,6 +2247,13 @@ Future<void> openPropertyTour(
   BuildContext context,
   RentalProperty property,
 ) async {
+  // Prefer the DIY 360° panorama walkthrough when the owner captured one — it's
+  // a real "look around / walk to the next point" experience, even without a
+  // heavy 3D scan.
+  if (property.hasPanoramaTour) {
+    await PanoramaTourView.open(context, property.panoramaTour!);
+    return;
+  }
   if (!property.hasReadyVirtualTour && property.videoUrls.isEmpty) {
     showModalBottomSheet(
       context: context,

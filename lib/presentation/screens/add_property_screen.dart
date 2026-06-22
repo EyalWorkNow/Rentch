@@ -10,7 +10,9 @@ import 'package:dating_app/core/services/scaniverse_asset_import_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
+import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/foundation.dart';
@@ -125,7 +127,19 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   PropertyVirtualTour? _virtualTourDraft;
   PropertyVirtualTour? _scanTourDraft;
   PropertyModel3d? _model3dDraft;
+  PropertyPanoramaTour? _panoramaTourDraft;
   Timer? _scanPollTimer;
+
+  Future<void> _createPanoramaTour() async {
+    final result = await Navigator.of(context).push<PropertyPanoramaTour>(
+      MaterialPageRoute(
+        builder: (_) => PanoramaCaptureScreen(initial: _panoramaTourDraft),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _panoramaTourDraft = result.isEmpty ? null : result);
+    }
+  }
   int _scanPollCount = 0;
   String? _stagingProgress;
   bool _wantsVerifiedListing = false;
@@ -809,6 +823,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         transactionType: transactionType,
         virtualTour: _scanTourDraft ?? _virtualTourDraft,
         model3d: _model3dDraft,
+        panoramaTour: _panoramaTourDraft,
         legal: legal,
         priceHistory: priceHistory,
         verification: verification,
@@ -1092,6 +1107,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 _scanTourDraft = null;
                 _model3dDraft = null;
               }),
+              onCreatePanoramaTour: _createPanoramaTour,
+              panoramaPointCount: _panoramaTourDraft?.length ?? 0,
               acceptedTerms: _acceptedPropertyTerms,
               onAcceptedTermsChanged: (value) =>
                   setState(() => _acceptedPropertyTerms = value),
@@ -2029,6 +2046,8 @@ class _StepPhotos extends StatelessWidget {
     required this.onImportScaniverseAssets,
     required this.onClearVirtualTour,
     required this.onClearScan,
+    this.onCreatePanoramaTour,
+    this.panoramaPointCount = 0,
     required this.acceptedTerms,
     required this.onAcceptedTermsChanged,
     required this.thirdPartyTransferAllowed,
@@ -2065,6 +2084,8 @@ class _StepPhotos extends StatelessWidget {
   final VoidCallback onImportScaniverseAssets;
   final VoidCallback onClearVirtualTour;
   final VoidCallback onClearScan;
+  final VoidCallback? onCreatePanoramaTour;
+  final int panoramaPointCount;
   final bool acceptedTerms;
   final ValueChanged<bool> onAcceptedTermsChanged;
   final bool thirdPartyTransferAllowed;
@@ -2326,6 +2347,12 @@ class _StepPhotos extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 16),
+              if (onCreatePanoramaTour != null)
+                _Panorama360Tile(
+                  count: panoramaPointCount,
+                  onTap: onCreatePanoramaTour!,
+                ),
+              if (onCreatePanoramaTour != null) const SizedBox(height: 16),
               _PropertyRightsPanel(
                 acceptedTerms: acceptedTerms,
                 onAcceptedTermsChanged: onAcceptedTermsChanged,
@@ -5767,4 +5794,67 @@ Future<bool?> showScanCaptureGuide(BuildContext context) {
       ),
     ),
   );
+}
+
+// ─── DIY 360° panorama-tour entry (Step Photos) ──────────────────────────────
+class _Panorama360Tile extends StatelessWidget {
+  const _Panorama360Tile({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final has = count > 0;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: has ? AppColors.primary : AppColors.borderLight,
+            width: has ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight2,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(IconsaxPlusLinear.rotate_left, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('סיור 360° (ללא סריקה)',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 14.5)),
+                  const SizedBox(height: 2),
+                  Text(
+                    has
+                        ? '$count נקודות נוספו — הקש לעריכה'
+                        : 'צלם פנורמות נקודה-לנקודה ליצירת סיור הליכה',
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              has ? IconsaxPlusBold.tick_circle : IconsaxPlusLinear.add_circle,
+              color: has ? AppColors.success : AppColors.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

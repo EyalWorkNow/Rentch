@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:latlong2/latlong.dart';
 
 enum SearchSortOption {
@@ -729,6 +730,7 @@ class RentalProperty {
     this.designTemplate = '',
     this.designAccent = 0,
     this.createdAt,
+    this.panoramaTour,
   })  : sourceUrl = sourceUrl.isNotEmpty ? sourceUrl : (url ?? ''),
         featureFlags = featureFlags ?? PropertyFeatureSet.fromJson(features),
         model3d = _resolveModel3d(model3d, virtualTour),
@@ -785,6 +787,12 @@ class RentalProperty {
   final String designTemplate;
   final int designAccent;
   final DateTime? createdAt;
+
+  /// Optional DIY 360° walkthrough (Street-View-style panorama nodes). Distinct
+  /// from [virtualTour]/[model3d] (heavy backend 3D reconstruction).
+  final PropertyPanoramaTour? panoramaTour;
+
+  bool get hasPanoramaTour => panoramaTour?.isNotEmpty ?? false;
 
   bool get hasCustomDesign => designTemplate.trim().isNotEmpty;
 
@@ -878,6 +886,7 @@ class RentalProperty {
     String? designTemplate,
     int? designAccent,
     DateTime? createdAt,
+    PropertyPanoramaTour? panoramaTour,
   }) {
     return RentalProperty(
       id: id ?? this.id,
@@ -913,6 +922,7 @@ class RentalProperty {
       designTemplate: designTemplate ?? this.designTemplate,
       designAccent: designAccent ?? this.designAccent,
       createdAt: createdAt ?? this.createdAt,
+      panoramaTour: panoramaTour ?? this.panoramaTour,
     );
   }
 
@@ -1007,6 +1017,7 @@ class RentalProperty {
                 json[r'$createdAt'],
           ) ??
           _generateDeterministicMockDate(json['id']?.toString() ?? ''),
+      panoramaTour: PropertyPanoramaTour.fromJsonOrNull(json['panoramaTour']),
     );
   }
 
@@ -1052,6 +1063,7 @@ class RentalProperty {
       'designTemplate': designTemplate,
       'designAccent': designAccent,
       'createdAt': createdAt?.toUtc().toIso8601String(),
+      if (panoramaTour != null) 'panoramaTour': panoramaTour!.toJson(),
     };
   }
 }
