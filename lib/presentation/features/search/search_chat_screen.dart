@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
@@ -378,6 +379,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             text: 'עוד לא צף לי משהו מדויק — ננסה אזור אחר או תקציב גמיש יותר?',
           ));
         } else {
+          // Explain what the engine actually analysed/filtered/ranked before
+          // showing the cards — turns the multi-dimensional math into a warm,
+          // one-paragraph "here's what I checked and why these fit".
+          _messages.add(_ChatMsg(
+            role: 'assistant',
+            text: SearchNarrative.summarize(
+                _query, provider.allProperties.length, results),
+          ));
           _messages.add(_ChatMsg(
             role: 'assistant',
             text: anyExact
@@ -844,13 +853,19 @@ class _AssistantPropertyCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   child: Stack(fit: StackFit.expand, children: [
                     SafeMedia(
-                      media: p.primaryMedia,
+                      // prefer a video for the hero so the user can play it
+                      // straight from the assistant preview (tap to play),
+                      // without opening the 3D-tour flow.
+                      media: p.media.any((m) => m.isVideo)
+                          ? p.media.firstWhere((m) => m.isVideo)
+                          : p.primaryMedia,
                       fallback: Container(
                         color: AppColors.primaryLight2,
                         child: Icon(IconsaxPlusLinear.building,
                             color: AppColors.primary, size: 48),
                       ),
                       fit: BoxFit.cover,
+                      videoMode: SafeVideoDisplayMode.playback,
                     ),
                     Positioned(
                       top: 10,
