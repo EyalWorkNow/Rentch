@@ -65,12 +65,19 @@ class _StreetViewCaptureScreenState extends State<StreetViewCaptureScreen> {
   DateTime? _holdStart;
   bool _capturing = false;
   bool _composing = false;
+  bool _showIntro = true; // onboarding shown before the camera activates
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     _buildTargets();
+  }
+
+  // Called from the intro's "start" button — only now do we light up the camera
+  // (so the OS permission prompt appears with clear context) and the sensors.
+  void _start() {
+    setState(() => _showIntro = false);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
     _initCamera();
     _initSensors();
   }
@@ -287,7 +294,7 @@ class _StreetViewCaptureScreenState extends State<StreetViewCaptureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      body: _showIntro ? _IntroOverlay(onStart: _start) : Stack(
         fit: StackFit.expand,
         children: [
           // camera preview (cover)
@@ -585,6 +592,161 @@ class _DoneButton extends StatelessWidget {
           : const Icon(IconsaxPlusLinear.tick_circle),
       label: Text(composing ? 'מרכיב…' : 'סיום',
           style: const TextStyle(fontWeight: FontWeight.w800)),
+    );
+  }
+}
+
+// Onboarding shown before the camera activates: what's about to happen + Start.
+class _IntroOverlay extends StatelessWidget {
+  const _IntroOverlay({required this.onStart});
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: const Icon(IconsaxPlusLinear.close_circle,
+                    color: Colors.white54, size: 28),
+              ),
+            ),
+            const Spacer(),
+            Center(
+              child: Container(
+                width: 92,
+                height: 92,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(IconsaxPlusBold.global,
+                    color: Colors.white, size: 46),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'סיור 360° מודרך',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'נצלם את החדר ב-360° עם הנחיות על המסך — בדיוק כמו Street View.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 14,
+                  height: 1.4),
+            ),
+            const SizedBox(height: 28),
+            const _IntroStep(
+              icon: IconsaxPlusLinear.user,
+              title: 'עמוד במרכז החדר',
+              body: 'הישאר במקום אחד — רק תסתובב סביב הציר שלך.',
+            ),
+            const _IntroStep(
+              icon: IconsaxPlusLinear.rotate_left,
+              title: 'סובב את הטלפון לאט',
+              body: 'תנועה איטית ויציבה נותנת תוצאה חדה יותר.',
+            ),
+            const _IntroStep(
+              icon: IconsaxPlusLinear.gps,
+              title: 'עקוב אחרי הנקודות',
+              body: 'כוון את העיגול שבמרכז לכל נקודה — היא תצולם לבד.',
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(IconsaxPlusLinear.sun_1,
+                    color: Colors.white38, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'טיפ: צלם בתאורה טובה ועם החלונות מאחוריך.',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12.5),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            SizedBox(
+              height: 56,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18)),
+                ),
+                onPressed: onStart,
+                icon: const Icon(IconsaxPlusBold.camera),
+                label: const Text('בוא נתחיל',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntroStep extends StatelessWidget {
+  const _IntroStep(
+      {required this.icon, required this.title, required this.body});
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(body,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 12.5,
+                        height: 1.35)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

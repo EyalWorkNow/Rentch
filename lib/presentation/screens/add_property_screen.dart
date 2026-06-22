@@ -4477,7 +4477,19 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   PropertyVirtualTour? _virtualTourDraft;
   PropertyVirtualTour? _scanTourDraft;
   PropertyModel3d? _model3dDraft;
+  PropertyPanoramaTour? _panoramaTourDraft;
   Timer? _scanPollTimer;
+
+  Future<void> _createPanoramaTour() async {
+    final result = await Navigator.of(context).push<PropertyPanoramaTour>(
+      MaterialPageRoute(
+        builder: (_) => PanoramaCaptureScreen(initial: _panoramaTourDraft),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _panoramaTourDraft = result.isEmpty ? null : result);
+    }
+  }
   int _scanPollCount = 0;
   late bool _wantsVerifiedListing;
   late String _verificationVideoUrl;
@@ -4518,6 +4530,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _designAccent = p.designAccent;
     _selectedFeatures = Set<String>.from(p.features);
     _virtualTourDraft = p.virtualTour;
+    _panoramaTourDraft = p.panoramaTour;
     _scanTourDraft = null;
     _model3dDraft = p.model3d;
     _wantsVerifiedListing = p.isVerifiedListing;
@@ -5107,6 +5120,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         transactionType: transactionType,
         virtualTour: _scanTourDraft ?? _virtualTourDraft,
         model3d: _model3dDraft,
+        panoramaTour: _panoramaTourDraft,
         legal: legal,
         priceHistory: nextHistory,
         marketSignals: widget.property.marketSignals,
@@ -5250,6 +5264,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                     _scanTourDraft = null;
                     _model3dDraft = null;
                   }),
+                  onCreatePanoramaTour: _createPanoramaTour,
+                  panoramaPointCount: _panoramaTourDraft?.length ?? 0,
                   acceptedTerms: _acceptedPropertyTerms,
                   onAcceptedTermsChanged: (value) =>
                       setState(() => _acceptedPropertyTerms = value),
