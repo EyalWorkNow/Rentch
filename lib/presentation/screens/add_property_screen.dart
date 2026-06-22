@@ -5807,50 +5807,106 @@ class _Panorama360Tile extends StatelessWidget {
     final has = count > 0;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: has ? AppColors.primary : AppColors.borderLight,
-            width: has ? 1.5 : 1,
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withValues(alpha: 0.78),
+            ],
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight2,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(IconsaxPlusLinear.rotate_left, color: AppColors.primary),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.28),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: Stack(
+          children: [
+            // decorative 360 rings
+            Positioned(
+              right: -22,
+              top: -22,
+              child: Icon(IconsaxPlusLinear.global,
+                  size: 120, color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  const Text('סיור 360° (ללא סריקה)',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800, fontSize: 14.5)),
-                  const SizedBox(height: 2),
-                  Text(
-                    has
-                        ? '$count נקודות נוספו — הקש לעריכה'
-                        : 'צלם פנורמות נקודה-לנקודה ליצירת סיור הליכה',
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(IconsaxPlusBold.camera,
+                        color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('סיור 360° וירטואלי',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text('AR',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          has
+                              ? '$count נקודות נוספו · הקש לעריכה או הוספה'
+                              : 'צילום מודרך עם הנחיות AR — כמו Street View',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              fontSize: 12.5,
+                              height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      has ? IconsaxPlusBold.tick_circle : IconsaxPlusBold.arrow_left_2,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                   ),
                 ],
               ),
-            ),
-            Icon(
-              has ? IconsaxPlusBold.tick_circle : IconsaxPlusLinear.add_circle,
-              color: has ? AppColors.success : AppColors.primary,
             ),
           ],
         ),

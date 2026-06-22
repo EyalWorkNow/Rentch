@@ -5,6 +5,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
+import 'package:dating_app/presentation/features/panorama/streetview_capture_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -137,6 +138,32 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
   }
 
+  // Guided AR capture (Photo-Sphere style) → returns a composed panorama path.
+  Future<void> _addArPoint() async {
+    if (_busy) return;
+    final path = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const StreetViewCaptureScreen()),
+    );
+    if (path == null || !mounted) return;
+    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    if (label == null) return;
+    setState(() => _busy = true);
+    String url = path;
+    try {
+      final remote = await AwsApiClient.instance.uploadFile(
+        path,
+        folder: 'panoramas',
+        contentType: 'image/png',
+      );
+      if (remote != null && remote.isNotEmpty) url = remote;
+    } catch (_) {}
+    final id = 'pano_${DateTime.now().microsecondsSinceEpoch}';
+    setState(() {
+      _nodes.add(PanoramaNode(id: id, imageUrl: url, label: label));
+      _busy = false;
+    });
+  }
+
   Future<String?> _askLabel(String fallback) async {
     final ctrl = TextEditingController(text: fallback);
     return showDialog<String>(
@@ -239,7 +266,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                     child: FilledButton.icon(
                       style:
                           FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                      onPressed: _busy ? null : () => _addPoint(ImageSource.camera),
+                      onPressed: _busy ? null : _addArPoint,
                       icon: _busy
                           ? const SizedBox(
                               width: 16,
@@ -247,7 +274,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
                           : const Icon(IconsaxPlusLinear.camera),
-                      label: const Text('צלם נקודה'),
+                      label: const Text('צלם 360°'),
                     ),
                   ),
                 ],
