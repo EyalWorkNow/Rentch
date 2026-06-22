@@ -1,6 +1,7 @@
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_web_tour.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -58,6 +59,60 @@ void main() {
         }),
         isNull,
       );
+    });
+  });
+
+  // ── Pannellum web-tour config (the Street-View viewer data) ──────────────────
+  group('Pannellum tour config', () {
+    PropertyPanoramaTour threeNodes() => const PropertyPanoramaTour(nodes: [
+          PanoramaNode(id: 'a', imageUrl: 'https://x/a.jpg', label: 'סלון', hotspots: [
+            PanoramaHotspot(targetNodeId: 'b', longitude: 0, latitude: -8, label: 'מטבח'),
+          ]),
+          PanoramaNode(id: 'b', imageUrl: 'https://x/b.jpg', label: 'מטבח', hotspots: [
+            PanoramaHotspot(targetNodeId: 'c', longitude: 0, latitude: -8, label: 'חדר'),
+            PanoramaHotspot(targetNodeId: 'a', longitude: 180, latitude: -8, label: 'חזרה'),
+          ]),
+          PanoramaNode(id: 'c', imageUrl: 'https://x/c.jpg', label: 'חדר', hotspots: [
+            PanoramaHotspot(targetNodeId: 'b', longitude: 180, latitude: -8, label: 'חזרה'),
+          ]),
+        ]);
+
+    test('builds one scene per node with the right panorama + links', () {
+      final cfg = pannellumTourConfig(threeNodes(), imageUrlFor: (id) => '/img/$id');
+      final scenes = cfg['scenes'] as Map<String, dynamic>;
+      expect(scenes.length, 3);
+      expect((cfg['default'] as Map)['firstScene'], 'a');
+
+      final a = scenes['a'] as Map<String, dynamic>;
+      expect(a['panorama'], '/img/a');
+      expect(a['type'], 'equirectangular');
+      expect(a['title'], 'סלון');
+      final aSpots = a['hotSpots'] as List;
+      expect(aSpots.length, 1);
+      expect(aSpots.first['type'], 'scene');
+      expect(aSpots.first['sceneId'], 'b');
+      expect(aSpots.first['yaw'], 0);
+      expect(aSpots.first['pitch'], -8);
+    });
+
+    test('heading continuity: arrive facing forward (away from the back-link)', () {
+      final t = threeNodes();
+      // entering b from a: b's back-link to a sits at 180 ⇒ arrive facing 0
+      expect(pannellumArrivalYaw(t, t.nodeById('b')!, 'a'), 0);
+      // entering a from b: a's link to b sits at 0 ⇒ arrive facing 180
+      expect(pannellumArrivalYaw(t, t.nodeById('a')!, 'b'), 180);
+    });
+
+    test('drops scenes + links for nodes whose image failed to load', () {
+      // c's image didn't load ⇒ scene c gone AND b's link to c removed
+      final cfg = pannellumTourConfig(threeNodes(),
+          imageUrlFor: (id) => '/img/$id', available: {'a', 'b'});
+      final scenes = cfg['scenes'] as Map<String, dynamic>;
+      expect(scenes.containsKey('c'), false);
+      expect(scenes.length, 2);
+      final bSpots = (scenes['b'] as Map)['hotSpots'] as List;
+      expect(bSpots.length, 1); // only the back-link to a survives
+      expect(bSpots.first['sceneId'], 'a');
     });
   });
 

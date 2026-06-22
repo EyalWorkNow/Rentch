@@ -152,58 +152,12 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
     req.response.close();
   }
 
-  // Heading continuity: arrive facing away from the link that points back.
-  double _arrivalYaw(PanoramaNode target, String fromId) {
-    for (final h in target.hotspots) {
-      if (h.targetNodeId == fromId) {
-        var y = (h.longitude + 180) % 360;
-        if (y > 180) y -= 360;
-        return y;
-      }
-    }
-    return 0;
-  }
-
   String _buildHtml(PropertyPanoramaTour tour, Set<String> available) {
-    final scenes = <String, dynamic>{};
-    for (final n in tour.nodes) {
-      if (!available.contains(n.id)) continue;
-      final hotSpots = <Map<String, dynamic>>[];
-      for (final h in n.hotspots) {
-        final target = tour.nodeById(h.targetNodeId);
-        if (target == null || !available.contains(target.id)) continue;
-        hotSpots.add({
-          'pitch': h.latitude,
-          'yaw': h.longitude,
-          'type': 'scene',
-          'text': h.label.isNotEmpty ? h.label : (target.label),
-          'sceneId': target.id,
-          'targetYaw': _arrivalYaw(target, n.id),
-          'cssClass': 'sv-arrow',
-        });
-      }
-      scenes[n.id] = {
-        'title': n.label,
-        'type': 'equirectangular',
-        'panorama': '/img/${Uri.encodeComponent(n.id)}',
-        'hotSpots': hotSpots,
-      };
-    }
-    final first = tour.nodes.firstWhere((n) => available.contains(n.id),
-        orElse: () => tour.nodes.first);
-    final config = {
-      'default': {
-        'firstScene': first.id,
-        'sceneFadeDuration': 1000,
-        'autoLoad': true,
-        'compass': true,
-        'showZoomCtrl': true,
-        'keyboardZoom': false,
-        'mouseZoom': true,
-        'hfov': 100,
-      },
-      'scenes': scenes,
-    };
+    final config = pannellumTourConfig(
+      tour,
+      imageUrlFor: (id) => '/img/${Uri.encodeComponent(id)}',
+      available: available,
+    );
     final json = jsonEncode(config);
 
     // Custom arrow styling for the link hotspots (Street-View feel).
@@ -309,4 +263,74 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
       ),
     );
   }
+}
+
+// ── pure, testable tour-config builder ───────────────────────────────────────
+
+/// Heading continuity: when walking from [fromId] into [target], arrive facing
+/// away from the link that points back (i.e. facing "forward"). Returns yaw in
+/// degrees (-180..180), or 0 when geometry is unknown.
+double pannellumArrivalYaw(PropertyPanoramaTour tour, PanoramaNode target,
+    String fromId) {
+  for (final h in target.hotspots) {
+    if (h.targetNodeId == fromId) {
+      var y = (h.longitude + 180) % 360;
+      if (y > 180) y -= 360;
+      return y;
+    }
+  }
+  return 0;
+}
+
+/// Builds the Pannellum tour config (multi-scene, link hotspots, heading
+/// continuity) from a [PropertyPanoramaTour]. [imageUrlFor] maps a node id to
+/// the URL the viewer should load the panorama from. [available] optionally
+/// restricts to the nodes whose images actually loaded.
+Map<String, dynamic> pannellumTourConfig(
+  PropertyPanoramaTour tour, {
+  required String Function(String nodeId) imageUrlFor,
+  Set<String>? available,
+}) {
+  bool ok(String id) => available == null || available.contains(id);
+
+  final scenes = <String, dynamic>{};
+  for (final n in tour.nodes) {
+    if (!ok(n.id)) continue;
+    final hotSpots = <Map<String, dynamic>>[];
+    for (final h in n.hotspots) {
+      final target = tour.nodeById(h.targetNodeId);
+      if (target == null || !ok(target.id)) continue;
+      hotSpots.add({
+        'pitch': h.latitude,
+        'yaw': h.longitude,
+        'type': 'scene',
+        'text': h.label.isNotEmpty ? h.label : target.label,
+        'sceneId': target.id,
+        'targetYaw': pannellumArrivalYaw(tour, target, n.id),
+        'cssClass': 'sv-arrow',
+      });
+    }
+    scenes[n.id] = {
+      'title': n.label,
+      'type': 'equirectangular',
+      'panorama': imageUrlFor(n.id),
+      'hotSpots': hotSpots,
+    };
+  }
+
+  final first = tour.nodes.firstWhere((n) => ok(n.id),
+      orElse: () => tour.nodes.first);
+  return {
+    'default': {
+      'firstScene': first.id,
+      'sceneFadeDuration': 1000,
+      'autoLoad': true,
+      'compass': true,
+      'showZoomCtrl': true,
+      'keyboardZoom': false,
+      'mouseZoom': true,
+      'hfov': 100,
+    },
+    'scenes': scenes,
+  };
 }
