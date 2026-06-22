@@ -5,7 +5,6 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_web_tour.dart';
-import 'package:dating_app/presentation/features/panorama/camera360_capture_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -138,31 +137,6 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
   }
 
-  // Guided 360° capture via the camera_360 plugin (real OpenCV stitching).
-  Future<void> _addArPoint() async {
-    if (_busy) return;
-    final path = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const Camera360CaptureScreen()),
-    );
-    if (path == null || !mounted) return;
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
-    if (label == null) return;
-    setState(() => _busy = true);
-    String url = path;
-    try {
-      final remote = await AwsApiClient.instance.uploadFile(
-        path,
-        folder: 'panoramas',
-        contentType: 'image/jpeg',
-      );
-      if (remote != null && remote.isNotEmpty) url = remote;
-    } catch (_) {}
-    final id = 'pano_${DateTime.now().microsecondsSinceEpoch}';
-    setState(() {
-      _nodes.add(PanoramaNode(id: id, imageUrl: url, label: label));
-      _busy = false;
-    });
-  }
 
   Future<String?> _askLabel(String fallback) async {
     final ctrl = TextEditingController(text: fallback);
@@ -252,32 +226,24 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _busy ? null : () => _addPoint(ImageSource.gallery),
-                      icon: const Icon(IconsaxPlusLinear.gallery),
-                      label: const Text('מהגלריה'),
-                    ),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      style:
-                          FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                      onPressed: _busy ? null : _addArPoint,
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(IconsaxPlusLinear.camera),
-                      label: const Text('צלם 360°'),
-                    ),
-                  ),
-                ],
+                  onPressed: _busy ? null : () => _addPoint(ImageSource.gallery),
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(IconsaxPlusLinear.gallery),
+                  label: const Text('ייבא תמונת 360°',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
               ),
             ),
           ),
@@ -328,13 +294,14 @@ class _Instructions extends StatelessWidget {
                     color: AppColors.navy, fontSize: 13, height: 1.45),
                 children: [
                   const TextSpan(
-                      text: 'איך מצלמים סיור 360° (כדור תמונה):\n',
+                      text: 'איך יוצרים סיור 360°:\n',
                       style: TextStyle(fontWeight: FontWeight.w900)),
+                  const TextSpan(
+                      text:
+                          '1. בכל חדר צלם תמונת 360° כדורית (equirectangular) — עם מצלמת 360° (Insta360 / Ricoh Theta) או אפליקציית «כדור תמונה» חינמית.\n2. הקש «ייבא תמונת 360°» ובחר אותה מהגלריה, ותן לה שם (סלון, מטבח…).\n3. חזור בכל חדר — נקשר ביניהן אוטומטית לסיור הליכה.\n'),
                   TextSpan(
                       text:
-                          '1. עמוד במרכז כל חדר.\n2. במצלמה בחר מצב «כדור תמונה» / Photo Sphere, וצלם את כל הנקודות שהמערכת מסמנת — כולל למעלה ולמטה. כך נוצרת תמונה כדורית מלאה (360°).\n3. הוסף את התמונה כאן ותן לה שם (סלון, מטבח…).\n4. חזור בכל נקודה — נקשר ביניהן לסיור הליכה.\n'),
-                  TextSpan(
-                      text: 'טיפ: «פנורמה» אופקית רגילה לא מספיקה — צריך «כדור תמונה» לכיסוי מלא.',
+                          'התמונה צריכה להיות כדורית ביחס 2:1. פנורמה אופקית רגילה לא מספיקה.',
                       style: TextStyle(
                           fontWeight: FontWeight.w700, color: AppColors.primary)),
                 ],
