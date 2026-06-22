@@ -94,7 +94,13 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
             final id = Uri.decodeComponent(path.substring(5));
             final bytes = images[id];
             if (bytes != null) {
-              _send(req, 'image/jpeg', bytes);
+              // sniff PNG (downscaled) vs JPEG (original) by magic bytes
+              final isPng = bytes.length > 3 &&
+                  bytes[0] == 0x89 &&
+                  bytes[1] == 0x50 &&
+                  bytes[2] == 0x4E &&
+                  bytes[3] == 0x47;
+              _send(req, isPng ? 'image/png' : 'image/jpeg', bytes);
             } else {
               req.response.statusCode = 404;
               await req.response.close();
@@ -116,6 +122,15 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(Colors.black)
+        ..setNavigationDelegate(NavigationDelegate(
+          onWebResourceError: (error) {
+            // a main-frame load failure (ATS/cleartext/WebGL) ⇒ fall back to the
+            // native viewer so the user still gets a tour.
+            if (error.isForMainFrame ?? true) {
+              if (mounted) setState(() => _failed = true);
+            }
+          },
+        ))
         ..loadRequest(Uri.parse(url));
 
       if (!mounted) {
@@ -139,7 +154,7 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
         return await File(p).readAsBytes();
       }
       final res =
-          await http.get(Uri.parse(n.imageUrl)).timeout(const Duration(seconds: 25));
+          await http.get(Uri.parse(n.imageUrl)).timeout(const Duration(seconds: 40));
       if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
     } catch (_) {}
     return null;
@@ -148,6 +163,7 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
   static void _send(HttpRequest req, String contentType, List<int> body) {
     req.response.headers.set(HttpHeaders.contentTypeHeader, contentType);
     req.response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+    req.response.contentLength = body.length;
     req.response.add(body);
     req.response.close();
   }
@@ -162,7 +178,7 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
 
     // Custom arrow styling for the link hotspots (Street-View feel).
     return '''<!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">

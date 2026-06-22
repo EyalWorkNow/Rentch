@@ -55,44 +55,68 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     return PropertyPanoramaTour(nodes: linked);
   }
 
+  // Cap imported panoramas at this width: WebGL MAX_TEXTURE_SIZE is 4096 on many
+  // mobile GPUs and Pannellum refuses larger images. image_picker downscales
+  // natively at pick time (cheap + low memory), so the result always renders.
+  static const double _maxPanoWidth = 4096;
+
   Future<void> _addPoint(ImageSource source) async {
     if (_busy) return;
     try {
-      final picked =
-          await _picker.pickImage(source: source, imageQuality: 90);
-      if (picked == null) return;
-      // A true Photo Sphere is equirectangular (~2:1). Warn (don't block) if the
-      // image isn't, since it will look distorted in the 360° viewer.
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: _maxPanoWidth,
+        imageQuality: 90,
+      );
+      if (picked == null || !mounted) return;
+
+      // A true Photo Sphere is equirectangular (~2:1).
       final aspect = await _imageAspect(picked.path);
       if (!mounted) return;
       if (aspect != null && (aspect < 1.85 || aspect > 2.2)) {
         final proceed = await _warnNotSpherical(aspect);
-        if (proceed != true) return;
+        if (proceed != true || !mounted) return;
       }
-      if (!mounted) return;
       final label = await _askLabel('נקודה ${_nodes.length + 1}');
-      if (label == null) return;
+      if (label == null || !mounted) return;
 
       setState(() => _busy = true);
-      // Try to upload; fall back to the local path (the viewer reads files too).
-      String url = picked.path;
+      // Upload is MANDATORY: a tour must live at a network URL so tenants on
+      // other devices can view it. A local path would only work on this phone.
+      String? url;
       try {
-        final remote = await AwsApiClient.instance.uploadFile(
+        url = await AwsApiClient.instance.uploadFile(
           picked.path,
           folder: 'panoramas',
           contentType: 'image/jpeg',
         );
-        if (remote != null && remote.isNotEmpty) url = remote;
-      } catch (_) {}
+      } catch (_) {
+        url = null;
+      }
+      if (!mounted) return;
+      if (url == null || url.isEmpty) {
+        setState(() => _busy = false);
+        _toast('ההעלאה נכשלה — בדוק את החיבור ונסה שוב. '
+            'הסיור חייב להיות מועלה כדי שאחרים יוכלו לצפות.');
+        return;
+      }
 
       final id = 'pano_${DateTime.now().microsecondsSinceEpoch}';
       setState(() {
-        _nodes.add(PanoramaNode(id: id, imageUrl: url, label: label));
+        _nodes.add(PanoramaNode(id: id, imageUrl: url!, label: label));
         _busy = false;
       });
     } catch (_) {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 3200),
+      content: Text(msg),
+    ));
   }
 
   // Width/height ratio of an image file (null if it can't be decoded).
