@@ -108,23 +108,39 @@ class AwsApiClient {
       final publicUrl = presignResult['publicUrl'] as String?;
       if (uploadUrl == null || publicUrl == null) return null;
 
-      // 2. PUT directly to S3 (no auth headers needed for presigned URL)
-      final bytes = await file.readAsBytes();
-      final s3Response = await _http
-          .put(
-            Uri.parse(uploadUrl),
-            headers: {'Content-Type': mime},
-            body: bytes,
-          )
-          .timeout(const Duration(seconds: 60));
-
-      if (s3Response.statusCode >= 300) return null;
-      return publicUrl;
+      // 2. STREAM the file straight to S3 (presigned URL needs no auth headers).
+      //    Streaming via dart:io avoids loading large videos fully into memory
+      //    (the old readAsBytes + flat 60s PUT failed/OOM'd on big clips), and a
+      //    size-based timeout prevents premature failure on slow cellular.
+      final fileSize = await file.length();
+      final httpClient = HttpClient();
+      try {
+        final request = await httpClient
+            .openUrl('PUT', Uri.parse(uploadUrl))
+            .timeout(const Duration(seconds: 30));
+        request.headers.set(HttpHeaders.contentTypeHeader, mime);
+        request.contentLength = fileSize;
+        await request
+            .addStream(file.openRead())
+            .timeout(_uploadTimeoutFor(fileSize));
+        final s3Response =
+            await request.close().timeout(const Duration(seconds: 90));
+        await s3Response.drain<void>();
+        if (s3Response.statusCode >= 300) return null;
+        return publicUrl;
+      } finally {
+        httpClient.close();
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('AwsApiClient.uploadFile error: $e');
       return null;
     }
   }
+
+  // Upload timeout: ~1 s per 50 KB, clamped to 3–20 min, so large videos on slow
+  // connections don't fail prematurely.
+  Duration _uploadTimeoutFor(int bytes) =>
+      Duration(seconds: (bytes / 50000).ceil().clamp(180, 1200));
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
