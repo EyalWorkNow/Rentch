@@ -73,6 +73,7 @@ dependencies:
   panorama_viewer: ^2.0.7
   dchs_motion_sensors: ^2.0.2
   camera_360: ^1.1.2
+  webview_flutter: ^4.14.0
 
 dev_dependencies:
   flutter_test:
@@ -172,6 +173,7 @@ flutter:
     - assets/images/
     - assets/data/
     - assets/data/govdata/
+    - assets/web/pannellum/
     - assets/audio/erik/
     - assets/images/rently_logo.svg
     - assets/images/rently_logo_full.svg
