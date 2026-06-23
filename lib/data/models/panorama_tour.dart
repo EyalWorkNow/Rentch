@@ -61,12 +61,29 @@ class PanoramaNode {
     required this.imageUrl,
     this.label = '',
     this.hotspots = const [],
+    this.x,
+    this.y,
+    this.haov = 360,
+    this.vaov = 180,
   });
 
   final String id;
-  final String imageUrl; // equirectangular (2:1) panorama, network or file path
+  final String imageUrl; // equirectangular panorama, network or file path
   final String label; // e.g. "סלון", "מטבח"
   final List<PanoramaHotspot> hotspots;
+
+  /// Normalized position (0..1) on the floor sketch, for the mini-map and for
+  /// computing geometrically-correct link directions. Null until placed.
+  final double? x;
+  final double? y;
+
+  /// Horizontal / vertical angle of view (degrees) the panorama actually covers.
+  /// 360×180 = full sphere; a partial panorama (e.g. a single wide shot) sets a
+  /// smaller haov/vaov so Pannellum renders it without faking the missing parts.
+  final double haov;
+  final double vaov;
+
+  bool get hasPosition => x != null && y != null;
 
   bool get isLocal =>
       imageUrl.startsWith('/') || imageUrl.startsWith('file://');
@@ -76,12 +93,20 @@ class PanoramaNode {
     String? imageUrl,
     String? label,
     List<PanoramaHotspot>? hotspots,
+    double? x,
+    double? y,
+    double? haov,
+    double? vaov,
   }) =>
       PanoramaNode(
         id: id ?? this.id,
         imageUrl: imageUrl ?? this.imageUrl,
         label: label ?? this.label,
         hotspots: hotspots ?? this.hotspots,
+        x: x ?? this.x,
+        y: y ?? this.y,
+        haov: haov ?? this.haov,
+        vaov: vaov ?? this.vaov,
       );
 
   factory PanoramaNode.fromJson(Map<String, dynamic> j) => PanoramaNode(
@@ -92,6 +117,10 @@ class PanoramaNode {
             .whereType<Map>()
             .map((m) => PanoramaHotspot.fromJson(Map<String, dynamic>.from(m)))
             .toList(),
+        x: (j['x'] as num?)?.toDouble(),
+        y: (j['y'] as num?)?.toDouble(),
+        haov: (j['haov'] as num?)?.toDouble() ?? 360,
+        vaov: (j['vaov'] as num?)?.toDouble() ?? 180,
       );
 
   Map<String, dynamic> toJson() => {
@@ -99,6 +128,10 @@ class PanoramaNode {
         'imageUrl': imageUrl,
         if (label.isNotEmpty) 'label': label,
         'hotspots': hotspots.map((h) => h.toJson()).toList(),
+        if (x != null) 'x': x,
+        if (y != null) 'y': y,
+        if (haov != 360) 'haov': haov,
+        if (vaov != 180) 'vaov': vaov,
       };
 }
 

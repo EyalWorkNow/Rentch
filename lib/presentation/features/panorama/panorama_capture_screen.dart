@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_web_tour.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -101,14 +102,41 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         return;
       }
 
+      if (!mounted) return;
+      setState(() => _busy = false);
+
+      // Place this point on the floor map (for the mini-map + correct link
+      // directions). Skippable — falls back to an auto position.
+      final pos = await _placeOnMap(label);
       final id = 'pano_${DateTime.now().microsecondsSinceEpoch}';
+      final placed = pos ?? _autoPosition();
       setState(() {
-        _nodes.add(PanoramaNode(id: id, imageUrl: url!, label: label));
-        _busy = false;
+        _nodes.add(PanoramaNode(
+            id: id, imageUrl: url!, label: label, x: placed.dx, y: placed.dy));
       });
     } catch (_) {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  // Spread auto-placed points along a diagonal so an un-mapped tour still has a
+  // usable mini-map.
+  Offset _autoPosition() {
+    final i = _nodes.length;
+    final t = (i + 1) / 8.0;
+    return Offset((0.2 + 0.6 * (t % 1.0)).clamp(0.05, 0.95),
+        (0.2 + 0.12 * i).clamp(0.05, 0.95));
+  }
+
+  Future<Offset?> _placeOnMap(String label) async {
+    return Navigator.of(context).push<Offset>(
+      MaterialPageRoute(
+        builder: (_) => PanoramaMapPlacementScreen(
+          label: label,
+          existing: List.unmodifiable(_nodes),
+        ),
+      ),
+    );
   }
 
   void _toast(String msg) {

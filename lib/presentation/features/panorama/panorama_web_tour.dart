@@ -176,7 +176,23 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
     );
     final json = jsonEncode(config);
 
-    // Custom arrow styling for the link hotspots (Street-View feel).
+    // nodes with a map position → mini-map data (id, x, y, label, link targets)
+    final mapNodes = [
+      for (final n in tour.nodes)
+        if (n.hasPosition && available.contains(n.id))
+          {
+            'id': n.id,
+            'x': n.x,
+            'y': n.y,
+            'label': n.label,
+            'links': [
+              for (final h in n.hotspots)
+                if (available.contains(h.targetNodeId)) h.targetNodeId
+            ],
+          }
+    ];
+    final mapJson = jsonEncode(mapNodes);
+
     return '''<!DOCTYPE html>
 <html lang="he">
 <head>
@@ -197,14 +213,70 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
   }
   .sv-arrow:hover{transform:scale(1.12)}
   .pnlm-compass{bottom:auto;top:14px;left:14px}
+  /* mini-map */
+  #minimap{position:absolute;left:12px;bottom:12px;width:132px;height:132px;
+    background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);
+    border-radius:14px;z-index:5;backdrop-filter:blur(4px)}
+  #minimap svg{position:absolute;inset:0;width:100%;height:100%}
+  #mm-name{position:absolute;left:12px;bottom:150px;z-index:5;color:#fff;
+    background:rgba(0,0,0,.55);padding:5px 10px;border-radius:999px;
+    font:700 12px sans-serif}
+  .mm-dot{cursor:pointer}
 </style>
 </head>
 <body>
 <div id="pano"></div>
+<div id="mm-name"></div>
+<div id="minimap"><svg id="mm-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div>
 <script>
+  var viewer;
   try {
-    pannellum.viewer('pano', $json);
+    viewer = pannellum.viewer('pano', $json);
   } catch (e) { document.body.innerHTML = '<div style="color:#fff;padding:24px">'+e+'</div>'; }
+
+  // ── mini-map: where you walked, current point, last name ──────────────────
+  (function(){
+    var nodes = $mapJson;
+    if (!viewer || !nodes.length) {
+      var mm = document.getElementById('minimap'); if (mm) mm.style.display='none';
+      var nm = document.getElementById('mm-name'); if (nm) nm.style.display='none';
+      return;
+    }
+    var byId = {}; nodes.forEach(function(n){ byId[n.id]=n; });
+    var svg = document.getElementById('mm-svg');
+    var nameEl = document.getElementById('mm-name');
+    var SVGNS='http://www.w3.org/2000/svg';
+    function el(t,a){var e=document.createElementNS(SVGNS,t);for(var k in a)e.setAttribute(k,a[k]);return e;}
+    var px=function(v){return 6+v*88;}; // pad inside the 0..100 viewbox
+    // edges (links)
+    var seen={};
+    nodes.forEach(function(n){
+      (n.links||[]).forEach(function(t){
+        var key=[n.id,t].sort().join('|'); if(seen[key]||!byId[t])return; seen[key]=1;
+        svg.appendChild(el('line',{x1:px(n.x),y1:px(n.y),x2:px(byId[t].x),y2:px(byId[t].y),
+          stroke:'rgba(255,255,255,.45)','stroke-width':1.5}));
+      });
+    });
+    // dots
+    var dots={};
+    nodes.forEach(function(n){
+      var g=el('g',{class:'mm-dot'});
+      var c=el('circle',{cx:px(n.x),cy:px(n.y),r:4.5,fill:'#fff',stroke:'#00A6A6','stroke-width':1.5});
+      g.appendChild(c);
+      g.addEventListener('click',function(){ viewer.loadScene(n.id); });
+      svg.appendChild(g); dots[n.id]=c;
+    });
+    function setActive(id){
+      for(var k in dots){
+        var on=(k===id);
+        dots[k].setAttribute('fill',on?'#00A6A6':'#fff');
+        dots[k].setAttribute('r',on?6.5:4.5);
+      }
+      if(byId[id]) nameEl.textContent='📍 '+(byId[id].label||'');
+    }
+    viewer.on('scenechange', setActive);
+    setActive(viewer.getScene());
+  })();
 </script>
 </body>
 </html>''';
@@ -331,6 +403,10 @@ Map<String, dynamic> pannellumTourConfig(
       'type': 'equirectangular',
       'panorama': imageUrlFor(n.id),
       'hotSpots': hotSpots,
+      // partial panoramas (e.g. a single wide shot) declare their real coverage
+      // so Pannellum renders them correctly instead of stretching to a sphere
+      if (n.haov != 360) 'haov': n.haov,
+      if (n.vaov != 180) 'vaov': n.vaov,
     };
   }
 

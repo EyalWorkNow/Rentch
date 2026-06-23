@@ -47,6 +47,23 @@ void main() {
       expect(restored.nodeById('b')!.hotspots.first.longitude, 180);
     });
 
+    test('position + haov/vaov round-trip; defaults omitted', () {
+      const n = PanoramaNode(
+          id: 'p', imageUrl: '/x.jpg', x: 0.3, y: 0.7, haov: 120, vaov: 90);
+      final j = n.toJson();
+      expect(j['x'], 0.3);
+      expect(j['y'], 0.7);
+      expect(j['haov'], 120);
+      expect(j['vaov'], 90);
+      final back = PanoramaNode.fromJson(j);
+      expect(back.hasPosition, true);
+      expect(back.haov, 120);
+      // full-sphere defaults are not serialized
+      const full = PanoramaNode(id: 'q', imageUrl: '/y.jpg');
+      expect(full.toJson().containsKey('haov'), false);
+      expect(full.hasPosition, false);
+    });
+
     test('fromJsonOrNull is tolerant of junk / empties', () {
       expect(PropertyPanoramaTour.fromJsonOrNull(null), isNull);
       expect(PropertyPanoramaTour.fromJsonOrNull({'nodes': []}), isNull);
@@ -101,6 +118,18 @@ void main() {
       expect(pannellumArrivalYaw(t, t.nodeById('b')!, 'a'), 0);
       // entering a from b: a's link to b sits at 0 ⇒ arrive facing 180
       expect(pannellumArrivalYaw(t, t.nodeById('a')!, 'b'), 180);
+    });
+
+    test('partial panoramas declare haov/vaov; full ones omit them', () {
+      final t = PropertyPanoramaTour(nodes: const [
+        PanoramaNode(id: 'wide', imageUrl: 'https://x/w.jpg', haov: 120, vaov: 90),
+        PanoramaNode(id: 'full', imageUrl: 'https://x/f.jpg'),
+      ]);
+      final scenes = pannellumTourConfig(t, imageUrlFor: (id) => '/img/$id')['scenes']
+          as Map<String, dynamic>;
+      expect((scenes['wide'] as Map)['haov'], 120);
+      expect((scenes['wide'] as Map)['vaov'], 90);
+      expect((scenes['full'] as Map).containsKey('haov'), false);
     });
 
     test('drops scenes + links for nodes whose image failed to load', () {
