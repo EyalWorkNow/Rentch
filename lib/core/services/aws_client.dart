@@ -142,6 +142,71 @@ class AwsApiClient {
   Duration _uploadTimeoutFor(int bytes) =>
       Duration(seconds: (bytes / 50000).ceil().clamp(180, 1200));
 
+  // ── Panorama stitch jobs (server-side OpenCV) ─────────────────────────────
+
+  /// Create a stitch job; returns the jobId + one presigned PUT URL per frame.
+  Future<({String jobId, List<String> uploadUrls})?> createPanoramaJob({
+    required String propertyId,
+    required int frameCount,
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/panorama', {
+      'propertyId': propertyId,
+      'frameCount': frameCount,
+    });
+    final data = res['data'] as Map<String, dynamic>?;
+    final jobId = data?['jobId'] as String?;
+    final urls = (data?['uploadUrls'] as List?)?.cast<String>();
+    if (jobId == null || urls == null || urls.isEmpty) return null;
+    return (jobId: jobId, uploadUrls: urls);
+  }
+
+  /// PUT one captured frame straight to its presigned S3 URL. Returns success.
+  Future<bool> uploadToPresignedUrl(String uploadUrl, String localPath,
+      {String contentType = 'image/jpeg'}) async {
+    try {
+      final file = File(localPath);
+      if (!file.existsSync()) return false;
+      final size = await file.length();
+      final httpClient = HttpClient();
+      try {
+        final req = await httpClient
+            .openUrl('PUT', Uri.parse(uploadUrl))
+            .timeout(const Duration(seconds: 30));
+        req.headers.set(HttpHeaders.contentTypeHeader, contentType);
+        req.contentLength = size;
+        await req.addStream(file.openRead()).timeout(_uploadTimeoutFor(size));
+        final resp = await req.close().timeout(const Duration(seconds: 60));
+        await resp.drain<void>();
+        return resp.statusCode < 300;
+      } finally {
+        httpClient.close();
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('uploadToPresignedUrl error: $e');
+      return false;
+    }
+  }
+
+  /// Kick off the (async) stitch once all frames are uploaded.
+  Future<void> startPanoramaStitch(String jobId) =>
+      post('/panorama/$jobId/stitch', const {});
+
+  /// Poll job status. status ∈ pending|processing|ready|failed.
+  Future<({String status, String imageUrl, double haov, double vaov, String error})?>
+      getPanorama(String jobId) async {
+    final res = await get('/panorama/$jobId');
+    final data = res['data'] as Map<String, dynamic>?;
+    if (data == null) return null;
+    return (
+      status: (data['status'] as String?) ?? 'pending',
+      imageUrl: (data['imageUrl'] as String?) ?? '',
+      haov: (data['haov'] as num?)?.toDouble() ?? 360,
+      vaov: (data['vaov'] as num?)?.toDouble() ?? 60,
+      error: (data['error'] as String?) ?? '',
+    );
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   static const Duration _timeout = Duration(seconds: 20);

@@ -19,7 +19,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_web_tour.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
@@ -2251,7 +2251,7 @@ Future<void> openPropertyTour(
   // a real "look around / walk to the next point" experience, even without a
   // heavy 3D scan.
   if (property.hasPanoramaTour) {
-    await PanoramaWebTourView.open(context, property.panoramaTour!);
+    await PanoramaPsvTourView.open(context, property.panoramaTour!);
     return;
   }
   if (!property.hasReadyVirtualTour && property.videoUrls.isEmpty) {

@@ -257,6 +257,11 @@ class PropertyRepository {
 
       // ── Virtual tour ───────────────────────────────────────────────────────
       'virtualTour': tour == null ? '' : jsonEncode(tour.toJson()),
+      // 360° tour rides the same JSON-blob convention as virtualTour. Only S3
+      // image URLs are stored here (a few KB), not the images themselves.
+      'panoramaTour': property.panoramaTour == null
+          ? ''
+          : jsonEncode(property.panoramaTour!.toJson()),
       'tourStatus': tour?.status.name ??
           (model3d?.hasAnyAsset == true
               ? PropertyTourStatus.ready.name

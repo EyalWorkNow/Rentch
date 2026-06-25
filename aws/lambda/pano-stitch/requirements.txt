@@ -1,0 +1,7 @@
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+boto3==1.34.131
+# Optional — real floor/ceiling cap compositing (pole_fill.py). Doesn't fit the
+# zip-Lambda 250 MB limit alongside OpenCV; needs a container-image Lambda:
+#   py360convert
+#   scipy==1.13.1

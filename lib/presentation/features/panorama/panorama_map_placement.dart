@@ -1,20 +1,32 @@
+import 'dart:io';
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:image_picker/image_picker.dart';
 
-/// Lets the landlord mark where a point was captured on a simple floor sketch.
-/// The user taps the canvas; returns the normalized (0..1) position via pop,
-/// or null if skipped.
+/// Lets the landlord mark where a point was captured. Background is a blank grid
+/// by default, or a real floor-plan image the user uploads (kept across points).
+/// The user taps the canvas; returns the normalized (0..1) position via pop, or
+/// null if skipped.
 class PanoramaMapPlacementScreen extends StatefulWidget {
   const PanoramaMapPlacementScreen({
     super.key,
     required this.label,
     this.existing = const [],
+    this.floorPlanPath,
+    this.onFloorPlanPicked,
   });
 
   final String label;
   final List<PanoramaNode> existing;
+
+  /// A floor-plan image to show behind the dots (local path), if the user added
+  /// one earlier. [onFloorPlanPicked] reports a newly-picked plan back so the
+  /// caller can reuse it for the next point.
+  final String? floorPlanPath;
+  final ValueChanged<String>? onFloorPlanPicked;
 
   @override
   State<PanoramaMapPlacementScreen> createState() =>
@@ -24,6 +36,22 @@ class PanoramaMapPlacementScreen extends StatefulWidget {
 class _PanoramaMapPlacementScreenState
     extends State<PanoramaMapPlacementScreen> {
   Offset? _placed; // normalized 0..1
+  String? _floor; // floor-plan image path
+  final _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _floor = widget.floorPlanPath;
+  }
+
+  Future<void> _pickFloorPlan() async {
+    final picked = await _picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 2000, imageQuality: 90);
+    if (picked == null || !mounted) return;
+    setState(() => _floor = picked.path);
+    widget.onFloorPlanPicked?.call(picked.path);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +84,17 @@ class _PanoramaMapPlacementScreenState
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _pickFloorPlan,
+                icon: const Icon(IconsaxPlusLinear.gallery_add, size: 18),
+                label: Text(_floor == null ? 'העלה תוכנית דירה' : 'החלף תוכנית'),
+              ),
+            ),
+          ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -79,10 +118,19 @@ class _PanoramaMapPlacementScreenState
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        child: CustomPaint(
-                          painter: _FloorPainter(),
-                          child: Stack(
-                            children: [
+                        child: Stack(
+                          children: [
+                            // background: uploaded floor plan, else a soft grid
+                            Positioned.fill(
+                              child: _floor != null
+                                  ? Image.file(File(_floor!),
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) =>
+                                          CustomPaint(painter: _FloorPainter()))
+                                  : CustomPaint(painter: _FloorPainter()),
+                            ),
+                            Stack(
+                              children: [
                               // existing points
                               for (final n in placedNodes)
                                 _Dot(
@@ -99,8 +147,9 @@ class _PanoramaMapPlacementScreenState
                                   label: widget.label,
                                   active: true,
                                 ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),

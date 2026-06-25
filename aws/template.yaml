@@ -26,6 +26,10 @@ Parameters:
   TablePrefix:
     Type: String
     Default: rentch-
+  PanoStitchKey:
+    Type: String
+    Default: pano-stitch.zip
+    Description: S3 key of the OpenCV panorama-stitcher zip (Python + bundled opencv/numpy).
 
 Resources:
 
@@ -265,6 +269,9 @@ Resources:
                   - s3:GetObject
                   - s3:DeleteObject
                 Resource: !Sub '${MediaBucket.Arn}/*'
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:rentch-pano-stitch'
 
   AuthorizerRole:
     Type: AWS::IAM::Role
@@ -295,6 +302,43 @@ Resources:
         Variables:
           S3_BUCKET: !Ref MediaBucket
           TABLE_PREFIX: !Ref TablePrefix
+          PANO_STITCH_FN: rentch-pano-stitch
+
+  PanoStitchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: rentch-pano-s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${MediaBucket.Arn}/*'
+
+  PanoStitchFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-pano-stitch
+      Runtime: python3.12
+      Handler: app.handler
+      Role: !GetAtt PanoStitchRole.Arn
+      # Stitching is CPU+memory heavy; Lambda CPU scales with memory.
+      Timeout: 300
+      MemorySize: 3008
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref PanoStitchKey
 
   AuthorizerFunction:
     Type: AWS::Lambda::Function

@@ -10,17 +10,26 @@ import 'package:http/http.dart' as http;
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-/// Google-Street-View-style multi-node tour, powered by Pannellum (MIT) inside a
-/// WebView. Pannellum handles the sphere render, look-around, gyro, compass, and
-/// the scene-to-scene fade transition with heading continuity — a battle-tested
-/// viewer instead of a hand-rolled one.
+/// Google-Street-View-style multi-node tour, powered by **Photo Sphere Viewer
+/// v5** (MIT) with the **VirtualTour** + **Markers** plugins, inside a WebView.
+///
+/// This is a drop-in alternative to [PanoramaWebTourView] (Pannellum). PSV ships
+/// the one thing Pannellum lacks: **native 3D ground-plane "walk-forward" arrows**
+/// laid flat on the floor (the real Street-View look), driven by a node graph,
+/// instead of flat billboard hotspots. It also has first-class support for
+/// **partial / cropped phone panoramas** via `panoData`, so a cylindrical strip
+/// (haov 360 / vaov ≈ 60) sits at the correct latitude band with *honest* empty
+/// poles instead of a stretched smear.
+///
+/// Same public API as the Pannellum viewer, so swapping is one line:
+///   PanoramaWebTourView.open(context, tour)  →  PanoramaPsvTourView.open(context, tour)
 ///
 /// Everything is served from a tiny on-device HTTP server (HTML + the bundled
-/// Pannellum lib + the panorama images), so there are no CORS/mixed-content
+/// PSV/three.js libs + the panorama images), so there are no CORS/mixed-content
 /// issues and it works offline. If anything fails to set up, it falls back to the
 /// native [PanoramaExperienceView] so the user always sees a tour.
-class PanoramaWebTourView extends StatefulWidget {
-  const PanoramaWebTourView({
+class PanoramaPsvTourView extends StatefulWidget {
+  const PanoramaPsvTourView({
     super.key,
     required this.tour,
     this.title = 'סיור 360°',
@@ -37,20 +46,36 @@ class PanoramaWebTourView extends StatefulWidget {
     return Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => PanoramaWebTourView(tour: tour, title: title),
+        builder: (_) => PanoramaPsvTourView(tour: tour, title: title),
       ),
     );
   }
 
   @override
-  State<PanoramaWebTourView> createState() => _PanoramaWebTourViewState();
+  State<PanoramaPsvTourView> createState() => _PanoramaPsvTourViewState();
 }
 
-class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
+class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
   HttpServer? _server;
   WebViewController? _controller;
   bool _ready = false;
   bool _failed = false;
+
+  // bundled PSV v5 + plugins + three.js (self-hosted, offline).
+  static const _assets = <String, _Asset>{
+    '/three.module.js':
+        _Asset('assets/web/psv/three.module.js', 'application/javascript'),
+    '/psv-core.module.js':
+        _Asset('assets/web/psv/psv-core.module.js', 'application/javascript'),
+    '/psv-virtual-tour.module.js': _Asset(
+        'assets/web/psv/psv-virtual-tour.module.js', 'application/javascript'),
+    '/psv-markers.module.js':
+        _Asset('assets/web/psv/psv-markers.module.js', 'application/javascript'),
+    '/psv-core.css': _Asset('assets/web/psv/psv-core.css', 'text/css'),
+    '/psv-virtual-tour.css':
+        _Asset('assets/web/psv/psv-virtual-tour.css', 'text/css'),
+    '/psv-markers.css': _Asset('assets/web/psv/psv-markers.css', 'text/css'),
+  };
 
   @override
   void initState() {
@@ -60,13 +85,12 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
 
   Future<void> _prepare() async {
     try {
-      // 1. bundled Pannellum lib
-      final js = (await rootBundle.load('assets/web/pannellum/pannellum.js'))
-          .buffer
-          .asUint8List();
-      final css = (await rootBundle.load('assets/web/pannellum/pannellum.css'))
-          .buffer
-          .asUint8List();
+      // 1. bundled PSV / three.js libs
+      final libs = <String, Uint8List>{};
+      for (final entry in _assets.entries) {
+        libs[entry.key] =
+            (await rootBundle.load(entry.value.path)).buffer.asUint8List();
+      }
 
       // 2. panorama images (network → download, local → read) into memory
       final images = <String, Uint8List>{};
@@ -86,10 +110,8 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
         try {
           if (path == '/' || path == '/index.html') {
             _send(req, 'text/html; charset=utf-8', utf8.encode(html));
-          } else if (path == '/pannellum.js') {
-            _send(req, 'application/javascript', js);
-          } else if (path == '/pannellum.css') {
-            _send(req, 'text/css', css);
+          } else if (libs.containsKey(path)) {
+            _send(req, _assets[path]!.mime, libs[path]!);
           } else if (path.startsWith('/img/')) {
             final id = Uri.decodeComponent(path.substring(5));
             final bytes = images[id];
@@ -169,7 +191,7 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
   }
 
   String _buildHtml(PropertyPanoramaTour tour, Set<String> available) {
-    final config = pannellumTourConfig(
+    final config = psvTourConfig(
       tour,
       imageUrlFor: (id) => '/img/${Uri.encodeComponent(id)}',
       available: available,
@@ -193,29 +215,18 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
     ];
     final mapJson = jsonEncode(mapNodes);
 
+    // arrow tint matches the Pannellum viewer's teal (#00A6A6).
     return '''<!DOCTYPE html>
-<html lang="he">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<link rel="stylesheet" href="/pannellum.css">
-<script src="/pannellum.js"></script>
+<link rel="stylesheet" href="/psv-core.css">
+<link rel="stylesheet" href="/psv-virtual-tour.css">
+<link rel="stylesheet" href="/psv-markers.css">
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden}
   #pano{width:100%;height:100%}
-  .sv-arrow{
-    width:56px;height:56px;border-radius:50%;
-    background:rgba(255,255,255,0.92);
-    box-shadow:0 3px 10px rgba(0,0,0,.45);
-    cursor:pointer;transition:transform .15s;
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 24 24' fill='none' stroke='%2300A6A6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='5 12 12 5 19 12'/><line x1='12' y1='19' x2='12' y2='5'/></svg>");
-    background-repeat:no-repeat;background-position:center;
-    animation:svbob 1.8s ease-in-out infinite;
-  }
-  .sv-arrow:hover{transform:scale(1.14)}
-  @keyframes svbob{0%,100%{box-shadow:0 3px 10px rgba(0,0,0,.45)}
-    50%{box-shadow:0 3px 18px rgba(0,166,166,.8)}}
-  .pnlm-compass{bottom:auto;top:14px;left:14px}
   /* mini-map */
   #minimap{position:absolute;left:12px;bottom:12px;width:144px;height:144px;
     background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);
@@ -226,24 +237,107 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
     font:800 12.5px sans-serif;max-width:60vw;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
   .mm-dot{cursor:pointer}
-  .mm-pulse{transform-origin:center;transform-box:fill-box}
   @keyframes mmpulse{0%{r:5;opacity:.9}70%{r:12;opacity:0}100%{opacity:0}}
+  #err{color:#fff;padding:24px;font:14px sans-serif}
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/three.module.js",
+    "@photo-sphere-viewer/core": "/psv-core.module.js",
+    "@photo-sphere-viewer/virtual-tour-plugin": "/psv-virtual-tour.module.js",
+    "@photo-sphere-viewer/markers-plugin": "/psv-markers.module.js"
+  }
+}
+</script>
 </head>
 <body>
 <div id="pano"></div>
 <div id="mm-name"></div>
 <div id="minimap"><svg id="mm-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div>
-<script>
-  var viewer;
+<script type="module">
+  import { Viewer } from '@photo-sphere-viewer/core';
+  import { VirtualTourPlugin } from '@photo-sphere-viewer/virtual-tour-plugin';
+  import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
+
+  var TOUR = $json;
+  var ARROW = '#00A6A6';
+
+  // ── partial-pano panoData ─────────────────────────────────────────────────
+  // Map our haov/vaov (degrees the strip actually covers) onto PSV's panoData:
+  // place the cropped image at the correct lat/long band of a full equirect
+  // (2:1) sphere, leaving honest empty poles instead of stretching.
+  //   fullWidth  = imgW * 360 / haov        (what 360° would have been)
+  //   fullHeight = fullWidth / 2            (equirect is 2:1)
+  //   croppedX   = (fullWidth  - imgW) / 2  (centered horizontally)
+  //   croppedY   = (fullHeight - imgH) / 2  (vertical band centered on horizon)
+  function panoDataFor(node) {
+    return function(image) {
+      var w = image.width, h = image.height;
+      var haov = node.haov, vaov = node.vaov;
+      if ((haov >= 360 && vaov >= 180) || !w || !h) return null; // full sphere
+      var fullWidth = Math.round(w * 360 / Math.max(1, haov));
+      var fullHeight = Math.round(fullWidth / 2);
+      // honor the real vertical coverage: keep the image height, only pad poles.
+      var croppedX = Math.round((fullWidth - w) / 2);
+      var croppedY = Math.round((fullHeight - h) / 2);
+      return {
+        fullWidth: fullWidth,
+        fullHeight: fullHeight,
+        croppedWidth: w,
+        croppedHeight: h,
+        croppedX: croppedX < 0 ? 0 : croppedX,
+        croppedY: croppedY < 0 ? 0 : croppedY,
+      };
+    };
+  }
+
+  var viewer, vt;
   try {
-    viewer = pannellum.viewer('pano', $json);
-  } catch (e) { document.body.innerHTML = '<div style="color:#fff;padding:24px">'+e+'</div>'; }
+    viewer = new Viewer({
+      container: 'pano',
+      adapter: undefined,
+      defaultZoomLvl: 30,
+      navbar: ['zoom', 'caption', 'fullscreen'],
+      plugins: [
+        MarkersPlugin,
+        [VirtualTourPlugin, {
+          // manual mode = we supply the node graph + per-node link directions,
+          // PSV renders the flat 3D floor arrows ("3d" rendering = Street-View).
+          positionMode: 'manual',
+          renderMode: '3d',
+          arrowStyle: { color: ARROW, hoverColor: '#7BE7E7' },
+          transitionOptions: { speed: '20rpm', fadeIn: true, rotation: true },
+        }],
+      ],
+    });
+
+    vt = viewer.getPlugin(VirtualTourPlugin);
+
+    // attach panoData per node so partial panos sit correctly.
+    var nodes = TOUR.nodes.map(function(n){
+      var node = {
+        id: n.id,
+        panorama: n.panorama,
+        name: n.name,
+        links: n.links,
+      };
+      var pd = panoDataFor(n);
+      node.panoData = pd; // PSV accepts a function(image) → panoData
+      // preserve heading continuity: face away from where we came in.
+      if (typeof n.startAngle === 'number') node.sphereCorrection = { pan: 0 };
+      return node;
+    });
+
+    vt.setNodes(nodes, TOUR.startNodeId);
+  } catch (e) {
+    document.body.innerHTML = '<div id="err">'+e+'</div>';
+  }
 
   // ── mini-map: where you walked, current point, last name ──────────────────
   (function(){
     var nodes = $mapJson;
-    if (!viewer || !nodes.length) {
+    if (!viewer || !vt || !nodes.length) {
       var mm = document.getElementById('minimap'); if (mm) mm.style.display='none';
       var nm = document.getElementById('mm-name'); if (nm) nm.style.display='none';
       return;
@@ -264,27 +358,27 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
       });
     });
     // a single pulsing ring that sits on the current point ("you are here")
-    var pulse=el('circle',{r:5,fill:'none',stroke:'#00A6A6','stroke-width':1.5});
+    var pulse=el('circle',{r:5,fill:'none',stroke:ARROW,'stroke-width':1.5});
     pulse.style.animation='mmpulse 1.6s ease-out infinite';
     svg.appendChild(pulse);
     // dots + name labels
     var dots={}, labels={};
     nodes.forEach(function(n){
       var g=el('g',{class:'mm-dot'});
-      var c=el('circle',{cx:px(n.x),cy:px(n.y),r:4.5,fill:'#fff',stroke:'#00A6A6','stroke-width':1.5});
+      var c=el('circle',{cx:px(n.x),cy:px(n.y),r:4.5,fill:'#fff',stroke:ARROW,'stroke-width':1.5});
       g.appendChild(c);
       var t=el('text',{x:px(n.x),y:px(n.y)-6.5,'text-anchor':'middle',
         fill:'#fff','font-size':5.5,'font-weight':700,
         style:'paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:1.2px'});
       t.textContent=n.label||'';
       g.appendChild(t);
-      g.addEventListener('click',function(){ viewer.loadScene(n.id); });
+      g.addEventListener('click',function(){ vt.setCurrentNode(n.id); });
       svg.appendChild(g); dots[n.id]=c; labels[n.id]=t;
     });
     function setActive(id){
       for(var k in dots){
         var on=(k===id);
-        dots[k].setAttribute('fill',on?'#00A6A6':'#fff');
+        dots[k].setAttribute('fill',on?ARROW:'#fff');
         dots[k].setAttribute('r',on?6.5:4.5);
         labels[k].setAttribute('fill',on?'#7BE7E7':'#fff');
       }
@@ -295,8 +389,8 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
         nameEl.textContent='📍 '+(cur.label||'');
       } else { pulse.style.display='none'; }
     }
-    viewer.on('scenechange', setActive);
-    setActive(viewer.getScene());
+    vt.addEventListener('node-changed', function(e){ setActive(e.node.id); });
+    setActive(TOUR.startNodeId);
   })();
 </script>
 </body>
@@ -374,13 +468,20 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
   }
 }
 
+class _Asset {
+  const _Asset(this.path, this.mime);
+  final String path;
+  final String mime;
+}
+
 // ── pure, testable tour-config builder ───────────────────────────────────────
 
 /// Heading continuity: when walking from [fromId] into [target], arrive facing
 /// away from the link that points back (i.e. facing "forward"). Returns yaw in
-/// degrees (-180..180), or 0 when geometry is unknown.
-double pannellumArrivalYaw(PropertyPanoramaTour tour, PanoramaNode target,
-    String fromId) {
+/// degrees (-180..180), or 0 when geometry is unknown. Mirrors
+/// `pannellumArrivalYaw` so both viewers behave identically.
+double psvArrivalYaw(
+    PropertyPanoramaTour tour, PanoramaNode target, String fromId) {
   for (final h in target.hotspots) {
     if (h.targetNodeId == fromId) {
       var y = (h.longitude + 180) % 360;
@@ -391,59 +492,60 @@ double pannellumArrivalYaw(PropertyPanoramaTour tour, PanoramaNode target,
   return 0;
 }
 
-/// Builds the Pannellum tour config (multi-scene, link hotspots, heading
-/// continuity) from a [PropertyPanoramaTour]. [imageUrlFor] maps a node id to
-/// the URL the viewer should load the panorama from. [available] optionally
-/// restricts to the nodes whose images actually loaded.
-Map<String, dynamic> pannellumTourConfig(
+/// Builds the Photo-Sphere-Viewer VirtualTour config (node graph, flat 3D floor
+/// arrows via link `position`, partial-pano haov/vaov, heading continuity) from
+/// a [PropertyPanoramaTour]. [imageUrlFor] maps a node id to the URL the viewer
+/// loads the panorama from. [available] optionally restricts to nodes whose
+/// images actually loaded.
+///
+/// PSV's VirtualTour link `position` is `{ yaw, pitch }` in **radians**, so we
+/// convert from our degrees. `startAngle` carries the arrival heading so the
+/// view faces "forward" after a transition.
+Map<String, dynamic> psvTourConfig(
   PropertyPanoramaTour tour, {
   required String Function(String nodeId) imageUrlFor,
   Set<String>? available,
 }) {
   bool ok(String id) => available == null || available.contains(id);
 
-  final scenes = <String, dynamic>{};
+  const deg2rad = 3.141592653589793 / 180.0;
+
+  final nodes = <Map<String, dynamic>>[];
   for (final n in tour.nodes) {
     if (!ok(n.id)) continue;
-    final hotSpots = <Map<String, dynamic>>[];
+    final links = <Map<String, dynamic>>[];
     for (final h in n.hotspots) {
       final target = tour.nodeById(h.targetNodeId);
       if (target == null || !ok(target.id)) continue;
-      hotSpots.add({
-        'pitch': h.latitude,
-        'yaw': h.longitude,
-        'type': 'scene',
-        'text': h.label.isNotEmpty ? h.label : target.label,
-        'sceneId': target.id,
-        'targetYaw': pannellumArrivalYaw(tour, target, n.id),
-        'cssClass': 'sv-arrow',
+      links.add({
+        'nodeId': target.id,
+        // flat floor-arrow direction (PSV link position is radians).
+        'position': {
+          'yaw': h.longitude * deg2rad,
+          'pitch': h.latitude * deg2rad,
+        },
+        'name': h.label.isNotEmpty ? h.label : target.label,
+        // heading continuity: where the camera should look on arrival.
+        'arrivalYaw': psvArrivalYaw(tour, target, n.id),
       });
     }
-    scenes[n.id] = {
-      'title': n.label,
-      'type': 'equirectangular',
+    nodes.add({
+      'id': n.id,
       'panorama': imageUrlFor(n.id),
-      'hotSpots': hotSpots,
-      // partial panoramas (e.g. a single wide shot) declare their real coverage
-      // so Pannellum renders them correctly instead of stretching to a sphere
-      if (n.haov != 360) 'haov': n.haov,
-      if (n.vaov != 180) 'vaov': n.vaov,
-    };
+      'name': n.label,
+      'links': links,
+      // partial-pano coverage; the HTML turns this into panoData(image).
+      'haov': n.haov,
+      'vaov': n.vaov,
+      // heading the *first-shown* node should face (0 = unknown).
+      'startAngle': 0,
+    });
   }
 
   final first = tour.nodes.firstWhere((n) => ok(n.id),
       orElse: () => tour.nodes.first);
   return {
-    'default': {
-      'firstScene': first.id,
-      'sceneFadeDuration': 700,
-      'autoLoad': true,
-      'compass': true,
-      'showZoomCtrl': true,
-      'keyboardZoom': false,
-      'mouseZoom': true,
-      'hfov': 100,
-    },
-    'scenes': scenes,
+    'nodes': nodes,
+    'startNodeId': first.id,
   };
 }

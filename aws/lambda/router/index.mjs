@@ -25,9 +25,14 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { S3Client, DeleteObjectCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
 const REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.S3_BUCKET;
+// Python OpenCV stitcher Lambda (container image) — invoked async to build a
+// horizontal 360° panorama from the frames the user swept on the phone.
+const PANO_STITCH_FN = process.env.PANO_STITCH_FN || '';
+const lambda = new LambdaClient({ region: REGION });
 const TABLE_PREFIX = process.env.TABLE_PREFIX || 'rently-';
 const LUMA_API_KEY = process.env.LUMA_API_KEY || '';
 // Luma Agents image API (uni-1) — virtual staging via image_edit.
@@ -188,6 +193,27 @@ export const handler = async (event) => {
       // GET /scans/:id → return scan status + viewerUrl
       if (method === 'GET' && scanId) return await getScan(scanId);
       return json(404, { message: 'Unknown scan route' });
+    }
+
+    // ── Panorama stitch jobs (OpenCV horizontal 360°) ───────────────────────
+    if (segments[0] === 'panorama') {
+      const jobId = segments[1] ? decodeURIComponent(segments[1]) : null;
+      // POST /panorama/pole-fill → composite real floor/ceiling caps (sync)
+      if (method === 'POST' && segments[1] === 'pole-fill') return await poleFill(event);
+      // POST /panorama → job + N presigned frame upload URLs
+      if (method === 'POST' && !jobId) return await createPanorama(event);
+      // POST /panorama/:id/stitch → async-invoke the stitcher
+      if (method === 'POST' && jobId && segments[2] === 'stitch') {
+        return await stitchPanorama(jobId);
+      }
+      // GET /panorama/:id → poll status → imageUrl + haov/vaov
+      if (method === 'GET' && jobId) return await getPanorama(jobId);
+      return json(404, { message: 'Unknown panorama route' });
+    }
+
+    // ── Spatial: single-pano room layout (floorplan + dimensions) ───────────
+    if (segments[0] === 'spatial' && segments[1] === 'layout' && method === 'POST') {
+      return await spatialLayout(event);
     }
 
     // ── Varjo Teleport 3D captures ──────────────────────────────────────────
@@ -593,6 +619,72 @@ async function create3dViewer(event) {
       },
     },
   });
+}
+
+// ── Pole-fill: composite real floor/ceiling caps into a phone panorama ────────
+// POST /panorama/pole-fill {stripUrl, floorUrl?, ceilingUrl?, vaov} → {data:{imageUrl}}
+// Invokes the Python Lambda synchronously (it carries the OpenCV/py360convert
+// runtime). The app already falls back to the partial-FOV strip on any failure.
+async function poleFill(event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  if (!PANO_STITCH_FN) return json(503, { message: 'Pole-fill not configured.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+
+  const stripKey = keyFromS3Url(body.stripUrl);
+  if (!stripKey) return json(400, { message: 'stripUrl required' });
+  const floorKey = body.floorUrl ? keyFromS3Url(body.floorUrl) : null;
+  const ceilingKey = body.ceilingUrl ? keyFromS3Url(body.ceilingUrl) : null;
+  const vaov = Number(body.vaov) || 60;
+  const resultKey =
+    `panoramas/composited/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+
+  try {
+    const out = await lambda.send(new InvokeCommand({
+      FunctionName: PANO_STITCH_FN,
+      InvocationType: 'RequestResponse',
+      Payload: Buffer.from(JSON.stringify({
+        op: 'poleFill', bucket: S3_BUCKET, stripKey, floorKey, ceilingKey,
+        vaov, resultKey,
+      })),
+    }));
+    const res = JSON.parse(Buffer.from(out.Payload || '').toString() || '{}');
+    if (res.status === 'ready' && res.imageUrl) {
+      return json(200, { data: { imageUrl: res.imageUrl } });
+    }
+    return json(502, { message: res.error || 'pole-fill failed' });
+  } catch (e) {
+    console.error('poleFill error:', e);
+    return json(502, { message: 'pole-fill failed' });
+  }
+}
+
+// POST /spatial/layout — single-pano room layout → floorplan + dimensions.
+// The metric geometry kernel is ready (server/spatial), but recovering wall/floor
+// corners from a raw panorama needs a HorizonNet-class model (torch + the
+// non-commercial-weights trap — see RENTLY_SPATIAL_ARCHITECTURE.md §1bis). Until
+// that model is deployed (retrained on Rently's own panos for clean rights), this
+// route is live but reports not-configured rather than faking measurements.
+async function spatialLayout(event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  return json(503, {
+    message: 'Room-layout model not yet configured.',
+    detail: 'Pending HorizonNet weights (retrain on own panos — see architecture doc §1bis).',
+  });
+}
+
+// Extract the S3 object key from a public S3 URL (virtual-hosted or path style).
+function keyFromS3Url(u) {
+  if (typeof u !== 'string' || !u) return null;
+  try {
+    const url = new URL(u);
+    let key = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    if (S3_BUCKET && key.startsWith(`${S3_BUCKET}/`)) key = key.slice(S3_BUCKET.length + 1);
+    return isSafeStorageKey(key) ? key : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeAssets(rawAssets) {
@@ -1099,6 +1191,106 @@ async function rehostImage(sourceUrl, key) {
     CacheControl: 'public, max-age=31536000',
   }));
   return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+}
+
+// ── Panorama stitch jobs ────────────────────────────────────────────────────
+// The phone uploads N overlapping frames; the Python OpenCV Lambda stitches them
+// into a horizontal 360° strip. Job meta is a small S3 JSON the stitcher updates
+// and the client polls (same store pattern as 3D scans — no extra table).
+
+async function getPanoMeta(jobId) {
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: S3_BUCKET, Key: `panoramas/meta/${jobId}.json`,
+    }));
+    return JSON.parse(await streamToString(obj.Body));
+  } catch {
+    return null;
+  }
+}
+
+async function putPanoMeta(jobId, meta) {
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET, Key: `panoramas/meta/${jobId}.json`,
+    Body: JSON.stringify(meta), ContentType: 'application/json',
+  }));
+}
+
+async function createPanorama(event) {
+  const body = event.body ? JSON.parse(event.body) : {};
+  const propertyId = sanitizeId(body.propertyId || 'prop');
+  // Allocate exactly as many frame slots as the client will upload (cv2 needs ≥2).
+  // Must NOT clamp up — extra unfilled slots become missing keys the stitcher 404s on.
+  const frameCount = Math.max(2, Math.min(60, Number(body.frameCount) || 16));
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 10);
+  const jobId = `pano_${ts}_${rand}`;
+
+  const frameKeys = [];
+  const uploadUrls = [];
+  for (let i = 0; i < frameCount; i++) {
+    const key = `panoramas/jobs/${jobId}/f${i}.jpg`;
+    frameKeys.push(key);
+    uploadUrls.push(await getSignedUrl(
+      s3,
+      new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'image/jpeg' }),
+      { expiresIn: 3600 },
+    ));
+  }
+  const resultKey = `panoramas/results/${jobId}.jpg`;
+  await putPanoMeta(jobId, {
+    jobId, propertyId, frameKeys, resultKey,
+    status: 'pending', createdAt: ts,
+  });
+  return json(200, { data: { jobId, uploadUrls } });
+}
+
+async function stitchPanorama(jobId) {
+  const meta = await getPanoMeta(jobId);
+  if (!meta) return json(404, { message: 'Panorama job not found' });
+  if (meta.status === 'ready' || meta.status === 'failed') {
+    return json(200, { data: panoData(meta) });
+  }
+  if (!PANO_STITCH_FN) {
+    const failed = { ...meta, status: 'failed', error: 'Stitcher not configured (no PANO_STITCH_FN).' };
+    await putPanoMeta(jobId, failed);
+    return json(200, { data: panoData(failed) });
+  }
+  await putPanoMeta(jobId, { ...meta, status: 'processing', processedAt: Date.now() });
+  // Stitching exceeds the API Gateway 29s limit, so invoke async (Event) and let
+  // the client poll GET /panorama/:id.
+  await lambda.send(new InvokeCommand({
+    FunctionName: PANO_STITCH_FN,
+    InvocationType: 'Event',
+    Payload: Buffer.from(JSON.stringify({
+      bucket: S3_BUCKET,
+      metaKey: `panoramas/meta/${jobId}.json`,
+      frameKeys: meta.frameKeys,
+      resultKey: meta.resultKey,
+      meta: {
+        jobId, propertyId: meta.propertyId, frameKeys: meta.frameKeys,
+        resultKey: meta.resultKey, createdAt: meta.createdAt,
+      },
+    })),
+  }));
+  return json(200, { data: { jobId, status: 'processing' } });
+}
+
+async function getPanorama(jobId) {
+  const meta = await getPanoMeta(jobId);
+  if (!meta) return json(404, { message: 'Panorama job not found' });
+  return json(200, { data: panoData(meta) });
+}
+
+function panoData(meta) {
+  return {
+    jobId: meta.jobId,
+    status: meta.status || 'pending',
+    imageUrl: meta.imageUrl || '',
+    haov: meta.haov ?? 360,
+    vaov: meta.vaov ?? 60,
+    error: meta.error || '',
+  };
 }
 
 async function createScan(event) {

@@ -260,6 +260,8 @@ class RentalDataService {
       'verifiedAt': data['verifiedAt'],
       'createdAt': data['createdAt'] ?? data[r'$createdAt'],
       if (virtualTour != null) 'virtualTour': virtualTour,
+      if (_decodeJsonMap(data['panoramaTour']) case final pano?)
+        'panoramaTour': pano,
     });
   }
   List<String> _decodeStringList(Object? rawValue) {

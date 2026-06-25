@@ -1,0 +1,17 @@
+# server/spatial — single-pano room layout -> metric floorplan data product.
+#
+# The metric geometry kernel (room_layout.py) + pipeline + self-check need ONLY:
+numpy>=1.24
+pillow>=10.0          # panorama I/O in the real adapter (not needed for self-check)
+#
+# OPTIONAL — only for REAL neural inference via adapter.predict_layout().
+# NOT required to run the math, the pipeline (--synthetic), or the self-check.
+#   torch>=2.1          # HorizonNet / AtlantaNet backbone
+#   torchvision>=0.16
+#   opencv-python-headless>=4.8   # gravity/VP alignment preprocessing
+#
+# Then clone the MIT code:
+#   sunset1995/HorizonNet   (MIT code; weights NON-COMMERCIAL — see license trap)
+#   crs4/AtlantaNet         (MIT code; same weight caveat)
+#
+# Install: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -m pip install -r requirements.txt

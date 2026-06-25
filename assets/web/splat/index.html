@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>סיור תלת-מימד</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden}
+  #viewer{position:absolute;inset:0}
+  #hud{position:absolute;left:0;right:0;top:64px;text-align:center;
+    color:#fff;font:700 13px sans-serif;pointer-events:none;
+    text-shadow:0 1px 4px rgba(0,0,0,.8)}
+  #err{position:absolute;inset:0;display:none;align-items:center;
+    justify-content:center;color:#fff;font:600 15px sans-serif;
+    padding:32px;text-align:center}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;color:#fff;font:600 14px sans-serif}
+</style>
+<!-- Import map: GaussianSplats3D (MIT) imports the bare specifier "three";
+     both files are vendored locally and served by the on-device HTTP server, so
+     nothing is fetched from the network for the viewer code itself. -->
+<script type="importmap">
+{ "imports": { "three": "/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="viewer"></div>
+<div id="loading">טוען סצנה תלת-מימדית…</div>
+<div id="hud"></div>
+<div id="err"></div>
+
+<script type="module">
+import * as GaussianSplats3D from '/gaussian-splats-3d.js';
+
+const cfg = window.RENTLY_SPLAT || { splatUrl: '', waypoints: [] };
+const errEl = document.getElementById('err');
+const loadEl = document.getElementById('loading');
+const hudEl = document.getElementById('hud');
+
+function fail(msg) {
+  if (loadEl) loadEl.style.display = 'none';
+  errEl.style.display = 'flex';
+  errEl.textContent = 'לא ניתן לטעון את הסצנה: ' + msg;
+}
+
+// ── Mobile-performance caps (RENTLY_SPATIAL_ARCHITECTURE.md §4.2) ────────────
+//   • cap device-pixel-ratio so we don't render at full retina resolution
+//   • the GaussianSplats3D sort runs on a worker; we keep splats ≲1M via the
+//     `splatAlphaRemovalThreshold` (drops near-transparent splats) and rely on
+//     the library's progressive load. True LOD/SOGS budgeting is a later tier.
+const DPR_CAP = 1.5;
+const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+
+// Detect the splat format from the URL. NOTE: GaussianSplats3D 0.4.x loads
+// .ply / .splat / .ksplat. For .spz delivery we must either (a) convert .spz →
+// .ksplat server-side, or (b) request a .ply from Luma. See README.md.
+function sceneFormat(url) {
+  const u = url.toLowerCase().split('?')[0];
+  if (u.endsWith('.ksplat')) return GaussianSplats3D.SceneFormat.KSplat;
+  if (u.endsWith('.splat'))  return GaussianSplats3D.SceneFormat.Splat;
+  if (u.endsWith('.ply'))    return GaussianSplats3D.SceneFormat.Ply;
+  // .spz is not natively supported by this build; let the lib attempt by
+  // extension and surface a clear error if it can't.
+  return undefined;
+}
+
+let viewer, waypoints = cfg.waypoints || [], idx = 0;
+
+function applyWaypoint(i, animate) {
+  if (!waypoints.length || !viewer) return;
+  idx = ((i % waypoints.length) + waypoints.length) % waypoints.length;
+  const w = waypoints[idx];
+  const cam = viewer.camera;
+  const dur = animate ? 650 : 0;
+  // Smooth teleport: lerp camera position + controls target over `dur` ms.
+  const start = cam.position.clone();
+  const ctrl = viewer.controls;
+  const startT = ctrl ? ctrl.target.clone() : null;
+  const endP = { x: w.position[0], y: w.position[1], z: w.position[2] };
+  const endT = { x: w.target[0],   y: w.target[1],   z: w.target[2] };
+  const t0 = performance.now();
+  function tick(now) {
+    const k = dur ? Math.min(1, (now - t0) / dur) : 1;
+    const e = k * k * (3 - 2 * k); // smoothstep
+    cam.position.set(
+      start.x + (endP.x - start.x) * e,
+      start.y + (endP.y - start.y) * e,
+      start.z + (endP.z - start.z) * e);
+    if (ctrl && startT) {
+      ctrl.target.set(
+        startT.x + (endT.x - startT.x) * e,
+        startT.y + (endT.y - startT.y) * e,
+        startT.z + (endT.z - startT.z) * e);
+      ctrl.update();
+    }
+    if (k < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+  if (hudEl) hudEl.textContent = '📍 ' + (w.label || ('נקודה ' + (idx + 1)));
+}
+
+// Exposed to Flutter: teleport forward (+1) / back (-1) between waypoints.
+window.rentlyStep = function (delta) { applyWaypoint(idx + (delta | 0), true); };
+
+try {
+  if (!cfg.splatUrl) throw new Error('no splat url');
+
+  viewer = new GaussianSplats3D.Viewer({
+    rootElement: document.getElementById('viewer'),
+    cameraUp: [0, -1, 0],
+    initialCameraPosition: waypoints[0] ? waypoints[0].position : [0, 1.5, 3],
+    initialCameraLookAt: waypoints[0] ? waypoints[0].target : [0, 1.2, 0],
+    // teleport-only navigation: orbit allowed, but we don't let the user fly
+    // through walls (no WASD free-cam). Controls re-target on each waypoint.
+    sphericalHarmonicsDegree: 0,   // keep memory/perf low on mobile
+    dynamicScene: false,
+    useBuiltInControls: true,
+    gpuAcceleratedSort: true,
+  });
+
+  const fmt = sceneFormat(cfg.splatUrl);
+  viewer.addSplatScene(cfg.splatUrl, {
+    splatAlphaRemovalThreshold: 5, // prune near-invisible splats → fewer to sort
+    showLoadingUI: false,
+    progressiveLoad: true,
+    ...(fmt !== undefined ? { format: fmt } : {}),
+  }).then(() => {
+    if (loadEl) loadEl.style.display = 'none';
+    viewer.start();
+    // ~30 FPS cap: throttle the render loop to spare mid-range GPUs/battery.
+    if (typeof viewer.setRenderMode === 'function') {
+      // OnChange render mode only redraws when the camera moves — the cheapest
+      // "cap" of all when the user is standing still at a waypoint.
+      viewer.setRenderMode(GaussianSplats3D.RenderMode.OnChange);
+    }
+    applyWaypoint(0, false);
+  }).catch((e) => fail((e && e.message) || String(e)));
+} catch (e) {
+  fail((e && e.message) || String(e));
+}
+</script>
+</body>
+</html>
