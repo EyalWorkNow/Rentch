@@ -72,6 +72,40 @@ class ContractRepository {
     }
   }
 
+  /// PAID FEATURE. Sends the draft lease text + property/match facts to the
+  /// server, which runs Gemini (key stays server-side) and returns an improved,
+  /// tailored Hebrew draft. The server grounds the model strictly and keeps the
+  /// "אינו תחליף לייעוץ משפטי" disclaimer. Returns the improved text, or null on
+  /// failure so the caller can keep the original draft.
+  Future<String?> improveWithAi({
+    required String contractText,
+    required String propertyTitle,
+    required int monthlyRent,
+    required int deposit,
+    required int durationMonths,
+    required String landlordName,
+    required String tenantName,
+  }) async {
+    if (!isEnabled) return null;
+    try {
+      final res = await _api.post('/contract/improve', {
+        'contractText': contractText,
+        'propertyTitle': propertyTitle,
+        'monthlyRent': monthlyRent,
+        'deposit': deposit,
+        'durationMonths': durationMonths,
+        'landlordName': landlordName,
+        'tenantName': tenantName,
+      });
+      final improved = res['improved'] ?? res['text'];
+      final out = improved?.toString().trim() ?? '';
+      return out.isEmpty ? null : out;
+    } catch (e) {
+      if (kDebugMode) debugPrint('ContractRepository.improveWithAi failed: $e');
+      return null;
+    }
+  }
+
   Future<void> cancel(String contractId) async {
     if (!isEnabled) return;
     try {

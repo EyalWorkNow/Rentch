@@ -94,8 +94,13 @@ class _ProfileCardState extends State<ProfileCard> {
     final hasMultiple = media.length > 1;
     final safeCurrentImage = _safeImageIndex(_currentImage);
     final currentMedia = media.isNotEmpty ? media[safeCurrentImage] : null;
-    final score = provider.matchScore(p);
+    // Honest match badge: only show a % when there's a real persona/filter
+    // basis. Returns null for guests / empty personas (where the raw score
+    // would otherwise inflate to ~100), so the badge is hidden rather than
+    // fabricated. See DatingProvider.displayMatchScore / hasMatchPersona.
+    final score = provider.displayMatchScore(p);
     final priceCtx = provider.priceContext(p);
+    final isSale = p.transactionType == PropertyTransactionType.sale;
     final properties = provider.filteredProperties;
     final isGuest = provider.isGuestMode;
     final isFirst = isGuest && properties.isNotEmpty && p.id == properties.first.id;
@@ -275,11 +280,18 @@ class _ProfileCardState extends State<ProfileCard> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            if (priceCtx != PriceContext.average)
-                              _PriceContextBadge(ctx: priceCtx)
-                            else
-                              const SizedBox.shrink(),
-                            if (score > 0)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSale) ...[
+                                  const _SaleBadge(),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (priceCtx != PriceContext.average)
+                                  _PriceContextBadge(ctx: priceCtx),
+                              ],
+                            ),
+                            if (score != null)
                               _MatchScoreBadge(score: score)
                             else
                               const SizedBox.shrink(),
@@ -715,6 +727,38 @@ class _MatchScoreBadge extends StatelessWidget {
             style: TextStyle(
               color: color,
               fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SaleBadge extends StatelessWidget {
+  const _SaleBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Color(0xFF6366F1); // indigo — distinct from rent
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.45), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          RentlyIcon(IconsaxPlusLinear.tag, size: 11, color: color),
+          SizedBox(width: 4),
+          Text(
+            'למכירה',
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
               fontWeight: FontWeight.w800,
             ),
           ),

@@ -2,6 +2,81 @@ import 'package:dating_app/core/services/signature_service.dart';
 
 enum ContractStatus { draft, sent, signed, declined, cancelled }
 
+/// Which body of legal text backs a contract before it is sent.
+///   • [standard] — the boilerplate residential lease "מטעם עורכי הדין של Rently".
+///   • [aiTailored] — that text after the paid AI-improve pass tailored it to the
+///     specific property/match.
+enum ContractTemplateKind { standard, aiTailored }
+
+/// The standard residential-lease text the app offers, "מטעם עורכי הדין של
+/// Rently". It is intentionally a reasonable, plain-Hebrew template — NOT legal
+/// advice — and always carries the disclaimer below. Placeholders in {{...}} are
+/// filled from the property/match data via [StandardLeaseTemplate.fill].
+class StandardLeaseTemplate {
+  const StandardLeaseTemplate._();
+
+  /// Shown next to the template everywhere it appears. Required by design so a
+  /// user never mistakes the boilerplate for vetted legal counsel.
+  static const String disclaimer =
+      'מסמך זה הוא תבנית כללית מטעם עורכי הדין של Rently ואינו תחליף לייעוץ '
+      'משפטי. מומלץ להיוועץ בעורך/ת דין לפני חתימה.';
+
+  static const String credit = 'מטעם עורכי הדין של Rently';
+
+  /// Builds the additional-terms body for a standard lease, auto-filled from the
+  /// supplied facts. Kept deterministic so it hashes cleanly into the signature.
+  static String fill({
+    required String landlordName,
+    required String tenantName,
+    required String propertyTitle,
+    required int monthlyRent,
+    required int deposit,
+    required int durationMonths,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) {
+    String money(int v) => '$v ש"ח';
+    String d(DateTime x) =>
+        '${x.day.toString().padLeft(2, '0')}/${x.month.toString().padLeft(2, '0')}/${x.year}';
+    final landlord = landlordName.trim().isNotEmpty ? landlordName.trim() : 'המשכיר';
+    final tenant = tenantName.trim().isNotEmpty ? tenantName.trim() : 'השוכר';
+    final property =
+        propertyTitle.trim().isNotEmpty ? propertyTitle.trim() : 'הנכס נשוא ההסכם';
+
+    return '''
+הסכם שכירות למגורים — $credit
+
+1. הצדדים
+הסכם זה נערך בין $landlord ("המשכיר") לבין $tenant ("השוכר").
+
+2. הנכס
+המשכיר משכיר לשוכר את הנכס: $property, למטרת מגורים בלבד.
+
+3. תקופת השכירות
+תקופת השכירות הינה $durationMonths חודשים, החל מיום ${d(startDate)} ועד ליום ${d(endDate)} ("תקופת השכירות").
+
+4. דמי השכירות
+השוכר ישלם למשכיר דמי שכירות חודשיים בסך ${money(monthlyRent)}, מראש עד ה-10 בכל חודש קלנדרי, באמצעי תשלום שיוסכם בין הצדדים.
+
+5. פיקדון וערבונות
+${deposit > 0 ? 'להבטחת קיום התחייבויותיו יפקיד השוכר בידי המשכיר פיקדון בסך ${money(deposit)}, אשר יושב לו בתום תקופת השכירות בכפוף לפינוי הנכס במצב תקין ולסילוק כל חוב.' : 'לא נדרש פיקדון במסגרת הסכם זה.'}
+
+6. חובות השוכר
+השוכר מתחייב להשתמש בנכס למגורים בלבד, לשמור עליו, לשאת בתשלומי חשמל, מים, גז וארנונה לתקופת שכירותו, ולא להעביר זכויותיו לאחר ללא הסכמת המשכיר בכתב.
+
+7. חובות המשכיר
+המשכיר מתחייב למסור את הנכס במצב ראוי למגורים ולתקן על חשבונו ליקויים מהותיים שאינם באשמת השוכר, תוך זמן סביר.
+
+8. סיום ההסכם והפרות
+הפרה יסודית של ההסכם שלא תוקנה תוך 14 יום ממתן הודעה בכתב תזכה את הצד הנפגע לבטל את ההסכם ולתבוע סעדים על פי דין. בתום התקופה יפנה השוכר את הנכס ויחזירו במצב תקין, למעט בלאי סביר.
+
+9. כללי
+שינוי להסכם ייעשה בכתב בלבד. הסכם זה כפוף לדיני מדינת ישראל.
+
+* $disclaimer''';
+  }
+}
+
 ContractStatus contractStatusFromString(String? raw) {
   switch ((raw ?? '').toLowerCase()) {
     case 'sent':

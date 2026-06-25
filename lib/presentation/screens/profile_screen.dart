@@ -26,6 +26,33 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
+/// Values that ship as the seeded demo profile (see
+/// `RentalDataService.createDefaultTenantProfile`). A first-time user who has
+/// not yet entered their own details must NOT see these as if they were real,
+/// so the profile UI treats any of them as "empty" and shows an "add" prompt.
+///
+/// NOTE: the demo data is seeded in a foreign file we don't own
+/// (lib/core/services/rental_data_service.dart). The lasting fix is to empty
+/// that default; until then we neutralise the placeholders here at the view.
+const Set<String> _kDemoNames = {'נועה לוי', 'יואב כהן'};
+const Set<String> _kDemoPhotoMarkers = {
+  'images.unsplash.com/photo-1494790108377-be9c29b29330',
+  'images.unsplash.com/photo-1517841905240-472988babdf9',
+};
+
+bool _isDemoName(String name) => _kDemoNames.contains(name.trim());
+
+bool _isDemoPhoto(String url) =>
+    _kDemoPhotoMarkers.any((marker) => url.contains(marker));
+
+/// A real, user-entered photo (not a seeded demo stock image and not empty).
+String _realPhotoUrl(TenantProfile profile) {
+  for (final url in profile.photoUrls) {
+    if (url.trim().isNotEmpty && !_isDemoPhoto(url)) return url;
+  }
+  return '';
+}
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -230,6 +257,18 @@ class ProfileScreen extends StatelessWidget {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final profile = provider.tenantProfile;
+        // First-time user: strip seeded demo placeholders so empty "add" prompts
+        // show instead of fake details (e.g. "נועה לוי", 85% completion).
+        final realPhoto = profile == null ? '' : _realPhotoUrl(profile);
+        final displayName =
+            profile != null && !_isDemoName(profile.name) ? profile.name : '';
+        final hasName = displayName.isNotEmpty;
+        // Treat the seeded demo profile (demo name + seeded stock photos and no
+        // user-supplied photo) as "not yet filled" so the search-preference
+        // tiles below show "הוסף ..." prompts instead of demo numbers.
+        final isDemoProfile = profile != null &&
+            _isDemoName(profile.name) &&
+            realPhoto.isEmpty;
         if (provider.isLoading || profile == null) {
           return Scaffold(
             backgroundColor: AppColors.background,
@@ -246,6 +285,11 @@ class ProfileScreen extends StatelessWidget {
             onDeleteAccount: () => _confirmDeleteAccount(context),
           );
         }
+
+        // For an unfilled demo profile the seeded data inflates completion
+        // (~85%). Show 0% so a fresh user sees a real "fill me in" state.
+        final completion =
+            isDemoProfile ? 0 : provider.profileCompletion;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -360,11 +404,11 @@ class ProfileScreen extends StatelessWidget {
                                 child: SizedBox(
                                   width: 220,
                                   height: 220,
-                                  child: profile.photoUrl.isNotEmpty
-                                      ? (profile.photoUrl.startsWith('/')
-                                          ? Image.file(File(profile.photoUrl),
+                                  child: realPhoto.isNotEmpty
+                                      ? (realPhoto.startsWith('/')
+                                          ? Image.file(File(realPhoto),
                                               fit: BoxFit.cover)
-                                          : Image.network(profile.photoUrl,
+                                          : Image.network(realPhoto,
                                               fit: BoxFit.cover))
                                       : Container(
                                           color: const Color(0xFFE2E8F0),
@@ -376,33 +420,36 @@ class ProfileScreen extends StatelessWidget {
                                         ),
                                 ),
                               ),
-                              // Checked teal badge overlay
-                              Positioned(
-                                top: 6,
-                                right: 6,
-                                child: Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary, // App primary color instead of pink
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.white, width: 3.5),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.1),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 28,
+                              // Checked teal badge overlay — only once the user
+                              // has actually filled in their profile, so a fresh
+                              // empty profile isn't shown as "verified".
+                              if (hasName)
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary, // App primary color instead of pink
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white, width: 3.5),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.1),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 16),
@@ -410,11 +457,13 @@ class ProfileScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                profile.name,
-                                style: const TextStyle(
+                                hasName ? displayName : 'הוסף שם',
+                                style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A),
+                                  color: hasName
+                                      ? const Color(0xFF0F172A)
+                                      : const Color(0xFF94A3B8),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -486,7 +535,7 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                '${provider.profileCompletion}%',
+                                '$completion%',
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w900,
@@ -499,7 +548,7 @@ class ProfileScreen extends StatelessWidget {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(99),
                             child: LinearProgressIndicator(
-                              value: provider.profileCompletion / 100,
+                              value: completion / 100,
                               minHeight: 10,
                               backgroundColor: const Color(0xFFF1F5F9),
                               valueColor: const AlwaysStoppedAnimation<Color>(
@@ -573,27 +622,38 @@ class ProfileScreen extends StatelessWidget {
                           _PreferenceTile(
                             icon: IconsaxPlusLinear.money,
                             label: 'תקציב מקסימלי',
-                            value: _fmt(profile.budgetMax),
+                            value: isDemoProfile
+                                ? 'הוסף תקציב'
+                                : _fmt(profile.budgetMax),
+                            isEmpty: isDemoProfile,
                           ),
                           const _SettingsDivider(),
                           _PreferenceTile(
                             icon: IconsaxPlusLinear.building,
                             label: 'מספר חדרים',
-                            value: '${profile.desiredRooms} חדרים',
+                            value: isDemoProfile
+                                ? 'הוסף מספר חדרים'
+                                : '${profile.desiredRooms} חדרים',
+                            isEmpty: isDemoProfile,
                           ),
                           const _SettingsDivider(),
                           _PreferenceTile(
                             icon: IconsaxPlusLinear.calendar,
                             label: 'מועד כניסה',
-                            value: profile.moveInWindow,
+                            value: isDemoProfile || profile.moveInWindow.isEmpty
+                                ? 'הוסף מועד כניסה'
+                                : profile.moveInWindow,
+                            isEmpty:
+                                isDemoProfile || profile.moveInWindow.isEmpty,
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // About me
-                    if (profile.bio.isNotEmpty) ...[
+                    // About me — hidden for the unfilled demo profile so the
+                    // seeded demo bio doesn't appear as the user's own.
+                    if (!isDemoProfile && profile.bio.isNotEmpty) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -3378,11 +3438,16 @@ class _PreferenceTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.isEmpty = false,
   });
 
   final IconData icon;
   final String label;
   final String value;
+
+  /// When true the value is a "הוסף ..." prompt (no real data yet) — rendered in
+  /// a muted style so it reads as a call to action rather than a real value.
+  final bool isEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -3415,15 +3480,17 @@ class _PreferenceTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: isEmpty
+                  ? AppColors.primary.withValues(alpha: 0.08)
+                  : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF475569),
+                color: isEmpty ? AppColors.primary : const Color(0xFF475569),
               ),
             ),
           ),

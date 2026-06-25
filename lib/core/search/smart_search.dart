@@ -144,6 +144,7 @@ class SearchQuery {
     Set<String>? amenities,
     this.nearTrain = false,
     this.cheapPreference = false,
+    this.transactionType = TransactionTypeFilter.any,
     this.rawText = '',
   }) : amenities = amenities ?? <String>{};
 
@@ -157,6 +158,12 @@ class SearchQuery {
   final Set<String> amenities; // PropertyFeatureSet keys, e.g. feat_pets
   final bool nearTrain;
   final bool cheapPreference; // user asked for "the cheapest"
+
+  /// Rent vs. sale intent parsed from the free text ("למכירה"/"לקנות" → sale).
+  /// Defaults to [TransactionTypeFilter.any] so existing rent searches are
+  /// unaffected; when not [any] it acts as a hard filter so sale and rent
+  /// listings never mix in the results.
+  final TransactionTypeFilter transactionType;
   final String rawText;
 
   bool get isEmpty =>
@@ -177,10 +184,16 @@ class SearchQuery {
       maxPrice != null ||
       minPrice != null ||
       minRooms != null ||
-      propertyType != null;
+      propertyType != null ||
+      transactionType != TransactionTypeFilter.any;
 
   String describe() {
     final parts = <String>[];
+    if (transactionType == TransactionTypeFilter.sale) {
+      parts.add('🏷️ למכירה');
+    } else if (transactionType == TransactionTypeFilter.rent) {
+      parts.add('🔑 להשכרה');
+    }
     if (neighborhood != null) {
       parts.add('📍 $neighborhood${city != null ? ', $city' : ''}');
     } else if (city != null) {
@@ -316,6 +329,19 @@ class SmartSearch {
 
     final cheap = RegExp(r'זול|משתלם|במחיר טוב|כמה שפחות').hasMatch(text);
 
+    // ── rent vs. sale intent ─────────────────────────────────────────────────
+    // Sale phrasing wins ("למכירה"/"לקנות"/"לרכוש"). Otherwise an explicit rent
+    // phrase ("להשכרה"/"לשכור"/"שכירות") pins it to rent; if neither appears we
+    // leave it [any] so the existing rent-first behaviour is preserved.
+    var transactionType = TransactionTypeFilter.any;
+    if (RegExp(r'למכירה|למכור|לקנות|לרכוש|רכישה|מכירה').hasMatch(text)) {
+      transactionType = TransactionTypeFilter.sale;
+    } else if (RegExp(r'להשכרה|לשכור|שכירות|להשכיר').hasMatch(text)) {
+      transactionType = TransactionTypeFilter.rent;
+    }
+    transactionType =
+        _parseTransactionFilter(llm['transactionType']) ?? transactionType;
+
     // ── city & neighborhood ─────────────────────────────────────────────────
     // City: prefer LLM extraction (Gemini saw the full context);
     // fall back to keyword scan + fuzzy matching only if LLM missed it
@@ -442,8 +468,19 @@ class SmartSearch {
       amenities: amenities,
       nearTrain: nearTrain,
       cheapPreference: cheap,
+      transactionType: transactionType,
       rawText: text,
     );
+  }
+
+  static TransactionTypeFilter? _parseTransactionFilter(dynamic v) {
+    final s = v?.toString().trim().toLowerCase();
+    if (s == null || s.isEmpty) return null;
+    if (s == 'sale' || s == 'sell' || s == 'for_sale') {
+      return TransactionTypeFilter.sale;
+    }
+    if (s == 'rent' || s == 'rental') return TransactionTypeFilter.rent;
+    return null;
   }
 
   static List<ScoredProperty> rank(
@@ -452,12 +489,14 @@ class SmartSearch {
     int limit = 10,
     TenantProfile? profile,
   }) {
+    // Hard rent/sale gate first so neither ranking path can mix the two.
+    final pool = _applyTransactionFilter(props, q);
     // Use advanced multi-dimensional matching if query has enough signal;
     // fall back to simpler scoring if vague.
-    if (q.hasEssentials && props.isNotEmpty) {
-      return rankAdvanced(props, q, limit: limit, profile: profile);
+    if (q.hasEssentials && pool.isNotEmpty) {
+      return rankAdvanced(pool, q, limit: limit, profile: profile);
     }
-    final scored = props.map((p) => _score(p, q)).toList()
+    final scored = pool.map((p) => _score(p, q)).toList()
       ..sort((a, b) => b.score.compareTo(a.score));
     return scored.take(limit).toList();
   }
@@ -473,10 +512,11 @@ class SmartSearch {
     int limit = 10,
     TenantProfile? profile,
   }) {
-    if (props.isEmpty) return [];
+    final pool = _applyTransactionFilter(props, q);
+    if (pool.isEmpty) return [];
     try {
       final scored = RecommendationEngine.recommendAsScored(
-        candidates: props,
+        candidates: pool,
         query: q,
         limit: limit,
         profile: profile,
@@ -485,7 +525,7 @@ class SmartSearch {
     } catch (_) {
       // fall through to the legacy matcher below
     }
-    return _rankAdvancedLegacy(props, q, limit: limit);
+    return _rankAdvancedLegacy(pool, q, limit: limit);
   }
 
   // Legacy multi-dimensional matcher, retained as a resilient fallback.
@@ -573,6 +613,7 @@ class SmartSearch {
   }
 
   static bool _checksConstraints(RentalProperty p, SearchQuery q) {
+    if (!_matchesTransactionType(p, q)) return false;
     if (q.city != null && !p.city.contains(q.city!)) return false;
     if (q.maxPrice != null && p.price > q.maxPrice!) return false;
     if (q.minPrice != null && p.price < q.minPrice!) return false;
@@ -583,6 +624,29 @@ class SmartSearch {
 
   static bool _hasAmenities(RentalProperty p, SearchQuery q) =>
       q.amenities.any((a) => p.featureFlags.isEnabled(a));
+
+  // Hard rent/sale gate so a "דירה למכירה" search never surfaces rentals (and
+  // vice-versa). [TransactionTypeFilter.any] matches everything.
+  static bool _matchesTransactionType(RentalProperty p, SearchQuery q) {
+    switch (q.transactionType) {
+      case TransactionTypeFilter.any:
+        return true;
+      case TransactionTypeFilter.sale:
+        return p.transactionType == PropertyTransactionType.sale;
+      case TransactionTypeFilter.rent:
+        return p.transactionType == PropertyTransactionType.rent;
+    }
+  }
+
+  // Drops listings of the wrong transaction type up-front so rent and sale
+  // results never blend, regardless of which ranking path runs.
+  static List<RentalProperty> _applyTransactionFilter(
+    List<RentalProperty> props,
+    SearchQuery q,
+  ) {
+    if (q.transactionType == TransactionTypeFilter.any) return props;
+    return props.where((p) => _matchesTransactionType(p, q)).toList();
+  }
 
   static ScoredProperty _score(RentalProperty p, SearchQuery q) {
     double s = 1;

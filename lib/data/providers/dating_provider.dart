@@ -2831,6 +2831,33 @@ class DatingProvider extends ChangeNotifier {
     return _matchScoreFor(p, _filters, DateTime.now(), selectedArea);
   }
 
+  /// Whether there is a genuine basis for showing a tenant→property match
+  /// percentage. The raw [matchScore] awards every structural weight in full
+  /// when no preferences are set, so an empty/guest persona scores ~100 — a
+  /// misleading "perfect match". We therefore only surface the match badge
+  /// when the user has actually expressed what they want, via either real
+  /// search filters or real profile preferences (budget / rooms / important
+  /// details). Guests (demo personas) never qualify.
+  bool get hasMatchPersona {
+    if (_isGuestMode) return false;
+    if (activeFilterCount > 0) return true;
+    final profile = _tenantProfile;
+    if (profile == null) return false;
+    return profile.importantDetails.isNotEmpty ||
+        profile.dealBreakers.isNotEmpty ||
+        profile.budgetMax > 0 ||
+        profile.desiredRooms > 0;
+  }
+
+  /// The match percentage to display on a card, or `null` when there is no
+  /// honest basis for one (see [hasMatchPersona]). The UI hides the badge on
+  /// `null` rather than show a fabricated number.
+  int? displayMatchScore(RentalProperty p) {
+    if (!hasMatchPersona) return null;
+    final score = matchScore(p);
+    return score > 0 ? score : null;
+  }
+
   static const MatchEngine _matchEngine = MatchEngine();
 
   /// Full two-sided, explainable match assessment for a property: combines the

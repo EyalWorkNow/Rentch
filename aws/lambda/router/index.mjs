@@ -260,6 +260,15 @@ export const handler = async (event) => {
       return json(404, { message: 'Unknown contracts route' });
     }
 
+    // ── Paid AI lease tailoring ───────────────────────────────────────────────
+    // POST /contract/improve — takes the standard lease text + property/match
+    // facts and returns an improved, tailored Hebrew draft (Gemini, key stays
+    // server-side). The paywall (50₪) is enforced client-side as a stub; this
+    // endpoint stays auth-gated and strictly grounded.
+    if (segments[0] === 'contract' && segments[1] === 'improve' && method === 'POST') {
+      return await handleContractImprove(event);
+    }
+
     // ── Erik personal assistant ─────────────────────────────────────────────
     if (segments[0] === 'assistant' && method === 'POST') {
       // POST /assistant/tts → Gemini natural voice for a reply (audio bytes).
@@ -1909,13 +1918,17 @@ async function handleAssistantExplain(event) {
   }
 }
 
-async function geminiGenerate(systemText, contents, tools) {
+async function geminiGenerate(systemText, contents, tools, genOverrides) {
   let lastStatus = '';
   for (const model of GEMINI_MODELS) {
     const reqBody = {
       systemInstruction: { parts: [{ text: systemText }] },
       contents,
-      generationConfig: { temperature: 0.6, maxOutputTokens: 480 },
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 480,
+        ...(genOverrides || {}),
+      },
     };
     // "thinking" config only applies to the 2.5 thinking models; sending it to
     // others can be rejected. Disable it where supported for low latency.
@@ -2276,6 +2289,100 @@ async function contractCancel(event, cid) {
   item.updatedAt = new Date().toISOString();
   await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
   return json(200, { item });
+}
+
+// The disclaimer the AI draft must always preserve. Kept here so the server can
+// re-append it even if the model drops it.
+const LEASE_DISCLAIMER =
+  'מסמך זה הוא תבנית כללית מטעם עורכי הדין של Rently ואינו תחליף לייעוץ ' +
+  'משפטי. מומלץ להיוועץ בעורך/ת דין לפני חתימה.';
+
+// The standard residential-lease boilerplate the app offers when the client did
+// not send its own draft text. Plain Hebrew, NOT legal advice; placeholders are
+// filled from the request facts.
+const STANDARD_LEASE_TEMPLATE =
+  'הסכם שכירות למגורים — מטעם עורכי הדין של Rently. הצדדים: {{landlordName}} ' +
+  '("המשכיר") ו-{{tenantName}} ("השוכר"). הנכס: {{propertyTitle}}, למגורים בלבד. ' +
+  'תקופה: {{durationMonths}} חודשים. דמי שכירות חודשיים: {{monthlyRent}} ש"ח, מראש ' +
+  'עד ה-10 בכל חודש. פיקדון: {{deposit}} ש"ח. השוכר ישמור על הנכס וישא בתשלומי ' +
+  'השוטפים; המשכיר ימסור נכס ראוי למגורים ויתקן ליקויים מהותיים. הפרה יסודית שלא ' +
+  'תוקנה תוך 14 יום תזכה בביטול וסעדים על פי דין. כפוף לדיני מדינת ישראל. ' + LEASE_DISCLAIMER;
+
+// POST /contract/improve — the LLM as a careful lease EDITOR. It takes the draft
+// lease text + the property/match facts and returns an improved, tailored Hebrew
+// draft. HARD RULES (enforced via the prompt): edit/clarify only, never invent
+// figures or legal nonsense, keep it a residential lease, and keep the disclaimer.
+async function handleContractImprove(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+
+  const str = (v, n) => (v === null || v === undefined ? '' : String(v).slice(0, n));
+  const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v) : 0);
+
+  const facts = {
+    landlordName: str(body.landlordName, 120) || 'המשכיר',
+    tenantName: str(body.tenantName, 120) || 'השוכר',
+    propertyTitle: str(body.propertyTitle, 200) || 'הנכס נשוא ההסכם',
+    monthlyRent: num(body.monthlyRent),
+    deposit: num(body.deposit),
+    durationMonths: num(body.durationMonths) || 12,
+  };
+
+  let draft = str(body.contractText, 8000).trim();
+  if (!draft) {
+    draft = STANDARD_LEASE_TEMPLATE
+      .replace('{{landlordName}}', facts.landlordName)
+      .replace('{{tenantName}}', facts.tenantName)
+      .replace('{{propertyTitle}}', facts.propertyTitle)
+      .replace('{{durationMonths}}', String(facts.durationMonths))
+      .replace('{{monthlyRent}}', String(facts.monthlyRent))
+      .replace('{{deposit}}', String(facts.deposit));
+  }
+
+  // No model key → degrade to returning the draft unchanged (the UI keeps it).
+  if (!GEMINI_API_KEY) return json(200, { improved: draft });
+
+  const sys =
+    'אתה עורך חוזים זהיר. קיבלת טיוטת הסכם שכירות למגורים בעברית ועובדות אמת על ' +
+    'הנכס והעסקה. שפר ונסח מחדש את ההסכם כך שיהיה ברור, מסודר וערוך בסעיפים ' +
+    'ממוספרים, ומותאם לנתונים שניתנו. ' +
+    'חוקים נוקשים: (1) השתמש אך ורק בעובדות שסופקו — אל תמציא מחירים, תאריכים, ' +
+    'שמות, סכומים או צדדים; (2) אל תמציא "סעיפים משפטיים" מופרכים; הישאר בגדר ' +
+    'הסכם שכירות למגורים סטנדרטי וסביר; (3) כתוב בעברית בלבד; (4) שמור בסוף את ' +
+    'משפט ההסתייגות במדויק: "' + LEASE_DISCLAIMER + '". ' +
+    'החזר את טקסט ההסכם המשופר בלבד, ללא הקדמות וללא הסברים.';
+
+  const contents = [{
+    role: 'user',
+    parts: [{
+      text:
+        'עובדות אמת (אין לסטות מהן):\n' + JSON.stringify(facts) +
+        '\n\nטיוטת ההסכם לשיפור:\n' + draft,
+    }],
+  }];
+
+  try {
+    const data = await geminiGenerate(sys, contents, undefined, {
+      temperature: 0.3, // low — fidelity to the supplied facts over creativity
+      maxOutputTokens: 2048, // a full lease is longer than the default cap
+    });
+    let text = (data?.candidates?.[0]?.content?.parts || [])
+      .map((p) => p.text || '').join('').trim();
+    text = text.replace(/```(?:\w+)?/g, '').replace(/```/g, '').trim();
+    if (!text) text = draft; // empty model output → keep the draft
+    // Belt-and-braces: guarantee the disclaimer survived.
+    if (!text.includes('אינו תחליף לייעוץ')) {
+      text = `${text}\n\n${LEASE_DISCLAIMER}`;
+    }
+    return json(200, { improved: text.slice(0, 12000) });
+  } catch (e) {
+    console.warn('contract/improve', e.message);
+    return json(200, { improved: draft });
+  }
 }
 
 async function handleAssistant(event) {

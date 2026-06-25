@@ -442,25 +442,11 @@ class FomoCardOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<DatingProvider>();
-    final isGuest = provider.isGuestMode;
-    final properties = provider.filteredProperties;
-    final isFirst = isGuest && properties.isNotEmpty && property.id == properties.first.id;
-    final isSecond = isGuest && properties.length > 1 && property.id == properties[1].id;
-
-    final viewers = isFirst
-        ? 245
-        : isSecond
-            ? 3
-            : property.marketSignals.liveViewers;
-
-    final likes = isFirst
-        ? 84
-        : isSecond
-            ? 47
-            : property.marketSignals.likesTodayFor(DateTime.now());
-
-    final isNew = isSecond ? true : (isFirst ? false : property.isNewListing);
+    // Honest FOMO: real per-listing signals only — no fabricated guest-demo
+    // numbers. Renders nothing (below) when there's no genuine activity.
+    final viewers = property.marketSignals.liveViewers;
+    final likes = property.marketSignals.likesTodayFor(DateTime.now());
+    final isNew = property.isNewListing;
 
     if (!isNew && viewers == 0 && likes == 0) {
       return const SizedBox.shrink();

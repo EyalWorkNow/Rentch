@@ -50,6 +50,10 @@ extension _PropertyMediaTypeUi on PropertyMediaType {
 // LegalConsentService across the whole app — never hardcode it here.
 final List<String> _propertyFeatureLabels = PropertyFeatureCatalog.allLabels;
 
+// Upper bound for a one-time sale price (₪). Sale listings reuse `price` as the
+// full asking price rather than a monthly rent, so they need a much wider range.
+const int _kMaxSalePrice = 20000000; // 20M ₪
+
 PropertyLegal _buildPropertyLegal({
   required bool acceptedTerms,
   required bool thirdPartyTransferAllowed,
@@ -113,6 +117,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       'custom-${DateTime.now().millisecondsSinceEpoch}';
 
   int _price = 5000;
+  PropertyTransactionType _transactionType = PropertyTransactionType.rent;
   double _rooms = 3;
   String _propertyType = 'דירה';
   String _condition = 'תקין';
@@ -753,8 +758,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               capturedAt: _verificationCapturedAt ?? DateTime.now().toUtc(),
             )
           : const PropertyVerification();
-      final sanitizedPrice = InputSanitizer.clampPrice(_price);
-      final transactionType = PropertyTransactionType.rent;
+      // For a sale the price is a one-time total (reusing `price`), so it can be
+      // far higher than a monthly rent — clamp it against the sale ceiling.
+      final sanitizedPrice = _transactionType == PropertyTransactionType.sale
+          ? _price.clamp(0, _kMaxSalePrice)
+          : InputSanitizer.clampPrice(_price);
+      final transactionType = _transactionType;
       final priceHistory = sanitizedPrice > 0
           ? [
               PropertyPricePoint(
@@ -890,6 +899,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             ),
             _StepDetails(
               price: _price,
+              transactionType: _transactionType,
               rooms: _rooms,
               sizeCtrl: _sizeCtrl,
               floorCtrl: _floorCtrl,
@@ -900,6 +910,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               agencyListing: _agencyListing,
               designTemplate: _designTemplate,
               designAccent: _designAccent,
+              onTransactionTypeChanged: (v) => setState(() {
+                _transactionType = v;
+                // Keep the price within the sensible range for the new mode so a
+                // 5,000 ₪ rent default doesn't read as a 5,000 ₪ sale.
+                if (v == PropertyTransactionType.sale && _price < 100000) {
+                  _price = 1500000;
+                } else if (v == PropertyTransactionType.rent &&
+                    _price > 150000) {
+                  _price = 5000;
+                }
+              }),
               onPriceChanged: (v) =>
                   setState(() => _price = v.round()),
               onRoomsChanged: (v) =>
@@ -1101,8 +1122,10 @@ class _WizardNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLast = step == total - 1;
     return Container(
+      // Lift the submit/"הוספה" button ~15px higher above the home indicator
+      // while staying SafeArea-aware (bottom inset is still added in).
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+          16, 12, 16, 27 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(
@@ -1203,8 +1226,9 @@ class _EditPropertyFooter extends StatelessWidget {
     final inactiveLabel = isSale ? 'לא למכירה / נמכר' : 'לא להשכרה / הושכר';
 
     return Container(
+      // Lift the submit button ~15px higher (SafeArea-aware).
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+          16, 12, 16, 27 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(
@@ -1506,11 +1530,102 @@ class _StepLocationState extends State<_StepLocation> {
   }
 }
 
+// ─── Rent / Sale toggle ───────────────────────────────────────────────────────
+
+class _TransactionTypeToggle extends StatelessWidget {
+  const _TransactionTypeToggle({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final PropertyTransactionType value;
+  final ValueChanged<PropertyTransactionType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3F6),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          _segment(
+            label: 'להשכרה',
+            icon: IconsaxPlusLinear.key,
+            selected: value == PropertyTransactionType.rent,
+            onTap: () => onChanged(PropertyTransactionType.rent),
+          ),
+          _segment(
+            label: 'למכירה',
+            icon: IconsaxPlusLinear.tag,
+            selected: value == PropertyTransactionType.sale,
+            onTap: () => onChanged(PropertyTransactionType.sale),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              RentlyIcon(
+                icon,
+                size: 17,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Step 2: Property Details ─────────────────────────────────────────────────
 
 class _StepDetails extends StatelessWidget {
   const _StepDetails({
     required this.price,
+    required this.transactionType,
     required this.rooms,
     required this.sizeCtrl,
     required this.floorCtrl,
@@ -1521,6 +1636,7 @@ class _StepDetails extends StatelessWidget {
     required this.agencyListing,
     required this.designTemplate,
     required this.designAccent,
+    required this.onTransactionTypeChanged,
     required this.onPriceChanged,
     required this.onRoomsChanged,
     required this.onTypeChanged,
@@ -1531,6 +1647,7 @@ class _StepDetails extends StatelessWidget {
   });
 
   final int price;
+  final PropertyTransactionType transactionType;
   final double rooms;
   final TextEditingController sizeCtrl;
   final TextEditingController floorCtrl;
@@ -1541,6 +1658,7 @@ class _StepDetails extends StatelessWidget {
   final bool agencyListing;
   final String designTemplate;
   final int designAccent;
+  final ValueChanged<PropertyTransactionType> onTransactionTypeChanged;
   final ValueChanged<double> onPriceChanged;
   final ValueChanged<double> onRoomsChanged;
   final ValueChanged<String?> onTypeChanged;
@@ -1551,6 +1669,7 @@ class _StepDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSale = transactionType == PropertyTransactionType.sale;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
       children: [
@@ -1560,15 +1679,22 @@ class _StepDetails extends StatelessWidget {
           subtitle: 'גודל הדירה הוא שדה חובה',
         ),
         const SizedBox(height: 16),
+        _TransactionTypeToggle(
+          value: transactionType,
+          onChanged: onTransactionTypeChanged,
+        ),
+        const SizedBox(height: 16),
         _FormCard(
           child: Column(
             children: [
               _SliderWithEntry(
-                label: 'מחיר לחודש',
+                // For a sale the price is a one-time total; for rent it's
+                // monthly. Label + range follow the selected mode.
+                label: isSale ? 'מחיר מבוקש (סה"כ)' : 'מחיר לחודש',
                 value: price.toDouble(),
                 min: 0,
-                max: 150000,
-                divisions: 300,
+                max: isSale ? _kMaxSalePrice.toDouble() : 150000,
+                divisions: isSale ? 400 : 300,
                 unitPrefix: '₪',
                 onChanged: onPriceChanged,
               ),
@@ -3390,22 +3516,10 @@ class _Field extends StatelessWidget {
         labelStyle:
             const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         prefixIcon: Icon(icon, size: 16, color: AppColors.primary),
-        filled: true,
-        fillColor: AppColors.background,
+        // Inherit the global rounded, soft-filled InputDecorationTheme (no boxy
+        // white border) so fields match the rounded cards around them.
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderLight),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderLight),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
-        ),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       ),
     );
   }
@@ -3907,22 +4021,9 @@ class _DropdownRow extends StatelessWidget {
         labelText: label,
         labelStyle:
             const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-        filled: true,
-        fillColor: AppColors.background,
+        // Inherit the global rounded soft-filled theme (no boxy white border).
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderLight),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderLight),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
-        ),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       ),
       style: const TextStyle(
           color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
@@ -3970,6 +4071,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   final _scaniverseImportService = ScaniverseAssetImportService();
 
   late int _price;
+  late PropertyTransactionType _transactionType;
   late double _rooms;
   late String _propertyType;
   late String _condition;
@@ -4029,6 +4131,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             .toList()
         : [_PropertyMediaDraft()];
     _price = p.price;
+    _transactionType = p.transactionType;
     _rooms = p.rooms;
     _propertyType = p.propertyType;
     _condition = p.condition.isNotEmpty ? p.condition : 'תקין';
@@ -4580,8 +4683,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   DateTime.now().toUtc(),
             )
           : const PropertyVerification();
-      final sanitizedPrice = InputSanitizer.clampPrice(_price);
-      final transactionType = widget.property.transactionType;
+      final transactionType = _transactionType;
+      // Sale price is a one-time total, so it uses the wider sale ceiling.
+      final sanitizedPrice = transactionType == PropertyTransactionType.sale
+          ? _price.clamp(0, _kMaxSalePrice)
+          : InputSanitizer.clampPrice(_price);
       final nextHistory = [
         ...widget.property.priceHistory,
         if (sanitizedPrice > 0 &&
@@ -4701,6 +4807,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                 ),
                 _StepDetails(
                   price: _price,
+                  transactionType: _transactionType,
                   rooms: _rooms,
                   sizeCtrl: _sizeCtrl,
                   floorCtrl: _floorCtrl,
@@ -4711,6 +4818,15 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   agencyListing: _agencyListing,
                   designTemplate: _designTemplate,
                   designAccent: _designAccent,
+                  onTransactionTypeChanged: (v) => setState(() {
+                    _transactionType = v;
+                    if (v == PropertyTransactionType.sale && _price < 100000) {
+                      _price = 1500000;
+                    } else if (v == PropertyTransactionType.rent &&
+                        _price > 150000) {
+                      _price = 5000;
+                    }
+                  }),
                   onPriceChanged: (v) =>
                       setState(() => _price = v.round()),
                   onRoomsChanged: (v) =>

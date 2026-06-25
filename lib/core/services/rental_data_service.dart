@@ -389,24 +389,17 @@ class RentalDataService {
   // ── Scaffolding helpers (unchanged — used by DatingProvider) ─────────────────
 
   TenantProfile createDefaultTenantProfile() {
+    // Fresh users start EMPTY — they fill the profile themselves. No demo
+    // placeholder identity (users disliked seeing pre-filled fake details).
     return const TenantProfile(
       id: 'tenant-local',
-      name: 'נועה לוי',
-      bio:
-          'מחפשת דירה שקטה ומוארת במרכז, עדיפות לבניין עם מעלית ומרחב עבודה נוח. עובדת בהייטק, שוכרת מסודרת, כניסה גמישה.',
-      photoUrls: [
-        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80',
-        'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
-      ],
-      budgetMax: 9000,
-      desiredRooms: 2.5,
-      moveInWindow: 'כניסה תוך 60 יום',
-      importantDetails: [
-        'ערבות בנקאית מוכנה',
-        'ללא חיות מחמד',
-        'עבודה קבועה',
-        'עדיפות לחניה',
-      ],
+      name: '',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 0,
+      desiredRooms: 0,
+      moveInWindow: '',
+      importantDetails: [],
     );
   }
 

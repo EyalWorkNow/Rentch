@@ -15,6 +15,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
 import 'package:dating_app/presentation/screens/contract_form_screen.dart';
+import 'package:dating_app/presentation/screens/contract_sign_flow_screen.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
 import 'package:dating_app/presentation/widgets/pulse_widget.dart';
@@ -497,10 +498,18 @@ class _MessageScreenState extends State<MessageScreen> {
     ));
   }
 
+  /// Opens the clean, built-in signing flow (review → parties → one-tap sign).
+  void _openSignFlow(String contractId, String matchId) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) =>
+          ContractSignFlowScreen(contractId: contractId, matchId: matchId),
+    ));
+  }
+
   void _openContractForMatch(DatingProvider provider, String matchId) {
     final contract = provider.contractForMatch(matchId);
     if (contract != null) {
-      _openContract(contract.id, matchId);
+      _openSignFlow(contract.id, matchId);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('החוזה לא נמצא. נסו לרענן את הצ׳אט.'),
@@ -690,12 +699,12 @@ class _MessageScreenState extends State<MessageScreen> {
                   if (match.contractSent)
                     _ContractBar(
                       match: match,
-                      onOwnerSign: (!match.ownerSigned)
-                          ? () => provider.signContract(match.id, asOwner: true)
-                          : null,
-                      onTenantSign: (!match.tenantSigned)
-                          ? () => provider.signContract(match.id, asOwner: false)
-                          : null,
+                      isLandlord: provider.isLandlord,
+                      onSign: () => _openContractForMatch(provider, match.id),
+                      onView: () {
+                        final c = provider.contractForMatch(match.id);
+                        if (c != null) _openContract(c.id, match.id);
+                      },
                     ),
 
                   // Message list
@@ -856,70 +865,80 @@ class _ChatBackground extends StatelessWidget {
 class _ContractBar extends StatelessWidget {
   const _ContractBar({
     required this.match,
-    required this.onOwnerSign,
-    required this.onTenantSign,
+    required this.isLandlord,
+    required this.onSign,
+    required this.onView,
   });
 
   final RentalMatch match;
-  final VoidCallback? onOwnerSign;
-  final VoidCallback? onTenantSign;
-
-  String get _label {
-    if (!match.ownerSigned && !match.tenantSigned) {
-      return 'חוזה נשלח · ממתין לחתימות';
-    }
-    if (!match.ownerSigned) return 'ממתין לחתימת בעלים';
-    if (!match.tenantSigned) return 'ממתין לחתימת שוכר';
-    return 'חוזה חתום על-ידי שני הצדדים ✓';
-  }
+  final bool isLandlord;
+  final VoidCallback onSign;
+  final VoidCallback onView;
 
   bool get _done => match.ownerSigned && match.tenantSigned;
 
-  VoidCallback? get _primaryAction => onOwnerSign ?? onTenantSign;
+  /// Whether the *current* user still has to sign their own part.
+  bool get _iNeedToSign =>
+      !_done && (isLandlord ? !match.ownerSigned : !match.tenantSigned);
+
+  String get _label {
+    if (_done) return 'החוזה נחתם על-ידי שני הצדדים ✓';
+    if (_iNeedToSign) {
+      final other = isLandlord ? 'השוכר/ת' : 'בעל הדירה';
+      final otherSigned = isLandlord ? match.tenantSigned : match.ownerSigned;
+      return otherSigned ? '$other חתם/ה · ממתין לחתימתך' : 'ממתין לחתימתך';
+    }
+    // I already signed → waiting on the other side.
+    final other = isLandlord ? 'השוכר/ת' : 'בעל הדירה';
+    return 'חתמת · ממתין לחתימת $other';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _done ? const Color(0xFFE9F9F1) : const Color(0xFFEBF7FA),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(children: [
-        Icon(
-          _done
-              ? IconsaxPlusLinear.tick_circle
-              : IconsaxPlusLinear.document_text,
-          size: 16,
-          color: _done ? AppColors.success : AppColors.primary,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            _label,
-            style: TextStyle(
-              color: _done ? AppColors.success : AppColors.navy,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-            ),
+    final action = _iNeedToSign ? onSign : onView;
+    return GestureDetector(
+      onTap: action,
+      child: Container(
+        color: _done ? const Color(0xFFE9F9F1) : const Color(0xFFEBF7FA),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(children: [
+          Icon(
+            _done
+                ? IconsaxPlusLinear.tick_circle
+                : IconsaxPlusLinear.document_text,
+            size: 16,
+            color: _done ? AppColors.success : AppColors.primary,
           ),
-        ),
-        if (_primaryAction != null)
-          GestureDetector(
-            onTap: _primaryAction,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Text(
-                'חתום',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _label,
+              style: TextStyle(
+                color: _done ? AppColors.success : AppColors.navy,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-      ]),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: _iNeedToSign ? AppColors.primary : Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              border: _iNeedToSign
+                  ? null
+                  : Border.all(color: AppColors.borderLight),
+            ),
+            child: Text(
+              _iNeedToSign ? 'חתום' : 'הצג',
+              style: TextStyle(
+                  color: _iNeedToSign ? Colors.white : AppColors.navy,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800),
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

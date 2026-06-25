@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/features/onboarding/app_intro.dart';
 import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
@@ -26,10 +27,37 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool? _cachedIsLandlord;
+  bool _introChecked = false;
 
   static const int _landlordSwipesTabIndex = 1;
   static const int _landlordMatchesTabIndex = 2;
   static const int _landlordPropertiesTabIndex = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    // First-run intro: after the first frame, show the "how to use" cards once.
+    // Gated by the seen_intro_v1 flag inside AppIntro, so it only appears on a
+    // genuine first launch and never blocks returning users.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
+  }
+
+  Future<void> _maybeShowIntro() async {
+    if (_introChecked || !mounted) return;
+    _introChecked = true;
+    if (await AppIntro.hasBeenSeen()) return;
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        pageBuilder: (_, __, ___) => AppIntro(
+          onDone: () => Navigator.of(context).maybePop(),
+        ),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
 
   void _showMatchOverlay(BuildContext context, RentalProperty property) {
     HapticFeedback.heavyImpact();
@@ -139,7 +167,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
+                // Lifted ~15px higher than the previous bottom:16 so the glass
+                // bar floats a touch further from the home indicator / screen
+                // edge. SafeArea(bottom:false) above already keeps it clear of
+                // the inset; this is purely the extra breathing room.
+                padding: const EdgeInsets.only(bottom: 31),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
