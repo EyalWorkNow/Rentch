@@ -108,7 +108,10 @@ class _ScorecardViewState extends State<ScorecardView> {
   // ── expanded body ──────────────────────────────────────────────────────────
   Widget _body(Scorecard c) {
     final dims = [...c.dimensions]
-      ..sort((a, b) => b.contributionPct.compareTo(a.contributionPct));
+      ..sort((a, b) {
+        final w = b.weightPct.compareTo(a.weightPct);
+        return w != 0 ? w : b.contributionPct.compareTo(a.contributionPct);
+      });
     final top = dims.take(4).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,9 +128,16 @@ class _ScorecardViewState extends State<ScorecardView> {
               style: TextStyle(
                   color: AppColors.textPrimary, fontSize: 13, height: 1.4)),
         ],
-        // dimension bars
+        // dimension bars — each shows how strong THIS apartment is on that axis
+        // (its satisfaction 0–100%), so the overall fit reads as their blend.
         if (top.isNotEmpty) ...[
           const SizedBox(height: 12),
+          Text('כמה הדירה חזקה בכל פרמטר:',
+              style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
           for (final d in top) ...[
             _dimensionBar(d),
             const SizedBox(height: 10),

@@ -417,7 +417,7 @@ class RecommendationEngine {
   // ───────────────────────────────────────────────────────────────────────────
 
   /// A dimension counts as a genuine strength above this contribution share.
-  static const double _kNeutralContribution = 0.06;
+  static const double _kStrongScore = 0.5; // axis reads as a strength at/above this satisfaction
 
   static Scorecard _buildScorecard({
     required RankedCandidate c,
@@ -429,7 +429,6 @@ class RecommendationEngine {
     required String explanation,
     required List<String> highlights,
   }) {
-    final breakdown = c.dimensionContrib; // dim key → contribution share
     final stats = ScorecardStats.statLabels(c.property, market);
     final weightSum = model.weightSum;
 
@@ -437,22 +436,32 @@ class RecommendationEngine {
     // Iterate the canonical dimension list so keys align with ScorecardStats /
     // the preference model exactly.
     for (final key in kScoringDimensions) {
-      final contribution = breakdown[key] ?? 0.0;
-      // Skip dimensions the candidate doesn't meaningfully touch and that carry
-      // no statistic — keeps the card focused on what actually matters.
-      if (contribution <= 0 && !stats.containsKey(key)) continue;
-      final weightPct = weightSum > 0 ? model.weight(key) / weightSum : 0.0;
+      // BAR = how well THIS apartment scores on the axis — its MAUT satisfaction
+      // u∈[0,1] — NOT the weighted contribution. The contribution is w·u/Σw, which
+      // is tiny by construction, so showing it made a 68% match read as
+      // "everything ≤13%". Weight is carried separately as importance.
+      final score = model.satisfaction(key, c.pfv).clamp(0.0, 1.0);
+      final weightPct =
+          weightSum > 0 ? (model.weight(key) / weightSum).clamp(0.0, 1.0) : 0.0;
+      // Keep the card focused: axes that matter to the user OR carry a gov stat.
+      final matters = model.statedDimensions.contains(key) || weightPct >= 0.05;
+      if (!matters && !stats.containsKey(key)) continue;
       dimensions.add(ScorecardDimension(
         key: key,
         label: Explainer.dimLabel(key),
-        weightPct: weightPct.clamp(0.0, 1.0),
-        contributionPct: contribution.clamp(0.0, 1.0),
+        weightPct: weightPct,
+        contributionPct: score, // the apartment's strength on this axis (0..1)
         stat: stats[key],
-        positive: contribution >= _kNeutralContribution,
+        // A concern only when the apartment genuinely scores low on the axis —
+        // not when the axis merely has low weight.
+        positive: score >= _kStrongScore,
       ));
     }
-    // Strongest contributors first.
-    dimensions.sort((a, b) => b.contributionPct.compareTo(a.contributionPct));
+    // Most-relevant axes first (what matters to the user); strongest as tiebreak.
+    dimensions.sort((a, b) {
+      final w = b.weightPct.compareTo(a.weightPct);
+      return w != 0 ? w : b.contributionPct.compareTo(a.contributionPct);
+    });
 
     final personaReasons = _personaReasons(c.property, profile);
     final concerns = _concerns(c, model, dimensions);
