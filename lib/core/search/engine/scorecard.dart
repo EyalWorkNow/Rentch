@@ -28,6 +28,7 @@ class ScorecardDimension {
     required this.weightPct,
     required this.contributionPct,
     this.stat,
+    this.source,
     this.positive = true,
   });
 
@@ -49,6 +50,12 @@ class ScorecardDimension {
   /// Null when no concrete number is available (degrade gracefully). Filled by A5.
   final String? stat;
 
+  /// Honest provenance for [stat] — the Israeli agency + dataset the figure came
+  /// from, e.g. "הלשכה המרכזית לסטטיסטיקה (למ״ס) — מדד מחירי שכר דירה למ״ר".
+  /// UI-only (the "מקורות הנתונים" dropdown); the engine/LLM ignore it. Null when
+  /// the dimension carries no [stat]. Optional/back-compat.
+  final String? source;
+
   /// Whether this dimension helps (true) or is a concern (false).
   final bool positive;
 
@@ -58,6 +65,7 @@ class ScorecardDimension {
         'weightPct': weightPct,
         'contributionPct': contributionPct,
         if (stat != null) 'stat': stat,
+        if (source != null) 'source': source,
         'positive': positive,
       };
 
@@ -68,6 +76,7 @@ class ScorecardDimension {
         weightPct: (j['weightPct'] as num?)?.toDouble() ?? 0,
         contributionPct: (j['contributionPct'] as num?)?.toDouble() ?? 0,
         stat: j['stat']?.toString(),
+        source: j['source']?.toString(),
         positive: j['positive'] as bool? ?? true,
       );
 }

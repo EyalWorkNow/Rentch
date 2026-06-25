@@ -19,6 +19,7 @@
 
 import 'dart:math' as math;
 
+import 'package:dating_app/core/govdata/gov_sources.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/engine/preference_model.dart';
@@ -446,12 +447,15 @@ class RecommendationEngine {
       // Keep the card focused: axes that matter to the user OR carry a gov stat.
       final matters = model.statedDimensions.contains(key) || weightPct >= 0.05;
       if (!matters && !stats.containsKey(key)) continue;
+      final stat = stats[key];
       dimensions.add(ScorecardDimension(
         key: key,
         label: Explainer.dimLabel(key),
         weightPct: weightPct,
         contributionPct: score, // the apartment's strength on this axis (0..1)
-        stat: stats[key],
+        stat: stat,
+        // Provenance only when there's a real figure to attribute.
+        source: stat != null ? GovSources.labelFor(key) : null,
         // A concern only when the apartment genuinely scores low on the axis —
         // not when the axis merely has low weight.
         positive: score >= _kStrongScore,

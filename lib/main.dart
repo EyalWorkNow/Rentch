@@ -129,6 +129,15 @@ class RentlyApp extends StatelessWidget {
           letterSpacing: -0.3,
         ),
       ),
+      // Make heading/title roles clearly extrabold so they stand out from the
+      // lighter body/label text (kept at their default weights for contrast).
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(fontWeight: FontWeight.w800),
+        headlineMedium: TextStyle(fontWeight: FontWeight.w800),
+        headlineSmall: TextStyle(fontWeight: FontWeight.w800),
+        titleLarge: TextStyle(fontWeight: FontWeight.w800),
+        titleMedium: TextStyle(fontWeight: FontWeight.w700),
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: palette.primaryLight2,
         selectedColor: palette.primary,

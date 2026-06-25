@@ -32,6 +32,7 @@ class ScorecardView extends StatefulWidget {
 
 class _ScorecardViewState extends State<ScorecardView> {
   late bool _open = widget.initiallyExpanded;
+  bool _sourcesOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -162,9 +163,135 @@ class _ScorecardViewState extends State<ScorecardView> {
           const SizedBox(height: 12),
           _llmReason(c.llmReason!.trim()),
         ],
+        // SEPARATE "מקורות הנתונים" dropdown — its own expand/collapse, shown
+        // only when at least one dimension carries a real figure + source.
+        if (_sourcedDimensions(c).isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _sourcesSection(c),
+        ],
       ],
     );
   }
+
+  // Dimensions that carry both a concrete figure and an attributable source.
+  List<ScorecardDimension> _sourcedDimensions(Scorecard c) => [
+        for (final d in c.dimensions)
+          if ((d.stat ?? '').trim().isNotEmpty &&
+              (d.source ?? '').trim().isNotEmpty)
+            d,
+      ];
+
+  // ── collapsible "מקורות הנתונים" dropdown — distinct from "למה זו?" ─────────
+  Widget _sourcesSection(Scorecard c) {
+    final sourced = _sourcedDimensions(c);
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _sourcesOpen = !_sourcesOpen),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              child: Row(children: [
+                Icon(IconsaxPlusLinear.document_text,
+                    size: 15, color: AppColors.primary),
+                const SizedBox(width: 7),
+                Text('מקורות הנתונים',
+                    style: TextStyle(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5)),
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text('${sourced.length}',
+                      style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11)),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: _sourcesOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Icons.keyboard_arrow_down,
+                      size: 19, color: AppColors.textSecondary),
+                ),
+              ]),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 200),
+            crossFadeState: _sourcesOpen
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('כל נתון מבוסס על מקור רשמי וניתן לאימות:',
+                      style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 10.5,
+                          height: 1.3)),
+                  const SizedBox(height: 8),
+                  for (final d in sourced) ...[
+                    _sourceRow(d),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sourceRow(ScorecardDimension d) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(IconsaxPlusLinear.tick_circle,
+                size: 13, color: AppColors.primary),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${d.label} — ${d.stat!.trim()}',
+                    style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 11.5,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 1),
+                Text('מקור: ${d.source!.trim()}',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10.5,
+                        height: 1.3)),
+              ],
+            ),
+          ),
+        ],
+      );
 
   Widget _tierChip(String tier) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
