@@ -240,7 +240,10 @@ class GradientBoostedScorer {
     _Stump('condition_score', 0.8, 0.3, 0.0),
     // livability (real gov data)
     _Stump('safety', 0.6, 0.4, -0.15), // safer area boosts; unsafe penalizes
-    _Stump('safety', 0.3, 0.0, -0.45), // strong penalty for high-crime areas
+    // NOTE: the strong high-crime penalty was moved out of the static stump list
+    // into _safetyPenalty() below, because a flat -0.45 cliff on `safety` alone
+    // is a disproportionate, opaque sledgehammer. See _safetyPenalty for the
+    // residential-denominator caveat and the SES/centrality gating.
     _Stump('school_access', 0.55, 0.25, 0.0), // education density
     _Stump('health_access', 0.5, 0.18, 0.0), // health facilities nearby
   ];
@@ -272,6 +275,47 @@ class GradientBoostedScorer {
     return logit;
   }
 
+  // Gentle, gated penalty for high-crime areas.
+  //
+  // The `safety` signal = 1 − percentile(per-capita reported-crime rate) from
+  // gov crime data. That per-capita rate uses a RESIDENTIAL-population
+  // denominator, but offences accrue from a much larger daytime/commuter/
+  // nightlife population. For flagship, high-density commercial cities
+  // (e.g. Tel Aviv → safety ≈ 0.01) this systematically OVERSTATES residential
+  // danger. The previous flat -0.45 cliff on `safety` alone silently buried
+  // such listings on a single contested metric — bad for a tenant assistant.
+  //
+  // So we keep safety as a real signal but soften it three ways:
+  //   1. Reduced magnitude: cap at -0.25 (was -0.45).
+  //   2. Gradual ramp: scale with how far below the 0.3 threshold we are,
+  //      instead of a hard cliff at the boundary.
+  //   3. SES/centrality gating: a high-socioeconomic, high-centrality center
+  //      (commercial/nightlife hub) gets the penalty attenuated, because its
+  //      crime rate is inflated by the residential denominator. A genuinely
+  //      distressed area (low SES AND low centrality) still gets the full,
+  //      meaningful penalty.
+  static double _safetyPenalty(PropertyFeatureVector pfv) {
+    const threshold = 0.3;
+    final safety = pfv.get('safety');
+    if (safety >= threshold) return 0.0;
+
+    // 0 at the threshold, 1 at safety == 0 → gradual ramp, no cliff.
+    final severity = (threshold - safety) / threshold;
+    const maxPenalty = 0.25; // softened from 0.45
+
+    // Centrality + SES both default to a neutral 0.5 when absent.
+    final ses = pfv.get('socioeconomic', 0.5);
+    final centrality = pfv.get('centrality', 0.5);
+    // High SES and/or high centrality ⇒ likely a commercial hub whose crime
+    // rate is denominator-inflated ⇒ attenuate. Distressed areas (both low)
+    // keep the full penalty (attenuation → 0).
+    final hubness = math.max(ses, centrality); // 0 distressed … 1 prime center
+    final attenuation = (hubness - 0.5).clamp(0.0, 0.5) / 0.5; // 0…1
+    final gate = 1.0 - 0.7 * attenuation; // up to 70% relief for prime centers
+
+    return -maxPenalty * severity * gate;
+  }
+
   static double score(PropertyFeatureVector pfv) {
     double logit = -0.6; // base rate slightly below 0.5
     for (final s in _stumps) {
@@ -279,6 +323,7 @@ class GradientBoostedScorer {
       logit += x >= s.threshold ? s.whenAbove : s.whenBelow;
     }
     logit += _interactions(pfv);
+    logit += _safetyPenalty(pfv);
     return 1.0 / (1.0 + math.exp(-logit.clamp(-30.0, 30.0)));
   }
 }

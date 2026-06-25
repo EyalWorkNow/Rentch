@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // Canonical scoring dimensions. Parts 2/3/4 iterate this exact list so weights,
@@ -42,6 +43,9 @@ const List<String> kScoringDimensions = [
   'freshness',
   'popularity',
   'trust',
+  'schools', // CBS education-institution density around the property (gov data)
+  'family', // CBS share of children 0-19 — family-friendliness of the locality
+  'health', // CBS health-facility availability for the locality (gov data)
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -420,6 +424,13 @@ class UserPreferenceModel {
         return 0.6 * pfv.popularity + 0.4 * pfv.get('like_rate_wilson');
       case 'trust':
         return pfv.trust;
+      // ── gov-data livability dimensions (flat keys from FeatureEngineer) ──────
+      case 'schools':
+        return pfv.get('school_access', 0.5).clamp(0.0, 1.0);
+      case 'family':
+        return pfv.get('demo_child', 0.5).clamp(0.0, 1.0);
+      case 'health':
+        return pfv.get('health_access', 0.5).clamp(0.0, 1.0);
       default:
         return 0.5;
     }
@@ -499,6 +510,11 @@ class PreferenceModelBuilder {
     'freshness': 0.3,
     'popularity': 0.3,
     'trust': 0.45,
+    // gov-data livability: non-zero so they always contribute a little, then
+    // persona-boosted below when the tenant signals a family / young household.
+    'schools': 0.3,
+    'family': 0.3,
+    'health': 0.3,
   };
   static const double _priorVariance = 0.09; // σ≈0.3 — fairly uncertain prior
 
@@ -579,12 +595,34 @@ class PreferenceModelBuilder {
     // persona-aware sharpening from the free text: families weight safety &
     // neighbourhood; everyone gets a mild safety prior bump (universally valued).
     final raw = query.rawText;
-    final familyPersona = RegExp(r'משפח|ילד|ילדים|בית ספר').hasMatch(raw);
+    // persona match-keys from the curated profile tags (e.g. 'family','students').
+    final personaKeys = profile != null
+        ? ProfileTagCatalog.matchKeysFor(profile.importantDetails,
+            isLandlord: false)
+        : const <String>{};
+    final familyTag = personaKeys.contains('family');
+    final studentTag =
+        personaKeys.contains('students') || personaKeys.contains('roommates');
+    final familyPersona =
+        familyTag || RegExp(r'משפח|ילד|ילדים|בית ספר').hasMatch(raw);
     if (familyPersona) {
       sharpen('safety', 0.9, 4.0);
       sharpen('neighborhood', 0.7, 2.0);
     } else {
       sharpen('safety', 0.6, 1.0); // soft default — safety still counts
+    }
+
+    // ── persona-weighted gov livability dimensions ───────────────────────────
+    // A family (or family free-text) makes schools + a family-friendly area
+    // strongly relevant; students/roommates care a little about a young area but
+    // not about schools. Otherwise these stay at their mild non-zero prior so
+    // they still contribute without dominating.
+    if (familyPersona) {
+      sharpen('schools', 0.9, 5.0);
+      sharpen('family', 0.85, 4.0);
+      sharpen('health', 0.6, 1.5); // families value clinic access too
+    } else if (studentTag) {
+      sharpen('family', 0.55, 2.0); // young/family-mix area, mild
     }
 
     // ── utilities per dimension ──────────────────────────────────────────────
@@ -620,6 +658,10 @@ class PreferenceModelBuilder {
       'freshness': const LinearUtility(),
       'popularity': const LinearUtility(),
       'trust': const LinearUtility(),
+      // gov-data livability inputs are already [0,1] scores — higher is better.
+      'schools': const LinearUtility(),
+      'family': const LinearUtility(),
+      'health': const LinearUtility(),
     };
 
     final constraints = HardConstraints(

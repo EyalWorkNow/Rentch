@@ -105,9 +105,27 @@ void main() {
     // Trace each number to its source.
     expect(labels['value']!.contains('₪'), true);
     expect(labels['neighborhood'], 'אשכול חברתי-כלכלי 8/10'); // CBS cluster 8
-    expect(labels['safety']!.contains('אחוזון בטיחות'), true);
+    // safety relabel: honest reported-crime percentile, NOT the misleading
+    // "אחוזון בטיחות 1" framing that read as totally-unsafe for Tel Aviv.
+    expect(labels['safety']!.contains('פשיעה מדווחת לנפש'), true);
+    expect(labels['safety']!.contains('אחוזון בטיחות'), false);
     expect(labels['transit']!.contains('ק״מ מהרכבת'), true);
     expect(labels['size']!.contains('92 מ״ר'), true);
+
+    // New gov-backed livability dimensions now surface as explained stats.
+    // Tel Aviv has indexed schools (coords), demographics, and health facilities.
+    expect(labels.containsKey('schools'), true,
+        reason: 'schools label should be present for a coord-bearing TLV unit');
+    expect(labels['schools']!.contains('מוסדות חינוך'), true);
+
+    expect(labels.containsKey('family'), true,
+        reason: 'family/demographics label should be present for TLV');
+    expect(labels['family']!.contains('% ילדים'), true);
+    expect(_hasDigit.hasMatch(labels['family']!), true);
+
+    expect(labels.containsKey('health'), true,
+        reason: 'health access label should be present for TLV');
+    expect(labels['health']!.contains('שירותי בריאות'), true);
   });
 
   test('(b) no gov match + no coords → gov-backed keys are OMITTED, not faked',
@@ -135,6 +153,11 @@ void main() {
     expect(labels.containsKey('safety'), false);
     expect(labels.containsKey('neighborhood'), false);
     expect(labels.containsKey('transit'), false);
+    // New gov livability dimensions must also be OMITTED (not faked) when the
+    // locality/coords have no gov coverage.
+    expect(labels.containsKey('schools'), false);
+    expect(labels.containsKey('family'), false);
+    expect(labels.containsKey('health'), false);
     // value: no gov ₪/m² anchor; ₪/m² alone with no comparison ⇒ a bare ratio
     // is still real (derived from price/size), so the engine may emit just the
     // unit ₪/m². It must NEVER claim a comparison-to-median figure.

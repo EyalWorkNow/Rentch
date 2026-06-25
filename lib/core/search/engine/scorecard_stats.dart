@@ -44,6 +44,9 @@ class ScorecardStats {
     _addSafety(out, property, gov);
     _addNeighborhood(out, property, gov);
     _addSize(out, property, market);
+    _addSchools(out, property, gov);
+    _addFamily(out, property, gov);
+    _addHealth(out, property, gov);
 
     return out;
   }
@@ -127,8 +130,15 @@ class ScorecardStats {
     if (!gov.loaded) return;
     final safety = gov.safetyScore(p.city); // [0,1], 1 = safest, null if no data
     if (safety == null) return;
-    final percentile = (safety * 100).round();
-    out['safety'] = 'אחוזון בטיחות $percentile (גבוה = בטוח יותר)';
+    // `safety` is 1 − percentile(crime-rate): a high-density city such as
+    // Tel Aviv has high reported crime per capita and so lands near the bottom
+    // of this distribution. The OLD label rendered that as "safety 1", which
+    // reads as "totally unsafe" and is misleading for a desirable city. Report
+    // the honest underlying figure instead — the reported-crime percentile —
+    // and frame it neutrally so a dense, in-demand locality isn't alarmed.
+    final crimePercentile = ((1.0 - safety) * 100).round(); // 100 = most crime
+    out['safety'] =
+        'פשיעה מדווחת לנפש: אחוזון $crimePercentile (נמוך = פחות פשיעה)';
   }
 
   // ── neighborhood: CBS socioeconomic cluster 1–10 for the locality. ───────────
@@ -157,5 +167,64 @@ class ScorecardStats {
       parts.add('אחוזון $pct באזור');
     }
     out['size'] = parts.join(' · ');
+  }
+
+  // ── schools: CBS education-institution density around the property's coords,
+  //    [0,1] (log-scaled count of schools+kindergartens). Omit when no coords /
+  //    no schools indexed near the point (score 0). ─────────────────────────────
+  static void _addSchools(
+    Map<String, String> out,
+    RentalProperty p,
+    GovData gov,
+  ) {
+    if (!gov.loaded) return;
+    final density = gov.schoolDensityScore(p.lat, p.lon); // [0,1], 0 = none/no data
+    if (density <= 0) return;
+    final pct = (density * 100).round();
+    final qualifier = density >= 0.66
+        ? 'גבוהה'
+        : density >= 0.33
+            ? 'בינונית'
+            : 'נמוכה';
+    out['schools'] = 'צפיפות מוסדות חינוך $qualifier (אחוזון $pct)';
+  }
+
+  // ── family: CBS share of children (0-19) in the locality → family-friendliness.
+  //    Append a "young area" note when the working-age share is high. Omit when
+  //    demographics are unavailable. ────────────────────────────────────────────
+  static void _addFamily(
+    Map<String, String> out,
+    RentalProperty p,
+    GovData gov,
+  ) {
+    if (!gov.loaded) return;
+    final demo = gov.demographics(p.city);
+    if (demo == null) return;
+    final childShare = demo['childShare'];
+    if (childShare == null || childShare <= 0) return;
+    final childPct = (childShare * 100).round();
+    var label = 'אזור משפחתי — $childPct% ילדים';
+    final youngShare = demo['youngShare'] ?? 0.0;
+    if (youngShare >= 0.6) label = '$label · אזור צעיר';
+    out['family'] = label;
+  }
+
+  // ── health: CBS health-facility availability for the locality, [0,1]
+  //    (log-scaled clinic/facility count). Omit when none indexed (score 0). ─────
+  static void _addHealth(
+    Map<String, String> out,
+    RentalProperty p,
+    GovData gov,
+  ) {
+    if (!gov.loaded) return;
+    final access = gov.healthAccessScore(p.city); // [0,1], 0 = none/no data
+    if (access <= 0) return;
+    final qualifier = access >= 0.66
+        ? 'גבוהה'
+        : access >= 0.33
+            ? 'טובה'
+            : 'בסיסית';
+    final pct = (access * 100).round();
+    out['health'] = 'נגישות שירותי בריאות $qualifier (אחוזון $pct)';
   }
 }

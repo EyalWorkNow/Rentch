@@ -186,6 +186,9 @@ class Explainer {
     'freshness': 'חדש',
     'popularity': 'ביקוש',
     'trust': 'אמינות',
+    'schools': 'מוסדות חינוך',
+    'family': 'אזור משפחתי',
+    'health': 'נגישות בריאות',
   };
 
   /// Public Hebrew label for a scoring dimension key (used by the Scorecard
