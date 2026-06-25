@@ -28,7 +28,10 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rentch.app"
+        // Play package id (must match the Firebase Android app + Play Console).
+        // namespace stays com.rentch.app (internal R/BuildConfig pkg) — only the
+        // applicationId is the store identity, so MainActivity needn't move.
+        applicationId = "com.eyalatiyawork.rentch"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdkVersion = flutter.minSdkVersion
