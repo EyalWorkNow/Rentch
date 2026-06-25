@@ -1,8 +1,12 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
+import 'package:dating_app/core/services/recommendation_explainer.dart';
+import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
@@ -37,8 +41,8 @@ class _ChatMsg {
     this.isConsent = false,
   });
   final String role; // 'user' | 'assistant'
-  final String text;
-  final List<ScoredProperty> scored;
+  String text; // mutable: the "how I chose" bubble is upgraded once the LLM returns
+  List<ScoredProperty> scored; // mutable: scorecards get llmReason merged in async
   final List<String> chips;
   final bool isConsent;
   bool expanded = false; // "show more" toggle for result lists
@@ -226,9 +230,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _scrollToEnd();
       return;
     }
-    final results = SmartSearch.rank(
-        context.read<DatingProvider>().allProperties, _query,
-        limit: 10);
+    final provider = context.read<DatingProvider>();
+    final results = SmartSearch.rank(provider.allProperties, _query,
+        limit: 10, profile: provider.tenantProfile);
     setState(() {
       _messages.add(_ChatMsg(
         role: 'assistant',
@@ -364,12 +368,17 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     List<ScoredProperty> results = const [];
     bool anyExact = false;
     if (shouldSearch) {
-      results = SmartSearch.rank(provider.allProperties, _query, limit: 10);
+      // Pass the tenant persona so it DRIVES the scores + populates each
+      // scorecard's personaReasons (tag / deal-breaker matches).
+      results = SmartSearch.rank(provider.allProperties, _query,
+          limit: 10, profile: provider.tenantProfile);
       anyExact = results.any((r) => r.exact);
     }
 
     if (!mounted) return;
     _lastReply = sr.$1;
+    _ChatMsg? howChoseMsg;
+    _ChatMsg? resultsMsg;
     setState(() {
       _messages.add(_ChatMsg(role: 'assistant', text: sr.$1, chips: sr.$2));
       if (shouldSearch) {
@@ -387,14 +396,22 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             text: SearchNarrative.summarize(
                 _query, provider.allProperties.length, results),
           ));
-          _messages.add(_ChatMsg(
+          // Transparency header: "how I chose these". Starts with a scorecard-
+          // built fallback, then gets upgraded to the LLM's warm version below.
+          howChoseMsg = _ChatMsg(
+            role: 'assistant',
+            text: _howIChoseFallback(results),
+          );
+          _messages.add(howChoseMsg!);
+          resultsMsg = _ChatMsg(
             role: 'assistant',
             text: anyExact
                 ? 'מצאתי ${results.length} דירות שמתאימות לך 🎯'
                 : 'אלה הכי קרובות למה שחיפשת 👇',
             scored: results,
             chips: _refineChips(),
-          ));
+          );
+          _messages.add(resultsMsg!);
         }
         _searched = true;
       }
@@ -402,7 +419,129 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     });
     _scrollToEnd();
 
+    // Fetch the LLM's number-grounded explanations WITHOUT blocking the cards:
+    // they're already on screen; this fills llmReason + the "how I chose" bubble
+    // when (and if) it returns within a short timeout. Degrades to engine reasons.
+    if (shouldSearch && results.isNotEmpty && resultsMsg != null) {
+      _fetchExplanations(
+        results: results,
+        persona: _personaLabels(provider),
+        howChoseMsg: howChoseMsg!,
+        resultsMsg: resultsMsg!,
+      );
+    }
+
     if (shouldSearch && results.isNotEmpty) _maybeCapturePersona(results.length);
+  }
+
+  // Persona labels driving the ranking + sent to the explainer.
+  List<String> _personaLabels(DatingProvider provider) {
+    final p = provider.tenantProfile;
+    if (p == null) return const [];
+    return [...p.importantDetails, ...p.dealBreakers]
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  // Calls the (frozen) RecommendationExplainer over the engine's scorecards and
+  // merges the result back in: per-property llmReason + the persona-level
+  // "how I chose these" paragraph. Never blocks the UI; null result = no-op.
+  Future<void> _fetchExplanations({
+    required List<ScoredProperty> results,
+    required List<String> persona,
+    required _ChatMsg howChoseMsg,
+    required _ChatMsg resultsMsg,
+  }) async {
+    // Index-align properties + cards (only entries that actually carry a card).
+    final props = <RentalProperty>[];
+    final cards = <Scorecard>[];
+    final order = <ScoredProperty>[];
+    for (final r in results) {
+      final c = r.scorecard;
+      if (c == null) continue;
+      props.add(r.property);
+      cards.add(c);
+      order.add(r);
+    }
+    if (cards.isEmpty) return;
+
+    RecommendationExplanation? exp;
+    try {
+      exp = await RecommendationExplainer.explain(
+        properties: props,
+        cards: cards,
+        persona: persona,
+        querySummary: _query.describe(),
+      ).timeout(const Duration(seconds: 6));
+    } catch (_) {
+      exp = null; // timeout / failure → keep the engine's own reasons
+    }
+    if (exp == null || !mounted) return;
+
+    // Merge: rebuild each ScoredProperty with its scorecard.withLlmReason(...).
+    final merged = <ScoredProperty>[];
+    for (final r in results) {
+      final c = r.scorecard;
+      final reason = c == null ? null : exp.perProperty[r.property.id];
+      merged.add(reason == null || reason.trim().isEmpty
+          ? r
+          : ScoredProperty(r.property, r.score, r.tags, r.trainKm, r.exact,
+              c!.withLlmReason(reason)));
+    }
+
+    setState(() {
+      resultsMsg.scored = merged;
+      if (exp!.howIChose.trim().isNotEmpty) {
+        howChoseMsg.text = exp.howIChose.trim();
+      }
+    });
+  }
+
+  // Engine-only fallback "how I chose these", built from the top scorecards when
+  // the LLM is unavailable — still cites real data so the header stays honest.
+  String _howIChoseFallback(List<ScoredProperty> results) {
+    final cards = results
+        .map((r) => r.scorecard)
+        .whereType<Scorecard>()
+        .toList();
+    if (cards.isEmpty) {
+      return 'דירגתי כל דירה לפי ציון רב-ממדי — תמורה למחיר, מיקום, '
+          'קרבה לתחבורה ובטיחות — והצפתי את ההתאמות הטובות ביותר.';
+    }
+    // Which dimensions weighed most across the top picks?
+    final weight = <String, double>{};
+    final labels = <String, String>{};
+    for (final c in cards.take(4)) {
+      for (final d in c.dimensions) {
+        weight[d.key] = (weight[d.key] ?? 0) + d.weightPct;
+        labels[d.key] = d.label;
+      }
+    }
+    final topDims = (weight.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value)))
+        .take(3)
+        .map((e) => labels[e.key] ?? e.key)
+        .toList();
+    final best = cards.first;
+    final sb = StringBuffer('כך בחרתי: שקללתי בעיקר ');
+    sb.write(topDims.isEmpty ? 'תמורה למחיר ומיקום' : _joinHe(topDims));
+    sb.write(' על בסיס נתוני אמת. ');
+    if (best.personaReasons.isNotEmpty) {
+      sb.write('התאמתי גם להעדפות שלך — ${best.personaReasons.first}. ');
+    }
+    sb.write('בראש הרשימה ${best.fitPct}% התאמה');
+    if (best.tier.isNotEmpty) sb.write(' (${best.tier})');
+    sb.write('. הקש "למה זו?" על כל דירה לפירוט המלא.');
+    return sb.toString();
+  }
+
+  // Hebrew-friendly list join: "א, ב ו-ג".
+  String _joinHe(List<String> items) {
+    if (items.isEmpty) return '';
+    if (items.length == 1) return items.first;
+    final head = items.sublist(0, items.length - 1).join(', ');
+    return '$head ו${items.last}';
   }
 
   // Warm conversational reply from server נועה (Gemini, tenant_search mode);
@@ -1004,6 +1143,10 @@ class _AssistantPropertyCard extends StatelessWidget {
                       ],
                     ]),
                   ),
+                  // Expandable transparency panel — the data-grounded "why this
+                  // one" breakdown (dimensions + stats + persona + LLM reason).
+                  if (scored.scorecard != null)
+                    ScorecardView(card: scored.scorecard!),
                 ],
               ),
             ),

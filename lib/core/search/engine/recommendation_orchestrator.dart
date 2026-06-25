@@ -19,10 +19,14 @@
 
 import 'dart:math' as math;
 
+import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/engine/preference_model.dart';
 import 'package:dating_app/core/search/engine/ranking_engine.dart';
+import 'package:dating_app/core/search/engine/scorecard.dart';
+import 'package:dating_app/core/search/engine/scorecard_stats.dart';
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -40,6 +44,7 @@ class Recommendation {
     required this.confidence,
     required this.strictMatch,
     required this.trainKm,
+    this.scorecard,
   });
 
   final RentalProperty property;
@@ -51,6 +56,10 @@ class Recommendation {
   final double confidence; // 0..1 how sure we are about this ranking
   final bool strictMatch; // all hard constraints met
   final double? trainKm;
+
+  /// Full data-grounded reasoning for this property (engine breakdown + raw
+  /// stats + persona reasons + concerns). Built in [RecommendationEngine.recommend].
+  final Scorecard? scorecard;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -178,6 +187,10 @@ class Explainer {
     'popularity': 'ביקוש',
     'trust': 'אמינות',
   };
+
+  /// Public Hebrew label for a scoring dimension key (used by the Scorecard
+  /// builder). Falls back to the raw key when unmapped.
+  static String dimLabel(String key) => _dimLabel[key] ?? key;
 
   /// Concrete, data-driven chips for a candidate.
   static List<String> highlights(
@@ -358,20 +371,180 @@ class RecommendationEngine {
 
     return [
       for (final c in selected)
-        Recommendation(
-          property: c.property,
-          fitScore: c.score * 100,
-          fitPct: (c.score * 100).round(),
-          explanation: Explainer.explain(c, model),
-          highlights: Explainer.highlights(c, model),
-          dimensionBreakdown: c.dimensionContrib,
-          confidence: (baseConfidence * (0.7 + 0.3 * c.constraintSatisfaction))
-              .clamp(0.0, 1.0),
-          strictMatch: c.strictMatch,
-          trainKm: IsraelGeoIndex.nearestStationKm(
-              c.property.lat, c.property.lon),
-        ),
+        () {
+          final fitPct = (c.score * 100).round();
+          final explanation = Explainer.explain(c, model);
+          final highlights = Explainer.highlights(c, model);
+          final confidence =
+              (baseConfidence * (0.7 + 0.3 * c.constraintSatisfaction))
+                  .clamp(0.0, 1.0);
+          final scorecard = _buildScorecard(
+            c: c,
+            model: model,
+            market: market,
+            profile: profile,
+            fitPct: fitPct,
+            confidence: confidence,
+            explanation: explanation,
+            highlights: highlights,
+          );
+          return Recommendation(
+            property: c.property,
+            fitScore: c.score * 100,
+            fitPct: fitPct,
+            explanation: explanation,
+            highlights: highlights,
+            dimensionBreakdown: c.dimensionContrib,
+            confidence: confidence,
+            strictMatch: c.strictMatch,
+            trainKm: IsraelGeoIndex.nearestStationKm(
+                c.property.lat, c.property.lon),
+            scorecard: scorecard,
+          );
+        }(),
     ];
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Scorecard assembly — stop discarding the engine's reasoning.
+  //
+  // Turns the candidate's already-computed MAUT breakdown + the preference
+  // model's weights + the raw market statistics + the tenant persona into the
+  // frozen [Scorecard] contract the transparency UI / LLM explainer consume.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// A dimension counts as a genuine strength above this contribution share.
+  static const double _kNeutralContribution = 0.06;
+
+  static Scorecard _buildScorecard({
+    required RankedCandidate c,
+    required UserPreferenceModel model,
+    required MarketContext market,
+    required TenantProfile? profile,
+    required int fitPct,
+    required double confidence,
+    required String explanation,
+    required List<String> highlights,
+  }) {
+    final breakdown = c.dimensionContrib; // dim key → contribution share
+    final stats = ScorecardStats.statLabels(c.property, market);
+    final weightSum = model.weightSum;
+
+    final dimensions = <ScorecardDimension>[];
+    // Iterate the canonical dimension list so keys align with ScorecardStats /
+    // the preference model exactly.
+    for (final key in kScoringDimensions) {
+      final contribution = breakdown[key] ?? 0.0;
+      // Skip dimensions the candidate doesn't meaningfully touch and that carry
+      // no statistic — keeps the card focused on what actually matters.
+      if (contribution <= 0 && !stats.containsKey(key)) continue;
+      final weightPct = weightSum > 0 ? model.weight(key) / weightSum : 0.0;
+      dimensions.add(ScorecardDimension(
+        key: key,
+        label: Explainer.dimLabel(key),
+        weightPct: weightPct.clamp(0.0, 1.0),
+        contributionPct: contribution.clamp(0.0, 1.0),
+        stat: stats[key],
+        positive: contribution >= _kNeutralContribution,
+      ));
+    }
+    // Strongest contributors first.
+    dimensions.sort((a, b) => b.contributionPct.compareTo(a.contributionPct));
+
+    final personaReasons = _personaReasons(c.property, profile);
+    final concerns = _concerns(c, model, dimensions);
+
+    return Scorecard(
+      fitPct: fitPct,
+      tier: MatchTierX.fromScore(fitPct).label,
+      confidence: confidence,
+      explanation: explanation,
+      highlights: highlights,
+      dimensions: dimensions,
+      personaReasons: personaReasons,
+      concerns: concerns,
+    );
+  }
+
+  // matchKey → property feature catalogue key (only the keys that correspond to
+  // a concrete property amenity can be satisfied by the listing itself).
+  static const Map<String, String> _personaKeyToFeature = {
+    'pets_allowed': 'petsAllowed',
+    'parking': 'parking',
+    'furnished': 'furnished',
+    'elevator': 'elevator',
+    'balcony': 'balcony',
+    'shelter': 'mamad',
+    'ac': 'airConditioning',
+  };
+
+  // Hebrew persona reason per matchKey (reads as "fits …").
+  static const Map<String, String> _personaKeyLabel = {
+    'pets_allowed': 'מתאים לבעלי חיות מחמד',
+    'parking': 'כולל חניה כפי שביקשת',
+    'furnished': 'מגיע מרוהט כפי שביקשת',
+    'elevator': 'יש מעלית כפי שביקשת',
+    'balcony': 'יש מרפסת כפי שביקשת',
+    'shelter': 'כולל ממ״ד / מקלט',
+    'ac': 'יש מיזוג אוויר',
+  };
+
+  /// Persona-specific reasons: the tenant's stated tags whose required feature
+  /// the property actually has. Empty when no profile is supplied.
+  static List<String> _personaReasons(
+    RentalProperty property,
+    TenantProfile? profile,
+  ) {
+    if (profile == null) return const [];
+    final tags = [...profile.importantDetails, ...profile.dealBreakers];
+    if (tags.isEmpty) return const [];
+    final keys =
+        ProfileTagCatalog.matchKeysFor(tags, isLandlord: false);
+    final dealKeys =
+        ProfileTagCatalog.matchKeysFor(profile.dealBreakers, isLandlord: false);
+    final reasons = <String>[];
+    for (final key in keys) {
+      final featureKey = _personaKeyToFeature[key];
+      if (featureKey == null) continue; // non-physical preference, can't verify
+      if (!propertyHasFeature(property, featureKey)) continue;
+      final base = _personaKeyLabel[key] ?? 'מתאים להעדפה שלך';
+      reasons.add(
+          dealKeys.contains(key) ? '$base — דרישת חובה שלך' : base);
+    }
+    return reasons;
+  }
+
+  /// Honest downsides: low/negative dimensions that carry weight, plus a
+  /// budget-over note when the listing exceeds the stated max budget.
+  static List<String> _concerns(
+    RankedCandidate c,
+    UserPreferenceModel model,
+    List<ScorecardDimension> dimensions,
+  ) {
+    final concerns = <String>[];
+
+    // Budget overrun against the model's stated max budget.
+    final price = c.property.price;
+    final maxBudget = model.maxBudget;
+    if (maxBudget > 0 && price > maxBudget) {
+      final over = ((price - maxBudget) / maxBudget * 100).round();
+      concerns.add(over <= 10
+          ? 'מעט מעל התקציב שלך'
+          : 'מעל התקציב שלך בכ-$over%');
+    }
+
+    // Weighted dimensions the listing scores poorly on (only ones the user
+    // actually cares about, to avoid noise).
+    for (final d in dimensions) {
+      if (concerns.length >= 3) break;
+      if (d.positive) continue;
+      if (d.key == 'budget') continue; // covered above
+      final weighty = model.statedDimensions.contains(d.key) ||
+          d.weightPct >= 0.12;
+      if (!weighty) continue;
+      concerns.add('${d.label} פחות חזק כאן');
+    }
+    return concerns;
   }
 
   /// Adapter: run the pipeline and return results as the legacy [ScoredProperty]
@@ -404,6 +577,7 @@ class RecommendationEngine {
           ],
           r.trainKm,
           r.strictMatch,
+          r.scorecard,
         ),
     ];
   }

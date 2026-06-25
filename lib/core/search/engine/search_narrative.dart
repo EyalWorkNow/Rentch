@@ -38,12 +38,20 @@ class SearchNarrative {
     if (q.propertyType != null) filters.add(q.propertyType!);
     if (q.nearTrain) filters.add('קרוב לרכבת');
 
-    // 2) which dimensions I weighed (always-on gov-data signals + intent)
-    final dims = <String>['בטיחות האזור', 'קרבה לתחבורה', 'תמורה למחיר'];
-    if (q.city != null) dims.add('איכות השכונה');
-    if (q.amenities.isNotEmpty) dims.add('המאפיינים שביקשת');
+    // 2) which dimensions I weighed — prefer the REAL top-weighted dimensions
+    //    from the scorecards; fall back to the generic gov-data signals.
+    final dims = _topDimensionLabels(results);
+    if (dims.isEmpty) {
+      dims.addAll(['בטיחות האזור', 'קרבה לתחבורה', 'תמורה למחיר']);
+      if (q.city != null) dims.add('איכות השכונה');
+      if (q.amenities.isNotEmpty) dims.add('המאפיינים שביקשת');
+    }
 
-    // 3) what the top picks actually stood out for (from result highlights)
+    // 3) concrete numbers the best pick actually scored on (from its scorecard
+    //    stats) — so the intro cites data, not just dimension names.
+    final stats = _topStats(results);
+
+    // 4) what the top picks otherwise stood out for (from result highlights)
     final standouts = _topHighlights(results);
 
     final sb = StringBuffer();
@@ -53,10 +61,48 @@ class SearchNarrative {
     }
     sb.write('. דירגתי כל אחת בציון רב-ממדי ששוקלל לפי ');
     sb.write('${_join(dims)} — על בסיס נתוני אמת ממשלתיים.');
-    if (standouts.isNotEmpty) {
+    if (stats.isNotEmpty) {
+      sb.write(' למשל, המובילה: ${_join(stats)}.');
+    } else if (standouts.isNotEmpty) {
       sb.write(' הדירות שבחרתי בלטו במיוחד ב${_join(standouts)}.');
     }
     return sb.toString();
+  }
+
+  // The most heavily-weighted dimension labels across the top scorecards.
+  static List<String> _topDimensionLabels(List<ScoredProperty> results) {
+    final weight = <String, double>{};
+    final labels = <String, String>{};
+    for (final r in results.take(4)) {
+      final c = r.scorecard;
+      if (c == null) continue;
+      for (final d in c.dimensions) {
+        weight[d.key] = (weight[d.key] ?? 0) + d.weightPct;
+        labels[d.key] = d.label;
+      }
+    }
+    final entries = weight.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return [for (final e in entries.take(3)) labels[e.key] ?? e.key];
+  }
+
+  // Real, ready-to-show stat strings from the top pick's positive dimensions —
+  // e.g. "₪82/מ״ר · 14% מתחת לחציון", "כ-1.4 ק״מ מהרכבת". Graceful when absent.
+  static List<String> _topStats(List<ScoredProperty> results) {
+    for (final r in results) {
+      final c = r.scorecard;
+      if (c == null) continue;
+      final dims = [...c.dimensions]
+        ..sort((a, b) => b.contributionPct.compareTo(a.contributionPct));
+      final stats = <String>[];
+      for (final d in dims) {
+        final s = d.stat?.trim();
+        if (d.positive && s != null && s.isNotEmpty) stats.add(s);
+        if (stats.length == 2) break;
+      }
+      if (stats.isNotEmpty) return stats;
+    }
+    return const [];
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────────

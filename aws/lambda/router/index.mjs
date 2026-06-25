@@ -271,6 +271,10 @@ export const handler = async (event) => {
       // listing flow: pull structured property fields out of a free-text
       // description + report which required fields are still missing.
       if (segments[1] === 'extract') return await handleAssistantExtract(event);
+      // POST /assistant/explain → data-grounded explainer: takes the engine's
+      // Scorecards + persona and writes a warm "how I chose" + per-property
+      // "why this one, by the numbers", grounded strictly in the supplied figures.
+      if (segments[1] === 'explain') return await handleAssistantExplain(event);
       return await handleAssistant(event);
     }
 
@@ -1800,6 +1804,108 @@ async function handleAssistantExtract(event) {
   } catch (e) {
     console.warn('assistant/extract', e.message);
     return json(200, { fields: current, missing: missingRequired(current), busy: true });
+  }
+}
+
+// POST /assistant/explain — the LLM as a data-grounded EXPLAINER.
+// The deterministic engine already CHOSE the apartments and produced a Scorecard
+// each (fit, dimension breakdown, REAL stats, persona reasons, concerns). Here we
+// feed those Scorecards + the persona to Gemini and get back a warm persona-level
+// "how I chose these" plus a per-property one-line "why this one, by the numbers".
+// HARD RULE enforced via the prompt: ground every claim in the supplied figures,
+// NEVER invent prices/stats. We also only return reasons for ids we were given.
+async function handleAssistantExplain(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+
+  const persona = Array.isArray(body.persona)
+    ? body.persona.map((s) => String(s || '').slice(0, 200)).filter(Boolean).slice(0, 20)
+    : [];
+  const query = (body.query || '').toString().slice(0, 500);
+
+  // Validate + clamp the scorecards. Cap to ~8 to bound the prompt size, drop any
+  // without a usable propertyId, and clamp the free-text fields the engine fills.
+  const clampStr = (v, n) => (v === null || v === undefined) ? undefined : String(v).slice(0, n);
+  const rawCards = Array.isArray(body.scorecards) ? body.scorecards.slice(0, 8) : [];
+  const cards = [];
+  const ids = [];
+  for (const c of rawCards) {
+    if (!c || typeof c !== 'object') continue;
+    const propertyId = (c.propertyId || '').toString().trim();
+    if (!propertyId) continue;
+    const dims = Array.isArray(c.dimensions) ? c.dimensions.slice(0, 8).map((d) => ({
+      key: clampStr(d?.key, 40),
+      label: clampStr(d?.label, 60),
+      weightPct: typeof d?.weightPct === 'number' ? d.weightPct : undefined,
+      contributionPct: typeof d?.contributionPct === 'number' ? d.contributionPct : undefined,
+      stat: clampStr(d?.stat, 160),
+      positive: d?.positive !== false,
+    })) : [];
+    cards.push({
+      propertyId,
+      fitPct: typeof c.fitPct === 'number' ? c.fitPct : undefined,
+      tier: clampStr(c.tier, 60),
+      confidence: typeof c.confidence === 'number' ? c.confidence : undefined,
+      explanation: clampStr(c.explanation, 300),
+      highlights: Array.isArray(c.highlights)
+        ? c.highlights.slice(0, 6).map((h) => clampStr(h, 120)).filter(Boolean) : [],
+      dimensions: dims,
+      personaReasons: Array.isArray(c.personaReasons)
+        ? c.personaReasons.slice(0, 6).map((p) => clampStr(p, 160)).filter(Boolean) : [],
+      concerns: Array.isArray(c.concerns)
+        ? c.concerns.slice(0, 6).map((p) => clampStr(p, 160)).filter(Boolean) : [],
+    });
+    ids.push(propertyId);
+  }
+
+  // Nothing usable, or no model key → degrade to empty (the UI keeps engine reasons).
+  if (cards.length === 0 || !GEMINI_API_KEY) {
+    return json(200, { howIChose: '', reasons: {} });
+  }
+
+  const sys = 'אתה אתי, עוזר חכם. קיבלת את הדירות שכבר נבחרו ע״י מנוע דירוג, כל אחת '
+    + 'עם ציון התאמה, פירוק לממדים, וסטטיסטיקות אמת, וגם הפרסונה של המשתמש. כתוב: '
+    + '(1) howIChose — פסקה חמה קצרה שמסבירה איך שקללת את הנתונים והפרסונה כדי לבחור '
+    + 'את אלו, תוך ציון הממדים/מספרים האמיתיים שהיו מכריעים; (2) reasons — לכל '
+    + 'propertyId משפט קצר אחד למה היא מתאימה, מצטט נתון אמיתי מה-scorecard שלה. '
+    + 'חוקים: השתמש רק במספרים שמופיעים בקלט; אל תמציא מחירים/סטטיסטיקות; אם נתון '
+    + 'חסר — דבר איכותית. החזר JSON תקין בלבד: {"howIChose":"...","reasons":{"id":"..."}}.';
+
+  const contents = [{
+    role: 'user',
+    parts: [{
+      text: `הפרסונה של המשתמש: ${JSON.stringify(persona)}\n`
+        + `החיפוש: ${query}\n`
+        + `הדירות שנבחרו (Scorecards): ${JSON.stringify(cards)}`,
+    }],
+  }];
+
+  try {
+    const data = await geminiGenerate(sys, contents);
+    let text = (data?.candidates?.[0]?.content?.parts || [])
+      .map((p) => p.text || '').join('');
+    // The model sometimes wraps JSON in ```json fences — strip them, then grab
+    // the first JSON object.
+    text = text.replace(/```(?:json)?/gi, '').replace(/```/g, '');
+    const m = text.match(/\{[\s\S]*\}/);
+    const parsed = m ? JSON.parse(m[0]) : {};
+    const howIChose = (parsed.howIChose || '').toString().slice(0, 800);
+    // Only surface reasons for ids we were actually given (ignore any invented).
+    const reasonsIn = (parsed.reasons && typeof parsed.reasons === 'object') ? parsed.reasons : {};
+    const reasons = {};
+    for (const id of ids) {
+      const r = reasonsIn[id];
+      if (r !== null && r !== undefined && String(r).trim() !== '') {
+        reasons[id] = String(r).slice(0, 300);
+      }
+    }
+    return json(200, { howIChose, reasons });
+  } catch (e) {
+    console.warn('assistant/explain', e.message);
+    return json(200, { howIChose: '', reasons: {} });
   }
 }
 

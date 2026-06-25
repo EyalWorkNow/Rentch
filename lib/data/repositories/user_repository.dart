@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
@@ -116,7 +118,10 @@ class UserRepository {
         budgetMax: _asInt(data['budgetMax']),
         desiredRooms: _asDouble(data['desiredRooms']),
         moveInWindow: (data['moveInWindow'] ?? '').toString(),
-        importantDetails: const [],
+        // Backward-compatible: rows saved before persona persistence have no
+        // importantDetails/dealBreakers column → _decodeList returns [].
+        importantDetails: _decodeList(data['importantDetails']),
+        dealBreakers: _decodeList(data['dealBreakers']),
       );
     } on CircuitOpenException {
       return null;
@@ -190,6 +195,34 @@ class UserRepository {
 
   // ── Row mapping ───────────────────────────────────────────────────────────────
 
+  /// Test-only seam: serialize a profile to a backend row, then parse it back
+  /// into a [TenantProfile] — without touching a live Appwrite. Proves the
+  /// persona (importantDetails/dealBreakers) survives the write→read trip.
+  @visibleForTesting
+  TenantProfile roundTripForTest(
+    TenantProfile profile, {
+    String role = 'tenant',
+    bool discoverable = true,
+  }) {
+    final row = _profileToRow(
+      profile,
+      sanitizedName: InputSanitizer.sanitizeText(profile.name, maxLength: 100),
+      role: role,
+      discoverable: discoverable,
+    );
+    return TenantProfile(
+      id: profile.id,
+      name: (row['name'] ?? '').toString(),
+      bio: (row['bio'] ?? '').toString(),
+      photoUrls: profile.photoUrls,
+      budgetMax: _asInt(row['budgetMax']),
+      desiredRooms: _asDouble(row['desiredRooms']),
+      moveInWindow: (row['moveInWindow'] ?? '').toString(),
+      importantDetails: _decodeList(row['importantDetails']),
+      dealBreakers: _decodeList(row['dealBreakers']),
+    );
+  }
+
   Map<String, dynamic> _profileToRow(
     TenantProfile profile, {
     required String sanitizedName,
@@ -215,8 +248,54 @@ class UserRepository {
       ),
       'role': role,
       'discoverable': discoverable,
+      // Tenant persona used by the AI assistant / matching. Stored as a
+      // JSON-encoded string so Hebrew tag labels (which may contain commas)
+      // round-trip intact in Appwrite Tables (no native array type).
+      'importantDetails': _encodeList(profile.importantDetails),
+      'dealBreakers': _encodeList(profile.dealBreakers),
       'updatedAt': DateTime.now().toUtc().toIso8601String(),
     };
+  }
+
+  // Persona lists are persisted as a JSON array string. Each label is also
+  // length-capped/sanitized to keep stored rows bounded.
+  String _encodeList(List<String> values) {
+    final cleaned = values
+        .map((v) => InputSanitizer.sanitizeText(v, maxLength: 80))
+        .where((v) => v.isNotEmpty)
+        .take(50)
+        .toList();
+    return jsonEncode(cleaned);
+  }
+
+  // Parses a persona list back. Tolerates: a JSON array string (current
+  // format), a real List (if the backend ever returns one), comma-separated
+  // legacy strings, or null/missing (pre-persistence rows) → returns [].
+  List<String> _decodeList(Object? raw) {
+    if (raw == null) return const [];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+    }
+    final str = raw.toString().trim();
+    if (str.isEmpty) return const [];
+    if (str.startsWith('[')) {
+      try {
+        final decoded = jsonDecode(str);
+        if (decoded is List) {
+          return decoded
+              .map((e) => e.toString())
+              .where((s) => s.isNotEmpty)
+              .toList();
+        }
+      } catch (_) {
+        // fall through to comma-split below
+      }
+    }
+    return str
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   String _safeUrl(String url) =>

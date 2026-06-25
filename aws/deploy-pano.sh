@@ -21,13 +21,39 @@ zip -q -j /tmp/router.zip "$HERE/lambda/router/index.mjs"
 aws s3 cp /tmp/pano-stitch.zip "s3://$CODE_BUCKET/pano-stitch.zip" --region "$REGION"
 aws s3 cp /tmp/router.zip "s3://$CODE_BUCKET/router.zip" --region "$REGION"
 
+# 3b. Preserve router secrets across the CFN deploy. The template now declares
+#     GEMINI_API_KEY etc. as NoEcho params (default ''); without this, a deploy
+#     would reset the router env to '' and wipe a manually-set key (which is
+#     exactly what took the assistant offline). Carry the LIVE value forward, and
+#     let a shell env var override it. Set the key ONCE (shell env on the next
+#     deploy, or `aws lambda update-function-configuration`) and it survives.
+live_secret() {  # $1 = env var name → current live value on rentch-router ('' if unset)
+  local v
+  v="$(aws lambda get-function-configuration --region "$REGION" \
+        --function-name rentch-router \
+        --query "Environment.Variables.$1" --output text 2>/dev/null || true)"
+  [ "$v" = "None" ] && v=""
+  printf '%s' "$v"
+}
+GEMINI_API_KEY="${GEMINI_API_KEY:-$(live_secret GEMINI_API_KEY)}"
+GEMINI_LIVE_API_KEY="${GEMINI_LIVE_API_KEY:-$(live_secret GEMINI_LIVE_API_KEY)}"
+LUMA_API_KEY="${LUMA_API_KEY:-$(live_secret LUMA_API_KEY)}"
+TELEPORT_CLIENT_ID="${TELEPORT_CLIENT_ID:-$(live_secret TELEPORT_CLIENT_ID)}"
+TELEPORT_CLIENT_SECRET="${TELEPORT_CLIENT_SECRET:-$(live_secret TELEPORT_CLIENT_SECRET)}"
+[ -z "$GEMINI_API_KEY" ] && echo "WARNING: GEMINI_API_KEY is empty — the assistant + /assistant/explain will be offline. Set it in your shell before deploying or via update-function-configuration." >&2
+
 # 4. Deploy CloudFormation (creates the stitcher Lambda + role, wires the router)
 aws cloudformation deploy \
   --region "$REGION" \
   --stack-name "$STACK" \
   --template-file "$HERE/template.yaml" \
   --capabilities CAPABILITY_IAM \
-  --parameter-overrides CodeBucket="$CODE_BUCKET"
+  --parameter-overrides CodeBucket="$CODE_BUCKET" \
+    GeminiApiKey="$GEMINI_API_KEY" \
+    GeminiLiveApiKey="$GEMINI_LIVE_API_KEY" \
+    LumaApiKey="$LUMA_API_KEY" \
+    TeleportClientId="$TELEPORT_CLIENT_ID" \
+    TeleportClientSecret="$TELEPORT_CLIENT_SECRET"
 
 # 5. Force-refresh code (deploy only updates if the S3 key changed)
 aws lambda update-function-code --function-name rentch-pano-stitch \

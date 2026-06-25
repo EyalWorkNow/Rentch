@@ -31,6 +31,38 @@ Parameters:
     Default: pano-stitch.zip
     Description: S3 key of the OpenCV panorama-stitcher zip (Python + bundled opencv/numpy).
 
+  # ── Router secrets (Gemini assistant + /assistant/explain, Luma, Teleport).
+  #    Wired here so `cloudformation deploy` PRESERVES them instead of resetting
+  #    the function's env to the template — which is what silently wiped a
+  #    manually-set GEMINI_API_KEY and took the assistant offline. NoEcho + empty
+  #    default; deploy-pano.sh carries the live value forward and a shell env var
+  #    overrides it, so the key survives every deploy once set.
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Gemini API key — powers the "אתי"/Erik assistant and /assistant/explain.
+  GeminiLiveApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Gemini Live key for the real-time voice assistant (optional).
+  LumaApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Luma API key for virtual staging / splat reconstruction (optional).
+  TeleportClientId:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Varjo Teleport client id for 3D capture (optional).
+  TeleportClientSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Varjo Teleport client secret (optional).
+
 Resources:
 
   # ── DynamoDB tables ─────────────────────────────────────────────────────────
@@ -303,6 +335,11 @@ Resources:
           S3_BUCKET: !Ref MediaBucket
           TABLE_PREFIX: !Ref TablePrefix
           PANO_STITCH_FN: rentch-pano-stitch
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          GEMINI_LIVE_API_KEY: !Ref GeminiLiveApiKey
+          LUMA_API_KEY: !Ref LumaApiKey
+          TELEPORT_CLIENT_ID: !Ref TeleportClientId
+          TELEPORT_CLIENT_SECRET: !Ref TeleportClientSecret
 
   PanoStitchRole:
     Type: AWS::IAM::Role

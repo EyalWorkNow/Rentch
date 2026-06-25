@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
+import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // Helper for fuzzy locality matching
@@ -202,12 +203,18 @@ class SearchQuery {
 }
 
 class ScoredProperty {
-  ScoredProperty(this.property, this.score, this.tags, this.trainKm, this.exact);
+  ScoredProperty(this.property, this.score, this.tags, this.trainKm, this.exact,
+      [this.scorecard]);
   final RentalProperty property;
   final double score;
   final List<String> tags;
   final double? trainKm;
   final bool exact;
+
+  /// Full data-grounded reasoning (engine breakdown + raw stats + persona +
+  /// LLM explanation). Null on legacy/non-engine paths; the transparency UI
+  /// renders the breakdown when present. See [Scorecard].
+  final Scorecard? scorecard;
 }
 
 // Smarter, more flexible matcher. Reads free Hebrew text into a rich query
@@ -443,11 +450,12 @@ class SmartSearch {
     List<RentalProperty> props,
     SearchQuery q, {
     int limit = 10,
+    TenantProfile? profile,
   }) {
     // Use advanced multi-dimensional matching if query has enough signal;
     // fall back to simpler scoring if vague.
     if (q.hasEssentials && props.isNotEmpty) {
-      return rankAdvanced(props, q, limit: limit);
+      return rankAdvanced(props, q, limit: limit, profile: profile);
     }
     final scored = props.map((p) => _score(p, q)).toList()
       ..sort((a, b) => b.score.compareTo(a.score));
@@ -463,6 +471,7 @@ class SmartSearch {
     List<RentalProperty> props,
     SearchQuery q, {
     int limit = 10,
+    TenantProfile? profile,
   }) {
     if (props.isEmpty) return [];
     try {
@@ -470,6 +479,7 @@ class SmartSearch {
         candidates: props,
         query: q,
         limit: limit,
+        profile: profile,
       );
       if (scored.isNotEmpty) return scored;
     } catch (_) {

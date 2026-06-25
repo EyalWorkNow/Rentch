@@ -1,4 +1,5 @@
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/core/search/engine/preference_model.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -236,5 +237,72 @@ void main() {
     final scored = SmartSearch.rankAdvanced(candidates, q, limit: 6);
     expect(scored.isNotEmpty, true);
     expect(scored.first.tags.any((t) => t.contains('התאמה')), true);
+  });
+
+  test('recommendAsScored attaches a populated Scorecard with a tier', () {
+    final candidates = [
+      ...backgroundMarket(),
+      prop(
+        id: 'star',
+        price: 6000,
+        features: ['parking', 'elevator', 'petsAllowed'],
+        verified: true,
+      ),
+    ];
+    final q = SmartSearch.parse('דירת 3 חדרים בתל אביב עם חניה עד 7000');
+    final scored = RecommendationEngine.recommendAsScored(
+      candidates: candidates,
+      query: q,
+      limit: 6,
+      seed: 1,
+    );
+    expect(scored.isNotEmpty, true);
+    // Every result must carry a non-null Scorecard with dimensions + a tier.
+    for (final s in scored) {
+      final card = s.scorecard;
+      expect(card, isNotNull, reason: 'scorecard must be attached');
+      expect(card!.dimensions, isNotEmpty,
+          reason: 'dimensions must be populated');
+      expect(card.tier, isNotEmpty, reason: 'tier label required');
+      expect(card.fitPct >= 0 && card.fitPct <= 100, true);
+      // dimension keys must come from the canonical list.
+      for (final d in card.dimensions) {
+        expect(kScoringDimensions.contains(d.key), true,
+            reason: 'dim key ${d.key} aligns with kScoringDimensions');
+      }
+    }
+  });
+
+  test('persona reasons surface for matching tenant tags', () {
+    final candidates = [
+      ...backgroundMarket(),
+      prop(id: 'pet', price: 6000, features: ['petsAllowed', 'parking']),
+    ];
+    final q = SmartSearch.parse('דירה בתל אביב עד 7000');
+    final profile = TenantProfile(
+      id: 'u1',
+      name: 'דנה',
+      bio: '',
+      photoUrls: const [],
+      budgetMax: 7000,
+      desiredRooms: 3,
+      moveInWindow: 'מיידי',
+      importantDetails: const ['מתאים לחיות מחמד'],
+      dealBreakers: const ['מתאים לחיות מחמד'],
+    );
+    final scored = RecommendationEngine.recommendAsScored(
+      candidates: candidates,
+      query: q,
+      profile: profile,
+      limit: 8,
+      seed: 1,
+    );
+    final pet = scored.firstWhere((s) => s.property.id == 'pet');
+    expect(pet.scorecard, isNotNull);
+    expect(
+      pet.scorecard!.personaReasons.any((r) => r.contains('חיות מחמד')),
+      true,
+      reason: 'pet-friendly persona reason expected',
+    );
   });
 }
