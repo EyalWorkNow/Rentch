@@ -4,16 +4,36 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image/image.dart' as img;
 import 'package:sensors_plus/sensors_plus.dart';
 
-/// Guided horizontal 360° sweep. The user does three passes — middle, tilted up,
-/// tilted down — and the app silently samples overlapping frames as they turn.
-/// All frames go into one stitch job → the server (OpenCV) builds a horizontal
-/// 360° strip with vertical FOV. Returns every frame path via pop.
+/// What the guided sweep returns to the caller: a finished, server-stitched
+/// equirectangular panorama already living at a network URL, plus the angle of
+/// view the stitch reported. The caller adds this straight as a tour node — no
+/// extra upload, no gallery. Null pop = the user backed out without finishing.
+class PanoramaSweepResult {
+  const PanoramaSweepResult({
+    required this.imageUrl,
+    required this.haov,
+    required this.vaov,
+  });
+
+  final String imageUrl;
+  final double haov;
+  final double vaov;
+}
+
+/// Guided in-app horizontal 360° sweep. The user does three passes — middle,
+/// tilted up, tilted down — and the app silently samples overlapping frames as
+/// they turn. When they finish, the screen runs the WHOLE server stitch itself
+/// (create job → upload frames → start OpenCV stitch → poll until ready) behind
+/// a progress overlay, and pops a finished [PanoramaSweepResult] (a stitched
+/// equirectangular panorama URL + its angle of view). The caller adds it as a
+/// tour node directly — there is no gallery and no second upload step.
 ///
 /// Capture is **gyroscope-gated**: a frame is kept once the phone has actually
 /// rotated ~one step (360° / framesInRow), NOT on a fixed timer — so the sweep
@@ -55,6 +75,10 @@ class _PanoramaSweepCaptureScreenState
   CameraController? _cam;
   StreamSubscription<GyroscopeEvent>? _gyro;
   String? _error;
+  // Stitch phase (after capture): a full-screen "building your tour" overlay.
+  bool _stitching = false;
+  String _stitchMsg = '';
+  String? _stitchError; // set → show retry, never a crash or silent gallery
   bool _running = false; // actively sampling the current row
   bool _converting = false; // a frame is mid-encode (drop stream frames)
   bool _flash = false; // brief visual cue per captured frame (no shutter sound)
@@ -190,9 +214,109 @@ class _PanoramaSweepCaptureScreenState
     }
   }
 
-  void _finish() {
+  // Done sweeping → build the panorama on the server, then pop the finished
+  // result. Needs a few frames to register a 360 cylinder; below that we coach
+  // the user to keep turning rather than ship a broken stitch.
+  Future<void> _finish() async {
     _running = false;
-    Navigator.of(context).pop(_frames.length >= 2 ? _frames : null);
+    if (_frames.length < 6) {
+      // Reuse the error overlay (with its "נסה שוב" that returns to capture) to
+      // coach them to keep turning instead of shipping a broken stitch.
+      setState(() {
+        _stitchError =
+            'צריך עוד תמונות כדי לבנות סיבוב שלם. סובב עוד קצת ונסה שוב.';
+        _stitching = true;
+      });
+      return;
+    }
+    await _stitchAndReturn();
+  }
+
+  // Full server stitch, fully in-app: create job → upload every frame → start
+  // the OpenCV stitch → poll until ready. Any failure surfaces a clear Hebrew
+  // message + "נסה שוב"; it NEVER drops the user into the gallery or crashes.
+  Future<void> _stitchAndReturn() async {
+    // Stop the live camera work so encoding doesn't fight the uploads.
+    setState(() {
+      _running = false;
+      _stitching = true;
+      _stitchError = null;
+      _stitchMsg = 'מתחילים לבנות את הסיור...';
+    });
+    final frames = List<String>.from(_frames);
+    try {
+      // A property doesn't exist yet while the landlord is still filling the
+      // draft, so group this job under a one-off id; the server only uses it as
+      // a folder key for the frames.
+      final groupId = 'draft_${DateTime.now().millisecondsSinceEpoch}';
+      final job = await AwsApiClient.instance
+          .createPanoramaJob(propertyId: groupId, frameCount: frames.length);
+      if (job == null || job.uploadUrls.length < frames.length) {
+        _failStitch('לא הצלחנו להתחיל את העיבוד. בדוק את החיבור לאינטרנט.');
+        return;
+      }
+
+      for (var i = 0; i < frames.length; i++) {
+        if (!mounted) return;
+        setState(() => _stitchMsg = 'מעלים תמונות... ${i + 1}/${frames.length}');
+        final ok = await AwsApiClient.instance
+            .uploadToPresignedUrl(job.uploadUrls[i], frames[i]);
+        if (!ok) {
+          _failStitch('ההעלאה נכשלה באמצע. בדוק את החיבור ונסה שוב.');
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _stitchMsg = 'מחברים את התמונות לסיבוב מלא...');
+      await AwsApiClient.instance.startPanoramaStitch(job.jobId);
+
+      // Poll until ready (or failed). OpenCV stitching of ~40 frames takes a
+      // little while; give it generous, patient time with clear progress text.
+      const maxPolls = 60; // ~2 min at 2 s
+      for (var i = 0; i < maxPolls; i++) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+        final status = await AwsApiClient.instance.getPanorama(job.jobId);
+        if (status == null) continue;
+        if (status.status == 'ready' && status.imageUrl.isNotEmpty) {
+          if (!mounted) return;
+          Navigator.of(context).pop(PanoramaSweepResult(
+            imageUrl: status.imageUrl,
+            haov: status.haov,
+            vaov: status.vaov,
+          ));
+          return;
+        }
+        if (status.status == 'failed') {
+          _failStitch(status.error.isNotEmpty
+              ? 'העיבוד נכשל. נסה לצלם שוב, לאט ובאור טוב.'
+              : 'העיבוד נכשל. נסה לצלם שוב.');
+          return;
+        }
+        setState(() => _stitchMsg = 'מחברים את התמונות לסיבוב מלא...');
+      }
+      _failStitch('העיבוד לוקח יותר מדי זמן. נסה שוב מאוחר יותר.');
+    } catch (_) {
+      _failStitch('משהו השתבש. בדוק את החיבור ונסה שוב.');
+    }
+  }
+
+  void _failStitch(String msg) {
+    if (!mounted) return;
+    setState(() {
+      _stitchError = msg;
+      _stitching = true;
+    });
+  }
+
+  // From the error overlay: go back to capture and let them keep/redo the sweep.
+  void _retryFromError() {
+    setState(() {
+      _stitching = false;
+      _stitchError = null;
+      _stitchMsg = '';
+    });
   }
 
   @override
@@ -300,7 +424,7 @@ class _PanoramaSweepCaptureScreenState
             ),
           ),
 
-          if (_cam != null && _error == null)
+          if (_cam != null && _error == null && !_stitching)
             Positioned(
               bottom: 0,
               left: 0,
@@ -332,7 +456,80 @@ class _PanoramaSweepCaptureScreenState
                 ),
               ),
             ),
+
+          // Full-screen "building your tour" / error overlay — covers everything.
+          if (_stitching) _stitchOverlay(),
         ],
+      ),
+    );
+  }
+
+  // Big, calm, jargon-free overlay shown while the server builds the panorama,
+  // and the clear retry screen if anything fails.
+  Widget _stitchOverlay() {
+    final hasError = _stitchError != null;
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.92),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  hasError
+                      ? IconsaxPlusLinear.warning_2
+                      : IconsaxPlusBold.gallery,
+                  color: hasError ? AppColors.coral : AppColors.primary,
+                  size: 64,
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  hasError ? 'לא הצלחנו לבנות את הסיור' : 'בונים את הסיור שלך',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  hasError
+                      ? _stitchError!
+                      : '$_stitchMsg\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 17, height: 1.5),
+                ),
+                const SizedBox(height: 28),
+                if (hasError) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: _retryFromError,
+                      icon: const Icon(IconsaxPlusBold.refresh),
+                      label: const Text('נסה שוב',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 18)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('סגור',
+                        style: TextStyle(color: Colors.white70, fontSize: 16)),
+                  ),
+                ] else
+                  const CircularProgressIndicator(color: Colors.white),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
