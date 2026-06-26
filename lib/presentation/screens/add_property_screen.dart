@@ -4,6 +4,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
+import 'package:dating_app/core/services/israel_locations.dart';
 import 'package:dating_app/core/services/legal_consent_service.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
 import 'package:dating_app/core/services/scaniverse_asset_import_service.dart';
@@ -123,7 +124,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   String _condition = 'תקין';
   String _designTemplate = '';
   int _designAccent = 0;
-  bool _agencyListing = false;
+  // Kept on the model (preserved when editing) but no longer user-toggleable on
+  // the add flow — the 'פרסום תיווך מאומת' switch was removed from the details step.
+  final bool _agencyListing = false;
   final Set<String> _selectedFeatures = {};
   bool _isSaving = false;
   bool _isSubmittingTour = false;
@@ -907,7 +910,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               entryDateCtrl: _entryDateCtrl,
               propertyType: _propertyType,
               condition: _condition,
-              agencyListing: _agencyListing,
               designTemplate: _designTemplate,
               designAccent: _designAccent,
               onTransactionTypeChanged: (v) => setState(() {
@@ -917,7 +919,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 if (v == PropertyTransactionType.sale && _price < 100000) {
                   _price = 1500000;
                 } else if (v == PropertyTransactionType.rent &&
-                    _price > 150000) {
+                    _price > 50000) {
                   _price = 5000;
                 }
               }),
@@ -927,7 +929,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   setState(() => _rooms = (v * 2).round() / 2),
               onTypeChanged: (v) => setState(() => _propertyType = v!),
               onConditionChanged: (v) => setState(() => _condition = v!),
-              onAgencyChanged: (v) => setState(() => _agencyListing = v),
               onDesignTemplateChanged: (v) =>
                   setState(() => _designTemplate = v),
               onDesignAccentChanged: (v) => setState(() => _designAccent = v),
@@ -1378,6 +1379,17 @@ class _StepLocation extends StatefulWidget {
 
 class _StepLocationState extends State<_StepLocation> {
   bool _isLoading = false;
+  bool _locationsReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Lazy-load the bundled Israel cities/streets dataset once so the
+    // autocomplete fields below can suggest as the landlord types.
+    IsraelLocations.ensureLoaded().then((_) {
+      if (mounted) setState(() => _locationsReady = true);
+    });
+  }
 
   Future<void> _captureLocation() async {
     setState(() => _isLoading = true);
@@ -1492,10 +1504,20 @@ class _StepLocationState extends State<_StepLocation> {
         _FormCard(
           child: Column(
             children: [
-              _Field(
-                  ctrl: widget.cityCtrl,
-                  label: 'עיר *',
-                  icon: IconsaxPlusLinear.map),
+              _AutocompleteField(
+                ctrl: widget.cityCtrl,
+                label: 'עיר *',
+                icon: IconsaxPlusLinear.map,
+                enabled: _locationsReady,
+                optionsBuilder: (query) =>
+                    IsraelLocations.searchCities(query, limit: 30),
+                onSelected: (_) {
+                  // A new city was picked — any previously typed street no longer
+                  // belongs to it, so clear it and refresh the street suggestions.
+                  widget.streetCtrl.clear();
+                  setState(() {});
+                },
+              ),
               const SizedBox(height: 12),
               _Field(
                   ctrl: widget.neighborhoodCtrl,
@@ -1506,10 +1528,17 @@ class _StepLocationState extends State<_StepLocation> {
                 children: [
                   Expanded(
                     flex: 2,
-                    child: _Field(
-                        ctrl: widget.streetCtrl,
-                        label: 'רחוב *',
-                        icon: IconsaxPlusLinear.routing),
+                    child: _AutocompleteField(
+                      ctrl: widget.streetCtrl,
+                      label: 'רחוב *',
+                      icon: IconsaxPlusLinear.routing,
+                      enabled: _locationsReady,
+                      optionsBuilder: (query) => IsraelLocations.streetsOf(
+                        widget.cityCtrl.text.trim(),
+                        query: query,
+                        limit: 30,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1633,7 +1662,6 @@ class _StepDetails extends StatelessWidget {
     required this.entryDateCtrl,
     required this.propertyType,
     required this.condition,
-    required this.agencyListing,
     required this.designTemplate,
     required this.designAccent,
     required this.onTransactionTypeChanged,
@@ -1641,7 +1669,6 @@ class _StepDetails extends StatelessWidget {
     required this.onRoomsChanged,
     required this.onTypeChanged,
     required this.onConditionChanged,
-    required this.onAgencyChanged,
     required this.onDesignTemplateChanged,
     required this.onDesignAccentChanged,
   });
@@ -1655,7 +1682,6 @@ class _StepDetails extends StatelessWidget {
   final TextEditingController entryDateCtrl;
   final String propertyType;
   final String condition;
-  final bool agencyListing;
   final String designTemplate;
   final int designAccent;
   final ValueChanged<PropertyTransactionType> onTransactionTypeChanged;
@@ -1663,7 +1689,6 @@ class _StepDetails extends StatelessWidget {
   final ValueChanged<double> onRoomsChanged;
   final ValueChanged<String?> onTypeChanged;
   final ValueChanged<String?> onConditionChanged;
-  final ValueChanged<bool> onAgencyChanged;
   final ValueChanged<String> onDesignTemplateChanged;
   final ValueChanged<int> onDesignAccentChanged;
 
@@ -1693,8 +1718,8 @@ class _StepDetails extends StatelessWidget {
                 label: isSale ? 'מחיר מבוקש (סה"כ)' : 'מחיר לחודש',
                 value: price.toDouble(),
                 min: 0,
-                max: isSale ? _kMaxSalePrice.toDouble() : 150000,
-                divisions: isSale ? 400 : 300,
+                max: isSale ? _kMaxSalePrice.toDouble() : 50000,
+                divisions: isSale ? 400 : 100,
                 unitPrefix: '₪',
                 onChanged: onPriceChanged,
               ),
@@ -1703,8 +1728,8 @@ class _StepDetails extends StatelessWidget {
                 label: 'מספר חדרים',
                 value: rooms,
                 min: 0,
-                max: 50,
-                divisions: 100,
+                max: 15,
+                divisions: 30,
                 unitSuffix: 'חד׳',
                 allowDecimals: true,
                 onChanged: onRoomsChanged,
@@ -1720,12 +1745,7 @@ class _StepDetails extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: _Field(
-                      ctrl: floorCtrl,
-                      label: 'קומה',
-                      icon: IconsaxPlusLinear.layer,
-                      numeric: true,
-                    ),
+                    child: _FloorDropdown(ctrl: floorCtrl),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1764,23 +1784,6 @@ class _StepDetails extends StatelessWidget {
                 ctrl: entryDateCtrl,
                 label: 'תאריך כניסה (לדוגמה: 01/09)',
                 icon: IconsaxPlusLinear.calendar,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Text(
-                    'פרסום תיווך מאומת',
-                    style: TextStyle(
-                        color: AppColors.navy,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14),
-                  ),
-                  const Spacer(),
-                  Switch.adaptive(
-                    value: agencyListing,
-                    onChanged: onAgencyChanged,
-                  ),
-                ],
               ),
             ],
           ),
@@ -2385,7 +2388,9 @@ class _VerifiedListingPanel extends StatelessWidget {
                   ),
                   SizedBox(height: 3),
                   Text(
-                    'דירה מאומתת מקבלת ניקוד גבוה יותר באלגוריתם.',
+                    'דירה מאומתת היא דירה שצילמתם בה סרטון קצר ואמיתי מתוך '
+                    'האפליקציה. ככה השוכרים יודעים שהדירה אמיתית — והיא מוצגת '
+                    'ליותר אנשים ומופיעה גבוה יותר ברשימה.',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12.5,
@@ -3487,6 +3492,158 @@ class _FormCard extends StatelessWidget {
         ],
       ),
       child: child,
+    );
+  }
+}
+
+/// A text field with a suggestion dropdown backed by the bundled Israel
+/// cities/streets dataset. Suggestions are advisory only — whatever the landlord
+/// types is kept in [ctrl], so free text that matches nothing is still allowed
+/// (nobody is blocked from submitting).
+class _AutocompleteField extends StatelessWidget {
+  const _AutocompleteField({
+    required this.ctrl,
+    required this.label,
+    required this.icon,
+    required this.optionsBuilder,
+    this.enabled = true,
+    this.onSelected,
+  });
+
+  final TextEditingController ctrl;
+  final String label;
+  final IconData icon;
+  final List<String> Function(String query) optionsBuilder;
+  final bool enabled;
+  final ValueChanged<String>? onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<String>(
+      // Seed Autocomplete's internal controller with whatever is already in our
+      // shared controller (e.g. GPS auto-fill or an Erik draft).
+      initialValue: TextEditingValue(text: ctrl.text),
+      optionsBuilder: (TextEditingValue value) {
+        final query = value.text.trim();
+        if (query.isEmpty) return const Iterable<String>.empty();
+        return optionsBuilder(query);
+      },
+      onSelected: (selection) {
+        ctrl.text = selection;
+        onSelected?.call(selection);
+      },
+      fieldViewBuilder:
+          (context, textController, focusNode, onFieldSubmitted) {
+        return TextField(
+          controller: textController,
+          focusNode: focusNode,
+          enabled: enabled,
+          // Mirror every keystroke into the shared controller so free text the
+          // user never "selected" from the list is still saved.
+          onChanged: (v) => ctrl.text = v,
+          onSubmitted: (_) => onFieldSubmitted(),
+          style: const TextStyle(color: AppColors.navy, fontSize: 14),
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            prefixIcon: Icon(icon, size: 16, color: AppColors.primary),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topRight,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(14),
+            color: Colors.white,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240, maxWidth: 320),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (context, index) {
+                  final option = options.elementAt(index);
+                  return InkWell(
+                    onTap: () => onSelected(option),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Text(
+                        option,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Floor-number selector as a drop-down menu (requested for older users instead
+/// of free typing). Range: basement, ground floor, then 1…50. Writes the chosen
+/// label straight into [ctrl] (kept as a string, same as before).
+class _FloorDropdown extends StatelessWidget {
+  const _FloorDropdown({required this.ctrl});
+
+  final TextEditingController ctrl;
+
+  static const List<String> _floors = [
+    'מרתף',
+    'קרקע',
+    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+    '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+    '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
+    '31', '32', '33', '34', '35', '36', '37', '38', '39', '40',
+    '41', '42', '43', '44', '45', '46', '47', '48', '49', '50',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ctrl.text.trim();
+    // A pre-filled value (GPS / Erik draft) might not be in the canonical list —
+    // surface it as an extra option so it isn't silently dropped.
+    final items = <String>[
+      if (current.isNotEmpty && !_floors.contains(current)) current,
+      ..._floors,
+    ];
+    return DropdownButtonFormField<String>(
+      initialValue: current.isEmpty ? null : current,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'קומה',
+        labelStyle:
+            const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        // AppColors.primary is a mutable static — never put it inside a const
+        // expression here (build-time invalid_constant even though it looks fine).
+        prefixIcon: Icon(IconsaxPlusLinear.layer,
+            size: 16, color: AppColors.primary),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      ),
+      style: const TextStyle(
+          color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
+      icon: const RentlyIcon(IconsaxPlusLinear.arrow_down,
+          size: 16, color: AppColors.textSecondary),
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      items: items
+          .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+          .toList(),
+      onChanged: (v) => ctrl.text = v ?? '',
     );
   }
 }
@@ -4815,7 +4972,6 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   entryDateCtrl: _entryDateCtrl,
                   propertyType: _propertyType,
                   condition: _condition,
-                  agencyListing: _agencyListing,
                   designTemplate: _designTemplate,
                   designAccent: _designAccent,
                   onTransactionTypeChanged: (v) => setState(() {
@@ -4823,7 +4979,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                     if (v == PropertyTransactionType.sale && _price < 100000) {
                       _price = 1500000;
                     } else if (v == PropertyTransactionType.rent &&
-                        _price > 150000) {
+                        _price > 50000) {
                       _price = 5000;
                     }
                   }),
@@ -4833,7 +4989,6 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       setState(() => _rooms = (v * 2).round() / 2),
                   onTypeChanged: (v) => setState(() => _propertyType = v!),
                   onConditionChanged: (v) => setState(() => _condition = v!),
-                  onAgencyChanged: (v) => setState(() => _agencyListing = v),
                   onDesignTemplateChanged: (v) =>
                       setState(() => _designTemplate = v),
                   onDesignAccentChanged: (v) =>

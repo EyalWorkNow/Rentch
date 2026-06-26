@@ -173,6 +173,8 @@ flutter:
   assets:
     - assets/images/
     - assets/data/
+    - assets/data/israel_cities.json
+    - assets/data/israel_streets.json
     - assets/data/govdata/
     - assets/web/pannellum/
     - assets/web/psv/

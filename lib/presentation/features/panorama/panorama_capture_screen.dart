@@ -7,7 +7,6 @@ import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_pole_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_wide_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -64,43 +63,6 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // natively at pick time (cheap + low memory), so the result always renders.
   static const double _maxPanoWidth = 4096;
 
-  // Import a ready equirectangular panorama from the gallery.
-  Future<void> _addPoint(ImageSource source) async {
-    if (_busy) return;
-    try {
-      final picked = await _picker.pickImage(
-        source: source,
-        maxWidth: _maxPanoWidth,
-        imageQuality: 90,
-      );
-      if (picked == null || !mounted) return;
-
-      // A true Photo Sphere is equirectangular (~2:1).
-      final aspect = await _imageAspect(picked.path);
-      if (!mounted) return;
-      if (aspect != null && (aspect < 1.85 || aspect > 2.2)) {
-        final proceed = await _warnNotSpherical(aspect);
-        if (proceed != true || !mounted) return;
-      }
-      await _uploadAndAdd(path: picked.path, contentType: 'image/jpeg');
-    } catch (_) {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  // In-app wide (ultra-wide) capture → shown as a partial panorama. haov/vaov
-  // are device-FOV estimates (calibration knobs) so Pannellum renders the single
-  // shot without stretching it to a full sphere.
-  Future<void> _captureWide() async {
-    if (_busy) return;
-    final path = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const PanoramaWideCaptureScreen()),
-    );
-    if (path == null || !mounted) return;
-    await _uploadAndAdd(
-        path: path, contentType: 'image/jpeg', haov: 100, vaov: 70);
-  }
-
   // Shared: name → mandatory upload → place on the map → add the node.
   Future<void> _uploadAndAdd({
     required String path,
@@ -140,6 +102,15 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // correct latitude band with honest, un-stretched poles.
   Future<void> _capturePano() async {
     if (_busy) return;
+
+    // GUIDED FIRST: never dump an older user straight into the gallery. Show the
+    // big step-by-step explainer; only after they tap the one primary button do
+    // we open the picker so they can choose the panorama they just shot.
+    final ready = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const _PanoramaGuideScreen()),
+    );
+    if (ready != true || !mounted) return;
+
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: _maxPanoWidth,
@@ -424,33 +395,6 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     }
   }
 
-  Future<bool?> _warnNotSpherical(double aspect) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('זו לא תמונה כדורית',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-        content: Text(
-          'התמונה ביחס ${aspect.toStringAsFixed(1)}:1, אבל סיור 360° תקין צריך '
-          'תמונה כדורית ביחס 2:1 (מצב «כדור תמונה» / Photo Sphere). אם תוסיף '
-          'אותה, ייתכן שהסיור ייראה מעוות.',
-          style: const TextStyle(color: Color(0xFF475569), height: 1.4),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('ביטול')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('הוסף בכל זאת'),
-          ),
-        ],
-      ),
-    );
-  }
 
 
   Future<String?> _askLabel(String fallback) async {
@@ -544,60 +488,27 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Column(
-                children: [
-                  // Primary: capture a real horizontal 360° on the phone.
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: _busy ? null : _capturePano,
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(IconsaxPlusBold.camera),
-                      label: const Text('הוסף פנורמה',
-                          style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
+              // ONE obvious next step: capture/add a panorama. Tapping it opens
+              // the guided explainer first, then the picker.
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 11),
-                            side: BorderSide(color: AppColors.primary),
-                          ),
-                          onPressed: _busy ? null : _captureWide,
-                          icon: const Icon(IconsaxPlusLinear.camera, size: 18),
-                          label: const Text('צלם רחב',
-                              style: TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 11),
-                            side: BorderSide(color: AppColors.primary),
-                          ),
-                          onPressed:
-                              _busy ? null : () => _addPoint(ImageSource.gallery),
-                          icon: const Icon(IconsaxPlusLinear.gallery, size: 18),
-                          label: const Text('ייבא 360°',
-                              style: TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  onPressed: _busy ? null : _capturePano,
+                  icon: _busy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(IconsaxPlusBold.camera, size: 22),
+                  label: const Text('הוסף פנורמה',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 17)),
+                ),
               ),
             ),
           ),
@@ -643,21 +554,16 @@ class _Instructions extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: RichText(
-              text: TextSpan(
-                style: const TextStyle(
-                    color: AppColors.navy, fontSize: 13, height: 1.45),
+              text: const TextSpan(
+                style: TextStyle(
+                    color: AppColors.navy, fontSize: 15, height: 1.5),
                 children: [
-                  const TextSpan(
-                      text: 'איך יוצרים סיור 360°:\n',
+                  TextSpan(
+                      text: 'בכל חדר מוסיפים נקודה אחת.\n',
                       style: TextStyle(fontWeight: FontWeight.w900)),
-                  const TextSpan(
-                      text:
-                          '1. בכל חדר פתח את אפליקציית המצלמה במצב «פנורמה», עמוד במרכז וסובב לאט סיבוב אחד (כמה שניות).\n2. חזור לכאן, הקש «הוסף פנורמה» ובחר את התמונה — היא תוצג כסיור 360°.\n3. תן שם לנקודה (סלון, מטבח…), סמן על המפה, וחזור בכל חדר — הנקודות נקשרות אוטומטית.\n'),
                   TextSpan(
                       text:
-                          'אפשר גם «ייבא 360°» (תמונה כדורית מלאה מ-Street View / Insta360), או «צלם רחב» לתצוגה חלקית מהירה.',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, color: AppColors.primary)),
+                          'הקישו «הוסף פנורמה» למטה — נסביר לכם בדיוק מה לעשות, צעד אחר צעד.'),
                 ],
               ),
             ),
@@ -761,4 +667,191 @@ class _NodeTile extends StatelessWidget {
         color: AppColors.primaryLight2,
         child: Icon(IconsaxPlusLinear.gallery, color: AppColors.primary),
       );
+}
+
+/// Full-screen, big-text guide shown BEFORE the photo picker opens. Teaches the
+/// landlord — in plain Hebrew, numbered steps with icons — how to shoot a real
+/// panorama with their phone's own Camera app, then return and pick it. ONE
+/// obvious primary button ("צילמתי — בחר תמונה") pops `true`, after which the
+/// caller opens the gallery. Designed for an older, non-technical user: minimal
+/// choices, large clear text, a single next step.
+class _PanoramaGuideScreen extends StatelessWidget {
+  const _PanoramaGuideScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        title: const Text('איך מצלמים פנורמה'),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Friendly hero illustration.
+                    Container(
+                      height: 130,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight2,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Icon(IconsaxPlusBold.rotate_left,
+                          size: 64, color: AppColors.primary),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'נצלם את החדר בסיבוב אחד',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 24,
+                          color: AppColors.navy),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'ככה יוצרים את הסיור 360° המושלם. פשוט עקבו אחרי השלבים.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 16,
+                          height: 1.4,
+                          color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 22),
+                    const _GuideStep(
+                      number: '1',
+                      icon: IconsaxPlusBold.camera,
+                      title: 'פתחו את אפליקציית המצלמה בטלפון',
+                      body: 'המצלמה הרגילה של הטלפון — לא צריך אפליקציה אחרת.',
+                    ),
+                    const _GuideStep(
+                      number: '2',
+                      icon: IconsaxPlusBold.gallery_add,
+                      title: 'בחרו מצב «פנורמה»',
+                      body:
+                          'מחליקים בין המצבים (וידאו · תמונה · פנורמה) ובוחרים «פנורמה».',
+                    ),
+                    const _GuideStep(
+                      number: '3',
+                      icon: IconsaxPlusBold.user,
+                      title: 'עמדו במרכז החדר',
+                      body: 'כדי שכל הפינות ייכנסו לתמונה.',
+                    ),
+                    const _GuideStep(
+                      number: '4',
+                      icon: IconsaxPlusBold.rotate_right,
+                      title: 'סובבו לאט סיבוב שלם',
+                      body:
+                          'מסתובבים עם הטלפון אט-אט סיבוב אחד מלא, ומסיימים במקום שהתחלתם.',
+                    ),
+                    const _GuideStep(
+                      number: '5',
+                      icon: IconsaxPlusBold.tick_circle,
+                      title: 'חזרו לכאן ובחרו את התמונה',
+                      body: 'הקישו על הכפתור למטה ובחרו את הפנורמה שצילמתם.',
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // ONE obvious primary action → opens the picker.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 17),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  icon: const Icon(IconsaxPlusBold.gallery, size: 22),
+                  label: const Text('צילמתי — בחר תמונה',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuideStep extends StatelessWidget {
+  const _GuideStep({
+    required this.number,
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.isLast = false,
+  });
+
+  final String number;
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Big numbered badge.
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: Text(number,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 17,
+                              color: AppColors.navy)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(body,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.35,
+                        color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
