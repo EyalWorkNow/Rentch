@@ -14,6 +14,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
+import 'package:dating_app/presentation/features/scan3d/room_scan_flow.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/foundation.dart';
@@ -136,7 +137,38 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   PropertyVirtualTour? _scanTourDraft;
   PropertyModel3d? _model3dDraft;
   PropertyPanoramaTour? _panoramaTourDraft;
+  List<ScannedRoom> _roomScans = const [];
   Timer? _scanPollTimer;
+
+  // Opens the per-room 3D scan flow (the founder's primary path: high-quality
+  // 3D captured one room at a time, linked together). Persists the resulting
+  // rooms on the draft. NOTE: full multi-room persistence needs a model field —
+  // see report. For now we keep the rooms in screen state and surface the first
+  // viewable room through the existing _model3dDraft so a save still carries 3D.
+  Future<void> _openRoomScan() async {
+    final result = await RoomScanFlowScreen.open(
+      context,
+      propertyId: _draftPropertyId,
+      initialRooms: _roomScans,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _roomScans = result;
+      final firstViewable = result.firstWhere(
+        (r) => r.hasViewableAsset,
+        orElse: () => const ScannedRoom(name: ''),
+      );
+      if (firstViewable.hasViewableAsset) {
+        _model3dDraft = (_model3dDraft ?? const PropertyModel3d()).copyWith(
+          glbUrl: firstViewable.meshGlbUrl ?? '',
+          plyUrl: firstViewable.splatUrl ?? '',
+          scanDate: DateTime.now(),
+        );
+      } else if (result.isEmpty) {
+        _model3dDraft = null;
+      }
+    });
+  }
 
   Future<void> _createPanoramaTour() async {
     final result = await Navigator.of(context).push<PropertyPanoramaTour>(
@@ -968,6 +1000,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   _pickPropertyVideo(ImageSource.camera),
               onPickScanFromGallery: () => _pickScanVideo(ImageSource.gallery),
               onPickScanFromCamera: () => _pickScanVideo(ImageSource.camera),
+              onOpenRoomScan: _openRoomScan,
+              roomScanCount: _roomScans.length,
               onLinkScaniverse: ScaniverseService.instance.isConfigured
                   ? () => _linkScaniverseScan()
                   : null,
@@ -978,6 +1012,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               onClearScan: () => setState(() {
                 _scanTourDraft = null;
                 _model3dDraft = null;
+                _roomScans = const [];
               }),
               onCreatePanoramaTour: _createPanoramaTour,
               panoramaPointCount: _panoramaTourDraft?.length ?? 0,
@@ -2019,6 +2054,8 @@ class _StepPhotos extends StatelessWidget {
     required this.onPickVideoFromCamera,
     required this.onPickScanFromGallery,
     required this.onPickScanFromCamera,
+    this.onOpenRoomScan,
+    this.roomScanCount = 0,
     this.onLinkScaniverse,
     required this.onImportScaniverseAssets,
     required this.onClearVirtualTour,
@@ -2055,6 +2092,8 @@ class _StepPhotos extends StatelessWidget {
   final VoidCallback onPickVideoFromCamera;
   final VoidCallback onPickScanFromGallery;
   final VoidCallback onPickScanFromCamera;
+  final VoidCallback? onOpenRoomScan;
+  final int roomScanCount;
   final VoidCallback? onLinkScaniverse;
   final VoidCallback onImportScaniverseAssets;
   final VoidCallback onClearVirtualTour;
@@ -2301,6 +2340,8 @@ class _StepPhotos extends StatelessWidget {
                   isBackendConfigured: isScanBackendConfigured,
                   onPickFromCamera: onPickScanFromCamera,
                   onPickFromGallery: onPickScanFromGallery,
+                  onOpenRoomScan: onOpenRoomScan,
+                  roomScanCount: roomScanCount,
                   onLinkScaniverse: onLinkScaniverse,
                   onImportScaniverseAssets: onImportScaniverseAssets,
                   onClear: onClearScan,
@@ -2953,6 +2994,8 @@ class _Scan3dPanel extends StatelessWidget {
     required this.onPickFromCamera,
     required this.onPickFromGallery,
     required this.onClear,
+    this.onOpenRoomScan,
+    this.roomScanCount = 0,
     this.onLinkScaniverse,
     this.onImportScaniverseAssets,
   });
@@ -2963,6 +3006,8 @@ class _Scan3dPanel extends StatelessWidget {
   final VoidCallback onPickFromCamera;
   final VoidCallback onPickFromGallery;
   final VoidCallback onClear;
+  final VoidCallback? onOpenRoomScan;
+  final int roomScanCount;
   final VoidCallback? onLinkScaniverse;
   final VoidCallback? onImportScaniverseAssets;
 
@@ -3014,7 +3059,8 @@ class _Scan3dPanel extends StatelessWidget {
                   ),
                   SizedBox(height: 3),
                   Text(
-                    'וידאו קצר ויציב הופך לסיור אינטראקטיבי קל לטעינה.',
+                    'סורקים חדר-חדר באיכות גבוהה — וכל החדרים מחוברים יחד. '
+                    '(לסיור הליכה בכל הדירה השתמשו באריח ה־360°.)',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12.5,
@@ -3026,39 +3072,35 @@ class _Scan3dPanel extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
+        // PRIMARY path: per-room high-quality 3D scan, linked together.
+        if (onOpenRoomScan != null) ...[
+          _RoomScanEntry(
+            roomScanCount: roomScanCount,
+            onTap: onOpenRoomScan!,
+          ),
+          const SizedBox(height: 14),
+        ],
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: const [
             _ScanTip(
-              icon: Icons.access_time_filled_rounded,
-              label: '45-75 שניות',
-            ),
-            _ScanTip(
               icon: Icons.wb_sunny_rounded,
               label: 'אור חזק',
             ),
             _ScanTip(
-              icon: Icons.slow_motion_video_rounded,
-              label: 'תנועה איטית',
+              icon: Icons.home_work_rounded,
+              label: 'חדר אחרי חדר',
             ),
             _ScanTip(
-              icon: Icons.home_work_rounded,
-              label: 'מעבר בכל חדר',
+              icon: Icons.photo_camera_rounded,
+              label: 'מכל הזוויות',
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        if (currentTour == null)
-          _ScanActions(
-            isSubmitting: isSubmitting,
-            onPickFromCamera: onPickFromCamera,
-            onPickFromGallery: onPickFromGallery,
-            onLinkScaniverse: onLinkScaniverse,
-            onImportScaniverseAssets: onImportScaniverseAssets,
-          )
-        else
+        if (currentTour != null) ...[
+          const SizedBox(height: 18),
           _ScanStatusCard(
             tour: currentTour,
             isSubmitting: isSubmitting,
@@ -3066,7 +3108,102 @@ class _Scan3dPanel extends StatelessWidget {
             onReplace: onPickFromCamera,
             onClear: onClear,
           ),
+        ] else ...[
+          // Secondary fallback: the older whole-apartment video → cloud flow.
+          const SizedBox(height: 16),
+          const Text(
+            'או: סריקה מהירה לכל הדירה מסרטון',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _ScanActions(
+            isSubmitting: isSubmitting,
+            onPickFromCamera: onPickFromCamera,
+            onPickFromGallery: onPickFromGallery,
+            onLinkScaniverse: onLinkScaniverse,
+            onImportScaniverseAssets: onImportScaniverseAssets,
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Big, primary entry to the per-room 3D scan flow. Shows how many rooms are
+/// already scanned so an older user always knows where they stand.
+class _RoomScanEntry extends StatelessWidget {
+  const _RoomScanEntry({required this.roomScanCount, required this.onTap});
+
+  final int roomScanCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final has = roomScanCount > 0;
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.navy, Color(0xFF1E3A8A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.view_in_ar_rounded,
+                    color: Colors.white, size: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        has ? 'המשך סריקת חדרים' : 'התחל סריקת חדרים',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        has
+                            ? '$roomScanCount חדרים נסרקו · אפשר להוסיף עוד'
+                            : 'סורקים חדר-חדר באיכות גבוהה',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_left_rounded, color: Colors.white),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
