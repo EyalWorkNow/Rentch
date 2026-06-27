@@ -8,6 +8,7 @@ import 'package:dating_app/data/models/scan3d_job.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_compress/video_compress.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
 // PER-ROOM 3D SCAN FLOW
@@ -20,8 +21,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 //       returns a USDZ path; we confirm capture (USDZ→GLB display is a backend
 //       follow-up, so we just mark the room "נסרק").
 //   • Everything else                          → guided CLOUD capture: walk the
-//       user through taking ~20+ photos in-app (big shutter + counter), then
-//       Kiri3dService.runScan(...) with a calm full-screen progress state.
+//       user through recording a slow VIDEO walkthrough in-app (big record
+//       button, live timer), then Kiri3dService.runScan(...) (KIRI /3dgs/video)
+//       with a calm full-screen progress state. Video is far more foolproof for
+//       an older user than aiming 20 stills, and it's what KIRI reconstructs best.
 //
 // Designed for OLDER, non-technical users: big text, ONE action per step, no
 // jargon, clear progress, graceful errors with "נסה שוב".
@@ -481,27 +484,27 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
       _showComingSoon();
       return;
     }
-    final files = await Navigator.of(context).push<List<File>>(
+    final video = await Navigator.of(context).push<File>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => const _GuidedPhotoCaptureScreen(),
+        builder: (_) => const _GuidedVideoCaptureScreen(),
       ),
     );
-    if (files == null || files.isEmpty || !mounted) return;
+    if (video == null || !mounted) return;
 
     final job = await Navigator.of(context).push<Scan3dJob>(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => _CloudReconstructScreen(
           propertyId: widget.propertyId,
-          files: files,
+          files: [video],
         ),
       ),
     );
     if (job == null || !mounted) return;
     if (!job.isReady) {
       setState(() => _error =
-          'בניית החדר נכשלה. נסו לצלם שוב באור טוב יותר ולאט.');
+          'בניית החדר נכשלה. נסו לצלם סרטון שוב באור טוב, ולסובב לאט בכל החדר.');
       return;
     }
 
@@ -590,10 +593,10 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
                 ),
               if (widget.supportsRoomPlan) const SizedBox(height: 12),
               _OptionCard(
-                title: 'סריקה עם צילום',
+                title: 'סריקה עם סרטון',
                 subtitle:
-                    'מצלמים את החדר מכל הזוויות, ואנחנו בונים אותו בתלת-מימד.',
-                icon: Icons.photo_camera_rounded,
+                    'מצלמים סרטון קצר של החדר, ואנחנו בונים אותו בתלת-מימד.',
+                icon: Icons.videocam_rounded,
                 highlighted: !widget.supportsRoomPlan,
                 busy: false,
                 onTap: _busy ? null : _startCloudCapture,
@@ -645,26 +648,36 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// GUIDED PHOTO CAPTURE — in-app camera, big shutter, live counter
+// GUIDED VIDEO CAPTURE — in-app camera, big record button, live timer
+// ────────────────────────────────────────────────────────────────────────────
+// Far more foolproof for an older user than aiming 20 stills: they just press
+// record and slowly pan the whole room. KIRI reconstructs video best (it submits
+// to /3dgs/video with the videoFile field). Resolution is capped at 1080p (KIRI
+// max is 1920×1080) — we use 720p for a reliably-uploadable file size.
 // ════════════════════════════════════════════════════════════════════════════
 
-class _GuidedPhotoCaptureScreen extends StatefulWidget {
-  const _GuidedPhotoCaptureScreen();
+class _GuidedVideoCaptureScreen extends StatefulWidget {
+  const _GuidedVideoCaptureScreen();
 
   @override
-  State<_GuidedPhotoCaptureScreen> createState() =>
-      _GuidedPhotoCaptureScreenState();
+  State<_GuidedVideoCaptureScreen> createState() =>
+      _GuidedVideoCaptureScreenState();
 }
 
-class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
-  // KIRI wants ~20+ photos for a clean reconstruction; 20 is the friendly
-  // minimum we ask older users to reach before "סיום".
-  static const int _minPhotos = 20;
+class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
+  // Soft minimum: keep "סיום" disabled until ~15s of footage so the room is
+  // well covered. Hard cap: auto-stop at 2.5 min, safely under KIRI's 3-min
+  // limit (and keeps the upload size manageable).
+  static const Duration _minDuration = Duration(seconds: 15);
+  static const Duration _maxDuration = Duration(seconds: 150);
 
   CameraController? _cam;
   String? _error;
-  bool _capturing = false;
-  final List<File> _photos = [];
+  bool _recording = false;
+  bool _stopping = false;
+  Duration _elapsed = Duration.zero;
+  // Wall-clock start so the timer stays accurate even if a frame is dropped.
+  DateTime? _startedAt;
 
   @override
   void initState() {
@@ -680,8 +693,13 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cams.first,
       );
-      final ctrl =
-          CameraController(back, ResolutionPreset.high, enableAudio: false);
+      // ResolutionPreset.high == 720p — under KIRI's 1920×1080 cap, with a
+      // reliably-uploadable file size. (veryHigh == 1080p is the hard ceiling.)
+      final ctrl = CameraController(
+        back,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
       await ctrl.initialize();
       if (!mounted) {
         await ctrl.dispose();
@@ -689,30 +707,90 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
       }
       setState(() => _cam = ctrl);
     } catch (_) {
-      if (mounted) setState(() => _error = 'לא ניתן לפתוח את המצלמה');
+      if (mounted) {
+        setState(() => _error =
+            'לא ניתן לפתוח את המצלמה. בדקו שאישרתם גישה למצלמה ונסו שוב.');
+      }
     }
   }
 
-  Future<void> _shoot() async {
+  Future<void> _startRecording() async {
     final cam = _cam;
-    if (cam == null || _capturing) return;
-    setState(() => _capturing = true);
+    if (cam == null || _recording || _stopping) return;
     try {
-      final shot = await cam.takePicture();
-      _photos.add(File(shot.path));
-    } catch (_) {/* ignore a single bad frame */} finally {
-      if (mounted) setState(() => _capturing = false);
+      await cam.startVideoRecording();
+      if (!mounted) return;
+      _startedAt = DateTime.now();
+      setState(() {
+        _recording = true;
+        _elapsed = Duration.zero;
+      });
+      _tick();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error =
+            'לא הצלחנו להתחיל הקלטה. נסו שוב, ובדקו שיש מקום פנוי בטלפון.');
+      }
     }
   }
 
-  void _finish() {
-    if (_photos.length < _minPhotos) return;
-    Navigator.of(context).pop(_photos);
+  /// Re-arms a ~250ms timer that refreshes the on-screen clock and auto-stops
+  /// at the hard cap. Uses wall-clock time so it never drifts.
+  void _tick() {
+    if (!_recording || !mounted) return;
+    Future<void>.delayed(const Duration(milliseconds: 250)).then((_) {
+      if (!_recording || !mounted) return;
+      final started = _startedAt;
+      if (started == null) return;
+      setState(() => _elapsed = DateTime.now().difference(started));
+      if (_elapsed >= _maxDuration) {
+        _stopAndFinish();
+      } else {
+        _tick();
+      }
+    });
+  }
+
+  Future<void> _stopAndFinish() async {
+    final cam = _cam;
+    if (cam == null || !_recording || _stopping) return;
+    setState(() {
+      _stopping = true;
+      _recording = false;
+    });
+    try {
+      final file = await cam.stopVideoRecording();
+      if (!mounted) return;
+      Navigator.of(context).pop(File(file.path));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _stopping = false;
+        _error = 'שמירת הסרטון נכשלה. נסו לצלם שוב.';
+      });
+    }
+  }
+
+  bool get _reachedMin => _elapsed >= _minDuration;
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   @override
   void dispose() {
-    _cam?.dispose();
+    // If we're still mid-recording when leaving, stop it so the controller can
+    // be disposed cleanly (best-effort — never throw out of dispose).
+    final cam = _cam;
+    if (cam != null && cam.value.isRecordingVideo) {
+      cam.stopVideoRecording().catchError((_) => XFile('')).whenComplete(
+            cam.dispose,
+          );
+    } else {
+      cam?.dispose();
+    }
     super.dispose();
   }
 
@@ -758,13 +836,25 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 16, height: 1.4),
               ),
               const SizedBox(height: 20),
               _BigButton(
-                label: 'חזרה',
-                icon: Icons.arrow_forward_rounded,
-                onTap: () => Navigator.of(context).pop(),
+                label: 'נסו שוב',
+                icon: Icons.refresh_rounded,
+                onTap: () {
+                  setState(() => _error = null);
+                  _init();
+                },
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  'חזרה',
+                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                ),
               ),
             ],
           ),
@@ -774,8 +864,6 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
   }
 
   Widget _topGuide() {
-    final n = _photos.length;
-    final enough = n >= _minPhotos;
     return Positioned(
       top: 0,
       left: 0,
@@ -789,22 +877,23 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
         ),
         child: Column(
           children: [
-            Text(
-              enough
-                  ? 'מצוין! יש מספיק תמונות'
-                  : 'מצלמים את החדר מכל פינה',
-              style: const TextStyle(
+            const Text(
+              'צלמו סרטון של החדר',
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 17,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
-              enough
-                  ? 'אפשר להוסיף עוד או ללחוץ "סיום"'
-                  : 'עוד ${_minPhotos - n} תמונות לפחות',
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
+              _recording
+                  ? 'ממשיכים לסובב לאט — תקרה, רצפה, פינות'
+                  : 'סובבו לאט בכל החדר — תקרה, רצפה, פינות. '
+                      'כ-30–60 שניות, באור טוב.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.white70, fontSize: 14, height: 1.4),
             ),
           ],
         ),
@@ -813,8 +902,7 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
   }
 
   Widget _bottomControls() {
-    final n = _photos.length;
-    final enough = n >= _minPhotos;
+    final canFinish = _recording && _reachedMin && !_stopping;
     return Positioned(
       bottom: 0,
       left: 0,
@@ -824,7 +912,7 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // counter pill
+            // live timer pill
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -832,15 +920,38 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
                 color: Colors.black.withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(30),
               ),
-              child: Text(
-                'צולמו $n תמונות',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_recording) ...[
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.coral,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    _recording ? _fmt(_elapsed) : 'מוכנים לצילום',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (_recording && !_reachedMin) ...[
+              const SizedBox(height: 8),
+              Text(
+                'המשיכו עוד מעט (לפחות ${_minDuration.inSeconds} שניות)',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
             const SizedBox(height: 18),
             Row(
               children: [
@@ -850,9 +961,13 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
                   onTap: () => Navigator.of(context).pop(),
                 ),
                 const Spacer(),
-                // big shutter
+                // big record / stop button
                 GestureDetector(
-                  onTap: _capturing ? null : _shoot,
+                  onTap: _stopping
+                      ? null
+                      : (_recording
+                          ? (canFinish ? _stopAndFinish : null)
+                          : _startRecording),
                   child: Container(
                     width: 86,
                     height: 86,
@@ -860,27 +975,47 @@ class _GuidedPhotoCaptureScreenState extends State<_GuidedPhotoCaptureScreen> {
                       shape: BoxShape.circle,
                       color: Colors.white,
                       border: Border.all(
-                          color: AppColors.primary, width: 5),
+                          color: AppColors.coral, width: 5),
                     ),
-                    child: _capturing
-                        ? Padding(
-                            padding: const EdgeInsets.all(26),
+                    child: _stopping
+                        ? const Padding(
+                            padding: EdgeInsets.all(26),
                             child: CircularProgressIndicator(
                               strokeWidth: 3,
-                              color: AppColors.primary,
+                              color: AppColors.coral,
                             ),
                           )
-                        : const Icon(Icons.camera_alt_rounded,
-                            color: AppColors.navy, size: 36),
+                        : Center(
+                            child: _recording
+                                ? Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: canFinish
+                                          ? AppColors.coral
+                                          : Colors.grey,
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.coral,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                          ),
                   ),
                 ),
                 const Spacer(),
-                // done
+                // finish (only meaningful while recording)
                 _CircleAction(
                   icon: Icons.check_rounded,
-                  enabled: enough,
-                  highlighted: enough,
-                  onTap: _finish,
+                  enabled: canFinish,
+                  highlighted: canFinish,
+                  onTap: _stopAndFinish,
                 ),
               ],
             ),
@@ -946,7 +1081,7 @@ class _CloudReconstructScreen extends StatefulWidget {
 }
 
 class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
-  String _stage = 'מעלים את התמונות…';
+  String _stage = 'מעלים את הסרטון…';
   bool _failed = false;
   String _failMessage = '';
 
@@ -958,10 +1093,27 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
 
   Future<void> _run() async {
     try {
+      // iOS records HEVC/.mov, which KIRI rejects (uploads fine but fails
+      // reconstruction). Transcode to H.264 mp4 first. Fail-soft: fall back to
+      // the original file if transcoding is unavailable rather than blocking.
+      var files = widget.files;
+      if (files.isNotEmpty) {
+        if (mounted) setState(() => _stage = 'מכינים את הסרטון…');
+        try {
+          final info = await VideoCompress.compressVideo(
+            files.first.path,
+            quality: VideoQuality.HighestQuality,
+            deleteOrigin: false,
+            includeAudio: false,
+          );
+          final out = info?.path;
+          if (out != null && out.trim().isNotEmpty) files = [File(out)];
+        } catch (_) {/* keep the original recording */}
+      }
       final job = await Kiri3dService.instance.runScan(
         propertyId: widget.propertyId,
-        captureType: Scan3dCaptureType.photos,
-        files: widget.files,
+        captureType: Scan3dCaptureType.video,
+        files: files,
         onUpdate: (j) {
           if (!mounted) return;
           setState(() => _stage = _stageLabel(j.status));
@@ -975,7 +1127,8 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         _failed = true;
         _failMessage = e.isUnauthorized || e.statusCode == 503
             ? 'התכונה תיפתח בקרוב.'
-            : 'בניית החדר נכשלה. נסו שוב.';
+            : 'בניית החדר נכשלה. נסו לצלם שוב באור טוב, '
+                'ולסובב לאט בכל החדר.';
       });
     } catch (_) {
       if (!mounted) return;
@@ -990,7 +1143,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
     switch (status) {
       case Scan3dStatus.created:
       case Scan3dStatus.uploading:
-        return 'מעלים את התמונות…';
+        return 'מעלים את הסרטון…';
       case Scan3dStatus.processing:
         return 'בונים את החדר בתלת-מימד… כמה דקות';
       case Scan3dStatus.ready:
