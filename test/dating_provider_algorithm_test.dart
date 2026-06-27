@@ -488,6 +488,70 @@ void main() {
 
     provider.dispose();
   });
+
+  test(
+      'persona: a CRITICAL deal-breaker miss scores far below a hit, and an '
+      'IMPORTANT match boosts the score', () async {
+    // Two listings identical except for their features. No landlord profile is
+    // cached for either, so the tenant's own persona is scored against the
+    // property's own attributes.
+    final withParking = _property(
+      id: 'with-parking',
+      features: const ['parking', 'elevator'],
+    );
+    final withoutParking = _property(
+      id: 'without-parking',
+      features: const ['elevator'], // fails the CRITICAL parking deal-breaker
+    );
+    final withElevator = _property(
+      id: 'with-elevator',
+      features: const ['parking', 'elevator'],
+    );
+    final withoutElevator = _property(
+      id: 'without-elevator',
+      features: const ['parking'], // meets CRITICAL, misses IMPORTANT elevator
+    );
+
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(
+        [withParking, withoutParking, withElevator, withoutElevator],
+      ),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    // חייב/ת חניה → parking (CRITICAL); מעלית → elevator (IMPORTANT).
+    const profile = TenantProfile(
+      id: 'tenant-persona',
+      name: 'Persona',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 7000,
+      desiredRooms: 3,
+      moveInWindow: 'גמיש',
+      importantDetails: ['חייב/ת חניה', 'מעלית'],
+      dealBreakers: ['חייב/ת חניה'], // parking is non-negotiable
+    );
+    await provider.updateTenantProfile(profile);
+
+    final critHit = provider.matchScore(withParking);
+    final critMiss = provider.matchScore(withoutParking);
+
+    // A property that FAILS the critical deal-breaker scores clearly lower than
+    // one that meets it — by a wide, gating margin.
+    expect(critMiss, lessThan(critHit));
+    expect(critHit - critMiss, greaterThanOrEqualTo(30),
+        reason: 'an unmet CRITICAL must heavily sink the match %');
+
+    // An IMPORTANT match (elevator) raises the score above an otherwise-equal
+    // property that lacks it.
+    final impHit = provider.matchScore(withElevator);
+    final impMiss = provider.matchScore(withoutElevator);
+    expect(impHit, greaterThan(impMiss),
+        reason: 'an IMPORTANT match must boost the score');
+
+    provider.dispose();
+  });
 }
 
 class _FakeUserRepository extends UserRepository {

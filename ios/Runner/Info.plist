@@ -52,6 +52,8 @@
 	<string>נדרשת גישה למיקרופון כדי לדבר עם העוזר האישי ולצלם וידאו של הנכס</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>נדרשת הרשאת זיהוי דיבור כדי שתוכל לדבר עם העוזר האישי אריק בעברית</string>
+	<key>NSLocationUsageDescription</key>
+	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

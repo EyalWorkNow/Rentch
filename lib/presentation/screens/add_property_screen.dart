@@ -1426,37 +1426,96 @@ class _StepLocationState extends State<_StepLocation> {
     });
   }
 
+  /// Shows a clear Hebrew error. When [offerSettings] is true the snackbar
+  /// gains a button that opens the OS app-settings page so an (older) user can
+  /// grant the blocked permission without hunting through Settings themselves.
+  void _showLocationError(String message, {bool offerSettings = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        content: Text(message),
+        backgroundColor: AppColors.coral,
+        action: offerSettings
+            ? SnackBarAction(
+                label: 'פתח הגדרות',
+                textColor: Colors.white,
+                onPressed: () => Geolocator.openAppSettings(),
+              )
+            : null,
+      ),
+    );
+  }
+
   Future<void> _captureLocation() async {
     setState(() => _isLoading = true);
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final bool serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw 'שירותי המיקום כבויים במכשיר.';
+        _showLocationError(
+          'שירותי המיקום כבויים. אנא הפעל את ה-GPS במכשיר ונסה שוב.',
+          offerSettings: true,
+        );
+        return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw 'הרשאת המיקום נדחתה.';
-        }
+      }
+      if (permission == LocationPermission.denied) {
+        _showLocationError(
+          'הרשאת המיקום נדחתה. ניתן להזין את הכתובת ידנית.',
+        );
+        return;
       }
       if (permission == LocationPermission.deniedForever) {
-        throw 'הרשאות המיקום חסומות לצמיתות בהגדרות המכשיר.';
+        _showLocationError(
+          'הרשאות המיקום חסומות בהגדרות. פתח את ההגדרות כדי לאפשר גישה למיקום.',
+          offerSettings: true,
+        );
+        return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
+      // Try a fresh fix first; a cold GPS start (especially indoors) can take
+      // a while, so on timeout we fall back to the last known position rather
+      // than dead-ending the user.
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 20),
+          ),
+        );
+      } on TimeoutException {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
 
-      await setLocaleIdentifier('he_IL');
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      if (position == null) {
+        _showLocationError(
+          'לא הצלחנו לקבל מיקום (ייתכן שאתה במקום סגור). נסה שוב בחוץ או הזן כתובת ידנית.',
+        );
+        return;
+      }
+
+      // Reverse-geocode to a human address. This can legitimately return
+      // nothing (offline / unsupported region) — that is not a failure: we
+      // still have valid coordinates, so we just ask the user to type the
+      // street manually instead of throwing.
+      List<Placemark> placemarks = const [];
+      try {
+        await setLocaleIdentifier('he_IL');
+        placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+      } catch (_) {
+        placemarks = const [];
+      }
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
@@ -1477,18 +1536,20 @@ class _StepLocationState extends State<_StepLocation> {
           );
         }
       } else {
-        throw 'לא נמצאו נתוני כתובת עבור הקואורדינטות.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 4),
+              content: const Text(
+                'מצאנו את המיקום אך לא את הכתובת המדויקת. אנא הזן את הרחוב ידנית.',
+              ),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(milliseconds: 2500),
-            content: Text('שגיאה בזיהוי המיקום: $e'),
-            backgroundColor: AppColors.coral,
-          ),
-        );
-      }
+      _showLocationError('שגיאה בזיהוי המיקום. נסה שוב או הזן כתובת ידנית.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

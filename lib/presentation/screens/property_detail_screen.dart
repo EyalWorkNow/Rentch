@@ -882,6 +882,8 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                 _AcidPriceCard(property: property, branding: branding),
                 const SizedBox(height: 18),
                 _TemplateFactsWrap(property: property, branding: branding),
+                const SizedBox(height: 26),
+                _paritySections(context),
               ],
             ),
           ),
@@ -903,7 +905,9 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
               18,
               124,
             ),
-            child: Transform.rotate(
+            child: Column(
+              children: [
+            Transform.rotate(
               angle: -0.018,
               child: Container(
                 padding: const EdgeInsets.all(16),
@@ -997,6 +1001,10 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+                const SizedBox(height: 26),
+                _paritySections(context),
+              ],
             ),
           ),
         ),
@@ -1119,19 +1127,8 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (reviews.isNotEmpty) ...[
-                        _ReviewsPreviewSection(reviews: reviews),
-                        const SizedBox(height: 22),
-                      ],
-                      _FeatureWrap(features: property.features.take(8).toList()),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 20),
+                _paritySections(context),
               ],
             ),
           ),
@@ -1305,6 +1302,8 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 22),
+                _paritySections(context),
               ],
             ),
           ),
@@ -1457,6 +1456,18 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    // Parity block lives in a light surface so the white content
+                    // cards (owner/facts/map/reviews) stay legible over the dark
+                    // cinematic backdrop, while still rendering EVERY section.
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 22),
+                        child: _paritySections(context),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1473,6 +1484,322 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
         '${property.propertyType} ${property.transactionLabel} ב${property.city}, ${property.roomsLabel} חדרים ו-${property.sizeM2} מ"ר';
     if (featureText.isEmpty) return base;
     return '$base. כולל $featureText.';
+  }
+
+  /// Shared, full-parity content block appended to EVERY broker template so that
+  /// no design style is ever missing a section that Rently Classic shows.
+  /// Visual identity (header tint, surface) adapts per-template via [branding]
+  /// and [dark], but the CONTENT/FEATURES are identical across all styles.
+  Widget _paritySections(BuildContext context, {bool dark = false}) {
+    return _ParitySections(
+      property: property,
+      branding: branding,
+      reviews: reviews,
+      hasVirtualTour: hasVirtualTour,
+      isLandlordPreview: isLandlordPreview,
+      dark: dark,
+      onShareTap: onShareTap,
+      onTour: onTour,
+    );
+  }
+}
+
+/// Renders the COMPLETE set of Rently-Classic content sections (specs grid,
+/// signal strip, gallery thumbnails, source URL, "why this match", owner,
+/// features, reviews, virtual-tour/360/3D entry, map) so every non-classic
+/// template reaches full parity. Centralizing this here makes it structurally
+/// impossible for a single template to drop a section.
+class _ParitySections extends StatelessWidget {
+  const _ParitySections({
+    required this.property,
+    required this.branding,
+    required this.reviews,
+    required this.hasVirtualTour,
+    required this.isLandlordPreview,
+    required this.onShareTap,
+    required this.onTour,
+    this.dark = false,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+  final List<AppReview> reviews;
+  final bool hasVirtualTour;
+  final bool isLandlordPreview;
+  final VoidCallback onShareTap;
+  final VoidCallback onTour;
+  final bool dark;
+
+  Color get _onSurface => dark ? Colors.white : branding.secondaryColor;
+  Color get _muted => dark
+      ? Colors.white.withValues(alpha: 0.66)
+      : branding.secondaryColor.withValues(alpha: 0.62);
+  Color get _cardSurface =>
+      dark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
+
+  Widget _header(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: branding.primaryColor, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: _onSurface,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = property.media;
+    final children = <Widget>[];
+
+    // ── Highlights / market signals ───────────────────────────────────────
+    if (_PropertySignalStrip.shouldShow(context, property)) {
+      children.add(_PropertySignalStrip(property: property));
+      children.add(const SizedBox(height: 24));
+    }
+
+    // ── Gallery thumbnails ────────────────────────────────────────────────
+    if (media.isNotEmpty) {
+      children.add(_header('גלריה', IconsaxPlusLinear.gallery));
+      children.add(
+        SizedBox(
+          height: 92,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: media.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, index) => ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 110,
+                height: 92,
+                child: SafeMedia(
+                  media: media[index],
+                  fit: BoxFit.cover,
+                  fallback: _ImageFallback(city: property.city),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      children.add(const SizedBox(height: 26));
+    }
+
+    // ── Property facts (rooms / size / floor / condition / parking / lift) ──
+    children.add(_header('פרטי הנכס', IconsaxPlusLinear.building_3));
+    children.add(_PropertyFactsCard(property));
+    children.add(const SizedBox(height: 26));
+
+    // ── Source / origin URL ───────────────────────────────────────────────
+    if (property.url.isNotEmpty) {
+      children.add(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: _header('אתר מקור', IconsaxPlusLinear.global)),
+            GestureDetector(
+              onTap: () async {
+                await launchUrl(Uri.parse(property.url),
+                    mode: LaunchMode.externalApplication);
+              },
+              child: Text(
+                'צפה במקור',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: branding.primaryColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      children.add(
+        Text(
+          'נכס זה פורסם במקור באתר ${Uri.parse(property.url).host}. באפשרותך לפתוח את המודעה המקורית לצפייה בפרטים המלאים.',
+          style: TextStyle(
+            color: _muted,
+            fontSize: 13.5,
+            height: 1.45,
+          ),
+        ),
+      );
+      children.add(const SizedBox(height: 26));
+    }
+
+    // ── Why this match (scorecard) ────────────────────────────────────────
+    if (!isLandlordPreview) {
+      children.add(_header('למה ההתאמה הזו', IconsaxPlusLinear.flash_1));
+      children.add(_MatchInsightCard(property: property));
+      children.add(const SizedBox(height: 26));
+    }
+
+    // ── Owner / contact (with verified badge inside the card) ─────────────
+    children.add(_header('בעל הנכס', IconsaxPlusLinear.profile_2user));
+    children.add(_OwnerCard(property: property));
+    children.add(const SizedBox(height: 26));
+
+    // ── Virtual tour / 360° / 3D scan entry ───────────────────────────────
+    children.add(_header('סיור וירטואלי', IconsaxPlusLinear.video_play));
+    children.add(_TourEntryCard(
+      property: property,
+      branding: branding,
+      hasVirtualTour: hasVirtualTour,
+      surface: _cardSurface,
+      onSurface: _onSurface,
+      muted: _muted,
+      onTour: onTour,
+    ));
+    children.add(const SizedBox(height: 26));
+
+    // ── Key features / amenities ──────────────────────────────────────────
+    if (property.features.isNotEmpty) {
+      children.add(_header('מאפיינים חשובים', IconsaxPlusLinear.flash_1));
+      children.add(_FeatureWrap(features: property.features));
+      children.add(const SizedBox(height: 26));
+    }
+
+    // ── Reviews ───────────────────────────────────────────────────────────
+    if (reviews.isNotEmpty) {
+      children.add(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: _header('חוות דעת', IconsaxPlusLinear.star_1)),
+            Text(
+              '${reviews.length} ביקורות',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _muted,
+              ),
+            ),
+          ],
+        ),
+      );
+      children.add(_HorizontalReviewsList(reviews));
+      children.add(const SizedBox(height: 26));
+    }
+
+    // ── Map / location ────────────────────────────────────────────────────
+    children.add(_header('מיקום', IconsaxPlusLinear.location));
+    children.add(_MapSection(property: property));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+}
+
+/// Branded entry card for the virtual tour / 360° walkthrough / 3D scan.
+class _TourEntryCard extends StatelessWidget {
+  const _TourEntryCard({
+    required this.property,
+    required this.branding,
+    required this.hasVirtualTour,
+    required this.surface,
+    required this.onSurface,
+    required this.muted,
+    required this.onTour,
+  });
+
+  final RentalProperty property;
+  final BrokerBrandingConfig branding;
+  final bool hasVirtualTour;
+  final Color surface;
+  final Color onSurface;
+  final Color muted;
+  final VoidCallback onTour;
+
+  @override
+  Widget build(BuildContext context) {
+    final isProcessing = property.virtualTour?.isProcessing == true;
+    final has360 = property.hasPanoramaTour;
+    final hasVideo = property.videoUrls.isNotEmpty;
+    final subtitle = has360
+        ? 'סיור 360° אינטראקטיבי — הסתובבו בדירה'
+        : hasVirtualTour
+            ? 'סריקת תלת־ממד / וידאו זמינה לצפייה'
+            : isProcessing
+                ? 'הסריקה בהכנה — תהיה זמינה בקרוב'
+                : 'בקשו סריקת תלת־ממד מבעל הנכס';
+
+    return GestureDetector(
+      onTap: onTour,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: branding.primaryColor.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: branding.primaryColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                has360 ? Icons.threesixty_rounded : Icons.view_in_ar_rounded,
+                color: branding.primaryColor,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    has360
+                        ? 'סיור 360°'
+                        : hasVideo && !hasVirtualTour
+                            ? 'וידאו הנכס'
+                            : 'סיור תלת־ממדי',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: muted,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(IconsaxPlusLinear.arrow_left,
+                size: 16, color: branding.primaryColor),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -2026,42 +2353,6 @@ class _StatusCapsule extends StatelessWidget {
           fontWeight: FontWeight.w900,
         ),
       ),
-    );
-  }
-}
-
-class _ReviewsPreviewSection extends StatelessWidget {
-  const _ReviewsPreviewSection({required this.reviews});
-
-  final List<AppReview> reviews;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Reviews',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 19,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 150,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: reviews.length.clamp(0, 4).toInt(),
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, index) => SizedBox(
-              width: 230,
-              child: _ReviewTile(review: reviews[index]),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -2628,58 +2919,6 @@ class _OwnerProfileSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReviewTile extends StatelessWidget {
-  const _ReviewTile({required this.review});
-  final AppReview review;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ...List.generate(
-                  5,
-                  (i) => Icon(
-                        i < review.rating
-                            ? IconsaxPlusLinear.star_1
-                            : IconsaxPlusLinear.star,
-                        size: 13,
-                        color: i < review.rating
-                            ? const Color(0xFFE8A84A)
-                            : AppColors.borderLight,
-                      )),
-              const SizedBox(width: 8),
-              Text(
-                review.authorName,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            review.text,
-            style: const TextStyle(
-                color: AppColors.navy, fontSize: 13, height: 1.45),
-          ),
         ],
       ),
     );

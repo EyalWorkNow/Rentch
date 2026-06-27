@@ -7,8 +7,8 @@ class MatchWeights {
   const MatchWeights({
     this.propertyFitWeight = 0.62,
     this.tenantFitWeight = 0.38,
-    this.dealBreakerPenalty = 28,
-    this.sharedTagBonus = 4,
+    this.dealBreakerPenalty = 45,
+    this.sharedTagBonus = 6,
     this.budgetHeadroomBonus = 10,
   });
 

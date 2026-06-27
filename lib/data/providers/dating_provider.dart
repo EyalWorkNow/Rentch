@@ -207,6 +207,31 @@ class DatingProvider extends ChangeNotifier {
   static const double _listingConfidenceWeight = 12;
   static const double _businessReadinessWeight = 4;
 
+  // ── Persona weighting (the tenant's "חשוב" / "קריטי" choices) ──────────────
+  // These act on the property DIRECTLY (via its own features), so the displayed
+  // match % responds to what the tenant marked even when we have no landlord
+  // profile to cross-reference. IMPORTANT details give a meaningful boost; a
+  // failed CRITICAL deal-breaker applies a heavy penalty that sinks the % so a
+  // property that misses a non-negotiable can never look like a strong match.
+  static const double _importantPersonaBoost = 9; // per met IMPORTANT detail
+  static const double _criticalPersonaPenalty = 45; // per unmet CRITICAL gate
+
+  // Tenant preference match-keys that correspond to a concrete property feature,
+  // so they can be evaluated against the property alone (no landlord profile
+  // needed). Keys absent here are landlord-policy/lifestyle concepts that only a
+  // landlord profile can answer, so they're left to the two-sided path.
+  static const Map<String, String> _personaKeyToFeatureKey = {
+    'parking': 'parking',
+    'furnished': 'furnished',
+    'elevator': 'elevator',
+    'balcony': 'balcony',
+    'shelter': 'mamad',
+    'ac': 'airConditioning',
+    'accessible': 'accessible',
+    'pets_allowed': 'petsAllowed',
+    'pets': 'petsAllowed',
+  };
+
   // Combined property list: base (from JSON) + landlord-added
   List<RentalProperty> get _allProperties {
     final cached = _allPropertiesCache;
@@ -2983,7 +3008,13 @@ class DatingProvider extends ChangeNotifier {
           ? p.ownerUserId
           : (_isGuestDemoProperty(p) ? 'guest_landlord' : '');
       final landlordProfile = getCachedProfile(ownerId);
-      if (landlordProfile != null) {
+      if (landlordProfile == null) {
+        // No landlord profile to cross-reference, so honour the tenant's own
+        // "חשוב"/"קריטי" choices against the property's own attributes. This is
+        // what makes the displayed % react to the persona for the common case
+        // (most listings have no landlord profile loaded).
+        tagCompatibilityScore += _personaFitScore(p, tenantProfile, context);
+      } else {
         // Catalog-driven compatibility: a renter preference and an owner offer
         // that resolve to the same `matchKey` (e.g. wants parking ↔ has
         // parking) reward the pair. See [ProfileTagCatalog].
@@ -3030,6 +3061,81 @@ class DatingProvider extends ChangeNotifier {
         tagCompatibilityScore;
 
     return _clampDouble(score, 0, 100).round();
+  }
+
+  /// Scores the property against the tenant's own persona choices when there is
+  /// no landlord profile to cross-reference (the common case). IMPORTANT details
+  /// ("חשוב") that the property satisfies add a meaningful boost; CRITICAL
+  /// deal-breakers ("קריטי") that the property FAILS apply a heavy penalty, so a
+  /// property missing a non-negotiable can never display as a strong match.
+  ///
+  /// Only persona keys that map to a concrete property attribute (a feature, or
+  /// budget/rooms/city) are evaluated here — lifestyle/landlord-policy keys are
+  /// left to the two-sided path, since the property alone can't answer them.
+  double _personaFitScore(
+    RentalProperty property,
+    TenantProfile profile,
+    _MatchContext context,
+  ) {
+    final importantKeys = ProfileTagCatalog.matchKeysFor(
+        profile.importantDetails,
+        isLandlord: false);
+    final criticalKeys = ProfileTagCatalog.matchKeysFor(profile.dealBreakers,
+        isLandlord: false);
+    if (importantKeys.isEmpty && criticalKeys.isEmpty) return 0;
+
+    double delta = 0;
+
+    // CRITICAL gates first — a failed deal-breaker is a hard penalty. A key only
+    // counts as "evaluable" (and therefore as a possible miss) when the property
+    // exposes the matching attribute; we never penalise for a key we can't read.
+    for (final key in criticalKeys) {
+      final met = _propertyMeetsPersonaKey(property, key, profile, context);
+      if (met == false) {
+        delta -= _criticalPersonaPenalty;
+      }
+    }
+
+    // IMPORTANT details — a satisfied "חשוב" boosts; an UNMET one applies a
+    // softer penalty. Penalising the miss (not just rewarding the hit) keeps the
+    // ordering honest even when the base score is already near the 100 ceiling:
+    // a property lacking what the tenant cares about always scores below one
+    // that has it.
+    for (final key in importantKeys) {
+      if (criticalKeys.contains(key)) continue; // already weighted as critical
+      final met = _propertyMeetsPersonaKey(property, key, profile, context);
+      if (met == true) {
+        delta += _importantPersonaBoost;
+      } else if (met == false) {
+        delta -= _importantPersonaBoost;
+      }
+    }
+
+    return delta;
+  }
+
+  /// Whether [property] satisfies a persona match-[key]. Returns `null` when the
+  /// property can't answer the key (so neither boost nor penalty applies).
+  bool? _propertyMeetsPersonaKey(
+    RentalProperty property,
+    String key,
+    TenantProfile profile,
+    _MatchContext context,
+  ) {
+    final featureKey = _personaKeyToFeatureKey[key];
+    if (featureKey != null) {
+      return property.featureFlags.isEnabled(featureKey);
+    }
+    // A handful of persona keys map onto structured attributes rather than
+    // feature flags.
+    switch (key) {
+      case 'immediate':
+        final entry = property.entryDateValue;
+        if (entry == null) return null;
+        return !entry.isAfter(context.now.add(const Duration(days: 30)));
+      default:
+        return null; // lifestyle/policy key — not answerable from the property
+    }
   }
 
   double _budgetFitScore(RentalProperty property, SearchFilters filters) {
