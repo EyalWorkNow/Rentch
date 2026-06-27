@@ -63,3 +63,4 @@ ios/Runner.xcworkspace/xcshareddata/swiftpm/
 firebase-service-account.json
 ios/build/
 build/
+aws/lambda/router/node_modules/

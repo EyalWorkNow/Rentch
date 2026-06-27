@@ -1,0 +1,10 @@
+{
+  "name": "rently-router",
+  "version": "1.0.0",
+  "description": "Rently API router Lambda (single-function REST router).",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  }
+}

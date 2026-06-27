@@ -14,8 +14,13 @@ echo "==> Account: $ACCOUNT  Region: $REGION"
 # 1. Build the stitcher zip (Python + linux opencv/numpy)
 bash "$HERE/build-pano-zip.sh"
 
-# 2. Package the router (carries the new /panorama routes)
-zip -q -j /tmp/router.zip "$HERE/lambda/router/index.mjs"
+# 2. Package the router (carries the new /panorama + /scan3d routes). The router
+#    now has a runtime dependency (adm-zip, to unzip KIRI's model bundle), so we
+#    bundle the WHOLE router dir — index.mjs + package.json + node_modules — with
+#    index.mjs at the zip root (handler stays index.handler), instead of zipping
+#    the single file. Re-create the zip fresh each time.
+rm -f /tmp/router.zip
+( cd "$HERE/lambda/router" && zip -q -r -X /tmp/router.zip index.mjs package.json node_modules )
 
 # 3. Upload both
 aws s3 cp /tmp/pano-stitch.zip "s3://$CODE_BUCKET/pano-stitch.zip" --region "$REGION"
@@ -40,6 +45,7 @@ GEMINI_LIVE_API_KEY="${GEMINI_LIVE_API_KEY:-$(live_secret GEMINI_LIVE_API_KEY)}"
 LUMA_API_KEY="${LUMA_API_KEY:-$(live_secret LUMA_API_KEY)}"
 TELEPORT_CLIENT_ID="${TELEPORT_CLIENT_ID:-$(live_secret TELEPORT_CLIENT_ID)}"
 TELEPORT_CLIENT_SECRET="${TELEPORT_CLIENT_SECRET:-$(live_secret TELEPORT_CLIENT_SECRET)}"
+KIRI_API_KEY="${KIRI_API_KEY:-$(live_secret KIRI_API_KEY)}"
 [ -z "$GEMINI_API_KEY" ] && echo "WARNING: GEMINI_API_KEY is empty — the assistant + /assistant/explain will be offline. Set it in your shell before deploying or via update-function-configuration." >&2
 
 # 4. Deploy CloudFormation (creates the stitcher Lambda + role, wires the router)
@@ -53,7 +59,8 @@ aws cloudformation deploy \
     GeminiLiveApiKey="$GEMINI_LIVE_API_KEY" \
     LumaApiKey="$LUMA_API_KEY" \
     TeleportClientId="$TELEPORT_CLIENT_ID" \
-    TeleportClientSecret="$TELEPORT_CLIENT_SECRET"
+    TeleportClientSecret="$TELEPORT_CLIENT_SECRET" \
+    KiriApiKey="$KIRI_API_KEY"
 
 # 5. Force-refresh code (deploy only updates if the S3 key changed)
 aws lambda update-function-code --function-name rentch-pano-stitch \

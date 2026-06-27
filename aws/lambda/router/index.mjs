@@ -26,6 +26,9 @@ import {
 import { S3Client, DeleteObjectCommand, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+// Pure-JS zip reader (bundled in node_modules) — KIRI returns the finished model
+// as a single ZIP, so we unzip it in-process to extract the .glb mesh / .ply splat.
+import AdmZip from 'adm-zip';
 
 const REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.S3_BUCKET;
@@ -1512,20 +1515,75 @@ async function getScan3d(event, jobId) {
     if (!dr.ok || !modelUrl) {
       return json(200, { status: 'processing' });
     }
-    const zipKey = `scan3d/results/${jobId}.zip`;
-    const zipUrl = await rehostFile(modelUrl, zipKey, 'application/zip');
+    // KIRI returns ONE zip bundle (link valid ~60 min). Download it, unzip in
+    // memory, and pull out the real renderable assets: the textured mesh
+    // (.glb/.gltf) and — for 3DGS scans — the gaussian splat (.ply). Re-host each
+    // extracted file permanently on S3 so the client gets directly-loadable urls.
+    const zipRes = await fetch(modelUrl);
+    if (!zipRes.ok) {
+      console.warn('KIRI zip download failed', zipRes.status);
+      return json(200, { status: 'processing' });
+    }
+    const zipBuf = Buffer.from(await zipRes.arrayBuffer());
 
-    // KIRI returns ONE zip bundle. We hand back the zip as both urls for now and
-    // flag the contained formats; a follow-up agent must unzip + convert (below).
-    const isGs = meta.scanType !== 'photo';
+    let entries;
+    try {
+      entries = new AdmZip(zipBuf).getEntries();
+    } catch (e) {
+      console.warn('KIRI zip unpack failed', e.message);
+      return json(200, { status: 'processing' });
+    }
+
+    // Pick the largest matching file per kind (the model, not a stray sample).
+    let meshEntry = null;   // .glb preferred, else .gltf
+    let splatEntry = null;  // .ply
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      const name = entry.entryName.toLowerCase();
+      const size = entry.header?.size || 0;
+      if (name.endsWith('.glb')) {
+        if (!meshEntry || meshEntry._ext !== 'glb' || size > meshEntry._size) {
+          meshEntry = { entry, _ext: 'glb', _size: size };
+        }
+      } else if (name.endsWith('.gltf')) {
+        // Only take a .gltf if we haven't found a (self-contained) .glb.
+        if (!meshEntry) meshEntry = { entry, _ext: 'gltf', _size: size };
+      } else if (name.endsWith('.ply')) {
+        if (!splatEntry || size > splatEntry._size) {
+          splatEntry = { entry, _size: size };
+        }
+      }
+    }
+
+    const base = `scan3d/results/${jobId}`;
+    let meshGlbUrl = '';
+    let splatUrl = '';
+
+    if (meshEntry) {
+      const ext = meshEntry._ext;
+      const key = `${base}/model.${ext}`;
+      const ctype = ext === 'glb' ? 'model/gltf-binary' : 'model/gltf+json';
+      meshGlbUrl = await putExtractedFile(meshEntry.entry.getData(), key, ctype);
+    }
+    if (splatEntry) {
+      const key = `${base}/splat.ply`;
+      splatUrl = await putExtractedFile(splatEntry.entry.getData(), key, 'application/octet-stream');
+    }
+
+    if (!meshGlbUrl && !splatUrl) {
+      // Nothing renderable found in the bundle — keep the raw zip as a fallback.
+      console.warn('KIRI zip had no .glb/.gltf/.ply', entries.map((e) => e.entryName).slice(0, 40));
+      meshGlbUrl = await rehostFile(modelUrl, `${base}/model.zip`, 'application/zip');
+    }
+
     const updated = {
       ...meta, status: 'ready',
-      meshGlbUrl: zipUrl,                 // zip contains the textured GLB mesh
-      splatUrl: isGs ? zipUrl : '',       // zip contains the 3DGS .ply (gaussian)
-      kiriZipUrl: zipUrl, completedAt: Date.now(),
+      meshGlbUrl,                 // extracted textured GLB/GLTF mesh
+      splatUrl,                   // extracted 3DGS .ply (gaussian splat), if present
+      completedAt: Date.now(),
     };
     await putScan3dMeta(jobId, updated);
-    return json(200, { status: 'ready', meshGlbUrl: updated.meshGlbUrl, splatUrl: updated.splatUrl });
+    return json(200, { status: 'ready', meshGlbUrl, splatUrl });
   } catch (e) {
     console.warn('KIRI poll exception', e.message);
     return json(200, { status: 'processing' });
@@ -1555,6 +1613,17 @@ async function streamToBuffer(stream) {
   const chunks = [];
   for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   return Buffer.concat(chunks);
+}
+
+// Persist an already-in-memory buffer (e.g. a file extracted from a zip) to S3
+// and return its public url. Mirrors rehostFile's caching/headers.
+async function putExtractedFile(buf, key, contentType) {
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET, Key: key, Body: buf,
+    ContentType: contentType || 'application/octet-stream',
+    CacheControl: 'public, max-age=31536000',
+  }));
+  return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 }
 
 // Download a (short-lived) remote file and re-host it permanently on S3.
