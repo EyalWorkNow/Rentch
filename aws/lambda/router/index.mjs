@@ -71,6 +71,14 @@ const TELEPORT_AUTH_URL = process.env.TELEPORT_AUTH_URL
 const TELEPORT_API_BASE = process.env.TELEPORT_API_BASE
   || 'https://teleport.varjo.com';
 
+// KIRI Engine — textured photogrammetry mesh (Photo Scan) + 3D Gaussian
+// Splatting (3DGS). The Bearer API key stays server-side ONLY: the client
+// uploads its capture frames/video to S3 via presigned PUTs, then the backend
+// streams those bytes to KIRI as multipart/form-data. We never hand the key out.
+const KIRI_API_KEY = process.env.KIRI_API_KEY || '';
+const KIRI_API_BASE = process.env.KIRI_API_BASE
+  || 'https://api.kiriengine.app/api/v1/open';
+
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }), {
   marshallOptions: { removeUndefinedValues: true },
 });
@@ -232,6 +240,22 @@ export const handler = async (event) => {
       // GET /teleport/captures/:eid → status + viewer_url
       if (method === 'GET' && eid) return await teleportGetCapture(eid);
       return json(404, { message: 'Unknown teleport route' });
+    }
+
+    // ── KIRI Engine 3D reconstruction (Photo Scan + 3DGS) ───────────────────
+    // The KIRI API key NEVER reaches the app — the client uploads frames to S3
+    // via our presigned PUT urls, then we POST those bytes to KIRI server-side.
+    if (segments[0] === 'scan3d') {
+      const jobId = segments[1] ? decodeURIComponent(segments[1]) : null;
+      // POST /scan3d → job + N presigned frame/video upload URLs
+      if (method === 'POST' && !jobId) return await createScan3d(event);
+      // POST /scan3d/:id/start → submit uploaded files to KIRI
+      if (method === 'POST' && jobId && segments[2] === 'start') {
+        return await startScan3d(event, jobId);
+      }
+      // GET /scan3d/:id → poll KIRI → {status, meshGlbUrl, splatUrl}
+      if (method === 'GET' && jobId) return await getScan3d(event, jobId);
+      return json(404, { message: 'Unknown scan3d route' });
     }
 
     // ── Push notification device tokens ─────────────────────────────────────
@@ -1304,6 +1328,246 @@ function panoData(meta) {
     vaov: meta.vaov ?? 60,
     error: meta.error || '',
   };
+}
+
+// ── KIRI Engine 3D reconstruction ────────────────────────────────────────────
+// Job meta is a small S3 JSON (same store pattern as scans/panoramas — no extra
+// DynamoDB table). Lifecycle:
+//   POST /scan3d            → allocate S3 keys + presigned PUTs (client uploads)
+//   POST /scan3d/:id/start  → stream the uploaded bytes to KIRI as multipart;
+//                             store KIRI's `serialize` (its job id)
+//   GET  /scan3d/:id        → poll KIRI getStatus; when Successful, fetch the
+//                             zip download link → {status:'ready', meshGlbUrl, splatUrl}
+
+const KIRI_MAX_FRAMES = 300; // KIRI accepts 20–300 images per project.
+
+async function getScan3dMeta(jobId) {
+  try {
+    const obj = await s3.send(new GetObjectCommand({
+      Bucket: S3_BUCKET, Key: `scan3d/meta/${jobId}.json`,
+    }));
+    return JSON.parse(await streamToString(obj.Body));
+  } catch {
+    return null;
+  }
+}
+
+async function putScan3dMeta(jobId, meta) {
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET, Key: `scan3d/meta/${jobId}.json`,
+    Body: JSON.stringify(meta), ContentType: 'application/json',
+  }));
+}
+
+// POST /scan3d {propertyId, captureType:'photos'|'video', frameCount}
+//   → {jobId, uploadUrls:[presigned S3 PUT urls]}
+async function createScan3d(event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+
+  const propertyId = sanitizeId(body.propertyId || 'prop');
+  const captureType = body.captureType === 'video' ? 'video' : 'photos';
+  // 3DGS by default (walkable splat for apartments); allow photo mesh too.
+  const scanType = body.scanType === 'photo' ? 'photo' : '3dgs';
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 10);
+  const jobId = `k3d_${ts}_${rand}`;
+
+  const fileKeys = [];
+  const uploadUrls = [];
+  if (captureType === 'video') {
+    const key = `scan3d/jobs/${jobId}/video.mp4`;
+    fileKeys.push(key);
+    uploadUrls.push(await getSignedUrl(
+      s3,
+      new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'video/mp4' }),
+      { expiresIn: 3600 },
+    ));
+  } else {
+    // KIRI needs 20–300 images. Trust the client's count but clamp to the API range.
+    const frameCount = Math.max(20, Math.min(KIRI_MAX_FRAMES, Number(body.frameCount) || 20));
+    for (let i = 0; i < frameCount; i++) {
+      const key = `scan3d/jobs/${jobId}/f${i}.jpg`;
+      fileKeys.push(key);
+      uploadUrls.push(await getSignedUrl(
+        s3,
+        new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'image/jpeg' }),
+        { expiresIn: 3600 },
+      ));
+    }
+  }
+
+  await putScan3dMeta(jobId, {
+    jobId, propertyId, captureType, scanType, fileKeys,
+    status: 'pending', createdAt: ts,
+  });
+  return json(200, { data: { jobId, uploadUrls } });
+}
+
+// POST /scan3d/:id/start → submit the uploaded S3 files to KIRI (create job).
+async function startScan3d(event, jobId) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  if (!KIRI_API_KEY) return json(503, { message: '3D reconstruction not configured.' });
+
+  const meta = await getScan3dMeta(jobId);
+  if (!meta) return json(404, { message: 'Scan job not found' });
+  // Idempotent: if already submitted, just report current status.
+  if (meta.serialize) return json(200, { ok: true, status: meta.status || 'processing' });
+
+  const isVideo = meta.captureType === 'video';
+  // Endpoint per scan + capture type (3DGS by default; photo = textured mesh).
+  // For 3DGS we set isMesh=1 so KIRI also bakes a GLB mesh alongside the .ply.
+  const path = meta.scanType === 'photo'
+    ? (isVideo ? '/photo/video' : '/photo/image')
+    : (isVideo ? '/3dgs/video' : '/3dgs/image');
+
+  try {
+    const parts = [];
+    for (const key of meta.fileKeys) {
+      const obj = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+      const bytes = await streamToBuffer(obj.Body);
+      const fileName = key.split('/').pop();
+      if (isVideo) {
+        parts.push({ name: 'videoFile', filename: fileName, contentType: 'video/mp4', data: bytes });
+      } else {
+        // KIRI expects the array field name `imagesFiles` for every image.
+        parts.push({ name: 'imagesFiles', filename: fileName, contentType: 'image/jpeg', data: bytes });
+      }
+    }
+    if (meta.scanType === 'photo') {
+      parts.push({ name: 'fileFormat', data: 'glb' });
+      parts.push({ name: 'modelQuality', data: '0' });
+      parts.push({ name: 'textureQuality', data: '0' });
+    } else {
+      parts.push({ name: 'isMesh', data: '1' });   // also emit a GLB mesh
+      parts.push({ name: 'isMask', data: '0' });
+      parts.push({ name: 'fileFormat', data: 'glb' });
+    }
+
+    const { body: mpBody, contentType } = buildMultipart(parts);
+    const res = await fetch(`${KIRI_API_BASE}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KIRI_API_KEY}`, 'Content-Type': contentType },
+      body: mpBody,
+    });
+    const data = await res.json().catch(() => ({}));
+    const serialize = data?.data?.serialize;
+    if (!res.ok || !serialize) {
+      console.warn('KIRI submit failed', res.status, JSON.stringify(data).slice(0, 200));
+      const failed = { ...meta, status: 'failed', error: data?.msg || `KIRI error ${res.status}` };
+      await putScan3dMeta(jobId, failed);
+      return json(502, { message: 'Could not start 3D reconstruction.' });
+    }
+    await putScan3dMeta(jobId, {
+      ...meta, serialize, calculateType: data.data.calculateType,
+      status: 'processing', submittedAt: Date.now(),
+    });
+    return json(200, { ok: true });
+  } catch (e) {
+    console.warn('KIRI submit exception', e.message);
+    return json(502, { message: 'Could not start 3D reconstruction.' });
+  }
+}
+
+// GET /scan3d/:id → poll KIRI; on success return rehosted asset urls.
+async function getScan3d(event, jobId) {
+  const meta = await getScan3dMeta(jobId);
+  if (!meta) return json(404, { message: 'Scan job not found' });
+
+  if (meta.status === 'ready') {
+    return json(200, { status: 'ready', meshGlbUrl: meta.meshGlbUrl || '', splatUrl: meta.splatUrl || '' });
+  }
+  if (meta.status === 'failed') {
+    return json(200, { status: 'failed', error: meta.error || 'reconstruction failed' });
+  }
+  if (!KIRI_API_KEY || !meta.serialize) {
+    return json(200, { status: 'processing' });
+  }
+
+  try {
+    const sr = await fetch(
+      `${KIRI_API_BASE}/model/getStatus?serialize=${encodeURIComponent(meta.serialize)}`,
+      { headers: { Authorization: `Bearer ${KIRI_API_KEY}` } },
+    );
+    const sd = await sr.json().catch(() => ({}));
+    // KIRI status: -1 Uploading, 0 Processing, 1 Failed, 2 Successful, 3 Queuing, 4 Exported.
+    const status = sd?.data?.status;
+    if (status === 1) {
+      await putScan3dMeta(jobId, { ...meta, status: 'failed', error: 'KIRI reconstruction failed' });
+      return json(200, { status: 'failed', error: 'KIRI reconstruction failed' });
+    }
+    if (status !== 2 && status !== 4) {
+      return json(200, { status: 'processing' });
+    }
+
+    // Successful → fetch the zip download link, re-host permanently on S3.
+    const dr = await fetch(
+      `${KIRI_API_BASE}/model/getModelZip?serialize=${encodeURIComponent(meta.serialize)}`,
+      { headers: { Authorization: `Bearer ${KIRI_API_KEY}` } },
+    );
+    const dd = await dr.json().catch(() => ({}));
+    const modelUrl = dd?.data?.modelUrl;
+    if (!dr.ok || !modelUrl) {
+      return json(200, { status: 'processing' });
+    }
+    const zipKey = `scan3d/results/${jobId}.zip`;
+    const zipUrl = await rehostFile(modelUrl, zipKey, 'application/zip');
+
+    // KIRI returns ONE zip bundle. We hand back the zip as both urls for now and
+    // flag the contained formats; a follow-up agent must unzip + convert (below).
+    const isGs = meta.scanType !== 'photo';
+    const updated = {
+      ...meta, status: 'ready',
+      meshGlbUrl: zipUrl,                 // zip contains the textured GLB mesh
+      splatUrl: isGs ? zipUrl : '',       // zip contains the 3DGS .ply (gaussian)
+      kiriZipUrl: zipUrl, completedAt: Date.now(),
+    };
+    await putScan3dMeta(jobId, updated);
+    return json(200, { status: 'ready', meshGlbUrl: updated.meshGlbUrl, splatUrl: updated.splatUrl });
+  } catch (e) {
+    console.warn('KIRI poll exception', e.message);
+    return json(200, { status: 'processing' });
+  }
+}
+
+// Build a multipart/form-data body from {name, data, filename?, contentType?}
+// parts. `data` is a Buffer (file) or string (field). Returns a single Buffer.
+function buildMultipart(parts) {
+  const boundary = `----rentlyKiri${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  const chunks = [];
+  for (const p of parts) {
+    let header = `--${boundary}\r\nContent-Disposition: form-data; name="${p.name}"`;
+    if (p.filename) header += `; filename="${p.filename}"`;
+    header += '\r\n';
+    if (p.contentType) header += `Content-Type: ${p.contentType}\r\n`;
+    header += '\r\n';
+    chunks.push(Buffer.from(header, 'utf-8'));
+    chunks.push(Buffer.isBuffer(p.data) ? p.data : Buffer.from(String(p.data), 'utf-8'));
+    chunks.push(Buffer.from('\r\n', 'utf-8'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`, 'utf-8'));
+  return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+// Download a (short-lived) remote file and re-host it permanently on S3.
+async function rehostFile(sourceUrl, key, contentType) {
+  const res = await fetch(sourceUrl);
+  if (!res.ok) throw new Error(`rehost download failed ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET, Key: key, Body: buf,
+    ContentType: contentType || 'application/octet-stream',
+    CacheControl: 'public, max-age=31536000',
+  }));
+  return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
 }
 
 async function createScan(event) {

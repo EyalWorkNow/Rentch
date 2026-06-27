@@ -21,5 +21,11 @@ import UIKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ScaniversePlugin") {
       ScaniversePlugin.register(with: registrar)
     }
+    // RoomPlan (Tier-1 LiDAR scan): to activate, add RoomPlanChannel.swift to the
+    // Runner target in Xcode, then restore the two lines below. Kept un-wired so
+    // the build stays green until tested on a LiDAR device.
+    // if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "RoomPlanChannel") {
+    //   RoomPlanChannel.register(with: registrar)
+    // }
   }
 }

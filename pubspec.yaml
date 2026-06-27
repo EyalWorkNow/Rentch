@@ -179,6 +179,7 @@ flutter:
     - assets/web/pannellum/
     - assets/web/psv/
     - assets/web/splat/
+    - assets/web/scan3d/
     - assets/audio/erik/
     - assets/images/rently_logo.svg
     - assets/images/rently_logo_full.svg

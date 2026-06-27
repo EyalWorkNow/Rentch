@@ -62,6 +62,11 @@ Parameters:
     NoEcho: true
     Default: ''
     Description: Varjo Teleport client secret (optional).
+  KiriApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: KIRI Engine API key for /scan3d 3D reconstruction (Photo Scan + 3DGS) (optional).
 
 Resources:
 
@@ -340,6 +345,7 @@ Resources:
           LUMA_API_KEY: !Ref LumaApiKey
           TELEPORT_CLIENT_ID: !Ref TeleportClientId
           TELEPORT_CLIENT_SECRET: !Ref TeleportClientSecret
+          KIRI_API_KEY: !Ref KiriApiKey
 
   PanoStitchRole:
     Type: AWS::IAM::Role
