@@ -7,6 +7,9 @@ import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
 import 'package:dating_app/presentation/screens/assistant_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
+import 'package:dating_app/presentation/screens/rent_tracking_screen.dart';
+import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
+import 'package:dating_app/presentation/features/landlord/reminders_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -118,6 +121,15 @@ class LandlordDashboardScreen extends StatelessWidget {
                     onSwipes: onOpenSwipes,
                     onMatches: onOpenMatches,
                     onProperties: onOpenProperties,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── Landlord Tools (big, plain-language helpers) ──
+                FadeSlideEntrance(
+                  delay: const Duration(milliseconds: 360),
+                  child: _LandlordToolsSection(
+                    properties: properties,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -395,7 +407,7 @@ class _SystemPerformanceGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'ביצועי מערכת',
+          'סיכום',
           style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 24,
@@ -428,10 +440,12 @@ class _SystemPerformanceGrid extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _LargeProgressCard(
-          title: 'אחוז המרה',
+          title: 'כמה מהמתעניינים הסכמתם להם',
           progressValue: conversionRate / 100.0,
           conversionRate: conversionRate,
-          statusText: pendingCount > 0 ? 'בטעינה: $pendingCount ממתינים' : 'יציב ותקין',
+          statusText: pendingCount > 0
+              ? '$pendingCount ממתינים לאישור שלך'
+              : 'אין מועמדים שממתינים',
           icon: IconsaxPlusLinear.flash,
         ),
       ],
@@ -718,7 +732,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'סטטוס תפוסה',
+                'נכסים עם התאמה',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 16,
@@ -796,7 +810,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                'אחוז תפוסה',
+                                'עם התאמה',
                                 style: TextStyle(
                                   color: isHigh
                                       ? Colors.white.withValues(alpha: 0.95)
@@ -826,7 +840,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                 children: [
                   Expanded(
                     child: _ArcStatChip(
-                      label: 'תפוסים',
+                      label: 'עם התאמה',
                       value: '${widget.matchesCount}',
                       color: AppColors.primary,
                     ),
@@ -834,7 +848,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                   const SizedBox(width: 10),
                   Expanded(
                     child: _ArcStatChip(
-                      label: 'פנויים',
+                      label: 'ממתינים',
                       value: '${(widget.propertiesCount - widget.matchesCount).clamp(0, widget.propertiesCount)}',
                       color: const Color(0xFFE8EDF2),
                       textColor: AppColors.textSecondary,
@@ -1110,13 +1124,35 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'פניות שוכרים ${_titleSuffix[_selectedPeriod]}',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'מתעניינים בנכסים שלך ${_titleSuffix[_selectedPeriod]}',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F4F8),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'הערכה לפי הפעילות',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               // Period selector
               Container(
@@ -1552,6 +1588,181 @@ class _QABtn extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Landlord Tools Section ───────────────────────────────────────────────────
+// Big, plain-Hebrew helpers aimed at older, non-technical landlords. Each row
+// is a large tappable card with an icon, a clear title and a one-line
+// explanation, opening the dedicated tool screen.
+
+class _LandlordToolsSection extends StatelessWidget {
+  const _LandlordToolsSection({required this.properties});
+
+  final List<RentalProperty> properties;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstProperty = properties.isNotEmpty ? properties.first : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'כלים לבעל הדירה',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'עזרה פשוטה לניהול הדירה — בלי כאב ראש',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _ToolTile(
+          icon: IconsaxPlusLinear.receipt_text,
+          color: AppColors.primary,
+          title: 'מס הכנסה — בקלות',
+          subtitle: 'בדיקה מהירה אם צריך לשלם מס על השכירות',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => TaxHelperScreen(
+                initialMonthlyRent: firstProperty?.price.toDouble(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _ToolTile(
+          icon: IconsaxPlusLinear.notification_bing,
+          color: AppColors.coral,
+          title: 'תזכורות',
+          subtitle: 'שלא תשכח חידוש חוזה, תשלום או ביטוח',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const RemindersScreen()),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _ToolTile(
+          icon: IconsaxPlusLinear.wallet_money,
+          color: AppColors.primaryDark,
+          title: 'מעקב תשלומים',
+          subtitle: firstProperty == null
+              ? 'הוסיפו דירה כדי לעקוב אחרי תשלומי השכירות'
+              : 'לראות מי שילם שכר דירה ומי עדיין חייב',
+          onTap: firstProperty == null
+              ? null
+              : () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => RentTrackingScreen(
+                        propertyId: firstProperty.id,
+                        propertyTitle: firstProperty.address,
+                        monthlyRent: firstProperty.price,
+                      ),
+                    ),
+                  ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: enabled
+          ? () {
+              HapticFeedback.selectionClick();
+              onTap!();
+            }
+          : null,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.55,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                IconsaxPlusLinear.arrow_left_2,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -238,6 +238,11 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                 const SizedBox(height: 12),
                 _numberField(_depositCtrl, 'פיקדון / ערבון (₪)',
                     IconsaxPlusLinear.security),
+                _DepositLegalityNote(
+                  deposit: _asInt(_depositCtrl.text),
+                  monthlyRent: _asInt(_rentCtrl.text),
+                  termMonths: _durationMonths,
+                ),
                 const SizedBox(height: 18),
                 const Text('תקופת השכירות',
                     style: TextStyle(
@@ -396,6 +401,8 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
       textDirection: TextDirection.rtl,
       onChanged: (_) {
         if (_template == ContractTemplateKind.standard) _fillStandardTemplate();
+        // Rebuild so the inline deposit-legality note re-evaluates.
+        setState(() {});
       },
       decoration: InputDecoration(
         labelText: label,
@@ -616,6 +623,91 @@ class _AiImproveTile extends StatelessWidget {
             if (!busy)
               const Icon(Icons.chevron_left_rounded,
                   color: AppColors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Deposit legality (חוק שכירות הוגנת) ──────────────────────────────────────
+
+/// Inline, NON-BLOCKING note shown under the deposit field. Warns (amber) when
+/// the entered cash-cost security exceeds the legal cap, and always explains the
+/// difference between a שטר חוב and a צ'ק ביטחון.
+class _DepositLegalityNote extends StatelessWidget {
+  const _DepositLegalityNote({
+    required this.deposit,
+    required this.monthlyRent,
+    required this.termMonths,
+  });
+
+  final int deposit;
+  final int monthlyRent;
+  final int termMonths;
+
+  @override
+  Widget build(BuildContext context) {
+    final legality = depositLegality(deposit, monthlyRent, termMonths);
+    // Nothing useful to show until there's a rent + a deposit.
+    if (legality.cap <= 0 || deposit <= 0) return const SizedBox.shrink();
+
+    const tip =
+        'שימו לב: שטר חוב או ערבות צד ג׳ אינם "פיקדון במזומן" ואינם כפופים לתקרה זו; '
+        'צ׳ק ביטחון שמופקד נספר כפיקדון במזומן.';
+
+    if (legality.ok) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          tip,
+          textDirection: TextDirection.rtl,
+          style: const TextStyle(
+              fontSize: 11, height: 1.45, color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.warning.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(IconsaxPlusLinear.warning_2,
+                size: 16, color: AppColors.warning),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    legality.message,
+                    textDirection: TextDirection.rtl,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        height: 1.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.navy),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    tip,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                        fontSize: 11,
+                        height: 1.45,
+                        color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

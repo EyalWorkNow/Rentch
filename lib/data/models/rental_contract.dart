@@ -1,6 +1,54 @@
+import 'dart:math' as math;
+
 import 'package:dating_app/core/services/signature_service.dart';
 
 enum ContractStatus { draft, sent, signed, declined, cancelled }
+
+/// Maximum a CASH-cost security (cash deposit / bank guarantee / a deposited
+/// security check) may legally be under Israel's 2017 חוק שכירות הוגנת: the
+/// LOWER of one-third of the total lease-term rent OR three months' rent.
+/// A pure function — no I/O, safe to call from UI on every keystroke.
+int maxLegalDepositNis({required int monthlyRent, required int termMonths}) {
+  if (monthlyRent <= 0 || termMonths <= 0) return 0;
+  final thirdOfTerm = (monthlyRent * termMonths / 3).floor();
+  final threeMonths = monthlyRent * 3;
+  return math.min(thirdOfTerm, threeMonths);
+}
+
+/// Result of checking an entered deposit against the legal cap.
+class DepositLegality {
+  const DepositLegality({
+    required this.ok,
+    required this.cap,
+    required this.message,
+  });
+
+  /// True when the deposit is within the cap (or can't be evaluated yet).
+  final bool ok;
+
+  /// The legal cap in ₪ for the given rent/term (0 if not computable).
+  final int cap;
+
+  /// Hebrew warning to show when [ok] is false; empty otherwise.
+  final String message;
+}
+
+/// Non-blocking legality check for a cash-cost security deposit. When the
+/// deposit exceeds [maxLegalDepositNis] it returns ok=false plus a Hebrew note
+/// the form can surface inline.
+DepositLegality depositLegality(int deposit, int monthlyRent, int termMonths) {
+  final cap = maxLegalDepositNis(monthlyRent: monthlyRent, termMonths: termMonths);
+  if (cap <= 0 || deposit <= cap) {
+    return DepositLegality(ok: true, cap: cap, message: '');
+  }
+  return DepositLegality(
+    ok: false,
+    cap: cap,
+    message:
+        'לפי חוק שכירות הוגנת, פיקדון במזומן/ערבות מוגבל ל-₪$cap '
+        '(השווה לנמוך מבין ⅓ מתקופת השכירות או 3 חודשי שכירות). מומלץ להוריד.',
+  );
+}
 
 /// Which body of legal text backs a contract before it is sent.
 ///   • [standard] — the boilerplate residential lease "מטעם עורכי הדין של Rently".

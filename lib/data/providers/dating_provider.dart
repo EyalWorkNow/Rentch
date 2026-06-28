@@ -1002,7 +1002,7 @@ class DatingProvider extends ChangeNotifier {
   }
 
   List<RentalProperty> get ownerLeads {
-    return _allProperties.where((property) {
+    final leads = _allProperties.where((property) {
       final hasIncoming =
           _incomingLikesByProperty[property.id]?.isNotEmpty ?? false;
       return _belongsToCurrentLandlord(property) &&
@@ -1012,6 +1012,127 @@ class DatingProvider extends ChangeNotifier {
           !_ownerRejectedPropertyIds.contains(property.id) &&
           !_matches.any((match) => match.propertyId == property.id);
     }).toList();
+
+    // Surface the best-fit candidate first. Each lead is a property the
+    // landlord owns that an interested tenant liked; we rank by how well that
+    // tenant genuinely fits THIS property, using only real profile data
+    // (budget vs asking rent, move-in timing, and the existing trust score).
+    // Stable: ties fall back to id so ordering is deterministic and the lead
+    // membership the rest of the app relies on is unchanged — only reordered.
+    final tenant = _tenantProfile;
+    if (tenant == null || leads.length < 2) return leads;
+
+    final scores = <String, double>{
+      for (final property in leads) property.id: leadFitScore(property),
+    };
+    leads.sort((a, b) {
+      final delta = (scores[b.id] ?? 0).compareTo(scores[a.id] ?? 0);
+      if (delta != 0) return delta;
+      return a.id.compareTo(b.id);
+    });
+    return leads;
+  }
+
+  // ── Candidate (lead) ranking ────────────────────────────────────────────
+  // The score below the [_highFitLeadScore] threshold gets no "high match"
+  // badge — it is honest: a candidate only earns the badge when the real
+  // signals line up. Score is in [0, 100].
+  static const double _highFitLeadScore = 70;
+  static const double _leadBudgetWeight = 60; // budget vs asking rent
+  static const double _leadTimingWeight = 25; // move-in timing match
+  static const double _leadTrustWeight = 15; // existing trust-score signal
+
+  /// Honest fit score in [0, 100] for the tenant who liked [property], scored
+  /// against the current tenant profile's REAL fields only. Drives both the
+  /// ranking order and the "התאמה גבוהה" badge — no fabricated trust.
+  double leadFitScore(RentalProperty property) {
+    final tenant = _tenantProfile;
+    if (tenant == null) return 0;
+
+    final budgetFit = _leadBudgetFit(tenant, property); // [0, 1]
+    final timingFit = _leadTimingFit(tenant, property); // [0, 1] or null
+    // Reuse the app's real trust signal (photo/bio/budget/etc.), normalised.
+    final trustFit =
+        GamificationService.computeTrustScore(tenant, const []) / 100.0;
+
+    var score = budgetFit * _leadBudgetWeight + trustFit * _leadTrustWeight;
+    // Only let timing move the score when we actually have a property entry
+    // date to compare against — otherwise skip it honestly (no invented fit).
+    if (timingFit != null) score += timingFit * _leadTimingWeight;
+    return score.clamp(0, 100).toDouble();
+  }
+
+  /// True when the candidate's fit is genuinely strong (top tier) — used for
+  /// the honest "התאמה גבוהה" badge.
+  bool isHighFitLead(RentalProperty property) =>
+      leadFitScore(property) >= _highFitLeadScore;
+
+  /// One concrete, real reason this candidate fits — or null if none stands
+  /// out. Budget is checked first (the strongest signal), then timing.
+  String? leadFitReason(RentalProperty property) {
+    final tenant = _tenantProfile;
+    if (tenant == null) return null;
+    if (_hasKnownPrice(property) &&
+        tenant.budgetMax >= property.price &&
+        _leadBudgetFit(tenant, property) >= 0.8) {
+      return 'התקציב מתאים למחיר';
+    }
+    final timingFit = _leadTimingFit(tenant, property);
+    if (timingFit != null && timingFit >= 0.8) {
+      return 'כניסה בזמן שמתאים לך';
+    }
+    return null;
+  }
+
+  // Budget fit in [0, 1]: a tenant whose budget meets the asking rent and sits
+  // close to it scores high; a budget far BELOW the rent scores low (they
+  // likely can't afford it). A comfortable margin above is fine, not penalised
+  // hard. Unknown price → neutral 0.5 (we can't claim a fit we can't measure).
+  double _leadBudgetFit(TenantProfile tenant, RentalProperty property) {
+    if (!_hasKnownPrice(property) || property.price <= 0) return 0.5;
+    final ratio = tenant.budgetMax / property.price;
+    if (ratio >= 1.0) {
+      // Budget covers rent. Closest-to-rent is the strongest signal; a very
+      // large budget gap is fine but no longer a tighter "match", so it eases
+      // off gently rather than dropping.
+      final over = ratio - 1.0;
+      return (1.0 - (over * 0.4)).clamp(0.6, 1.0);
+    }
+    // Budget below rent: ramps down to 0 by the time they're 30% short.
+    return (1.0 - (1.0 - ratio) / 0.30).clamp(0.0, 1.0);
+  }
+
+  // Move-in timing fit in [0, 1], or null when the property has no entry date
+  // to compare against (so we never invent a timing match). Compares the
+  // tenant's declared move-in window against the property's available-from
+  // date: the sooner the tenant can move relative to availability, the better.
+  double? _leadTimingFit(TenantProfile tenant, RentalProperty property) {
+    final entryDate = property.entryDateValue;
+    if (entryDate == null) return null;
+    final window = tenant.moveInWindow.trim();
+    if (window.isEmpty) return null;
+
+    final tenantReadyDays = _tenantMoveInDays(window);
+    if (tenantReadyDays == null) return null; // unrecognised/flexible
+
+    final daysUntilAvailable =
+        entryDate.difference(DateTime.now()).inDays.clamp(0, 3650);
+    // The tenant fits the timing when they're ready by the time the property
+    // is available. If the property is available well before the tenant is
+    // ready, fit tapers off (landlord waits longer than they'd like).
+    if (tenantReadyDays <= daysUntilAvailable) return 1.0;
+    final gap = tenantReadyDays - daysUntilAvailable;
+    return (1.0 - gap / 120.0).clamp(0.0, 1.0);
+  }
+
+  // Maps a declared move-in window to an approximate "ready in N days". A
+  // flexible/blank window returns null (no timing signal to score on).
+  int? _tenantMoveInDays(String window) {
+    if (window.contains('מיידי')) return 0;
+    if (window.contains('תוך חודש') || window.contains('30')) return 30;
+    if (window.contains('1-3') || window.contains('60')) return 90;
+    if (window.contains('3-6')) return 180;
+    return null;
   }
 
   /// Total number of tenant likes across the current landlord's properties —

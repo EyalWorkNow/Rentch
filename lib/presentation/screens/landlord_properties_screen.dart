@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
+import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
+import 'package:dating_app/presentation/screens/contract_form_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
@@ -140,6 +143,42 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
     }
 
     return list;
+  }
+
+  /// Makes contracts reachable straight from a property card. If a contract
+  /// already exists for the property, opens its detail; otherwise opens the
+  /// draft form for one of the property's matched tenants. Contracts are bound
+  /// to a match, so with no match yet we explain that instead of dead-ending.
+  void _openContract(
+    BuildContext context, {
+    required RentalContract? existing,
+    required List<RentalMatch> matches,
+  }) {
+    if (existing != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ContractDetailScreen(
+            contractId: existing.id,
+            matchId: existing.matchId,
+          ),
+        ),
+      );
+      return;
+    }
+    if (matches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'חוזה נפתח מול שוכר שכבר נוצר אתו התאמה. קבלו תחילה התאמה לנכס.'),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ContractFormScreen(matchId: matches.first.id),
+      ),
+    );
   }
 
   void _showSortSheet() {
@@ -601,15 +640,26 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                         16, 0, 16, _listBottomInset),
                                     itemBuilder: (context, index) {
                                       final property = filtered[index];
-                                      final matchCount = provider.matches
+                                      final propertyMatches = provider.matches
                                           .where((m) =>
                                               m.propertyId == property.id)
-                                          .length;
+                                          .toList();
+                                      final matchCount = propertyMatches.length;
+                                      // Cheapest existing contract for this
+                                      // property (any party), to surface status.
+                                      RentalContract? contract;
+                                      for (final c in provider.contracts) {
+                                        if (c.propertyId == property.id) {
+                                          contract = c;
+                                          break;
+                                        }
+                                      }
                                       return StaggeredEntrance(
                                         index: index,
                                         child: _PropertyManageCard(
                                           property: property,
                                           matchCount: matchCount,
+                                          contractStatus: contract?.status,
                                           onRemove: () => context
                                               .read<DatingProvider>()
                                               .removeLandlordProperty(
@@ -628,6 +678,11 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                                 isLandlordPreview: true,
                                               ),
                                             ),
+                                          ),
+                                          onContract: () => _openContract(
+                                            context,
+                                            existing: contract,
+                                            matches: propertyMatches,
                                           ),
                                         ),
                                       );
@@ -652,16 +707,36 @@ class _PropertyManageCard extends StatelessWidget {
   const _PropertyManageCard({
     required this.property,
     required this.matchCount,
+    required this.contractStatus,
     required this.onRemove,
     required this.onEdit,
     required this.onPreview,
+    required this.onContract,
   });
 
   final RentalProperty property;
   final int matchCount;
+  final ContractStatus? contractStatus;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
   final VoidCallback onPreview;
+  final VoidCallback onContract;
+
+  /// Short Hebrew label for the property's contract state, or null if none.
+  String? get _contractStatusLabel {
+    switch (contractStatus) {
+      case ContractStatus.draft:
+        return 'טיוטה';
+      case ContractStatus.sent:
+        return 'נשלח';
+      case ContractStatus.signed:
+        return 'חתום ✓';
+      case ContractStatus.declined:
+      case ContractStatus.cancelled:
+      case null:
+        return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -726,6 +801,13 @@ class _PropertyManageCard extends StatelessWidget {
                         icon: Icons.space_dashboard_outlined,
                         label: '${property.sizeM2} מ״ר',
                       ),
+                      if (_contractStatusLabel != null) ...[
+                        const SizedBox(width: 8),
+                        _GlassTag(
+                          icon: Icons.description_outlined,
+                          label: 'חוזה: $_contractStatusLabel',
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -782,10 +864,41 @@ class _PropertyManageCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Actions Row (Preview, Edit and Status Indicator)
+                    // Actions Row (Contract, Preview, Edit and Status Indicator)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Contract Button (Glassmorphic White Circle) — makes
+                        // the contract flow reachable directly from the card.
+                        ScaleBounce(
+                          onTap: onContract,
+                          scaleDownTo: 0.88,
+                          child: ClipOval(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.18),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.20),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: RentlyIcon(
+                                    IconsaxPlusLinear.document_text,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         // Preview Button (Glassmorphic White Circle)
                         ScaleBounce(
                           onTap: onPreview,

@@ -75,6 +75,12 @@ dependencies:
   camera: ^0.12.0+1
   image: ^4.3.0 # silent frame encode for the 360 sweep (YUV/BGRA → JPEG)
   sensors_plus: ^6.0.0 # gyro: capture a frame per N° of real rotation, not per timer
+  # Scheduled LOCAL reminders for landlords (rent-due / lease-expiry). FCM already
+  # handles server push but can't schedule on-device alarms; flutter_local_notifications
+  # fires at an exact local time. `timezone` provides the Asia/Jerusalem tz the
+  # plugin's zonedSchedule requires.
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
 
 dev_dependencies:
   flutter_test:

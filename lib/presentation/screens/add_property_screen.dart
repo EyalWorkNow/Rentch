@@ -14,6 +14,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
+import 'package:dating_app/presentation/features/pricing/fair_rent_hint.dart';
 import 'package:dating_app/presentation/features/scan3d/room_scan_flow.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -467,7 +468,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           _isScanSubmitting = false;
         });
         _showMediaError(
-          'הסריקה נשמרה כטיוטה. כדי לשלוח לעיבוד צריך להגדיר RENTCH_3D_SCAN_PROXY_URL.',
+          'הסריקה נשמרה כטיוטה. שליחת הסריקה לעיבוד אינה זמינה כרגע.',
         );
         return;
       }
@@ -519,7 +520,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     final service = ScaniverseService.instance;
     if (!service.isConfigured) {
       _showMediaError(
-        'Scaniverse לא מוגדר. הפעל עם --dart-define=SPATIAL_API_KEY=<token>.',
+        'ייבוא סריקות אינו זמין כרגע.',
       );
       return;
     }
@@ -936,6 +937,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               price: _price,
               transactionType: _transactionType,
               rooms: _rooms,
+              cityCtrl: _cityCtrl,
               sizeCtrl: _sizeCtrl,
               floorCtrl: _floorCtrl,
               totalFloorsCtrl: _totalFloorsCtrl,
@@ -957,6 +959,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               }),
               onPriceChanged: (v) =>
                   setState(() => _price = v.round()),
+              onPriceSet: (v) => setState(() => _price = v),
               onRoomsChanged: (v) =>
                   setState(() => _rooms = (v * 2).round() / 2),
               onTypeChanged: (v) => setState(() => _propertyType = v!),
@@ -1752,6 +1755,7 @@ class _StepDetails extends StatelessWidget {
     required this.price,
     required this.transactionType,
     required this.rooms,
+    required this.cityCtrl,
     required this.sizeCtrl,
     required this.floorCtrl,
     required this.totalFloorsCtrl,
@@ -1762,6 +1766,7 @@ class _StepDetails extends StatelessWidget {
     required this.designAccent,
     required this.onTransactionTypeChanged,
     required this.onPriceChanged,
+    required this.onPriceSet,
     required this.onRoomsChanged,
     required this.onTypeChanged,
     required this.onConditionChanged,
@@ -1772,6 +1777,7 @@ class _StepDetails extends StatelessWidget {
   final int price;
   final PropertyTransactionType transactionType;
   final double rooms;
+  final TextEditingController cityCtrl;
   final TextEditingController sizeCtrl;
   final TextEditingController floorCtrl;
   final TextEditingController totalFloorsCtrl;
@@ -1782,6 +1788,8 @@ class _StepDetails extends StatelessWidget {
   final int designAccent;
   final ValueChanged<PropertyTransactionType> onTransactionTypeChanged;
   final ValueChanged<double> onPriceChanged;
+  // Sets the price directly to a specific value (e.g. the recommended rent).
+  final ValueChanged<int> onPriceSet;
   final ValueChanged<double> onRoomsChanged;
   final ValueChanged<String?> onTypeChanged;
   final ValueChanged<String?> onConditionChanged;
@@ -1819,6 +1827,21 @@ class _StepDetails extends StatelessWidget {
                 unitPrefix: '₪',
                 onChanged: onPriceChanged,
               ),
+              // Fair-rent guidance (rent only). Listens to the city/size fields
+              // so the recommendation updates live as the landlord types; hides
+              // itself whenever the market model can't price the listing.
+              if (!isSale)
+                ListenableBuilder(
+                  listenable: Listenable.merge([cityCtrl, sizeCtrl]),
+                  builder: (context, _) => FairRentHint(
+                    city: cityCtrl.text,
+                    sizeM2: int.tryParse(sizeCtrl.text.trim()) ?? 0,
+                    rooms: rooms,
+                    transactionType: transactionType,
+                    typedPrice: price,
+                    onUseRecommended: onPriceSet,
+                  ),
+                ),
               const SizedBox(height: 10),
               _SliderWithEntry(
                 label: 'מספר חדרים',
@@ -1876,11 +1899,7 @@ class _StepDetails extends StatelessWidget {
                 onChanged: onConditionChanged,
               ),
               const SizedBox(height: 12),
-              _Field(
-                ctrl: entryDateCtrl,
-                label: 'תאריך כניסה (לדוגמה: 01/09)',
-                icon: IconsaxPlusLinear.calendar,
-              ),
+              _EntryDatePicker(ctrl: entryDateCtrl),
             ],
           ),
         ),
@@ -3880,6 +3899,79 @@ class _Field extends StatelessWidget {
   }
 }
 
+/// Read-only "entry date" field that opens a real date picker instead of asking
+/// an (older) landlord to type a date by hand. Stores a clean dd/MM/yyyy string.
+class _EntryDatePicker extends StatelessWidget {
+  const _EntryDatePicker({required this.ctrl});
+  final TextEditingController ctrl;
+
+  Future<void> _pick(BuildContext context) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initial = _parse(ctrl.text) ?? today;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(today) ? today : initial,
+      firstDate: today,
+      lastDate: DateTime(now.year + 5),
+      helpText: 'בחר תאריך כניסה',
+    );
+    if (picked != null) {
+      ctrl.text =
+          '${_two(picked.day)}/${_two(picked.month)}/${picked.year}';
+    }
+  }
+
+  static String _two(int v) => v.toString().padLeft(2, '0');
+
+  // Best-effort parse of a previously stored dd/MM/yyyy (or dd/MM) value.
+  static DateTime? _parse(String s) {
+    final parts = s.trim().split('/');
+    if (parts.length < 2) return null;
+    final d = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (d == null || m == null) return null;
+    final y = parts.length >= 3
+        ? (int.tryParse(parts[2]) ?? DateTime.now().year)
+        : DateTime.now().year;
+    return DateTime(y, m, d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ctrl,
+      builder: (context, _) {
+        final hasValue = ctrl.text.trim().isNotEmpty;
+        return InkWell(
+          onTap: () => _pick(context),
+          borderRadius: BorderRadius.circular(14),
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'תאריך כניסה',
+              labelStyle: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13),
+              prefixIcon: Icon(IconsaxPlusLinear.calendar,
+                  size: 16, color: AppColors.primary),
+              suffixIcon: const Icon(IconsaxPlusLinear.arrow_down_1,
+                  size: 14, color: AppColors.textSecondary),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            ),
+            child: Text(
+              hasValue ? ctrl.text : 'בחר תאריך',
+              style: TextStyle(
+                color: hasValue ? AppColors.navy : AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Slider with a tappable numeric field so the value can be set by dragging OR
 /// typed freely (precise amounts the slider's coarse steps can't reach). The
 /// typed value is clamped to [min, max].
@@ -4745,7 +4837,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           _isScanSubmitting = false;
         });
         _showMediaError(
-          'הסריקה נשמרה כטיוטה. כדי לשלוח לעיבוד צריך להגדיר RENTCH_3D_SCAN_PROXY_URL.',
+          'הסריקה נשמרה כטיוטה. שליחת הסריקה לעיבוד אינה זמינה כרגע.',
         );
         return;
       }
@@ -4797,7 +4889,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     final service = ScaniverseService.instance;
     if (!service.isConfigured) {
       _showMediaError(
-        'Scaniverse לא מוגדר. הפעל עם --dart-define=SPATIAL_API_KEY=<token>.',
+        'ייבוא סריקות אינו זמין כרגע.',
       );
       return;
     }
@@ -5164,6 +5256,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   price: _price,
                   transactionType: _transactionType,
                   rooms: _rooms,
+                  cityCtrl: _cityCtrl,
                   sizeCtrl: _sizeCtrl,
                   floorCtrl: _floorCtrl,
                   totalFloorsCtrl: _totalFloorsCtrl,
@@ -5183,6 +5276,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   }),
                   onPriceChanged: (v) =>
                       setState(() => _price = v.round()),
+                  onPriceSet: (v) => setState(() => _price = v),
                   onRoomsChanged: (v) =>
                       setState(() => _rooms = (v * 2).round() / 2),
                   onTypeChanged: (v) => setState(() => _propertyType = v!),

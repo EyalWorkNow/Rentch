@@ -171,11 +171,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                         if (index < 0 || index >= leads.length) {
                                           return const SizedBox.shrink();
                                         }
+                                        final lead = leads[index];
                                         return _LeadCard(
                                           tenant: tenant,
-                                          property: leads[index],
+                                          property: lead,
                                           reviews: provider.tenantReviews,
                                           hOffset: hOffset,
+                                          isHighFit:
+                                              provider.isHighFitLead(lead),
+                                          fitReason:
+                                              provider.leadFitReason(lead),
                                         );
                                       },
                                     ),
@@ -329,12 +334,16 @@ class _LeadCard extends StatefulWidget {
     required this.property,
     required this.reviews,
     required this.hOffset,
+    required this.isHighFit,
+    required this.fitReason,
   });
 
   final TenantProfile tenant;
   final RentalProperty property;
   final List<AppReview> reviews;
   final int hOffset;
+  final bool isHighFit;
+  final String? fitReason;
 
   @override
   State<_LeadCard> createState() => _LeadCardState();
@@ -560,6 +569,36 @@ class _LeadCardState extends State<_LeadCard> {
                         ],
                       ),
                     ),
+                    if (widget.isHighFit) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              IconsaxPlusBold.medal_star,
+                              color: Colors.white,
+                              size: 13,
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              'התאמה גבוהה',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const Spacer(),
                     GestureDetector(
                       onTap: () {
@@ -642,6 +681,32 @@ class _LeadCardState extends State<_LeadCard> {
                         height: 1.1,
                       ),
                     ),
+                    if (widget.fitReason != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            IconsaxPlusBold.tick_circle,
+                            color: Color(0xFF5AD4DC),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              widget.fitReason!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF5AD4DC),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,

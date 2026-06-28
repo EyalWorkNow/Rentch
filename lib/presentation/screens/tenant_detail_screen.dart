@@ -1,11 +1,15 @@
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 
 /// Tenant (apartment-seeker) profile detail — restyled to be visually
@@ -70,6 +74,28 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
   String get _roomsLabel {
     final r = widget.tenant.desiredRooms;
     return r.toStringAsFixed(r % 1 == 0 ? 0 : 1);
+  }
+
+  /// Real trust score for this candidate (no fabricated number).
+  int get _trustScore =>
+      GamificationService.computeTrustScore(widget.tenant, widget.reviews);
+
+  /// Accept ("אהבתי · צור קשר") or reject ("דלג") the candidate by driving the
+  /// same owner-swipe path the explore screen uses. We locate this candidate's
+  /// property inside the landlord's pending leads and apply a right (accept) or
+  /// left (reject) swipe — accepting creates the match/contact thread.
+  Future<void> _resolveLead(bool accept) async {
+    final provider = context.read<DatingProvider>();
+    final leads = provider.ownerLeads;
+    final index = leads.indexWhere((p) => p.id == widget.property.id);
+    if (index >= 0) {
+      await provider.handleOwnerSwipe(
+        index,
+        null,
+        accept ? CardSwiperDirection.right : CardSwiperDirection.left,
+      );
+    }
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -156,6 +182,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                         tenant: tenant,
                         budgetLabel: _fmt(tenant.budgetMax),
                         roomsLabel: _roomsLabel,
+                        trustScore: _trustScore,
                       ),
                       const SizedBox(height: 24),
 
@@ -283,8 +310,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
             right: 0,
             bottom: 0,
             child: _TenantBottomBar(
-              onReject: () => Navigator.of(context).pop(),
-              onAccept: () => Navigator.of(context).pop(),
+              onReject: () => _resolveLead(false),
+              onAccept: () => _resolveLead(true),
             ),
           ),
         ],
@@ -585,11 +612,13 @@ class _TenantFactsCard extends StatelessWidget {
     required this.tenant,
     required this.budgetLabel,
     required this.roomsLabel,
+    required this.trustScore,
   });
 
   final TenantProfile tenant;
   final String budgetLabel;
   final String roomsLabel;
+  final int trustScore;
 
   @override
   Widget build(BuildContext context) {
@@ -647,9 +676,9 @@ class _TenantFactsCard extends StatelessWidget {
                 delay: const Duration(milliseconds: 180),
                 duration: const Duration(milliseconds: 400),
                 offset: const Offset(0.0, 25.0),
-                child: const _FactItemCard(
+                child: _FactItemCard(
                   IconsaxPlusLinear.shield_tick,
-                  '85',
+                  '$trustScore',
                   'נקודות אמון',
                 ),
               ),
