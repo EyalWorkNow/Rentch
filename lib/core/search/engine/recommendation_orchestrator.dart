@@ -19,6 +19,7 @@
 
 import 'dart:math' as math;
 
+import 'package:dating_app/core/finance/commute.dart';
 import 'package:dating_app/core/govdata/gov_sources.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
@@ -332,6 +333,8 @@ class RecommendationEngine {
     bool explore = true,
     int? seed,
     OnlineLogisticLearner? learner,
+    double? workLat,
+    double? workLon,
   }) {
     if (candidates.isEmpty) return const [];
 
@@ -391,6 +394,8 @@ class RecommendationEngine {
             confidence: confidence,
             explanation: explanation,
             highlights: highlights,
+            workLat: workLat,
+            workLon: workLon,
           );
           return Recommendation(
             property: c.property,
@@ -429,6 +434,8 @@ class RecommendationEngine {
     required double confidence,
     required String explanation,
     required List<String> highlights,
+    double? workLat,
+    double? workLon,
   }) {
     final stats = ScorecardStats.statLabels(c.property, market);
     final weightSum = model.weightSum;
@@ -461,6 +468,13 @@ class RecommendationEngine {
         positive: score >= _kStrongScore,
       ));
     }
+
+    // Optional commute-to-work axis (Tenant Feature #3). Mirrors the train-
+    // distance dimension: shown only when the tenant supplied a work location AND
+    // the property has usable coordinates. Off by default → fully back-compat.
+    final commuteDim = _commuteDimension(c.property, workLat, workLon);
+    if (commuteDim != null) dimensions.add(commuteDim);
+
     // Most-relevant axes first (what matters to the user); strongest as tiebreak.
     dimensions.sort((a, b) {
       final w = b.weightPct.compareTo(a.weightPct);
@@ -479,6 +493,43 @@ class RecommendationEngine {
       dimensions: dimensions,
       personaReasons: personaReasons,
       concerns: concerns,
+    );
+  }
+
+  /// Stable engine key for the optional commute-to-work axis.
+  static const String kCommuteDimensionKey = 'commute';
+
+  /// Build the optional "מרחק מהעבודה" scorecard dimension from a coarse,
+  /// honest [Commute] estimate. Returns null when work coords are absent/invalid
+  /// or the property has no usable coordinates — so behaviour is unchanged when
+  /// the tenant has no stored work location.
+  static ScorecardDimension? _commuteDimension(
+    RentalProperty property,
+    double? workLat,
+    double? workLon,
+  ) {
+    if (workLat == null || workLon == null) return null;
+    final est = Commute.estimate(
+      propLat: property.lat,
+      propLon: property.lon,
+      workLat: workLat,
+      workLon: workLon,
+    );
+    if (est == null) return null;
+
+    // Closer = better. Map drive minutes to a 0..1 satisfaction: ≤10 min ≈ 1,
+    // ≥60 min ≈ 0. Linear, deterministic, purely for ordering/positivity.
+    final score =
+        (1.0 - (est.approxDriveMinutes - 10) / 50.0).clamp(0.0, 1.0).toDouble();
+    return ScorecardDimension(
+      key: kCommuteDimensionKey,
+      label: 'מרחק מהעבודה',
+      // Importance is owned by the preference model; this axis is informational,
+      // so it carries no model weight (it never re-ranks, only explains).
+      weightPct: 0.0,
+      contributionPct: score,
+      stat: est.plainHebrewLabel,
+      positive: score >= _kStrongScore,
     );
   }
 

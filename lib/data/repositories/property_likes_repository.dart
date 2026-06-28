@@ -10,6 +10,9 @@ class PropertyLike {
     required this.tenantName,
     this.tenantPhotoUrl = '',
     this.ownerUserId = '',
+    this.introMessage = '',
+    this.budgetSnapshot = '',
+    this.moveInSnapshot = '',
     this.createdAt,
   });
 
@@ -18,7 +21,23 @@ class PropertyLike {
   final String tenantName;
   final String tenantPhotoUrl;
   final String ownerUserId;
+
+  /// Optional short note (≤140 chars) the tenant attaches to their like so they
+  /// can stand out to the landlord. Empty when not provided (old likes have none).
+  final String introMessage;
+
+  /// Optional budget snapshot the tenant chose to share (e.g. "עד ₪6,500").
+  final String budgetSnapshot;
+
+  /// Optional move-in snapshot (e.g. "כניסה מיידית"). Empty when not provided.
+  final String moveInSnapshot;
+
   final DateTime? createdAt;
+
+  bool get hasIntro =>
+      introMessage.isNotEmpty ||
+      budgetSnapshot.isNotEmpty ||
+      moveInSnapshot.isNotEmpty;
 
   factory PropertyLike.fromRow(Map<String, dynamic> row) {
     DateTime? parseDate(Object? v) =>
@@ -29,6 +48,9 @@ class PropertyLike {
       tenantName: row['tenantName']?.toString() ?? '',
       tenantPhotoUrl: row['tenantPhotoUrl']?.toString() ?? '',
       ownerUserId: row['ownerUserId']?.toString() ?? '',
+      introMessage: row['introMessage']?.toString() ?? '',
+      budgetSnapshot: row['budgetSnapshot']?.toString() ?? '',
+      moveInSnapshot: row['moveInSnapshot']?.toString() ?? '',
       createdAt: parseDate(row['createdAt']),
     );
   }
@@ -57,16 +79,27 @@ class PropertyLikesRepository {
   static String likeId(String propertyId, String tenantId) =>
       'like_${_safe(propertyId)}_${_safe(tenantId)}';
 
+  /// Max length of the optional [introMessage] note. Enforced here so a long
+  /// note never reaches the backend even if a caller forgets to clamp.
+  static const int introMessageMaxLength = 140;
+
   Future<void> addLike({
     required String propertyId,
     required String ownerUserId,
     required String tenantId,
     required String tenantName,
     String tenantPhotoUrl = '',
+    String introMessage = '',
+    String budgetSnapshot = '',
+    String moveInSnapshot = '',
     DateTime? at,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
     final id = likeId(propertyId, tenantId);
+    final note = introMessage.trim();
+    final clampedNote = note.length > introMessageMaxLength
+        ? note.substring(0, introMessageMaxLength)
+        : note;
     try {
       await _api.post(_path, {
         'id': id,
@@ -75,6 +108,13 @@ class PropertyLikesRepository {
         'tenantId': tenantId,
         'tenantName': tenantName,
         'tenantPhotoUrl': tenantPhotoUrl,
+        // Only send the optional fields when present, so the payload stays
+        // identical to old likes when no note is attached.
+        if (clampedNote.isNotEmpty) 'introMessage': clampedNote,
+        if (budgetSnapshot.trim().isNotEmpty)
+          'budgetSnapshot': budgetSnapshot.trim(),
+        if (moveInSnapshot.trim().isNotEmpty)
+          'moveInSnapshot': moveInSnapshot.trim(),
         'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
       });
     } catch (e) {

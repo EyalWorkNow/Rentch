@@ -5,11 +5,15 @@ import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/event_service.dart';
+import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/saved_search_repository.dart';
 import 'package:dating_app/presentation/features/discover/action_button.dart';
 import 'package:dating_app/presentation/features/discover/profile_card.dart';
+import 'package:dating_app/presentation/screens/compare_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
+import 'package:dating_app/presentation/screens/saved_searches_screen.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +36,41 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> {
+class _DiscoverScreenState extends State<DiscoverScreen>
+    with WidgetsBindingObserver {
   DiscoverTab _selectedTab = DiscoverTab.forYou;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Run once on entry too (covers cold start), not just on later resumes.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkSavedSearches());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkSavedSearches();
+  }
+
+  /// On app-foreground, fire local alerts for NEW listings matching the tenant's
+  /// alerts-on saved searches. Fail-soft — never throws into the UI.
+  Future<void> _checkSavedSearches() async {
+    try {
+      final provider = context.read<DatingProvider>();
+      if (provider.isLandlord) return; // tenant feature only
+      final searches = await SavedSearchRepository().loadAll();
+      if (searches.isEmpty) return;
+      await NotificationService.instance
+          .checkSavedSearches(searches, provider.allProperties);
+    } catch (_) {/* fail-soft */}
+  }
 
   // ── View-side swipe signals (fail-soft, no UX impact) ─────────────────────
   // Dwell = time the top card was visible before the user acted on it.
@@ -442,7 +479,28 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(width: 42),
+                    if (!provider.isLandlord) ...[
+                      _RoundHeaderButton(
+                        icon: IconsaxPlusLinear.notification_bing,
+                        tooltip: 'חיפושים שמורים',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SavedSearchesScreen(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _RoundHeaderButton(
+                        icon: IconsaxPlusLinear.arrange_square,
+                        tooltip: 'השוואת דירות',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CompareScreen(),
+                          ),
+                        ),
+                      ),
+                    ] else
+                      const SizedBox(width: 42),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Align(
@@ -881,6 +939,85 @@ class _GlassPillBadge extends StatelessWidget {
   }
 }
 
+class _RoundHeaderButton extends StatelessWidget {
+  const _RoundHeaderButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 42,
+          width: 42,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(
+            child: RentlyIcon(icon, size: 20, color: AppColors.navy),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SaveSearchButton extends StatelessWidget {
+  const _SaveSearchButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'שמור חיפוש',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RentlyIcon(IconsaxPlusLinear.save_2,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'שמור',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Filters Sheet ────────────────────────────────────────────────────────────
 
 class _FiltersSheet extends StatefulWidget {
@@ -1213,6 +1350,80 @@ class _FiltersSheetState extends State<_FiltersSheet> {
 
     if (values == null) return;
     onSubmitted(values.$1, values.$2);
+  }
+
+  /// Persist the current draft filters as a named saved search (with alerts on).
+  /// Prompts for a name, then calls the saved-search feature's public API.
+  Future<void> _saveCurrentSearch(BuildContext context) async {
+    final f = _draftFilters;
+    final nameCtrl = TextEditingController(
+      text: f.city.trim().isNotEmpty ? 'דירות ב${f.city.trim()}' : 'החיפוש שלי',
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'שמירת חיפוש',
+            style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'נשמור את הסינון הנוכחי ונודיע לך כשתעלה דירה חדשה שמתאימה.',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                textAlign: TextAlign.right,
+                decoration: const InputDecoration(hintText: 'שם לחיפוש'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('ביטול'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(nameCtrl.text),
+              child: const Text('שמור'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (name == null) return;
+
+    final transactionType = switch (f.transactionType) {
+      TransactionTypeFilter.rent => 'rent',
+      TransactionTypeFilter.sale => 'sale',
+      TransactionTypeFilter.any => null,
+    };
+    await SavedSearchesScreen.saveCurrent(
+      name: name,
+      city: f.city.trim().isEmpty ? null : f.city.trim(),
+      minBudget: f.minBudget > 600 ? f.minBudget : null,
+      maxBudget: f.maxBudget < 2000000000 ? f.maxBudget : null,
+      minRooms: f.minRooms > 0 ? f.minRooms : null,
+      maxRooms: f.maxRooms < 10 ? f.maxRooms : null,
+      transactionType: transactionType,
+      requiredTags: f.requiredFeatures.toList(),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      duration: Duration(milliseconds: 2500),
+      content: Text('החיפוש נשמר. נודיע לך על דירות חדשות שמתאימות 🔔'),
+    ));
   }
 
   void _resetFilters(DatingProvider provider) {
@@ -2480,6 +2691,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     ),
                     child: Row(
                       children: [
+                        if (!provider.isLandlord) ...[
+                          _SaveSearchButton(
+                            onTap: () => _saveCurrentSearch(context),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
                         Expanded(
                           child: TextButton(
                             onPressed: () {

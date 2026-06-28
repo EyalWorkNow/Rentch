@@ -231,8 +231,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       return;
     }
     final provider = context.read<DatingProvider>();
-    final results = SmartSearch.rank(provider.allProperties, _query,
-        limit: 10, profile: provider.tenantProfile);
+    // Commute-aware: routes through the provider so the tenant's stored work
+    // coords add the "מרחק מהעבודה" dimension to each scorecard automatically.
+    final results = provider.recommendForTenant(provider.allProperties, _query,
+        limit: 10);
     setState(() {
       _messages.add(_ChatMsg(
         role: 'assistant',
@@ -369,9 +371,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     bool anyExact = false;
     if (shouldSearch) {
       // Pass the tenant persona so it DRIVES the scores + populates each
-      // scorecard's personaReasons (tag / deal-breaker matches).
-      results = SmartSearch.rank(provider.allProperties, _query,
-          limit: 10, profile: provider.tenantProfile);
+      // scorecard's personaReasons (tag / deal-breaker matches). Routed through
+      // the provider so the tenant's work coords add the commute dimension too.
+      results = provider.recommendForTenant(provider.allProperties, _query,
+          limit: 10);
       anyExact = results.any((r) => r.exact);
     }
 

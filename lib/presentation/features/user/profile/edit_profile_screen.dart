@@ -7,6 +7,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:image_picker/image_picker.dart';
@@ -70,12 +71,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bioCtrl;
+  late final TextEditingController _incomeCtrl;
+  late final TextEditingController _workAddressCtrl;
   late int _budget;
   late double _rooms;
   late String _moveIn;
   late List<String> _details;
   late List<String> _dealBreakers;
   late List<_PhotoEntry> _photos;
+
+  // Geocoded work location. Kept in sync with the address field on save; cleared
+  // when the address is emptied. Null leaves the commute dimension off.
+  double? _workLat;
+  double? _workLon;
 
   bool _isSaving = false;
   int _currentPhotoPage = 0;
@@ -87,6 +95,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final p = widget.profile;
     _nameCtrl = TextEditingController(text: p.name);
     _bioCtrl = TextEditingController(text: p.bio);
+    _incomeCtrl = TextEditingController(
+      text: p.monthlyIncome == null ? '' : p.monthlyIncome.toString(),
+    );
+    // We persist only the geocoded coords (not the typed string), so on reopen
+    // the field starts empty but the stored coords remain unless re-edited.
+    _workAddressCtrl = TextEditingController();
+    _workLat = p.workLat;
+    _workLon = p.workLon;
     _budget = p.budgetMax;
     _rooms = p.desiredRooms;
     _moveIn = p.moveInWindow.isNotEmpty ? p.moveInWindow : 'גמיש';
@@ -99,6 +115,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _bioCtrl.dispose();
+    _incomeCtrl.dispose();
+    _workAddressCtrl.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -275,6 +293,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isSaving = true);
 
+    // Income (tenant only): parse digits; empty clears it.
+    final incomeDigits = _incomeCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final monthlyIncome = incomeDigits.isEmpty ? null : int.tryParse(incomeDigits);
+
+    // Work address (tenant only): geocode the typed address into coords for the
+    // commute dimension. Empty field clears any stored coords; a typed address
+    // that fails to geocode keeps the previous coords (best-effort, never blocks).
+    final workAddress = _workAddressCtrl.text.trim();
+    if (workAddress.isEmpty) {
+      _workLat = null;
+      _workLon = null;
+    } else {
+      try {
+        final locations = await locationFromAddress(workAddress);
+        if (locations.isNotEmpty) {
+          _workLat = locations.first.latitude;
+          _workLon = locations.first.longitude;
+        }
+      } catch (_) {/* keep previous coords on geocode failure */}
+    }
+
     final urls = _photos.map((e) => e.displayUrl).toList();
     final updated = widget.profile.copyWith(
       name: name,
@@ -286,8 +325,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       importantDetails: _details,
       dealBreakers:
           _dealBreakers.where((tag) => _details.contains(tag)).toList(),
+      monthlyIncome: monthlyIncome,
+      workLat: _workLat,
+      workLon: _workLon,
     );
 
+    if (!mounted) return;
     await context.read<DatingProvider>().updateTenantProfile(updated);
 
     if (!mounted) return;
@@ -300,6 +343,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       duration: const Duration(milliseconds: 2500),
       content: Text(msg),
     ));
+  }
+
+  InputDecoration _fieldDecoration({
+    required String hint,
+    required IconData icon,
+    String? suffixText,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+          color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+      suffixText: suffixText,
+      suffixIcon:
+          RentlyIcon(icon, size: 18, color: AppColors.primary),
+      filled: true,
+      fillColor: AppColors.background,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.borderLight),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.borderLight),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
+      ),
+    );
   }
 
   // ─── Build ──────────────────────────────────────────────────────────────────
@@ -639,6 +713,81 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 ),
                               );
                             }).toList(),
+                          ),
+                          const SizedBox(height: 22),
+
+                          // Monthly income — drives the affordability strip on
+                          // each listing. Optional; left blank hides the band.
+                          const Text(
+                            'הכנסה חודשית (ברוטו)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _incomeCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                color: AppColors.navy, fontSize: 15),
+                            decoration: _fieldDecoration(
+                              hint: 'לדוגמה: 12000',
+                              icon: IconsaxPlusLinear.wallet_money,
+                              suffixText: '₪',
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'נשתמש בזה רק כדי לחשב עבורך אם השכירות נוחה לתקציב. לא מוצג לבעלי הדירות.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              height: 1.4,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                          const SizedBox(height: 18),
+
+                          // Work address — geocoded into coords to show "מרחק
+                          // מהעבודה" in the match breakdown. Optional.
+                          const Text(
+                            'כתובת מקום העבודה',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _workAddressCtrl,
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                color: AppColors.navy, fontSize: 15),
+                            decoration: _fieldDecoration(
+                              hint: _workLat != null
+                                  ? 'מיקום עבודה נשמר — הקלד/י לעדכון'
+                                  : 'רחוב, עיר',
+                              icon: IconsaxPlusLinear.location,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'נחשב לפי זה את המרחק מהעבודה לכל דירה בהסבר "למה ההתאמה הזו".',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              height: 1.4,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.right,
                           ),
                         ],
                       ),

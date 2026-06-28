@@ -1079,6 +1079,9 @@ class TenantProfile {
     required this.moveInWindow,
     required this.importantDetails,
     this.dealBreakers = const [],
+    this.monthlyIncome,
+    this.workLat,
+    this.workLon,
   });
 
   final String id;
@@ -1096,6 +1099,17 @@ class TenantProfile {
   /// bonus. Defaults to empty for backward compatibility with stored profiles.
   final List<String> dealBreakers;
 
+  /// Gross monthly income in ₪, used by the affordability strip to assess
+  /// rent-to-income fit. Optional — null hides the ratio band. Back-compat: not
+  /// required, defaults to null, and old stored profiles load fine without it.
+  final int? monthlyIncome;
+
+  /// Tenant's work location (geocoded from a typed address). Feeds the optional
+  /// "מרחק מהעבודה" commute dimension in the recommendation scorecard. Both must
+  /// be present for a commute estimate; null leaves behaviour unchanged.
+  final double? workLat;
+  final double? workLon;
+
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
   TenantProfile copyWith({
@@ -1108,6 +1122,9 @@ class TenantProfile {
     String? moveInWindow,
     List<String>? importantDetails,
     List<String>? dealBreakers,
+    int? monthlyIncome,
+    double? workLat,
+    double? workLon,
   }) {
     return TenantProfile(
       id: id ?? this.id,
@@ -1119,6 +1136,9 @@ class TenantProfile {
       moveInWindow: moveInWindow ?? this.moveInWindow,
       importantDetails: importantDetails ?? this.importantDetails,
       dealBreakers: dealBreakers ?? this.dealBreakers,
+      monthlyIncome: monthlyIncome ?? this.monthlyIncome,
+      workLat: workLat ?? this.workLat,
+      workLon: workLon ?? this.workLon,
     );
   }
 
@@ -1138,6 +1158,9 @@ class TenantProfile {
       dealBreakers: List<String>.from(
         json['dealBreakers'] as List<dynamic>? ?? const [],
       ),
+      monthlyIncome: _optionalInt(json['monthlyIncome']),
+      workLat: _optionalDouble(json['workLat']),
+      workLon: _optionalDouble(json['workLon']),
     );
   }
 
@@ -1152,6 +1175,11 @@ class TenantProfile {
       'moveInWindow': moveInWindow,
       'importantDetails': importantDetails,
       'dealBreakers': dealBreakers,
+      // Optional fields are only written when set, so existing stored profiles
+      // and downstream consumers that don't know them stay byte-for-byte same.
+      if (monthlyIncome != null) 'monthlyIncome': monthlyIncome,
+      if (workLat != null) 'workLat': workLat,
+      if (workLon != null) 'workLon': workLon,
     };
   }
 }

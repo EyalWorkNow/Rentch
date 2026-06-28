@@ -10,6 +10,8 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/matching/match_engine.dart';
 import 'package:dating_app/core/matching/match_models.dart';
+import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
+import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
@@ -351,6 +353,37 @@ class DatingProvider extends ChangeNotifier {
   bool get hasActiveSession => _hasActiveSession;
   TenantProfile? get tenantProfile => _tenantProfile;
   SearchFilters get filters => _filters;
+
+  /// Commute-aware recommendation entry point. Threads the tenant's stored work
+  /// coordinates into [RecommendationEngine.recommend] so the "מרחק מהעבודה"
+  /// scorecard dimension is populated automatically when a work location exists
+  /// (otherwise behaviour is unchanged). Returns the legacy [ScoredProperty]
+  /// shape the search UI already renders.
+  List<ScoredProperty> recommendForTenant(
+    List<RentalProperty> candidates,
+    SearchQuery query, {
+    int limit = 10,
+  }) {
+    final recs = RecommendationEngine.recommend(
+      candidates: candidates,
+      query: query,
+      profile: _tenantProfile,
+      limit: limit,
+      workLat: _tenantProfile?.workLat,
+      workLon: _tenantProfile?.workLon,
+    );
+    return [
+      for (final r in recs)
+        ScoredProperty(
+          r.property,
+          r.fitScore / 100.0,
+          ['${r.fitPct}% התאמה', ...r.highlights],
+          r.trainKm,
+          r.strictMatch,
+          r.scorecard,
+        ),
+    ];
+  }
   List<SearchArea> get searchAreas => _searchAreas;
   List<AppReview> get tenantReviews => const []; // reviews feature removed
   List<RentalMatch> get matches => isLandlord

@@ -4,6 +4,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/verification_info_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -285,6 +286,14 @@ class _ProfileCardState extends State<ProfileCard> {
                               children: [
                                 if (isSale) ...[
                                   const _SaleBadge(),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (p.isVerifiedListing) ...[
+                                  GestureDetector(
+                                    onTap: () =>
+                                        VerificationInfoSheet.show(context),
+                                    child: const _VerifiedListingBadge(),
+                                  ),
                                   const SizedBox(width: 6),
                                 ],
                                 if (priceCtx != PriceContext.average)

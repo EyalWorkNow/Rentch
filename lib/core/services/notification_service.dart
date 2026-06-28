@@ -1,5 +1,8 @@
+import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/models/saved_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -27,6 +30,21 @@ class NotificationService {
   static const String _channelName = 'תזכורות בעל דירה';
   static const String _channelDescription =
       'תזכורות על מועדי גביית שכר וסיום חוזה';
+
+  /// Stable Android channel for tenant saved-search "new listing" alerts.
+  static const String _searchChannelId = 'saved_search_alerts';
+  static const String _searchChannelName = 'התראות על דירות חדשות';
+  static const String _searchChannelDescription =
+      'נודיע לך כשעולה דירה חדשה שמתאימה לחיפוש ששמרת';
+
+  /// Notification ids for saved-search alerts live above the lease range so they
+  /// never collide with landlord reminders.
+  static const int _searchIdBase = 2000000;
+
+  /// Prefs key holding the set of property ids we've already alerted about, so
+  /// we notify once per listing even if [checkSavedSearches] runs every
+  /// foreground.
+  static const String _notifiedKey = 'saved_search_notified_ids';
 
   /// Reserved id-space so auto-scheduled lease reminders never collide with the
   /// manual ones the landlord adds in the reminders screen. Lease ids are
@@ -209,7 +227,107 @@ class NotificationService {
     await cancel(leaseIdBase + key * 2 + 1);
   }
 
+  // ── Tenant: saved-search new-listing alerts ─────────────────────────────────
+
+  /// On app-foreground, look for NEW listings ([RentalProperty.isNewListing])
+  /// that match an alerts-on [SavedSearch] and fire a friendly local
+  /// notification for each — once per property (deduped via prefs). Returns the
+  /// property ids we notified about this run (empty if nothing new / on error).
+  ///
+  /// Fail-soft: never throws into the tenant's UI.
+  Future<List<String>> checkSavedSearches(
+    List<SavedSearch> searches,
+    List<RentalProperty> properties,
+  ) async {
+    final active = searches.where((s) => s.alertsOn).toList();
+    if (active.isEmpty) return const [];
+    if (!await init()) return const [];
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notified = (prefs.getStringList(_notifiedKey) ?? const <String>[])
+          .toSet();
+
+      final fired = <String>[];
+      for (final property in properties) {
+        if (!property.isNewListing) continue;
+        if (notified.contains(property.id)) continue;
+
+        SavedSearch? hit;
+        for (final search in active) {
+          if (search.matches(property)) {
+            hit = search;
+            break;
+          }
+        }
+        if (hit == null) continue;
+
+        await _fireListingAlert(property, hit);
+        notified.add(property.id);
+        fired.add(property.id);
+      }
+
+      if (fired.isNotEmpty) {
+        // Cap the dedupe set so it can't grow without bound.
+        var ids = notified.toList();
+        if (ids.length > 500) ids = ids.sublist(ids.length - 500);
+        await prefs.setStringList(_notifiedKey, ids);
+      }
+      return fired;
+    } catch (e) {
+      if (kDebugMode) debugPrint('NotificationService.checkSavedSearches: $e');
+      return const [];
+    }
+  }
+
+  /// Fire a sample saved-search alert (for a "send me a test" button / QA).
+  Future<void> testFireSavedSearch() async {
+    if (!await init()) return;
+    await _show(
+      _searchIdBase,
+      'דירה חדשה שמתאימה לך!',
+      'כך תיראה התראה כשתעלה דירה חדשה שמתאימה לחיפוש ששמרת.',
+    );
+  }
+
+  Future<void> _fireListingAlert(
+    RentalProperty property,
+    SavedSearch search,
+  ) async {
+    final where = property.city.trim().isEmpty ? '' : ' ב${property.city.trim()}';
+    final rooms = property.rooms;
+    final roomsText =
+        rooms == rooms.roundToDouble() ? rooms.round().toString() : '$rooms';
+    final body = 'דירת $roomsText חדרים$where ב-${property.price} ₪ '
+        'מתאימה לחיפוש "${search.name}". מהר — דירות טובות נחטפות בימים.';
+    await _show(
+      _searchIdBase + _stableKey(property.id),
+      'דירה חדשה שמתאימה לך!',
+      body,
+    );
+  }
+
+  Future<void> _show(int id, String title, String body) async {
+    try {
+      await _plugin.show(id, title, body, _searchDetails());
+    } catch (e) {
+      if (kDebugMode) debugPrint('NotificationService._show: $e');
+    }
+  }
+
   // ── Internals ───────────────────────────────────────────────────────────────
+
+  NotificationDetails _searchDetails() {
+    const android = AndroidNotificationDetails(
+      _searchChannelId,
+      _searchChannelName,
+      channelDescription: _searchChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const darwin = DarwinNotificationDetails();
+    return const NotificationDetails(android: android, iOS: darwin, macOS: darwin);
+  }
 
   NotificationDetails _details() {
     const android = AndroidNotificationDetails(

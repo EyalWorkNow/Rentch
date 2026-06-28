@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/finance/affordability.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
+import 'package:dating_app/presentation/widgets/tenant_rights_sheet.dart';
+import 'package:dating_app/presentation/widgets/term_tooltip.dart';
+import 'package:dating_app/presentation/widgets/verification_info_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -328,6 +332,17 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
+                          // Affordability + rights (rentals only, real tenants).
+                          if (!widget.isLandlordPreview &&
+                              p.transactionType ==
+                                  PropertyTransactionType.rent) ...[
+                            _AffordabilityStrip(
+                              property: p,
+                              monthlyIncome:
+                                  provider.tenantProfile?.monthlyIncome,
+                            ),
+                            const SizedBox(height: 24),
+                          ],
                           if (_PropertySignalStrip.shouldShow(context, p)) ...[
                             _PropertySignalStrip(property: p),
                             const SizedBox(height: 24),
@@ -3230,9 +3245,9 @@ class _FeatureWrap extends StatelessWidget {
       runSpacing: 8,
       children: features.map((f) {
         final icon = _getFeatureIcon(f);
-        return ScaleBounce(
-          onTap: () {},
-          scaleDownTo: 0.94,
+        // Tap-to-explain for known rental terms (ממ"ד, בטוחות…); no-op otherwise.
+        return TermTooltip(
+          term: f,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -4441,6 +4456,153 @@ class _DarkMetricChip extends StatelessWidget {
   }
 }
 
+/// Tenant affordability snapshot for a rental: rent-to-income band (when income
+/// is known) + the up-front move-in total breakdown, plus a "מה הזכויות שלי?"
+/// entry point. Pure read-only; never blocks. When income is null it shows a
+/// gentle prompt to add it (deep-links nowhere — the profile editor owns that).
+class _AffordabilityStrip extends StatelessWidget {
+  const _AffordabilityStrip({
+    required this.property,
+    required this.monthlyIncome,
+  });
+
+  final RentalProperty property;
+  final int? monthlyIncome;
+
+  static const _bandColors = <RentBand, Color>{
+    RentBand.comfortable: Color(0xFF22C55E),
+    RentBand.stretched: Color(0xFFF59E0B),
+    RentBand.high: Color(0xFFFF5A67),
+    RentBand.unknown: Color(0xFF64748B),
+  };
+
+  static const _bandLabels = <RentBand, String>{
+    RentBand.comfortable: 'נוח לתקציב',
+    RentBand.stretched: 'מתיחה תקציבית',
+    RentBand.high: 'נטל גבוה',
+    RentBand.unknown: 'הוסיפו הכנסה לבדיקת התאמה',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final result = Affordability.assess(
+      monthlyRent: property.price,
+      monthlyIncome: monthlyIncome,
+    );
+    final color = _bandColors[result.band]!;
+    final ratioPct = result.rentToIncomePercent;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              RentlyIcon(IconsaxPlusLinear.wallet_money, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  result.band == RentBand.unknown
+                      ? 'הזן הכנסה לבדיקת התאמה'
+                      : '${_bandLabels[result.band]}'
+                          '${ratioPct != null ? ' · $ratioPct% מההכנסה' : ''}',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Move-in cost breakdown — what's needed in cash on day one.
+          for (final item in result.lineItems)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '₪${item.amount}',
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const Divider(height: 16, color: Color(0xFFE2E8F0)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'סה״כ עלות כניסה',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                '₪${result.moveInTotal}',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => TenantRightsSheet.show(
+                context,
+                monthlyRent: property.price,
+                termMonths: 12,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.navy,
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: RentlyIcon(IconsaxPlusLinear.shield_tick,
+                  size: 16, color: AppColors.primary),
+              label: const Text(
+                'מה הזכויות שלי?',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PropertySignalStrip extends StatelessWidget {
   const _PropertySignalStrip({required this.property});
 
@@ -4480,10 +4642,14 @@ class _PropertySignalStrip extends StatelessWidget {
             color: const Color(0xFFFF5A67),
           ),
         if (property.isVerifiedListing)
-          const _PropertySignalChip(
-            icon: IconsaxPlusLinear.verify,
-            label: 'דירה מאומתת',
-            color: Color(0xFF13BEC9),
+          GestureDetector(
+            onTap: () => VerificationInfoSheet.show(context),
+            child: const _PropertySignalChip(
+              icon: IconsaxPlusLinear.verify,
+              label: 'דירה מאומתת',
+              color: Color(0xFF13BEC9),
+              showInfoHint: true,
+            ),
           ),
         if (property.isNewListing)
           const SignalStripPulse(
@@ -4521,11 +4687,15 @@ class _PropertySignalChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.color,
+    this.showInfoHint = false,
   });
 
   final IconData icon;
   final String label;
   final Color color;
+
+  /// Adds a trailing "?" hint so the verified chip reads as tappable.
+  final bool showInfoHint;
 
   @override
   Widget build(BuildContext context) {
@@ -4549,6 +4719,10 @@ class _PropertySignalChip extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
+          if (showInfoHint) ...[
+            const SizedBox(width: 5),
+            Icon(Icons.help_outline_rounded, size: 14, color: color),
+          ],
         ],
       ),
     );
