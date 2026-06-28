@@ -145,14 +145,21 @@ class AwsApiClient {
   // ── Panorama stitch jobs (server-side OpenCV) ─────────────────────────────
 
   /// Create a stitch job; returns the jobId + one presigned PUT URL per frame.
+  ///
+  /// [poses] is optional and, when given, must be PARALLEL to the frames
+  /// (poses[i] ↔ frame f{i}, same order/length): a top-level `poses` JSON array
+  /// of `{yaw, pitch, hfov, vfov}` in degrees, which the server uses for
+  /// deterministic pose-assisted stitching. Omitted/empty → backward-compatible.
   Future<({String jobId, List<String> uploadUrls})?> createPanoramaJob({
     required String propertyId,
     required int frameCount,
+    List<Map<String, double>>? poses,
   }) async {
     if (!isConfigured) return null;
     final res = await post('/panorama', {
       'propertyId': propertyId,
       'frameCount': frameCount,
+      if (poses != null && poses.isNotEmpty) 'poses': poses,
     });
     final data = res['data'] as Map<String, dynamic>?;
     final jobId = data?['jobId'] as String?;

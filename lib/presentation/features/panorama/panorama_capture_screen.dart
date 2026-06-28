@@ -105,9 +105,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (_busy) return;
 
     // GUIDED FIRST: show the big explainer with TWO clear choices. PRIMARY =
-    // import a native phone panorama (reliable: Apple/Google already stitched it,
-    // no parallax/drift/black-hole). SECONDARY = the experimental in-app sweep.
-    // Import is the default path; the sweep is demoted to "advanced".
+    // the in-app guided sweep (one slow spin; the yaw/gyro/blur/crop are now
+    // fixed so a single real turn = one full 360° ring). SECONDARY = import a
+    // panorama the landlord already shot in the phone's native camera mode.
     final choice = await Navigator.of(context).push<_CaptureChoice>(
       MaterialPageRoute(builder: (_) => const _PanoramaGuideScreen()),
     );
@@ -705,14 +705,15 @@ class _NodeTile extends StatelessWidget {
 /// Which capture path the landlord chose on the guide screen.
 enum _CaptureChoice { sweep, gallery }
 
-/// Full-screen, big-text guide shown BEFORE capture. Honest + import-first for an
-/// older, non-technical user: the phone's OWN native «פנורמה» camera mode is the
-/// reliable path (Apple/Google stitch it with no parallax, drift, blur, or black
-/// hole), so the guide teaches that in plain numbered Hebrew steps.
-/// PRIMARY button ("בחר תמונת פנורמה") pops [_CaptureChoice.gallery] → import.
-/// A clearly-secondary link ("צילום מתקדם בתוך האפליקציה (ניסיוני)") pops
-/// [_CaptureChoice.sweep] → the experimental in-app sweep, kept reachable but never
-/// the default. Large clear text, one obvious primary action; no false promises.
+/// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
+/// older, non-technical user: the in-app guided sweep now lands one full 360°
+/// ring from a single slow spin (yaw/gyro/blur/crop fixed + pose-assisted
+/// stitching), so it's the warm default — the app does the work, the landlord
+/// just turns once.
+/// PRIMARY button ("צלם עכשיו — בתוך האפליקציה") pops [_CaptureChoice.sweep] →
+/// the in-app sweep. A clear SECONDARY button ("כבר צילמתי פנורמה — ייבא תמונה")
+/// pops [_CaptureChoice.gallery] → import a panorama already shot in the phone's
+/// native camera. Large clear text, one obvious primary action; no false promises.
 class _PanoramaGuideScreen extends StatelessWidget {
   const _PanoramaGuideScreen();
 
@@ -722,7 +723,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
-        title: const Text('איך מצלמים פנורמה'),
+        title: const Text('איך מצלמים סיור 360°'),
       ),
       body: SafeArea(
         child: Column(
@@ -740,12 +741,12 @@ class _PanoramaGuideScreen extends StatelessWidget {
                         color: AppColors.primaryLight2,
                         borderRadius: BorderRadius.circular(22),
                       ),
-                      child: Icon(IconsaxPlusBold.gallery,
+                      child: Icon(IconsaxPlusBold.rotate_right,
                           size: 64, color: AppColors.primary),
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'מצלמים פנורמה במצלמה של הטלפון',
+                      'מצלמים את הסיור כאן באפליקציה',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontWeight: FontWeight.w900,
@@ -754,7 +755,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'הדרך הכי פשוטה והכי יפה. מצלמים פעם אחת — וחוזרים לבחור את התמונה.',
+                      'עמדו במרכז החדר וסובבו לאט סיבוב אחד — האפליקציה תלכוד את התמונות לבד ותבנה סיור 360°.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 16,
@@ -764,36 +765,30 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     const SizedBox(height: 22),
                     const _GuideStep(
                       number: '1',
-                      icon: IconsaxPlusBold.camera,
-                      title: 'פתחו את אפליקציית המצלמה של הטלפון',
-                      body: 'המצלמה הרגילה שאיתה אתם מצלמים תמונות.',
+                      icon: IconsaxPlusBold.user,
+                      title: 'עמדו במרכז החדר',
+                      body: 'מחזיקים את הטלפון לפניכם, ישר וקבוע.',
                     ),
                     const _GuideStep(
                       number: '2',
-                      icon: IconsaxPlusBold.gallery_export,
-                      title: 'בחרו מצב «פנורמה»',
-                      body: 'מחליקים בין המצבים עד שמופיע «פנורמה» (Panorama).',
+                      icon: IconsaxPlusBold.rotate_right,
+                      title: 'סובבו לאט סיבוב אחד שלם',
+                      body:
+                          'מסתובבים על המקום אט-אט, סיבוב אחד מלא. האפליקציה מצלמת לבד תוך כדי.',
                     ),
                     const _GuideStep(
                       number: '3',
-                      icon: IconsaxPlusBold.rotate_right,
-                      title: 'עמדו במרכז וסובבו לאט סיבוב אחד',
-                      body:
-                          'עמדו במקום וסובבו אט-אט סיבוב שלם. הטלפון מחבר את התמונה לבד.',
-                    ),
-                    const _GuideStep(
-                      number: '4',
                       icon: IconsaxPlusBold.tick_circle,
-                      title: 'חזרו לכאן ובחרו את התמונה',
-                      body: 'נציג אותה כסיור 360° — בלי שום עבודה נוספת.',
+                      title: 'זהו — הסיור מוכן',
+                      body: 'האפליקציה מחברת את התמונות לסיור 360°. אין שום עבודה נוספת.',
                       isLast: true,
                     ),
                   ],
                 ),
               ),
             ),
-            // PRIMARY: import the native phone panorama (the reliable, default
-            // path — Apple/Google already stitched it with no parallax or drift).
+            // PRIMARY (default): the in-app guided sweep. One slow spin → one full
+            // 360° ring (yaw/gyro/blur/crop fixed + pose-assisted stitching).
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
               child: SizedBox(
@@ -804,41 +799,33 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 17),
                   ),
                   onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.gallery),
-                  icon: const Icon(IconsaxPlusBold.gallery, size: 22),
-                  label: const Text('בחר תמונת פנורמה',
+                      Navigator.of(context).pop(_CaptureChoice.sweep),
+                  icon: const Icon(IconsaxPlusBold.camera, size: 22),
+                  label: const Text('צלם עכשיו — בתוך האפליקציה',
                       style:
                           TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                 ),
               ),
             ),
-            // SECONDARY, clearly subordinate + honest: the experimental in-app
-            // sweep. Kept reachable, never the default — and it really needs
-            // about three slow passes, so we say so plainly.
+            // SECONDARY: import a panorama already shot in the phone's native
+            // camera. A clear, easy-to-find fallback — not the default.
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: Column(
-                children: [
-                  TextButton.icon(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_CaptureChoice.sweep),
-                    icon: Icon(IconsaxPlusLinear.camera,
-                        size: 18, color: AppColors.textSecondary),
-                    label: const Text('צילום מתקדם בתוך האפליקציה (ניסיוני)',
-                        style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15)),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary, width: 1.4),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  const Text(
-                    'דורש כ-3 סיבובים איטיים בגבהים שונים — מומלץ למתקדמים בלבד.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        height: 1.3),
-                  ),
-                ],
+                  onPressed: () =>
+                      Navigator.of(context).pop(_CaptureChoice.gallery),
+                  icon: const Icon(IconsaxPlusLinear.gallery, size: 20),
+                  label: const Text('כבר צילמתי פנורמה — ייבא תמונה',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                ),
               ),
             ),
           ],

@@ -20,11 +20,16 @@ class PanoramaSweepResult {
     required this.imageUrl,
     required this.haov,
     required this.vaov,
+    this.poses = const [],
   });
 
   final String imageUrl;
   final double haov;
   final double vaov;
+
+  /// Per-frame capture pose, PARALLEL to the uploaded frames (poses[i] ↔ f{i}),
+  /// each `{yaw, pitch, hfov, vfov}` in DEGREES. Empty when poses weren't sent.
+  final List<Map<String, double>> poses;
 }
 
 /// Guided in-app horizontal 360° sweep. The user does three passes — middle,
@@ -67,6 +72,14 @@ const _rows = <_Row>[
 
 const _total = 42; // sum of _rows[].frames — keep in sync
 const _sampleEveryMs = 700; // timer fallback only (no gyro)
+
+// Per-row tilt (pitch) in DEGREES, parallel to _rows: middle 0, up +30, down −30.
+// Matches the row hints ("הטה מעט כלפי מעלה/מטה (~30°)") and the horizon guide.
+const _rowPitchDeg = <double>[0, 30, -30];
+// Camera horizontal field of view in degrees. The `camera` plugin doesn't expose
+// it, so use a sane default for a typical phone back camera. Tunable here; vfov is
+// derived per-frame from the captured aspect (vfov = hfov * frameHeight/frameWidth).
+const _defaultHfovDeg = 65.0;
 // Gate capture on a near-STILL phone: above this the frame is smeared. Tight
 // (was 90) because we now measure true world-yaw rate, so frames land between
 // turns instead of mid-motion.
@@ -89,6 +102,10 @@ class _PanoramaSweepCaptureScreenState
   int _rowIndex = 0;
   int _rowDone = 0; // frames captured in the current row
   final List<String> _frames = []; // all rows
+  // Capture pose per kept frame, PARALLEL to _frames (poses[i] ↔ _frames[i]):
+  // {yaw, pitch, hfov, vfov} in degrees. Sent to the backend for deterministic
+  // pose-assisted stitching instead of fragile feature-matching.
+  final List<Map<String, double>> _poses = [];
   final _clock = Stopwatch();
   int _lastSampleMs = 0;
 
@@ -246,6 +263,18 @@ class _PanoramaSweepCaptureScreenState
           '${Directory.systemTemp.path}/pano_${_frames.length}_${_clock.elapsedMicroseconds}.jpg');
       await file.writeAsBytes(jpg);
       _frames.add(file.path);
+      // Record the pose for THIS frame, kept strictly parallel to _frames. yaw is
+      // the gravity-projected heading the ring uses; pitch is the row tilt; vfov
+      // is derived from the captured portrait aspect (h>w → vfov > hfov).
+      final aspect = image.width == 0 ? 1.0 : image.height / image.width;
+      _poses.add({
+        'yaw': (_yawDeg % 360 + 360) % 360,
+        'pitch': _rowPitchDeg[_rowIndex],
+        'hfov': _defaultHfovDeg,
+        'vfov': _defaultHfovDeg * aspect,
+      });
+      assert(_poses.length == _frames.length,
+          'pose/frame misalignment: ${_poses.length} poses vs ${_frames.length} frames');
       _lastCaptureYaw = _yawDeg;
       _lastSampleMs = _clock.elapsedMilliseconds;
       HapticFeedback.lightImpact();
@@ -315,13 +344,21 @@ class _PanoramaSweepCaptureScreenState
       _stitchMsg = 'מתחילים לבנות את הסיור...';
     });
     final frames = List<String>.from(_frames);
+    // Snapshot poses parallel to the frame snapshot so f{i} ↔ poses[i] survives
+    // any later mutation. Asserted equal-length before we send them on.
+    final poses = List<Map<String, double>>.from(_poses);
+    assert(poses.length == frames.length,
+        'pose/frame misalignment at stitch: ${poses.length} vs ${frames.length}');
     try {
       // A property doesn't exist yet while the landlord is still filling the
       // draft, so group this job under a one-off id; the server only uses it as
       // a folder key for the frames.
       final groupId = 'draft_${DateTime.now().millisecondsSinceEpoch}';
-      final job = await AwsApiClient.instance
-          .createPanoramaJob(propertyId: groupId, frameCount: frames.length);
+      final job = await AwsApiClient.instance.createPanoramaJob(
+        propertyId: groupId,
+        frameCount: frames.length,
+        poses: poses,
+      );
       if (job == null || job.uploadUrls.length < frames.length) {
         _failStitch('לא הצלחנו להתחיל את העיבוד. בדוק את החיבור לאינטרנט.');
         return;
@@ -356,6 +393,7 @@ class _PanoramaSweepCaptureScreenState
             imageUrl: status.imageUrl,
             haov: status.haov,
             vaov: status.vaov,
+            poses: poses,
           ));
           return;
         }

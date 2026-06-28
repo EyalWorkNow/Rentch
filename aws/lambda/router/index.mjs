@@ -219,7 +219,7 @@ export const handler = async (event) => {
       if (method === 'POST' && !jobId) return await createPanorama(event);
       // POST /panorama/:id/stitch → async-invoke the stitcher
       if (method === 'POST' && jobId && segments[2] === 'stitch') {
-        return await stitchPanorama(jobId);
+        return await stitchPanorama(jobId, event);
       }
       // GET /panorama/:id → poll status → imageUrl + haov/vaov
       if (method === 'GET' && jobId) return await getPanorama(jobId);
@@ -1318,18 +1318,21 @@ async function createPanorama(event) {
     uploadUrls.push(await getSignedUrl(
       s3,
       new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'image/jpeg' }),
-      { expiresIn: 3600 },
+      { expiresIn: 21600 },
     ));
   }
   const resultKey = `panoramas/results/${jobId}.jpg`;
   await putPanoMeta(jobId, {
     jobId, propertyId, frameKeys, resultKey,
+    // pose-assisted stitching: persist the per-frame poses sent at create so the
+    // stitch step (a separate request) can use them (bridged via meta).
+    ...(Array.isArray(body.poses) && body.poses.length ? { poses: body.poses } : {}),
     status: 'pending', createdAt: ts,
   });
   return json(200, { data: { jobId, uploadUrls } });
 }
 
-async function stitchPanorama(jobId) {
+async function stitchPanorama(jobId, event) {
   const meta = await getPanoMeta(jobId);
   if (!meta) return json(404, { message: 'Panorama job not found' });
   if (meta.status === 'ready' || meta.status === 'failed') {
@@ -1341,6 +1344,20 @@ async function stitchPanorama(jobId) {
     return json(200, { data: panoData(failed) });
   }
   await putPanoMeta(jobId, { ...meta, status: 'processing', processedAt: Date.now() });
+
+  // Pose-assisted stitching: the app may send a top-level `poses` array on the
+  // stitch request, parallel to the frames (poses[i] ↔ frame f{i}), each
+  // {yaw, pitch, hfov, vfov} in DEGREES. When present and aligned with the
+  // frames, the stitch Lambda projects each frame onto an equirectangular canvas
+  // by its KNOWN pose (deterministic) instead of fragile feature-matching — the
+  // real fix for failed stitches on blank walls. We forward it untouched and let
+  // the stitcher validate alignment; if it's absent/mismatched the stitcher
+  // falls back to cv2.Stitcher (backward-compatible).
+  // Prefer poses persisted at create (the app sends them on POST /panorama);
+  // fall back to poses on the stitch request body for flexibility.
+  const poses = validatePoses(meta.poses, meta.frameKeys.length)
+    ?? sanitizePoses(event, meta.frameKeys.length);
+
   // Stitching exceeds the API Gateway 29s limit, so invoke async (Event) and let
   // the client poll GET /panorama/:id.
   await lambda.send(new InvokeCommand({
@@ -1351,6 +1368,7 @@ async function stitchPanorama(jobId) {
       metaKey: `panoramas/meta/${jobId}.json`,
       frameKeys: meta.frameKeys,
       resultKey: meta.resultKey,
+      ...(poses ? { poses } : {}),
       meta: {
         jobId, propertyId: meta.propertyId, frameKeys: meta.frameKeys,
         resultKey: meta.resultKey, createdAt: meta.createdAt,
@@ -1358,6 +1376,37 @@ async function stitchPanorama(jobId) {
     })),
   }));
   return json(200, { data: { jobId, status: 'processing' } });
+}
+
+// Parse + validate the optional `poses` array off the stitch request body.
+// Returns a clean array of {yaw,pitch,hfov,vfov} numbers (in degrees) only when
+// it's a non-empty array aligned 1:1 with the frames; otherwise null so the
+// stitcher takes its existing feature-matching path. Stays backward-compatible:
+// a request with no poses behaves exactly as before.
+function sanitizePoses(event, frameCount) {
+  let body = {};
+  try { body = event?.body ? JSON.parse(event.body) : {}; }
+  catch { return null; }
+  return validatePoses(body.poses, frameCount);
+}
+
+// Validate a raw poses array (from the stitch request OR the persisted job meta).
+function validatePoses(raw, frameCount) {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  // Must be parallel to the frames — a mismatch means we can't trust the mapping.
+  if (raw.length !== frameCount) return null;
+  const out = [];
+  for (const p of raw) {
+    if (!p || typeof p !== 'object') return null;
+    const yaw = Number(p.yaw);
+    const pitch = Number(p.pitch);
+    const hfov = Number(p.hfov);
+    const vfov = Number(p.vfov);
+    if (![yaw, pitch, hfov, vfov].every(Number.isFinite)) return null;
+    if (hfov <= 0 || vfov <= 0) return null;
+    out.push({ yaw, pitch, hfov, vfov });
+  }
+  return out;
 }
 
 async function getPanorama(jobId) {
