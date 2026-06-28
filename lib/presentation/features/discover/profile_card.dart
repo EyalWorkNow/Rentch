@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
@@ -31,13 +32,20 @@ class _ProfileCardState extends State<ProfileCard> {
   RentalProperty get p => widget.property;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheNeighbors();
+  }
+
+  @override
   void didUpdateWidget(covariant ProfileCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.property.id != widget.property.id) {
       _currentImage = 0;
-      return;
+    } else {
+      _currentImage = _safeImageIndex(_currentImage);
     }
-    _currentImage = _safeImageIndex(_currentImage);
+    _precacheNeighbors();
   }
 
   int _safeImageIndex(int index) {
@@ -46,15 +54,37 @@ class _ProfileCardState extends State<ProfileCard> {
     return index.clamp(0, mediaLength - 1).toInt();
   }
 
+  /// Decode the current image + its immediate neighbors ahead of time so the
+  /// AnimatedSwitcher always crossfades between already-loaded images instead of
+  /// fading to a still-loading (blank) one — the cause of the flicker.
+  void _precacheNeighbors() {
+    final media = p.media;
+    if (media.isEmpty) return;
+    final cur = _safeImageIndex(_currentImage);
+    for (final idx in [cur, cur - 1, cur + 1]) {
+      if (idx < 0 || idx >= media.length) continue;
+      final m = media[idx];
+      if (!m.isImage) continue;
+      final url = InputSanitizer.sanitizeImageUrl(m.url);
+      if (url == null || url.isEmpty) continue;
+      if (url.startsWith('/') || url.startsWith('file://')) continue;
+      precacheImage(NetworkImage(url), context, onError: (_, __) {});
+    }
+  }
+
   void _prevImage() {
     final current = _safeImageIndex(_currentImage);
-    if (current > 0) setState(() => _currentImage = current - 1);
+    if (current > 0) {
+      setState(() => _currentImage = current - 1);
+      _precacheNeighbors();
+    }
   }
 
   void _nextImage() {
     final current = _safeImageIndex(_currentImage);
     if (current < p.media.length - 1) {
       setState(() => _currentImage = current + 1);
+      _precacheNeighbors();
     }
   }
 
