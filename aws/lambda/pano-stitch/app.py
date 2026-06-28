@@ -12,8 +12,12 @@
 import json
 import math
 import os
-import cv2
 import numpy as np
+
+try:
+    import cv2  # present in the Lambda container; absent in a numpy-only --selfcheck
+except ImportError:  # pragma: no cover — only the cv2-free self-check hits this
+    cv2 = None
 
 
 def _s3():
@@ -369,10 +373,186 @@ def _handle_pole_fill(event):
         return {"status": "failed", "error": str(e)}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Video frame source
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The app records ONE mp4 while rotating in place and a gyro pose timeline
+# [{tMs, yaw, pitch}]. We decode the video, interpolate each frame's pose from
+# the timeline by its timestamp, score sharpness (variance of the Laplacian),
+# bucket frames by yaw, and keep only the SHARPEST frame per bucket. The chosen
+# frames + their poses then feed the EXISTING project_poses() projector — the
+# video is just a better frame source for the pose-assisted stitcher.
+
+# 24 yaw buckets → 15° each: dense enough that adjacent frames overlap given a
+# typical phone hfov (~60°), coarse enough to keep the projector cheap.
+VIDEO_YAW_BUCKETS = int(os.environ.get("VIDEO_YAW_BUCKETS", "24"))
+# Drop frames blurrier than this (Laplacian variance). Motion blur during a sweep
+# tanks this score; a low floor still rejects the truly smeared frames while
+# keeping usable ones on textured walls.
+VIDEO_SHARPNESS_FLOOR = float(os.environ.get("VIDEO_SHARPNESS_FLOOR", "12.0"))
+# Don't Laplacian every frame at 30–60fps — step through to keep runtime bounded.
+VIDEO_FRAME_STEP = int(os.environ.get("VIDEO_FRAME_STEP", "3"))
+# Need a usable frame in at least this many buckets or the sweep is too sparse.
+VIDEO_MIN_BUCKETS = int(os.environ.get("VIDEO_MIN_BUCKETS", "6"))
+
+
+def _interp_pose(timeline, t_ms):
+    """Linearly interpolate (yaw, pitch) from the gyro `timeline` (list of
+    {tMs, yaw, pitch}, assumed time-sorted) at time `t_ms`. yaw is interpolated
+    on the shortest arc so the 360→0 wrap doesn't spin the result the long way.
+    Clamps to the endpoints outside the timeline range. Returns (yaw, pitch) with
+    yaw normalized to [0,360)."""
+    n = len(timeline)
+    if n == 0:
+        return 0.0, 0.0
+    if t_ms <= timeline[0]["tMs"]:
+        return timeline[0]["yaw"] % 360.0, float(timeline[0]["pitch"])
+    if t_ms >= timeline[-1]["tMs"]:
+        return timeline[-1]["yaw"] % 360.0, float(timeline[-1]["pitch"])
+    # Find the bracketing pair [a, b] with a.tMs <= t_ms <= b.tMs.
+    lo, hi = 0, n - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if timeline[mid]["tMs"] <= t_ms:
+            lo = mid
+        else:
+            hi = mid
+    a, b = timeline[lo], timeline[hi]
+    span = b["tMs"] - a["tMs"]
+    f = 0.0 if span <= 0 else (t_ms - a["tMs"]) / span
+    # Shortest-arc yaw interpolation (handle the 360 wrap).
+    dyaw = ((b["yaw"] - a["yaw"] + 180.0) % 360.0) - 180.0
+    yaw = (a["yaw"] + f * dyaw) % 360.0
+    pitch = a["pitch"] + f * (b["pitch"] - a["pitch"])
+    return yaw, float(pitch)
+
+
+def _select_video_keyframes(scored, n_buckets):
+    """Given `scored` = list of (yaw, pitch, sharpness, frame_or_index), keep only
+    the SHARPEST entry per yaw bucket whose sharpness clears the floor. Returns a
+    dict {bucket_index: best_entry}. Pure (no cv2) so it's self-checkable."""
+    best = {}
+    bucket_w = 360.0 / n_buckets
+    for entry in scored:
+        yaw, _pitch, sharp, _payload = entry
+        if sharp < VIDEO_SHARPNESS_FLOOR:
+            continue
+        b = int((yaw % 360.0) / bucket_w) % n_buckets
+        if b not in best or sharp > best[b][2]:
+            best[b] = entry
+    return best
+
+
+def _handle_video_stitch(event):
+    """captureMode='video': decode the mp4, pick the sharpest keyframe per yaw
+    bucket with its interpolated pose, then run the existing project_poses path.
+    Returns {status:'ready', imageUrl, haov, vaov} or {status:'failed', error}."""
+    bucket = event["bucket"]
+    meta_key = event["metaKey"]
+    result_key = event["resultKey"]
+    region = os.environ.get("AWS_REGION", "eu-central-1")
+    s3 = _s3()
+
+    timeline = event.get("poseTimeline") or []
+    # Defend: keep only well-formed, finite samples, time-sorted.
+    clean = []
+    for p in timeline:
+        try:
+            t = float(p["tMs"]); y = float(p["yaw"]); pi = float(p["pitch"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if all(math.isfinite(x) for x in (t, y, pi)):
+            clean.append({"tMs": t, "yaw": y, "pitch": pi})
+    clean.sort(key=lambda p: p["tMs"])
+
+    hfov = float(event.get("hfov") or 0)
+    vfov = float(event.get("vfov") or 0)
+
+    try:
+        if len(clean) < 2:
+            raise RuntimeError("pose timeline too short (need >=2 gyro samples)")
+        if hfov <= 0 or vfov <= 0:
+            raise RuntimeError("missing hfov/vfov for video projection")
+
+        # Download the recorded video to /tmp and open it.
+        vid_path = "/tmp/pano_video.mp4"
+        obj = s3.get_object(Bucket=bucket, Key=event["videoKey"])
+        with open(vid_path, "wb") as fh:
+            fh.write(obj["Body"].read())
+        cap = cv2.VideoCapture(vid_path)
+        if not cap.isOpened():
+            raise RuntimeError("could not open recorded video")
+
+        # Walk frames (subsampled), interpolate pose by timestamp, score sharpness,
+        # and keep the sharpest frame per yaw bucket.
+        bucket_w = 360.0 / VIDEO_YAW_BUCKETS
+        best = {}  # bucket -> (yaw, pitch, sharpness, frame)
+        i = 0
+        try:
+            while True:
+                ok, frame = cap.read()
+                if not ok:
+                    break
+                if i % VIDEO_FRAME_STEP != 0:
+                    i += 1
+                    continue
+                i += 1
+                t_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+                yaw, pitch = _interp_pose(clean, t_ms)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                sharp = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+                if sharp < VIDEO_SHARPNESS_FLOOR:
+                    continue
+                b = int((yaw % 360.0) / bucket_w) % VIDEO_YAW_BUCKETS
+                if b not in best or sharp > best[b][2]:
+                    best[b] = (yaw, pitch, sharp, frame)
+        finally:
+            cap.release()
+
+        if len(best) < VIDEO_MIN_BUCKETS:
+            raise RuntimeError(
+                f"only {len(best)} usable yaw buckets (need >={VIDEO_MIN_BUCKETS}); "
+                "sweep too sparse or too blurry — rotate slower for a full turn")
+
+        images, poses = [], []
+        for b in sorted(best):
+            yaw, pitch, _sharp, frame = best[b]
+            images.append(frame)
+            poses.append({"yaw": yaw, "pitch": pitch, "hfov": hfov, "vfov": vfov})
+
+        # Feed the EXISTING deterministic projector + pole-fill (same as photos).
+        pano, haov, vaov = _handle_pose_stitch(images, poses)
+
+        ok, buf = cv2.imencode(".jpg", pano, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        if not ok:
+            raise RuntimeError("encode failed")
+        s3.put_object(
+            Bucket=bucket, Key=result_key, Body=buf.tobytes(),
+            ContentType="image/jpeg", CacheControl="public, max-age=31536000",
+        )
+        image_url = f"https://{bucket}.s3.{region}.amazonaws.com/{result_key}"
+        _put_meta(s3, bucket, meta_key, {
+            **event.get("meta", {}),
+            "status": "ready", "imageUrl": image_url,
+            "haov": round(haov, 2), "vaov": round(vaov, 2),
+        })
+        return {"status": "ready", "imageUrl": image_url}
+    except Exception as e:  # noqa: BLE001 — record any failure for the poller
+        _put_meta(s3, bucket, meta_key, {
+            **event.get("meta", {}), "status": "failed", "error": str(e),
+        })
+        return {"status": "failed", "error": str(e)}
+
+
 def handler(event, _context):
     # Synchronous pole-fill op (router RequestResponse); default = async stitch job.
     if event.get("op") == "poleFill":
         return _handle_pole_fill(event)
+    # Video capture: recorded mp4 + gyro pose timeline → sharpest keyframe per
+    # yaw bucket → existing pose-assisted projector.
+    if event.get("captureMode") == "video":
+        return _handle_video_stitch(event)
     bucket = event["bucket"]
     meta_key = event["metaKey"]
     frame_keys = event["frameKeys"]
@@ -475,6 +655,32 @@ def _selfcheck():
              {"yaw": 30, "pitch": 0, "hfov": 40, "vfov": 50}]
     haov, vaov = _arc_from_poses(poses)
     assert abs(haov - 70.0) < 1e-6 and abs(vaov - 50.0) < 1e-6, ("arc partial", haov, vaov)
+
+    # ── Video pipeline (numpy-only: no cv2/boto3) ────────────────────────────
+    tl = [{"tMs": 0, "yaw": 0, "pitch": -5},
+          {"tMs": 1000, "yaw": 90, "pitch": 5}]
+    # 8) Midpoint interpolation: half-way in time → half-way in yaw/pitch.
+    y, p = _interp_pose(tl, 500)
+    assert abs(y - 45.0) < 1e-6 and abs(p - 0.0) < 1e-6, ("interp mid", y, p)
+    # 9) Clamp before/after the timeline to the endpoints.
+    y, _ = _interp_pose(tl, -100); assert abs(y - 0.0) < 1e-6, ("clamp lo", y)
+    y, _ = _interp_pose(tl, 9999); assert abs(y - 90.0) < 1e-6, ("clamp hi", y)
+    # 10) Shortest-arc wrap: 350° → 10° midpoint is 0°, not 180°.
+    wrap = [{"tMs": 0, "yaw": 350, "pitch": 0}, {"tMs": 100, "yaw": 10, "pitch": 0}]
+    y, _ = _interp_pose(wrap, 50)
+    assert abs(((y + 180.0) % 360.0) - 180.0) < 1e-6, ("wrap mid", y)
+    # 11) Yaw-bucket selection: keep the sharpest per bucket, drop below floor.
+    floor = VIDEO_SHARPNESS_FLOOR
+    scored = [
+        (5.0, 0.0, floor + 10, "a"),   # bucket 0, sharp
+        (6.0, 0.0, floor + 50, "b"),   # bucket 0, sharper → wins
+        (20.0, 0.0, floor - 1, "c"),   # bucket 1, below floor → dropped
+        (200.0, 0.0, floor + 5, "d"),  # another bucket, kept
+    ]
+    sel = _select_video_keyframes(scored, VIDEO_YAW_BUCKETS)
+    b0 = int((5.0) / (360.0 / VIDEO_YAW_BUCKETS))
+    assert sel[b0][3] == "b", ("bucket sharpest", sel.get(b0))
+    assert len(sel) == 2, ("bucket count", sorted(sel))
 
     print("selfcheck OK")
 

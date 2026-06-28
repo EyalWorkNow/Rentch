@@ -195,6 +195,41 @@ class AwsApiClient {
     }
   }
 
+  /// Create a VIDEO-mode panorama job: the user recorded a short clip while
+  /// turning once, and the SERVER extracts sharp keyframes and stitches them via
+  /// the supplied [poseTimeline]. Returns the jobId + ONE presigned PUT URL for
+  /// the (transcoded mp4) video.
+  ///
+  /// [poseTimeline] is a list of `{tMs, yaw, pitch}` samples (tMs = ms since the
+  /// recording started; yaw in DEGREES 0..360; pitch in DEGREES), monotonic in
+  /// tMs. Reuses [startPanoramaStitch]/[getPanorama] for stitch + poll.
+  Future<({String jobId, String videoUploadUrl})?> createPanoramaVideoJob({
+    required String propertyId,
+    required double hfov,
+    required double vfov,
+    required List<Map<String, double>> poseTimeline,
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/panorama', {
+      'propertyId': propertyId,
+      'captureMode': 'video',
+      'hfov': hfov,
+      'vfov': vfov,
+      'poseTimeline': poseTimeline,
+    });
+    final data = res['data'] as Map<String, dynamic>?;
+    final jobId = data?['jobId'] as String?;
+    final url = data?['videoUploadUrl'] as String?;
+    if (jobId == null || url == null || url.isEmpty) return null;
+    return (jobId: jobId, videoUploadUrl: url);
+  }
+
+  /// PUT the transcoded mp4 bytes straight to the presigned video URL with
+  /// `Content-Type: video/mp4`. Returns success. Thin alias over
+  /// [uploadToPresignedUrl] so the contract reads clearly at the call site.
+  Future<bool> uploadVideoToPresigned(String uploadUrl, String localPath) =>
+      uploadToPresignedUrl(uploadUrl, localPath, contentType: 'video/mp4');
+
   /// Kick off the (async) stitch once all frames are uploaded.
   Future<void> startPanoramaStitch(String jobId) =>
       post('/panorama/$jobId/stitch', const {});

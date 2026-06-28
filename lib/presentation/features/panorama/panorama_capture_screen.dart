@@ -8,6 +8,7 @@ import 'package:dating_app/presentation/features/panorama/panorama_map_placement
 import 'package:dating_app/presentation/features/panorama/panorama_pole_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sweep_capture.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_video_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -113,11 +114,35 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
     if (choice == null || !mounted) return;
 
-    if (choice == _CaptureChoice.sweep) {
-      await _captureWithSweep();
-    } else {
-      await _importFromGallery();
+    switch (choice) {
+      case _CaptureChoice.video:
+        await _captureWithVideo();
+      case _CaptureChoice.sweep:
+        await _captureWithSweep();
+      case _CaptureChoice.gallery:
+        await _importFromGallery();
     }
+  }
+
+  // PRIMARY (default): the in-app "record while turning" video capture. The video
+  // screen records, samples a pose timeline, uploads the video + poses, runs the
+  // server stitch, and returns a finished [PanoramaSweepResult] — we add it as a
+  // node EXACTLY like the sweep/import result (same _addNode call).
+  Future<void> _captureWithVideo() async {
+    final result = await Navigator.of(context).push<PanoramaSweepResult>(
+      MaterialPageRoute(builder: (_) => const PanoramaVideoCaptureScreen()),
+    );
+    if (result == null || !mounted) return;
+
+    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    if (label == null || !mounted) return;
+    // Already uploaded + stitched by the video screen — add it directly.
+    await _addNode(
+      url: result.imageUrl,
+      label: label,
+      haov: result.haov,
+      vaov: result.vaov,
+    );
   }
 
   // PRIMARY: in-app guided 360° camera sweep. The sweep screen captures frames,
@@ -703,7 +728,9 @@ class _NodeTile extends StatelessWidget {
 }
 
 /// Which capture path the landlord chose on the guide screen.
-enum _CaptureChoice { sweep, gallery }
+/// [video] = record a clip while turning (PRIMARY default), [sweep] = the
+/// frame-by-frame guided sweep (advanced), [gallery] = import a native pano.
+enum _CaptureChoice { video, sweep, gallery }
 
 /// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
 /// older, non-technical user: the in-app guided sweep now lands one full 360°
@@ -787,8 +814,8 @@ class _PanoramaGuideScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // PRIMARY (default): the in-app guided sweep. One slow spin → one full
-            // 360° ring (yaw/gyro/blur/crop fixed + pose-assisted stitching).
+            // PRIMARY (default): record a short video while turning once. The
+            // simplest flow for an older user — just press record and spin.
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
               child: SizedBox(
@@ -799,18 +826,17 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 17),
                   ),
                   onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.sweep),
-                  icon: const Icon(IconsaxPlusBold.camera, size: 22),
-                  label: const Text('צלם עכשיו — בתוך האפליקציה',
+                      Navigator.of(context).pop(_CaptureChoice.video),
+                  icon: const Icon(IconsaxPlusBold.video, size: 22),
+                  label: const Text('צלם עכשיו — סרטון מסתובב',
                       style:
                           TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                 ),
               ),
             ),
-            // SECONDARY: import a panorama already shot in the phone's native
-            // camera. A clear, easy-to-find fallback — not the default.
+            // SECONDARY: the frame-by-frame guided sweep, for users who want it.
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -820,11 +846,30 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.gallery),
-                  icon: const Icon(IconsaxPlusLinear.gallery, size: 20),
-                  label: const Text('כבר צילמתי פנורמה — ייבא תמונה',
+                      Navigator.of(context).pop(_CaptureChoice.sweep),
+                  icon: const Icon(IconsaxPlusBold.camera, size: 20),
+                  label: const Text('צילום מתקדם — תמונה אחר תמונה',
                       style:
                           TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                ),
+              ),
+            ),
+            // FALLBACK: import a panorama already shot in the phone's native camera.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () =>
+                      Navigator.of(context).pop(_CaptureChoice.gallery),
+                  icon: const Icon(IconsaxPlusLinear.gallery, size: 20),
+                  label: const Text('כבר צילמתי — ייבא תמונה',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 ),
               ),
             ),

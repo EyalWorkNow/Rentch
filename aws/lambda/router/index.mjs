@@ -1303,12 +1303,40 @@ async function putPanoMeta(jobId, meta) {
 async function createPanorama(event) {
   const body = event.body ? JSON.parse(event.body) : {};
   const propertyId = sanitizeId(body.propertyId || 'prop');
-  // Allocate exactly as many frame slots as the client will upload (cv2 needs ≥2).
-  // Must NOT clamp up — extra unfilled slots become missing keys the stitcher 404s on.
-  const frameCount = Math.max(2, Math.min(60, Number(body.frameCount) || 16));
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 10);
   const jobId = `pano_${ts}_${rand}`;
+
+  // ── Video capture mode ────────────────────────────────────────────────────
+  // The app recorded one mp4 while rotating in place plus a gyro pose timeline
+  // [{tMs, yaw, pitch}]. We presign ONE video PUT and stash the timeline + FOVs
+  // in the job meta; the stitch Lambda extracts the sharpest keyframe per yaw
+  // bucket, attaches the interpolated pose, and feeds the existing pose-assisted
+  // projector. (Same contract the photo path uses, just a better frame source.)
+  if (body.captureMode === 'video') {
+    const videoKey = `panoramas/jobs/${jobId}/video.mp4`;
+    const videoUploadUrl = await getSignedUrl(
+      s3,
+      new PutObjectCommand({ Bucket: S3_BUCKET, Key: videoKey, ContentType: 'video/mp4' }),
+      { expiresIn: 21600 },
+    );
+    const resultKey = `panoramas/results/${jobId}.jpg`;
+    await putPanoMeta(jobId, {
+      jobId, propertyId, resultKey,
+      captureMode: 'video',
+      videoKey,
+      poseTimeline: Array.isArray(body.poseTimeline) ? body.poseTimeline : [],
+      hfov: Number(body.hfov) || 0,
+      vfov: Number(body.vfov) || 0,
+      status: 'pending', createdAt: ts,
+    });
+    return json(200, { data: { jobId, videoUploadUrl } });
+  }
+
+  // ── Photo capture mode (unchanged) ────────────────────────────────────────
+  // Allocate exactly as many frame slots as the client will upload (cv2 needs ≥2).
+  // Must NOT clamp up — extra unfilled slots become missing keys the stitcher 404s on.
+  const frameCount = Math.max(2, Math.min(60, Number(body.frameCount) || 16));
 
   const frameKeys = [];
   const uploadUrls = [];
@@ -1344,6 +1372,32 @@ async function stitchPanorama(jobId, event) {
     return json(200, { data: panoData(failed) });
   }
   await putPanoMeta(jobId, { ...meta, status: 'processing', processedAt: Date.now() });
+
+  // ── Video capture mode ────────────────────────────────────────────────────
+  // Hand the stitcher the recorded video + pose timeline; it picks the sharpest
+  // keyframe per yaw bucket, attaches each frame's interpolated pose, and runs
+  // the same pose-assisted projector the photo path uses.
+  if (meta.captureMode === 'video') {
+    await lambda.send(new InvokeCommand({
+      FunctionName: PANO_STITCH_FN,
+      InvocationType: 'Event',
+      Payload: Buffer.from(JSON.stringify({
+        bucket: S3_BUCKET,
+        metaKey: `panoramas/meta/${jobId}.json`,
+        videoKey: meta.videoKey,
+        resultKey: meta.resultKey,
+        captureMode: 'video',
+        poseTimeline: meta.poseTimeline || [],
+        hfov: meta.hfov,
+        vfov: meta.vfov,
+        meta: {
+          jobId, propertyId: meta.propertyId, videoKey: meta.videoKey,
+          resultKey: meta.resultKey, createdAt: meta.createdAt,
+        },
+      })),
+    }));
+    return json(200, { data: { jobId, status: 'processing' } });
+  }
 
   // Pose-assisted stitching: the app may send a top-level `poses` array on the
   // stitch request, parallel to the frames (poses[i] ↔ frame f{i}), each
