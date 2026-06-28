@@ -120,6 +120,7 @@ class _PanoramaSweepCaptureScreenState
   int _runStartMs = 0; // when the current row's sweep started
   bool _gotGyro = false; // any gyro event ever seen
   final _yawNotifier = ValueNotifier<double>(0); // drives the live ring/hint
+  final _lastFrameNotifier = ValueNotifier<String?>(null); // last captured frame path
 
   double get _stepDeg => 360 / _rows[_rowIndex].frames;
 
@@ -277,6 +278,7 @@ class _PanoramaSweepCaptureScreenState
           'pose/frame misalignment: ${_poses.length} poses vs ${_frames.length} frames');
       _lastCaptureYaw = _yawDeg;
       _lastSampleMs = _clock.elapsedMilliseconds;
+      _lastFrameNotifier.value = file.path; // show the user the frame just captured
       HapticFeedback.lightImpact();
       if (mounted) {
         setState(() {
@@ -437,6 +439,7 @@ class _PanoramaSweepCaptureScreenState
     _gyro?.cancel();
     _accel?.cancel();
     _yawNotifier.dispose();
+    _lastFrameNotifier.dispose();
     // Delete the temp JPEG frames we wrote during the sweep — they'd otherwise
     // leak in systemTemp until the OS clears it. Fire-and-forget; errors logged.
     for (final path in _frames) {
@@ -478,15 +481,68 @@ class _PanoramaSweepCaptureScreenState
             Center(
               child: ValueListenableBuilder<double>(
                 valueListenable: _yawNotifier,
-                builder: (_, yaw, __) => CustomPaint(
-                  size: const Size(220, 220),
-                  painter: _RingPainter(
-                    yawDeg: yaw,
-                    stepDeg: _stepDeg,
-                    done: _rowDone,
-                    target: row.frames,
+                builder: (_, yaw, __) => SizedBox(
+                  width: 220,
+                  height: 220,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        size: const Size(220, 220),
+                        painter: _RingPainter(
+                          yawDeg: yaw,
+                          stepDeg: _stepDeg,
+                          done: _rowDone,
+                          target: row.frames,
+                        ),
+                      ),
+                      // live degrees readout — "how many degrees you've closed"
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('${yaw.clamp(0, 360).toInt()}°',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 46,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.0)),
+                          const SizedBox(height: 2),
+                          const Text('סגרת · מתוך 360°',
+                              style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+              ),
+            ),
+
+          // last captured frame — shows the user the frame just grabbed
+          if (_cam != null && _error == null && _running)
+            Positioned(
+              right: 16,
+              bottom: 170,
+              child: ValueListenableBuilder<String?>(
+                valueListenable: _lastFrameNotifier,
+                builder: (_, path, __) => (path == null)
+                    ? const SizedBox.shrink()
+                    : Container(
+                        width: 66,
+                        height: 88,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black54, blurRadius: 8),
+                          ],
+                        ),
+                        child: Image.file(File(path),
+                            key: ValueKey(path), fit: BoxFit.cover),
+                      ),
               ),
             ),
 
