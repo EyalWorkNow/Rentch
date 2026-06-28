@@ -1102,7 +1102,10 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         try {
           final info = await VideoCompress.compressVideo(
             files.first.path,
-            quality: VideoQuality.HighestQuality,
+            // ponytail: MediumQuality ≈ 720p low-bitrate (~5–15MB/30s) — reliable
+            // mobile upload + plenty for KIRI frame extraction. HighestQuality
+            // ballooned a 30s clip to ~72MB and the S3 upload kept failing.
+            quality: VideoQuality.MediumQuality,
             deleteOrigin: false,
             includeAudio: false,
           );

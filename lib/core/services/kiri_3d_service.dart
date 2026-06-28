@@ -126,8 +126,17 @@ class Kiri3dService {
   Future<bool> uploadCapture(String uploadUrl, File file) async {
     if (uploadUrl.trim().isEmpty) return false;
     if (!file.existsSync()) return false;
-
     final size = await file.length();
+    // ponytail: 3 attempts — one mobile-network hiccup shouldn't fail the scan
+    // (this was the silent killer: a dropped PUT → false → generic UI error).
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      if (await _putOnce(uploadUrl, file, size)) return true;
+      if (attempt < 3) await Future<void>.delayed(Duration(seconds: attempt * 2));
+    }
+    return false;
+  }
+
+  Future<bool> _putOnce(String uploadUrl, File file, int size) async {
     final client = HttpClient();
     try {
       final req = await client
