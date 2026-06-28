@@ -1091,27 +1091,30 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
     _run();
   }
 
+  // A raw recording (iOS HEVC ~72MB/30s) loses the S3 upload race on cellular,
+  // so the job never starts. We MUST transcode down before uploading — never
+  // fall back to the giant original. Above this, abort with a clear message.
+  static const int _maxUploadBytes = 40 * 1024 * 1024; // ~40MB
+
   Future<void> _run() async {
     try {
       // iOS records HEVC/.mov, which KIRI rejects (uploads fine but fails
-      // reconstruction). Transcode to H.264 mp4 first. Fail-soft: fall back to
-      // the original file if transcoding is unavailable rather than blocking.
+      // reconstruction). Transcode to a small H.264 mp4 first. This is NOT
+      // fail-soft: if we can't produce a sane-sized file we abort with a clear
+      // message rather than silently uploading a 72MB raw clip that 403s out.
       var files = widget.files;
       if (files.isNotEmpty) {
         if (mounted) setState(() => _stage = 'מכינים את הסרטון…');
-        try {
-          final info = await VideoCompress.compressVideo(
-            files.first.path,
-            // ponytail: MediumQuality ≈ 720p low-bitrate (~5–15MB/30s) — reliable
-            // mobile upload + plenty for KIRI frame extraction. HighestQuality
-            // ballooned a 30s clip to ~72MB and the S3 upload kept failing.
-            quality: VideoQuality.MediumQuality,
-            deleteOrigin: false,
-            includeAudio: false,
-          );
-          final out = info?.path;
-          if (out != null && out.trim().isNotEmpty) files = [File(out)];
-        } catch (_) {/* keep the original recording */}
+        final prepared = await _prepareVideo(files.first);
+        if (prepared == null) {
+          if (!mounted) return;
+          setState(() {
+            _failed = true;
+            _failMessage = 'לא הצלחנו להכין את הסרטון — נסו שוב.';
+          });
+          return;
+        }
+        files = [prepared];
       }
       final job = await Kiri3dService.instance.runScan(
         propertyId: widget.propertyId,
@@ -1128,10 +1131,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
       if (!mounted) return;
       setState(() {
         _failed = true;
-        _failMessage = e.isUnauthorized || e.statusCode == 503
-            ? 'התכונה תיפתח בקרוב.'
-            : 'בניית החדר נכשלה. נסו לצלם שוב באור טוב, '
-                'ולסובב לאט בכל החדר.';
+        _failMessage = _failMessageFor(e);
       });
     } catch (_) {
       if (!mounted) return;
@@ -1140,6 +1140,66 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         _failMessage = 'משהו השתבש. נסו שוב.';
       });
     }
+  }
+
+  /// Transcodes [source] to a small H.264 mp4 suitable for a reliable mobile
+  /// upload. Retries once on failure. Returns the prepared file, or null if we
+  /// couldn't produce a sane-sized file (caller shows a clear error and never
+  /// uploads the raw original).
+  Future<File?> _prepareVideo(File source) async {
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final info = await VideoCompress.compressVideo(
+          source.path,
+          // MediumQuality ≈ 720p low-bitrate (~5–15MB/30s): reliable mobile
+          // upload + plenty of detail for KIRI frame extraction. HighestQuality
+          // ballooned a 30s clip to ~72MB and the S3 upload kept failing.
+          quality: VideoQuality.MediumQuality,
+          deleteOrigin: false,
+          includeAudio: false,
+        );
+        final out = info?.path;
+        if (out == null || out.trim().isEmpty) {
+          debugPrint('room_scan_flow: transcode returned null (attempt $attempt)');
+          continue;
+        }
+        final file = File(out);
+        final size = await file.length();
+        debugPrint('room_scan_flow: transcoded to ${size ~/ 1024}KB (attempt $attempt)');
+        if (size > _maxUploadBytes) {
+          // Still too big to upload reliably — abort rather than lose the race.
+          debugPrint('room_scan_flow: transcode still >${_maxUploadBytes ~/ (1024 * 1024)}MB, aborting');
+          return null;
+        }
+        return file;
+      } catch (e) {
+        debugPrint('room_scan_flow: transcode failed (attempt $attempt): $e');
+      }
+    }
+    return null;
+  }
+
+  static String _failMessageFor(Kiri3dException e) {
+    final code = e.statusCode;
+    // runScan tags upload failures with "Failed to upload capture …": a 403/401
+    // here is an EXPIRED/rejected presigned S3 PUT (not an app-auth gate), a 5xx
+    // is S3 server trouble, and a null code means the PUT never reached a server.
+    if (e.message.contains('upload')) {
+      if (code == 403 || code == 401) {
+        return 'פג תוקף ההעלאה. נסו שוב — הפעם זה יעלה מהר יותר.';
+      }
+      if (code != null && code >= 500) {
+        return 'תקלת שרת בהעלאה. נסו שוב עוד רגע.';
+      }
+      return 'ההעלאה נכשלה בגלל החיבור. בדקו את האינטרנט ונסו שוב.';
+    }
+    // Otherwise the code comes from OUR API (createJob/start): 401/403 = auth,
+    // 503 = not-yet-configured → feature gate.
+    if (e.isUnauthorized || code == 503) {
+      return 'התכונה תיפתח בקרוב.';
+    }
+    return 'בניית החדר נכשלה. נסו לצלם שוב באור טוב, '
+        'ולסובב לאט בכל החדר.';
   }
 
   static String _stageLabel(Scan3dStatus status) {

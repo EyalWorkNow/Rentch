@@ -46,6 +46,31 @@ def _put_meta(s3, bucket, meta_key, meta):
     )
 
 
+def _crop_black(pano):
+    """A spherical-warp stitch is a curved/banana strip: its canvas corners and
+    concave arcs are pure black (0,0,0) padding. Ship that uncropped and the
+    viewer stretches black across the sphere. So: (1) bbox-crop to the non-black
+    region, then (2) inpaint any black that survives *inside* that bbox (the
+    concave top/bottom arcs), so no zero pixel reaches the JPEG. Returns the
+    cleaned pano; raises if the frame is entirely black."""
+    gray = cv2.cvtColor(pano, cv2.COLOR_BGR2GRAY)
+    ys, xs = np.where(gray > 0)
+    if ys.size == 0:
+        raise RuntimeError("stitched pano is entirely black")
+    y0, y1 = int(ys.min()), int(ys.max())
+    x0, x1 = int(xs.min()), int(xs.max())
+    pano = pano[y0:y1 + 1, x0:x1 + 1]
+
+    # Interior black (the concave arcs left after a rectangular bbox crop). Mask
+    # the zeros and inpaint them from surrounding real pixels so nothing black
+    # survives to encode.
+    gray = cv2.cvtColor(pano, cv2.COLOR_BGR2GRAY)
+    holes = (gray == 0).astype(np.uint8)
+    if holes.any():
+        pano = cv2.inpaint(pano, holes, 3, cv2.INPAINT_TELEA)
+    return pano
+
+
 def stitch(images):
     """Stitch overlapping frames into one wide panorama. Returns (pano, haov, vaov)
     or raises on failure. Pure-ish (no S3) so it can be unit-tested locally."""
@@ -56,6 +81,10 @@ def stitch(images):
     if status != cv2.Stitcher_OK:
         raise RuntimeError(f"stitch failed (status {status})")
 
+    # Strip the black warp-padding *before* deriving FOV — otherwise vaov is
+    # measured off a black-inflated bounding box and the viewer stretches emptiness.
+    pano = _crop_black(pano)
+
     h, w = pano.shape[:2]
     if w > MAX_W:
         scale = MAX_W / w
@@ -63,10 +92,19 @@ def stitch(images):
                           interpolation=cv2.INTER_AREA)
         h, w = pano.shape[:2]
 
-    haov = ASSUMED_HAOV
-    # Equirectangular relationship: degrees-per-pixel is equal on both axes, so the
-    # vertical FOV the strip covers follows from its pixel aspect ratio.
-    vaov = min(180.0, haov * (h / w))
+    # Honest FOV from the *cropped* pixels. Equirectangular degrees-per-pixel is
+    # equal on both axes, so once we fix the horizontal span we get the vertical
+    # span from the pixel aspect ratio. The cropped strip rarely spans a true
+    # 360°; cap haov at the assumption but never claim more pan than the aspect
+    # ratio can carry given the (clamped) vaov, so the returned haov/vaov always
+    # match the cropped pixels.
+    haov = min(ASSUMED_HAOV, 360.0)
+    vaov = haov * (h / w)
+    if vaov > 180.0:
+        # Aspect ratio implies more vertical than a sphere holds: clamp vaov and
+        # re-derive haov so the pair stays consistent with the pixel ratio.
+        vaov = 180.0
+        haov = min(haov, vaov * (w / h))
     return pano, haov, vaov
 
 

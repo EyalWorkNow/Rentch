@@ -67,13 +67,17 @@ const _rows = <_Row>[
 
 const _total = 42; // sum of _rows[].frames — keep in sync
 const _sampleEveryMs = 700; // timer fallback only (no gyro)
-const _maxSpinDegPerSec = 90; // faster than this → motion blur, skip the frame
+// Gate capture on a near-STILL phone: above this the frame is smeared. Tight
+// (was 90) because we now measure true world-yaw rate, so frames land between
+// turns instead of mid-motion.
+const _maxSpinDegPerSec = 14;
 const _minStepGapMs = 120; // encode back-pressure floor between captures
 
 class _PanoramaSweepCaptureScreenState
     extends State<PanoramaSweepCaptureScreen> {
   CameraController? _cam;
   StreamSubscription<GyroscopeEvent>? _gyro;
+  StreamSubscription<AccelerometerEvent>? _accel;
   String? _error;
   // Stitch phase (after capture): a full-screen "building your tour" overlay.
   bool _stitching = false;
@@ -91,8 +95,11 @@ class _PanoramaSweepCaptureScreenState
   // gyro yaw integration (per row)
   double _yawDeg = 0; // |accumulated| yaw since this row started
   double _lastCaptureYaw = 0; // yaw at the previous captured frame
-  double _spinRate = 0; // deg/s (for too-fast / stalled hints)
+  double _spinRate = 0; // deg/s about world-up (for too-fast / stalled hints)
   int _lastGyroUs = 0;
+  // Gravity unit vector in device frame, from the accelerometer. Lets us project
+  // the gyro onto world-up so yaw is correct even when the phone is tilted ~30°.
+  double _gx = 0, _gy = -1, _gz = 0; // default: upright portrait (gravity ≈ -Y)
   int _runStartMs = 0; // when the current row's sweep started
   bool _gotGyro = false; // any gyro event ever seen
   final _yawNotifier = ValueNotifier<double>(0); // drives the live ring/hint
@@ -103,14 +110,28 @@ class _PanoramaSweepCaptureScreenState
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-    // yaw integration assumes an upright phone — lock portrait so device-Z ≈ world-yaw
+    // Lock portrait for a stable preview/UI. Yaw no longer assumes an upright
+    // phone: we project the gyro onto the gravity (world-up) axis (_onAccel).
     SystemChrome.setPreferredOrientations(
         [DeviceOrientation.portraitUp]);
     _clock.start();
+    // Self-check the gravity-projection math: a pure horizontal turn of an
+    // upright portrait phone (gyro = +Y, gravity = -Y) must project to a yaw
+    // rate of magnitude 1 (full turn registers), while a screen-normal twist
+    // (gyro = +Z) must project to ~0 (the old buggy axis).
+    assert(() {
+      double dot(List<double> a, List<double> b) =>
+          a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      final gravity = [0.0, -1.0, 0.0]; // upright portrait
+      final yawCapture = dot([0.0, 1.0, 0.0], gravity).abs(); // turning
+      final spinNormal = dot([0.0, 0.0, 1.0], gravity).abs(); // screen twist
+      return (yawCapture - 1).abs() < 1e-9 && spinNormal < 1e-9;
+    }());
     _init();
   }
 
   Future<void> _init() async {
+    CameraController? ctrl;
     try {
       final cams = await availableCameras();
       if (cams.isEmpty) throw StateError('no camera');
@@ -118,24 +139,72 @@ class _PanoramaSweepCaptureScreenState
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cams.first,
       );
-      // medium keeps on-device YUV→JPEG fast enough that the preview stays smooth.
-      // ponytail: convert on the main isolate; if it janks, move _encode to compute().
-      final ctrl =
-          CameraController(back, ResolutionPreset.medium, enableAudio: false);
+      // veryHigh for crisp stitch input. We capture only when near-still (the
+      // tight spin gate), so the heavier YUV→JPEG encode doesn't fight a moving
+      // preview. ponytail: encode on the main isolate; if it janks, → compute().
+      ctrl =
+          CameraController(back, ResolutionPreset.veryHigh, enableAudio: false);
       await ctrl.initialize();
       if (!mounted) {
         await ctrl.dispose();
         return;
       }
+      // Lock focus + exposure + orientation so frames don't hunt/refocus or
+      // re-expose mid-sweep — the biggest source of blur and seams. Each lock
+      // is best-effort: some devices reject one mode but the rest still help.
+      await _lockCamera(ctrl);
       await ctrl.startImageStream(_onFrame);
       _gyro = gyroscopeEventStream().listen(_onGyro);
+      _accel = accelerometerEventStream().listen(_onAccel);
       setState(() => _cam = ctrl);
-    } catch (_) {
-      if (mounted) setState(() => _error = 'לא ניתן לפתוח את המצלמה');
+    } catch (e) {
+      debugPrint('panorama camera init failed: $e');
+      // Dispose the half-built controller so the failure doesn't leak it.
+      try {
+        await ctrl?.dispose();
+      } catch (e2) {
+        debugPrint('panorama controller dispose after init-fail: $e2');
+      }
+      if (mounted) {
+        setState(() => _error = 'לא ניתן לפתוח את המצלמה. בדוק הרשאות מצלמה.');
+      }
     }
   }
 
-  // Integrate angular velocity about the device's screen-normal (≈ yaw upright).
+  // Best-effort focus/exposure/orientation lock. Wrapped per-call: a device that
+  // rejects one mode still gets the others, and we never abort init over it.
+  Future<void> _lockCamera(CameraController ctrl) async {
+    Future<void> tryLock(String what, Future<void> Function() f) async {
+      try {
+        await f();
+      } catch (e) {
+        debugPrint('panorama lock $what failed: $e');
+      }
+    }
+
+    await tryLock('orientation',
+        () => ctrl.lockCaptureOrientation(DeviceOrientation.portraitUp));
+    await tryLock('focus', () => ctrl.setFocusMode(FocusMode.locked));
+    await tryLock('exposure', () => ctrl.setExposureMode(ExposureMode.locked));
+  }
+
+  // Track gravity (world-up) in the device frame so we can find the true yaw
+  // axis regardless of tilt. The accelerometer at rest reads ≈ +g along up, so
+  // its unit vector IS the world-up direction expressed in device coordinates.
+  void _onAccel(AccelerometerEvent e) {
+    final m = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
+    if (m < 1e-3) return; // free-fall / bogus sample — keep last good gravity
+    _gx = e.x / m;
+    _gy = e.y / m;
+    _gz = e.z / m;
+  }
+
+  // Integrate angular velocity about WORLD-UP. The yaw rate is the component of
+  // the gyro vector along the gravity unit vector: yawRate = gyro · gravityUnit.
+  // For an upright portrait phone gravity ≈ -Y, so this picks up e.y (a real
+  // horizontal turn), NOT e.z (screen-normal, ≈0 during a turn → the old ~3×
+  // under-count). Stays correct when tilted ~30° for rows 2/3, where any single
+  // fixed axis under-counts by ~cos30°.
   void _onGyro(GyroscopeEvent e) {
     _gotGyro = true;
     final now = _clock.elapsedMicroseconds;
@@ -146,8 +215,10 @@ class _PanoramaSweepCaptureScreenState
       return;
     }
     final dt = (now - last) / 1e6;
-    _spinRate = e.z.abs() * 180 / math.pi;
-    _yawDeg += (e.z * 180 / math.pi * dt).abs(); // abs → direction-agnostic
+    // dot(gyro, gravityUnit) — angular velocity (rad/s) about world-up.
+    final yawRate = e.x * _gx + e.y * _gy + e.z * _gz;
+    _spinRate = yawRate.abs() * 180 / math.pi;
+    _yawDeg += (yawRate * 180 / math.pi * dt).abs(); // abs → direction-agnostic
     _yawNotifier.value = _yawDeg;
   }
 
@@ -188,8 +259,8 @@ class _PanoramaSweepCaptureScreenState
         });
         if (_rowDone >= row.frames) setState(() => _running = false);
       }
-    } catch (_) {
-      // skip a bad frame; keep sweeping
+    } catch (e) {
+      debugPrint('panorama frame encode/write skipped: $e'); // drop, keep sweeping
     } finally {
       _converting = false;
     }
@@ -297,7 +368,8 @@ class _PanoramaSweepCaptureScreenState
         setState(() => _stitchMsg = 'מחברים את התמונות לסיבוב מלא...');
       }
       _failStitch('העיבוד לוקח יותר מדי זמן. נסה שוב מאוחר יותר.');
-    } catch (_) {
+    } catch (e) {
+      debugPrint('panorama stitch failed: $e');
       _failStitch('משהו השתבש. בדוק את החיבור ונסה שוב.');
     }
   }
@@ -325,7 +397,16 @@ class _PanoramaSweepCaptureScreenState
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _gyro?.cancel();
+    _accel?.cancel();
     _yawNotifier.dispose();
+    // Delete the temp JPEG frames we wrote during the sweep — they'd otherwise
+    // leak in systemTemp until the OS clears it. Fire-and-forget; errors logged.
+    for (final path in _frames) {
+      File(path).delete().catchError((Object e) {
+        debugPrint('panorama temp frame delete failed: $e');
+        return File(path);
+      });
+    }
     final c = _cam;
     if (c != null) {
       // stop the stream before disposing, else the plugin throws on teardown
@@ -535,10 +616,12 @@ class _PanoramaSweepCaptureScreenState
   }
 
   String _coachText() {
-    if (!_gotGyro) return 'סובב לאט במקום · עצור רגע בכל צעד';
-    if (_spinRate > _maxSpinDegPerSec) return 'סובב לאט יותר 🐢';
-    if (_spinRate < 5) return 'התחל לסובב את הגוף לאט במקום';
-    return 'יופי — שמור על קצב אחיד';
+    // Frames are grabbed when the phone is near-STILL, so coach stop-and-go:
+    // turn a step, pause for the snap, repeat.
+    if (!_gotGyro) return 'סובב צעד · עצור · חזור על כך סביב';
+    if (_spinRate > _maxSpinDegPerSec) return 'עצור רגע כדי לצלם 🐢';
+    if (_yawDeg - _lastCaptureYaw >= _stepDeg) return 'יופי — עצור רגע';
+    return 'סובב צעד קטן והמשך';
   }
 
   Widget _actionButton() {

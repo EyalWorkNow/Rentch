@@ -122,21 +122,39 @@ class Kiri3dService {
 
   /// Streams [file] to its presigned [uploadUrl] (no auth header on the
   /// presigned PUT). Streams from disk so large video sweeps don't OOM, with a
-  /// size-based timeout. Returns true on success.
+  /// size-based timeout. Throws [Kiri3dException] on failure, attaching the HTTP
+  /// [statusCode] of the last attempt when the PUT actually reached S3 (e.g. a
+  /// 403 from an expired presigned URL) so the UI can show a truthful message
+  /// instead of a generic "film again".
   Future<bool> uploadCapture(String uploadUrl, File file) async {
-    if (uploadUrl.trim().isEmpty) return false;
-    if (!file.existsSync()) return false;
+    if (uploadUrl.trim().isEmpty) {
+      throw const Kiri3dException('Upload URL is empty');
+    }
+    if (!file.existsSync()) {
+      throw const Kiri3dException('Capture file does not exist');
+    }
     final size = await file.length();
     // ponytail: 3 attempts — one mobile-network hiccup shouldn't fail the scan
     // (this was the silent killer: a dropped PUT → false → generic UI error).
+    int? lastStatus;
     for (var attempt = 1; attempt <= 3; attempt++) {
-      if (await _putOnce(uploadUrl, file, size)) return true;
+      final status = await _putOnce(uploadUrl, file, size);
+      if (status != null && status < 300) return true;
+      lastStatus = status;
       if (attempt < 3) await Future<void>.delayed(Duration(seconds: attempt * 2));
     }
-    return false;
+    // lastStatus is non-null when the PUT reached S3 (real HTTP status, e.g.
+    // 403 expired / 401 auth / 5xx server); null when it never connected
+    // (network/timeout) — keep statusCode null so the UI can distinguish.
+    throw Kiri3dException(
+      'Upload failed${lastStatus != null ? ' (HTTP $lastStatus)' : ''}',
+      statusCode: lastStatus,
+    );
   }
 
-  Future<bool> _putOnce(String uploadUrl, File file, int size) async {
+  /// Performs one PUT. Returns the HTTP status code, or null if the request
+  /// never produced a response (network failure / timeout).
+  Future<int?> _putOnce(String uploadUrl, File file, int size) async {
     final client = HttpClient();
     try {
       final req = await client
@@ -147,10 +165,13 @@ class Kiri3dService {
       await req.addStream(file.openRead()).timeout(_uploadTimeoutFor(size));
       final resp = await req.close().timeout(const Duration(seconds: 120));
       await resp.drain<void>();
-      return resp.statusCode < 300;
+      if (kDebugMode && resp.statusCode >= 300) {
+        debugPrint('Kiri3dService.uploadCapture: HTTP ${resp.statusCode}');
+      }
+      return resp.statusCode;
     } catch (e) {
       if (kDebugMode) debugPrint('Kiri3dService.uploadCapture: $e');
-      return false;
+      return null;
     } finally {
       client.close();
     }
@@ -249,10 +270,15 @@ class Kiri3dService {
         ? files.length
         : created.uploadUrls.length;
     for (var i = 0; i < count; i++) {
-      final ok = await uploadCapture(created.uploadUrls[i], files[i]);
-      if (!ok) {
+      try {
+        await uploadCapture(created.uploadUrls[i], files[i]);
+      } on Kiri3dException catch (e) {
+        // Preserve the HTTP status code (expiry/auth/server) so the UI can show
+        // a truthful message rather than "film again".
         throw Kiri3dException(
-            'Failed to upload capture ${i + 1} of $count');
+          'Failed to upload capture ${i + 1} of $count: ${e.message}',
+          statusCode: e.statusCode,
+        );
       }
     }
 

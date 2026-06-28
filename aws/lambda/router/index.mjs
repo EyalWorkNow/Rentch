@@ -1430,7 +1430,8 @@ async function createScan3d(event) {
     uploadUrls.push(await getSignedUrl(
       s3,
       new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'video/mp4' }),
-      { expiresIn: 3600 },
+      // 6h: a slow mobile video upload (tens of MB on cellular) must not 403 mid-flight.
+      { expiresIn: 21600 },
     ));
   } else {
     // KIRI needs 20–300 images. Trust the client's count but clamp to the API range.
@@ -1441,7 +1442,8 @@ async function createScan3d(event) {
       uploadUrls.push(await getSignedUrl(
         s3,
         new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'image/jpeg' }),
-        { expiresIn: 3600 },
+        // 6h: keep parity with video so a slow multi-image upload can't expire.
+        { expiresIn: 21600 },
       ));
     }
   }
