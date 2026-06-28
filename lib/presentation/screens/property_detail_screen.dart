@@ -111,15 +111,17 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               })
             : null;
         final branding = propertyBranding ?? provider.brokerBranding;
-        // Use property template if it exists (any viewer), OR if viewer is broker with custom branding
-        final useTemplate = propertyBranding != null ||
-            (provider.isBroker &&
-                provider.brokerBranding.propertyTemplate !=
-                    BrokerPropertyTemplate.rentlyClassic);
+        // A per-property design exists (any viewer), OR the viewer is a broker
+        // whose user-level branding chooses a non-classic template.
+        final useTemplate = propertyBranding != null || provider.isBroker;
 
-        // Always show template if property has custom design (applies to all viewers)
-        if (p.hasCustomDesign ||
-            (useTemplate && branding.propertyTemplate != BrokerPropertyTemplate.rentlyClassic)) {
+        // "rentlyClassic" is NOT a broker template — it IS the Classic layout
+        // rendered below. So we only enter the broker-template path when the
+        // RESOLVED template is something other than rentlyClassic. This makes
+        // choosing "קלאסי" actually render Classic (previously it silently fell
+        // through to Gallery Editorial).
+        if (useTemplate &&
+            branding.propertyTemplate != BrokerPropertyTemplate.rentlyClassic) {
           return _BrokerPropertyDetailTemplate(
             property: p,
             branding: branding,
@@ -758,6 +760,9 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
       BrokerPropertyTemplate.estateCard => _buildEstateCard(context),
       BrokerPropertyTemplate.galleryEditorial => _buildGalleryEditorial(context),
       BrokerPropertyTemplate.cinematicGlass => _buildCinematicGlass(context),
+      // Unreachable: rentlyClassic is handled by the Classic Scaffold in
+      // PropertyDetailScreen.build and never reaches this broker-template
+      // widget. Kept only to satisfy switch exhaustiveness.
       BrokerPropertyTemplate.rentlyClassic => _buildGalleryEditorial(context),
     };
 

@@ -2977,8 +2977,47 @@ class DatingProvider extends ChangeNotifier {
     );
   }
 
+  /// Returns [filters] with the tenant profile's stated budget / rooms folded
+  /// in for the dimensions the user left at their default. A profile preference
+  /// only fills a gap — an explicit filter the user set always wins, so opening
+  /// the filter sheet still overrides the profile. Returns [filters] unchanged
+  /// when there is no profile or nothing to inherit (the common, fast path).
+  SearchFilters _effectiveScoringFilters(SearchFilters filters) {
+    final profile = _tenantProfile;
+    if (profile == null) return filters;
+
+    final type = filters.transactionType;
+    final hasExplicitMaxBudget =
+        filters.maxBudget < _defaultMaxBudgetFor(type);
+    final hasExplicitMinRooms = filters.minRooms > 0;
+
+    final inheritBudget =
+        !hasExplicitMaxBudget && profile.budgetMax >= _missingPriceThreshold;
+    final inheritRooms = !hasExplicitMinRooms && profile.desiredRooms > 0;
+    if (!inheritBudget && !inheritRooms) return filters;
+
+    final maxBudgetCeiling = _defaultMaxBudgetFor(type);
+    return filters.copyWith(
+      maxBudget: inheritBudget
+          ? profile.budgetMax.clamp(filters.minBudget, maxBudgetCeiling)
+          : filters.maxBudget,
+      // Use the profile's desired rooms as a soft floor; the existing rooms-fit
+      // curve rewards being at/above it and gently penalises being under.
+      minRooms: inheritRooms
+          ? _clampDouble(profile.desiredRooms, 0, _unsetMaxRooms)
+          : filters.minRooms,
+    );
+  }
+
   int _matchScoreForContext(RentalProperty p, _MatchContext context) {
-    final filters = context.filters;
+    // Fold the tenant profile's stated budget / rooms into the scoring filters
+    // when the user hasn't set those filters explicitly. Without this, a tenant
+    // whose PROFILE says "max ₪4,000 / 5 rooms" but who never opened the filter
+    // sheet would still see a property at ₪6,000 / 3 rooms scored as a full-fit
+    // — the displayed % would contradict their own profile. The gates below
+    // (required features / types / conditions / sources) keep using the user's
+    // real filters, so only the budget / rooms soft scores inherit the profile.
+    final filters = _effectiveScoringFilters(context.filters);
     if (!filters.requiredFeatures.every(p.features.contains)) {
       return 0;
     }
@@ -3050,17 +3089,60 @@ class DatingProvider extends ChangeNotifier {
       }
     }
 
-    final score = _budgetFitScore(p, filters) +
+    final structural = _budgetFitScore(p, filters) +
         _marketValueScore(p, context) +
         _locationScore(p, context) +
         _spaceFitScore(p, filters) +
         _moveInScore(p, filters, context.now) +
         _featureFitScore(p, context) +
         _listingConfidenceScore(p) +
-        _businessReadinessScore(p, context) +
-        tagCompatibilityScore;
+        _businessReadinessScore(p, context);
+
+    // The raw structural weights sum to ~108 at a perfect fit, so they alone
+    // clamp to 100 for almost any decent listing — which made the displayed
+    // "% התאמה" saturate and swallowed every persona/tag boost (the boost was
+    // applied above the ceiling and never showed). We compress the structural
+    // total into a sub-100 band so that:
+    //   • a perfect structural fit lands at [_structuralCeiling] (≈88), leaving
+    //     real headroom for IMPORTANT/shared-tag boosts to be visible, and
+    //   • the displayed number genuinely moves with how well the property fits
+    //     the user's budget / rooms / location / size / features.
+    // Persona deltas (tag compatibility, IMPORTANT boosts, CRITICAL penalties)
+    // are added AFTER compression so they shift the visible score rather than
+    // being absorbed by the clamp.
+    final compressed = _compressStructural(structural);
+    final score = compressed + tagCompatibilityScore;
 
     return _clampDouble(score, 0, 100).round();
+  }
+
+  // The theoretical maximum of the structural weights, used to normalise the
+  // raw sum before mapping it into the visible [0, _structuralCeiling] band.
+  static const double _maxStructuralScore = _budgetWeight +
+      _marketValueWeight +
+      _locationWeight +
+      _roomsWeight +
+      _sizeWeight +
+      _floorWeight +
+      _timingWeight +
+      _requiredFeatureWeight +
+      _preferredFeatureWeight +
+      _preferredPropertyTypeWeight +
+      _preferredConditionWeight +
+      _preferredListingSourceWeight +
+      _listingConfidenceWeight +
+      _businessReadinessWeight;
+
+  // A perfect structural fit maps to this score, reserving the remaining
+  // headroom up to 100 for honest persona/tag boosts.
+  static const double _structuralCeiling = 88;
+
+  /// Maps the raw structural sum (0.._maxStructuralScore) into 0.._structuralCeiling
+  /// so the base never saturates at 100 on its own and persona boosts stay
+  /// visible. Monotonic: a better structural fit always yields a higher result.
+  double _compressStructural(double structural) {
+    final ratio = _clampDouble(structural / _maxStructuralScore, 0, 1);
+    return ratio * _structuralCeiling;
   }
 
   /// Scores the property against the tenant's own persona choices when there is

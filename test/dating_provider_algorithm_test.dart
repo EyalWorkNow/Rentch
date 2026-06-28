@@ -552,6 +552,199 @@ void main() {
 
     provider.dispose();
   });
+
+  test('displayed % does not saturate: it moves with how many IMPORTANT '
+      'details the property satisfies', () async {
+    // Identical listings except for their features. With the old un-compressed
+    // base every one of these clamped to 100 and the IMPORTANT boost was eaten
+    // by the ceiling, so the badge was a meaningless "100% for everything".
+    final both = _property(id: 'both', features: const ['parking', 'elevator']);
+    final one = _property(id: 'one', features: const ['parking']);
+    final none = _property(id: 'none', features: const []);
+
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([both, one, none]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    const profile = TenantProfile(
+      id: 'tenant-imp',
+      name: 'Persona',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 0,
+      desiredRooms: 0,
+      moveInWindow: 'גמיש',
+      // חייב/ת חניה → parking, מעלית → elevator, both IMPORTANT (not critical).
+      importantDetails: ['חייב/ת חניה', 'מעלית'],
+    );
+    await provider.updateTenantProfile(profile);
+
+    final sBoth = provider.matchScore(both);
+    final sOne = provider.matchScore(one);
+    final sNone = provider.matchScore(none);
+
+    // Strictly monotonic in the number of satisfied IMPORTANT details.
+    expect(sBoth, greaterThan(sOne));
+    expect(sOne, greaterThan(sNone));
+    // And the score genuinely varies — it is NOT pinned at 100 for everything.
+    expect(sNone, lessThan(100));
+    expect(sBoth - sNone, greaterThanOrEqualTo(10),
+        reason: 'the IMPORTANT boost must be visible, not absorbed by a clamp');
+
+    provider.dispose();
+  });
+
+  test('profile budget is honoured even with no active filters: an '
+      'over-budget property scores below an in-budget one', () async {
+    final inBudget = _property(id: 'in-budget', price: 3800);
+    final overBudget = _property(id: 'over-budget', price: 6000);
+
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([inBudget, overBudget]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    // No filters touched — only the PROFILE states a max budget.
+    expect(provider.activeFilterCount, 0);
+    const profile = TenantProfile(
+      id: 'tenant-budget',
+      name: 'Budgeter',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 4000,
+      desiredRooms: 0,
+      moveInWindow: 'גמיש',
+      importantDetails: [],
+    );
+    await provider.updateTenantProfile(profile);
+
+    // hasMatchPersona is true (profile budget set) so the badge shows…
+    expect(provider.displayMatchScore(inBudget), isNotNull);
+    // …and it honestly reflects the profile budget rather than ignoring it.
+    expect(
+      provider.matchScore(overBudget),
+      lessThan(provider.matchScore(inBudget)),
+      reason: 'a 50%-over-budget listing must not match the profile budget',
+    );
+
+    provider.dispose();
+  });
+
+  test('profile rooms are honoured with no active filters: too-few-rooms '
+      'scores below a rooms match', () async {
+    final enoughRooms = _property(id: 'enough', rooms: 4);
+    final tooFewRooms = _property(id: 'too-few', rooms: 2);
+
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([enoughRooms, tooFewRooms]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    expect(provider.activeFilterCount, 0);
+    const profile = TenantProfile(
+      id: 'tenant-rooms',
+      name: 'Roomer',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 0,
+      desiredRooms: 4,
+      moveInWindow: 'גמיש',
+      importantDetails: [],
+    );
+    await provider.updateTenantProfile(profile);
+
+    expect(
+      provider.matchScore(tooFewRooms),
+      lessThan(provider.matchScore(enoughRooms)),
+      reason: 'a 2-room listing must not fully match a 4-room desire',
+    );
+
+    provider.dispose();
+  });
+
+  test('an explicit filter always overrides the profile preference', () async {
+    final mid = _property(id: 'mid', price: 6000);
+
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([mid]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    // Profile says max 4000 → with no filters, the 6000 listing is penalised.
+    const profile = TenantProfile(
+      id: 'tenant-override',
+      name: 'Override',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 4000,
+      desiredRooms: 0,
+      moveInWindow: 'גמיש',
+      importantDetails: [],
+    );
+    await provider.updateTenantProfile(profile);
+    final penalised = provider.matchScore(mid);
+
+    // The user explicitly widens the budget filter to 8000 → the listing is now
+    // comfortably in budget and the explicit filter wins over the stale profile.
+    await provider.updateFilters(
+      provider.filters.copyWith(maxBudget: 8000, minBudget: 600),
+    );
+    final widened = provider.matchScore(mid);
+
+    expect(widened, greaterThan(penalised),
+        reason: 'an explicit filter must override the profile preference');
+
+    provider.dispose();
+  });
+
+  test('a CRITICAL miss can never look like a strong match (< 80)', () async {
+    // Two over-budget, wrong-room, missing-feature listings to stress the gate.
+    final compliant = _property(
+      id: 'compliant',
+      price: 5000,
+      rooms: 3,
+      features: const ['parking', 'elevator'],
+    );
+    final violating = _property(
+      id: 'violating',
+      price: 5000,
+      rooms: 3,
+      features: const ['elevator'], // fails CRITICAL parking
+    );
+
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([compliant, violating]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    const profile = TenantProfile(
+      id: 'tenant-crit',
+      name: 'Critical',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 0,
+      desiredRooms: 0,
+      moveInWindow: 'גמיש',
+      importantDetails: ['חייב/ת חניה'],
+      dealBreakers: ['חייב/ת חניה'],
+    );
+    await provider.updateTenantProfile(profile);
+
+    final violatingScore = provider.matchScore(violating);
+    expect(violatingScore, lessThan(80),
+        reason: 'a property that misses a non-negotiable must never read as a '
+            'strong match');
+    expect(violatingScore, lessThan(provider.matchScore(compliant) - 30),
+        reason: 'the CRITICAL gate must dominate over any base similarity');
+
+    provider.dispose();
+  });
 }
 
 class _FakeUserRepository extends UserRepository {
