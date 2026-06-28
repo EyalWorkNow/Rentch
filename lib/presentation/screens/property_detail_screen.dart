@@ -4,6 +4,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
@@ -40,9 +41,72 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   DatingProvider? _analyticsProvider;
   int _currentPage = 0;
 
+  // ── View-side behavioral signals (fail-soft, no UX impact) ────────────────
+  // Captured locally and emitted once on dispose so a single network blip can
+  // never affect the screen. All reads are guarded so they can never throw.
+  final Stopwatch _viewStopwatch = Stopwatch();
+  double _maxScrollDepth = 0.0; // 0..1 fraction of the detail page scrolled
+  int _photosViewed = 1; // current image counts as one viewed
+  bool _opened360 = false;
+  bool _opened3d = false;
+  bool _openedVideo = false;
+  int _mediaDwellMs = 0;
+  bool _contacted = false; // guard so a single contact emits once
+
+  void _onScroll(ScrollMetrics m) {
+    if (widget.isLandlordPreview) return;
+    final max = m.maxScrollExtent;
+    if (max <= 0) return;
+    final depth = (m.pixels / max).clamp(0.0, 1.0);
+    if (depth > _maxScrollDepth) _maxScrollDepth = depth;
+  }
+
+  /// Wraps the (template-shared) tour open so the tap is recorded as media
+  /// engagement before delegating to the real handler. Classifies by the
+  /// property's available media so 360/3D/video are tracked distinctly.
+  void _openTourTracked(RentalProperty p) {
+    if (!widget.isLandlordPreview) {
+      final tourStart = DateTime.now();
+      if (p.hasPanoramaTour) {
+        _opened360 = true;
+      } else if (p.hasReadyVirtualTour) {
+        _opened3d = true;
+      } else if (p.videoUrls.isNotEmpty) {
+        _openedVideo = true;
+      }
+      // The tour is a pushed route / sheet; approximate dwell as time until the
+      // user is back on this screen by sampling on the next frame after return.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mediaDwellMs += DateTime.now().difference(tourStart).inMilliseconds;
+      });
+    }
+    openPropertyTour(context, p);
+  }
+
+  /// Records the in-app contact (like → match/chat) as a funnel + timing
+  /// signal, then delegates to the supplied real action.
+  void _contactTracked(VoidCallback action) {
+    if (!widget.isLandlordPreview && !_contacted) {
+      _contacted = true;
+      try {
+        final svc = AppEvents.instance.service;
+        svc.logContactInitiated(
+          propertyId: widget.property.id,
+          viewToContactMs: _viewStopwatch.elapsedMilliseconds,
+        );
+        svc.logFunnelStage(
+          stage: FunnelStage.contact,
+          propertyId: widget.property.id,
+        );
+      } catch (_) {/* fail-soft */}
+    }
+    action();
+  }
+
   @override
   void initState() {
     super.initState();
+    _viewStopwatch.start();
     if (!widget.isLandlordPreview) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -54,6 +118,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         // If this listing's 3D tour is still "processing", re-check Teleport now
         // so a finished/failed capture stops showing "בעיבוד" indefinitely.
         provider.refreshPropertyTour(widget.property.id);
+        // View-side funnel signal: the user opened this listing's detail.
+        try {
+          AppEvents.instance.service.logFunnelStage(
+            stage: FunnelStage.view,
+            propertyId: widget.property.id,
+          );
+        } catch (_) {/* fail-soft */}
       });
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -71,6 +142,22 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         _analyticsProvider?.endPropertyDetailView(widget.property.id) ??
             Future<void>.value(),
       );
+      // Emit the accumulated view-side signals once, on the way out.
+      try {
+        final svc = AppEvents.instance.service;
+        svc.logDetailScrollDepth(
+          propertyId: widget.property.id,
+          depth: _maxScrollDepth,
+        );
+        svc.logMediaEngagement(
+          propertyId: widget.property.id,
+          photosViewed: _photosViewed,
+          opened360: _opened360,
+          opened3d: _opened3d,
+          openedVideo: _openedVideo,
+          mediaDwellMs: _mediaDwellMs,
+        );
+      } catch (_) {/* fail-soft */}
     }
     _pageController.dispose();
     super.dispose();
@@ -79,6 +166,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   void _handleGalleryPageChanged(String propertyId, int index) {
     setState(() => _currentPage = index);
     if (!widget.isLandlordPreview) {
+      // Distinct photos paged through = highest page index reached + 1.
+      final reached = index + 1;
+      if (reached > _photosViewed) _photosViewed = reached;
       context.read<DatingProvider>().recordPropertyGallerySwipe(
             propertyId,
             index,
@@ -88,6 +178,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Track max scroll depth across whatever scrollable any template renders,
+    // without threading a controller through each of them. Read-only, no UX.
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        _onScroll(n.metrics);
+        return false; // never consume — preserve scroll behavior exactly
+      },
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final p = provider.propertyById(widget.property.id) ?? widget.property;
@@ -134,11 +236,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             isLandlordPreview: widget.isLandlordPreview,
             onBackTap: () => Navigator.of(context).pop(),
             onShareTap: () => showPropertyShareSheet(context, p),
-            onLike: () {
+            onLike: () => _contactTracked(() {
               context.read<DatingProvider>().likeProperty(p.id);
               Navigator.of(context).pop();
-            },
-            onTour: () => openPropertyTour(context, p),
+            }),
+            onTour: () => _openTourTracked(p),
             onEdit: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => EditPropertyScreen(property: p),
@@ -474,11 +576,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   property: p,
                   hasVirtualTour: hasVirtualTour,
                   isLandlordPreview: widget.isLandlordPreview,
-                  onLike: () {
+                  onLike: () => _contactTracked(() {
                     context.read<DatingProvider>().likeProperty(p.id);
                     Navigator.of(context).pop();
-                  },
-                  onTour: () => openPropertyTour(context, p),
+                  }),
+                  onTour: () => _openTourTracked(p),
                   onEdit: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => EditPropertyScreen(property: p),

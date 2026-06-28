@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/discover/action_button.dart';
@@ -33,6 +34,53 @@ class DiscoverScreen extends StatefulWidget {
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
   DiscoverTab _selectedTab = DiscoverTab.forYou;
+
+  // ── View-side swipe signals (fail-soft, no UX impact) ─────────────────────
+  // Dwell = time the top card was visible before the user acted on it.
+  // Comparison set = the run of listings seen consecutively before a "decision"
+  // (a like/super-like), capturing what the user weighed the chosen one against.
+  DateTime _topCardShownAt = DateTime.now();
+  final List<String> _comparisonIds = <String>[];
+
+  /// Wraps [DatingProvider.handlePropertySwipe] to emit dwell + comparison-set
+  /// signals at the decision moment, then delegates unchanged.
+  Future<bool> _onSwipe(
+    int previousIndex,
+    int? currentIndex,
+    CardSwiperDirection direction,
+  ) async {
+    try {
+      final props = context.read<DatingProvider>().filteredProperties;
+      if (previousIndex >= 0 && previousIndex < props.length) {
+        final decided = props[previousIndex];
+        final dwellMs =
+            DateTime.now().difference(_topCardShownAt).inMilliseconds;
+        AppEvents.instance.service
+            .logCardDwell(propertyId: decided.id, dwellMs: dwellMs);
+
+        _comparisonIds.add(decided.id);
+        final isLike = direction == CardSwiperDirection.right ||
+            direction == CardSwiperDirection.top;
+        if (isLike) {
+          // A decision was reached: this run of listings was the comparison set.
+          if (_comparisonIds.length > 1) {
+            AppEvents.instance.service
+                .logComparisonSet(propertyIds: List<String>.from(_comparisonIds));
+          }
+          _comparisonIds.clear();
+        }
+      }
+      // The next card becomes visible now — restart the dwell clock.
+      _topCardShownAt = DateTime.now();
+    } catch (_) {/* fail-soft */}
+
+    // Delegate to the (untouched) outcome handler in the provider.
+    return context.read<DatingProvider>().handlePropertySwipe(
+          previousIndex,
+          currentIndex,
+          direction,
+        );
+  }
 
   Widget _buildPillSelector() {
     return _PillSelector(
@@ -295,7 +343,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                             right: true,
                                             up: true,
                                           ),
-                                          onSwipe: provider.handlePropertySwipe,
+                                          onSwipe: _onSwipe,
                                           cardBuilder: (
                                             context,
                                             index,
@@ -905,11 +953,49 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   void _setDraftFilters(SearchFilters filters, DatingProvider provider) {
     final count = provider.filteredCountFor(filters);
     final markers = provider.previewFilteredProperties(filters);
+    _emitFilterChanges(_draftFilters, filters);
     setState(() {
       _draftFilters = filters;
       _visibleCount = count;
       _markerPreview = markers;
     });
+  }
+
+  /// View-side signal: emit one [logFilterChange] per field that actually
+  /// changed value between the previous and next draft. Fail-soft, no UX.
+  void _emitFilterChanges(SearchFilters oldF, SearchFilters newF) {
+    try {
+      final svc = AppEvents.instance.service;
+      void diff(String field, Object? oldV, Object? newV) {
+        if (oldV != newV) {
+          svc.logFilterChange(field: field, oldValue: oldV, newValue: newV);
+        }
+      }
+
+      diff('transactionType', oldF.transactionType.name,
+          newF.transactionType.name);
+      diff('minBudget', oldF.minBudget, newF.minBudget);
+      diff('maxBudget', oldF.maxBudget, newF.maxBudget);
+      diff('minRooms', oldF.minRooms, newF.minRooms);
+      diff('maxRooms', oldF.maxRooms, newF.maxRooms);
+      diff('city', oldF.city, newF.city);
+      diff('areaId', oldF.areaId, newF.areaId);
+      diff('minSizeM2', oldF.minSizeM2, newF.minSizeM2);
+      diff('maxSizeM2', oldF.maxSizeM2, newF.maxSizeM2);
+      diff('minFloor', oldF.minFloor, newF.minFloor);
+      diff('moveInFilter', oldF.moveInFilter.name, newF.moveInFilter.name);
+      diff('listingSource', oldF.listingSource.name, newF.listingSource.name);
+      diff('sortBy', oldF.sortBy.name, newF.sortBy.name);
+      diff('includeUnknownPriceListings', oldF.includeUnknownPriceListings,
+          newF.includeUnknownPriceListings);
+      diff('requiredFeatures', oldF.requiredFeatures.length,
+          newF.requiredFeatures.length);
+      diff('preferredFeatures', oldF.preferredFeatures.length,
+          newF.preferredFeatures.length);
+      diff('propertyTypes', oldF.propertyTypes.length,
+          newF.propertyTypes.length);
+      diff('conditions', oldF.conditions.length, newF.conditions.length);
+    } catch (_) {/* fail-soft */}
   }
 
   SearchFilters _filtersForTransaction(

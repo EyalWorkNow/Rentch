@@ -17,6 +17,7 @@ import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/models/user_signals.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/signature_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
@@ -132,6 +133,13 @@ class DatingProvider extends ChangeNotifier {
   bool _autoLikeEnabled = false;
   int _currentTabIndex = 0;
 
+  // Per-user revealed-preference aggregate, folded out of the raw swipe/dwell
+  // event stream (see [UserSignals]). Loaded from the same local_storage snapshot
+  // the rest of the provider state lives in, updated optimistically on each swipe
+  // decision, and folded back into the match score so the algorithm personalises
+  // from what the user actually does — not just what they declared.
+  UserSignals _userSignals = const UserSignals();
+
   // Pagination state — properties are loaded in pages to avoid loading the
   // entire catalog upfront (which would be prohibitive at scale).
   bool _hasMoreProperties = false;
@@ -215,6 +223,28 @@ class DatingProvider extends ChangeNotifier {
   // property that misses a non-negotiable can never look like a strong match.
   static const double _importantPersonaBoost = 9; // per met IMPORTANT detail
   static const double _criticalPersonaPenalty = 45; // per unmet CRITICAL gate
+
+  // ── Learned-signal folding (revealed preferences → score) ──────────────────
+  // These deltas are deliberately SMALL: learned behaviour nudges the score, it
+  // never re-saturates it. A prior audit compressed the structural band below
+  // 100 on purpose; these bounds keep the learned layer from undoing that.
+  //
+  // revealedBudgetTolerance widens the *effective* max-budget the budget-fit
+  // curve is measured against, but only up to this cap, so a user who keeps
+  // liking ~15%-over listings stops being punished for being just over their
+  // stated cap — without making any price look on-budget.
+  static const double _maxLearnedBudgetWiden = 1.20; // never widen past +20%
+  // Per matching feature, tagAffinity in [-1, 1] scales to at most this many
+  // points (so a strongly-liked feature adds ≤ +_learnedTagWeight and a
+  // strongly-disliked one subtracts the same).
+  static const double _learnedTagWeight = 4.0;
+  // The whole tag-affinity contribution is additionally clamped so a long tag
+  // list can't stack into a large swing.
+  static const double _maxLearnedTagDelta = 8.0;
+  // A liked-area centroid within this radius of the property adds a small
+  // location-affinity bonus, scaled by how many likes back the centroid.
+  static const double _learnedAreaWeight = 4.0;
+  static const double _learnedAreaRadiusKm = 5.0;
 
   // Tenant preference match-keys that correspond to a concrete property feature,
   // so they can be evaluated against the property alone (no landlord profile
@@ -312,6 +342,10 @@ class DatingProvider extends ChangeNotifier {
       isBroker ? _brokerBranding : BrokerBrandingConfig.defaults;
   bool get autoLikeEnabled => _autoLikeEnabled;
   int get currentTabIndex => _currentTabIndex;
+
+  /// The per-user revealed-preference aggregate folded into the match score.
+  /// Read-only; mutated only via the swipe path and the [UserSignals] reducer.
+  UserSignals get userSignals => _userSignals;
   bool get roleExplicitlyChosen => _roleExplicitlyChosen;
   bool get isGuestMode => _isGuestMode;
   bool get hasActiveSession => _hasActiveSession;
@@ -2194,15 +2228,20 @@ class DatingProvider extends ChangeNotifier {
       _passedPropertyIds.add(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: false));
       AppEvents.instance.log(UserEventType.swipeLeft, propertyId: property.id);
+      _recordSwipeSignal(property, SwipeDirection.skip);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       final isNewLike = _likedPropertyIds.add(property.id);
       if (isNewLike) _recordPropertyLike(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: true));
-      final eventType = direction == CardSwiperDirection.top
-          ? UserEventType.superLike
-          : UserEventType.swipeRight;
+      final isSuperLike = direction == CardSwiperDirection.top;
+      final eventType =
+          isSuperLike ? UserEventType.superLike : UserEventType.swipeRight;
       AppEvents.instance.log(eventType, propertyId: property.id);
+      _recordSwipeSignal(
+        property,
+        isSuperLike ? SwipeDirection.superlike : SwipeDirection.like,
+      );
 
       // Simulate owner acceptance: ~40% chance for regular swipe, 100% for super-like.
       // If landlord auto-like is enabled, force 100% match chance for properties they own.
@@ -2224,6 +2263,132 @@ class DatingProvider extends ChangeNotifier {
     // Proactively fetch next page when the deck is getting short.
     unawaited(loadMorePropertiesIfNeeded());
     return true;
+  }
+
+  // ── Revealed-preference capture (the learning loop) ────────────────────────
+
+  /// The budget the revealed signals are measured against: the tenant's stated
+  /// profile budget when set, else the active max-budget filter. Used both to
+  /// derive `priceToBudgetRatio` for [EventService.logSwipeOutcome] and to widen
+  /// the effective budget in scoring.
+  double get _signalBudget {
+    final profileBudget = _tenantProfile?.budgetMax ?? 0;
+    if (profileBudget >= _missingPriceThreshold) return profileBudget.toDouble();
+    final filterMax = _filters.maxBudget;
+    if (filterMax > 0 && filterMax < _unsetBudget) return filterMax.toDouble();
+    return 0;
+  }
+
+  double _priceToBudgetRatio(RentalProperty property) {
+    final budget = _signalBudget;
+    if (budget <= 0 || !_hasKnownPrice(property)) return 1.0;
+    return property.price / budget;
+  }
+
+  /// Emits the raw behavioral row(s) for a swipe decision AND folds the same
+  /// event into the in-memory [_userSignals] aggregate (optimistic update), so
+  /// the next match score already reflects this swipe. Cheap: the heavy state
+  /// write is debounced via [_persist], already called on the swipe path.
+  void _recordSwipeSignal(RentalProperty property, SwipeDirection direction) {
+    final now = DateTime.now();
+    final ratio = _priceToBudgetRatio(property);
+    final liked = direction != SwipeDirection.skip;
+
+    AppEvents.instance.service.logSwipeOutcome(
+      propertyId: property.id,
+      direction: direction,
+      priceToBudgetRatio: ratio,
+    );
+    _foldUserSignal('swipeOutcome', {
+      'direction': direction.name,
+      'priceToBudgetRatio': ratio,
+    }, now);
+
+    if (liked) {
+      // A like reveals a preferred location and reinforces the tags the
+      // property carries.
+      if (property.lat != 0 || property.lon != 0) {
+        AppEvents.instance.service.logLikedLocation(
+          propertyId: property.id,
+          lat: property.lat,
+          lng: property.lon,
+        );
+        _foldUserSignal(
+          'likedLocation',
+          {'lat': property.lat, 'lng': property.lon},
+          now,
+        );
+      }
+      for (final tag in _matchableTagsOf(property)) {
+        _foldUserSignal('tagLiked', {'tag': tag}, now);
+      }
+    } else {
+      // A skip that violated one of the tenant's deal-breakers / IMPORTANT tags
+      // is the strongest negative signal — record it explicitly and lower the
+      // affinity for the violated tag.
+      _recordDealBreakerMisses(property);
+    }
+    // The swipe path persists immediately after this returns, so the updated
+    // aggregate is written without scheduling a second redundant write here.
+  }
+
+  /// Folds one raw event into [_userSignals] using the pure reducer. Kept tiny
+  /// so it's safe to call on the hot swipe path.
+  void _foldUserSignal(
+    String type,
+    Map<String, dynamic> event,
+    DateTime at,
+  ) {
+    _userSignals = UserSignals.update(
+      _userSignals,
+      type: type,
+      event: event,
+      at: at,
+    );
+  }
+
+  /// The persona match-keys the tenant marked IMPORTANT/CRITICAL that this
+  /// property FAILS to satisfy — i.e. the deal-breakers a skip just confirmed.
+  void _recordDealBreakerMisses(RentalProperty property) {
+    final profile = _tenantProfile;
+    if (profile == null) return;
+    final now = DateTime.now();
+    final criticalKeys = ProfileTagCatalog.matchKeysFor(profile.dealBreakers,
+        isLandlord: false);
+    final importantKeys = ProfileTagCatalog.matchKeysFor(profile.importantDetails,
+        isLandlord: false);
+
+    final context = _MatchContext(
+      filters: _filters,
+      now: now,
+      area: selectedArea,
+      featureWeights: _featureWeights,
+      marketIndex: _marketIndex,
+    );
+
+    for (final key in {...criticalKeys, ...importantKeys}) {
+      final met = _propertyMeetsPersonaKey(property, key, profile, context);
+      if (met == false) {
+        final critical = criticalKeys.contains(key);
+        AppEvents.instance.service.logDealBreakerApplied(
+          propertyId: property.id,
+          tag: key,
+          kind: critical ? DealBreakerKind.critical : DealBreakerKind.important,
+        );
+        _foldUserSignal('dealBreakerApplied', {'tag': key}, now);
+      }
+    }
+  }
+
+  /// The property's matching tags, expressed as the same affinity keys scoring
+  /// uses — the feature keys present on the property that map to a persona
+  /// match-key (so liking a property with parking raises 'parking' affinity).
+  Iterable<String> _matchableTagsOf(RentalProperty property) {
+    final keys = <String>{};
+    _personaKeyToFeatureKey.forEach((personaKey, featureKey) {
+      if (property.featureFlags.isEnabled(featureKey)) keys.add(personaKey);
+    });
+    return keys;
   }
 
   Future<void> ownerSwipeLeft() async {
@@ -3111,9 +3276,74 @@ class DatingProvider extends ChangeNotifier {
     // are added AFTER compression so they shift the visible score rather than
     // being absorbed by the clamp.
     final compressed = _compressStructural(structural);
-    final score = compressed + tagCompatibilityScore;
+    final score = compressed + tagCompatibilityScore + _learnedScoreDelta(p);
 
     return _clampDouble(score, 0, 100).round();
+  }
+
+  /// The bounded personalisation layer: small ± nudges folded out of the user's
+  /// own revealed behaviour ([_userSignals]). Added AFTER structural compression
+  /// — exactly like the persona deltas — so it shifts the visible score honestly
+  /// instead of being absorbed by the clamp, and is deliberately small so it can
+  /// never re-saturate the score back to 100.
+  ///
+  ///  • tagAffinity → ± up to [_learnedTagWeight] per matching feature, with the
+  ///    total clamped to ±[_maxLearnedTagDelta]. A feature the user keeps liking
+  ///    nudges similar listings up; one they keep skipping nudges them down.
+  ///  • preferredAreas → up to +[_learnedAreaWeight] when the property sits near
+  ///    a centroid the user has revealed a preference for (no penalty — absence
+  ///    of a known area is simply neutral).
+  double _learnedScoreDelta(RentalProperty property) {
+    var delta = 0.0;
+
+    final affinities = _userSignals.tagAffinity;
+    if (affinities.isNotEmpty) {
+      var tagDelta = 0.0;
+      for (final personaKey in _matchableTagsOf(property)) {
+        final affinity = affinities[personaKey];
+        if (affinity != null) {
+          tagDelta += affinity.clamp(-1.0, 1.0) * _learnedTagWeight;
+        }
+      }
+      delta += tagDelta.clamp(-_maxLearnedTagDelta, _maxLearnedTagDelta);
+    }
+
+    delta += _learnedAreaAffinity(property);
+    return delta;
+  }
+
+  /// Small positive bonus when the property is near a liked-area centroid, scaled
+  /// both by proximity and by how many likes back that centroid (more-revealed
+  /// areas count for more), capped at [_learnedAreaWeight].
+  double _learnedAreaAffinity(RentalProperty property) {
+    final areas = _userSignals.preferredAreas;
+    if (areas.isEmpty) return 0.0;
+    if (property.lat == 0 && property.lon == 0) return 0.0;
+
+    var best = 0.0;
+    for (final area in areas) {
+      final km =
+          _haversineKm(area.lat, area.lng, property.lat, property.lon);
+      if (km >= _learnedAreaRadiusKm) continue;
+      final proximity = 1.0 - (km / _learnedAreaRadiusKm); // 0..1
+      // Confidence saturates by ~3 backing likes so a single like doesn't max it.
+      final confidence = (area.weight / 3.0).clamp(0.0, 1.0);
+      best = math.max(best, proximity * confidence);
+    }
+    return best * _learnedAreaWeight;
+  }
+
+  static double _haversineKm(
+      double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371.0;
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLng = (lng2 - lng1) * math.pi / 180.0;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) *
+            math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
 
   // The theoretical maximum of the structural weights, used to normalise the
@@ -3231,9 +3461,20 @@ class DatingProvider extends ChangeNotifier {
         filters.maxBudget < _defaultMaxBudgetFor(filters.transactionType);
     if (!hasMin && !hasMax) return _budgetWeight;
 
+    // Revealed budget tolerance: a user who demonstrably keeps liking listings
+    // over their stated cap shouldn't be harshly penalised for being just over.
+    // We widen ONLY the ceiling the overage is measured against (clamped to
+    // +20%), so listings the user has shown they'll consider stop reading as a
+    // poor budget fit. This never makes an over-budget listing look on-budget —
+    // a strongly over-budget listing still decays — it just softens the cliff at
+    // the stated cap up to the revealed tolerance.
+    final tolerance =
+        _userSignals.revealedBudgetTolerance.clamp(1.0, _maxLearnedBudgetWiden);
+    final effectiveMax = filters.maxBudget * tolerance;
+
     final price = property.price.toDouble();
     if ((!hasMin || price >= filters.minBudget) &&
-        (!hasMax || price <= filters.maxBudget)) {
+        (!hasMax || price <= effectiveMax)) {
       return _budgetWeight;
     }
 
@@ -3242,7 +3483,7 @@ class DatingProvider extends ChangeNotifier {
       return _budgetWeight * _expDecay(gap / 0.3, 1.2);
     }
 
-    final overage = (price - filters.maxBudget) / filters.maxBudget;
+    final overage = (price - effectiveMax) / effectiveMax;
     return _budgetWeight * _expDecay(overage / 0.18, 1.45);
   }
 
@@ -4083,6 +4324,10 @@ class DatingProvider extends ChangeNotifier {
       );
     });
     _lastSeenMatchCount = storedState['lastSeenMatchCount'] as int? ?? 0;
+    final userSignalsJson = storedState['userSignals'];
+    _userSignals = userSignalsJson is Map
+        ? UserSignals.fromJson(Map<String, dynamic>.from(userSignalsJson))
+        : const UserSignals();
     _pendingMatchPropertyId = null;
     _invalidateCatalogCache();
   }
@@ -4160,6 +4405,7 @@ class DatingProvider extends ChangeNotifier {
       ),
       'lastSeenMatchCount': _lastSeenMatchCount,
       'autoLikeEnabled': _autoLikeEnabled,
+      'userSignals': _userSignals.toJson(),
     };
 
     await _localStorageService.saveAppState(snapshot, syncRemote: false);

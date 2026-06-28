@@ -73,9 +73,15 @@ class AppConfig {
     defaultValue: 'rently-messages',
   );
 
+  // Behavioral-event table. EventService routes through the AWS API gateway via
+  // the `events` path segment (appwriteEventsTableId), so the backend's
+  // TABLE_PREFIX (rentch-) resolves the real table — this constant is the
+  // direct-DynamoDB name and is kept in sync with the live table so any direct
+  // reader hits the right one. EventService is enabled whenever the AWS core
+  // config + appwriteEventsTableId ('events') are present, which they are.
   static const String dynamoEventsTable = String.fromEnvironment(
     'DYNAMO_EVENTS_TABLE',
-    defaultValue: 'rently-events',
+    defaultValue: 'rentch-events',
   );
 
   static const String dynamoUsersTable = String.fromEnvironment(

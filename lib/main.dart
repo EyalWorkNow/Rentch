@@ -1,5 +1,6 @@
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/push_notification_service.dart';
@@ -10,6 +11,7 @@ import 'package:dating_app/presentation/screens/onboarding_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:dating_app/firebase_options.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -95,7 +97,7 @@ class RentlyApp extends StatelessWidget {
                 child: IpadFrame(child: child ?? const SizedBox.shrink()),
               );
             },
-            home: const OnboardingScreen(),
+            home: const _SessionLifecycleTracker(child: OnboardingScreen()),
           );
         },
       ),
@@ -216,4 +218,70 @@ class RentlyApp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Transparent wrapper that emits one ambient [EventService.logSessionContext]
+/// signal per session boundary (when the app is backgrounded or detached),
+/// reusing the existing root tree. Fail-soft and renders [child] unchanged.
+class _SessionLifecycleTracker extends StatefulWidget {
+  const _SessionLifecycleTracker({required this.child});
+  final Widget child;
+
+  @override
+  State<_SessionLifecycleTracker> createState() =>
+      _SessionLifecycleTrackerState();
+}
+
+class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
+    with WidgetsBindingObserver {
+  final DateTime _sessionStart = DateTime.now();
+  bool _emitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _emitSessionContext();
+    }
+  }
+
+  String _timeOfDayBucket(int hour) {
+    if (hour < 6) return 'night';
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
+  }
+
+  void _emitSessionContext() {
+    if (_emitted) return;
+    _emitted = true;
+    try {
+      final now = DateTime.now();
+      final locale =
+          WidgetsBinding.instance.platformDispatcher.locale.toLanguageTag();
+      AppEvents.instance.service.logSessionContext(
+        timeOfDayBucket: _timeOfDayBucket(now.hour),
+        dayOfWeek: now.weekday, // 1 = Monday … 7 = Sunday
+        sessionDurationMs: now.difference(_sessionStart).inMilliseconds,
+        platform: defaultTargetPlatform.name,
+        appVersion: '1.0.0+110',
+        locale: locale,
+      );
+    } catch (_) {/* fail-soft */}
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

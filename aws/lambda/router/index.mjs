@@ -93,7 +93,11 @@ const TABLES = {
   properties:      { name: `${TABLE_PREFIX}properties`,      gsi: { name: 'status-createdAt',     pk: 'status',         filterKey: 'status' }, ownerIndex: 'ownerUserId-createdAt' },
   messages:        { name: `${TABLE_PREFIX}messages`,        gsi: { name: 'matchId-createdAt',    pk: 'matchId',        filterKey: 'matchId' } },
   users:           { name: `${TABLE_PREFIX}users`,           gsi: { name: 'discoverable-updatedAt', pk: 'discoverable', filterKey: 'discoverable' } },
-  events:          { name: `${TABLE_PREFIX}events`,          gsi: null },
+  // Behavioral events — query-able for research by userId (a user's full event
+  // stream) via the userId-createdAt GSI, and by eventType (e.g. all swipeRight)
+  // via the eventType-createdAt GSI. The default `gsi` (userId) backs
+  // GET /events?userId=<uid>; eventType is exposed as an extra index below.
+  events:          { name: `${TABLE_PREFIX}events`,          gsi: { name: 'userId-createdAt', pk: 'userId', filterKey: 'userId' }, indexes: { eventType: { name: 'eventType-createdAt', pk: 'eventType', filterKey: 'eventType' } } },
   reports:         { name: `${TABLE_PREFIX}reports`,         gsi: null },
   blocks:          { name: `${TABLE_PREFIX}blocks`,          gsi: null },
   reviews:         { name: `${TABLE_PREFIX}reviews`,         gsi: { name: 'targetKey-createdAt', pk: 'targetKey', filterKey: 'targetKey' } },
@@ -503,6 +507,28 @@ async function listItems(table, query) {
     return json(200, pageBody(out));
   }
 
+  // Extra named GSIs (beyond the default one): query whichever filter is
+  // supplied. Used by the events table so research can pull rows by eventType
+  // (e.g. GET /events?eventType=swipeRight) as well as by userId.
+  if (table.indexes) {
+    for (const idx of Object.values(table.indexes)) {
+      const v = query[idx.filterKey];
+      if (v !== undefined) {
+        const out = await ddb.send(new QueryCommand({
+          TableName: table.name,
+          IndexName: idx.name,
+          KeyConditionExpression: '#pk = :v',
+          ExpressionAttributeNames: { '#pk': idx.pk },
+          ExpressionAttributeValues: { ':v': castFilter(v) },
+          Limit: limit,
+          ExclusiveStartKey: cursor,
+          ScanIndexForward: query.order !== 'desc',
+        }));
+        return json(200, pageBody(out));
+      }
+    }
+  }
+
   // Query the GSI when the matching filter is supplied (efficient path).
   if (table.gsi && filterVal !== undefined) {
     const out = await ddb.send(new QueryCommand({
@@ -551,8 +577,26 @@ function parseCursor(cursor) {
 async function putItem(table, id, body) {
   if (!id) return json(400, { message: 'Missing id' });
   const item = { ...body, id };
+  coerceGsiKeyTypes(table, item);
   await ddb.send(new PutCommand({ TableName: table.name, Item: item }));
   return json(200, item);
+}
+
+// DynamoDB GSI key attributes are strongly typed: a row whose GSI-key attribute
+// has the wrong type is rejected (ValidationException: "Type mismatch for Index
+// Key …"). The app writes some GSI keys with a JS type that doesn't match the
+// table's declared key type — e.g. users.discoverable is declared S (String) on
+// the `discoverable-updatedAt` index, but the client sends a BOOL, which threw
+// on EVERY user write. Coerce known GSI-key attributes to the declared type
+// before the put so the index always accepts the row.
+//
+// The discoverable-updatedAt index is only ever WRITTEN (the discovery read path
+// scans without a discoverable filter), so stringifying here has no read impact.
+function coerceGsiKeyTypes(table, item) {
+  // users.discoverable → String ("true"/"false") to match the S-typed GSI key.
+  if (table.name.endsWith('users') && item.discoverable !== undefined) {
+    item.discoverable = String(item.discoverable);
+  }
 }
 
 async function deleteItem(table, tableKey, id, callerUid) {

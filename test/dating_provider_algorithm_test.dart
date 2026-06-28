@@ -4,6 +4,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
+import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -745,6 +746,109 @@ void main() {
 
     provider.dispose();
   });
+
+  test(
+      'learning loop: liking over-budget + tagged + clustered listings raises a '
+      'similar property\'s score above cold-start, while a deal-breaker miss '
+      'stays low', () async {
+    // Training listings: each is ~17% over the stated budget, has parking, and
+    // sits in the same geographic cluster — exactly the revealed pattern we want
+    // the algorithm to learn (budget tolerance + tag affinity + area affinity).
+    List<RentalProperty> trainers() => [
+          for (var i = 0; i < 6; i++)
+            _property(
+              id: 'train-$i',
+              price: 7000, // budget is 6000 → ratio ≈ 1.17
+              features: const ['parking', 'elevator'],
+              lat: 32.10 + i * 0.001,
+              lon: 34.80 + i * 0.001,
+            ),
+        ];
+
+    // The held-out probe: same shape (over-budget + parking + near-cluster) but
+    // priced far enough over budget that even after the learned lift there is
+    // real headroom below 100 — so the test proves the personalisation does NOT
+    // re-saturate the score.
+    final probe = _property(
+      id: 'probe',
+      price: 8000,
+      features: const ['parking', 'elevator'],
+      lat: 32.101,
+      lon: 34.801,
+    );
+
+    DatingProvider build() => DatingProvider(
+          rentalDataService: _FakeRentalDataService([...trainers(), probe]),
+          localStorageService: _MemoryLocalStorageService(),
+        );
+
+    const profile = TenantProfile(
+      id: 'learner',
+      name: 'Learner',
+      bio: '',
+      photoUrls: [],
+      budgetMax: 6000,
+      desiredRooms: 0,
+      moveInWindow: 'גמיש',
+      importantDetails: ['חייב/ת חניה'],
+    );
+
+    // ── Cold start: a fresh provider that has never seen a swipe. ──
+    final cold = build();
+    await cold.initialize();
+    await cold.updateTenantProfile(profile);
+    final coldScore = cold.matchScore(probe);
+    cold.dispose();
+
+    // ── Warm: the same setup, but the user likes every over-budget trainer. ──
+    final warm = build();
+    await warm.initialize();
+    await warm.updateTenantProfile(profile);
+
+    // Swipe-like the trainers off the top of the deck. Each like removes the
+    // card, so index 0 always points at the next unliked trainer; the probe is
+    // intentionally never swiped so we read a learned-but-unseen property.
+    for (var i = 0; i < 6; i++) {
+      final deck = warm.filteredProperties;
+      final idx = deck.indexWhere((p) => p.id.startsWith('train-'));
+      if (idx < 0) break;
+      await warm.handlePropertySwipe(idx, null, CardSwiperDirection.right);
+    }
+
+    final warmScore = warm.matchScore(probe);
+
+    // The learned signals must measurably lift the probe above cold start, but
+    // stay bounded — the personalisation layer is small by design and must not
+    // re-saturate the score to 100.
+    expect(warmScore, greaterThan(coldScore),
+        reason: 'revealed budget tolerance + tag/area affinity must personalise '
+            'the score upward for a property matching demonstrated behaviour');
+    expect(warmScore - coldScore, greaterThanOrEqualTo(5),
+        reason: 'the learned lift should be measurable, not noise');
+    expect(warmScore, lessThan(100),
+        reason: 'bounded honest learning must never re-saturate the score');
+
+    // A property that violates the CRITICAL parking deal-breaker stays low even
+    // after all that learning — revealed preferences never override a gate.
+    final dealBreakerMiss = _property(
+      id: 'no-parking',
+      price: 8000,
+      features: const ['elevator'], // misses parking
+      lat: 32.101,
+      lon: 34.801,
+    );
+    final missScore = warm.matchScore(dealBreakerMiss);
+    expect(missScore, lessThan(warmScore - 20),
+        reason: 'a deal-breaker miss must score far below a learned-good match');
+
+    // The aggregate persisted, so a relaunch keeps the personalisation.
+    expect(warm.userSignals.revealedBudgetTolerance, greaterThan(1.0),
+        reason: 'liking over-budget listings must raise the revealed tolerance');
+    expect(warm.userSignals.tagAffinity['parking'], greaterThan(0.0),
+        reason: 'liking parking listings must raise parking affinity');
+
+    warm.dispose();
+  });
 }
 
 class _FakeUserRepository extends UserRepository {
@@ -875,6 +979,8 @@ RentalProperty _property({
   String entryDate = '2026-06-15',
   bool agencyListing = false,
   PropertyVerification? verification,
+  double lat = 32.08,
+  double lon = 34.78,
 }) {
   return RentalProperty(
     id: id,
@@ -889,8 +995,8 @@ RentalProperty _property({
     neighborhood: 'Center',
     street: street,
     streetNumber: streetNumber,
-    lat: 32.08,
-    lon: 34.78,
+    lat: lat,
+    lon: lon,
     propertyType: 'Apartment',
     entryDate: entryDate,
     condition: 'Renovated',

@@ -150,6 +150,9 @@ Resources:
             - { AttributeName: updatedAt, KeyType: RANGE }
           Projection: { ProjectionType: ALL }
 
+  # Behavioral events — append-only rows from EventService. Query-able for
+  # research by userId (a user's full event stream) and by eventType (e.g. all
+  # swipeRight across users), each sorted by createdAt.
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -157,8 +160,22 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - { AttributeName: id, AttributeType: S }
+        - { AttributeName: userId, AttributeType: S }
+        - { AttributeName: eventType, AttributeType: S }
+        - { AttributeName: createdAt, AttributeType: S }
       KeySchema:
         - { AttributeName: id, KeyType: HASH }
+      GlobalSecondaryIndexes:
+        - IndexName: userId-createdAt
+          KeySchema:
+            - { AttributeName: userId, KeyType: HASH }
+            - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+        - IndexName: eventType-createdAt
+          KeySchema:
+            - { AttributeName: eventType, KeyType: HASH }
+            - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
 
   ReportsTable:
     Type: AWS::DynamoDB::Table

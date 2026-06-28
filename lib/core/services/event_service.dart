@@ -71,7 +71,33 @@ enum UserEventType {
   propertyUpdated,
   propertyDeleted,
   tourUploaded,
+
+  // ── Behavioral signals ──────────────────────────────────────────────────
+  // High-value revealed-preference + market-intelligence telemetry. Each
+  // carries a typed `metadata` payload (see the logXxx helpers below) on top of
+  // the shared userId/sessionId/propertyId?/createdAt envelope.
+  cardDwell, // {dwellMs}
+  swipeOutcome, // {direction, priceToBudgetRatio}
+  detailScrollDepth, // {depth}
+  mediaEngagement, // {photosViewed, opened360, opened3d, openedVideo, mediaDwellMs}
+  filterChange, // {field, oldValue, newValue}
+  dealBreakerApplied, // {tag, kind}
+  contactInitiated, // {viewToContactMs}
+  sessionContext, // {timeOfDayBucket, dayOfWeek, sessionDurationMs, platform, appVersion, locale}
+  likedLocation, // {lat, lng}
+  comparisonSet, // {propertyIds}
+  funnelStage, // {stage, abandoned}
+  priceSensitivity, // {maxOverBudgetRatioLiked}
 }
+
+/// Direction of a swipe decision, as recorded by [EventService.logSwipeOutcome].
+enum SwipeDirection { like, skip, superlike }
+
+/// Severity of a violated deal-breaker, for [EventService.logDealBreakerApplied].
+enum DealBreakerKind { important, critical }
+
+/// Stage in the rental funnel, for [EventService.logFunnelStage].
+enum FunnelStage { search, view, like, contact, contract }
 
 class EventService {
   EventService({
@@ -114,6 +140,163 @@ class EventService {
       metadata: metadata,
     );
   }
+
+  // ── Behavioral-signal emit API ────────────────────────────────────────────
+  //
+  // One typed helper per signal. All reuse [log] (the existing fire-and-forget
+  // send path), so they inherit the same enable/consent guard (isConfigured &&
+  // userId set), circuit breaker, and fail-soft behavior — none ever throw into
+  // the UI. Values are clamped/normalized where it cheapens the consumer side.
+
+  /// (1) Time a listing card was visible before the user acted on it.
+  void logCardDwell({required String propertyId, required int dwellMs}) => log(
+        UserEventType.cardDwell,
+        propertyId: propertyId,
+        metadata: {'dwellMs': math.max(0, dwellMs)},
+      );
+
+  /// (2) Revealed price tolerance at the moment of a swipe decision.
+  /// [priceToBudgetRatio] = listing price / user's stated budget (1.0 == on budget).
+  void logSwipeOutcome({
+    required String propertyId,
+    required SwipeDirection direction,
+    required double priceToBudgetRatio,
+  }) =>
+      log(
+        UserEventType.swipeOutcome,
+        propertyId: propertyId,
+        metadata: {
+          'direction': direction.name,
+          'priceToBudgetRatio': priceToBudgetRatio,
+        },
+      );
+
+  /// (3) How far (0..1) into the detail view the user scrolled.
+  void logDetailScrollDepth({
+    required String propertyId,
+    required double depth,
+  }) =>
+      log(
+        UserEventType.detailScrollDepth,
+        propertyId: propertyId,
+        metadata: {'depth': depth.clamp(0.0, 1.0)},
+      );
+
+  /// (4) Rich-media engagement on a listing.
+  void logMediaEngagement({
+    required String propertyId,
+    int photosViewed = 0,
+    bool opened360 = false,
+    bool opened3d = false,
+    bool openedVideo = false,
+    int mediaDwellMs = 0,
+  }) =>
+      log(
+        UserEventType.mediaEngagement,
+        propertyId: propertyId,
+        metadata: {
+          'photosViewed': math.max(0, photosViewed),
+          'opened360': opened360,
+          'opened3d': opened3d,
+          'openedVideo': openedVideo,
+          'mediaDwellMs': math.max(0, mediaDwellMs),
+        },
+      );
+
+  /// (5) A single filter field changed value.
+  void logFilterChange({
+    required String field,
+    required Object? oldValue,
+    required Object? newValue,
+  }) =>
+      log(
+        UserEventType.filterChange,
+        metadata: {
+          'field': field,
+          'oldValue': oldValue,
+          'newValue': newValue,
+        },
+      );
+
+  /// (6) A skipped listing violated one of the user's deal-breakers.
+  void logDealBreakerApplied({
+    required String propertyId,
+    required String tag,
+    required DealBreakerKind kind,
+  }) =>
+      log(
+        UserEventType.dealBreakerApplied,
+        propertyId: propertyId,
+        metadata: {'tag': tag, 'kind': kind.name},
+      );
+
+  /// (7) User initiated contact; [viewToContactMs] is time from first view.
+  void logContactInitiated({
+    required String propertyId,
+    required int viewToContactMs,
+  }) =>
+      log(
+        UserEventType.contactInitiated,
+        propertyId: propertyId,
+        metadata: {'viewToContactMs': math.max(0, viewToContactMs)},
+      );
+
+  /// (8) Ambient session context, typically emitted once per session.
+  void logSessionContext({
+    required String timeOfDayBucket,
+    required int dayOfWeek,
+    required int sessionDurationMs,
+    required String platform,
+    required String appVersion,
+    required String locale,
+  }) =>
+      log(
+        UserEventType.sessionContext,
+        metadata: {
+          'timeOfDayBucket': timeOfDayBucket,
+          'dayOfWeek': dayOfWeek,
+          'sessionDurationMs': math.max(0, sessionDurationMs),
+          'platform': platform,
+          'appVersion': appVersion,
+          'locale': locale,
+        },
+      );
+
+  /// (9) Geographic point of a liked listing (for area-preference centroids).
+  void logLikedLocation({
+    required String propertyId,
+    required double lat,
+    required double lng,
+  }) =>
+      log(
+        UserEventType.likedLocation,
+        propertyId: propertyId,
+        metadata: {'lat': lat, 'lng': lng},
+      );
+
+  /// (10) The set of listings viewed consecutively before a decision.
+  void logComparisonSet({required List<String> propertyIds}) => log(
+        UserEventType.comparisonSet,
+        metadata: {'propertyIds': List<String>.from(propertyIds)},
+      );
+
+  /// (11) Funnel stage reached; [abandoned] marks a drop-off at that stage.
+  void logFunnelStage({
+    required FunnelStage stage,
+    bool abandoned = false,
+    String? propertyId,
+  }) =>
+      log(
+        UserEventType.funnelStage,
+        propertyId: propertyId,
+        metadata: {'stage': stage.name, 'abandoned': abandoned},
+      );
+
+  /// (12) Derived snapshot of how far over budget the user is willing to like.
+  void logPriceSensitivity({required double maxOverBudgetRatioLiked}) => log(
+        UserEventType.priceSensitivity,
+        metadata: {'maxOverBudgetRatioLiked': maxOverBudgetRatioLiked},
+      );
 
   Future<void> _writeEvent({
     required UserEventType type,
