@@ -545,10 +545,189 @@ def _handle_video_stitch(event):
         return {"status": "failed", "error": str(e)}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Arranged composite (deterministic, by KNOWN position — no feature matching)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The user shot N wide native panoramas and PLACED each one on the sphere:
+#   • horizontal extent  [startDeg, startDeg+widthDeg)  (degrees, wraps at 360)
+#   • vertical row        'horizontal' | 'top' | 'bottom'
+# Each native pano is already a wide equirect-ish strip (~149°×~60° from the
+# iPhone). We treat it as a rectilinear-ish equirect rectangle and bilinear-resize
+# it straight into its target lon/lat rectangle on a 360×180 canvas — the correct
+# first-order mapping. Overlapping panos cross-fade via a horizontal edge feather.
+#
+# Canvas mapping (out_w×out_h, 2:1):
+#   column c  ↔  longitude  lon = c / out_w * 360            (0 … 360, left→right)
+#   row    r  ↔  latitude   lat = 90 − r / out_h * 180       (+90 top … −90 bottom)
+# So a degree band [a,b] in longitude → columns [a/360*out_w, b/360*out_w); a
+# latitude band [lat_lo, lat_hi] → rows [(90−lat_hi)/180*out_h, (90−lat_lo)/180*out_h).
+#
+# Row → latitude band (vertical placement):
+#   'horizontal' → centered on the equator,  lat ∈ [−30, +30]  (~the pano's vFOV)
+#   'top'        → upper band,               lat ∈ [+10, +70]
+#   'bottom'     → lower band,               lat ∈ [−70, −10]
+#
+# Wrap handling: if startDeg+widthDeg crosses 360, the column span splits into two
+# pieces ([start,360) and [0,end)); we resize the pano into each piece in
+# proportion to its share of widthDeg, so the seam at 0/360 is continuous.
+
+ROW_LAT_BANDS = {
+    "horizontal": (-30.0, 30.0),
+    "top": (10.0, 70.0),
+    "bottom": (-70.0, -10.0),
+}
+
+
+def _col_feather(width_px):
+    """Horizontal feather weight 0→1→0 across `width_px` columns (cosine ramp at
+    the left/right edges) so overlapping panos cross-fade with no hard seam."""
+    if width_px <= 1:
+        return np.ones(max(width_px, 1), dtype=np.float32)
+    x = np.linspace(-1.0, 1.0, width_px, dtype=np.float32)  # −1 (left) … +1 (right)
+    # cos(|x|·π/2): 1 at center, →0 at both edges.
+    return np.clip(np.cos(np.abs(x) * (math.pi / 2.0)), 1e-3, 1.0).astype(np.float32)
+
+
+def _paste_pano(acc, wsum, covered, pano, c0, c1, r0, r1):
+    """Resize `pano` to fill canvas columns [c0,c1) × rows [r0,r1) and accumulate
+    it with a horizontal edge feather. Columns are taken modulo canvas width so a
+    span that ran off the right edge wraps to the left. c1 may exceed out_w."""
+    out_w = acc.shape[1]
+    w_px = c1 - c0
+    h_px = r1 - r0
+    if w_px <= 0 or h_px <= 0:
+        return
+    resized = cv2.resize(pano, (w_px, h_px), interpolation=cv2.INTER_AREA)
+    feather = _col_feather(w_px)[None, :]  # (1, w_px) broadcast over rows
+    cols = (np.arange(c0, c1) % out_w)
+    block = resized.astype(np.float32) * feather[..., None]
+    # Scatter-add column by column (handles the wrapped, non-contiguous columns).
+    acc[r0:r1, cols] += block
+    wsum[r0:r1, cols] += feather
+    covered[r0:r1, cols] = True
+
+
+def _handle_arranged_stitch(event):
+    """captureMode='arranged': composite N user-placed native panoramas into one
+    equirectangular 360 by KNOWN position. Returns {status, imageUrl, haov, vaov}."""
+    bucket = event["bucket"]
+    meta_key = event["metaKey"]
+    result_key = event["resultKey"]
+    region = os.environ.get("AWS_REGION", "eu-central-1")
+    s3 = _s3()
+
+    panos = event.get("panos") or []
+    pano_keys = event.get("panoKeys") or []
+
+    try:
+        if len(pano_keys) < 1 or len(panos) < 1:
+            raise RuntimeError("arranged stitch needs >=1 pano")
+
+        out_w = MAX_W
+        out_h = out_w // 2
+        acc = np.zeros((out_h, out_w, 3), dtype=np.float32)
+        wsum = np.zeros((out_h, out_w), dtype=np.float32)
+        covered = np.zeros((out_h, out_w), dtype=bool)
+
+        lat_lo_seen, lat_hi_seen = 90.0, -90.0
+        placed = 0
+        for i, key in enumerate(pano_keys):
+            p = panos[i] if i < len(panos) else {}
+            try:
+                img = _download(s3, bucket, key)
+            except Exception:  # noqa: BLE001 — dropped upload; skip this pano
+                continue
+
+            start = float(p.get("startDeg", 0.0)) % 360.0
+            width = max(0.0, min(360.0, float(p.get("widthDeg", 0.0))))
+            if width <= 0:
+                continue
+            row = p.get("row", "horizontal")
+            lat_lo, lat_hi = ROW_LAT_BANDS.get(row, ROW_LAT_BANDS["horizontal"])
+            lat_lo_seen = min(lat_lo_seen, lat_lo)
+            lat_hi_seen = max(lat_hi_seen, lat_hi)
+
+            # Latitude band → row range (top of canvas = +90°).
+            r0 = int(round((90.0 - lat_hi) / 180.0 * out_h))
+            r1 = int(round((90.0 - lat_lo) / 180.0 * out_h))
+            r0 = max(0, min(out_h, r0))
+            r1 = max(0, min(out_h, r1))
+
+            end = start + width  # may exceed 360 → wrap
+            c0 = int(round(start / 360.0 * out_w))
+            c1 = int(round(end / 360.0 * out_w))
+            if c1 <= c0:
+                continue
+
+            if c1 <= out_w:
+                # No wrap: one contiguous (modulo) span.
+                _paste_pano(acc, wsum, covered, img, c0, c1, r0, r1)
+            else:
+                # Wrap at the 0/360 seam: split the pano left/right in proportion
+                # to each piece's share of the column span, so the seam stays
+                # continuous (the right piece is the pano's left part).
+                seam = out_w
+                frac = (seam - c0) / float(c1 - c0)
+                split_x = int(round(frac * img.shape[1]))
+                split_x = max(1, min(img.shape[1] - 1, split_x))
+                left_img = img[:, :split_x]
+                right_img = img[:, split_x:]
+                _paste_pano(acc, wsum, covered, left_img, c0, seam, r0, r1)
+                _paste_pano(acc, wsum, covered, right_img, 0, c1 - seam, r0, r1)
+            placed += 1
+
+        if placed < 1 or not covered.any():
+            raise RuntimeError("no panos decoded/placed")
+
+        pano = np.zeros((out_h, out_w, 3), dtype=np.uint8)
+        safe_w = np.where(covered, wsum, 1.0)[..., None]
+        blended = acc / safe_w
+        pano[covered] = np.clip(blended[covered], 0, 255).astype(np.uint8)
+
+        # Fill uncovered pixels (poles / gaps) so nothing ships as a hard hole:
+        # blur-stretch the nearest valid rows toward the poles, then heal the wrap
+        # seam. Defensive import — a missing pole_fill leaves honest holes.
+        try:
+            import pole_fill as pf
+            valid = (covered.astype(np.uint8) * 255)
+            pano = pf._blur_stretch_poles(pano, valid)
+            pano = pf._heal_wrap_seam(pano)
+        except Exception:  # noqa: BLE001
+            pass
+
+        haov = 360.0
+        vaov = min(180.0, max(0.0, lat_hi_seen - lat_lo_seen))
+
+        ok, buf = cv2.imencode(".jpg", pano, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        if not ok:
+            raise RuntimeError("encode failed")
+        s3.put_object(
+            Bucket=bucket, Key=result_key, Body=buf.tobytes(),
+            ContentType="image/jpeg", CacheControl="public, max-age=31536000",
+        )
+        image_url = f"https://{bucket}.s3.{region}.amazonaws.com/{result_key}"
+        _put_meta(s3, bucket, meta_key, {
+            **event.get("meta", {}),
+            "status": "ready", "imageUrl": image_url,
+            "haov": round(haov, 2), "vaov": round(vaov, 2),
+        })
+        return {"status": "ready", "imageUrl": image_url}
+    except Exception as e:  # noqa: BLE001 — record any failure for the poller
+        _put_meta(s3, bucket, meta_key, {
+            **event.get("meta", {}), "status": "failed", "error": str(e),
+        })
+        return {"status": "failed", "error": str(e)}
+
+
 def handler(event, _context):
     # Synchronous pole-fill op (router RequestResponse); default = async stitch job.
     if event.get("op") == "poleFill":
         return _handle_pole_fill(event)
+    # Arranged capture: N user-placed native panoramas composited by KNOWN
+    # position (startDeg/widthDeg/row) — deterministic, no feature matching.
+    if event.get("captureMode") == "arranged":
+        return _handle_arranged_stitch(event)
     # Video capture: recorded mp4 + gyro pose timeline → sharpest keyframe per
     # yaw bucket → existing pose-assisted projector.
     if event.get("captureMode") == "video":
@@ -681,6 +860,44 @@ def _selfcheck():
     b0 = int((5.0) / (360.0 / VIDEO_YAW_BUCKETS))
     assert sel[b0][3] == "b", ("bucket sharpest", sel.get(b0))
     assert len(sel) == 2, ("bucket count", sorted(sel))
+
+    # ── Arranged composite (numpy-only: no cv2/boto3) ────────────────────────
+    OUT_W = 4096
+    def lon_to_col(deg):
+        return int(round((deg % 360.0) / 360.0 * OUT_W))
+    # 12) lon→column mapping: 0°→col 0, 180°→half, 360°≡0°→0.
+    assert lon_to_col(0) == 0, ("lon col 0", lon_to_col(0))
+    assert lon_to_col(180) == OUT_W // 2, ("lon col 180", lon_to_col(180))
+    assert lon_to_col(360) == 0, ("lon col 360", lon_to_col(360))
+
+    # 13) Row→latitude band table maps to the documented canvas rows (top=+90°).
+    OUT_H = OUT_W // 2
+    def lat_to_row(lat):
+        return int(round((90.0 - lat) / 180.0 * OUT_H))
+    lo, hi = ROW_LAT_BANDS["horizontal"]
+    assert lat_to_row(hi) < lat_to_row(lo), "horizontal band rows ordered"
+    assert lat_to_row(0) == OUT_H // 2, ("equator row", lat_to_row(0))
+    # top band sits above the equator (smaller row indices), bottom below.
+    assert lat_to_row(ROW_LAT_BANDS["top"][1]) < OUT_H // 2, "top band above equator"
+    assert lat_to_row(ROW_LAT_BANDS["bottom"][0]) > OUT_H // 2, "bottom band below equator"
+
+    # 14) Wrap handling: a span starting at 300° of width 120° crosses the seam.
+    start, width = 300.0, 120.0
+    c0 = lon_to_col(start)               # 300° → col
+    c1 = int(round((start + width) / 360.0 * OUT_W))  # 420° → > OUT_W (no modulo)
+    assert c1 > OUT_W, ("wrap span exceeds width", c0, c1)
+    seam = OUT_W
+    frac = (seam - c0) / float(c1 - c0)  # share of the span before the seam
+    # 300→360 is 60° of the 120° span → exactly half before the seam.
+    assert abs(frac - 0.5) < 1e-6, ("wrap split frac", frac)
+    # The wrapped (right) piece lands at columns [0, c1-seam).
+    assert (c1 - seam) == lon_to_col(60.0), ("wrap right end", c1 - seam)
+
+    # 15) Feather is symmetric, peaks at center, ~0 at edges.
+    f = _col_feather(101)
+    assert f.argmax() == 50, ("feather peak center", f.argmax())
+    assert f[0] < 0.05 and f[-1] < 0.05, ("feather edges →0", f[0], f[-1])
+    assert abs(f[0] - f[-1]) < 1e-6, "feather symmetric"
 
     print("selfcheck OK")
 

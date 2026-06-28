@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_align_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_pole_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
@@ -119,9 +120,31 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         await _captureWithVideo();
       case _CaptureChoice.sweep:
         await _captureWithSweep();
+      case _CaptureChoice.arranged:
+        await _composeFromPanoramas();
       case _CaptureChoice.gallery:
         await _importFromGallery();
     }
+  }
+
+  // HIGH-QUALITY path: import several NATIVE phone panoramas and arrange them on
+  // a 360° track; the server stitches them into one full equirectangular pano.
+  // Returns a finished [PanoramaSweepResult] — added as a node exactly like the
+  // sweep/video/import results (same _addNode call).
+  Future<void> _composeFromPanoramas() async {
+    final result = await Navigator.of(context).push<PanoramaSweepResult>(
+      MaterialPageRoute(builder: (_) => const PanoramaAlignScreen()),
+    );
+    if (result == null || !mounted) return;
+
+    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    if (label == null || !mounted) return;
+    await _addNode(
+      url: result.imageUrl,
+      label: label,
+      haov: result.haov,
+      vaov: result.vaov,
+    );
   }
 
   // PRIMARY (default): the in-app "record while turning" video capture. The video
@@ -730,7 +753,7 @@ class _NodeTile extends StatelessWidget {
 /// Which capture path the landlord chose on the guide screen.
 /// [video] = record a clip while turning (PRIMARY default), [sweep] = the
 /// frame-by-frame guided sweep (advanced), [gallery] = import a native pano.
-enum _CaptureChoice { video, sweep, gallery }
+enum _CaptureChoice { video, sweep, arranged, gallery }
 
 /// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
 /// older, non-technical user: the in-app guided sweep now lands one full 360°
@@ -854,7 +877,29 @@ class _PanoramaGuideScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // FALLBACK: import a panorama already shot in the phone's native camera.
+            // HIGH-QUALITY: compose a full 360° from several native phone panos.
+            // Native panos are sharp and parallax-free, so arranging 2+ of them
+            // is the most reliable path — given clear, prominent billing.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary, width: 1.4),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () =>
+                      Navigator.of(context).pop(_CaptureChoice.arranged),
+                  icon: const Icon(IconsaxPlusBold.gallery_add, size: 20),
+                  label: const Text('הרכבת 360° מכמה פנורמות (איכותי)',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                ),
+              ),
+            ),
+            // FALLBACK: import a single panorama already shot in the native camera.
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: SizedBox(

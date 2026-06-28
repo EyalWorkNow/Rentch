@@ -224,6 +224,34 @@ class AwsApiClient {
     return (jobId: jobId, videoUploadUrl: url);
   }
 
+  /// Create an ARRANGED panorama job: the user imported several NATIVE phone
+  /// panoramas and placed each one on a 360° track (where it starts + how wide
+  /// it is + which vertical band it covers). The SERVER stitches them into one
+  /// equirectangular panorama. Returns the jobId + ONE presigned PUT URL per
+  /// pano, in the SAME order as [panos] (uploadUrls[i] ↔ panos[i]).
+  ///
+  /// [panos] is a list of `{startDeg, widthDeg, row}` where `startDeg` (0..360)
+  /// is where the pano begins on the rotation, `widthDeg` (>0..360) is its
+  /// angular width, and `row` ∈ 'horizontal'|'top'|'bottom' is the vertical band.
+  /// Reuses [uploadToPresignedUrl] for upload + [startPanoramaStitch]/[getPanorama]
+  /// for stitch + poll.
+  Future<({String jobId, List<String> uploadUrls})?> createArrangedPanoramaJob({
+    required String propertyId,
+    required List<Map<String, dynamic>> panos,
+  }) async {
+    if (!isConfigured || panos.isEmpty) return null;
+    final res = await post('/panorama', {
+      'propertyId': propertyId,
+      'captureMode': 'arranged',
+      'panos': panos,
+    });
+    final data = res['data'] as Map<String, dynamic>?;
+    final jobId = data?['jobId'] as String?;
+    final urls = (data?['uploadUrls'] as List?)?.cast<String>();
+    if (jobId == null || urls == null || urls.length < panos.length) return null;
+    return (jobId: jobId, uploadUrls: urls);
+  }
+
   /// PUT the transcoded mp4 bytes straight to the presigned video URL with
   /// `Content-Type: video/mp4`. Returns success. Thin alias over
   /// [uploadToPresignedUrl] so the contract reads clearly at the call site.

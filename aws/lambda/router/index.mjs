@@ -1333,6 +1333,42 @@ async function createPanorama(event) {
     return json(200, { data: { jobId, videoUploadUrl } });
   }
 
+  // ── Arranged capture mode ─────────────────────────────────────────────────
+  // The user shot N wide native panoramas and PLACED each at a known horizontal
+  // position (startDeg + widthDeg) and a vertical row (horizontal/top/bottom).
+  // No feature-matching: the stitcher composites by KNOWN position. We presign
+  // ONE jpeg PUT per pano (SAME order the client sends), and stash the parallel
+  // panoKeys[] + the panos[] placement array in the job meta.
+  if (body.captureMode === 'arranged') {
+    const panos = Array.isArray(body.panos) ? body.panos : [];
+    if (panos.length < 1) return json(400, { message: 'panos required' });
+    const panoKeys = [];
+    const uploadUrls = [];
+    for (let i = 0; i < panos.length; i++) {
+      const key = `panoramas/jobs/${jobId}/p${i}.jpg`;
+      panoKeys.push(key);
+      uploadUrls.push(await getSignedUrl(
+        s3,
+        new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'image/jpeg' }),
+        { expiresIn: 21600 },
+      ));
+    }
+    const resultKey = `panoramas/results/${jobId}.jpg`;
+    await putPanoMeta(jobId, {
+      jobId, propertyId, resultKey,
+      captureMode: 'arranged',
+      panoKeys,
+      // Keep only the placement fields we use (startDeg, widthDeg, row).
+      panos: panos.map((p) => ({
+        startDeg: Number(p.startDeg) || 0,
+        widthDeg: Number(p.widthDeg) || 0,
+        row: (p.row === 'top' || p.row === 'bottom') ? p.row : 'horizontal',
+      })),
+      status: 'pending', createdAt: ts,
+    });
+    return json(200, { data: { jobId, uploadUrls } });
+  }
+
   // ── Photo capture mode (unchanged) ────────────────────────────────────────
   // Allocate exactly as many frame slots as the client will upload (cv2 needs ≥2).
   // Must NOT clamp up — extra unfilled slots become missing keys the stitcher 404s on.
@@ -1392,6 +1428,31 @@ async function stitchPanorama(jobId, event) {
         vfov: meta.vfov,
         meta: {
           jobId, propertyId: meta.propertyId, videoKey: meta.videoKey,
+          resultKey: meta.resultKey, createdAt: meta.createdAt,
+        },
+      })),
+    }));
+    return json(200, { data: { jobId, status: 'processing' } });
+  }
+
+  // ── Arranged capture mode ─────────────────────────────────────────────────
+  // Deterministic composite by KNOWN position: hand the stitcher the per-pano
+  // S3 keys and their {startDeg, widthDeg, row} placements; it bilinear-resizes
+  // each native pano into its lon/lat rectangle on a 360×180 equirect canvas and
+  // feather-blends overlaps. No feature-matching.
+  if (meta.captureMode === 'arranged') {
+    await lambda.send(new InvokeCommand({
+      FunctionName: PANO_STITCH_FN,
+      InvocationType: 'Event',
+      Payload: Buffer.from(JSON.stringify({
+        bucket: S3_BUCKET,
+        metaKey: `panoramas/meta/${jobId}.json`,
+        resultKey: meta.resultKey,
+        captureMode: 'arranged',
+        panoKeys: meta.panoKeys,
+        panos: meta.panos,
+        meta: {
+          jobId, propertyId: meta.propertyId,
           resultKey: meta.resultKey, createdAt: meta.createdAt,
         },
       })),
