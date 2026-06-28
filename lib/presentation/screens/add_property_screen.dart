@@ -3188,26 +3188,10 @@ class _Scan3dPanel extends StatelessWidget {
             onReplace: onPickFromCamera,
             onClear: onClear,
           ),
-        ] else ...[
-          // Secondary fallback: the older whole-apartment video → cloud flow.
-          const SizedBox(height: 16),
-          const Text(
-            'או: סריקה מהירה לכל הדירה מסרטון',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _ScanActions(
-            isSubmitting: isSubmitting,
-            onPickFromCamera: onPickFromCamera,
-            onPickFromGallery: onPickFromGallery,
-            onLinkScaniverse: onLinkScaniverse,
-            onImportScaniverseAssets: onImportScaniverseAssets,
-          ),
         ],
+        // The old whole-apartment video→Teleport fallback was removed: Teleport
+        // isn't configured (it returned "השרת לא זמין"). The per-room KIRI flow
+        // above (which records a video per room) is the one working 3D path.
       ],
     );
   }
