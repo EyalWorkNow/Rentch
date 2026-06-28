@@ -385,16 +385,26 @@ def _handle_pole_fill(event):
 # video is just a better frame source for the pose-assisted stitcher.
 
 # 24 yaw buckets → 15° each: dense enough that adjacent frames overlap given a
-# typical phone hfov (~60°), coarse enough to keep the projector cheap.
+# typical phone hfov (~60°), coarse enough to keep the projector cheap. NOTE: the
+# video path deliberately does NOT cosine-average all overlapping frames (that's
+# what ghosted — see _project_video_keyframes); it picks, per output column, the
+# single frame whose CENTER is nearest, so heavy overlap can't double-expose.
 VIDEO_YAW_BUCKETS = int(os.environ.get("VIDEO_YAW_BUCKETS", "24"))
 # Drop frames blurrier than this (Laplacian variance). Motion blur during a sweep
-# tanks this score; a low floor still rejects the truly smeared frames while
-# keeping usable ones on textured walls.
-VIDEO_SHARPNESS_FLOOR = float(os.environ.get("VIDEO_SHARPNESS_FLOOR", "12.0"))
+# tanks this score; raised from 12 → 30 so genuinely soft frames (the blur source)
+# are rejected outright rather than averaged into the pano.
+VIDEO_SHARPNESS_FLOOR = float(os.environ.get("VIDEO_SHARPNESS_FLOOR", "30.0"))
 # Don't Laplacian every frame at 30–60fps — step through to keep runtime bounded.
 VIDEO_FRAME_STEP = int(os.environ.get("VIDEO_FRAME_STEP", "3"))
 # Need a usable frame in at least this many buckets or the sweep is too sparse.
 VIDEO_MIN_BUCKETS = int(os.environ.get("VIDEO_MIN_BUCKETS", "6"))
+# Each kept keyframe only contributes within this fraction of its real hfov. A
+# frame's edges carry the most parallax/lens distortion and overlap the next
+# frame the most, so we place only its sharp central core (e.g. 0.7·hfov) on the
+# equirect — narrower angular placement = less overlap = less ghosting. This is
+# the "FOV-correct placement" knob: a frame is never stretched past its hfov, and
+# we trim the soft edges that would otherwise smear into the neighbour.
+VIDEO_PLACE_FOV_FRAC = float(os.environ.get("VIDEO_PLACE_FOV_FRAC", "0.7"))
 
 
 def _interp_pose(timeline, t_ms):
@@ -442,6 +452,112 @@ def _select_video_keyframes(scored, n_buckets):
         if b not in best or sharp > best[b][2]:
             best[b] = entry
     return best
+
+
+def _project_video_keyframes(images, poses, out_w):
+    """Equirectangular projection for VIDEO keyframes — a nearest-center,
+    winner-takes-most variant of project_poses() built specifically to kill the
+    handheld-video ghosting ("image inside image").
+
+    Why a separate projector instead of project_poses():
+      project_poses() cosine-feathers and AVERAGES every frame that covers a
+      pixel. With ~15° buckets and ~60° hfov each output column is covered by 3–4
+      frames, and handheld parallax + gyro drift means they don't align — so the
+      average super-imposes several offset copies of the scene → ghosting/smear.
+
+    This projector instead, per output column:
+      1. Places each frame only across its central VIDEO_PLACE_FOV_FRAC of its
+         REAL hfov (FOV-correct, narrow placement — no stretching past hfov, soft
+         distorted edges trimmed).
+      2. Picks, for each pixel, the frame whose viewing direction is ANGULARLY
+         NEAREST that frame's center (smallest |u|,|v| in normalised coords) and
+         lets it dominate via a very narrow feather, so a single frame wins each
+         column instead of N frames blurring together. A thin cosine seam at the
+         hand-off boundary keeps it from hard-edging.
+
+    Honest limit: handheld video has real parallax (the camera translates, not
+    just rotates), so even a perfect seam can't make two views of a near object
+    line up. Nearest-center hides it by NOT blending the misaligned regions; it
+    can't remove parallax itself. Deterministic — same frames/poses → same pano.
+
+    Returns (pano, haov, vaov, covered_fraction). Raises if nothing projected."""
+    out_w = int(out_w)
+    out_h = out_w // 2
+    lon = (np.arange(out_w, dtype=np.float32) / out_w) * 360.0 - 180.0
+    lat = 90.0 - (np.arange(out_h, dtype=np.float32) / out_h) * 180.0
+    lon_grid, lat_grid = np.meshgrid(lon, lat)  # (out_h, out_w)
+    dx, dy, dz = _dir_from_lonlat(lon_grid, lat_grid)
+
+    acc = np.zeros((out_h, out_w, 3), dtype=np.float32)
+    wsum = np.zeros((out_h, out_w), dtype=np.float32)
+    # Per-pixel record of the BEST (nearest-center) score seen so far and the
+    # contribution that produced it, so a clearly-nearer frame replaces — not
+    # averages with — whatever a farther frame deposited.
+    best_score = np.full((out_h, out_w), -1.0, dtype=np.float32)
+    place_frac = float(np.clip(VIDEO_PLACE_FOV_FRAC, 0.2, 1.0))
+
+    for img, pose in zip(images, poses):
+        fh, fw = img.shape[:2]
+        u, v, infront = _project_into_frame(
+            dx, dy, dz, pose["yaw"], pose["pitch"], pose["hfov"], pose["vfov"])
+        # FOV-correct narrow placement: only this frame's central core (|u|,|v| ≤
+        # place_frac) is eligible, trimming the distorted, heavily-overlapping
+        # edges. u,v are already normalised to the frame's REAL hfov/vfov, so the
+        # angular width placed == place_frac · hfov — never inflated.
+        inside = (infront & (np.abs(u) <= place_frac) & (np.abs(v) <= place_frac))
+        if not inside.any():
+            continue
+
+        # Nearest-center score: 1 at the frame's optical center, →0 at the placed
+        # edge. The frame with the highest score at a pixel is the closest-aimed
+        # one and should own that pixel.
+        radial = np.sqrt(u * u + v * v) / place_frac           # 0 center … 1 edge
+        score = np.clip(1.0 - radial, 0.0, 1.0).astype(np.float32)
+
+        ys, xs = np.where(inside)
+        s_here = score[ys, xs]
+        prev = best_score[ys, xs]
+        # A pixel is (re)claimed by this frame when it aims clearly nearer-center
+        # than the incumbent. A small margin avoids dithering between two frames
+        # of near-equal score along the hand-off boundary.
+        win = s_here > prev + 1e-3
+        if not win.any():
+            continue
+        wy, wx = ys[win], xs[win]
+
+        px = ((u + 1.0) * 0.5) * (fw - 1)
+        py = ((1.0 - (v + 1.0) * 0.5)) * (fh - 1)
+        sampled = _bilinear_sample(img, px[wy, wx], py[wy, wx])
+        # Narrow feather (score²) so the winner dominates but the seam to the next
+        # winner still cross-fades over a thin band instead of hard-edging.
+        feat = (s_here[win] * s_here[win]).astype(np.float32)[:, None]
+        # Overwrite (not add to) the incumbent: drop its prior deposit so two
+        # offset frames never co-exist in one pixel → no ghost.
+        acc[wy, wx] = sampled * feat
+        wsum[wy, wx] = feat[:, 0]
+        best_score[wy, wx] = s_here[win]
+
+    covered = wsum > 1e-6
+    if not covered.any():
+        raise RuntimeError("video pose projection covered no pixels")
+    pano = np.zeros((out_h, out_w, 3), dtype=np.uint8)
+    safe_w = np.where(covered, wsum, 1.0)[..., None]
+    blended = (acc / safe_w)
+    pano[covered] = np.clip(blended[covered], 0, 255).astype(np.uint8)
+
+    # Fill uncovered pixels (poles / honest gaps) — same blur-stretch + wrap heal
+    # as project_poses(). An under-rotated sweep stays a partial pano (we don't
+    # stretch frames to fake 360); the gap is pole-filled, not smeared shut.
+    try:
+        import pole_fill as pf
+        valid = (covered.astype(np.uint8) * 255)
+        pano = pf._blur_stretch_poles(pano, valid)
+        pano = pf._heal_wrap_seam(pano)
+    except Exception:  # noqa: BLE001 — pole-fill is a nicety; honest holes if absent
+        pass
+
+    haov, vaov = _arc_from_poses(poses)
+    return pano, haov, vaov, float(covered.mean())
 
 
 def _handle_video_stitch(event):
@@ -515,14 +631,36 @@ def _handle_video_stitch(event):
                 f"only {len(best)} usable yaw buckets (need >={VIDEO_MIN_BUCKETS}); "
                 "sweep too sparse or too blurry — rotate slower for a full turn")
 
+        # Relative-sharpness gate: only keep a bucket's winner if it's clearly
+        # sharp relative to the kept set's typical sharpness — a bucket whose best
+        # candidate is still soft (e.g. a smeared wall) is dropped, leaving an
+        # honest gap (pole-filled) rather than a blurry frame in the pano. Better a
+        # small gap than a smear.
+        sharps = sorted(best[b][2] for b in best)
+        med = sharps[len(sharps) // 2]
+        rel_floor = max(VIDEO_SHARPNESS_FLOOR, 0.5 * med)
+
         images, poses = [], []
         for b in sorted(best):
-            yaw, pitch, _sharp, frame = best[b]
+            yaw, pitch, sharp, frame = best[b]
+            if sharp < rel_floor:
+                continue
             images.append(frame)
             poses.append({"yaw": yaw, "pitch": pitch, "hfov": hfov, "vfov": vfov})
 
-        # Feed the EXISTING deterministic projector + pole-fill (same as photos).
-        pano, haov, vaov = _handle_pose_stitch(images, poses)
+        if len(poses) < VIDEO_MIN_BUCKETS:
+            raise RuntimeError(
+                f"only {len(poses)} sharp-enough yaw buckets after gating "
+                f"(need >={VIDEO_MIN_BUCKETS}); rotate slower/steadier for a full turn")
+
+        # Video-specific nearest-center projector (NOT _handle_pose_stitch's wide
+        # cosine average) — this is what removes the handheld ghosting/smear.
+        pano, haov, vaov, _covered = _project_video_keyframes(images, poses, out_w=MAX_W)
+        h, w = pano.shape[:2]
+        if w > MAX_W:
+            scale = MAX_W / w
+            pano = cv2.resize(pano, (MAX_W, int(round(h * scale))),
+                              interpolation=cv2.INTER_AREA)
 
         ok, buf = cv2.imencode(".jpg", pano, [cv2.IMWRITE_JPEG_QUALITY, 90])
         if not ok:
@@ -860,6 +998,26 @@ def _selfcheck():
     b0 = int((5.0) / (360.0 / VIDEO_YAW_BUCKETS))
     assert sel[b0][3] == "b", ("bucket sharpest", sel.get(b0))
     assert len(sel) == 2, ("bucket count", sorted(sel))
+
+    # 11b) Nearest-center video projector (numpy only — pole_fill import is
+    # optional). Two solid-colour frames overlapping by half their hfov must NOT
+    # produce a blended midtone in the overlap: the nearer-center frame wins each
+    # column, so every projected pixel stays one of the two pure source colours
+    # (proof that we don't average offset frames → no ghost).
+    out_w = 64
+    red = np.zeros((40, 40, 3), dtype=np.uint8); red[..., 2] = 255   # BGR red
+    blu = np.zeros((40, 40, 3), dtype=np.uint8); blu[..., 0] = 255   # BGR blue
+    vposes = [{"yaw": -20.0, "pitch": 0.0, "hfov": 60.0, "vfov": 45.0},
+              {"yaw": 20.0, "pitch": 0.0, "hfov": 60.0, "vfov": 45.0}]
+    pano, haov, vaov, cov = _project_video_keyframes([red, blu], vposes, out_w=out_w)
+    eq = pano[pano.shape[0] // 2]  # equator row
+    nonblack = eq[(eq.sum(axis=1) > 0)]
+    if nonblack.size:
+        # Every covered pixel is pure red or pure blue — never a purple average.
+        is_red = (nonblack[:, 2] > 200) & (nonblack[:, 0] < 50)
+        is_blu = (nonblack[:, 0] > 200) & (nonblack[:, 2] < 50)
+        assert bool((is_red | is_blu).all()), "video projector blended (ghost) instead of winner-takes-all"
+    assert 0.0 <= cov <= 1.0 and haov > 0.0, ("video proj arc", haov, vaov, cov)
 
     # ── Arranged composite (numpy-only: no cv2/boto3) ────────────────────────
     OUT_W = 4096

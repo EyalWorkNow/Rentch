@@ -510,8 +510,9 @@ class _WideHero extends StatelessWidget {
         const Text(
           'הדרך המהירה\nלמצוא את הבית הבא שלך.',
           style: TextStyle(
+              fontFamily: 'SF Hebrew Rounded',
               color: AppColors.navy,
-              fontSize: 40,
+              fontSize: 42,
               height: 1.15,
               fontWeight: FontWeight.w900,
               letterSpacing: -1.2),

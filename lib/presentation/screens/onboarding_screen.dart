@@ -243,7 +243,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       const SizedBox(height: 20),
                       BreatheAnimation(
                         child: SvgPicture.asset(
-                          'assets/images/rently_logo.svg',
+                          'assets/images/rently_logo_with_text.svg',
                           height: 42,
                           colorFilter: const ColorFilter.mode(
                             Colors.white,
@@ -291,8 +291,9 @@ class _SlideCopy extends StatelessWidget {
           slide.title,
           textAlign: TextAlign.center,
           style: const TextStyle(
+            fontFamily: 'SF Hebrew Rounded',
             color: Colors.white,
-            fontSize: 30,
+            fontSize: 34,
             height: 1.18,
             fontWeight: FontWeight.w900,
             shadows: [

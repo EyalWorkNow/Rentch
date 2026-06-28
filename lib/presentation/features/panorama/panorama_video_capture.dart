@@ -55,6 +55,11 @@ class _PanoramaVideoCaptureScreenState
 
   bool _recording = false;
   bool _building = false; // transcode → upload → stitch → poll overlay
+
+  // Ultra-wide (0.5×) state. _minZoom is null when no ultra-wide is reachable
+  // (toggle stays hidden). _ultraWide tracks the current lens choice.
+  double? _minZoom;
+  bool _ultraWide = false;
   String _buildMsg = '';
   String? _buildError; // set → show retry, never crash
 
@@ -109,6 +114,10 @@ class _PanoramaVideoCaptureScreenState
       // Lock focus/exposure/orientation so frames don't hunt or re-expose
       // mid-turn — the biggest source of blur. Best-effort per lock.
       await _lockCamera(ctrl);
+      // Prefer the ultra-wide (0.5×) view: it captures more of the room in one
+      // turn. Query zoom range; if the device exposes sub-1.0 zoom there's an
+      // ultra-wide reachable — default to it and surface a toggle. Fail-soft.
+      await _initZoom(ctrl);
       _accel = accelerometerEventStream().listen(_onAccel);
       _gyro = gyroscopeEventStream().listen(_onGyro);
       setState(() => _cam = ctrl);
@@ -137,7 +146,63 @@ class _PanoramaVideoCaptureScreenState
     await tryLock('orientation',
         () => ctrl.lockCaptureOrientation(DeviceOrientation.portraitUp));
     await tryLock('focus', () => ctrl.setFocusMode(FocusMode.locked));
-    await tryLock('exposure', () => ctrl.setExposureMode(ExposureMode.locked));
+
+    // EXPOSURE — the old code locked instantly on the very first metered frame,
+    // which is usually blown out (the preview hasn't settled yet). Instead:
+    //   1) Let auto-exposure run and settle BEFORE we lock (short delay).
+    //   2) Bias modestly NEGATIVE (-1.0..-1.5 EV, clamped to device range) so
+    //      bright rooms/windows don't blow out the highlights.
+    //   3) Lock so it stays CONSISTENT across the whole sweep (no per-frame
+    //      flicker between keyframes).
+    // Every step is best-effort: an unsupported API just falls through.
+    await tryLock('exposure-auto',
+        () => ctrl.setExposureMode(ExposureMode.auto));
+    // Give the metering ~600ms to converge on a sane exposure for the room.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    await tryLock('exposure-offset', () async {
+      final minEv = await ctrl.getMinExposureOffset();
+      final maxEv = await ctrl.getMaxExposureOffset();
+      // Aim for -1.25 EV; clamp into whatever the device actually supports.
+      // If the device reports no range (min==max==0) this resolves to 0 → no-op.
+      final target = (-1.25).clamp(minEv, maxEv);
+      await ctrl.setExposureOffset(target);
+    });
+    // Lock AFTER settling + biasing so the value we just metered is held steady.
+    await tryLock('exposure-lock',
+        () => ctrl.setExposureMode(ExposureMode.locked));
+  }
+
+  // 0.5× ultra-wide support. `getMinZoomLevel()` < 1.0 means the device exposes
+  // the ultra-wide lens via zoom; default to it (wider room shot) and show the
+  // 0.5×/1× toggle. If min zoom >= 1.0 there's no ultra-wide reachable → keep
+  // the toggle hidden (no dead button). Fail-soft on any unsupported API.
+  Future<void> _initZoom(CameraController ctrl) async {
+    try {
+      final minZoom = await ctrl.getMinZoomLevel();
+      if (minZoom < 1.0) {
+        _minZoom = minZoom;
+        _ultraWide = true;
+        await ctrl.setZoomLevel(minZoom); // default to the wider view
+      }
+    } catch (e) {
+      debugPrint('panorama video zoom probe failed: $e');
+      _minZoom = null; // hide toggle on probe failure
+    }
+  }
+
+  // Toggle between 0.5× (ultra-wide, minZoom) and 1× (normal). Best-effort.
+  Future<void> _toggleUltraWide() async {
+    final cam = _cam;
+    final mz = _minZoom;
+    if (cam == null || mz == null) return;
+    final next = !_ultraWide;
+    try {
+      await cam.setZoomLevel(next ? mz : 1.0);
+      setState(() => _ultraWide = next);
+    } catch (e) {
+      debugPrint('panorama video setZoom failed: $e');
+    }
   }
 
   // Gravity (world-up) in device coords: the accelerometer at rest reads ≈ +g
@@ -424,15 +489,41 @@ class _PanoramaVideoCaptureScreenState
           else
             const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-          // Live yaw ring — turns green at a full turn so they SEE when done.
+          // Live coverage ring + big Hebrew coaching — turns green at a full
+          // turn so an older user SEES at a glance when one rotation is done.
           if (_cam != null && _error == null && _recording)
             Center(
               child: ValueListenableBuilder<double>(
                 valueListenable: _yawNotifier,
-                builder: (_, yaw, __) => CustomPaint(
-                  size: const Size(240, 240),
-                  painter: _YawRingPainter(yawDeg: yaw),
-                ),
+                builder: (_, yaw, __) {
+                  final done = yaw >= 359.5;
+                  final tooFast = _spinRate > 40;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Persistent top coaching line: stand still, turn slowly.
+                      _coachPill(
+                        done
+                            ? 'סיבוב מלא ✓ אפשר לעצור'
+                            : 'עמדו במקום וסובבו לאט סיבוב שלם',
+                        bg: done
+                            ? Colors.green.withValues(alpha: 0.85)
+                            : Colors.black.withValues(alpha: 0.6),
+                      ),
+                      const SizedBox(height: 18),
+                      CustomPaint(
+                        size: const Size(240, 240),
+                        painter: _YawRingPainter(
+                            yawDeg: yaw, tooFast: tooFast && !done),
+                      ),
+                      const SizedBox(height: 18),
+                      // "Slow down" hint only while actually spinning too fast.
+                      if (tooFast && !done)
+                        _coachPill('סובב יותר לאט 🐢',
+                            bg: AppColors.coral.withValues(alpha: 0.92)),
+                    ],
+                  );
+                },
               ),
             ),
 
@@ -450,6 +541,10 @@ class _PanoramaVideoCaptureScreenState
                       onTap: _building ? null : () => Navigator.of(context).pop(),
                       child: _circle(IconsaxPlusLinear.close_circle),
                     ),
+                    const Spacer(),
+                    // 0.5× / 1× toggle — only when an ultra-wide lens is
+                    // reachable and we're not mid-build.
+                    if (_minZoom != null && !_building) _zoomToggle(),
                   ],
                 ),
               ),
@@ -608,6 +703,58 @@ class _PanoramaVideoCaptureScreenState
     );
   }
 
+  // Big, high-contrast coaching pill used by the rotation guidance.
+  Widget _coachPill(String text, {required Color bg}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              height: 1.35,
+              fontWeight: FontWeight.w900),
+        ),
+      );
+
+  // Big, clear 0.5× / 1× pill. Shows which view is active; tap flips it.
+  Widget _zoomToggle() {
+    return GestureDetector(
+      onTap: _toggleUltraWide,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _ultraWide ? '0.5×' : '1×',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _ultraWide ? 'רחב' : 'רגיל',
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _circle(IconData icon) => Container(
         width: 44,
         height: 44,
@@ -660,8 +807,9 @@ class _PanoramaVideoCaptureScreenState
 // Live yaw ring: the filled arc is how far you've turned (0→360). It turns green
 // at a full turn so an older user can SEE, at a glance, when one rotation is done.
 class _YawRingPainter extends CustomPainter {
-  _YawRingPainter({required this.yawDeg});
+  _YawRingPainter({required this.yawDeg, this.tooFast = false});
   final double yawDeg;
+  final bool tooFast; // turning too fast → warn on the arc colour
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -671,12 +819,20 @@ class _YawRingPainter extends CustomPainter {
     final frac = (yawDeg / 360).clamp(0.0, 1.0);
     final done = frac >= 0.999;
 
+    // Arc colour: green when a full turn is reached, coral while turning too
+    // fast (visual echo of the "slow down" hint), otherwise the brand colour.
+    final arcColor = done
+        ? Colors.greenAccent
+        : tooFast
+            ? AppColors.coral
+            : AppColors.primary;
+
     canvas.drawCircle(
         c,
         r,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 12
+          ..strokeWidth = 14
           ..color = Colors.white24);
     canvas.drawArc(
         rect,
@@ -685,9 +841,9 @@ class _YawRingPainter extends CustomPainter {
         false,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 12
+          ..strokeWidth = 14
           ..strokeCap = StrokeCap.round
-          ..color = done ? Colors.greenAccent : AppColors.primary);
+          ..color = arcColor);
 
     final label = done ? 'סיבוב מלא ✓' : '${(frac * 360).round()}°';
     final tp = TextPainter(
@@ -695,7 +851,7 @@ class _YawRingPainter extends CustomPainter {
           text: label,
           style: TextStyle(
               color: done ? Colors.greenAccent : Colors.white,
-              fontSize: done ? 24 : 32,
+              fontSize: done ? 26 : 34,
               fontWeight: FontWeight.w900)),
       textDirection: TextDirection.rtl,
     )..layout();
@@ -703,5 +859,6 @@ class _YawRingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _YawRingPainter old) => old.yawDeg != yawDeg;
+  bool shouldRepaint(covariant _YawRingPainter old) =>
+      old.yawDeg != yawDeg || old.tooFast != tooFast;
 }

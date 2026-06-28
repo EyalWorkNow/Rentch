@@ -2411,22 +2411,27 @@ class _StepPhotos extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 18),
-                const Divider(height: 1, color: AppColors.borderLight),
-                const SizedBox(height: 16),
-                _Scan3dPanel(
-                  tour: scanTourDraft,
-                  isSubmitting: isScanSubmitting,
-                  isBackendConfigured: isScanBackendConfigured,
-                  onPickFromCamera: onPickScanFromCamera,
-                  onPickFromGallery: onPickScanFromGallery,
-                  onOpenRoomScan: onOpenRoomScan,
-                  roomScanCount: roomScanCount,
-                  onLinkScaniverse: onLinkScaniverse,
-                  onImportScaniverseAssets: onImportScaniverseAssets,
-                  onClear: onClearScan,
-                ),
               ],
+              // The per-room 3D scan tool is ALWAYS available, independent of
+              // verified mode. "דירה מאומתת" only locks the PHOTO media (to force
+              // an in-app verification video); it must NOT hide the separate 3D
+              // room-scan tool. So _Scan3dPanel renders in BOTH verified and
+              // non-verified states.
+              const SizedBox(height: 18),
+              const Divider(height: 1, color: AppColors.borderLight),
+              const SizedBox(height: 16),
+              _Scan3dPanel(
+                tour: scanTourDraft,
+                isSubmitting: isScanSubmitting,
+                isBackendConfigured: isScanBackendConfigured,
+                onPickFromCamera: onPickScanFromCamera,
+                onPickFromGallery: onPickScanFromGallery,
+                onOpenRoomScan: onOpenRoomScan,
+                roomScanCount: roomScanCount,
+                onLinkScaniverse: onLinkScaniverse,
+                onImportScaniverseAssets: onImportScaniverseAssets,
+                onClear: onClearScan,
+              ),
               const SizedBox(height: 16),
               if (onCreatePanoramaTour != null)
                 _Panorama360Tile(
@@ -4518,7 +4523,36 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   PropertyVirtualTour? _scanTourDraft;
   PropertyModel3d? _model3dDraft;
   PropertyPanoramaTour? _panoramaTourDraft;
+  List<ScannedRoom> _roomScans = const [];
   Timer? _scanPollTimer;
+
+  // Opens the per-room 3D scan flow on the EDIT screen. Mirrors the add
+  // screen's _openRoomScan: keeps the rooms in screen state and surfaces the
+  // first viewable room through _model3dDraft so a save still carries 3D.
+  Future<void> _openRoomScan() async {
+    final result = await RoomScanFlowScreen.open(
+      context,
+      propertyId: widget.property.id,
+      initialRooms: _roomScans,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _roomScans = result;
+      final firstViewable = result.firstWhere(
+        (r) => r.hasViewableAsset,
+        orElse: () => const ScannedRoom(name: ''),
+      );
+      if (firstViewable.hasViewableAsset) {
+        _model3dDraft = (_model3dDraft ?? const PropertyModel3d()).copyWith(
+          glbUrl: firstViewable.meshGlbUrl ?? '',
+          plyUrl: firstViewable.splatUrl ?? '',
+          scanDate: DateTime.now(),
+        );
+      } else if (result.isEmpty) {
+        _model3dDraft = null;
+      }
+    });
+  }
 
   Future<void> _createPanoramaTour() async {
     final result = await Navigator.of(context).push<PropertyPanoramaTour>(
@@ -5307,6 +5341,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       _pickScanVideo(ImageSource.gallery),
                   onPickScanFromCamera: () =>
                       _pickScanVideo(ImageSource.camera),
+                  onOpenRoomScan: _openRoomScan,
+                  roomScanCount: _roomScans.length,
                   onLinkScaniverse: ScaniverseService.instance.isConfigured
                       ? () => _linkScaniverseScan()
                       : null,
