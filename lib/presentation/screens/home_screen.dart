@@ -23,7 +23,7 @@ import 'package:dating_app/presentation/widgets/animations/micro_animations.dart
 // to the compact .splat (12.84MB vs 95MB raw .ply) and hosted on S3, to eyeball
 // the 360+3D splat tour on a real device. Remove after verifying.
 const String _kDebugTestSplatUrl =
-    'https://rentch-media-543897290879.s3.us-east-1.amazonaws.com/scan3d/test/c44aa2d751974942a2deb90500297e78.splat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAX5IWOBB7VMKDBIJ7%2F20260629%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260629T143550Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=97c1162fe1a6cfdeb66af5978d5a2741c7830ed32daf822b9fa96fd680d25204';
+    'https://rentch-media-543897290879.s3.us-east-1.amazonaws.com/scan3d/test/img0108.splat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAX5IWOBB7VMKDBIJ7%2F20260629%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260629T170548Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=4d71a7bfffb1619f38ad29f6869275ddf9dc49fba0c48e7e06d6171a98dcec09';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -167,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Scan3dViewerScreen.open(
               context,
               splatUrl: _kDebugTestSplatUrl,
-              title: 'בדיקת ספלאט — IMG_9919',
+              title: 'בדיקת ספלאט — IMG_0108 (חדר קטן)',
             ),
           ),
           // RepaintBoundary isolates the (often animating) body from the
