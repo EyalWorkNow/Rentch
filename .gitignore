@@ -64,3 +64,8 @@ firebase-service-account.json
 ios/build/
 build/
 aws/lambda/router/node_modules/
+
+# Firebase Admin service account (FCM send) — SECRET, never commit
+aws/lambda/router/fcm-service-account.json
+aws/lambda/router/router.zip
+*.zip

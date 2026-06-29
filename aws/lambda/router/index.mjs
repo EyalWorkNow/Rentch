@@ -29,6 +29,10 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 // Pure-JS zip reader (bundled in node_modules) — KIRI returns the finished model
 // as a single ZIP, so we unzip it in-process to extract the .glb mesh / .ply splat.
 import AdmZip from 'adm-zip';
+// Node built-ins only — used to mint a Google OAuth token from the Firebase
+// service account (sign a JWT with RS256) and to load that account off disk.
+import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 const REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.S3_BUCKET;
@@ -110,6 +114,240 @@ const TABLES = {
 // the scheduled tour-notifier Lambda can push "your 3D tour is ready" to every
 // device a landlord owns. Created out-of-band (see deploy checklist).
 const DEVICE_TOKENS_TABLE = `${TABLE_PREFIX}device-tokens`;
+
+// ── Firebase Cloud Messaging (HTTP v1) — SENDING ─────────────────────────────
+// Push delivery using ONLY Node built-ins: we mint a Google OAuth access token
+// by signing a JWT with the service account's RSA private key, cache it in
+// module scope, and POST messages to the FCM v1 endpoint. Dead/unregistered
+// tokens are pruned from the owning user's row. Everything fails soft: if the
+// service account is missing or a send errors, the main request is never broken.
+const FCM_PROJECT_ID = 'mydatingapp-4c043';
+const FCM_SEND_URL = `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`;
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+
+// Load the service account JSON once (next to this file, bundled in the deploy
+// zip). Absent/garbage → fcmSA stays null and all sends become no-ops.
+let fcmSA = null;
+try {
+  fcmSA = JSON.parse(readFileSync(new URL('./fcm-service-account.json', import.meta.url), 'utf8'));
+  if (!fcmSA.client_email || !fcmSA.private_key) {
+    console.warn('FCM: service account JSON missing client_email/private_key — push disabled');
+    fcmSA = null;
+  }
+} catch (e) {
+  console.warn('FCM: no service account JSON — push disabled:', e.message);
+  fcmSA = null;
+}
+
+// Cached OAuth token { value, exp(ms epoch) } and an in-flight promise so that
+// concurrent sends don't each mint their own token.
+let _fcmToken = null;
+let _fcmTokenInflight = null;
+
+const b64url = (buf) => Buffer.from(buf)
+  .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+// Mint (or reuse) a Google OAuth access token for FCM. Cached until ~5 min
+// before expiry. Returns null if the service account is unavailable or the
+// token exchange fails (caller treats null as "push disabled").
+async function fcmAccessToken() {
+  if (!fcmSA) return null;
+  const now = Date.now();
+  if (_fcmToken && _fcmToken.exp - 5 * 60 * 1000 > now) return _fcmToken.value;
+  if (_fcmTokenInflight) return _fcmTokenInflight;
+
+  _fcmTokenInflight = (async () => {
+    try {
+      const iat = Math.floor(Date.now() / 1000);
+      const exp = iat + 3600;
+      const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+      const claims = b64url(JSON.stringify({
+        iss: fcmSA.client_email,
+        scope: FCM_SCOPE,
+        aud: GOOGLE_TOKEN_URL,
+        iat,
+        exp,
+      }));
+      const signingInput = `${header}.${claims}`;
+      const signer = crypto.createSign('RSA-SHA256');
+      signer.update(signingInput);
+      signer.end();
+      const signature = b64url(signer.sign(fcmSA.private_key));
+      const assertion = `${signingInput}.${signature}`;
+
+      const resp = await fetch(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          assertion,
+        }).toString(),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.access_token) {
+        console.warn('FCM: token exchange failed', resp.status, JSON.stringify(data).slice(0, 300));
+        return null;
+      }
+      const ttlMs = (Number(data.expires_in) || 3600) * 1000;
+      _fcmToken = { value: data.access_token, exp: Date.now() + ttlMs };
+      return _fcmToken.value;
+    } catch (e) {
+      console.warn('FCM: token exchange exception:', e.message);
+      return null;
+    } finally {
+      _fcmTokenInflight = null;
+    }
+  })();
+  return _fcmTokenInflight;
+}
+
+// Read a user's stored FCM device tokens (empty array on any miss).
+async function getUserTokens(userId) {
+  if (!userId) return [];
+  try {
+    const r = await ddb.send(new GetCommand({
+      TableName: DEVICE_TOKENS_TABLE, Key: { userId },
+    }));
+    return (r.Item && Array.isArray(r.Item.tokens)) ? r.Item.tokens : [];
+  } catch { return []; }
+}
+
+// Remove dead tokens from a user's row (best-effort; never throws).
+async function pruneUserTokens(userId, deadSet) {
+  if (!deadSet || deadSet.size === 0) return;
+  try {
+    const current = await getUserTokens(userId);
+    const kept = current.filter((t) => !deadSet.has(t));
+    if (kept.length === current.length) return;
+    await ddb.send(new PutCommand({
+      TableName: DEVICE_TOKENS_TABLE,
+      Item: { userId, tokens: kept, updatedAt: new Date().toISOString() },
+    }));
+  } catch (e) {
+    console.warn('FCM: prune failed for', userId, e.message);
+  }
+}
+
+// Send a push to every device a user owns. notification = {title, body, data?}.
+// `data` values are coerced to strings (FCM v1 requires string-only data maps).
+// Prunes UNREGISTERED / invalid tokens. Returns the count that were accepted.
+// Fully fail-soft: returns 0 rather than throwing.
+async function sendPushToUser(userId, { title, body, data } = {}) {
+  try {
+    const token = await fcmAccessToken();
+    if (!token) return 0;
+    const tokens = await getUserTokens(userId);
+    if (tokens.length === 0) return 0;
+
+    const dataStr = {};
+    if (data && typeof data === 'object') {
+      for (const [k, v] of Object.entries(data)) {
+        if (v === undefined || v === null) continue;
+        dataStr[k] = typeof v === 'string' ? v : String(v);
+      }
+    }
+
+    const dead = new Set();
+    const results = await Promise.all(tokens.map(async (deviceToken) => {
+      try {
+        const message = {
+          token: deviceToken,
+          notification: { title: title || '', body: body || '' },
+          data: dataStr,
+          apns: { payload: { aps: { sound: 'default' } } },
+          android: { priority: 'high' },
+        };
+        const resp = await fetch(FCM_SEND_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message }),
+        });
+        if (resp.ok) return true;
+
+        const errBody = await resp.json().catch(() => ({}));
+        const status = errBody?.error?.status || '';
+        const fcmErr = errBody?.error?.details?.find?.(
+          (d) => d['@type']?.includes('FcmError'))?.errorCode || '';
+        // Dead token → prune it so we stop trying. 404 UNREGISTERED, or a 400
+        // that flags the registration token itself as invalid.
+        const isDead = resp.status === 404
+          || status === 'UNREGISTERED' || status === 'NOT_FOUND'
+          || fcmErr === 'UNREGISTERED' || fcmErr === 'INVALID_ARGUMENT'
+          || (resp.status === 400 && /registration token|not a valid fcm/i
+            .test(JSON.stringify(errBody)));
+        if (isDead) dead.add(deviceToken);
+        else {
+          console.warn('FCM: send failed', resp.status,
+            JSON.stringify(errBody).slice(0, 200));
+        }
+        return false;
+      } catch (e) {
+        console.warn('FCM: send exception:', e.message);
+        return false;
+      }
+    }));
+
+    if (dead.size > 0) await pruneUserTokens(userId, dead);
+    return results.filter(Boolean).length;
+  } catch (e) {
+    console.warn('FCM: sendPushToUser failed:', e.message);
+    return 0;
+  }
+}
+
+// Translate a successful table write into the right push (Hebrew copy). Called
+// fire-and-forget from the POST handler; fully fail-soft. Two highest-value
+// triggers are wired here:
+//   • property_likes → a tenant liked a landlord's property = a NEW MATCH;
+//                      push the property owner (landlord).
+//   • messages       → a NEW CHAT MESSAGE; push the other party in the thread.
+async function firePushForWrite(tableKey, body, senderUid) {
+  try {
+    if (tableKey === 'property_likes') {
+      const propertyId = body.propertyId;
+      if (!propertyId) return;
+      let ownerUid = null;
+      let propTitle = '';
+      try {
+        const prop = await ddb.send(new GetCommand({
+          TableName: TABLES.properties.name, Key: { id: propertyId },
+        }));
+        ownerUid = prop.Item && prop.Item.ownerUserId;
+        propTitle = (prop.Item && (prop.Item.street || prop.Item.city)) || '';
+      } catch { /* ignore */ }
+      if (!ownerUid || ownerUid === senderUid) return;
+      const who = body.tenantName || 'מתעניין חדש';
+      await sendPushToUser(ownerUid, {
+        title: 'התאמה חדשה! 🎉',
+        body: propTitle ? `${who} התעניין/ה בדירה שלך ב${propTitle}`
+          : `${who} התעניין/ה בדירה שלך`,
+        data: { type: 'match', propertyId: String(propertyId) },
+      });
+      return;
+    }
+
+    if (tableKey === 'messages') {
+      const matchId = body.matchId;
+      if (!matchId) return;
+      const recipient = await otherPartyOf(matchId, senderUid);
+      if (!recipient || recipient === senderUid) return;
+      const text = (body.text || body.body || '').toString();
+      const preview = text.length > 80 ? `${text.slice(0, 79)}…` : (text || 'הודעה חדשה');
+      await sendPushToUser(recipient, {
+        title: 'הודעה חדשה 💬',
+        body: preview,
+        data: { type: 'message', matchId: String(matchId) },
+      });
+      return;
+    }
+  } catch (e) {
+    console.warn('FCM: firePushForWrite failed:', e.message);
+  }
+}
 
 // Rental contracts (pk: id). Stores terms + each party's Ed25519 signature.
 // Only the contract's landlord or tenant can read/sign it.
@@ -270,6 +508,11 @@ export const handler = async (event) => {
         && method === 'POST') {
       return await handleRegisterToken(event);
     }
+    // POST /notifications/test → send a test push to the authenticated caller.
+    if (segments[0] === 'notifications' && segments[1] === 'test'
+        && method === 'POST') {
+      return await handleTestPush(event);
+    }
 
     // ── Two-sided match ranking (landlord's leads) ──────────────────────────
     if (segments[0] === 'match' && segments[1] === 'leads' && method === 'POST') {
@@ -371,7 +614,14 @@ export const handler = async (event) => {
         const writeId = tableKey === 'users'
           ? callerUid
           : (body.id || body.propertyId || body.userId);
-        return await putItem(table, writeId, body);
+        const written = await putItem(table, writeId, body);
+        // Fire-and-forget push notifications on real events. Never block or fail
+        // the write on a push problem — awaited so the Lambda doesn't get frozen
+        // mid-send, but every error is swallowed inside the helpers.
+        if (written.statusCode === 200) {
+          await firePushForWrite(tableKey, body, callerUid);
+        }
+        return written;
       }
       case 'PUT': {
         stampOwner(tableKey, body, callerUid);
@@ -420,6 +670,30 @@ async function isOwnerOf(propertyId, uid) {
   } catch (e) {
     console.error('isThreadMember property lookup failed:', e);
     return false;
+  }
+}
+
+// Resolve the OTHER party of a chat thread, given the sender. matchId encodes
+// the property + tenant; the two members are that tenant and the property's
+// owner (landlord). Returns the recipient uid, or null if undeterminable.
+async function otherPartyOf(matchId, senderUid) {
+  if (!matchId || !senderUid) return null;
+  const rest = matchId.startsWith('match-') ? matchId.slice(6) : matchId;
+  const sep = rest.lastIndexOf('~');
+  if (sep < 0) return null; // legacy threads: can't resolve a single counterpart
+  const propertyId = rest.slice(0, sep);
+  const tenantUid = rest.slice(sep + 1);
+  try {
+    const prop = await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name, Key: { id: propertyId },
+    }));
+    const ownerUid = prop.Item && prop.Item.ownerUserId;
+    if (!ownerUid) return senderUid === tenantUid ? null : tenantUid;
+    if (senderUid === tenantUid) return ownerUid;     // tenant → landlord
+    if (senderUid === ownerUid) return tenantUid;     // landlord → tenant
+    return tenantUid; // sender is neither (shouldn't happen) — default to tenant
+  } catch {
+    return senderUid === tenantUid ? null : tenantUid;
   }
 }
 
@@ -1820,6 +2094,27 @@ async function getScan3d(event, jobId) {
       completedAt: Date.now(),
     };
     await putScan3dMeta(jobId, updated);
+
+    // 3D/tour just became READY (one-time transition: meta was 'processing'
+    // until this write). Push the property's owner. Fire-and-forget; swallow.
+    if (meta.propertyId) {
+      try {
+        const prop = await ddb.send(new GetCommand({
+          TableName: TABLES.properties.name, Key: { id: meta.propertyId },
+        }));
+        const ownerUid = prop.Item && prop.Item.ownerUserId;
+        if (ownerUid) {
+          const where = (prop.Item.street || prop.Item.city) || '';
+          await sendPushToUser(ownerUid, {
+            title: 'הסיור התלת-ממדי מוכן! 🏠',
+            body: where ? `הסיור התלת-ממדי של הדירה ב${where} מוכן לצפייה`
+              : 'הסיור התלת-ממדי של הדירה שלך מוכן לצפייה',
+            data: { type: 'tour_ready', propertyId: String(meta.propertyId), jobId: String(jobId) },
+          });
+        }
+      } catch (e) { console.warn('FCM: tour-ready push failed:', e.message); }
+    }
+
     return json(200, { status: 'ready', meshGlbUrl, splatUrl, plyUrl });
   } catch (e) {
     console.warn('KIRI poll exception', e.message);
@@ -2795,6 +3090,21 @@ async function handleRegisterToken(event) {
     Item: { userId: uid, tokens, platform, updatedAt: now },
   }));
   return json(200, { ok: true, count: tokens.length });
+}
+
+// POST /notifications/test → send a test push to the caller's own devices.
+// Handy for end-to-end verification once a device token is registered.
+async function handleTestPush(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const sent = await sendPushToUser(uid, {
+    title: (body.title || 'בדיקת התראות 🔔').toString(),
+    body: (body.body || 'אם קיבלת את זה — ההתראות עובדות!').toString(),
+    data: { type: 'test' },
+  });
+  return json(200, { ok: true, sent });
 }
 
 // POST /match/leads → rank the tenants who liked the caller's properties by the
