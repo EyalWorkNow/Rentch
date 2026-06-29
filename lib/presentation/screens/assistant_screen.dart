@@ -967,7 +967,12 @@ class _AssistantScreenState extends State<AssistantScreen>
           ),
           child: SafeArea(
             top: false,
-            child: Column(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.82,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1114,6 +1119,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                   ),
                 ),
               ],
+                ),
+              ),
             ),
           ),
         ),
@@ -1142,6 +1149,9 @@ class _AssistantScreenState extends State<AssistantScreen>
             const SizedBox(height: 6),
             Text(
               label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -1311,7 +1321,12 @@ class _DraftSheet extends StatelessWidget {
           ),
           child: SafeArea(
             top: false,
-            child: Column(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.82,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1444,6 +1459,8 @@ class _DraftSheet extends StatelessWidget {
                   ),
                 ),
               ],
+                ),
+              ),
             ),
           ),
         ),

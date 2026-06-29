@@ -86,68 +86,101 @@ class ErikOrbStage extends StatelessWidget {
     final idle = state == ErikState.idle && !callActive;
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 6, 22, 18),
-        child: Column(
-          children: [
-            _statusChip(),
-            const Spacer(flex: 3),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // The screen must fit on a short phone AND breathe on a tall one, so
+          // the orb and the gaps scale with the available height rather than
+          // relying on fixed sizes that overflow.
+          final h = constraints.maxHeight;
+          final w = constraints.maxWidth;
 
-            // ── The orb — the centerpiece. Tap to start / stop the talk. ──────
-            GestureDetector(
-              onTap: onTapOrb,
-              behavior: HitTestBehavior.opaque,
-              child: ErikPresence(
-                size: 216,
-                state: state,
-                accent: ErikTokens.accent,
-                accentGlow: ErikTokens.accentGlow,
-                soundLevel: soundLevel,
-              ),
-            ),
+          // Orb diameter scales with the smaller of width/height; the presence
+          // widget paints inside a field 1.85× this, so we cap so the field
+          // never dominates a small screen.
+          final orbSize = (h * 0.30)
+              .clamp(132.0, 216.0)
+              .clamp(0.0, (w - 24) / 1.85)
+              .toDouble();
 
-            const SizedBox(height: ErikTokens.s3),
+          // Vertical rhythm scales gently with height (tight on small phones).
+          final gap = (h * 0.02).clamp(8.0, 22.0).toDouble();
 
-            // ── Status line ───────────────────────────────────────────────────
-            AnimatedSwitcher(
-              duration: ErikTokens.mBase,
-              child: Text(
-                statusLine,
-                key: ValueKey(statusLine),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: idle ? ErikTokens.inkSoft : _accent,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                  height: 1.2,
-                  letterSpacing: 0.2,
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Column(
+              children: [
+                _statusChip(),
+                SizedBox(height: gap),
+
+                // ── The orb — the centerpiece. Tap to start / stop the talk. ──
+                // FittedBox lets the orb shrink to whatever vertical room the
+                // Flexible region offers, so its glow-field never overflows on a
+                // short screen (or with the keyboard / a panel pushing up).
+                Flexible(
+                  flex: 6,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: onTapOrb,
+                      behavior: HitTestBehavior.opaque,
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: ErikPresence(
+                          size: orbSize,
+                          state: state,
+                          accent: ErikTokens.accent,
+                          accentGlow: ErikTokens.accentGlow,
+                          soundLevel: soundLevel,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+
+                // ── Status line ───────────────────────────────────────────────
+                AnimatedSwitcher(
+                  duration: ErikTokens.mBase,
+                  child: Text(
+                    statusLine,
+                    key: ValueKey(statusLine),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: idle ? ErikTokens.inkSoft : _accent,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: gap),
+
+                // ── Live waveform ─────────────────────────────────────────────
+                ErikWaveform(
+                  t: clock,
+                  level: soundLevel.value,
+                  active: callActive && !connecting,
+                  color: _accent,
+                  height: 44,
+                ),
+
+                // ── Minimal reply area (Erik's latest words + user's last line)─
+                Flexible(
+                  flex: 5,
+                  child: Center(child: _replyArea(idle: idle)),
+                ),
+
+                SizedBox(height: gap),
+
+                // ── Minimal control row: mic · keyboard · end ─────────────────
+                _controls(),
+                const SizedBox(height: ErikTokens.s1),
+              ],
             ),
-
-            const SizedBox(height: ErikTokens.s4),
-
-            // ── Live waveform ─────────────────────────────────────────────────
-            ErikWaveform(
-              t: clock,
-              level: soundLevel.value,
-              active: callActive && !connecting,
-              color: _accent,
-              height: 48,
-            ),
-
-            const Spacer(flex: 2),
-
-            // ── Minimal reply area (Erik's latest words + user's last line) ────
-            _replyArea(idle: idle),
-
-            const Spacer(flex: 3),
-
-            // ── Minimal control row: mic · keyboard · end ─────────────────────
-            _controls(),
-            const SizedBox(height: ErikTokens.s1),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -202,10 +235,10 @@ class ErikOrbStage extends StatelessWidget {
                     ? 'אריק עונה לך...'
                     : 'אני מקשיב — דבר חופשי על הדירה.';
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 96, maxHeight: 188),
-      child: SingleChildScrollView(
-        reverse: true,
+    return SingleChildScrollView(
+      reverse: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -234,51 +267,56 @@ class ErikOrbStage extends StatelessWidget {
   }
 
   Widget _controls() {
+    // Equal-width cells (Expanded) so the row never overflows on narrow phones;
+    // the big mic stays visually centred and every label sits on one baseline.
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Mute / unmute Erik's voice.
-        _CallButton(
-          icon: voiceOn
-              ? IconsaxPlusBold.volume_high
-              : IconsaxPlusLinear.volume_slash,
-          label: voiceOn ? 'קול פעיל' : 'מושתק',
-          color: ErikTokens.inkSoft,
-          background: ErikTokens.glassHi,
-          onTap: onToggleVoice,
+        Expanded(
+          child: _CallButton(
+            icon: voiceOn
+                ? IconsaxPlusBold.volume_high
+                : IconsaxPlusLinear.volume_slash,
+            label: voiceOn ? 'קול פעיל' : 'מושתק',
+            color: ErikTokens.inkSoft,
+            background: ErikTokens.glassHi,
+            onTap: onToggleVoice,
+          ),
         ),
-        const SizedBox(width: 22),
         // The big primary mic — start / stop the conversation (same as the orb).
-        _CallButton(
-          icon: callActive
-              ? IconsaxPlusBold.microphone_2
-              : IconsaxPlusBold.microphone_2,
-          label: callActive ? 'מקשיב...' : 'דבר',
-          color: Colors.white,
-          background: callActive ? ErikTokens.danger : ErikTokens.accent,
-          big: true,
-          glow: true,
-          clock: clock,
-          onTap: onToggleMic,
+        Expanded(
+          child: _CallButton(
+            icon: IconsaxPlusBold.microphone_2,
+            label: callActive ? 'מקשיב...' : 'דבר',
+            color: Colors.white,
+            background: callActive ? ErikTokens.danger : ErikTokens.accent,
+            big: true,
+            glow: true,
+            clock: clock,
+            onTap: onToggleMic,
+          ),
         ),
-        const SizedBox(width: 22),
         // Keyboard fallback — reveal the text composer.
-        _CallButton(
-          icon: IconsaxPlusLinear.keyboard,
-          label: 'מקלדת',
-          color: ErikTokens.inkSoft,
-          background: ErikTokens.glassHi,
-          onTap: onOpenKeyboard,
+        Expanded(
+          child: _CallButton(
+            icon: IconsaxPlusLinear.keyboard,
+            label: 'מקלדת',
+            color: ErikTokens.inkSoft,
+            background: ErikTokens.glassHi,
+            onTap: onOpenKeyboard,
+          ),
         ),
-        const SizedBox(width: 22),
         // End / close.
-        _CallButton(
-          icon: IconsaxPlusBold.close_circle,
-          label: 'סגור',
-          color: ErikTokens.inkSoft,
-          background: ErikTokens.glassHi,
-          onTap: onClose,
+        Expanded(
+          child: _CallButton(
+            icon: IconsaxPlusBold.close_circle,
+            label: 'סגור',
+            color: ErikTokens.inkSoft,
+            background: ErikTokens.glassHi,
+            onTap: onClose,
+          ),
         ),
       ],
     );
@@ -478,33 +516,50 @@ class _CallButton extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: dim,
-            height: dim,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: background,
-              border:
-                  glow ? null : Border.all(color: ErikTokens.line, width: 1.2),
-              boxShadow: glow
-                  ? [
-                      BoxShadow(
-                        color: background.withValues(alpha: 0.40 + 0.16 * t),
-                        blurRadius: 26 + 10 * t,
-                        spreadRadius: 1 + 1.5 * t,
-                        offset: const Offset(0, 10),
-                      ),
-                    ]
-                  : null,
+        // Fixed 76-high slot keeps every label on one baseline regardless of
+        // whether the circle is the big mic (76) or a small control (56).
+        SizedBox(
+          height: 76,
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: onTap,
+                customBorder: const CircleBorder(),
+                child: Ink(
+                  width: dim,
+                  height: dim,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: background,
+                    border: glow
+                        ? null
+                        : Border.all(color: ErikTokens.line, width: 1.2),
+                    boxShadow: glow
+                        ? [
+                            BoxShadow(
+                              color:
+                                  background.withValues(alpha: 0.40 + 0.16 * t),
+                              blurRadius: 26 + 10 * t,
+                              spreadRadius: 1 + 1.5 * t,
+                              offset: const Offset(0, 10),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(icon, color: color, size: big ? 30 : 23),
+                ),
+              ),
             ),
-            child: Icon(icon, color: color, size: big ? 30 : 23),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: const TextStyle(
             color: ErikTokens.muted,
             fontSize: 12,

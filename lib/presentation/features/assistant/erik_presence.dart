@@ -403,9 +403,14 @@ class ErikWaveform extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final idle = idleColor ?? color.withValues(alpha: 0.30);
+    // The bar set has a fixed intrinsic width; FittedBox scales it down to the
+    // available width so it never overflows on a narrow phone.
     return SizedBox(
       height: height,
-      child: Row(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: List.generate(bars, (index) {
@@ -427,6 +432,7 @@ class ErikWaveform extends StatelessWidget {
             ),
           );
         }),
+        ),
       ),
     );
   }
