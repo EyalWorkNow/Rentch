@@ -1,9 +1,17 @@
 part of '../property_detail_screen.dart';
 
-/// Gallery Editorial (`galleryEditorial`) — an edge-to-edge 385px hero with the
-/// top bar overlaid in the safe area, then an editorial text block (title,
-/// location, transaction capsule, price), followed by the shared parity block.
-/// Uses only shared building blocks; self-contained and designer-owned.
+/// Gallery Editorial (`galleryEditorial`) — a luxury real-estate MAGAZINE
+/// spread. A big, confident edge-to-edge hero (reaching the very top, with the
+/// top bar overlaid in the safe area) opens the feature; below it an editorial
+/// masthead lays out a kicker rule, a large display title, a refined location
+/// line, an editorial price line and a magazine-style "spec ledger" of stat
+/// columns, followed by a factual lede built from REAL data — then a centered
+/// section ornament leads into the complete shared parity block.
+///
+/// Self-contained and designer-owned: uses only shared building blocks plus the
+/// small private helpers defined in this file. No section is duplicated — every
+/// gallery / facts / owner / reviews / map / tour / match section is rendered
+/// exactly once, by [_ParitySections].
 class _GalleryEditorialTemplate extends StatelessWidget {
   const _GalleryEditorialTemplate({
     required this.property,
@@ -31,8 +39,59 @@ class _GalleryEditorialTemplate extends StatelessWidget {
   final VoidCallback onShareTap;
   final VoidCallback onTour;
 
+  static const double _heroHeight = 440;
+
+  // Editorial ink colours derived from the brand's secondary (text) colour so
+  // the magazine reads as one tasteful, on-brand palette — never hard-coded.
+  Color get _ink => branding.secondaryColor;
+  Color get _inkMuted => branding.secondaryColor.withValues(alpha: 0.55);
+  Color get _hairline => branding.secondaryColor.withValues(alpha: 0.12);
+
+  /// The editorial kicker: `type · neighborhood` (or city) in small caps. Falls
+  /// back gracefully so it always reads as a real, complete label.
+  String get _kicker {
+    final type = property.propertyType.trim();
+    final place = property.neighborhood.trim().isNotEmpty
+        ? property.neighborhood.trim()
+        : property.city.trim();
+    if (type.isNotEmpty && place.isNotEmpty) return '$type · $place';
+    if (type.isNotEmpty) return type;
+    return place.isNotEmpty ? place : 'נכס נבחר';
+  }
+
+  /// The display title — the headline of the feature.
+  String get _displayTitle {
+    if (property.street.trim().isNotEmpty) {
+      final number = property.streetNumber > 0 ? ' ${property.streetNumber}' : '';
+      return '${property.propertyType} ב${property.street}$number';
+    }
+    return property.address;
+  }
+
+  /// A factual lede paragraph composed strictly from REAL listing data — no
+  /// invented prose. Reads like an editorial standfirst introducing the home.
+  String get _lede {
+    final parts = <String>[];
+    parts.add('${property.roomsLabel} חדרים');
+    if (property.sizeM2 > 0) parts.add('${property.sizeM2} מ״ר');
+    if (property.floor.trim().isNotEmpty) {
+      final total = property.totalFloors.trim();
+      parts.add(total.isNotEmpty
+          ? 'קומה ${property.floor} מתוך $total'
+          : 'קומה ${property.floor}');
+    }
+    if (property.condition.trim().isNotEmpty) parts.add(property.condition.trim());
+    final spec = parts.join(' · ');
+    final place = property.neighborhood.trim().isNotEmpty
+        ? '${property.neighborhood.trim()}, ${property.city}'
+        : property.city;
+    return '${property.propertyType} ב$place. $spec.';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
@@ -40,115 +99,19 @@ class _GalleryEditorialTemplate extends StatelessWidget {
           child: Padding(
             // Edge-to-edge hero: no top padding so the image reaches the very
             // top; the top bar is overlaid inside the status-bar safe area.
+            // Bottom padding clears the floating bottom bar.
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 124),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  height: 385,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: _TemplateHeroMedia(
-                          property: property,
-                          controller: controller,
-                          currentPage: currentPage,
-                          onPageChanged: onPageChanged,
-                          height: 385,
-                          radius: 0,
-                        ),
-                      ),
-                      Positioned(
-                        top: MediaQuery.of(context).padding.top + 12,
-                        left: 20,
-                        right: 20,
-                        child: _TemplateTopBar(
-                          branding: branding,
-                          title: '',
-                          dark: true,
-                          onBackTap: onBackTap,
-                          onShareTap: onShareTap,
-                        ),
-                      ),
-                    ],
-                  ),
+                _buildHero(context, topInset),
+                _buildMasthead(context),
+                const SizedBox(height: 24),
+                _EditorialDivider(
+                  hairline: _hairline,
+                  accent: branding.primaryColor,
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        property.street.isNotEmpty
-                            ? '${property.propertyType} ב${property.street}'
-                            : property.address,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: branding.secondaryColor,
-                          fontSize: 25,
-                          fontWeight: FontWeight.w900,
-                          height: 1.08,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(IconsaxPlusLinear.location,
-                              size: 15, color: branding.primaryColor),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              property.address,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: branding.secondaryColor
-                                    .withValues(alpha: 0.62),
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      _StatusCapsule(
-                        label: property.transactionLabel,
-                        fg: branding.secondaryColor,
-                        bg: const Color(0xFFF3F4F6),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            property.priceLabel,
-                            style: TextStyle(
-                              color: branding.secondaryColor,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              property.priceSuffixLabel,
-                              style: TextStyle(
-                                color: branding.secondaryColor
-                                    .withValues(alpha: 0.55),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 20),
                 _ParitySections(
                   property: property,
                   branding: branding,
@@ -166,4 +129,366 @@ class _GalleryEditorialTemplate extends StatelessWidget {
       ],
     );
   }
+
+  // ── Hero ────────────────────────────────────────────────────────────────
+  Widget _buildHero(BuildContext context, double topInset) {
+    return SizedBox(
+      height: _heroHeight,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: _TemplateHeroMedia(
+              property: property,
+              controller: controller,
+              currentPage: currentPage,
+              onPageChanged: onPageChanged,
+              height: _heroHeight,
+              radius: 0,
+            ),
+          ),
+          // Soft top scrim so the overlaid controls stay readable over any
+          // image, and a bottom scrim anchoring the overlaid kicker.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.0, 0.32, 0.7, 1.0],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.40),
+                      Colors.black.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.10),
+                      Colors.black.withValues(alpha: 0.52),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: topInset + 12,
+            left: 20,
+            right: 20,
+            child: _TemplateTopBar(
+              branding: branding,
+              title: '',
+              dark: true,
+              onBackTap: onBackTap,
+              onShareTap: onShareTap,
+            ),
+          ),
+          // Editorial overlay low on the image: a thin rule + a small-caps
+          // "feature" kicker, the magazine signature of this template.
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 26,
+            child: IgnorePointer(
+              child: Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 2,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      property.transactionType == PropertyTransactionType.sale
+                          ? 'נכס למכירה'
+                          : 'נכס להשכרה',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3.5,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Masthead (editorial text block) ───────────────────────────────────────
+  Widget _buildMasthead(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Kicker rule — small caps over a hairline, magazine section label.
+          Text(
+            _kicker.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: branding.primaryColor,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2.2,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(height: 1, color: _hairline),
+          const SizedBox(height: 16),
+
+          // Display headline.
+          Text(
+            _displayTitle,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: _ink,
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              height: 1.06,
+              letterSpacing: -0.8,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Location line.
+          Row(
+            children: [
+              Icon(IconsaxPlusLinear.location,
+                  size: 16, color: branding.primaryColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  property.address,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _inkMuted,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+
+          // Editorial lede — a factual standfirst built from real data.
+          Text(
+            _lede,
+            style: TextStyle(
+              color: branding.secondaryColor.withValues(alpha: 0.78),
+              fontSize: 16,
+              height: 1.6,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Editorial price line — large price + suffix + price-per-m² caption.
+          _buildPriceBlock(),
+          const SizedBox(height: 24),
+
+          // Magazine "spec ledger": stat columns split by vertical hairlines.
+          _SpecLedger(
+            property: property,
+            ink: _ink,
+            muted: _inkMuted,
+            hairline: _hairline,
+            accent: branding.primaryColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceBlock() {
+    final ppm = property.pricePerSquareMeter;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              property.priceLabel,
+              style: TextStyle(
+                color: _ink,
+                fontSize: 38,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+                letterSpacing: -1.0,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                property.priceSuffixLabel,
+                style: TextStyle(
+                  color: _inkMuted,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (ppm != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            '₪${_editorialNumber(ppm)} למ״ר',
+            style: TextStyle(
+              color: _inkMuted,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Magazine-style stat ledger: equal stat columns separated by vertical
+/// hairlines. Big, legible numerals over small-caps labels — easy for older
+/// users to scan. Only renders columns backed by real data.
+class _SpecLedger extends StatelessWidget {
+  const _SpecLedger({
+    required this.property,
+    required this.ink,
+    required this.muted,
+    required this.hairline,
+    required this.accent,
+  });
+
+  final RentalProperty property;
+  final Color ink;
+  final Color muted;
+  final Color hairline;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <_SpecEntry>[
+      _SpecEntry(property.roomsLabel, 'חדרים'),
+      if (property.sizeM2 > 0) _SpecEntry('${property.sizeM2}', 'מ״ר'),
+      if (property.floor.trim().isNotEmpty)
+        _SpecEntry(property.floor, 'קומה'),
+      if (property.totalFloors.trim().isNotEmpty)
+        _SpecEntry(property.totalFloors, 'קומות'),
+    ];
+
+    final columns = <Widget>[];
+    for (var i = 0; i < entries.length; i++) {
+      if (i > 0) {
+        columns.add(Container(width: 1, height: 38, color: hairline));
+      }
+      columns.add(Expanded(child: _column(entries[i])));
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: hairline),
+          bottom: BorderSide(color: hairline),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: columns,
+      ),
+    );
+  }
+
+  Widget _column(_SpecEntry e) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          e.value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: ink,
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            height: 1.0,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          e.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: muted,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SpecEntry {
+  const _SpecEntry(this.value, this.label);
+  final String value;
+  final String label;
+}
+
+/// A centered editorial section ornament: a hairline rule broken by a small
+/// brand-accent diamond — the typographic "section break" of the magazine.
+class _EditorialDivider extends StatelessWidget {
+  const _EditorialDivider({required this.hairline, required this.accent});
+
+  final Color hairline;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          Expanded(child: Container(height: 1, color: hairline)),
+          const SizedBox(width: 12),
+          Transform.rotate(
+            angle: 0.785398, // 45° — a refined diamond mark.
+            child: Container(
+              width: 7,
+              height: 7,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Container(height: 1, color: hairline)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Formats an integer with thin grouping for the editorial price caption.
+String _editorialNumber(int value) {
+  final s = value.abs().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
+  }
+  return (value < 0 ? '-' : '') + buf.toString();
 }

@@ -1,8 +1,15 @@
 part of '../property_detail_screen.dart';
 
-/// Aura Hero (a.k.a. `acidHero`) — centered brand mark + address, a tall rounded
-/// hero with a glass owner card + size badge overlay, a glass "floor" pill, and
-/// a clean white price card, followed by the shared full-parity content block.
+/// Aura Hero (a.k.a. `acidHero`) — the most EXPRESSIVE template. An edge-to-edge
+/// hero that reaches the very top of the screen, washed by a vibrant brand
+/// "aura" gradient, with glass safe-area controls and a glowing rating chip
+/// overlaid low on the image. Below the hero, a vivid aura panel carries
+/// oversized price typography, the transaction badge, and a quick-facts rail —
+/// then the shared full-parity content block renders every remaining section.
+///
+/// The aura gradient is built FROM the live brand palette (`branding` +
+/// runtime-swappable [AppColors.primary]) so it re-themes for brokers (black)
+/// vs. tenants (teal) without hard-coded accents.
 ///
 /// Self-contained, designer-owned unit. Exclusive helper widgets used only by
 /// this layout ([_AcidHeroOverlay], [_GlassFilterPill], [_AcidPriceCard]) live
@@ -39,83 +46,96 @@ class _AuraHeroTemplate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+    // Aura accent derived from the live brand palette so it re-themes correctly.
+    final aura = branding.primaryColor;
+
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
+          // Edge-to-edge: no top padding so the hero reaches the very top; the
+          // top bar is overlaid inside the status-bar safe area.
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              22,
-              MediaQuery.of(context).padding.top + 8,
-              22,
-              124,
-            ),
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 128),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Empty title → renders the broker brand logo mark (not the
-                // owner's name, which previously read oddly as a page title).
-                _TemplateTopBar(
-                  branding: branding,
-                  title: '',
-                  dark: false,
-                  onBackTap: onBackTap,
-                  onShareTap: onShareTap,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  property.address,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: branding.secondaryColor,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
+                // ── Edge-to-edge hero with overlaid glass controls ──────────
+                SizedBox(
+                  // Tall, immersive hero (extends under the status bar).
+                  height: 440 + topInset,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _TemplateHeroMedia(
+                          property: property,
+                          controller: controller,
+                          currentPage: currentPage,
+                          onPageChanged: onPageChanged,
+                          height: 440 + topInset,
+                          radius: 0,
+                          overlay: _AcidHeroOverlay(
+                            property: property,
+                            branding: branding,
+                            avgRating: avgRating,
+                            aura: aura,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: topInset + 12,
+                        left: 18,
+                        right: 18,
+                        child: _TemplateTopBar(
+                          branding: branding,
+                          title: '',
+                          dark: true,
+                          onBackTap: onBackTap,
+                          onShareTap: onShareTap,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${property.city} · ${property.transactionLabel}',
-                  style: TextStyle(
-                    color: branding.secondaryColor.withValues(alpha: 0.68),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                // ── Vivid aura price panel (pulled up to overlap the hero) ──
+                Transform.translate(
+                  offset: const Offset(0, -34),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
+                    child: _AcidPriceCard(
+                      property: property,
+                      branding: branding,
+                      aura: aura,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                _TemplateHeroMedia(
-                  property: property,
-                  controller: controller,
-                  currentPage: currentPage,
-                  onPageChanged: onPageChanged,
-                  height: 320,
-                  radius: 34,
-                  overlay: _AcidHeroOverlay(
+                // ── Floor / type quick pill ─────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
+                  child: _GlassFilterPill(
+                    icon: IconsaxPlusLinear.layer,
+                    label: property.floor.isEmpty
+                        ? property.propertyType
+                        : 'קומה ${property.floor}',
+                    branding: branding,
+                    aura: aura,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // ── Shared full-parity content (no duplicates) ──────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: _ParitySections(
                     property: property,
                     branding: branding,
-                    avgRating: avgRating,
+                    controller: controller,
+                    reviews: reviews,
+                    hasVirtualTour: hasVirtualTour,
+                    isLandlordPreview: isLandlordPreview,
+                    onShareTap: onShareTap,
+                    onTour: onTour,
                   ),
-                ),
-                const SizedBox(height: 18),
-                _GlassFilterPill(
-                  icon: IconsaxPlusLinear.layer,
-                  label: property.floor.isEmpty
-                      ? property.propertyType
-                      : 'קומה ${property.floor}',
-                  branding: branding,
-                ),
-                const SizedBox(height: 18),
-                _AcidPriceCard(property: property, branding: branding),
-                const SizedBox(height: 26),
-                _ParitySections(
-                  property: property,
-                  branding: branding,
-                  controller: controller,
-                  reviews: reviews,
-                  hasVirtualTour: hasVirtualTour,
-                  isLandlordPreview: isLandlordPreview,
-                  onShareTap: onShareTap,
-                  onTour: onTour,
                 ),
               ],
             ),
@@ -126,105 +146,118 @@ class _AuraHeroTemplate extends StatelessWidget {
   }
 }
 
+/// Overlay painted on top of the edge-to-edge hero image: a bottom aura wash
+/// for legibility, the oversized address/city headline, a glowing rating chip,
+/// and a glass size badge. All colours derive from the brand palette.
 class _AcidHeroOverlay extends StatelessWidget {
   const _AcidHeroOverlay({
     required this.property,
     required this.branding,
     required this.avgRating,
+    required this.aura,
   });
 
   final RentalProperty property;
   final BrokerBrandingConfig branding;
   final double avgRating;
+  final Color aura;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
-        Positioned(
-          bottom: 22,
-          right: 22,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 11, 16, 11),
-                decoration: BoxDecoration(
-                  color: branding.secondaryColor.withValues(alpha: 0.46),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: branding.accentColor,
-                      child: Text(
-                        property.ownerName.isEmpty ? '?' : property.ownerName[0],
-                        style: TextStyle(
-                          color: branding.secondaryColor,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          property.ownerName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          avgRating > 0
-                              ? '${avgRating.toStringAsFixed(1)} דירוג'
-                              : 'מתווך נדל״ן',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.78),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+        // Vibrant aura wash: brand-tinted at the bottom for readable text,
+        // fading to transparent so the photo stays vivid up top.
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0.0, 0.42, 0.74, 1.0],
+                colors: [
+                  Colors.black.withValues(alpha: 0.26),
+                  Colors.transparent,
+                  aura.withValues(alpha: 0.42),
+                  branding.secondaryColor.withValues(alpha: 0.92),
+                ],
               ),
             ),
           ),
         ),
+        // Headline + rating sit low-left (logical-start in RTL).
         Positioned(
-          bottom: 22,
-          left: 22,
-          child: Container(
-            width: 66,
-            height: 66,
-            decoration: BoxDecoration(
-              color: branding.secondaryColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: Center(
-              child: Text(
-                '${property.sizeM2}\nמ״ר',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: branding.accentColor,
-                  fontSize: 13,
+          left: 20,
+          right: 20,
+          bottom: 50,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _AuraGlowChip(
+                    icon: IconsaxPlusBold.star_1,
+                    label: avgRating > 0
+                        ? avgRating.toStringAsFixed(1)
+                        : 'חדש',
+                    aura: aura,
+                    secondary: branding.secondaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  _AuraGlowChip(
+                    icon: IconsaxPlusLinear.maximize_3,
+                    label: '${property.sizeM2} מ״ר',
+                    aura: aura,
+                    secondary: branding.secondaryColor,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                property.address,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  height: 1.06,
+                  letterSpacing: -0.5,
                   fontWeight: FontWeight.w900,
-                  height: 1.05,
+                  shadows: [
+                    Shadow(
+                      color: Color(0x66000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
               ),
-            ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    IconsaxPlusBold.location,
+                    size: 16,
+                    color: Colors.white.withValues(alpha: 0.92),
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      '${property.city} · ${property.transactionLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.88),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
@@ -232,31 +265,98 @@ class _AcidHeroOverlay extends StatelessWidget {
   }
 }
 
+/// Small glowing glass chip used over the hero (rating / size). The glow tint
+/// comes from the live brand accent so it re-themes.
+class _AuraGlowChip extends StatelessWidget {
+  const _AuraGlowChip({
+    required this.icon,
+    required this.label,
+    required this.aura,
+    required this.secondary,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color aura;
+  final Color secondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+            boxShadow: [
+              BoxShadow(
+                color: aura.withValues(alpha: 0.45),
+                blurRadius: 18,
+                spreadRadius: -4,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Glass quick-fact pill (floor / property type) under the price panel.
 class _GlassFilterPill extends StatelessWidget {
   const _GlassFilterPill({
     required this.icon,
     required this.label,
     required this.branding,
+    required this.aura,
   });
 
   final IconData icon;
   final String label;
   final BrokerBrandingConfig branding;
+  final Color aura;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 62,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.60),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        color: aura.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: aura.withValues(alpha: 0.16)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: branding.secondaryColor, size: 20),
-          const SizedBox(width: 10),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: aura.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: aura, size: 21),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
@@ -264,7 +364,7 @@ class _GlassFilterPill extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: branding.secondaryColor,
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -275,64 +375,203 @@ class _GlassFilterPill extends StatelessWidget {
   }
 }
 
+/// The signature aura price card: a vivid brand-gradient panel with oversized
+/// price typography, a transaction badge, and a compact rooms/size/floor rail.
+/// The gradient is built FROM the brand palette so it re-themes per account.
 class _AcidPriceCard extends StatelessWidget {
   const _AcidPriceCard({
     required this.property,
     required this.branding,
+    required this.aura,
   });
 
   final RentalProperty property;
   final BrokerBrandingConfig branding;
+  final Color aura;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        borderRadius: BorderRadius.circular(30),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            branding.secondaryColor,
+            Color.lerp(branding.secondaryColor, aura, 0.55) ??
+                branding.secondaryColor,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: aura.withValues(alpha: 0.40),
+            blurRadius: 34,
+            spreadRadius: -8,
+            offset: const Offset(0, 16),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            property.propertyType,
-            style: TextStyle(
-              color: branding.secondaryColor,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  property.propertyType,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              // Transaction badge in the accent for a vivid pop.
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: branding.accentColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  property.transactionLabel,
+                  style: TextStyle(
+                    color: branding.secondaryColor,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+          // Oversized price headline.
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                property.priceLabel,
-                style: TextStyle(
-                  color: branding.secondaryColor,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
+              Flexible(
+                child: Text(
+                  property.priceLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 44,
+                    height: 1.0,
+                    letterSpacing: -1.2,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 7),
                 child: Text(
                   property.priceSuffixLabel,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.70),
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 18),
+          // Compact rooms / size / floor rail (legible over the gradient).
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            ),
+            child: Row(
+              children: [
+                _AuraStat(
+                  icon: IconsaxPlusBold.building,
+                  value: property.roomsLabel,
+                  label: 'חדרים',
+                ),
+                _AuraStatDivider(),
+                _AuraStat(
+                  icon: IconsaxPlusBold.maximize_3,
+                  value: '${property.sizeM2}',
+                  label: 'מ״ר',
+                ),
+                _AuraStatDivider(),
+                _AuraStat(
+                  icon: IconsaxPlusBold.layer,
+                  value: property.floor.isEmpty ? '—' : property.floor,
+                  label: 'קומה',
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _AuraStat extends StatelessWidget {
+  const _AuraStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 19, color: Colors.white.withValues(alpha: 0.90)),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.62),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuraStatDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 38,
+      color: Colors.white.withValues(alpha: 0.14),
     );
   }
 }
