@@ -11,6 +11,7 @@ import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
 import 'package:dating_app/presentation/screens/contract_form_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/swipe_to_confirm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -177,6 +178,92 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ContractFormScreen(matchId: matches.first.id),
+      ),
+    );
+  }
+
+  /// Entry point for the card's "חוזה" action.
+  ///
+  /// • If a contract already exists, opening it can lead to (re)sending it, so
+  ///   we first ask the landlord to slide-to-confirm before proceeding.
+  /// • If no contract exists yet, we offer a simple choice: create their own
+  ///   contract, or use Rently's standard lawyers' template — both continue to
+  ///   the existing ContractFormScreen (the form itself lets them pick the
+  ///   standard template vs. their own terms).
+  Future<void> _handleContractAction(
+    BuildContext context, {
+    required RentalContract? existing,
+    required List<RentalMatch> matches,
+  }) async {
+    if (existing != null) {
+      final ok = await SwipeToConfirmSheet.show(
+        context,
+        title: 'לשלוח חוזה?',
+        message: 'האם אתה בטוח שאתה רוצה לשלוח חוזה?',
+      );
+      if (!ok || !context.mounted) return;
+      _openContract(context, existing: existing, matches: matches);
+      return;
+    }
+
+    if (matches.isEmpty) {
+      // No match → no contract can be drafted yet. Reuse the existing notice.
+      _openContract(context, existing: null, matches: matches);
+      return;
+    }
+
+    final useOurs = await _askContractSource(context);
+    if (useOurs == null || !context.mounted) return;
+    // Both choices open the same form; the form defaults to (and lets the user
+    // pick) the standard Rently template, so no extra wiring is needed here.
+    _openContract(context, existing: null, matches: matches);
+  }
+
+  /// Simple, large-tap choice for an older user: create their own contract or
+  /// use Rently's standard template. Returns `true` for "ours", `false` for
+  /// "own", or `null` if dismissed.
+  Future<bool?> _askContractSource(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'איך תרצה ליצור את החוזה?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _ContractSourceButton(
+                icon: IconsaxPlusLinear.shield_tick,
+                title: 'להשתמש בחוזה שלנו',
+                subtitle: 'חוזה סטנדרטי מטעם עורכי הדין של Rently',
+                filled: true,
+                onTap: () => Navigator.of(ctx).pop(true),
+              ),
+              const SizedBox(height: 12),
+              _ContractSourceButton(
+                icon: IconsaxPlusLinear.edit_2,
+                title: 'ליצור חוזה משלך',
+                subtitle: 'מלא את התנאים בעצמך',
+                filled: false,
+                onTap: () => Navigator.of(ctx).pop(false),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -671,7 +758,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                                   property: property),
                                             ),
                                           ),
-                                          onPreview: () => Navigator.of(context).push(
+                                          onOpen: () => Navigator.of(context).push(
                                             MaterialPageRoute(
                                               builder: (_) => PropertyDetailScreen(
                                                 property: property,
@@ -679,7 +766,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
                                               ),
                                             ),
                                           ),
-                                          onContract: () => _openContract(
+                                          onContract: () => _handleContractAction(
                                             context,
                                             existing: contract,
                                             matches: propertyMatches,
@@ -710,7 +797,7 @@ class _PropertyManageCard extends StatelessWidget {
     required this.contractStatus,
     required this.onRemove,
     required this.onEdit,
-    required this.onPreview,
+    required this.onOpen,
     required this.onContract,
   });
 
@@ -719,7 +806,9 @@ class _PropertyManageCard extends StatelessWidget {
   final ContractStatus? contractStatus;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
-  final VoidCallback onPreview;
+
+  /// Tapping anywhere on the card opens the property (detail/preview).
+  final VoidCallback onOpen;
   final VoidCallback onContract;
 
   /// Short Hebrew label for the property's contract state, or null if none.
@@ -742,273 +831,238 @@ class _PropertyManageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: AspectRatio(
-        aspectRatio: 0.92,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _PropertyThumb(media: property.primaryMedia),
-              // Linear gradient overlay (smooth dark bottom)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.3),
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.85),
-                      ],
-                      stops: const [0.0, 0.45, 1.0],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        // Whole card is tappable → opens the property (detail/preview).
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onOpen,
+            child: AspectRatio(
+              // Shorter, more compact card.
+              aspectRatio: 1.55,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _PropertyThumb(media: property.primaryMedia),
+                  // Linear gradient overlay (smooth dark bottom)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.28),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.85),
+                          ],
+                          stops: const [0.0, 0.4, 1.0],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // Top Row for Glass Tags (Beds, Floor/Type, Size)
-              Positioned(
-                top: 16,
-                left: 16,
-                right: 16,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _GlassTag(
-                        icon: Icons.king_bed_outlined,
-                        label: '${property.roomsLabel} חדרים',
-                      ),
-                      const SizedBox(width: 8),
-                      _GlassTag(
-                        icon: Icons.layers_outlined,
-                        label: property.floor.isEmpty
-                            ? 'דירה'
-                            : 'קומה ${property.floor}',
-                      ),
-                      const SizedBox(width: 8),
-                      _GlassTag(
-                        icon: Icons.space_dashboard_outlined,
-                        label: '${property.sizeM2} מ״ר',
-                      ),
-                      if (_contractStatusLabel != null) ...[
+                  // Top Row: status dot + key glass tags + contract tag.
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    right: 12,
+                    child: Row(
+                      children: [
+                        _StatusDot(isActive: property.isActive),
                         const SizedBox(width: 8),
-                        _GlassTag(
-                          icon: Icons.description_outlined,
-                          label: 'חוזה: $_contractStatusLabel',
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              // Price, Address, and Action Buttons at the bottom
-              Positioned(
-                bottom: 20,
-                left: 20,
-                right: 20,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Price and Address Column
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Price
-                          Text(
-                            property.priceLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _GlassTag(
+                                  icon: Icons.king_bed_outlined,
+                                  label: '${property.roomsLabel} חד׳',
+                                ),
+                                const SizedBox(width: 6),
+                                _GlassTag(
+                                  icon: Icons.space_dashboard_outlined,
+                                  label: '${property.sizeM2} מ״ר',
+                                ),
+                                if (_contractStatusLabel != null) ...[
+                                  const SizedBox(width: 6),
+                                  _GlassTag(
+                                    icon: Icons.description_outlined,
+                                    label: 'חוזה: $_contractStatusLabel',
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          // Location Address
-                          Row(
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Bottom: price + address, with Contract & Edit actions.
+                  Positioned(
+                    bottom: 12,
+                    left: 14,
+                    right: 14,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.location_on_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  property.address,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              Text(
+                                property.priceLabel,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
                                 ),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_rounded,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(
+                                      property.address,
+                                      style: TextStyle(
+                                        color:
+                                            Colors.white.withValues(alpha: 0.9),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Actions Row (Contract, Preview, Edit and Status Indicator)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Contract Button (Glassmorphic White Circle) — makes
-                        // the contract flow reachable directly from the card.
-                        ScaleBounce(
-                          onTap: onContract,
-                          scaleDownTo: 0.88,
-                          child: ClipOval(
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white.withValues(alpha: 0.18),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.20),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: RentlyIcon(
-                                    IconsaxPlusLinear.document_text,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Preview Button (Glassmorphic White Circle)
-                        ScaleBounce(
-                          onTap: onPreview,
-                          scaleDownTo: 0.88,
-                          child: ClipOval(
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white.withValues(alpha: 0.18),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.20),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: RentlyIcon(
-                                    IconsaxPlusLinear.eye,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Edit Button (Glassmorphic White Circle)
-                        ScaleBounce(
-                          onTap: onEdit,
-                          scaleDownTo: 0.88,
-                          child: ClipOval(
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white.withValues(alpha: 0.18),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.20),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: RentlyIcon(
-                                    IconsaxPlusLinear.edit_2,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
                         ),
                         const SizedBox(width: 10),
-                        // Status Indicator Circle (Glassmorphic Green/Grey Circle)
-                        ClipOval(
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: property.isActive
-                                    ? AppColors.success.withValues(alpha: 0.25)
-                                    : Colors.white.withValues(alpha: 0.1),
-                                border: Border.all(
-                                  color: property.isActive
-                                      ? AppColors.success
-                                          .withValues(alpha: 0.40)
-                                      : Colors.white.withValues(alpha: 0.15),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Center(
-                                child: property.isActive
-                                    ? PulseWidget(
-                                        child: Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: AppColors.success,
-                                          ),
-                                        ),
-                                      )
-                                    : Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Colors.white60,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
+                        // Actions: Contract + Edit (eye removed — card tap opens).
+                        _GlassAction(
+                          icon: IconsaxPlusLinear.document_text,
+                          onTap: onContract,
+                        ),
+                        const SizedBox(width: 8),
+                        _GlassAction(
+                          icon: IconsaxPlusLinear.edit_2,
+                          onTap: onEdit,
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small glassmorphic circular action button used on the property card.
+class _GlassAction extends StatelessWidget {
+  const _GlassAction({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.88,
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.18),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.20),
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: RentlyIcon(icon, color: Colors.white, size: 16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact active/inactive indicator (replaces the large status circle).
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.isActive});
+
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isActive
+                ? AppColors.success.withValues(alpha: 0.25)
+                : Colors.white.withValues(alpha: 0.12),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.success.withValues(alpha: 0.40)
+                  : Colors.white.withValues(alpha: 0.15),
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: isActive
+                ? PulseWidget(
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  )
+                : Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white60,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -1253,6 +1307,95 @@ class _FilterPill extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Big, friendly choice row for the "create or use ours" contract sheet.
+class _ContractSourceButton extends StatelessWidget {
+  const _ContractSourceButton({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = filled ? Colors.white : AppColors.navy;
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.96,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: filled ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: filled ? AppColors.primary : AppColors.borderLight,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: filled
+                    ? Colors.white.withValues(alpha: 0.18)
+                    : AppColors.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: RentlyIcon(
+                  icon,
+                  color: filled ? Colors.white : AppColors.primary,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: filled
+                          ? Colors.white.withValues(alpha: 0.85)
+                          : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

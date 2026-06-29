@@ -9,6 +9,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/chat_provider.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
+import 'package:dating_app/presentation/widgets/swipe_to_confirm.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -453,12 +454,19 @@ class _MessageScreenState extends State<MessageScreen> {
         },
         onSendContract: match.contractSent
             ? null
-            : () {
+            : () async {
                 Navigator.pop(context);
                 final existing = provider.contractForMatch(match.id);
                 if (existing != null) {
                   _openContract(existing.id, match.id);
                 } else if (provider.isLandlord) {
+                  final confirmed = await SwipeToConfirmSheet.show(
+                    context,
+                    title: 'לשלוח חוזה?',
+                    message:
+                        'האם אתה בטוח שאתה רוצה לשלוח חוזה לצד השני?',
+                  );
+                  if (!confirmed || !mounted) return;
                   Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => ContractFormScreen(matchId: match.id),
                   ));
@@ -972,13 +980,6 @@ class _ActionsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       _ActionItem(
-        icon: IconsaxPlusLinear.document_text,
-        label: 'שליחת חוזה',
-        subtitle: match.contractSent ? 'החוזה כבר נשלח' : 'שלח טיוטה לשוכר',
-        enabled: !match.contractSent,
-        onTap: onSendContract,
-      ),
-      _ActionItem(
         icon: IconsaxPlusLinear.pen_tool,
         label: 'חתימת בעלים',
         subtitle: !match.contractSent
@@ -1059,6 +1060,11 @@ class _ActionsSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
+          _SendContractCard(
+            sent: match.contractSent,
+            onTap: onSendContract,
+          ),
+          const SizedBox(height: 6),
           ...actions.map((a) => _ActionTile(item: a)),
           const SizedBox(height: 8),
           const Divider(height: 1, color: Color(0xFFF0F5F8)),
@@ -1168,6 +1174,102 @@ class _QuickActionButton extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Prominent, on-brand "send contract" CTA card used in the actions sheet.
+class _SendContractCard extends StatelessWidget {
+  const _SendContractCard({required this.sent, required this.onTap});
+
+  final bool sent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = !sent && onTap != null;
+    final accent = enabled ? AppColors.primary : AppColors.textSecondary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: enabled
+                ? LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.14),
+                      AppColors.primaryLight2,
+                    ],
+                  )
+                : null,
+            color: enabled ? null : const Color(0xFFF3F8FB),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: enabled
+                  ? AppColors.primary.withValues(alpha: 0.30)
+                  : AppColors.borderLight,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: enabled ? accent : const Color(0xFFE6EDF2),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  sent
+                      ? IconsaxPlusLinear.tick_circle
+                      : IconsaxPlusLinear.document_text,
+                  size: 24,
+                  color: enabled ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'שליחת חוזה',
+                      style: TextStyle(
+                        color: enabled ? AppColors.navy : AppColors.textSecondary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      sent
+                          ? 'החוזה כבר נשלח לצד השני'
+                          : 'שלח טיוטת חוזה לחתימה דיגיטלית',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (enabled)
+                Icon(
+                  Icons.keyboard_arrow_left_rounded,
+                  size: 24,
+                  color: accent,
+                ),
             ],
           ),
         ),

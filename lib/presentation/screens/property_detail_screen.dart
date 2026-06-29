@@ -332,6 +332,38 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
+
+                          // ── Property facts/specs — DIRECTLY below gallery+title
+                          // so a tenant judges fit immediately (rooms, size,
+                          // floor, condition, parking, elevator, entry, price).
+                          const Text(
+                            'פרטי הנכס',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _PropertyFactsCard(p),
+                          const SizedBox(height: 24),
+
+                          // ── ALL tags/features right under the specs. Shows the
+                          // FULL set (no cap) so the tenant sees exactly what the
+                          // property has.
+                          if (p.features.isNotEmpty) ...[
+                            _SectionCardShell(
+                              title: 'מאפיינים חשובים',
+                              icon: IconsaxPlusLinear.flash_1,
+                              child: _FeatureWrap(features: p.features),
+                            ),
+                          ],
+
+                          // ── "למה ההתאמה הזו?" — collapsible dropdown (collapsed
+                          // by default) with a "?" icon; expands the scorecard.
+                          if (!widget.isLandlordPreview)
+                            _MatchInsightDropdown(property: p),
+
                           // Affordability + rights (rentals only, real tenants).
                           if (!widget.isLandlordPreview &&
                               p.transactionType ==
@@ -431,19 +463,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             const SizedBox(height: 24),
                           ],
 
-                          // Property Facts Grid Card (Mockup Style)
-                          const Text(
-                            'פרטי הנכס',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _PropertyFactsCard(p),
-                          const SizedBox(height: 24),
-
                           // Description / Website URL Section
                           if (p.url.isNotEmpty) ...[
                             Row(
@@ -485,28 +504,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             const SizedBox(height: 24),
                           ],
 
-                          // Owners Section
-                          if (!widget.isLandlordPreview)
-                            _SectionCardShell(
-                              title: 'למה ההתאמה הזו',
-                              icon: IconsaxPlusLinear.flash_1,
-                              child: _MatchInsightCard(property: p),
-                            ),
-
+                          // Owner Section (features + match moved up, directly
+                          // below the specs).
                           _SectionCardShell(
                             title: 'בעל הנכס',
                             icon: IconsaxPlusLinear.profile_2user,
                             child: _OwnerCard(property: p),
                           ),
-
-                          // Features Section
-                          if (p.features.isNotEmpty) ...[
-                            _SectionCardShell(
-                              title: 'מאפיינים חשובים',
-                              icon: IconsaxPlusLinear.flash_1,
-                              child: _FeatureWrap(features: p.features),
-                            ),
-                          ],
 
                           // Reviews Section (Mockup Style)
                           if (reviews.isNotEmpty) ...[
@@ -5013,6 +5017,102 @@ class _HorizontalReviewsList extends StatelessWidget {
 }
 
 // ─── Match insight ("why this match") ─────────────────────────────────────────
+
+/// Collapsible "למה ההתאמה הזו?" expander. Collapsed by default; a row with a
+/// "?" icon on the trailing side that, when tapped, reveals the existing
+/// [_MatchInsightCard] scorecard as its body.
+class _MatchInsightDropdown extends StatefulWidget {
+  const _MatchInsightDropdown({required this.property});
+  final RentalProperty property;
+
+  @override
+  State<_MatchInsightDropdown> createState() => _MatchInsightDropdownState();
+}
+
+class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Row(
+            children: [
+              const Icon(IconsaxPlusLinear.flash_1,
+                  color: Color(0xFF13BEC9), size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'למה ההתאמה הזו?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    IconsaxPlusLinear.arrow_down_1,
+                    size: 16,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF13BEC9).withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Text(
+                    '?',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF13BEC9),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: _MatchInsightCard(property: widget.property),
+          ),
+          crossFadeState: _expanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 220),
+        ),
+        const SizedBox(height: 18),
+        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+      ],
+    );
+  }
+}
 
 class _MatchInsightCard extends StatelessWidget {
   const _MatchInsightCard({required this.property});
