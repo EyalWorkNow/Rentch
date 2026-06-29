@@ -2,11 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -46,24 +41,29 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>נדרשת גישה למצלמה לצילום תמונות ווידאו של הנכס</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>נדרשת גישה למיקרופון כדי לדבר עם העוזר האישי ולצלם וידאו של הנכס</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>נדרשת הרשאת זיהוי דיבור כדי שתוכל לדבר עם העוזר האישי אריק בעברית</string>
-	<key>NSLocationUsageDescription</key>
-	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSLocationUsageDescription</key>
+	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>נדרשת גישה למיקרופון כדי לדבר עם העוזר האישי ולצלם וידאו של הנכס</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>נדרשת גישה לשמירה בגלריה</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>נדרשת גישה לגלריה כדי לעדכן תמונות פרופיל</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>נדרשת הרשאת זיהוי דיבור כדי שתוכל לדבר עם העוזר האישי אריק בעברית</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
