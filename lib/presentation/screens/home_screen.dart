@@ -10,9 +10,6 @@ import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
-import 'package:dating_app/data/models/panorama_tour.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
-import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
@@ -20,35 +17,6 @@ import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
-
-// ponytail: TEST-only — a real KIRI Gaussian splat from IMG_9919.MOV, converted
-// to the compact .splat (12.84MB vs 95MB raw .ply) and hosted on S3, to eyeball
-// the 360+3D splat tour on a real device. Remove after verifying.
-const String _kDebugTestSplatUrl =
-    'https://rentch-media-543897290879.s3.us-east-1.amazonaws.com/scan3d/test/img0108.splat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAX5IWOBB7VMKDBIJ7%2F20260629%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260629T170548Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=4d71a7bfffb1619f38ad29f6869275ddf9dc49fba0c48e7e06d6171a98dcec09';
-
-// ponytail: TEST-only — a 2-node Street-View demo tour (public PSV equirect demo
-// images) to prove the 360→360 VirtualTour transitions work. Remove after.
-const PropertyPanoramaTour _kDebugDemoTour = PropertyPanoramaTour(nodes: [
-  PanoramaNode(
-    id: 'demo1',
-    imageUrl:
-        'https://photo-sphere-viewer-data.netlify.app/assets/tour/key-biscayne-1.jpg',
-    label: 'נקודה 1',
-    x: 0.30,
-    y: 0.60,
-    hotspots: [PanoramaHotspot(targetNodeId: 'demo2', longitude: 50, label: 'קדימה')],
-  ),
-  PanoramaNode(
-    id: 'demo2',
-    imageUrl:
-        'https://photo-sphere-viewer-data.netlify.app/assets/tour/key-biscayne-2.jpg',
-    label: 'נקודה 2',
-    x: 0.70,
-    y: 0.60,
-    hotspots: [PanoramaHotspot(targetNodeId: 'demo1', longitude: -130, label: 'חזרה')],
-  ),
-]);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -182,36 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Scaffold(
           extendBody: true,
-          // TEST: shown in release too so it's tappable on a TestFlight device.
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FloatingActionButton.extended(
-                heroTag: 'dbgTour',
-                backgroundColor: AppColors.primary,
-                icon: const Icon(Icons.threesixty_rounded, color: Colors.white),
-                label: const Text('בדיקת סיור 360',
-                    style: TextStyle(color: Colors.white)),
-                onPressed: () => PanoramaPsvTourView.open(
-                    context, _kDebugDemoTour,
-                    title: 'בדיקת סיור 360 (Street View)'),
-              ),
-              const SizedBox(height: 12),
-              FloatingActionButton.extended(
-                heroTag: 'dbgSplat',
-                backgroundColor: Colors.black,
-                icon:
-                    const Icon(Icons.view_in_ar_rounded, color: Colors.white),
-                label: const Text('בדיקת ספלאט',
-                    style: TextStyle(color: Colors.white)),
-                onPressed: () => Scan3dViewerScreen.open(
-                  context,
-                  splatUrl: _kDebugTestSplatUrl,
-                  title: 'בדיקת ספלאט — IMG_0108 (חדר קטן)',
-                ),
-              ),
-            ],
-          ),
           // RepaintBoundary isolates the (often animating) body from the
           // bottomNavigationBar's BackdropFilter, so body frames don't force the
           // navbar to recomposite — keeps the bar responsive under load.
