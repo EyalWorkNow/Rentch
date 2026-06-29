@@ -1134,11 +1134,14 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
+              Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'מתעניינים בנכסים שלך ${_titleSuffix[_selectedPeriod]}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 16,
@@ -1164,6 +1167,8 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                   ),
                 ],
               ),
+              ),
+              const SizedBox(width: 8),
               // Period selector
               Container(
                 decoration: BoxDecoration(

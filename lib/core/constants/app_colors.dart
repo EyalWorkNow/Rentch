@@ -9,13 +9,13 @@ class AppColors {
   static Color primaryDark = const Color(0xFF0D96A0);
   static Color primaryLight = const Color(0xFF5AD4DC);
 
-  /// Switches the brand accent to match [role] ('broker' → indigo, else teal).
+  /// Switches the brand accent to match [role] ('broker' → black, else teal).
   static void applyRole(String role) {
     if (role == 'broker') {
-      primary = const Color(0xFF6C5CE7);
-      primaryDark = const Color(0xFF5346C9);
-      primaryLight = const Color(0xFF9D90FF);
-      primaryLight2 = const Color(0xFFEEEBFF);
+      primary = const Color(0xFF000000);
+      primaryDark = const Color(0xFF000000);
+      primaryLight = const Color(0xFF333333);
+      primaryLight2 = const Color(0xFFEDEDED);
     } else {
       primary = const Color(0xFF13BEC9);
       primaryDark = const Color(0xFF0D96A0);

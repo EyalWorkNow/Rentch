@@ -28,12 +28,12 @@ class BrandPalette {
     accountLabel: '',
   );
 
-  /// Premium indigo identity for real-estate brokers.
+  /// Premium black identity for real-estate brokers.
   static const BrandPalette broker = BrandPalette(
-    primary: Color(0xFF6C5CE7),
-    primaryDark: Color(0xFF5346C9),
-    primaryLight: Color(0xFF9D90FF),
-    primaryLight2: Color(0xFFEEEBFF),
+    primary: Color(0xFF000000),
+    primaryDark: Color(0xFF000000),
+    primaryLight: Color(0xFF333333),
+    primaryLight2: Color(0xFFEDEDED),
     accountLabel: 'מתווך נדל״ן',
   );
 
