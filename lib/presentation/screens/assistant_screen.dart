@@ -19,19 +19,23 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Keep Erik visually aligned with the rest of Rently while preserving the
-// richer assistant interaction model.
-Color get _kBgTop => AppColors.navy;
-const _kBgMid = Color(0xFF0F3250); // slightly lighter navy
-Color get _kBgBot => AppColors.navy;
-const _kInk = Colors.white;
-const _kMuted = Color(0xFF9EB5C8); // lighter muted blue-grey
+// ── Erik design tokens ────────────────────────────────────────────────────────
+// A calm, premium voice-assistant palette layered on a deep navy "night" canvas.
+// The accent is NEVER hard-coded: it flows from AppColors (auto BLACK for
+// brokers, teal for everyone else). Never `const` a widget that reads these.
+const _kBgDeep = Color(0xFF041C2F); // deepest navy (top & bottom of canvas)
+const _kBgMid = Color(0xFF0B2F4D); // lifted navy (centre glow)
+const _kInk = Colors.white; // primary text on dark
+const _kInkSoft = Color(0xFFE6EEF6); // softened white for body copy
+const _kMuted = Color(0xFFA6BDD2); // muted blue-grey (secondary text)
 const _kAssistantSurface = Color(0x1A5AD4DC); // translucent teal-blue
-Color get _kUserSurface => AppColors.primary; // solid Teal
-const _kPanelSurface = Color(0x1F072946); // translucent dark navy
-const _kLine = Color(0x28FFFFFF); // thin white border for glassmorphism
-Color get _kAccent => AppColors.primary; // Teal
-Color get _kAccent2 => AppColors.primaryLight; // Light teal for glowing accents
+Color get _kUserSurface => AppColors.primary; // solid accent (user bubble)
+const _kPanelSurface = Color(0x140E3358); // translucent navy glass
+const _kCardSurface = Color(0x14FFFFFF); // faint white glass for cards
+const _kLine = Color(0x24FFFFFF); // hairline border for glassmorphism
+const _kLineStrong = Color(0x3DFFFFFF); // brighter hairline
+Color get _kAccent => AppColors.primary; // teal / black per role
+Color get _kAccent2 => AppColors.primaryLight; // luminous accent for glow
 
 /// "אריק" — a premium, interactive voice/text concierge for landlords (built so
 /// both a 20-year-old and a 70-year-old breeze through it). Glass surfaces, soft
@@ -675,59 +679,49 @@ class _AssistantScreenState extends State<AssistantScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBgBot,
+      backgroundColor: _kBgDeep,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          Positioned.fill(
+          // ── The calm "night" canvas: a deep navy radial that lifts toward the
+          // centre, so Erik's presence feels lit from within the screen. ──
+          const Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [_kBgTop, _kBgMid, _kBgBot],
-                  stops: [0.0, 0.52, 1.0],
+                gradient: RadialGradient(
+                  center: Alignment(0, -0.35),
+                  radius: 1.25,
+                  colors: [_kBgMid, _kBgDeep],
+                  stops: [0.0, 1.0],
                 ),
               ),
             ),
           ),
-          // Soft, brand-driven ambient glows — calm and on-theme (auto black for
-          // brokers, teal for tenants). Kept subtle so text stays restful.
-          Positioned(
-            top: -140,
-            right: -110,
+          // Soft, brand-driven ambient aurora — on-theme (auto black for brokers,
+          // teal for tenants), gently animated so the screen breathes.
+          Positioned.fill(
             child: IgnorePointer(
-              child: Container(
-                width: 340,
-                height: 340,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      _kAccent2.withValues(alpha: 0.16),
-                      Colors.transparent,
+              child: AnimatedBuilder(
+                animation: _pulse,
+                builder: (context, _) {
+                  final t = _pulse.value;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        top: -150 + 14 * t,
+                        right: -120,
+                        child: _ambientGlow(
+                            360, _kAccent2.withValues(alpha: 0.14 + 0.05 * t)),
+                      ),
+                      Positioned(
+                        bottom: -160,
+                        left: -130 + 14 * (1 - t),
+                        child: _ambientGlow(
+                            400, _kAccent.withValues(alpha: 0.13 + 0.04 * t)),
+                      ),
                     ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -120,
-            left: -120,
-            child: IgnorePointer(
-              child: Container(
-                width: 380,
-                height: 380,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      _kAccent.withValues(alpha: 0.14),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -737,7 +731,9 @@ class _AssistantScreenState extends State<AssistantScreen>
                 _header(),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 320),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeIn,
                     child: _showVisualizer
                         ? _buildVoiceChatThread()
                         : _buildChatThread(),
@@ -760,23 +756,46 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
   }
 
+  /// A soft circular brand glow used in the ambient background.
+  Widget _ambientGlow(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, Colors.transparent],
+        ),
+      ),
+    );
+  }
+
   Widget _buildUploadPanel() {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
           decoration: BoxDecoration(
-            color: const Color(0xFF072946).withOpacity(0.92),
-            border: const Border(
-              top: BorderSide(color: Color(0x28FFFFFF)),
-            ),
+            color: _kBgMid.withValues(alpha: 0.94),
+            border: const Border(top: BorderSide(color: _kLineStrong)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: _kMuted.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -791,12 +810,13 @@ class _AssistantScreenState extends State<AssistantScreen>
                   GestureDetector(
                     onTap: _closeUploadPanel,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.white10,
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(IconsaxPlusLinear.close_circle, color: Colors.white70, size: 20),
+                      child: const Icon(IconsaxPlusLinear.close_circle,
+                          color: Colors.white70, size: 20),
                     ),
                   ),
                 ],
@@ -807,13 +827,16 @@ class _AssistantScreenState extends State<AssistantScreen>
                   height: 80,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
+                    color: Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: _kLine),
                   ),
                   child: const Text(
                     'טרם הוספת תמונות לדירה זו',
-                    style: TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600),
                   ),
                 )
               else
@@ -921,9 +944,9 @@ class _AssistantScreenState extends State<AssistantScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.35), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
         ),
         child: Column(
           children: [
@@ -997,30 +1020,34 @@ class _AssistantScreenState extends State<AssistantScreen>
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+            padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 18),
+                const SizedBox(height: 26),
+                // The emotional centerpiece: Erik's living presence. Tapping it
+                // starts the real-time call, exactly like the hero button.
                 GestureDetector(
                   onTap: _toggleLive,
+                  behavior: HitTestBehavior.opaque,
                   child: _VoiceOrb(
-                    size: 156,
+                    size: 168,
                     listening: false,
                     speaking: false,
                     connecting: false,
                     soundLevelNotifier: _soundLevelNotifier,
                   ),
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 22),
                 const Text(
                   'שלום, אני אריק',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: _kInk,
-                    fontSize: 30,
+                    fontSize: 31,
                     fontWeight: FontWeight.w900,
-                    height: 1.15,
+                    height: 1.12,
+                    letterSpacing: 0.2,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1031,21 +1058,17 @@ class _AssistantScreenState extends State<AssistantScreen>
                   style: TextStyle(
                     color: _kMuted,
                     fontSize: 17,
-                    height: 1.6,
+                    height: 1.62,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 32),
                 _bigStartButton(),
-                const SizedBox(height: 16),
-                TextButton.icon(
-                  onPressed: () => setState(() => _showVisualizer = false),
-                  icon: const Icon(IconsaxPlusLinear.keyboard, size: 18),
-                  style: TextButton.styleFrom(foregroundColor: _kMuted),
-                  label: const Text(
-                    'מעדיף לכתוב? עבור לצ׳אט',
-                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                  ),
+                const SizedBox(height: 18),
+                _heroSecondaryAction(
+                  icon: IconsaxPlusLinear.keyboard,
+                  label: 'מעדיף לכתוב? עבור לצ׳אט',
+                  onTap: () => setState(() => _showVisualizer = false),
                 ),
               ],
             ),
@@ -1055,97 +1078,146 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
   }
 
-  Widget _bigStartButton() {
-    return GestureDetector(
-      onTap: _toggleLive,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 19),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_kAccent, _kAccent2],
-          ),
-          borderRadius: BorderRadius.circular(99),
-          boxShadow: [
-            BoxShadow(
-              color: _kAccent.withValues(alpha: 0.42),
-              blurRadius: 26,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 24),
-            SizedBox(width: 10),
-            Text(
-              'התחל שיחה עם אריק',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18.5,
-                fontWeight: FontWeight.w900,
+  Widget _heroSecondaryAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(99),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: _kMuted),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                    color: _kMuted,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
+  /// The hero TALK control — big, gorgeous, unmistakable. A breathing accent
+  /// pill with a soft glow that invites a tap.
+  Widget _bigStartButton() {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final t = _pulse.value;
+        return GestureDetector(
+          onTap: _toggleLive,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [_kAccent2, _kAccent],
+              ),
+              borderRadius: BorderRadius.circular(99),
+              boxShadow: [
+                BoxShadow(
+                  color: _kAccent.withValues(alpha: 0.34 + 0.14 * t),
+                  blurRadius: 28 + 10 * t,
+                  spreadRadius: 1 + 1.5 * t,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(IconsaxPlusBold.microphone_2,
+                    color: Colors.white, size: 24),
+                SizedBox(width: 11),
+                Text(
+                  'התחל שיחה עם אריק',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _voiceChatHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: _toggleLive,
-          child: AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, _) {
-              final connecting = _liveStatus == LiveStatus.connecting;
-              final speaking = _liveActive && _liveStatus == LiveStatus.speaking;
-              final liveListening =
-                  _liveActive && _liveStatus == LiveStatus.listening;
-              final active = _liveActive || _listening || _thinking;
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, _) {
+          final connecting = _liveStatus == LiveStatus.connecting;
+          final speaking = _liveActive && _liveStatus == LiveStatus.speaking;
+          final liveListening =
+              _liveActive && _liveStatus == LiveStatus.listening;
+          final active = _liveActive || _listening || _thinking;
 
-              final title = !_liveActive
-                  ? 'שיחה קולית בזמן אמת'
+          final title = !_liveActive
+              ? 'שיחה קולית בזמן אמת'
+              : connecting
+                  ? 'מתחבר לאריק...'
+                  : speaking
+                      ? 'אריק מדבר...'
+                      : 'מקשיב לך... דבר חופשי';
+
+          final livePartial =
+              speaking ? _liveErikText.trim() : _liveUserText.trim();
+          final subtitle = _liveActive
+              ? (livePartial.isNotEmpty
+                  ? livePartial
                   : connecting
-                      ? 'מתחבר לאריק...'
-                      : speaking
-                          ? 'אריק מדבר...'
-                          : 'מקשיב לך... דבר חופשי';
+                      ? 'רגע, מתחבר לשיחה החיה...'
+                      : 'דבר חופשי — אריק שומע ועונה בזמן אמת. אפשר גם לקטוע אותו.')
+              : 'דבר עם אריק כמו בטלפון — הוא שומע, עונה בקול, ואפשר לקטוע אותו באמצע.';
 
-              final livePartial =
-                  speaking ? _liveErikText.trim() : _liveUserText.trim();
-              final subtitle = _liveActive
-                  ? (livePartial.isNotEmpty
-                      ? livePartial
-                      : connecting
-                          ? 'רגע, מתחבר לשיחה החיה...'
-                          : 'דבר חופשי — אריק שומע ועונה בזמן אמת. אפשר גם לקטוע אותו. גע כאן כדי לסיים.')
-                  : 'גע כאן ודבר עם אריק כמו בטלפון — שיחה חיה בזמן אמת. הוא שומע, עונה בקול, ואפשר אפילו לקטוע אותו באמצע.';
-
-              return Container(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                decoration: BoxDecoration(
-                  color: _kPanelSurface.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: active ? _kAccent.withValues(alpha: 0.45) : _kLine,
+          return Container(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: active
+                    ? [
+                        _kAccent.withValues(alpha: 0.16),
+                        _kAccent.withValues(alpha: 0.05),
+                      ]
+                    : [_kPanelSurface, _kPanelSurface],
+              ),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: active ? _kAccent.withValues(alpha: 0.40) : _kLine,
+                width: 1.2,
+              ),
+              boxShadow: [
+                if (active)
+                  BoxShadow(
+                    color: _kAccent.withValues(alpha: 0.16),
+                    blurRadius: 26,
+                    offset: const Offset(0, 10),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _kInk.withValues(alpha: active ? 0.10 : 0.06),
-                      blurRadius: active ? 22 : 16,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Row(
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
                   children: [
                     Expanded(
                       child: Column(
@@ -1155,79 +1227,95 @@ class _AssistantScreenState extends State<AssistantScreen>
                             title,
                             textAlign: TextAlign.right,
                             style: TextStyle(
-                              color: _liveActive ? _kAccent : _kInk,
-                              fontSize: 16,
+                              color: active ? _kAccent : _kInk,
+                              fontSize: 16.5,
                               fontWeight: FontWeight.w900,
                               height: 1.2,
-                              letterSpacing: 0,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 5),
                           Text(
                             subtitle,
                             textAlign: TextAlign.right,
-                            maxLines: livePartial.isNotEmpty ? 2 : 3,
+                            maxLines: livePartial.isNotEmpty ? 3 : 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: _kMuted,
-                              fontSize: 12.5,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              height: 1.35,
+                              height: 1.4,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          _conversationPill(),
-                          const SizedBox(height: 10),
-                          _compactWave(isActive: active && !connecting),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    _VoiceOrb(
-                      size: 66,
-                      listening: liveListening || _listening,
-                      speaking: speaking,
-                      connecting: connecting || _thinking,
-                      soundLevelNotifier: _soundLevelNotifier,
+                    const SizedBox(width: 14),
+                    GestureDetector(
+                      onTap: _toggleLive,
+                      child: _VoiceOrb(
+                        size: 70,
+                        listening: liveListening || _listening,
+                        speaking: speaking,
+                        connecting: connecting || _thinking,
+                        soundLevelNotifier: _soundLevelNotifier,
+                      ),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-        ),
+                const SizedBox(height: 12),
+                _compactWave(isActive: active && !connecting),
+                const SizedBox(height: 12),
+                _conversationPill(),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  /// Big, unmistakable start/end-call pill for the real-time live conversation.
+  /// Big, unmistakable full-width start/end-call control for the real-time
+  /// conversation. Filled red while a call is live (clear "hang up"), filled
+  /// accent when idle (clear "start").
   Widget _conversationPill() {
     final on = _liveActive;
     final color = on ? const Color(0xFFE5484D) : _kAccent;
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: color.withValues(alpha: 0.45)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(on ? IconsaxPlusBold.close_circle : IconsaxPlusBold.microphone_2,
-                color: color, size: 18),
-            const SizedBox(width: 7),
-            Text(
-              on ? 'סיים שיחה' : 'התחל שיחה בזמן אמת',
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
+          onTap: _toggleLive,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: on ? 0.16 : 0.14),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: color.withValues(alpha: 0.55), width: 1.4),
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                    on
+                        ? IconsaxPlusBold.close_circle
+                        : IconsaxPlusBold.microphone_2,
+                    color: color,
+                    size: 20),
+                const SizedBox(width: 9),
+                Text(
+                  on ? 'סיים שיחה' : 'התחל שיחה בזמן אמת',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1235,20 +1323,26 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   Widget _compactWave({required bool isActive}) {
     return SizedBox(
-      height: 24,
+      height: 26,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: List.generate(26, (index) {
-          final phase = (_pulse.value + index * 0.06) % 1;
-          final wave = 0.35 + 0.65 * math.sin(phase * math.pi);
-          final height = isActive ? 6 + wave * 16 : 5 + (index % 4) * 2.2;
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: List.generate(34, (index) {
+          // Symmetric "spindle" envelope — taller in the middle, calm at the ends.
+          final dist = (index - 16.5).abs() / 16.5;
+          final envelope = 1 - dist * dist;
+          final phase = (_pulse.value + index * 0.05) % 1;
+          final wave = 0.3 + 0.7 * math.sin(phase * math.pi);
+          final height = isActive
+              ? 4 + wave * 18 * envelope
+              : 4 + envelope * 6;
           return Container(
             width: 3,
             height: height,
-            margin: const EdgeInsets.only(left: 3),
+            margin: const EdgeInsets.symmetric(horizontal: 1.6),
             decoration: BoxDecoration(
               color: (isActive ? _kAccent : _kMuted).withValues(
-                alpha: isActive ? 0.70 : 0.32,
+                alpha: isActive ? 0.75 : 0.30,
               ),
               borderRadius: BorderRadius.circular(99),
             ),
@@ -1260,66 +1354,69 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   Widget _glassCircleBtn(IconData icon, VoidCallback onTap,
       {Color? color, String? tooltip}) {
-    final btn = GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-          boxShadow: [
-            BoxShadow(
-              color: _kInk.withValues(alpha: 0.06),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
+    final btn = Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.07),
+            shape: BoxShape.circle,
+            border: Border.all(color: _kLine),
+          ),
+          child: Icon(icon, color: color ?? _kInk, size: 22),
         ),
-        child: Icon(icon, color: color ?? _kInk, size: 22),
       ),
     );
     return tooltip == null ? btn : Tooltip(message: tooltip, child: btn);
   }
 
   Widget _header() {
+    final active = _listening || _thinking || _liveActive;
+    final statusText = _listening
+        ? 'מקשיב לך...'
+        : _thinking
+            ? 'חושב על תשובה...'
+            : _liveActive
+                ? 'בשיחה איתך'
+                : 'העוזר האישי שלך · זמין';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
       child: Row(
         children: [
           _glassCircleBtn(IconsaxPlusLinear.arrow_right_3,
               () => Navigator.of(context).pop()),
           const SizedBox(width: 12),
-          // Animated avatar orb with a soft breathing halo ring — friendly
-          // concierge, not a generic chat icon.
+          // Compact living presence — a breathing halo around Erik's mark.
           AnimatedBuilder(
             animation: _pulse,
             builder: (context, _) {
               final t = _pulse.value;
-              final active = _listening || _thinking;
               return SizedBox(
-                width: 56,
-                height: 56,
+                width: 50,
+                height: 50,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Breathing halo ring.
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 50,
+                      height: 50,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: _kAccent.withValues(
-                              alpha: (active ? 0.45 : 0.22) * (0.6 + 0.4 * t)),
-                          width: 2,
+                              alpha: (active ? 0.50 : 0.24) * (0.6 + 0.4 * t)),
+                          width: 1.6,
                         ),
                       ),
                     ),
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
@@ -1330,21 +1427,21 @@ class _AssistantScreenState extends State<AssistantScreen>
                         boxShadow: [
                           BoxShadow(
                             color: _kAccent.withValues(
-                                alpha: (active ? 0.55 : 0.30) * (0.6 + 0.4 * t)),
+                                alpha: (active ? 0.55 : 0.28) * (0.6 + 0.4 * t)),
                             blurRadius: 14 + 8 * t,
-                            spreadRadius: 1 + 1.5 * t,
+                            spreadRadius: 0.5 + 1.5 * t,
                           ),
                         ],
                       ),
-                      child: const Icon(IconsaxPlusBold.message_favorite,
-                          color: Colors.white, size: 23),
+                      child: const Icon(IconsaxPlusBold.magic_star,
+                          color: Colors.white, size: 21),
                     ),
                   ],
                 ),
               );
             },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1354,61 +1451,43 @@ class _AssistantScreenState extends State<AssistantScreen>
                     const Text('אריק',
                         style: TextStyle(
                             color: _kInk,
-                            fontSize: 22,
+                            fontSize: 21,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 0)),
+                            letterSpacing: 0.2)),
                     const SizedBox(width: 7),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                          horizontal: 7, vertical: 2.5),
                       decoration: BoxDecoration(
-                        color: _kAccent.withValues(alpha: 0.18),
+                        color: _kAccent.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(20),
                         border:
-                            Border.all(color: _kAccent.withValues(alpha: 0.35)),
+                            Border.all(color: _kAccent.withValues(alpha: 0.32)),
                       ),
                       child: Text('AI',
                           style: TextStyle(
                               color: _kAccent,
-                              fontSize: 10.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 0.4)),
+                              letterSpacing: 0.5)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
                   child: Row(
-                    key: ValueKey(_listening
-                        ? 0
-                        : _thinking
-                            ? 1
-                            : 2),
+                    key: ValueKey(statusText),
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: (_listening || _thinking)
-                              ? _kAccent
-                              : const Color(0xFF4ADE80),
-                        ),
-                      ),
+                      _StatusDot(active: active, pulse: _pulse),
                       const SizedBox(width: 6),
                       Text(
-                        _listening
-                            ? 'מקשיב לך...'
-                            : _thinking
-                                ? 'חושב על תשובה...'
-                                : 'העוזר האישי שלך · זמין',
+                        statusText,
                         style: TextStyle(
-                            color:
-                                (_listening || _thinking) ? _kAccent : _kMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600),
+                            color: active ? _kAccent : _kMuted,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -1534,55 +1613,52 @@ class _AssistantScreenState extends State<AssistantScreen>
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: ClipRRect(
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(22),
-          topRight: const Radius.circular(22),
-          bottomLeft: Radius.circular(isErik ? 7 : 22),
-          bottomRight: Radius.circular(isErik ? 22 : 7),
+          topLeft: const Radius.circular(24),
+          topRight: const Radius.circular(24),
+          bottomLeft: Radius.circular(isErik ? 8 : 24),
+          bottomRight: Radius.circular(isErik ? 24 : 8),
         ),
         child: BackdropFilter(
           filter: isErik
-              ? ImageFilter.blur(sigmaX: 14, sigmaY: 14)
+              ? ImageFilter.blur(sigmaX: 16, sigmaY: 16)
               : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             constraints: BoxConstraints(maxWidth: maxWidth),
             decoration: BoxDecoration(
               gradient: isErik
                   ? LinearGradient(
                       colors: [
-                        _kAccent.withValues(alpha: 0.20),
-                        _kAccent.withValues(alpha: 0.09),
+                        Colors.white.withValues(alpha: 0.10),
+                        Colors.white.withValues(alpha: 0.04),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
                   : LinearGradient(
-                      colors: [
-                        const Color(0xFF1A4063), // calm neutral navy surface
-                        const Color(0xFF143350),
-                      ],
+                      colors: [_kAccent2, _kAccent],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(22),
-                topRight: const Radius.circular(22),
-                bottomLeft: Radius.circular(isErik ? 7 : 22),
-                bottomRight: Radius.circular(isErik ? 22 : 7),
+                topLeft: const Radius.circular(24),
+                topRight: const Radius.circular(24),
+                bottomLeft: Radius.circular(isErik ? 8 : 24),
+                bottomRight: Radius.circular(isErik ? 24 : 8),
               ),
               border: Border.all(
                 color: isErik
-                    ? _kAccent.withValues(alpha: 0.28)
-                    : Colors.white.withValues(alpha: 0.12),
+                    ? _kLine
+                    : Colors.white.withValues(alpha: 0.18),
                 width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
                   color: isErik
-                      ? _kAccent.withValues(alpha: 0.14)
-                      : Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
+                      ? Colors.black.withValues(alpha: 0.18)
+                      : _kAccent.withValues(alpha: 0.30),
+                  blurRadius: 16,
+                  offset: const Offset(0, 7),
                 ),
               ],
             ),
@@ -1595,11 +1671,9 @@ class _AssistantScreenState extends State<AssistantScreen>
                     t.text,
                     textAlign: TextAlign.right,
                     style: TextStyle(
-                      color: isErik
-                          ? _kInk
-                          : Colors.white.withValues(alpha: 0.96),
-                      fontSize: 17,
-                      height: 1.55,
+                      color: isErik ? _kInkSoft : Colors.white,
+                      fontSize: 17.5,
+                      height: 1.58,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0,
                     ),
@@ -2340,18 +2414,11 @@ class _AssistantScreenState extends State<AssistantScreen>
     Widget? child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.10),
-            Colors.white.withValues(alpha: 0.04),
-          ],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kAccent.withValues(alpha: 0.22)),
+        color: _kCardSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kAccent.withValues(alpha: 0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2370,7 +2437,7 @@ class _AssistantScreenState extends State<AssistantScreen>
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                         color: _kInk,
-                        fontSize: 15.5,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                         height: 1.2,
                       ),
@@ -2559,22 +2626,22 @@ class _AssistantScreenState extends State<AssistantScreen>
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
             _kAccent.withValues(alpha: 0.20),
-            _kAccent.withValues(alpha: 0.08),
+            _kAccent.withValues(alpha: 0.07),
           ],
           begin: Alignment.centerRight,
           end: Alignment.centerLeft,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _kAccent.withValues(alpha: 0.45), width: 1.4),
         boxShadow: [
           BoxShadow(
             color: _kAccent.withValues(alpha: 0.18),
-            blurRadius: 20,
+            blurRadius: 22,
             offset: const Offset(0, 8),
           ),
         ],
@@ -2584,26 +2651,37 @@ class _AssistantScreenState extends State<AssistantScreen>
           AnimatedBuilder(
             animation: _pulse,
             builder: (context, _) {
-              final scale = 1 + 0.18 * _pulse.value;
+              final t = _pulse.value;
               return Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _kAccent.withValues(alpha: 0.16 * scale),
+                  color: _kAccent.withValues(alpha: 0.14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kAccent.withValues(alpha: 0.25 + 0.20 * t),
+                      blurRadius: 8 + 10 * t,
+                      spreadRadius: 1 + 2 * t,
+                    ),
+                  ],
                 ),
                 child: Icon(IconsaxPlusBold.microphone,
                     color: _kAccent, size: 22),
               );
             },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               _partial.isEmpty ? 'מקשיב לך... דבר בנחת' : _partial,
+              textAlign: TextAlign.right,
               style: const TextStyle(
-                  color: _kInk, fontSize: 17, fontWeight: FontWeight.w600),
+                  color: _kInk,
+                  fontSize: 17,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -2695,6 +2773,40 @@ class _AssistantScreenState extends State<AssistantScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A small status dot in the header — softly pulses on the accent when Erik is
+/// busy, steady green when he's idle and available.
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.active, required this.pulse});
+  final bool active;
+  final Animation<double> pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? _kAccent : const Color(0xFF4ADE80);
+    return AnimatedBuilder(
+      animation: pulse,
+      builder: (context, _) {
+        final t = pulse.value;
+        return Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: (active ? 0.6 : 0.4) * t),
+                blurRadius: 4 + 4 * t,
+                spreadRadius: 0.5 + 1.5 * t,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

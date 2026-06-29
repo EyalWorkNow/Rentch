@@ -340,6 +340,33 @@ class DatingProvider extends ChangeNotifier {
   bool get isLandlord => _userRole == 'landlord' || _userRole == 'broker';
   bool get isBroker => _userRole == 'broker';
   String get userRole => _userRole;
+
+  /// ponytail: SINGLE SOURCE OF TRUTH for the app-wide brand accent.
+  ///
+  /// The global accent (teal vs broker-black) MUST be derived from this getter
+  /// and nothing else. It returns the broker identity ONLY when the user is a
+  /// genuinely confirmed, in-app broker — i.e. they are in the broker role AND
+  /// have an active session (a session is established only after a real login,
+  /// social sign-in, signup or guest entry; it is NEVER set while a fresh user
+  /// is on the onboarding/login screens). Because the entry flow runs with
+  /// `_hasActiveSession == false` for any first-time user, the login / signup /
+  /// onboarding flow is ALWAYS the neutral teal brand and black can never leak
+  /// into it:
+  ///   • true first launch → storedState is null → `_hasActiveSession = false`
+  ///     and `_userRole = 'tenant'`, so this is 'tenant' (teal).
+  ///   • relaunch of a confirmed broker → hydrated `_hasActiveSession = true`,
+  ///     `_userRole = 'broker'`, and `_StartupGate` routes them straight to the
+  ///     in-app home (never the entry flow), so 'broker' (black) is correct.
+  ///   • a stale/transient 'broker' role with no active session (e.g. a role
+  ///     preview, or a partially-hydrated session) collapses to teal.
+  ///
+  /// Covers both confirmed-login brokers and guest brokers (both set an active
+  /// session), so the just-added broker-black-in-app behaviour is preserved.
+  ///
+  /// Guarantee: `themeRole == 'broker'` ⟺ a broker is operating INSIDE the app.
+  /// Any entry-flow / tenant / landlord / sessionless state ⟹ neutral 'tenant'.
+  String get themeRole =>
+      (_userRole == 'broker' && _hasActiveSession) ? 'broker' : 'tenant';
   BrokerBrandingConfig get brokerBranding =>
       isBroker ? _brokerBranding : BrokerBrandingConfig.defaults;
   bool get autoLikeEnabled => _autoLikeEnabled;

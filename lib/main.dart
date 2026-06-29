@@ -86,8 +86,18 @@ class RentlyApp extends StatelessWidget {
           // keeps the signature teal. Swap the global brand accent first so the
           // 380+ `AppColors.primary` references across the app repaint in the
           // broker's indigo, then theme + rebuild on top.
-          AppColors.applyRole(provider.userRole);
-          final palette = BrandPalette.forRole(provider.userRole);
+          //
+          // ponytail: the accent is derived from `provider.themeRole` (the
+          // SINGLE SOURCE OF TRUTH), NOT the raw `userRole`. themeRole only
+          // resolves to 'broker' for a confirmed, in-app broker (broker role +
+          // active session) and is neutral teal for the entire login / signup /
+          // onboarding entry flow — so black can never leak into the entry flow
+          // on a first launch or relaunch, regardless of any stale/transient
+          // role or leftover global statics (which we overwrite here every
+          // build from this one gated source).
+          final themeRole = provider.themeRole;
+          AppColors.applyRole(themeRole);
+          final palette = BrandPalette.forRole(themeRole);
           return MaterialApp(
             title: 'Rently',
             debugShowCheckedModeBanner: false,

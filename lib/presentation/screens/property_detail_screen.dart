@@ -202,7 +202,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         final hasVirtualTour =
             p.hasReadyVirtualTour || p.videoUrls.isNotEmpty || p.hasPanoramaTour;
         final title = p.street.isNotEmpty
-            ? '${p.propertyType} ב${p.street} ${p.streetNumber}'
+            ? (p.streetNumber > 0
+                ? '${p.propertyType} ב${p.street} ${p.streetNumber}'
+                : '${p.propertyType} ב${p.street}')
             : '${p.propertyType} ב${p.city}';
         final reviews = provider.propertyReviews(p.id);
         final avgRating = provider.reviewAverage(reviews);
@@ -263,7 +265,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   // Image Gallery wrapped in a padded rounded card (Mockup Style)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        MediaQuery.of(context).padding.top + 8,
+                        16,
+                        16,
+                      ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(32),
                         child: SizedBox(
@@ -931,15 +938,17 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               22,
-              MediaQuery.of(context).padding.top + 14,
+              MediaQuery.of(context).padding.top + 8,
               22,
               124,
             ),
             child: Column(
               children: [
+                // Empty title → renders the broker brand logo mark (not the
+                // owner's name, which previously read oddly as a page title).
                 _TemplateTopBar(
                   branding: branding,
-                  title: property.ownerName,
+                  title: '',
                   dark: false,
                   onBackTap: onBackTap,
                   onShareTap: onShareTap,
@@ -980,35 +989,15 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _GlassFilterPill(
-                        icon: IconsaxPlusLinear.layer,
-                        label: property.floor.isEmpty
-                            ? property.propertyType
-                            : 'קומה ${property.floor}',
-                        branding: branding,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    _RoundTemplateButton(
-                      icon: IconsaxPlusLinear.location,
-                      onTap: () {},
-                      color: branding.secondaryColor,
-                    ),
-                    const SizedBox(width: 10),
-                    _RoundTemplateButton(
-                      icon: IconsaxPlusLinear.export_2,
-                      onTap: onShareTap,
-                      color: branding.secondaryColor,
-                    ),
-                  ],
+                _GlassFilterPill(
+                  icon: IconsaxPlusLinear.layer,
+                  label: property.floor.isEmpty
+                      ? property.propertyType
+                      : 'קומה ${property.floor}',
+                  branding: branding,
                 ),
                 const SizedBox(height: 18),
                 _AcidPriceCard(property: property, branding: branding),
-                const SizedBox(height: 18),
-                _TemplateFactsWrap(property: property, branding: branding),
                 const SizedBox(height: 26),
                 _paritySections(context),
               ],
@@ -1034,17 +1023,14 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
             ),
             child: Column(
               children: [
-            Transform.rotate(
-              angle: -0.018,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.64),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
-                ),
-                child: Transform.rotate(
-                  angle: 0.018,
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.64),
+                    borderRadius: BorderRadius.circular(28),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.7)),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1093,7 +1079,8 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                       Text(
                         '${property.priceLabel} · ${property.priceSuffixLabel}',
                         style: TextStyle(
-                          color: branding.secondaryColor.withValues(alpha: 0.58),
+                          color:
+                              branding.secondaryColor.withValues(alpha: 0.58),
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1123,12 +1110,11 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      _TemplateFactsWrap(property: property, branding: branding),
+                      _TemplateFactsWrap(
+                          property: property, branding: branding),
                     ],
                   ),
                 ),
-              ),
-            ),
                 const SizedBox(height: 26),
                 _paritySections(context),
               ],
@@ -1145,12 +1131,9 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              0,
-              MediaQuery.of(context).padding.top,
-              0,
-              120,
-            ),
+            // Edge-to-edge hero: no top inset here so the image bleeds to the
+            // very top; the top bar carries the status-bar safe area instead.
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1170,7 +1153,7 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                         ),
                       ),
                       Positioned(
-                        top: 18,
+                        top: MediaQuery.of(context).padding.top + 12,
                         left: 20,
                         right: 20,
                         child: _TemplateTopBar(
@@ -1265,18 +1248,14 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
   }
 
   Widget _buildGalleryEditorial(BuildContext context) {
-    final images = property.media;
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              0,
-              MediaQuery.of(context).padding.top,
-              0,
-              124,
-            ),
+            // Edge-to-edge hero: no top padding so the image reaches the very
+            // top; the top bar is overlaid inside the status-bar safe area.
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 124),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1295,7 +1274,7 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                         ),
                       ),
                       Positioned(
-                        top: 18,
+                        top: MediaQuery.of(context).padding.top + 12,
                         left: 20,
                         right: 20,
                         child: _TemplateTopBar(
@@ -1309,64 +1288,46 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (images.length > 1)
-                  SizedBox(
-                    height: 92,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: images.length.clamp(0, 5).toInt(),
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (_, index) => GestureDetector(
-                        onTap: () => controller.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 280),
-                          curve: Curves.easeOut,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(13),
-                          child: SizedBox(
-                            width: 94,
-                            height: 66,
-                            child: SafeMedia(
-                              media: images[index],
-                              fit: BoxFit.cover,
-                              fallback: _ImageFallback(city: property.city),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        property.street.isNotEmpty
+                            ? '${property.propertyType} ב${property.street}'
+                            : property.address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: branding.secondaryColor,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          height: 1.08,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
+                          Icon(IconsaxPlusLinear.location,
+                              size: 15, color: branding.primaryColor),
+                          const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              property.street.isNotEmpty
-                                  ? '${property.propertyType} ב${property.street}'
-                                  : property.address,
-                              maxLines: 2,
+                              property.address,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: branding.secondaryColor,
-                                fontSize: 25,
-                                fontWeight: FontWeight.w900,
-                                height: 1.08,
+                                color: branding.secondaryColor
+                                    .withValues(alpha: 0.62),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                          IconButton(
-                            onPressed: onShareTap,
-                            icon: const RentlyIcon(IconsaxPlusLinear.export_2),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _StatusCapsule(
                         label: property.transactionLabel,
                         fg: branding.secondaryColor,
@@ -1374,57 +1335,30 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Expanded(
-                            child: Text(
-                              '${property.priceLabel}${property.transactionType == PropertyTransactionType.rent ? '/חודש' : ''}',
-                              style: TextStyle(
-                                color: branding.secondaryColor,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          Text(
+                            property.priceLabel,
+                            style: TextStyle(
+                              color: branding.secondaryColor,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                          FilledButton(
-                            onPressed: onTour,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: branding.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 22,
-                                vertical: 14,
+                          const SizedBox(width: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              property.priceSuffixLabel,
+                              style: TextStyle(
+                                color: branding.secondaryColor
+                                    .withValues(alpha: 0.55),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            child: const Text(
-                              'Book Now',
-                              style: TextStyle(fontWeight: FontWeight.w900),
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'About this Home',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _propertyDescription,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                          height: 1.45,
-                          fontWeight: FontWeight.w600,
-                        ),
                       ),
                     ],
                   ),
@@ -1440,7 +1374,6 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
   }
 
   Widget _buildCinematicGlass(BuildContext context) {
-    final darkText = Colors.white.withValues(alpha: 0.84);
     return Stack(
       children: [
         Positioned.fill(
@@ -1483,33 +1416,13 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                   children: [
                     _TemplateTopBar(
                       branding: branding,
-                      title: 'Details',
+                      title: '',
                       dark: true,
                       onBackTap: onBackTap,
                       onShareTap: onShareTap,
                     ),
-                    SizedBox(height: MediaQuery.sizeOf(context).height * 0.42),
-                    if (property.media.length > 1)
-                      SizedBox(
-                        height: 82,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: property.media.length.clamp(0, 3).toInt(),
-                          separatorBuilder: (_, __) => const SizedBox(width: 10),
-                          itemBuilder: (_, index) => ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: SizedBox(
-                              width: 124,
-                              child: SafeMedia(
-                                media: property.media[index],
-                                fit: BoxFit.cover,
-                                fallback: _ImageFallback(city: property.city),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: MediaQuery.sizeOf(context).height * 0.40),
+                    // Transaction + price glass strip over the cinematic image.
                     ClipRRect(
                       borderRadius: BorderRadius.circular(24),
                       child: BackdropFilter(
@@ -1527,33 +1440,29 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Previews',
+                                    Text(
+                                      property.transactionLabel,
                                       style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
+                                        color:
+                                            Colors.white.withValues(alpha: 0.78),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: List.generate(
-                                        5,
-                                        (index) => const Padding(
-                                          padding: EdgeInsets.only(left: 3),
-                                          child: Icon(
-                                            IconsaxPlusLinear.star_1,
-                                            color: Color(0xFFFFC233),
-                                            size: 15,
-                                          ),
-                                        ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${property.priceLabel} ${property.priceSuffixLabel}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               _StatusCapsule(
-                                label: property.priceLabel,
+                                label: '${property.roomsLabel} חד׳',
                                 fg: branding.secondaryColor,
                                 bg: Colors.white,
                               ),
@@ -1569,18 +1478,6 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _propertyDescription,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: darkText,
-                        fontSize: 14,
-                        height: 1.5,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -1605,14 +1502,6 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
     );
   }
 
-  String get _propertyDescription {
-    final featureText = property.features.take(3).join(', ');
-    final base =
-        '${property.propertyType} ${property.transactionLabel} ב${property.city}, ${property.roomsLabel} חדרים ו-${property.sizeM2} מ"ר';
-    if (featureText.isEmpty) return base;
-    return '$base. כולל $featureText.';
-  }
-
   /// Shared, full-parity content block appended to EVERY broker template so that
   /// no design style is ever missing a section that Rently Classic shows.
   /// Visual identity (header tint, surface) adapts per-template via [branding]
@@ -1621,6 +1510,7 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
     return _ParitySections(
       property: property,
       branding: branding,
+      controller: controller,
       reviews: reviews,
       hasVirtualTour: hasVirtualTour,
       isLandlordPreview: isLandlordPreview,
@@ -1640,6 +1530,7 @@ class _ParitySections extends StatelessWidget {
   const _ParitySections({
     required this.property,
     required this.branding,
+    required this.controller,
     required this.reviews,
     required this.hasVirtualTour,
     required this.isLandlordPreview,
@@ -1650,6 +1541,7 @@ class _ParitySections extends StatelessWidget {
 
   final RentalProperty property;
   final BrokerBrandingConfig branding;
+  final PageController controller;
   final List<AppReview> reviews;
   final bool hasVirtualTour;
   final bool isLandlordPreview;
@@ -1706,15 +1598,26 @@ class _ParitySections extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: media.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (_, index) => ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                width: 110,
-                height: 92,
-                child: SafeMedia(
-                  media: media[index],
-                  fit: BoxFit.cover,
-                  fallback: _ImageFallback(city: property.city),
+            itemBuilder: (_, index) => GestureDetector(
+              onTap: () {
+                if (controller.hasClients) {
+                  controller.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 110,
+                  height: 92,
+                  child: SafeMedia(
+                    media: media[index],
+                    fit: BoxFit.cover,
+                    fallback: _ImageFallback(city: property.city),
+                  ),
                 ),
               ),
             ),
@@ -2700,10 +2603,9 @@ class _ImageFallback extends StatelessWidget {
 // ─── Floating navigation buttons ─────────────────────────────────────────────
 
 class _FloatingNavBtn extends StatelessWidget {
-  const _FloatingNavBtn({required this.icon, required this.onTap, this.tint});
+  const _FloatingNavBtn({required this.icon, required this.onTap});
   final IconData icon;
   final VoidCallback onTap;
-  final Color? tint;
 
   @override
   Widget build(BuildContext context) {
@@ -2724,82 +2626,9 @@ class _FloatingNavBtn extends StatelessWidget {
                 width: 1,
               ),
             ),
-            child: Icon(icon, color: tint ?? Colors.white, size: 20),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _DarkCapsuleTag extends StatelessWidget {
-  const _DarkCapsuleTag({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF475569),
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _MetadataGrid extends StatelessWidget {
-  const _MetadataGrid({required this.property});
-  final RentalProperty property;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildColumn(context, 'שטח כולל', '${property.sizeM2} מ"ר'),
-        _buildColumn(context, 'מספר חדרים', property.roomsLabel),
-        _buildColumn(
-            context, 'תאריך כניסה', _formatEntryDate(property.entryDate)),
-      ],
-    );
-  }
-
-  Widget _buildColumn(BuildContext context, String label, String value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -3198,128 +3027,6 @@ class _OwnerProfileSheet extends StatelessWidget {
 
 // ─── Content widgets ──────────────────────────────────────────────────────────
 
-class _PrimaryFactsGrid extends StatelessWidget {
-  const _PrimaryFactsGrid({required this.property});
-  final RentalProperty property;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = <_FactDetailItem>[
-      _FactDetailItem(
-        icon: IconsaxPlusLinear.building,
-        value: property.roomsLabel,
-        label: 'חדרים',
-      ),
-      _FactDetailItem(
-        icon: IconsaxPlusLinear.maximize_3,
-        value: property.sizeM2.toString(),
-        label: 'מ"ר',
-      ),
-      if (property.floor.isNotEmpty)
-        _FactDetailItem(
-          icon: IconsaxPlusLinear.layer,
-          value: property.floor,
-          label: 'קומה',
-        ),
-      if (property.entryDate.isNotEmpty)
-        _FactDetailItem(
-          icon: IconsaxPlusLinear.calendar,
-          value: _formatEntryDate(property.entryDate),
-          label: 'כניסה',
-        ),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.7,
-      ),
-      itemBuilder: (_, index) => _FactDetailCard(item: items[index]),
-    );
-  }
-}
-
-class _FactDetailItem {
-  const _FactDetailItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-}
-
-class _FactDetailCard extends StatelessWidget {
-  const _FactDetailCard({required this.item});
-
-  final _FactDetailItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final iconBadge = Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Icon(item.icon, size: 18, color: AppColors.primary),
-    );
-
-    final textBlock = Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            item.value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: AppColors.navy,
-              height: 1.15,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            item.label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFD),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE0EBF2)),
-      ),
-      child: Row(
-        children: [
-          iconBadge,
-          const SizedBox(width: 12),
-          textBlock,
-        ],
-      ),
-    );
-  }
-}
-
 class _SectionCardShell extends StatelessWidget {
   const _SectionCardShell({
     required this.title,
@@ -3428,108 +3135,6 @@ class _FeatureWrap extends StatelessWidget {
       }).toList(),
     );
   }
-}
-
-class _DetailsList extends StatelessWidget {
-  const _DetailsList({required this.property});
-  final RentalProperty property;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      if (property.condition.isNotEmpty)
-        _DetailItem(
-            icon: IconsaxPlusLinear.star,
-            label: 'מצב הנכס',
-            value: property.condition),
-      if (property.totalFloors.isNotEmpty)
-        _DetailItem(
-            icon: IconsaxPlusLinear.layer,
-            label: 'קומות בבניין',
-            value: property.totalFloors),
-    ];
-
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          _SecondaryDetailRow(item: items[i]),
-          if (i != items.length - 1)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Divider(
-                  height: 1, color: Colors.white.withValues(alpha: 0.08)),
-            ),
-        ],
-      ],
-    );
-  }
-}
-
-class _DetailItem {
-  const _DetailItem(
-      {required this.icon, required this.label, required this.value});
-  final IconData icon;
-  final String label;
-  final String value;
-}
-
-class _SecondaryDetailRow extends StatelessWidget {
-  const _SecondaryDetailRow({required this.item});
-
-  final _DetailItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(item.icon, size: 18, color: const Color(0xFF13BEC9)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                item.label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-String _formatEntryDate(String rawValue) {
-  final parsed = DateTime.tryParse(rawValue);
-  if (parsed == null) return rawValue;
-  final dd = parsed.day.toString().padLeft(2, '0');
-  final mm = parsed.month.toString().padLeft(2, '0');
-  final yyyy = parsed.year.toString();
-  return '$dd/$mm/$yyyy';
 }
 
 class _MapSection extends StatelessWidget {
@@ -3735,310 +3340,6 @@ class _BottomBar extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _OverviewCard extends StatelessWidget {
-  const _OverviewCard({
-    required this.property,
-    required this.tour,
-    required this.hasVirtualTour,
-    required this.onTourTap,
-  });
-
-  final RentalProperty property;
-  final PropertyVirtualTour? tour;
-  final bool hasVirtualTour;
-  final VoidCallback onTourTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _MetaPill(
-                          icon: property.transactionType ==
-                                  PropertyTransactionType.sale
-                              ? IconsaxPlusLinear.tag
-                              : IconsaxPlusLinear.key,
-                          label: property.transactionLabel,
-                        ),
-                        if (property.propertyType.trim().isNotEmpty)
-                          _MetaPill(
-                            icon: IconsaxPlusLinear.building_4,
-                            label: property.propertyType,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          property.priceLabel,
-                          style: const TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.navy,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Text(
-                            property.priceSuffixLabel,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        RentlyIcon(
-                          IconsaxPlusLinear.location,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            property.address,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _CompactFactsRow(property: property),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: onTourTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0B3957), Color(0xFF0F5478)],
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                ),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.view_in_ar_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _tourTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _tourSubtitle,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const RentlyIcon(
-                    IconsaxPlusLinear.arrow_left_2,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String get _tourTitle {
-    if (tour?.isReady == true) return 'סיור תלת־ממדי זמין עכשיו';
-    if (tour?.isProcessing == true) return 'סריקת 3D בעיבוד';
-    if (property.videoUrls.isNotEmpty) return 'וידאו סיור זמין';
-    return 'אין עדיין סריקת 3D לנכס הזה';
-  }
-
-  String get _tourSubtitle {
-    if (tour?.isReady == true) return 'פתח סיור עצמי ועבור בין חללי הדירה';
-    if (tour?.isProcessing == true) {
-      final progress = tour?.processingProgress;
-      return progress == null
-          ? 'הסיור יופיע כאן כשהעיבוד יסתיים'
-          : 'התקדמות עיבוד: $progress%';
-    }
-    if (property.videoUrls.isNotEmpty) {
-      return 'צפה בוידאו של הדירה בלי להוריד מודל כבד';
-    }
-    return 'אפשר לפתוח בקשה לסריקה או לצפות במדיה הקיימת';
-  }
-}
-
-class _MetaPill extends StatelessWidget {
-  const _MetaPill({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4FAFD),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFD9EAF2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompactFactsRow extends StatelessWidget {
-  const _CompactFactsRow({required this.property});
-
-  final RentalProperty property;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _FactChip(
-          icon: IconsaxPlusLinear.building,
-          label: '${property.roomsLabel} חדרים',
-        ),
-        _FactChip(
-          icon: IconsaxPlusLinear.maximize_3,
-          label: '${property.sizeM2} מ"ר',
-        ),
-        if (property.floor.isNotEmpty)
-          _FactChip(
-            icon: IconsaxPlusLinear.layer,
-            label: 'קומה ${property.floor}',
-          ),
-      ],
-    );
-  }
-}
-
-class _FactChip extends StatelessWidget {
-  const _FactChip({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFD),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0EBF2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppColors.primary),
-          const SizedBox(width: 7),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.navy,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
       ),
     );
   }
