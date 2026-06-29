@@ -13,7 +13,9 @@ import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
+import 'package:dating_app/core/services/kiri_3d_service.dart';
 import 'package:dating_app/core/services/local_storage.dart';
+import 'package:dating_app/core/services/pending_scan_store.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
@@ -2073,6 +2075,114 @@ class DatingProvider extends ChangeNotifier {
     for (final id in pending) {
       await refreshPropertyTour(id);
     }
+    // KIRI 3D-scan jobs run in the background too — re-check them on the same
+    // hooks so a finished model surfaces without re-opening the capture screen.
+    await finalizePendingScans();
+  }
+
+  /// Attaches a finished KIRI 3D-scan model to an owned property and persists it,
+  /// then surfaces the "סריקת תלת-מימד" viewer. Mirrors [attachPropertyVirtualTour]:
+  /// it only ever touches the current landlord's own listings.
+  Future<void> attachPropertyModel3d({
+    required String propertyId,
+    required PropertyModel3d model3d,
+  }) async {
+    var changed = false;
+    final updated = _customProperties.map((property) {
+      if (property.id != propertyId) return property;
+      if (!_belongsToCurrentLandlord(property)) return property;
+      changed = true;
+      return property.copyWith(model3d: model3d);
+    }).toList();
+    if (!changed) return;
+    _customProperties = updated;
+    _invalidateCatalogCache();
+    await _persist();
+    final property = propertyById(propertyId);
+    if (property != null) {
+      unawaited(_propertyRepository
+          .saveProperty(property, ownerUserId: _currentOwnerUserId)
+          .then((result) {
+        if (!result.isOk && kDebugMode) {
+          debugPrint(
+              'attachPropertyModel3d: remote rejected — ${result.userMessage}');
+        }
+      }));
+      AppEvents.instance
+          .log(UserEventType.tourUploaded, propertyId: propertyId);
+    }
+    notifyListeners();
+  }
+
+  /// Re-checks every locally-persisted in-flight 3D scan against the backend
+  /// (which polls KIRI; on KIRI status==2 it fetches+extracts the model zip,
+  /// re-hosts the assets, and marks the job ready). When a job is ready we attach
+  /// its model to the property and drop the record; failed jobs are also dropped.
+  /// Safe to call from any owner-facing screen / on app resume — never throws.
+  Future<void> finalizePendingScans() async {
+    if (!Kiri3dService.instance.isConfigured) return;
+    final List<PendingScan> pending;
+    try {
+      pending = await PendingScanStore.instance.all();
+    } catch (_) {
+      return;
+    }
+    if (pending.isEmpty) return;
+    for (final scan in pending) {
+      // Only act on the current landlord's own listings.
+      final property = _customPropertyById(scan.propertyId);
+      if (property == null || !_belongsToCurrentLandlord(property)) continue;
+      try {
+        // Close the create→start gap: if a submit ever didn't take (no
+        // `serialize` on the backend job), `start` is idempotent — it submits a
+        // still-"pending" job to KIRI and is a no-op once already submitted.
+        try {
+          await Kiri3dService.instance.start(scan.jobId);
+        } catch (_) {/* best-effort; getStatus below still reports state */}
+        final job = await Kiri3dService.instance.result(scan.jobId);
+        if (job.isReady && job.hasAssets) {
+          final model = PropertyModel3d(
+            glbUrl: job.meshGlbUrl ?? '',
+            plyUrl: job.splatUrl ?? '',
+            scanDate: DateTime.now().toUtc(),
+          );
+          await attachPropertyModel3d(propertyId: scan.propertyId, model3d: model);
+          await PendingScanStore.instance.remove(scan.jobId);
+        } else if (job.isFailed) {
+          // Reconstruction failed on KIRI — stop polling it.
+          await PendingScanStore.instance.remove(scan.jobId);
+        }
+        // Otherwise still processing — leave it for the next finalize pass.
+      } catch (error) {
+        if (kDebugMode) debugPrint('finalizePendingScans(${scan.jobId}): $error');
+      }
+    }
+    // Reflect any newly-removed (ready/failed) jobs in the cached processing set.
+    await refreshScanProcessingCache();
+  }
+
+  // In-memory mirror of the property ids with an in-flight background scan, so
+  // widgets can read the "processing" state synchronously during build (the
+  // store itself is async). Refreshed by [refreshScanProcessingCache] and kept
+  // current by [finalizePendingScans].
+  Set<String> _scanProcessingPropertyIds = const {};
+
+  /// Synchronous: does [propertyId] currently have a 3D scan reconstructing in
+  /// the background? Drives the "מעבד… נודיע כשמוכן" notice on the listing.
+  bool isScanProcessing(String propertyId) =>
+      _scanProcessingPropertyIds.contains(propertyId);
+
+  /// Reloads the cached set of property ids with an in-flight scan and notifies
+  /// listeners if it changed. Cheap and safe to call from any owner screen.
+  Future<void> refreshScanProcessingCache() async {
+    try {
+      final pending = await PendingScanStore.instance.all();
+      final ids = pending.map((s) => s.propertyId).toSet();
+      if (!setEquals(ids, _scanProcessingPropertyIds)) {
+        _scanProcessingPropertyIds = ids;
+        notifyListeners();
+      }
+    } catch (_) {/* fail-soft */}
   }
 
   void beginPropertyDetailView(String propertyId) {

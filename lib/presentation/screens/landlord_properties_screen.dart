@@ -28,7 +28,8 @@ class LandlordPropertiesScreen extends StatefulWidget {
       _LandlordPropertiesScreenState();
 }
 
-class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
+class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
+    with WidgetsBindingObserver {
   static const double _floatingActionBottomInset = 102;
   static const double _listBottomInset = 132;
 
@@ -44,6 +45,22 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
+    WidgetsBinding.instance.addObserver(this);
+    // On opening the owner's properties, re-check any background 3D scans so a
+    // KIRI reconstruction that finished while away gets attached to its listing.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _finalizeScans());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _finalizeScans();
+  }
+
+  void _finalizeScans() {
+    if (!mounted) return;
+    final provider = context.read<DatingProvider>();
+    unawaited(provider.refreshScanProcessingCache());
+    unawaited(provider.finalizePendingScans());
   }
 
   void _scrollListener() {
@@ -60,6 +77,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
     _searchCtrl.dispose();

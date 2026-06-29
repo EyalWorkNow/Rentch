@@ -248,14 +248,18 @@ class Kiri3dService {
   // ── End-to-end helper ───────────────────────────────────────────────────────
 
   /// One-shot: create → upload every file in [files] → start → poll to terminal.
-  /// [onUpdate] receives each polled state. Returns the final [Scan3dJob]
-  /// (ready or failed). Throws [Kiri3dException] before reconstruction begins
-  /// (job creation, upload, or start failure).
+  /// [onUpdate] receives each polled state. [onSubmitted] fires with the [jobId]
+  /// the instant KIRI accepts the job (after a successful `start`) — the caller
+  /// MUST persist this so the background finalizer can fetch the model even if
+  /// the user leaves the screen mid-reconstruction (KIRI takes several minutes).
+  /// Returns the final [Scan3dJob] (ready or failed). Throws [Kiri3dException]
+  /// before reconstruction begins (job creation, upload, or start failure).
   Future<Scan3dJob> runScan({
     required String propertyId,
     required Scan3dCaptureType captureType,
     required List<File> files,
     void Function(Scan3dJob job)? onUpdate,
+    void Function(String jobId)? onSubmitted,
   }) async {
     if (files.isEmpty) {
       throw const Kiri3dException('No capture files to upload');
@@ -286,6 +290,10 @@ class Kiri3dService {
     if (!started) {
       throw const Kiri3dException('Backend did not acknowledge scan start');
     }
+
+    // KIRI has the job now and will keep reconstructing in the background even
+    // if this screen closes — hand the jobId back so the caller can persist it.
+    onSubmitted?.call(created.jobId);
 
     Scan3dJob last = Scan3dJob(
       jobId: created.jobId,

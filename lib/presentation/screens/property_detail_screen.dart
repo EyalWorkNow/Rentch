@@ -69,6 +69,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _mediaDwellMs = 0;
   bool _contacted = false; // guard so a single contact emits once
 
+  /// Finalizes any background scan for this listing (attaching a finished model)
+  /// and refreshes the cached "processing" state. Only the owner has a pending
+  /// record; the provider notifies listeners so the banner / viewer updates.
+  void _refreshScanState(DatingProvider provider) {
+    unawaited(provider.finalizePendingScans());
+    unawaited(provider.refreshScanProcessingCache());
+  }
+
   void _onScroll(ScrollMetrics m) {
     if (widget.isLandlordPreview) return;
     final max = m.maxScrollExtent;
@@ -134,6 +142,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         // If this listing's 3D tour is still "processing", re-check Teleport now
         // so a finished/failed capture stops showing "בעיבוד" indefinitely.
         provider.refreshPropertyTour(widget.property.id);
+        // Same for a background KIRI 3D scan: re-check it so a finished model
+        // gets attached + the "סריקת תלת-מימד" viewer appears on the listing.
+        _refreshScanState(provider);
         // View-side funnel signal: the user opened this listing's detail.
         try {
           AppEvents.instance.service.logFunnelStage(
@@ -146,7 +157,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         // Landlord previewing their own listing — refresh the tour state too.
-        context.read<DatingProvider>().refreshPropertyTour(widget.property.id);
+        final provider = context.read<DatingProvider>();
+        provider.refreshPropertyTour(widget.property.id);
+        _refreshScanState(provider);
       });
     }
   }
@@ -871,7 +884,7 @@ class _ParitySections extends StatelessWidget {
       mediaCards.add(_MediaTourCard(
         icon: Icons.view_in_ar_rounded,
         title: 'סריקת תלת-מימד',
-        subtitle: 'מודל תלת-מימדי — סובבו והתקרבו מכל זווית',
+        subtitle: '✓ הסריקה מוכנה — סובבו והתקרבו מכל זווית',
         branding: branding,
         surface: _cardSurface,
         onSurface: _onSurface,
@@ -882,6 +895,18 @@ class _ParitySections extends StatelessWidget {
           splatUrl: _scan3dSplatUrl(property),
           title: 'סריקת תלת-מימד',
         ),
+      ));
+    }
+
+    // A 3D scan is reconstructing in the background — set expectations that it
+    // takes a few minutes and the owner can leave; it appears here when ready.
+    final scanProcessing =
+        context.watch<DatingProvider>().isScanProcessing(property.id);
+    if (scanProcessing && !has3d) {
+      mediaCards.add(_Scan3dProcessingCard(
+        surface: _cardSurface,
+        onSurface: _onSurface,
+        muted: _muted,
       ));
     }
 
@@ -1136,6 +1161,78 @@ class _MediaTourCard extends StatelessWidget {
                 size: 16, color: branding.primaryColor),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "מעבד… נודיע כשמוכן" notice for a 3D scan still reconstructing in the
+/// background. Sets expectations (a few minutes, can leave) and reassures the
+/// owner the scan wasn't lost — it surfaces here as a viewer once ready.
+class _Scan3dProcessingCard extends StatelessWidget {
+  const _Scan3dProcessingCard({
+    required this.surface,
+    required this.onSurface,
+    required this.muted,
+  });
+
+  final Color surface;
+  final Color onSurface;
+  final Color muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: CircularProgressIndicator(
+                strokeWidth: 2.6,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'מעבד סריקת תלת-מימד…',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'בונים את המודל — כמה דקות. אפשר לעזוב, נודיע כשמוכן.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: muted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

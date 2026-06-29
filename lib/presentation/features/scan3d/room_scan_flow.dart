@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/kiri_3d_service.dart';
+import 'package:dating_app/core/services/pending_scan_store.dart';
 import 'package:dating_app/core/services/roomplan_service.dart';
 import 'package:dating_app/data/models/scan3d_job.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
@@ -1084,6 +1086,10 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
   String _stage = 'מעלים את הסרטון…';
   bool _failed = false;
   String _failMessage = '';
+  // Set once KIRI accepts the job: from this point the reconstruction continues
+  // in the BACKGROUND, so the user can safely leave and we'll surface the model
+  // on the property when it's ready (via the finalizer).
+  bool _submitted = false;
 
   @override
   void initState() {
@@ -1120,12 +1126,26 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         propertyId: widget.propertyId,
         captureType: Scan3dCaptureType.video,
         files: files,
+        onSubmitted: (jobId) {
+          // KIRI now owns the job and keeps reconstructing even if this screen
+          // closes. Persist it so the background finalizer fetches the finished
+          // model and attaches it to the property — the user can leave now.
+          unawaited(PendingScanStore.instance.add(PendingScan(
+            jobId: jobId,
+            propertyId: widget.propertyId,
+            submittedAt: DateTime.now().toUtc(),
+          )));
+          if (mounted) setState(() => _submitted = true);
+        },
         onUpdate: (j) {
           if (!mounted) return;
           setState(() => _stage = _stageLabel(j.status));
         },
       );
       if (!mounted) return;
+      // Job reached a terminal state while the screen was open — it's no longer
+      // pending, so drop the background record before returning the result.
+      unawaited(PendingScanStore.instance.remove(job.jobId));
       Navigator.of(context).pop(job);
     } on Kiri3dException catch (e) {
       if (!mounted) return;
@@ -1258,11 +1278,28 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'אפשר להשאיר את המסך פתוח. אנחנו מודיעים כשמוכן.',
+        Text(
+          _submitted
+              ? 'הסריקה ממשיכה ברקע — אפשר לעזוב את המסך. '
+                  'המודל יופיע על הדירה כשיהיה מוכן (כמה דקות).'
+              : 'אפשר להשאיר את המסך פתוח. אנחנו מודיעים כשמוכן.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.4),
+          style: const TextStyle(
+              color: Colors.white70, fontSize: 15, height: 1.4),
         ),
+        if (_submitted) ...[
+          const SizedBox(height: 28),
+          _BigButton(
+            label: 'המשך ברקע',
+            icon: Icons.check_rounded,
+            filled: false,
+            onTap: () {
+              // Leave the in-flight job in the pending store; the finalizer will
+              // attach the model to the property when it's ready.
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
       ],
     );
   }
