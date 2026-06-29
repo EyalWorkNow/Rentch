@@ -1730,20 +1730,23 @@ class _LandlordToolsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        _ToolTile(
-          icon: IconsaxPlusLinear.receipt_text,
-          color: AppColors.primary,
-          title: 'מס הכנסה — בקלות',
-          subtitle: 'בדיקה מהירה אם צריך לשלם מס על השכירות',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TaxHelperScreen(
-                initialMonthlyRent: firstProperty?.price.toDouble(),
+        // Income-tax helper — landlords only; removed from the broker (סוכן) account.
+        if (!context.watch<DatingProvider>().isBroker) ...[
+          _ToolTile(
+            icon: IconsaxPlusLinear.receipt_text,
+            color: AppColors.primary,
+            title: 'מס הכנסה — בקלות',
+            subtitle: 'בדיקה מהירה אם צריך לשלם מס על השכירות',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => TaxHelperScreen(
+                  initialMonthlyRent: firstProperty?.price.toDouble(),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
         _ToolTile(
           icon: IconsaxPlusLinear.notification_bing,
           color: AppColors.coral,

@@ -365,7 +365,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                             10,
                                             72,
                                             10,
-                                            110,
+                                            130,
                                           ),
                                           scale: 0.93,
                                           threshold: 38,
