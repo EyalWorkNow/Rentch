@@ -10,6 +10,9 @@ import 'package:dating_app/core/services/assistant_live_service.dart';
 import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/features/assistant/erik_design.dart';
+import 'package:dating_app/presentation/features/assistant/erik_presence.dart';
+import 'package:dating_app/presentation/features/assistant/erik_voice_call.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -20,22 +23,24 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ── Erik design tokens ────────────────────────────────────────────────────────
-// A calm, premium voice-assistant palette layered on a deep navy "night" canvas.
-// The accent is NEVER hard-coded: it flows from AppColors (auto BLACK for
-// brokers, teal for everyone else). Never `const` a widget that reads these.
-const _kBgDeep = Color(0xFF041C2F); // deepest navy (top & bottom of canvas)
-const _kBgMid = Color(0xFF0B2F4D); // lifted navy (centre glow)
-const _kInk = Colors.white; // primary text on dark
-const _kInkSoft = Color(0xFFE6EEF6); // softened white for body copy
-const _kMuted = Color(0xFFA6BDD2); // muted blue-grey (secondary text)
-const _kAssistantSurface = Color(0x1A5AD4DC); // translucent teal-blue
-Color get _kUserSurface => AppColors.primary; // solid accent (user bubble)
-const _kPanelSurface = Color(0x140E3358); // translucent navy glass
-const _kCardSurface = Color(0x14FFFFFF); // faint white glass for cards
-const _kLine = Color(0x24FFFFFF); // hairline border for glassmorphism
-const _kLineStrong = Color(0x3DFFFFFF); // brighter hairline
-Color get _kAccent => AppColors.primary; // teal / black per role
-Color get _kAccent2 => AppColors.primaryLight; // luminous accent for glow
+// The full token layer lives in `features/assistant/erik_design.dart`
+// (ErikTokens). These short aliases keep this screen's call-sites concise; they
+// are a thin re-export so there is still a SINGLE source of truth. The accent is
+// NEVER hard-coded — it flows from AppColors (auto BLACK for brokers, teal
+// otherwise). Never `const` a widget that reads an accent token.
+const _kBgDeep = ErikTokens.bgDeep; // deepest navy (top & bottom of canvas)
+const _kBgMid = ErikTokens.bgMid; // lifted navy (centre glow)
+const _kInk = ErikTokens.ink; // primary text on dark
+const _kInkSoft = ErikTokens.inkSoft; // softened white for body copy
+const _kMuted = ErikTokens.muted; // muted blue-grey (secondary text)
+const _kAssistantSurface = ErikTokens.assistantSurface; // translucent teal-blue
+Color get _kUserSurface => ErikTokens.userSurface; // solid accent (user bubble)
+const _kPanelSurface = ErikTokens.panel; // translucent navy glass
+const _kCardSurface = ErikTokens.card; // faint white glass for cards
+const _kLine = ErikTokens.line; // hairline border for glassmorphism
+const _kLineStrong = ErikTokens.lineStrong; // brighter hairline
+Color get _kAccent => ErikTokens.accent; // teal / black per role
+Color get _kAccent2 => ErikTokens.accentGlow; // luminous accent for glow
 
 /// "אריק" — a premium, interactive voice/text concierge for landlords (built so
 /// both a 20-year-old and a 70-year-old breeze through it). Glass surfaces, soft
@@ -109,6 +114,28 @@ class _AssistantScreenState extends State<AssistantScreen>
   String get _storeKey => 'erik_transcript_$_uid';
 
   final ValueNotifier<double> _soundLevelNotifier = ValueNotifier<double>(0.0);
+
+  /// Maps the screen's many flags into the four expressive presence states that
+  /// drive Erik's orb. One place, so the orb, header and call view stay in sync.
+  ErikState get _erikState {
+    if (_liveActive) {
+      switch (_liveStatus) {
+        case LiveStatus.connecting:
+          return ErikState.thinking;
+        case LiveStatus.speaking:
+          return ErikState.speaking;
+        case LiveStatus.listening:
+          return ErikState.listening;
+        case LiveStatus.idle:
+        case LiveStatus.error:
+        case LiveStatus.closed:
+          return ErikState.idle;
+      }
+    }
+    if (_thinking) return ErikState.thinking;
+    if (_listening) return ErikState.listening;
+    return ErikState.idle;
+  }
 
   @override
   void initState() {
@@ -985,6 +1012,10 @@ class _AssistantScreenState extends State<AssistantScreen>
   }
 
   Widget _buildVoiceChatThread() {
+    // While a real-time call is live, the immersive call view takes over the
+    // whole canvas — this is the centerpiece experience.
+    if (_liveActive) return _buildLiveCall();
+
     // Calm, inviting hero before any conversation has begun — the orb is the
     // hero and a single big button starts the real-time call.
     final idle = !_liveActive &&
@@ -1015,6 +1046,51 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
   }
 
+  /// The immersive, hands-free voice-call surface (the centerpiece). All state
+  /// and actions are the screen's real ones — this just presents them.
+  Widget _buildLiveCall() {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final connecting = _liveStatus == LiveStatus.connecting;
+        final speaking = _liveStatus == LiveStatus.speaking;
+
+        final statusLine = connecting
+            ? 'מתחבר לאריק...'
+            : speaking
+                ? 'אריק מדבר'
+                : 'מקשיב לך';
+
+        // Surface whichever side is currently talking as the big transcript.
+        final transcript =
+            speaking ? _liveErikText.trim() : _liveUserText.trim();
+
+        return ErikFadeInUp(
+          child: ErikVoiceCall(
+            clock: _pulse.value,
+            state: _erikState,
+            connecting: connecting,
+            callActive: _liveActive,
+            statusLine: statusLine,
+            transcript: transcript,
+            soundLevel: _soundLevelNotifier,
+            voiceOn: _voiceReplies,
+            onTapOrb: _toggleLive,
+            onHangUp: _toggleLive,
+            onToggleVoice: () async {
+              if (_voiceReplies) await _service.stopSpeaking();
+              setState(() => _voiceReplies = !_voiceReplies);
+            },
+            onSwitchToText: () async {
+              await _stopLive();
+              if (mounted) setState(() => _showVisualizer = false);
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildVoiceWelcomeHero() {
     return Column(
       children: [
@@ -1030,12 +1106,12 @@ class _AssistantScreenState extends State<AssistantScreen>
                 GestureDetector(
                   onTap: _toggleLive,
                   behavior: HitTestBehavior.opaque,
-                  child: _VoiceOrb(
-                    size: 168,
-                    listening: false,
-                    speaking: false,
-                    connecting: false,
-                    soundLevelNotifier: _soundLevelNotifier,
+                  child: ErikPresence(
+                    size: 178,
+                    state: ErikState.idle,
+                    accent: ErikTokens.accent,
+                    accentGlow: ErikTokens.accentGlow,
+                    soundLevel: _soundLevelNotifier,
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -1166,8 +1242,6 @@ class _AssistantScreenState extends State<AssistantScreen>
         builder: (context, _) {
           final connecting = _liveStatus == LiveStatus.connecting;
           final speaking = _liveActive && _liveStatus == LiveStatus.speaking;
-          final liveListening =
-              _liveActive && _liveStatus == LiveStatus.listening;
           final active = _liveActive || _listening || _thinking;
 
           final title = !_liveActive
@@ -1252,12 +1326,12 @@ class _AssistantScreenState extends State<AssistantScreen>
                     const SizedBox(width: 14),
                     GestureDetector(
                       onTap: _toggleLive,
-                      child: _VoiceOrb(
-                        size: 70,
-                        listening: liveListening || _listening,
-                        speaking: speaking,
-                        connecting: connecting || _thinking,
-                        soundLevelNotifier: _soundLevelNotifier,
+                      child: ErikPresence(
+                        size: 74,
+                        state: _erikState,
+                        accent: ErikTokens.accent,
+                        accentGlow: ErikTokens.accentGlow,
+                        soundLevel: _soundLevelNotifier,
                       ),
                     ),
                   ],
@@ -3003,262 +3077,6 @@ class _AnimatedChipState extends State<_AnimatedChip>
       ),
     );
   }
-}
-class _VoiceOrb extends StatefulWidget {
-  const _VoiceOrb({
-    required this.size,
-    required this.listening,
-    required this.speaking,
-    required this.connecting,
-    this.soundLevelNotifier,
-  });
-
-  final double size;
-  final bool listening;
-  final bool speaking;
-  final bool connecting;
-  final ValueNotifier<double>? soundLevelNotifier;
-
-  @override
-  State<_VoiceOrb> createState() => _VoiceOrbState();
-}
-
-class _VoiceOrbState extends State<_VoiceOrb>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _anim = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 16),
-  )..repeat();
-
-  double _level = 0.0;
-
-  @override
-  void dispose() {
-    _anim.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final field = widget.size * 1.85;
-    return SizedBox(
-      width: field,
-      height: field,
-      child: ValueListenableBuilder<double>(
-        valueListenable:
-            widget.soundLevelNotifier ?? ValueNotifier<double>(0.0),
-        builder: (context, raw, _) {
-          final target = ((raw + 2.0) / 12.0).clamp(0.0, 1.0);
-          // Snap up fast on sound, ease down slowly — feels reactive but smooth.
-          final k = target > _level ? 0.5 : 0.12;
-          _level += (target - _level) * k;
-          return AnimatedBuilder(
-            animation: _anim,
-            builder: (context, _) {
-              return CustomPaint(
-                size: Size(field, field),
-                painter: _DotBlobPainter(
-                  t: _anim.value,
-                  level: _level,
-                  listening: widget.listening,
-                  speaking: widget.speaking,
-                  connecting: widget.connecting,
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Rently's living "AI orb": an asymmetric blob that constantly loses its shape
-/// — far more when it hears or speaks — rendered as a flowing field of dots
-/// (phyllotaxis) that deform with the surface, lit from within. App palette,
-/// pure Canvas.
-class _DotBlobPainter extends CustomPainter {
-  _DotBlobPainter({
-    required this.t,
-    required this.level,
-    required this.listening,
-    required this.speaking,
-    required this.connecting,
-  });
-
-  final double t; // 0..1 seamless loop
-  final double level; // 0..1 smoothed audio amplitude
-  final bool listening;
-  final bool speaking;
-  final bool connecting;
-
-  // App palette.
-  static const _bright = Color(0xFFB8FBFF);
-  static const _tealLight = Color(0xFF5AD4DC);
-  static const _teal = Color(0xFF13BEC9);
-  static const _blue = Color(0xFF4A6CF7);
-  static const _coral = Color(0xFFFF5A67);
-  static const _deep = Color(0xFF06303A);
-
-  static const int _dotCount = 150;
-  // Phyllotaxis (sunflower) layout — even disk fill. (angle, normRadius, seed).
-  static final List<_PolarDot> _dots = _build();
-  static List<_PolarDot> _build() {
-    final out = <_PolarDot>[];
-    const golden = 2.399963229; // golden angle (rad)
-    for (var i = 0; i < _dotCount; i++) {
-      final rho = math.sqrt(i / _dotCount) * 1.14; // a few spill past the edge
-      out.add(_PolarDot(golden * i, rho, (i * 53) % 100 / 100.0));
-    }
-    return out;
-  }
-
-  double get _tau => 2 * math.pi;
-
-  // Multi-harmonic organic noise → big asymmetric lobes. Seamless over t∈[0,1].
-  double _noise(double a) {
-    final p = t * _tau;
-    return 0.50 * math.sin(2 * a + p) +
-        0.34 * math.sin(3 * a - 2 * p + 1.3) +
-        0.22 * math.sin(5 * a + 3 * p + 0.5) +
-        0.14 * math.sin(7 * a - p * 1.5 + 0.6);
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final s = size.shortestSide;
-    final base = s * 0.26;
-    final active = listening || speaking || connecting;
-
-    // It is ALWAYS morphing; sound (in = listening, out = speaking) drives it
-    // much harder, so the orb visibly "loses its shape".
-    double deform = 0.16 + 0.05 * math.sin(t * _tau * 1.5);
-    if (connecting) deform += 0.05;
-    if (speaking) deform += 0.14 * (0.4 + 0.6 * math.sin(t * _tau * 5).abs());
-    if (listening) deform += 0.16 + level * 0.6;
-    deform += level * 0.35;
-
-    final warm = listening ? (0.4 + level * 0.4).clamp(0.0, 0.85) : 0.0;
-    Color mix(Color x) => Color.lerp(x, _coral, warm)!;
-
-    final breathe = 1 + 0.05 * math.sin(t * _tau) + level * 0.12;
-    final baseR = base * breathe;
-
-    double blobR(double a) => baseR * (1 + deform * _noise(a));
-
-    // 1 ── Ambient glow.
-    final glowR = baseR * 2.2;
-    canvas.drawCircle(
-      c,
-      glowR,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            mix(_teal).withValues(alpha: (active ? 0.30 : 0.16) + level * 0.20),
-            mix(_blue).withValues(alpha: 0.08),
-            Colors.transparent,
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ).createShader(Rect.fromCircle(center: c, radius: glowR))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
-    );
-
-    // 2 ── Soft luminous body under the dots (follows the morph).
-    final bodyPath = _blobPath(c, blobR);
-    canvas.drawPath(
-      bodyPath,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-0.25, -0.3),
-          colors: [
-            mix(_tealLight).withValues(alpha: 0.55),
-            mix(_teal).withValues(alpha: 0.40),
-            _deep.withValues(alpha: 0.55),
-          ],
-          stops: const [0.0, 0.55, 1.0],
-        ).createShader(Rect.fromCircle(center: c, radius: baseR * 1.2))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
-    );
-
-    // 3 ── The dot field — texture that flows with the surface.
-    final dotPaint = Paint();
-    for (final d in _dots) {
-      final r = d.rho * blobR(d.angle);
-      final pos = Offset(
-        c.dx + r * math.cos(d.angle),
-        c.dy + r * math.sin(d.angle),
-      );
-      // colour by radial position: bright core → teal → blue rim.
-      final Color col = d.rho < 0.5
-          ? Color.lerp(_bright, _teal, d.rho * 2)!
-          : Color.lerp(_teal, _blue, ((d.rho - 0.5) / 0.64).clamp(0.0, 1.0))!;
-      // twinkle + fade out past the edge.
-      final twinkle = 0.65 + 0.35 * math.sin(t * _tau * 3 + d.seed * _tau);
-      final edgeFade = d.rho > 1.0 ? (1.15 - d.rho) / 0.15 : 1.0;
-      final op = ((1.0 - d.rho * 0.45) * twinkle * edgeFade * (active ? 1.0 : 0.85))
-          .clamp(0.0, 1.0);
-      final dotR = s * 0.0095 * (1.15 - 0.45 * d.rho) * (1 + level * 0.25);
-      dotPaint.color = mix(col).withValues(alpha: op);
-      canvas.drawCircle(pos, math.max(0.4, dotR), dotPaint);
-    }
-
-    // 4 ── Inner light — a soft pulsing glow from the core (lights the dots).
-    final pulse = 0.5 +
-        0.5 * math.sin(t * _tau * (speaking ? 5 : 2)).abs() +
-        level * 0.4;
-    final lc = Offset(c.dx - baseR * 0.1, c.dy - baseR * 0.12);
-    canvas.drawCircle(
-      lc,
-      baseR * 0.7,
-      Paint()
-        ..blendMode = BlendMode.plus
-        ..shader = RadialGradient(
-          colors: [
-            _bright.withValues(alpha: (0.30 + 0.32 * pulse).clamp(0.0, 0.75)),
-            mix(_teal).withValues(alpha: 0.10),
-            Colors.transparent,
-          ],
-        ).createShader(Rect.fromCircle(center: lc, radius: baseR * 0.7))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
-    );
-  }
-
-  Path _blobPath(Offset c, double Function(double a) radius) {
-    const n = 96;
-    final pts = List<Offset>.generate(n, (i) {
-      final a = (i / n) * _tau;
-      final r = radius(a);
-      return Offset(c.dx + r * math.cos(a), c.dy + r * math.sin(a));
-    });
-    final path = Path();
-    final start = Offset(
-        (pts[0].dx + pts[n - 1].dx) / 2, (pts[0].dy + pts[n - 1].dy) / 2);
-    path.moveTo(start.dx, start.dy);
-    for (var i = 0; i < n; i++) {
-      final cur = pts[i];
-      final next = pts[(i + 1) % n];
-      path.quadraticBezierTo(
-          cur.dx, cur.dy, (cur.dx + next.dx) / 2, (cur.dy + next.dy) / 2);
-    }
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldRepaint(covariant _DotBlobPainter old) =>
-      old.t != t ||
-      old.level != level ||
-      old.listening != listening ||
-      old.speaking != speaking ||
-      old.connecting != connecting;
-}
-
-class _PolarDot {
-  const _PolarDot(this.angle, this.rho, this.seed);
-  final double angle;
-  final double rho;
-  final double seed;
 }
 class _ComposerCircleButton extends StatelessWidget {
   const _ComposerCircleButton({

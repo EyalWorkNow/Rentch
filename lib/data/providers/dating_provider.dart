@@ -106,6 +106,15 @@ class DatingProvider extends ChangeNotifier {
   bool _isGuestMode = false;
   bool _hasActiveSession = false;
   bool _roleExplicitlyChosen = false;
+  // True ONLY once the user is actually inside the in-app experience
+  // (HomeScreen is mounted). This is the SOLE gate for broker-black theming —
+  // see [themeRole]. It is deliberately NOT persisted: it is a transient
+  // "what is on screen right now" flag, re-established on every launch by the
+  // startup gate (returning users) or by the entry screens at the moment they
+  // navigate into HomeScreen. Because no onboarding / login / signup / role-
+  // picker / guest-entry code sets it, the entire entry flow is structurally
+  // incapable of turning broker-black.
+  bool _isInsideApp = false;
   TenantProfile? _tenantProfile;
   final Map<String, TenantProfile> _cachedProfiles = {};
   final Set<String> _loadingProfileIds = {};
@@ -341,32 +350,46 @@ class DatingProvider extends ChangeNotifier {
   bool get isBroker => _userRole == 'broker';
   String get userRole => _userRole;
 
+  /// True once the user is actually inside the in-app experience (HomeScreen
+  /// mounted). The sole gate for broker-black theming.
+  bool get isInsideApp => _isInsideApp;
+
+  /// Marks that the user has crossed the entry/in-app boundary — i.e. the app
+  /// is now showing [HomeScreen]. Called at the exact navigation seam by the
+  /// three (and only three) places that show HomeScreen: the startup gate for
+  /// a returning user, and the auth/onboarding screens when they navigate in.
+  /// Idempotent and safe to call from a post-frame callback.
+  void markEnteredApp() {
+    if (_isInsideApp) return;
+    _isInsideApp = true;
+    notifyListeners();
+  }
+
   /// ponytail: SINGLE SOURCE OF TRUTH for the app-wide brand accent.
   ///
   /// The global accent (teal vs broker-black) MUST be derived from this getter
   /// and nothing else. It returns the broker identity ONLY when the user is a
-  /// genuinely confirmed, in-app broker — i.e. they are in the broker role AND
-  /// have an active session (a session is established only after a real login,
-  /// social sign-in, signup or guest entry; it is NEVER set while a fresh user
-  /// is on the onboarding/login screens). Because the entry flow runs with
-  /// `_hasActiveSession == false` for any first-time user, the login / signup /
-  /// onboarding flow is ALWAYS the neutral teal brand and black can never leak
-  /// into it:
-  ///   • true first launch → storedState is null → `_hasActiveSession = false`
-  ///     and `_userRole = 'tenant'`, so this is 'tenant' (teal).
-  ///   • relaunch of a confirmed broker → hydrated `_hasActiveSession = true`,
-  ///     `_userRole = 'broker'`, and `_StartupGate` routes them straight to the
-  ///     in-app home (never the entry flow), so 'broker' (black) is correct.
-  ///   • a stale/transient 'broker' role with no active session (e.g. a role
-  ///     preview, or a partially-hydrated session) collapses to teal.
-  ///
-  /// Covers both confirmed-login brokers and guest brokers (both set an active
-  /// session), so the just-added broker-black-in-app behaviour is preserved.
+  /// confirmed broker AND is actually INSIDE the app ([_isInsideApp] — set only
+  /// when HomeScreen is reached). Crucially it does NOT key off session state:
+  /// a session is established by `setUserRole` / `enterGuestMode` WHILE the user
+  /// is still on the entry screens (e.g. right after picking the broker role in
+  /// signup, or after a social/guest broker entry, before the success sheet is
+  /// dismissed and HomeScreen is pushed). Gating on session there is exactly
+  /// what let black leak into the entry flow. Gating on "inside the app"
+  /// instead makes that structurally impossible:
+  ///   • true first launch → `_isInsideApp = false` → teal for the whole
+  ///     onboarding/login/signup/role-pick/guest-entry flow, regardless of the
+  ///     chosen role or whether a session was just created.
+  ///   • relaunch of a confirmed broker → the startup gate routes them straight
+  ///     to HomeScreen and calls [markEnteredApp], so 'broker' (black) is
+  ///     correct — and only AFTER HomeScreen is the active screen.
+  ///   • logout returns to the entry flow and resets `_isInsideApp = false`, so
+  ///     the next sign-up/role-pick is teal again.
   ///
   /// Guarantee: `themeRole == 'broker'` ⟺ a broker is operating INSIDE the app.
-  /// Any entry-flow / tenant / landlord / sessionless state ⟹ neutral 'tenant'.
+  /// Any entry-flow / tenant / landlord / not-yet-entered state ⟹ neutral teal.
   String get themeRole =>
-      (_userRole == 'broker' && _hasActiveSession) ? 'broker' : 'tenant';
+      (_userRole == 'broker' && _isInsideApp) ? 'broker' : 'tenant';
   BrokerBrandingConfig get brokerBranding =>
       isBroker ? _brokerBranding : BrokerBrandingConfig.defaults;
   bool get autoLikeEnabled => _autoLikeEnabled;
@@ -1648,6 +1671,10 @@ class DatingProvider extends ChangeNotifier {
     _userRole = 'tenant';
     _isGuestMode = false;
     _hasActiveSession = false;
+    // Back to the entry flow → must render the neutral teal brand again, even
+    // if the user was previously an in-app broker (black). Without this reset a
+    // logged-out broker would briefly see black accents on the entry screens.
+    _isInsideApp = false;
     _seedInitialState();
     await _persist();
     // Clear circuit breakers and rate-limit buckets on logout.

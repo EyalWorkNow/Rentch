@@ -1,11 +1,18 @@
 import 'dart:ui';
-import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
+
+/// The entry flow (onboarding/auth) is ALWAYS the source teal brand, never the
+/// broker-black accent — so it uses this fixed compile-time token rather than
+/// the runtime-swappable `AppColors.primary`, making it structurally immune to
+/// any global accent flip that may occur while a session is being established.
+const Color _kBrandTeal = Color(0xFF13BEC9);
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -132,10 +139,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       borderRadius: BorderRadius.circular(8),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () => Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                              builder: (_) => const HomeScreen()),
-                        ),
+                        onTap: () {
+                          context.read<DatingProvider>().markEnteredApp();
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                                builder: (_) => const HomeScreen()),
+                          );
+                        },
                         child: const Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: 10, vertical: 6),
@@ -193,10 +203,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               height: 62,
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.18),
+                                color: _kBrandTeal.withValues(alpha: 0.18),
                                 borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
-                                  color: AppColors.primary.withValues(alpha: 0.3),
+                                  color: _kBrandTeal.withValues(alpha: 0.3),
                                   width: 1.5,
                                 ),
                               ),
@@ -222,8 +232,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     Container(
                                       width: 50,
                                       height: 50,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
+                                      decoration: const BoxDecoration(
+                                        color: _kBrandTeal,
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(

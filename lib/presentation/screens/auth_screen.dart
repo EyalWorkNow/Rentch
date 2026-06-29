@@ -24,7 +24,15 @@ const _kScreenBg = Color(0xFFF0F4F7);
 const _kCardBg = Colors.white;
 const _kInputBorder = Color(0xFFDDE3EE);
 const _kInputFill = Color(0xFFF7F9FC);
-Color get _kPillBtn => AppColors.primary;
+
+/// Fixed source-teal brand for the ENTIRE entry flow (welcome / login / signup
+/// / role-pick / guest entry). The entry experience must NEVER render the
+/// broker-black accent — a broker only gets black once inside the app. Using a
+/// compile-time constant here (instead of the runtime-swappable
+/// [_kBrandTeal]) makes the entry screens structurally immune to any
+/// global accent flip that happens while a session is being established.
+const Color _kBrandTeal = Color(0xFF13BEC9);
+const Color _kPillBtn = _kBrandTeal;
 
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
 
@@ -60,6 +68,12 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   void _onEnter() {
+    // Crossing the entry → in-app boundary. Flip the "inside the app" flag that
+    // gates broker-black theming, so the accent only switches to black AFTER we
+    // leave the entry flow — never on the auth screens themselves. This is the
+    // single seam through which welcome/login/register/guest entry all reach
+    // HomeScreen, so one call here covers every path.
+    context.read<DatingProvider>().markEnteredApp();
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, animation, __) => const HomeScreen(),
@@ -212,7 +226,7 @@ class _AuthScreenState extends State<AuthScreen>
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: _kBrandTeal,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -570,9 +584,9 @@ class _WideFeatureItem extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.10),
+            color: _kBrandTeal.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(14)),
-        child: Icon(icon, color: AppColors.primary, size: 20),
+        child: Icon(icon, color: _kBrandTeal, size: 20),
       ),
       const SizedBox(width: 14),
       Expanded(
@@ -603,7 +617,7 @@ class _SimpleTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return TabBar(
       controller: controller,
-      indicatorColor: AppColors.primary,
+      indicatorColor: _kBrandTeal,
       indicatorWeight: 2.5,
       indicatorSize: TabBarIndicatorSize.label,
       dividerColor: _kInputBorder,
@@ -833,7 +847,7 @@ class _GuestModeDialog extends StatelessWidget {
                     title: 'אורח כדייר מחפש דירה',
                     subtitle: 'דירות פעילות ומאצ׳ים פתוחים.',
                     icon: IconsaxPlusLinear.profile_circle,
-                    color: AppColors.primary,
+                    color: _kBrandTeal,
                     onTap: () => Navigator.of(context).pop('tenant'),
                   ),
                   const SizedBox(height: 12),
@@ -841,7 +855,7 @@ class _GuestModeDialog extends StatelessWidget {
                     title: 'אורח כבעל דירה',
                     subtitle: 'נכסים פעילים ומועמדים בתהליך.',
                     icon: IconsaxPlusLinear.home,
-                    color: AppColors.primary, // use primary brand color so it pops nicely on dark glass
+                    color: _kBrandTeal, // use primary brand color so it pops nicely on dark glass
                     onTap: () => Navigator.of(context).pop('landlord'),
                   ),
                   const SizedBox(height: 12),
@@ -928,7 +942,7 @@ class _SocialRoleDialog extends StatelessWidget {
                     title: 'מחפש/ת דירה',
                     subtitle: 'גלה דירות, שלח בקשות וקבל התאמות.',
                     icon: IconsaxPlusLinear.profile_circle,
-                    color: AppColors.primary,
+                    color: _kBrandTeal,
                     onTap: () => Navigator.of(context).pop('tenant'),
                   ),
                   const SizedBox(height: 12),
@@ -936,7 +950,7 @@ class _SocialRoleDialog extends StatelessWidget {
                     title: 'בעל/ת דירה',
                     subtitle: 'פרסם נכסים, נהל בקשות ומצא דיירים.',
                     icon: IconsaxPlusLinear.home,
-                    color: AppColors.primary,
+                    color: _kBrandTeal,
                     onTap: () => Navigator.of(context).pop('landlord'),
                   ),
                 ],
@@ -1262,7 +1276,7 @@ class _LoginTabState extends State<_LoginTab> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: _kBrandTeal,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -1406,10 +1420,10 @@ class _LoginTabState extends State<_LoginTab> {
                               height: 18,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(5),
-                                color: _rememberMe ? AppColors.primary : Colors.transparent,
+                                color: _rememberMe ? _kBrandTeal : Colors.transparent,
                                 border: Border.all(
                                   color:
-                                      _rememberMe ? AppColors.primary : Colors.white.withOpacity(0.25),
+                                      _rememberMe ? _kBrandTeal : Colors.white.withOpacity(0.25),
                                   width: 1.5,
                                 ),
                               ),
@@ -1527,7 +1541,7 @@ class _LoginTabState extends State<_LoginTab> {
                           onTap: widget.onSwitchToRegister,
                           child: Text('הרשמה',
                               style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: _kBrandTeal,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800)),
                         ),
@@ -1764,7 +1778,10 @@ class _RegisterFlowState extends State<_RegisterFlow> {
           ),
         );
       }
-      await provider.setUserRole(_role);
+      // The user explicitly picked this role on the role step, so mark it
+      // explicit — this keeps the role authoritative on relaunch and matches
+      // the social-signup paths (which also pass explicit: true).
+      await provider.setUserRole(_role, explicit: true);
       final city = _cityCtrl.text.trim();
       if (_role == 'landlord' && city.isNotEmpty) {
         // Registration creates a draft skeleton — no consent required for drafts.
@@ -1969,7 +1986,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                                 onTap: widget.onSwitchToLogin,
                                 child: Text('התחברות',
                                     style: TextStyle(
-                                        color: AppColors.primary,
+                                        color: _kBrandTeal,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w800)),
                               ),
@@ -2221,7 +2238,7 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: [
-                            AppColors.primary,
+                            _kBrandTeal,
                             AppColors.coral,
                             const Color(0xFFF39C12),
                             const Color(0xFF4A6CF7),
@@ -2336,7 +2353,7 @@ class _StepProgress extends StatelessWidget {
                   height: 2,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(1),
-                    color: i < step ? AppColors.primary : _kInputBorder,
+                    color: i < step ? _kBrandTeal : _kInputBorder,
                   ),
                 ),
               ),
@@ -2367,15 +2384,15 @@ class _StepBubble extends StatelessWidget {
           height: 30,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isDone || isActive ? AppColors.primary : Colors.transparent,
+            color: isDone || isActive ? _kBrandTeal : Colors.transparent,
             border: Border.all(
-              color: isDone || isActive ? AppColors.primary : _kInputBorder,
+              color: isDone || isActive ? _kBrandTeal : _kInputBorder,
               width: 1.5,
             ),
             boxShadow: isDone || isActive
                 ? [
                     BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.26),
+                        color: _kBrandTeal.withValues(alpha: 0.26),
                         blurRadius: 8,
                         offset: const Offset(0, 3))
                   ]
@@ -2394,7 +2411,7 @@ class _StepBubble extends StatelessWidget {
         const SizedBox(height: 3),
         Text(label,
             style: TextStyle(
-                color: isActive ? AppColors.primary : AppColors.textDisabled,
+                color: isActive ? _kBrandTeal : AppColors.textDisabled,
                 fontSize: 10,
                 fontWeight: FontWeight.w700)),
       ],
@@ -2536,9 +2553,9 @@ class _StepEmailPassword extends StatelessWidget {
                   height: 20,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6),
-                    color: agreedToTerms ? AppColors.primary : Colors.transparent,
+                    color: agreedToTerms ? _kBrandTeal : Colors.transparent,
                     border: Border.all(
-                      color: agreedToTerms ? AppColors.primary : (isDark ? Colors.white.withOpacity(0.6) : _kInputBorder),
+                      color: agreedToTerms ? _kBrandTeal : (isDark ? Colors.white.withOpacity(0.6) : _kInputBorder),
                       width: 1.5,
                     ),
                   ),
@@ -2559,14 +2576,14 @@ class _StepEmailPassword extends StatelessWidget {
                       TextSpan(
                         text: 'תנאי השימוש',
                         style: TextStyle(
-                            color: AppColors.primary,
+                            color: _kBrandTeal,
                             fontWeight: FontWeight.w700),
                       ),
                       TextSpan(text: ' ו'),
                       TextSpan(
                         text: 'מדיניות הפרטיות',
                         style: TextStyle(
-                            color: AppColors.primary,
+                            color: _kBrandTeal,
                             fontWeight: FontWeight.w700),
                       ),
                     ],
@@ -2613,7 +2630,7 @@ class _StepRole extends StatelessWidget {
             icon: IconsaxPlusLinear.house_2,
             title: 'אני מחפש/ת דירה',
             subtitle: 'שוכר / שוכרת',
-            accent: AppColors.primary,
+            accent: _kBrandTeal,
             selected: selected == 'tenant',
             onTap: () => onSelect('tenant'),
             isDark: isDark,
@@ -2841,7 +2858,7 @@ class _CompactBudgetPicker extends StatelessWidget {
             const Spacer(),
             Text('₪${_fmt(budget)}',
                 style: TextStyle(
-                    color: AppColors.primary,
+                    color: _kBrandTeal,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.3)),
@@ -2852,10 +2869,10 @@ class _CompactBudgetPicker extends StatelessWidget {
               trackHeight: 4,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-              activeTrackColor: AppColors.primary,
+              activeTrackColor: _kBrandTeal,
               inactiveTrackColor: isDark ? Colors.white.withOpacity(0.12) : const Color(0xFFD0EDF0),
-              thumbColor: AppColors.primary,
-              overlayColor: AppColors.primary.withValues(alpha: 0.16),
+              thumbColor: _kBrandTeal,
+              overlayColor: _kBrandTeal.withValues(alpha: 0.16),
             ),
             child: Slider(
               value: budget.toDouble().clamp(2000, 20000),
@@ -3034,7 +3051,7 @@ class _CleanTextFieldState extends State<_CleanTextField> {
       child: GlowFocusDecorator(
         isFocused: _isFocused,
         borderRadius: 16.0,
-        glowColor: AppColors.primary,
+        glowColor: _kBrandTeal,
         child: TextField(
           controller: widget.controller,
           keyboardType: widget.keyboardType,
@@ -3064,7 +3081,7 @@ class _CleanTextFieldState extends State<_CleanTextField> {
             border: border,
             enabledBorder: border,
             focusedBorder: border.copyWith(
-              borderSide: BorderSide(color: AppColors.primary, width: 1.8),
+              borderSide: BorderSide(color: _kBrandTeal, width: 1.8),
             ),
           ),
         ),
@@ -3188,12 +3205,12 @@ class _StepPropertyDetails extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+                  color: _kBrandTeal.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text('אופציונלי',
                     style: TextStyle(
-                        color: AppColors.primary,
+                        color: _kBrandTeal,
                         fontSize: 11,
                         fontWeight: FontWeight.w700)),
               ),
@@ -3275,7 +3292,7 @@ class _RoomsStepper extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(label,
               style: TextStyle(
-                  color: AppColors.primary,
+                  color: _kBrandTeal,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.5)),
@@ -3307,7 +3324,7 @@ class _StepperBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = filled
-        ? AppColors.primary
+        ? _kBrandTeal
         : (isDark ? Colors.white.withOpacity(0.12) : _kInputBorder.withValues(alpha: 0.6));
     final iconColor = filled
         ? Colors.white
@@ -3348,10 +3365,10 @@ class _FeatureChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chipBg = selected
-        ? AppColors.primary
+        ? _kBrandTeal
         : (isDark ? Colors.white.withOpacity(0.08) : Colors.white);
     final borderCol = selected
-        ? AppColors.primary
+        ? _kBrandTeal
         : (isDark ? Colors.white.withOpacity(0.15) : _kInputBorder);
 
     return GestureDetector(
@@ -3366,7 +3383,7 @@ class _FeatureChip extends StatelessWidget {
           boxShadow: selected
               ? [
                   BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.22),
+                      color: _kBrandTeal.withValues(alpha: 0.22),
                       blurRadius: 10,
                       offset: const Offset(0, 4))
                 ]
@@ -3426,7 +3443,7 @@ class _EulaSection extends StatelessWidget {
         children: [
           Text(title,
               style: TextStyle(
-                  color: AppColors.primary,
+                  color: _kBrandTeal,
                   fontWeight: FontWeight.w700,
                   fontSize: 13)),
           const SizedBox(height: 3),
@@ -3563,7 +3580,7 @@ class _WelcomePortal extends StatelessWidget {
                         child: Container(
                           height: 56,
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: _kBrandTeal,
                             borderRadius: BorderRadius.circular(28),
                           ),
                           alignment: Alignment.center,

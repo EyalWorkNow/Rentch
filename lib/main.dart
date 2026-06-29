@@ -265,6 +265,12 @@ class _StartupGate extends StatelessWidget {
                 provider.hasActiveSession && provider.roleExplicitlyChosen;
 
             if (hasRealAccount || hasRestoredSession) {
+              // A returning user goes straight to the in-app experience, so we
+              // are now "inside the app": let broker-black theming apply. Done
+              // after this frame so we never call notifyListeners() mid-build.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                provider.markEnteredApp();
+              });
               return const HomeScreen();
             }
             return const OnboardingScreen();
