@@ -10,6 +10,7 @@ import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
+import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,12 @@ import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
+
+// ponytail: TEST-only — a real KIRI Gaussian splat from IMG_9919.MOV, converted
+// to the compact .splat (12.84MB vs 95MB raw .ply) and hosted on S3, to eyeball
+// the 360+3D splat tour on a real device. Remove after verifying.
+const String _kDebugTestSplatUrl =
+    'https://rentch-media-543897290879.s3.us-east-1.amazonaws.com/scan3d/test/c44aa2d751974942a2deb90500297e78.splat?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAX5IWOBB7VMKDBIJ7%2F20260629%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260629T143550Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=97c1162fe1a6cfdeb66af5978d5a2741c7830ed32daf822b9fa96fd680d25204';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -150,6 +157,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Scaffold(
           extendBody: true,
+          // TEST: shown in release too so it's tappable on a TestFlight device.
+          floatingActionButton: FloatingActionButton.extended(
+            heroTag: 'dbgSplat',
+            backgroundColor: Colors.black,
+            icon: const Icon(Icons.view_in_ar_rounded, color: Colors.white),
+            label: const Text('בדיקת ספלאט',
+                style: TextStyle(color: Colors.white)),
+            onPressed: () => Scan3dViewerScreen.open(
+              context,
+              splatUrl: _kDebugTestSplatUrl,
+              title: 'בדיקת ספלאט — IMG_9919',
+            ),
+          ),
           // RepaintBoundary isolates the (often animating) body from the
           // bottomNavigationBar's BackdropFilter, so body frames don't force the
           // navbar to recomposite — keeps the bar responsive under load.

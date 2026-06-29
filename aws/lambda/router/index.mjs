@@ -1695,7 +1695,12 @@ async function getScan3d(event, jobId) {
   if (!meta) return json(404, { message: 'Scan job not found' });
 
   if (meta.status === 'ready') {
-    return json(200, { status: 'ready', meshGlbUrl: meta.meshGlbUrl || '', splatUrl: meta.splatUrl || '' });
+    return json(200, {
+      status: 'ready',
+      meshGlbUrl: meta.meshGlbUrl || '',
+      splatUrl: meta.splatUrl || '',
+      plyUrl: meta.plyUrl || '',
+    });
   }
   if (meta.status === 'failed') {
     return json(200, { status: 'failed', error: meta.error || 'reconstruction failed' });
@@ -1772,7 +1777,8 @@ async function getScan3d(event, jobId) {
 
     const base = `scan3d/results/${jobId}`;
     let meshGlbUrl = '';
-    let splatUrl = '';
+    let splatUrl = '';   // COMPACT .splat the app loads (primary)
+    let plyUrl = '';     // raw KIRI .ply kept for archival / debugging
 
     if (meshEntry) {
       const ext = meshEntry._ext;
@@ -1781,8 +1787,23 @@ async function getScan3d(event, jobId) {
       meshGlbUrl = await putExtractedFile(meshEntry.entry.getData(), key, ctype);
     }
     if (splatEntry) {
-      const key = `${base}/splat.ply`;
-      splatUrl = await putExtractedFile(splatEntry.entry.getData(), key, 'application/octet-stream');
+      const plyBuf = splatEntry.entry.getData();
+      // Keep the raw .ply (archival), but the app's splat viewer must receive the
+      // COMPACT .splat — the 95 MB .ply is too slow to stream + parse on-device.
+      plyUrl = await putExtractedFile(plyBuf, `${base}/splat.ply`, 'application/octet-stream');
+      try {
+        const splatBuf = plyToSplat(plyBuf);
+        splatUrl = await putExtractedFile(
+          splatBuf, `${base}/${jobId}.splat`, 'application/octet-stream',
+        );
+        console.log(`plyToSplat ${jobId}: ${plyBuf.length}B ply → ${splatBuf.length}B splat (${splatBuf.length / 32} splats)`);
+      } catch (e) {
+        // Conversion failed (unexpected PLY layout) — fall back to the raw .ply so
+        // the viewer at least has something to load; the URL still ends .ply, which
+        // the viewer's sceneFormat() detects correctly.
+        console.warn('plyToSplat failed, serving raw .ply', e.message);
+        splatUrl = plyUrl;
+      }
     }
 
     if (!meshGlbUrl && !splatUrl) {
@@ -1794,14 +1815,166 @@ async function getScan3d(event, jobId) {
     const updated = {
       ...meta, status: 'ready',
       meshGlbUrl,                 // extracted textured GLB/GLTF mesh
-      splatUrl,                   // extracted 3DGS .ply (gaussian splat), if present
+      splatUrl,                   // COMPACT .splat (gaussian splat) — what the app loads
+      plyUrl,                     // raw KIRI .ply (archival), if present
       completedAt: Date.now(),
     };
     await putScan3dMeta(jobId, updated);
-    return json(200, { status: 'ready', meshGlbUrl, splatUrl });
+    return json(200, { status: 'ready', meshGlbUrl, splatUrl, plyUrl });
   } catch (e) {
     console.warn('KIRI poll exception', e.message);
     return json(200, { status: 'processing' });
+  }
+}
+
+// ── 3DGS .ply → compact .splat converter ────────────────────────────────────
+// KIRI returns a HEAVY raw gaussian-splat .ply (~95 MB, full spherical-harmonics
+// SH) that is far too slow to stream + parse in the in-app WebView splat viewer.
+// We convert it server-side to the compact antimatter15 .splat format (32 bytes
+// per splat → ~5-8x smaller, ~13-25 MB), which the GaussianSplats3D viewer loads
+// natively and fast on-device.
+//
+// Per-splat .splat record (32 bytes):
+//   • position  : 3 × float32  (x, y, z)                          (12B)
+//   • scale     : 3 × float32  = exp(scale_i)                     (12B)
+//   • color RGBA: 4 × uint8     rgb = 0.5 + C0·f_dc_i ; a=sigmoid (4B)
+//   • rotation  : 4 × uint8     normalized quaternion ·128+128    (4B)
+//
+// Parses the PLY HEADER to find each property's byte offset (order varies between
+// exporters: x,y,z; maybe nx,ny,nz; f_dc_0..2 = DC SH color; f_rest_* = higher SH
+// which we IGNORE; opacity; scale_0..2; rot_0..3). One pass over the buffer with a
+// DataView, writing straight into the output — bounded memory (a ~95 MB ply fits
+// the 3008 MB Lambda with headroom). Splats are emitted in descending
+// scale-volume × opacity order for better front-to-back blending.
+const SH_C0 = 0.28209479177387814;
+
+function plyToSplat(plyBuffer) {
+  const headerEnd = plyHeaderEnd(plyBuffer);
+  if (headerEnd < 0) throw new Error('plyToSplat: no end_header found');
+  const headerText = plyBuffer.toString('latin1', 0, headerEnd);
+  const lines = headerText.split(/\r?\n/);
+  if (!lines.some((l) => l.trim() === 'ply')) {
+    throw new Error('plyToSplat: not a PLY file');
+  }
+  const fmtLine = lines.find((l) => l.startsWith('format'));
+  if (!fmtLine || !fmtLine.includes('binary_little_endian')) {
+    throw new Error(`plyToSplat: unsupported format "${(fmtLine || '').trim()}"`);
+  }
+
+  // Parse the vertex element + its properties in declared (= on-disk) order.
+  let vertexCount = 0;
+  let inVertex = false;
+  const props = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith('element ')) {
+      const [, name, count] = line.split(/\s+/);
+      inVertex = name === 'vertex';
+      if (inVertex) vertexCount = parseInt(count, 10) || 0;
+    } else if (inVertex && line.startsWith('property ')) {
+      const parts = line.split(/\s+/);
+      props.push({ name: parts[2], size: plyTypeSize(parts[1]) });
+    }
+  }
+  if (vertexCount <= 0) throw new Error('plyToSplat: zero vertices');
+
+  let stride = 0;
+  const offsetOf = {};
+  for (const p of props) { offsetOf[p.name] = stride; stride += p.size; }
+
+  const need = (n) => {
+    if (!(n in offsetOf)) throw new Error(`plyToSplat: missing property "${n}"`);
+    return offsetOf[n];
+  };
+  const oX = need('x'), oY = need('y'), oZ = need('z');
+  const oFdc0 = need('f_dc_0'), oFdc1 = need('f_dc_1'), oFdc2 = need('f_dc_2');
+  const oOpacity = need('opacity');
+  const oS0 = need('scale_0'), oS1 = need('scale_1'), oS2 = need('scale_2');
+  const oR0 = need('rot_0'), oR1 = need('rot_1'), oR2 = need('rot_2'), oR3 = need('rot_3');
+
+  const bodyStart = headerEnd;
+  if (bodyStart + vertexCount * stride > plyBuffer.length) {
+    // Truncated file — clamp to the vertices actually present.
+    vertexCount = Math.floor((plyBuffer.length - bodyStart) / stride);
+  }
+  if (vertexCount <= 0) throw new Error('plyToSplat: no vertex data');
+
+  const view = new DataView(
+    plyBuffer.buffer, plyBuffer.byteOffset + bodyStart, vertexCount * stride,
+  );
+  const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+  // Importance order = scale-volume × opacity, descending.
+  const sortKey = new Float32Array(vertexCount);
+  for (let i = 0; i < vertexCount; i++) {
+    const base = i * stride;
+    const sx = Math.exp(view.getFloat32(base + oS0, true));
+    const sy = Math.exp(view.getFloat32(base + oS1, true));
+    const sz = Math.exp(view.getFloat32(base + oS2, true));
+    sortKey[i] = sx * sy * sz * sigmoid(view.getFloat32(base + oOpacity, true));
+  }
+  const order = new Uint32Array(vertexCount);
+  for (let i = 0; i < vertexCount; i++) order[i] = i;
+  order.sort((a, b) => sortKey[b] - sortKey[a]);
+
+  const out = Buffer.allocUnsafe(vertexCount * 32);
+  const clampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
+
+  for (let n = 0; n < vertexCount; n++) {
+    const i = order[n];
+    const base = i * stride;
+    const o = n * 32;
+
+    out.writeFloatLE(view.getFloat32(base + oX, true), o);
+    out.writeFloatLE(view.getFloat32(base + oY, true), o + 4);
+    out.writeFloatLE(view.getFloat32(base + oZ, true), o + 8);
+
+    out.writeFloatLE(Math.exp(view.getFloat32(base + oS0, true)), o + 12);
+    out.writeFloatLE(Math.exp(view.getFloat32(base + oS1, true)), o + 16);
+    out.writeFloatLE(Math.exp(view.getFloat32(base + oS2, true)), o + 20);
+
+    const r = Math.round((0.5 + SH_C0 * view.getFloat32(base + oFdc0, true)) * 255);
+    const g = Math.round((0.5 + SH_C0 * view.getFloat32(base + oFdc1, true)) * 255);
+    const b = Math.round((0.5 + SH_C0 * view.getFloat32(base + oFdc2, true)) * 255);
+    const al = Math.round(sigmoid(view.getFloat32(base + oOpacity, true)) * 255);
+    out[o + 24] = clampByte(r);
+    out[o + 25] = clampByte(g);
+    out[o + 26] = clampByte(b);
+    out[o + 27] = clampByte(al);
+
+    let q0 = view.getFloat32(base + oR0, true);
+    let q1 = view.getFloat32(base + oR1, true);
+    let q2 = view.getFloat32(base + oR2, true);
+    let q3 = view.getFloat32(base + oR3, true);
+    let len = Math.hypot(q0, q1, q2, q3);
+    if (len === 0) { q0 = 1; len = 1; }
+    q0 /= len; q1 /= len; q2 /= len; q3 /= len;
+    out[o + 28] = clampByte(Math.round(q0 * 128 + 128));
+    out[o + 29] = clampByte(Math.round(q1 * 128 + 128));
+    out[o + 30] = clampByte(Math.round(q2 * 128 + 128));
+    out[o + 31] = clampByte(Math.round(q3 * 128 + 128));
+  }
+  return out;
+}
+
+// Byte index just past the "end_header" line (start of the binary body).
+function plyHeaderEnd(buf) {
+  const idx = buf.indexOf(Buffer.from('end_header'));
+  if (idx < 0) return -1;
+  let i = idx + 'end_header'.length;
+  if (buf[i] === 0x0d) i++; // \r
+  if (buf[i] === 0x0a) i++; // \n
+  return i;
+}
+
+function plyTypeSize(type) {
+  switch (type) {
+    case 'char': case 'uchar': case 'int8': case 'uint8': return 1;
+    case 'short': case 'ushort': case 'int16': case 'uint16': return 2;
+    case 'int': case 'uint': case 'int32': case 'uint32':
+    case 'float': case 'float32': return 4;
+    case 'double': case 'float64': case 'int64': case 'uint64': return 8;
+    default: throw new Error(`plyToSplat: unknown property type "${type}"`);
   }
 }
 
