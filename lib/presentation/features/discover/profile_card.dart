@@ -175,23 +175,15 @@ class _ProfileCardState extends State<ProfileCard> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-              // Background image — AnimatedSwitcher crossfades between images
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ...previousChildren,
-                    if (currentChild != null) currentChild,
-                  ],
-                ),
-                child: _CardImage(
-                  key: ValueKey<String>(
-                    '${p.id}:$safeCurrentImage:${currentMedia?.url ?? 'empty'}',
-                  ),
-                  media: currentMedia,
-                  city: p.city,
-                ),
+              // Background image. The old AnimatedSwitcher crossfade dipped to the
+              // background mid-transition (both layers ~50% opacity) — that was the
+              // flicker. Now a single stable element: gaplessPlayback (in SafeImage)
+              // holds the current frame until the next is decoded, and we precache
+              // neighbors, so tapping through photos swaps instantly with no flash.
+              _CardImage(
+                key: ValueKey<String>('cardimg:${p.id}'),
+                media: currentMedia,
+                city: p.city,
               ),
 
               DecoratedBox(

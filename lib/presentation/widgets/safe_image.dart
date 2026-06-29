@@ -46,6 +46,7 @@ class SafeImage extends StatelessWidget {
         File(path),
         fit: fit,
         alignment: alignment,
+        gaplessPlayback: true,
         frameBuilder: _animatedFrameBuilder,
         errorBuilder: (_, __, ___) => fallback,
       );
@@ -61,6 +62,10 @@ class SafeImage extends StatelessWidget {
       fit: fit,
       alignment: alignment,
       headers: _imageRequestHeaders(cleaned),
+      // Hold the previously-decoded frame until the new one is ready (no blank
+      // flash when tapping between the card's photos). Pairs with the neighbor
+      // precache in ProfileCard so the swap is instant.
+      gaplessPlayback: true,
       frameBuilder: _animatedFrameBuilder,
       errorBuilder: (_, __, ___) => fallback,
     );
