@@ -104,6 +104,10 @@ window.rentlyStep = function (delta) { applyWaypoint(idx + (delta | 0), true); }
 
 try {
   if (!cfg.splatUrl) throw new Error('no splat url');
+  // GaussianSplats3D needs WebGL2 — fail clearly if the WebView can't provide it.
+  if (!document.createElement('canvas').getContext('webgl2')) {
+    throw new Error('המכשיר/הדפדפן לא תומך ב-WebGL2');
+  }
 
   viewer = new GaussianSplats3D.Viewer({
     rootElement: document.getElementById('viewer'),
@@ -115,16 +119,31 @@ try {
     sphericalHarmonicsDegree: 0,   // keep memory/perf low on mobile
     dynamicScene: false,
     useBuiltInControls: true,
-    gpuAcceleratedSort: true,
+    // WKWebView (iOS) + the on-device HTTP server are NOT cross-origin isolated,
+    // so SharedArrayBuffer is unavailable. With sharedMemoryForWorkers:true the
+    // sort worker silently hangs → "loading" forever. Disable it (transfer copies
+    // instead). CPU sort is also the most compatible path across the iOS WebView.
+    sharedMemoryForWorkers: false,
+    gpuAcceleratedSort: false,
   });
 
   const fmt = sceneFormat(cfg.splatUrl);
+  console.log('rently-splat: start fmt=' + fmt + ' url=' + cfg.splatUrl.split('?')[0]);
+  // Watchdog: never hang on "loading" forever — surface a real reason instead.
+  const watchdog = setTimeout(() => {
+    if (loadEl && loadEl.style.display !== 'none') {
+      fail('הטעינה נתקעה (30 שניות). ייתכן WebGL/worker/רשת.');
+    }
+  }, 30000);
   viewer.addSplatScene(cfg.splatUrl, {
     splatAlphaRemovalThreshold: 5, // prune near-invisible splats → fewer to sort
     showLoadingUI: false,
-    progressiveLoad: true,
+    progressiveLoad: false,
+    onProgress: (p, msg) => console.log('rently-splat: progress ' + Math.round((p || 0)) + '% ' + (msg || '')),
     ...(fmt !== undefined ? { format: fmt } : {}),
   }).then(() => {
+    clearTimeout(watchdog);
+    console.log('rently-splat: loaded ok');
     if (loadEl) loadEl.style.display = 'none';
     viewer.start();
     // ~30 FPS cap: throttle the render loop to spare mid-range GPUs/battery.
@@ -134,8 +153,13 @@ try {
       viewer.setRenderMode(GaussianSplats3D.RenderMode.OnChange);
     }
     applyWaypoint(0, false);
-  }).catch((e) => fail((e && e.message) || String(e)));
+  }).catch((e) => {
+    clearTimeout(watchdog);
+    console.log('rently-splat: addSplatScene error: ' + ((e && e.message) || e));
+    fail((e && e.message) || String(e));
+  });
 } catch (e) {
+  console.log('rently-splat: fatal: ' + ((e && e.message) || e));
   fail((e && e.message) || String(e));
 }
 </script>

@@ -112,6 +112,8 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
             }
           },
         ))
+        ..setOnConsoleMessage(
+            (m) => debugPrint('SPLAT-JS: ${m.message}'))
         ..loadRequest(Uri.parse('http://127.0.0.1:${server.port}/'));
 
       if (!mounted) {
