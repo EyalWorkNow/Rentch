@@ -15,6 +15,32 @@
     padding:32px;text-align:center}
   #loading{position:absolute;inset:0;display:flex;align-items:center;
     justify-content:center;color:#fff;font:600 14px sans-serif}
+
+  /* ── Virtual joysticks ──────────────────────────────────────────────
+     Two circular pads overlaid on the viewer. Left = movement, right =
+     look. `touch-action:none` stops the WebView from hijacking drags as
+     page scroll/zoom. Pads are positional (not RTL-flipped). */
+  .joy{position:absolute;bottom:max(28px,env(safe-area-inset-bottom));
+    width:128px;height:128px;border-radius:50%;
+    background:rgba(255,255,255,.10);
+    border:2px solid rgba(255,255,255,.28);
+    box-shadow:0 2px 14px rgba(0,0,0,.45);
+    touch-action:none;-webkit-user-select:none;user-select:none;
+    transition:background .12s,border-color .12s;z-index:20}
+  .joy.active{background:rgba(255,255,255,.18);
+    border-color:rgba(255,255,255,.55)}
+  #joyMove{left:max(20px,env(safe-area-inset-left))}
+  #joyLook{right:max(20px,env(safe-area-inset-right))}
+  .nub{position:absolute;left:50%;top:50%;width:58px;height:58px;
+    margin:-29px 0 0 -29px;border-radius:50%;
+    background:rgba(255,255,255,.55);
+    border:2px solid rgba(255,255,255,.85);
+    box-shadow:0 1px 8px rgba(0,0,0,.5);
+    pointer-events:none;will-change:transform}
+  .joy.active .nub{background:rgba(255,255,255,.78)}
+  .joylabel{position:absolute;left:0;right:0;top:-22px;text-align:center;
+    color:rgba(255,255,255,.75);font:600 11px sans-serif;
+    pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 </style>
 <!-- Import map: GaussianSplats3D (MIT) imports the bare specifier "three";
      both files are vendored locally and served by the on-device HTTP server, so
@@ -29,8 +55,39 @@
 <div id="hud"></div>
 <div id="err"></div>
 
+<!-- Free-roam virtual joysticks (left = move, right = look). Hidden until
+     the scene is loaded so they don't float over the loading screen. -->
+<div id="joyMove" class="joy" style="display:none">
+  <div class="joylabel">תנועה</div><div class="nub"></div>
+</div>
+<div id="joyLook" class="joy" style="display:none">
+  <div class="joylabel">מבט</div><div class="nub"></div>
+</div>
+
 <script type="module">
 import * as GaussianSplats3D from '/gaussian-splats-3d.js';
+import * as THREE from 'three';
+
+// ── TUNABLES ─────────────────────────────────────────────────────────────────
+//   Adjust these to taste; they are the only knobs you should normally touch.
+//
+//   NOISE PRUNING — the KIRI splat is full of near-transparent "fog" splats and
+//   tiny sparkle floaters. The library's per-scene `splatAlphaRemovalThreshold`
+//   (0–255) drops any splat whose alpha is below the cutoff; it is by far the
+//   biggest lever on perceived noise. We raise it from 5 → 40. We also shrink
+//   the global render scale a touch so big blobby splats read tighter (the lib
+//   has no public per-splat scale-cull, so SPLAT_SCALE is our proxy for that).
+const ALPHA_CULL  = 40;   // was 5 — drop near-transparent fog splats (0..255)
+const SPLAT_SCALE = 0.85; // <1 tightens blobby splats; 1 = library default
+
+//   FREE-FLY NAVIGATION — indoor-apartment scaled. cameraUp is [0,-1,0] (KIRI
+//   splats are Y-DOWN), so "down" in world space is +Y. We keep our own yaw/
+//   pitch and rebuild the camera basis every frame against this up vector.
+const MOVE_SPEED  = 1.6;  // metres / second at full stick deflection
+const LOOK_SPEED  = 1.9;  // radians / second at full stick deflection
+const PITCH_LIMIT = 1.45; // ~83°, clamp so you can't flip over the poles
+const DEADZONE    = 0.12; // ignore tiny stick jitter near centre
+const WORLD_UP    = new THREE.Vector3(0, -1, 0); // matches cameraUp:[0,-1,0]
 
 const cfg = window.RENTLY_SPLAT || { splatUrl: '', waypoints: [] };
 const errEl = document.getElementById('err');
@@ -66,41 +123,169 @@ function sceneFormat(url) {
 
 let viewer, waypoints = cfg.waypoints || [], idx = 0;
 
-function applyWaypoint(i, animate) {
-  if (!waypoints.length || !viewer) return;
-  idx = ((i % waypoints.length) + waypoints.length) % waypoints.length;
-  const w = waypoints[idx];
-  const cam = viewer.camera;
-  const dur = animate ? 650 : 0;
-  // Smooth teleport: lerp camera position + controls target over `dur` ms.
-  const start = cam.position.clone();
-  const ctrl = viewer.controls;
-  const startT = ctrl ? ctrl.target.clone() : null;
-  const endP = { x: w.position[0], y: w.position[1], z: w.position[2] };
-  const endT = { x: w.target[0],   y: w.target[1],   z: w.target[2] };
-  const t0 = performance.now();
-  function tick(now) {
-    const k = dur ? Math.min(1, (now - t0) / dur) : 1;
-    const e = k * k * (3 - 2 * k); // smoothstep
-    cam.position.set(
-      start.x + (endP.x - start.x) * e,
-      start.y + (endP.y - start.y) * e,
-      start.z + (endP.z - start.z) * e);
-    if (ctrl && startT) {
-      ctrl.target.set(
-        startT.x + (endT.x - startT.x) * e,
-        startT.y + (endT.y - startT.y) * e,
-        startT.z + (endT.z - startT.z) * e);
-      ctrl.update();
-    }
-    if (k < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-  if (hudEl) hudEl.textContent = '📍 ' + (w.label || ('נקודה ' + (idx + 1)));
+// ── FPS free-fly camera state ────────────────────────────────────────────────
+//   We drive viewer.camera ourselves (useBuiltInControls:false). Orientation is
+//   stored as yaw (heading around WORLD_UP) + pitch (elevation). Each frame we
+//   rebuild forward/right/up and apply them. `position` is the eye point.
+const camPos = new THREE.Vector3(0, 1.5, 3);
+let yaw = 0, pitch = 0;
+
+// Scratch vectors (avoid per-frame allocation).
+const _fwd = new THREE.Vector3();   // look direction
+const _fwdFlat = new THREE.Vector3(); // look direction projected onto move plane
+const _right = new THREE.Vector3();
+const _tmp = new THREE.Vector3();
+
+// Seed yaw/pitch from a position→target pair (used for initial pose + waypoints).
+function aimFrom(position, target) {
+  camPos.set(position[0], position[1], position[2]);
+  _fwd.set(target[0] - position[0], target[1] - position[1], target[2] - position[2]);
+  if (_fwd.lengthSq() < 1e-9) _fwd.set(0, 0, -1);
+  _fwd.normalize();
+  // pitch = angle of forward relative to the horizontal (move) plane.
+  // Horizontal component magnitude vs. the up-axis component (WORLD_UP=[0,-1,0]).
+  const upDot = _fwd.dot(WORLD_UP);              // +1 looking straight "down" (=+Y)
+  pitch = Math.asin(THREE.MathUtils.clamp(-upDot, -1, 1)); // up on screen = -upDot
+  pitch = THREE.MathUtils.clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
+  // yaw from the horizontal projection (drop the WORLD_UP component).
+  _fwdFlat.copy(_fwd).addScaledVector(WORLD_UP, -upDot).normalize();
+  if (_fwdFlat.lengthSq() < 1e-9) _fwdFlat.set(0, 0, -1);
+  yaw = Math.atan2(_fwdFlat.x, -_fwdFlat.z); // 0 → looking toward -Z
 }
 
-// Exposed to Flutter: teleport forward (+1) / back (-1) between waypoints.
-window.rentlyStep = function (delta) { applyWaypoint(idx + (delta | 0), true); };
+// Rebuild camera basis from yaw/pitch and push it into viewer.camera.
+function applyCamera() {
+  if (!viewer) return;
+  // Horizontal heading on the move plane (perpendicular to WORLD_UP).
+  // -Z is "north" at yaw 0; +X is east.
+  _fwdFlat.set(Math.sin(yaw), 0, -Math.cos(yaw)); // already horizontal (y=0)
+  // "up on screen" direction is -WORLD_UP (= world -Y, i.e. screen up).
+  _tmp.copy(WORLD_UP).multiplyScalar(-1); // screen-up = [0,1,0]
+  // Tilt the flat heading by pitch toward screen-up.
+  _fwd.copy(_fwdFlat).multiplyScalar(Math.cos(pitch))
+      .addScaledVector(_tmp, Math.sin(pitch))
+      .normalize();
+  const cam = viewer.camera;
+  cam.position.copy(camPos);
+  cam.up.copy(WORLD_UP);
+  cam.lookAt(camPos.x + _fwd.x, camPos.y + _fwd.y, camPos.z + _fwd.z);
+  cam.updateMatrixWorld();
+}
+
+// Exposed to Flutter: jump the camera to waypoint (+1 forward / -1 back).
+window.rentlyStep = function (delta) {
+  if (!waypoints.length) return;
+  idx = ((idx + (delta | 0)) % waypoints.length + waypoints.length) % waypoints.length;
+  const w = waypoints[idx];
+  aimFrom(w.position, w.target);
+  applyCamera();
+  if (hudEl) hudEl.textContent = '📍 ' + (w.label || ('נקודה ' + (idx + 1)));
+};
+
+// ── Joystick widgets ─────────────────────────────────────────────────────────
+//   Each pad reports a normalised vector in [-1,1] for x (right+) and y (up+).
+//   Supports mouse + multi-touch (both pads driven at once via pointer ids).
+function makeJoystick(el) {
+  const nub = el.querySelector('.nub');
+  const out = { x: 0, y: 0 };
+  let pid = null, cx = 0, cy = 0, radius = 56;
+
+  function setNub(dx, dy) { nub.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }
+
+  function activate(clientX, clientY) {
+    const r = el.getBoundingClientRect();
+    cx = r.left + r.width / 2;
+    cy = r.top + r.height / 2;
+    radius = r.width / 2 - 8;
+    el.classList.add('active');
+  }
+  function move(clientX, clientY) {
+    let dx = clientX - cx, dy = clientY - cy;
+    const len = Math.hypot(dx, dy);
+    if (len > radius) { dx = dx / len * radius; dy = dy / len * radius; }
+    setNub(dx, dy);
+    out.x = dx / radius;          // +1 = right
+    out.y = -dy / radius;         // +1 = up (screen y grows downward → invert)
+  }
+  function release() {
+    pid = null; out.x = 0; out.y = 0; setNub(0, 0); el.classList.remove('active');
+  }
+
+  el.addEventListener('pointerdown', (e) => {
+    if (pid !== null) return;
+    pid = e.pointerId;
+    el.setPointerCapture(pid);
+    activate(e.clientX, e.clientY);
+    move(e.clientX, e.clientY);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== pid) return;
+    move(e.clientX, e.clientY);
+    e.preventDefault();
+  });
+  const end = (e) => { if (e.pointerId === pid) { release(); e.preventDefault(); } };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', () => { if (pid !== null) release(); });
+  return out;
+}
+
+let joyMove = null, joyLook = null;
+
+function dz(v) { // apply radial-ish deadzone + keep full-range past it
+  const a = Math.abs(v);
+  if (a < DEADZONE) return 0;
+  return Math.sign(v) * (a - DEADZONE) / (1 - DEADZONE);
+}
+
+// ── Continuous free-fly loop ─────────────────────────────────────────────────
+//   Idle (no stick input) we leave the viewer in OnChange render mode to save
+//   battery; the moment a stick is pushed we flip to Always so motion is smooth,
+//   then drop back to OnChange when both sticks return to rest.
+let lastT = 0, moving = false;
+function setRenderMode(always) {
+  if (always === moving || !viewer || typeof viewer.setRenderMode !== 'function') return;
+  moving = always;
+  viewer.setRenderMode(always
+    ? GaussianSplats3D.RenderMode.Always
+    : GaussianSplats3D.RenderMode.OnChange);
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!viewer || !joyMove) return;
+  const dt = Math.min(0.05, (now - lastT) / 1000 || 0); // clamp big gaps
+  lastT = now;
+
+  const mx = dz(joyMove.x), my = dz(joyMove.y);
+  const lx = dz(joyLook.x), ly = dz(joyLook.y);
+  const anyInput = mx || my || lx || ly;
+  setRenderMode(!!anyInput);
+  if (!anyInput) return;
+
+  // LOOK: right stick. x = yaw, y = pitch (up on screen → look up).
+  if (lx || ly) {
+    yaw   += lx * LOOK_SPEED * dt;
+    pitch += ly * LOOK_SPEED * dt;
+    pitch = THREE.MathUtils.clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
+  }
+
+  // MOVE: left stick translates in the HORIZONTAL facing plane.
+  if (mx || my) {
+    // Forward = current heading flattened onto the move plane (level walk).
+    _fwdFlat.set(Math.sin(yaw), 0, -Math.cos(yaw));
+    // Right = WORLD_UP × forward. With a Y-DOWN up vector this resolves to the
+    // user's screen-right (verified against the camera basis), so strafe isn't
+    // inverted; forward × WORLD_UP would point the wrong way here.
+    _right.copy(WORLD_UP).cross(_fwdFlat).normalize();
+    const step = MOVE_SPEED * dt;
+    camPos.addScaledVector(_fwdFlat, my * step); // up = forward, down = back
+    camPos.addScaledVector(_right,   mx * step); // right = strafe right
+  }
+
+  applyCamera();
+}
 
 try {
   if (!cfg.splatUrl) throw new Error('no splat url');
@@ -114,11 +299,12 @@ try {
     cameraUp: [0, -1, 0],
     initialCameraPosition: waypoints[0] ? waypoints[0].position : [0, 1.5, 3],
     initialCameraLookAt: waypoints[0] ? waypoints[0].target : [0, 1.2, 0],
-    // teleport-only navigation: orbit allowed, but we don't let the user fly
-    // through walls (no WASD free-cam). Controls re-target on each waypoint.
+    // FPS free-roam: we disable the built-in orbit controls and drive
+    // viewer.camera ourselves from the on-screen joysticks (see frame()).
     sphericalHarmonicsDegree: 0,   // keep memory/perf low on mobile
     dynamicScene: false,
-    useBuiltInControls: true,
+    useBuiltInControls: false,
+    splatScale: SPLAT_SCALE,       // <1 tightens blobby splats (noise reduction)
     // WKWebView (iOS) + the on-device HTTP server are NOT cross-origin isolated,
     // so SharedArrayBuffer is unavailable. With sharedMemoryForWorkers:true the
     // sort worker silently hangs → "loading" forever. Disable it (transfer copies
@@ -136,7 +322,8 @@ try {
     }
   }, 30000);
   viewer.addSplatScene(cfg.splatUrl, {
-    splatAlphaRemovalThreshold: 5, // prune near-invisible splats → fewer to sort
+    // NOISE PRUNE: drop near-transparent "fog" splats — the dominant noise.
+    splatAlphaRemovalThreshold: ALPHA_CULL, // was 5, now 40 (0..255)
     showLoadingUI: false,
     progressiveLoad: false,
     onProgress: (p, msg) => console.log('rently-splat: progress ' + Math.round((p || 0)) + '% ' + (msg || '')),
@@ -146,13 +333,25 @@ try {
     console.log('rently-splat: loaded ok');
     if (loadEl) loadEl.style.display = 'none';
     viewer.start();
-    // ~30 FPS cap: throttle the render loop to spare mid-range GPUs/battery.
+    // Idle render mode: OnChange only redraws when the camera moves; the
+    // free-fly loop bumps it to Always while a joystick is held.
     if (typeof viewer.setRenderMode === 'function') {
-      // OnChange render mode only redraws when the camera moves — the cheapest
-      // "cap" of all when the user is standing still at a waypoint.
       viewer.setRenderMode(GaussianSplats3D.RenderMode.OnChange);
     }
-    applyWaypoint(0, false);
+    // Seed the FPS camera from the first waypoint, wire up the joysticks and
+    // start the continuous free-fly loop.
+    const w0 = waypoints[0];
+    if (w0) { aimFrom(w0.position, w0.target); if (hudEl) hudEl.textContent = '📍 ' + (w0.label || 'נקודה 1'); }
+    else    { aimFrom([0, 1.5, 3], [0, 1.2, 0]); }
+    applyCamera();
+    const moveEl = document.getElementById('joyMove');
+    const lookEl = document.getElementById('joyLook');
+    moveEl.style.display = 'block';
+    lookEl.style.display = 'block';
+    joyMove = makeJoystick(moveEl);
+    joyLook = makeJoystick(lookEl);
+    lastT = performance.now();
+    requestAnimationFrame(frame);
   }).catch((e) => {
     clearTimeout(watchdog);
     console.log('rently-splat: addSplatScene error: ' + ((e && e.message) || e));
