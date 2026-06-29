@@ -10,11 +10,17 @@ enum ErikState { idle, listening, thinking, speaking }
 /// ───────────────────────────────────────────────────────────────────────────
 /// Erik PRESENCE — the emotional heart of the assistant.
 ///
-/// A living "AI orb": an asymmetric blob that constantly loses its shape — far
-/// more when it hears or speaks — rendered as a flowing field of dots
-/// (phyllotaxis) that deform with the surface, lit from within, wrapped by a
-/// slowly rotating energy ring. Audio-reactive via [soundLevel]. Pure Canvas,
-/// app palette (accent passed in so it always honours AppColors).
+/// A clean, premium "AI voice orb": a soft luminous sphere built from a smooth
+/// radial-gradient core, layered translucent glow halos, a glossy highlight and
+/// elegant gentle motion. Audio-reactive via [soundLevel]. Pure Canvas, app
+/// palette (accent passed in so it always honours AppColors — teal or black).
+///
+/// States read clearly:
+///   • idle      — slow calm breathing (gentle scale + soft glow pulse).
+///   • listening — audio-reactive concentric ripples + the core scaling to the
+///                 voice; warm and energized.
+///   • thinking  — a smooth sweeping highlight rotating around the orb.
+///   • speaking  — a rhythmic, confident pulse.
 ///
 /// One widget drives every appearance of Erik: the header mark, the welcome
 /// hero, and the big call orb — only [size] and [state] change.
@@ -127,224 +133,237 @@ class _PresencePainter extends CustomPainter {
     required this.showRing,
   });
 
-  final double t; // 0..1 seamless morph loop
-  final double spin; // 0..1 seamless ring loop
+  final double t; // 0..1 seamless breathing loop
+  final double spin; // 0..1 seamless rotation loop
   final double level; // 0..1 smoothed audio amplitude
   final ErikState state;
   final Color accent;
   final Color accentGlow;
   final bool showRing;
 
-  // Cool palette for the dot field's depth gradient.
-  static const _bright = Color(0xFFB8FBFF);
-  static const _blue = Color(0xFF4A6CF7);
-  static const _coral = Color(0xFFFF5A67);
-  static const _deep = Color(0xFF06303A);
+  // A single warm spark used to inject life into the highlight; the orb's hue
+  // is otherwise driven entirely by the passed-in accent (teal or black).
+  static const _spark = Color(0xFFFFFFFF);
+  static const _warm = Color(0xFFFFC9A3);
 
   bool get _listening => state == ErikState.listening;
   bool get _speaking => state == ErikState.speaking;
   bool get _thinking => state == ErikState.thinking;
   bool get _active => state != ErikState.idle;
 
-  static const int _dotCount = 150;
-  static final List<_PolarDot> _dots = _build();
-  static List<_PolarDot> _build() {
-    final out = <_PolarDot>[];
-    const golden = 2.399963229; // golden angle (rad)
-    for (var i = 0; i < _dotCount; i++) {
-      final rho = math.sqrt(i / _dotCount) * 1.14;
-      out.add(_PolarDot(golden * i, rho, (i * 53) % 100 / 100.0));
-    }
-    return out;
-  }
-
-  double get _tau => 2 * math.pi;
-
-  // Multi-harmonic organic noise → big asymmetric lobes. Seamless over t∈[0,1].
-  double _noise(double a) {
-    final p = t * _tau;
-    return 0.50 * math.sin(2 * a + p) +
-        0.34 * math.sin(3 * a - 2 * p + 1.3) +
-        0.22 * math.sin(5 * a + 3 * p + 0.5) +
-        0.14 * math.sin(7 * a - p * 1.5 + 0.6);
-  }
+  static const double _tau = 2 * math.pi;
 
   @override
   void paint(Canvas canvas, Size size) {
     final c = Offset(size.width / 2, size.height / 2);
     final s = size.shortestSide;
-    final base = s * 0.26;
+    final base = s * 0.27;
 
-    // It is ALWAYS morphing; state drives it harder so the orb visibly reacts.
-    double deform = 0.16 + 0.05 * math.sin(t * _tau * 1.5);
-    if (_thinking) deform += 0.05 + 0.04 * math.sin(t * _tau * 4).abs();
-    if (_speaking) deform += 0.14 * (0.4 + 0.6 * math.sin(t * _tau * 5).abs());
-    if (_listening) deform += 0.16 + level * 0.6;
-    deform += level * 0.35;
+    // ── Breathing & state-driven scale. Always alive, never jittery. ──
+    final breath = math.sin(t * _tau); // -1..1 calm sine
+    double scale = 1.0 + 0.035 * breath; // idle: gentle breathing
 
-    // Warm-shift toward coral while listening to a voice — invites speech.
-    final warm = _listening ? (0.4 + level * 0.4).clamp(0.0, 0.85) : 0.0;
-    Color mix(Color x) => Color.lerp(x, _coral, warm)!;
+    if (_listening) {
+      // The sphere swells toward the voice — energized and responsive.
+      scale += 0.06 + level * 0.22;
+    } else if (_speaking) {
+      // A confident rhythmic pulse, a touch faster than the breath clock.
+      final beat = math.sin(t * _tau * 3).abs();
+      scale += 0.05 + 0.10 * beat + level * 0.10;
+    } else if (_thinking) {
+      // Calm and steady — motion comes from the sweeping shimmer, not scale.
+      scale += 0.02 * math.sin(t * _tau * 1.5);
+    }
 
-    final breathe = 1 + 0.05 * math.sin(t * _tau) + level * 0.12;
-    final baseR = base * breathe;
+    final r = base * scale;
 
-    double blobR(double a) => baseR * (1 + deform * _noise(a));
+    // ── Warm shift while listening to invite speech (subtle). ──
+    final warmth = _listening ? (0.18 + level * 0.22).clamp(0.0, 0.4) : 0.0;
+    Color tint(Color x) => Color.lerp(x, _warm, warmth)!;
+    final acc = tint(accent);
+    final accG = tint(accentGlow);
 
-    // 1 ── Ambient glow.
-    final glowR = baseR * 2.2;
+    // 1 ── Outer bloom halo — soft, wide, breathes with the state. ──
+    final haloAlpha = (_active ? 0.26 : 0.16) + level * 0.18 +
+        (_speaking ? 0.06 * math.sin(t * _tau * 3).abs() : 0.0);
+    final haloR = r * 2.4;
     canvas.drawCircle(
       c,
-      glowR,
+      haloR,
       Paint()
         ..shader = RadialGradient(
           colors: [
-            mix(accent).withValues(alpha: (_active ? 0.30 : 0.16) + level * 0.20),
-            mix(_blue).withValues(alpha: 0.08),
+            accG.withValues(alpha: haloAlpha.clamp(0.0, 0.6)),
+            acc.withValues(alpha: haloAlpha.clamp(0.0, 0.6) * 0.45),
             Colors.transparent,
           ],
-          stops: const [0.0, 0.5, 1.0],
-        ).createShader(Rect.fromCircle(center: c, radius: glowR))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(Rect.fromCircle(center: c, radius: haloR))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24),
     );
 
-    // 2 ── Rotating energy ring — a thin orbit of light that speeds up with the
-    // conversation. Skipped for the small header mark.
-    if (showRing) {
-      _paintRing(canvas, c, baseR, mix);
+    // 2 ── Listening ripples — concentric rings expanding outward from the orb.
+    if (_listening) {
+      _paintRipples(canvas, c, r, accG);
     }
 
-    // 3 ── Soft luminous body under the dots (follows the morph).
-    final bodyPath = _blobPath(c, blobR);
-    canvas.drawPath(
-      bodyPath,
+    // 3 ── Mid glow ring (bloom) hugging the sphere for a luminous edge. ──
+    final midR = r * 1.5;
+    canvas.drawCircle(
+      c,
+      midR,
       Paint()
         ..shader = RadialGradient(
-          center: const Alignment(-0.25, -0.3),
           colors: [
-            mix(accentGlow).withValues(alpha: 0.55),
-            mix(accent).withValues(alpha: 0.40),
-            _deep.withValues(alpha: 0.55),
+            Colors.transparent,
+            accG.withValues(alpha: 0.20 + level * 0.18),
+            Colors.transparent,
           ],
-          stops: const [0.0, 0.55, 1.0],
-        ).createShader(Rect.fromCircle(center: c, radius: baseR * 1.2))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+          stops: const [0.55, 0.78, 1.0],
+        ).createShader(Rect.fromCircle(center: c, radius: midR))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
     );
 
-    // 4 ── The dot field — texture that flows with the surface.
-    final dotPaint = Paint();
-    for (final d in _dots) {
-      final r = d.rho * blobR(d.angle);
-      final pos = Offset(
-        c.dx + r * math.cos(d.angle),
-        c.dy + r * math.sin(d.angle),
-      );
-      final Color col = d.rho < 0.5
-          ? Color.lerp(_bright, accent, d.rho * 2)!
-          : Color.lerp(accent, _blue, ((d.rho - 0.5) / 0.64).clamp(0.0, 1.0))!;
-      final twinkle = 0.65 + 0.35 * math.sin(t * _tau * 3 + d.seed * _tau);
-      final edgeFade = d.rho > 1.0 ? (1.15 - d.rho) / 0.15 : 1.0;
-      final op =
-          ((1.0 - d.rho * 0.45) * twinkle * edgeFade * (_active ? 1.0 : 0.85))
-              .clamp(0.0, 1.0);
-      final dotR = s * 0.0095 * (1.15 - 0.45 * d.rho) * (1 + level * 0.25);
-      dotPaint.color = mix(col).withValues(alpha: op);
-      canvas.drawCircle(pos, math.max(0.4, dotR), dotPaint);
-    }
-
-    // 5 ── Inner light — a soft pulsing glow from the core (lights the dots).
-    final pulse = 0.5 +
-        0.5 * math.sin(t * _tau * (_speaking ? 5 : 2)).abs() +
-        level * 0.4;
-    final lc = Offset(c.dx - baseR * 0.1, c.dy - baseR * 0.12);
+    // 4 ── The sphere body — a smooth radial-gradient core, lit from upper-left
+    // so it reads as a real 3-D ball. ──
     canvas.drawCircle(
-      lc,
-      baseR * 0.7,
+      c,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.35, -0.4),
+          radius: 1.1,
+          colors: [
+            Color.lerp(accG, _spark, 0.55)!,
+            accG,
+            acc,
+            Color.lerp(acc, Colors.black, 0.55)!,
+          ],
+          stops: const [0.0, 0.32, 0.66, 1.0],
+        ).createShader(Rect.fromCircle(center: c, radius: r)),
+    );
+
+    // 5 ── Inner core light — a soft luminous heart that pulses. ──
+    final corePulse = _speaking
+        ? 0.55 + 0.45 * math.sin(t * _tau * 3).abs()
+        : 0.5 + 0.5 * (0.5 + 0.5 * breath);
+    final coreC = Offset(c.dx - r * 0.12, c.dy - r * 0.14);
+    canvas.drawCircle(
+      coreC,
+      r * 0.72,
       Paint()
         ..blendMode = BlendMode.plus
         ..shader = RadialGradient(
           colors: [
-            _bright.withValues(alpha: (0.30 + 0.32 * pulse).clamp(0.0, 0.75)),
-            mix(accent).withValues(alpha: 0.10),
+            _spark.withValues(
+                alpha: (0.22 + 0.30 * corePulse + level * 0.25).clamp(0.0, 0.8)),
+            accG.withValues(alpha: 0.10),
             Colors.transparent,
           ],
-        ).createShader(Rect.fromCircle(center: lc, radius: baseR * 0.7))
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(Rect.fromCircle(center: coreC, radius: r * 0.72))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
     );
-  }
 
-  /// A thin, luminous orbit. Its sweep direction & speed read the state:
-  /// idle = slow drift, thinking = a single chasing comet, listening/speaking =
-  /// a brighter full ring that breathes with [level].
-  void _paintRing(Canvas canvas, Offset c, double baseR, Color Function(Color) mix) {
-    final ringR = baseR * 1.32;
-    final rot = spin * _tau * (_thinking ? 2.4 : 1.0);
-    final rect = Rect.fromCircle(center: c, radius: ringR);
-
+    // 6 ── Thinking shimmer — a smooth sweeping band of light rotating around
+    // the sphere. Clipped to the body so it reads as a surface sweep. ──
     if (_thinking) {
-      // A chasing comet arc — Erik is working.
-      final sweep = _tau * 0.32;
-      canvas.drawArc(
-        rect,
-        rot,
-        sweep,
-        false,
+      _paintShimmer(canvas, c, r);
+    }
+
+    // 7 ── Glossy specular highlight — a small soft white catch-light. ──
+    final hl = Offset(c.dx - r * 0.34, c.dy - r * 0.40);
+    canvas.drawCircle(
+      hl,
+      r * 0.30,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            _spark.withValues(alpha: 0.85),
+            _spark.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromCircle(center: hl, radius: r * 0.30))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    );
+    // A faint secondary rim light on the lower-right for roundness.
+    final rim = Offset(c.dx + r * 0.42, c.dy + r * 0.46);
+    canvas.drawCircle(
+      rim,
+      r * 0.5,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = RadialGradient(
+          colors: [
+            accG.withValues(alpha: 0.18),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: rim, radius: r * 0.5))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+
+    // 8 ── A thin luminous orbit ring (skipped for the tiny header mark). ──
+    if (showRing) {
+      final ringR = r * 1.16;
+      canvas.drawCircle(
+        c,
+        ringR,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round
-          ..strokeWidth = baseR * 0.07
-          ..shader = SweepGradient(
-            startAngle: rot,
-            endAngle: rot + sweep,
-            colors: [Colors.transparent, mix(accentGlow).withValues(alpha: 0.9)],
-          ).createShader(rect)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+          ..strokeWidth = r * (0.018 + level * 0.02)
+          ..color = accG.withValues(
+              alpha: (_active ? 0.4 : 0.22) + level * 0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
-      return;
     }
-
-    // Full breathing ring; brighter & thicker when active.
-    final activeBoost = _active ? (0.55 + level * 0.35) : 0.22;
-    canvas.drawCircle(
-      c,
-      ringR,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = baseR * (0.045 + level * 0.03)
-        ..color = mix(accentGlow).withValues(alpha: activeBoost.clamp(0.0, 0.85))
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, _active ? 4 : 2),
-    );
-    // A bright travelling highlight along the ring.
-    final hx = c.dx + ringR * math.cos(rot);
-    final hy = c.dy + ringR * math.sin(rot);
-    canvas.drawCircle(
-      Offset(hx, hy),
-      baseR * (0.10 + level * 0.05),
-      Paint()
-        ..color = _bright.withValues(alpha: _active ? 0.85 : 0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
   }
 
-  Path _blobPath(Offset c, double Function(double a) radius) {
-    const n = 96;
-    final pts = List<Offset>.generate(n, (i) {
-      final a = (i / n) * _tau;
-      final r = radius(a);
-      return Offset(c.dx + r * math.cos(a), c.dy + r * math.sin(a));
-    });
-    final path = Path();
-    final start = Offset(
-        (pts[0].dx + pts[n - 1].dx) / 2, (pts[0].dy + pts[n - 1].dy) / 2);
-    path.moveTo(start.dx, start.dy);
-    for (var i = 0; i < n; i++) {
-      final cur = pts[i];
-      final next = pts[(i + 1) % n];
-      path.quadraticBezierTo(
-          cur.dx, cur.dy, (cur.dx + next.dx) / 2, (cur.dy + next.dy) / 2);
+  /// Listening: concentric ripples that expand outward and fade — driven by the
+  /// rotation clock so multiple rings are always in flight.
+  void _paintRipples(Canvas canvas, Offset c, double r, Color color) {
+    const rings = 3;
+    final energy = (0.35 + level * 0.65).clamp(0.0, 1.0);
+    for (var i = 0; i < rings; i++) {
+      final phase = (spin + i / rings) % 1.0; // 0..1 expanding
+      final rr = r * (1.0 + phase * (0.7 + level * 0.6));
+      final fade = (1.0 - phase) * energy;
+      if (fade <= 0.01) continue;
+      canvas.drawCircle(
+        c,
+        rr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.04 * (1.0 - phase * 0.5)
+          ..color = color.withValues(alpha: (fade * 0.5).clamp(0.0, 0.5))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
     }
-    path.close();
-    return path;
+  }
+
+  /// Thinking: a soft sweeping highlight that rotates around the sphere,
+  /// clipped to the body so it looks like light gliding over a surface.
+  void _paintShimmer(Canvas canvas, Offset c, double r) {
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: r)));
+    final rot = spin * _tau;
+    final rect = Rect.fromCircle(center: c, radius: r * 1.1);
+    canvas.drawCircle(
+      c,
+      r * 1.1,
+      Paint()
+        ..shader = SweepGradient(
+          transform: GradientRotation(rot),
+          colors: [
+            Colors.transparent,
+            _spark.withValues(alpha: 0.0),
+            _spark.withValues(alpha: 0.30),
+            _spark.withValues(alpha: 0.0),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.30, 0.42, 0.54, 1.0],
+        ).createShader(rect)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.restore();
   }
 
   @override
@@ -354,14 +373,8 @@ class _PresencePainter extends CustomPainter {
       old.level != level ||
       old.state != state ||
       old.accent != accent ||
+      old.accentGlow != accentGlow ||
       old.showRing != showRing;
-}
-
-class _PolarDot {
-  const _PolarDot(this.angle, this.rho, this.seed);
-  final double angle;
-  final double rho;
-  final double seed;
 }
 
 /// A live, audio-reactive waveform bar visualizer used in the voice-call view.
