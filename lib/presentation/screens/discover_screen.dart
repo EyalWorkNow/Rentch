@@ -11,8 +11,8 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/saved_search_repository.dart';
 import 'package:dating_app/presentation/features/discover/action_button.dart';
 import 'package:dating_app/presentation/features/discover/profile_card.dart';
-import 'package:dating_app/presentation/screens/compare_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
+import 'package:dating_app/presentation/screens/saved_properties_screen.dart';
 import 'package:dating_app/presentation/screens/saved_searches_screen.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -491,11 +491,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       ),
                       const SizedBox(width: 8),
                       _RoundHeaderButton(
-                        icon: IconsaxPlusLinear.arrange_square,
-                        tooltip: 'השוואת דירות',
+                        icon: IconsaxPlusLinear.heart,
+                        tooltip: 'הדירות ששמרתי',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const CompareScreen(),
+                            builder: (_) => const SavedPropertiesScreen(),
                           ),
                         ),
                       ),
