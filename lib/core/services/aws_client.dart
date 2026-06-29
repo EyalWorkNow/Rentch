@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dating_app/core/config/app_config.dart';
+import 'package:dating_app/data/models/app_notification.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -275,6 +276,30 @@ class AwsApiClient {
       vaov: (data['vaov'] as num?)?.toDouble() ?? 60,
       error: (data['error'] as String?) ?? '',
     );
+  }
+
+  // ── Notifications inbox ───────────────────────────────────────────────────
+
+  /// Fetches the user's notifications (newest first) plus the unread count.
+  /// Fail-soft: returns empty when the backend is unconfigured.
+  Future<({List<AppNotification> items, int unread})> getNotifications() async {
+    if (!isConfigured) return (items: <AppNotification>[], unread: 0);
+    final res = await get('/notifications');
+    final rawItems = (res['items'] as List?) ?? const [];
+    final items = rawItems
+        .whereType<Map>()
+        .map((m) => AppNotification.fromJson(Map<String, dynamic>.from(m)))
+        .toList(growable: false);
+    final unread = (res['unread'] as num?)?.toInt() ??
+        items.where((n) => !n.read).length;
+    return (items: items, unread: unread);
+  }
+
+  /// Marks notifications read — either a specific [ids] list or [all].
+  Future<void> markNotificationsRead({List<String>? ids, bool all = false}) async {
+    if (!isConfigured) return;
+    if (!all && (ids == null || ids.isEmpty)) return;
+    await post('/notifications/mark-read', all ? {'all': true} : {'ids': ids});
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

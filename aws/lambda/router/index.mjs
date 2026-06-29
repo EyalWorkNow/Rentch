@@ -115,6 +115,13 @@ const TABLES = {
 // device a landlord owns. Created out-of-band (see deploy checklist).
 const DEVICE_TOKENS_TABLE = `${TABLE_PREFIX}device-tokens`;
 
+// Notification inbox — one row per delivered notification, keyed by
+// userId (pk) + createdAt (sk, ms-epoch Number, newest = largest). Stores the
+// same {title, body, data} that was pushed so the app can render an in-app
+// inbox and an unread badge even if the device push was dropped. Created
+// out-of-band (aws dynamodb create-table, on-demand). pk=userId(S) sk=createdAt(N).
+const NOTIFICATIONS_TABLE = `${TABLE_PREFIX}notifications`;
+
 // ── Firebase Cloud Messaging (HTTP v1) — SENDING ─────────────────────────────
 // Push delivery using ONLY Node built-ins: we mint a Google OAuth access token
 // by signing a JWT with the service account's RSA private key, cache it in
@@ -299,12 +306,53 @@ async function sendPushToUser(userId, { title, body, data } = {}) {
   }
 }
 
+// ── Notification inbox + unified delivery ────────────────────────────────────
+// notify() is the ONE entry point every real notification goes through. It does
+// two things, in order, and is fully fail-soft (never throws, never blocks the
+// request that triggered it):
+//   1. PERSIST a row in the notifications table so the app can show an inbox and
+//      an unread badge — keyed by userId (pk) + createdAt (sk, ms-epoch), with
+//      read:false. The row id (a uuid) is what mark-read targets.
+//   2. PUSH the same title/body/data to all of that user's devices via FCM.
+// `data` is the structured payload the app routes on (type, propertyId, …); the
+// notification's own `type`/`id` are merged into it so a tapped push and an
+// inbox row resolve to the exact same destination.
+async function notify(userId, type, title, body, data = {}) {
+  if (!userId) return;
+  const createdAt = Date.now();
+  const id = crypto.randomUUID();
+  const payload = { ...data, type, notificationId: id };
+  try {
+    await ddb.send(new PutCommand({
+      TableName: NOTIFICATIONS_TABLE,
+      Item: {
+        userId,
+        createdAt,            // sk: ms-epoch Number, newest = largest
+        id,
+        type,
+        title: title || '',
+        body: body || '',
+        data: payload,
+        read: false,
+      },
+    }));
+  } catch (e) {
+    console.warn('notify: persist failed:', e.message);
+  }
+  try {
+    await sendPushToUser(userId, { title, body, data: payload });
+  } catch (e) {
+    console.warn('notify: push failed:', e.message);
+  }
+}
+
 // Translate a successful table write into the right push (Hebrew copy). Called
-// fire-and-forget from the POST handler; fully fail-soft. Two highest-value
-// triggers are wired here:
-//   • property_likes → a tenant liked a landlord's property = a NEW MATCH;
-//                      push the property owner (landlord).
-//   • messages       → a NEW CHAT MESSAGE; push the other party in the thread.
+// fire-and-forget from the POST handler; fully fail-soft. Routed through
+// notify() so every event is BOTH stored in the inbox AND pushed. Triggers:
+//   • property_likes → a tenant liked a landlord's property (a new lead, not yet
+//                      a mutual match) → push the property owner (landlord).
+//   • messages       → a NEW CHAT MESSAGE → push the other party in the thread.
+//   • reviews        → a NEW REVIEW → push the reviewee (or the property owner).
 async function firePushForWrite(tableKey, body, senderUid) {
   try {
     if (tableKey === 'property_likes') {
@@ -321,12 +369,14 @@ async function firePushForWrite(tableKey, body, senderUid) {
       } catch { /* ignore */ }
       if (!ownerUid || ownerUid === senderUid) return;
       const who = body.tenantName || 'מתעניין חדש';
-      await sendPushToUser(ownerUid, {
-        title: 'התאמה חדשה! 🎉',
-        body: propTitle ? `${who} התעניין/ה בדירה שלך ב${propTitle}`
+      await notify(
+        ownerUid,
+        'property_like',
+        'מתעניין חדש בנכס שלך 👀',
+        propTitle ? `${who} התעניין/ה בדירה שלך ב${propTitle}`
           : `${who} התעניין/ה בדירה שלך`,
-        data: { type: 'match', propertyId: String(propertyId) },
-      });
+        { propertyId: String(propertyId) },
+      );
       return;
     }
 
@@ -337,11 +387,41 @@ async function firePushForWrite(tableKey, body, senderUid) {
       if (!recipient || recipient === senderUid) return;
       const text = (body.text || body.body || '').toString();
       const preview = text.length > 80 ? `${text.slice(0, 79)}…` : (text || 'הודעה חדשה');
-      await sendPushToUser(recipient, {
-        title: 'הודעה חדשה 💬',
-        body: preview,
-        data: { type: 'message', matchId: String(matchId) },
-      });
+      await notify(
+        recipient,
+        'message',
+        'הודעה חדשה 💬',
+        preview,
+        { matchId: String(matchId) },
+      );
+      return;
+    }
+
+    if (tableKey === 'reviews') {
+      // A new review was written. Notify the reviewee — explicit revieweeUserId
+      // if the client set one, otherwise (for a property review) the property's
+      // owner (landlord). Never notify the author of their own review.
+      let target = (body.revieweeUserId || '').toString();
+      const propertyId = (body.propertyId || body.targetId || '').toString();
+      if (!target && (body.targetType === 'property') && propertyId) {
+        try {
+          const prop = await ddb.send(new GetCommand({
+            TableName: TABLES.properties.name, Key: { id: propertyId },
+          }));
+          target = (prop.Item && prop.Item.ownerUserId) || '';
+        } catch { /* ignore */ }
+      }
+      if (!target || target === senderUid) return;
+      const stars = Math.max(0, Math.min(5, Number(body.rating) || 0));
+      const author = body.authorName || 'משתמש Rently';
+      await notify(
+        target,
+        'review',
+        'קיבלת ביקורת חדשה ⭐',
+        stars ? `${author} השאיר/ה לך ביקורת (${stars}/5)`
+          : `${author} השאיר/ה לך ביקורת`,
+        { propertyId, rating: String(stars) },
+      );
       return;
     }
   } catch (e) {
@@ -512,6 +592,15 @@ export const handler = async (event) => {
     if (segments[0] === 'notifications' && segments[1] === 'test'
         && method === 'POST') {
       return await handleTestPush(event);
+    }
+    // POST /notifications/mark-read → mark some/all of the caller's rows read.
+    if (segments[0] === 'notifications' && segments[1] === 'mark-read'
+        && method === 'POST') {
+      return await handleMarkRead(event);
+    }
+    // GET /notifications → the caller's inbox, newest-first, + unread count.
+    if (segments[0] === 'notifications' && !segments[1] && method === 'GET') {
+      return await handleListNotifications(event);
     }
 
     // ── Two-sided match ranking (landlord's leads) ──────────────────────────
@@ -2105,12 +2194,14 @@ async function getScan3d(event, jobId) {
         const ownerUid = prop.Item && prop.Item.ownerUserId;
         if (ownerUid) {
           const where = (prop.Item.street || prop.Item.city) || '';
-          await sendPushToUser(ownerUid, {
-            title: 'הסיור התלת-ממדי מוכן! 🏠',
-            body: where ? `הסיור התלת-ממדי של הדירה ב${where} מוכן לצפייה`
+          await notify(
+            ownerUid,
+            'tour_ready',
+            'הסיור התלת-ממדי מוכן! 🏠',
+            where ? `הסיור התלת-ממדי של הדירה ב${where} מוכן לצפייה`
               : 'הסיור התלת-ממדי של הדירה שלך מוכן לצפייה',
-            data: { type: 'tour_ready', propertyId: String(meta.propertyId), jobId: String(jobId) },
-          });
+            { propertyId: String(meta.propertyId), jobId: String(jobId) },
+          );
         }
       } catch (e) { console.warn('FCM: tour-ready push failed:', e.message); }
     }
@@ -3107,6 +3198,99 @@ async function handleTestPush(event) {
   return json(200, { ok: true, sent });
 }
 
+// GET /notifications → the authenticated caller's notification inbox, newest
+// first, plus the count still unread. Query the notifications table by userId
+// (pk) with ScanIndexForward=false so the largest createdAt (newest) comes back
+// first. Optional ?limit (default 50, max 200). Returns flat, app-ready rows.
+async function handleListNotifications(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  const q = event.queryStringParameters || {};
+  const limit = Math.min(Math.max(parseInt(q.limit, 10) || 50, 1), 200);
+
+  let items = [];
+  try {
+    const out = await ddb.send(new QueryCommand({
+      TableName: NOTIFICATIONS_TABLE,
+      KeyConditionExpression: 'userId = :u',
+      ExpressionAttributeValues: { ':u': uid },
+      ScanIndexForward: false, // newest (largest createdAt) first
+      Limit: limit,
+    }));
+    items = out.Items || [];
+  } catch (e) {
+    console.warn('notifications list failed:', e.message);
+  }
+
+  const notifications = items.map((it) => ({
+    id: it.id,
+    type: it.type || '',
+    title: it.title || '',
+    body: it.body || '',
+    data: it.data || {},
+    read: it.read === true,
+    createdAt: Number(it.createdAt) || 0,
+  }));
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  return json(200, { notifications, unreadCount, count: notifications.length });
+}
+
+// POST /notifications/mark-read → mark the caller's notifications read.
+// Body: { ids: [...] } marks those ids, or { all: true } marks every unread row.
+// Only ever touches rows under the caller's own userId partition. Returns the
+// number of rows updated.
+async function handleMarkRead(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const all = body.all === true;
+  const ids = Array.isArray(body.ids) ? body.ids.map((x) => String(x)) : [];
+  if (!all && ids.length === 0) {
+    return json(400, { message: 'ids[] or all:true required' });
+  }
+
+  // Pull the caller's rows so we can map ids → sort keys (createdAt) and skip
+  // rows already read. The table is keyed by userId+createdAt, so a write needs
+  // the createdAt; we never trust a client-supplied key.
+  let rows = [];
+  try {
+    let lastKey;
+    do {
+      const out = await ddb.send(new QueryCommand({
+        TableName: NOTIFICATIONS_TABLE,
+        KeyConditionExpression: 'userId = :u',
+        ExpressionAttributeValues: { ':u': uid },
+        ExclusiveStartKey: lastKey,
+      }));
+      rows = rows.concat(out.Items || []);
+      lastKey = out.LastEvaluatedKey;
+    } while (lastKey && rows.length < 1000);
+  } catch (e) {
+    console.warn('mark-read query failed:', e.message);
+    return json(200, { ok: true, updated: 0 });
+  }
+
+  const idSet = new Set(ids);
+  const targets = rows.filter((r) =>
+    r.read !== true && (all || idSet.has(String(r.id))));
+
+  let updated = 0;
+  await Promise.all(targets.map(async (r) => {
+    try {
+      await ddb.send(new PutCommand({
+        TableName: NOTIFICATIONS_TABLE,
+        Item: { ...r, read: true },
+      }));
+      updated += 1;
+    } catch (e) {
+      console.warn('mark-read write failed:', e.message);
+    }
+  }));
+
+  return json(200, { ok: true, updated });
+}
+
 // POST /match/leads → rank the tenants who liked the caller's properties by the
 // same two-sided model the client uses (landlord→tenant fit: affordability +
 // shared preferences + deal-breaker gates). Landlord-only.
@@ -3239,6 +3423,24 @@ async function contractCreate(event) {
   const now = new Date().toISOString();
   const item = { ...body, id, createdAt: body.createdAt || now, updatedAt: now };
   await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
+
+  // Contract sent → notify the OTHER party that a contract awaits their
+  // signature. Only when the status is actually 'sent' (a draft saved by the
+  // creator shouldn't ping the counterpart). Fire-and-forget; never blocks.
+  if ((item.status || '') === 'sent') {
+    const other = item.landlordUserId === uid ? item.tenantUserId : item.landlordUserId;
+    const fromName = item.landlordUserId === uid
+      ? (item.landlordName || 'המשכיר') : (item.tenantName || 'השוכר');
+    if (other && other !== uid) {
+      await notify(
+        other,
+        'contract_sent',
+        'נשלח אליך חוזה לחתימה 📄',
+        `${fromName} שלח/ה אליך הסכם שכירות לעיון וחתימה`,
+        { contractId: String(id) },
+      );
+    }
+  }
   return json(200, { item });
 }
 
@@ -3303,6 +3505,25 @@ async function contractSign(event, cid) {
   if (item.landlordSignature && item.tenantSignature) item.status = 'signed';
   item.updatedAt = new Date().toISOString();
   await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
+
+  // Contract signed → tell the OTHER party that this signer just signed.
+  // Fire-and-forget; never blocks the response. The body distinguishes a
+  // fully-signed contract from one still awaiting the counterpart's signature.
+  const other = role === 'landlord' ? item.tenantUserId : item.landlordUserId;
+  const signerName = (sig.signerName
+    || (role === 'landlord' ? item.landlordName : item.tenantName) || 'הצד השני');
+  if (other && other !== uid) {
+    const fullySigned = item.status === 'signed';
+    await notify(
+      other,
+      'contract_signed',
+      'החוזה נחתם ✅',
+      fullySigned
+        ? `${signerName} חתם/ה — ההסכם נחתם על ידי שני הצדדים`
+        : `${signerName} חתם/ה על ההסכם — נותרה חתימתך`,
+      { contractId: String(cid) },
+    );
+  }
   return json(200, { item });
 }
 
