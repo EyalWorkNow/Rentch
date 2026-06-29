@@ -29,7 +29,7 @@ class LandlordPropertiesScreen extends StatefulWidget {
 }
 
 class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen> {
-  static const double _floatingActionBottomInset = 92;
+  static const double _floatingActionBottomInset = 102;
   static const double _listBottomInset = 132;
 
   String _query = '';

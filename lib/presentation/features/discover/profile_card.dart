@@ -180,10 +180,18 @@ class _ProfileCardState extends State<ProfileCard> {
               // flicker. Now a single stable element: gaplessPlayback (in SafeImage)
               // holds the current frame until the next is decoded, and we precache
               // neighbors, so tapping through photos swaps instantly with no flash.
-              _CardImage(
-                key: ValueKey<String>('cardimg:${p.id}'),
-                media: currentMedia,
-                city: p.city,
+              // Isolate the image in its own raster layer so the frequent
+              // drag-driven repaints of the gradient/badges/tap-zones above it
+              // never repaint (and never blink) the photo. Combined with the
+              // stable ValueKey, a photo swap only changes the provider —
+              // gaplessPlayback in SafeImage holds the old frame until the new
+              // one decodes, so the swap is instant with no flicker.
+              RepaintBoundary(
+                child: _CardImage(
+                  key: ValueKey<String>('cardimg:${p.id}'),
+                  media: currentMedia,
+                  city: p.city,
+                ),
               ),
 
               DecoratedBox(

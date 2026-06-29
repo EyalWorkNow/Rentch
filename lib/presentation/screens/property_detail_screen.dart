@@ -25,6 +25,7 @@ import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
+import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
@@ -1777,17 +1778,64 @@ class _ParitySections extends StatelessWidget {
     children.add(_OwnerCard(property: property));
     children.add(const SizedBox(height: 26));
 
-    // ── Virtual tour / 360° / 3D scan entry ───────────────────────────────
-    children.add(_header('סיור וירטואלי', IconsaxPlusLinear.video_play));
-    children.add(_TourEntryCard(
-      property: property,
-      branding: branding,
-      hasVirtualTour: hasVirtualTour,
-      surface: _cardSurface,
-      onSurface: _onSurface,
-      muted: _muted,
-      onTour: onTour,
+    // ── Virtual tours / media (360° + 3D scan) ────────────────────────────
+    final has360 = property.hasPanoramaTour;
+    final has3d = _scan3dGlbUrl(property) != null ||
+        _scan3dSplatUrl(property) != null;
+    children.add(_header(
+      has360 || has3d ? 'סיורים' : 'סיור וירטואלי',
+      IconsaxPlusLinear.video_play,
     ));
+
+    final mediaCards = <Widget>[];
+    if (has360) {
+      mediaCards.add(_MediaTourCard(
+        icon: Icons.threesixty_rounded,
+        title: 'סיור 360°',
+        subtitle: 'סיור פנורמי אינטראקטיבי — הסתובבו בדירה',
+        branding: branding,
+        surface: _cardSurface,
+        onSurface: _onSurface,
+        muted: _muted,
+        onTap: () => PanoramaPsvTourView.open(context, property.panoramaTour!),
+      ));
+    }
+    if (has3d) {
+      mediaCards.add(_MediaTourCard(
+        icon: Icons.view_in_ar_rounded,
+        title: 'סריקת תלת-מימד',
+        subtitle: 'מודל תלת-מימדי — סובבו והתקרבו מכל זווית',
+        branding: branding,
+        surface: _cardSurface,
+        onSurface: _onSurface,
+        muted: _muted,
+        onTap: () => Scan3dViewerScreen.open(
+          context,
+          meshGlbUrl: _scan3dGlbUrl(property),
+          splatUrl: _scan3dSplatUrl(property),
+          title: 'סריקת תלת-מימד',
+        ),
+      ));
+    }
+
+    if (mediaCards.isEmpty) {
+      // No 360 and no 3D scan: keep the existing single entry (video /
+      // processing / "request a scan" states) so the CTA is never dead.
+      children.add(_TourEntryCard(
+        property: property,
+        branding: branding,
+        hasVirtualTour: hasVirtualTour,
+        surface: _cardSurface,
+        onSurface: _onSurface,
+        muted: _muted,
+        onTour: onTour,
+      ));
+    } else {
+      for (var i = 0; i < mediaCards.length; i++) {
+        if (i > 0) children.add(const SizedBox(height: 12));
+        children.add(mediaCards[i]);
+      }
+    }
     children.add(const SizedBox(height: 26));
 
     // ── Key features / amenities ──────────────────────────────────────────
@@ -1901,6 +1949,103 @@ class _TourEntryCard extends StatelessWidget {
                         : hasVideo && !hasVirtualTour
                             ? 'וידאו הנכס'
                             : 'סיור תלת־ממדי',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: muted,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(IconsaxPlusLinear.arrow_left,
+                size: 16, color: branding.primaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Returns a textured-mesh GLB url for [property]'s 3D scan, or null when none.
+String? _scan3dGlbUrl(RentalProperty property) {
+  final m = property.model3d;
+  if (m == null) return null;
+  final glb = m.glbUrl.trim();
+  return glb.isEmpty ? null : glb;
+}
+
+/// Returns a Gaussian-splat url (`.ply`) for [property]'s 3D scan, or null.
+String? _scan3dSplatUrl(RentalProperty property) {
+  final m = property.model3d;
+  if (m == null) return null;
+  final ply = m.plyUrl.trim();
+  return ply.isEmpty ? null : ply;
+}
+
+/// Branded, tappable card for a single virtual-media entry (360° tour or 3D
+/// scan). Mirrors [_TourEntryCard]'s look so the section reads consistently.
+class _MediaTourCard extends StatelessWidget {
+  const _MediaTourCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.branding,
+    required this.surface,
+    required this.onSurface,
+    required this.muted,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final BrokerBrandingConfig branding;
+  final Color surface;
+  final Color onSurface;
+  final Color muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(20),
+          border:
+              Border.all(color: branding.primaryColor.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: branding.primaryColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: branding.primaryColor, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,

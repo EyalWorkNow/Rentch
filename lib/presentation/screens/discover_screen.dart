@@ -1973,7 +1973,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           height: 52,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(26),
+                            borderRadius: BorderRadius.circular(18),
                             border: Border.all(color: const Color(0xFFE2ECF1)),
                             boxShadow: [
                               BoxShadow(

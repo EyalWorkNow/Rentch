@@ -2397,13 +2397,20 @@ class DatingProvider extends ChangeNotifier {
         isSuperLike ? SwipeDirection.superlike : SwipeDirection.like,
       );
 
-      // Simulate owner acceptance: ~40% chance for regular swipe, 100% for super-like.
-      // If landlord auto-like is enabled, force 100% match chance for properties they own.
-      final belongsToLandlord = _belongsToCurrentLandlord(property);
-      final matchChance = (direction == CardSwiperDirection.top || (belongsToLandlord && _autoLikeEnabled)) ? 1.0 : 0.40;
-      if (math.Random().nextDouble() < matchChance) {
-        _ownerAcceptedPropertyIds.add(property.id);
-        _createMatch(property);
+      // A tenant right-swipe registers the LIKE only — it is NOT a match. A
+      // match is two-sided and is created when the other side (the landlord)
+      // accepts the lead, via [handleOwnerSwipe] / [_processAutoLikes]. The
+      // sole exception is the guest/demo walkthrough, where there is no real
+      // landlord on the other side: there we simulate the owner accepting an
+      // owned demo listing the guest super-likes (or any owned demo listing
+      // when auto-like is on) so the demo can showcase the match flow. Real
+      // swipes never blanket-match.
+      if (_isGuestMode && _isGuestDemoProperty(property)) {
+        final acceptsDemo = isSuperLike || _autoLikeEnabled;
+        if (acceptsDemo) {
+          _ownerAcceptedPropertyIds.add(property.id);
+          _createMatch(property);
+        }
       }
     } else {
       return false;

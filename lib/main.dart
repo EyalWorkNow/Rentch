@@ -7,6 +7,7 @@ import 'package:dating_app/core/services/push_notification_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/core/widgets/ipad_frame.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:dating_app/presentation/screens/onboarding_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -97,7 +98,7 @@ class RentlyApp extends StatelessWidget {
                 child: IpadFrame(child: child ?? const SizedBox.shrink()),
               );
             },
-            home: const _SessionLifecycleTracker(child: OnboardingScreen()),
+            home: const _SessionLifecycleTracker(child: _StartupGate()),
           );
         },
       ),
@@ -134,7 +135,7 @@ class RentlyApp extends StatelessWidget {
       // Make heading/title roles clearly extrabold so they stand out from the
       // lighter body/label text (kept at their default weights for contrast).
       textTheme: const TextTheme(
-        headlineLarge: TextStyle(fontWeight: FontWeight.w800),
+        headlineLarge: TextStyle(fontWeight: FontWeight.w900),
         headlineMedium: TextStyle(fontWeight: FontWeight.w800),
         headlineSmall: TextStyle(fontWeight: FontWeight.w800),
         titleLarge: TextStyle(fontWeight: FontWeight.w800),
@@ -215,6 +216,65 @@ class RentlyApp extends StatelessWidget {
           fontWeight: FontWeight.w800,
         ),
         insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      ),
+    );
+  }
+}
+
+/// Decides the first screen on launch so a returning, already-signed-in user
+/// goes straight to [HomeScreen] instead of being sent back through onboarding/
+/// login every time.
+///
+/// A user is considered "already in" when EITHER a non-anonymous Firebase user
+/// is restored (real email/Google/Apple account) OR the provider re-hydrated an
+/// active session with an explicitly chosen role (covers guest mode, which also
+/// bypassed onboarding previously). We wait for the provider to finish its
+/// async restore ([DatingProvider.isLoading]) before deciding, so there is no
+/// flash of the wrong screen — a brief splash is shown while auth resolves.
+class _StartupGate extends StatelessWidget {
+  const _StartupGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, authSnapshot) {
+        return Consumer<DatingProvider>(
+          builder: (context, provider, _) {
+            // Hold on the splash until both auth state and the persisted
+            // session have resolved, to avoid showing onboarding for a beat
+            // before bouncing a logged-in user to home.
+            if (authSnapshot.connectionState == ConnectionState.waiting ||
+                provider.isLoading) {
+              return const _StartupSplash();
+            }
+
+            final user = authSnapshot.data;
+            final hasRealAccount = user != null && !user.isAnonymous;
+            final hasRestoredSession =
+                provider.hasActiveSession && provider.roleExplicitlyChosen;
+
+            if (hasRealAccount || hasRestoredSession) {
+              return const HomeScreen();
+            }
+            return const OnboardingScreen();
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Minimal branded splash shown while startup auth/session state resolves.
+class _StartupSplash extends StatelessWidget {
+  const _StartupSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
       ),
     );
   }

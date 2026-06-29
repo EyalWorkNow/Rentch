@@ -1322,7 +1322,14 @@ class _LoginTabState extends State<_LoginTab> {
                         color: Colors.white,
                         fontSize: 26,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5),
+                        letterSpacing: -0.5,
+                        shadows: [
+                          Shadow(
+                            color: Color(0x40000000),
+                            blurRadius: 10,
+                            offset: Offset(0, 2),
+                          ),
+                        ]),
                   ),
                   const SizedBox(height: 6),
                   const Text(
@@ -2443,7 +2450,14 @@ class _StepEmailPassword extends StatelessWidget {
                 color: isDark ? Colors.white : AppColors.navy,
                 fontSize: 26,
                 fontWeight: FontWeight.w900,
-                letterSpacing: -0.5),
+                letterSpacing: -0.5,
+                shadows: const [
+                  Shadow(
+                    color: Color(0x40000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ]),
           ),
           const SizedBox(height: 6),
           Text(
@@ -3527,6 +3541,13 @@ class _WelcomePortal extends StatelessWidget {
                       fontSize: 40,
                       fontWeight: FontWeight.w900,
                       height: 1.25,
+                      shadows: [
+                        Shadow(
+                          color: Color(0x59000000),
+                          blurRadius: 14,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
                     ),
                   ),
                 ),

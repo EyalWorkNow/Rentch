@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:flutter/material.dart';
 
-class SafeImage extends StatelessWidget {
+class SafeImage extends StatefulWidget {
   const SafeImage({
     super.key,
     required this.source,
@@ -17,13 +17,34 @@ class SafeImage extends StatelessWidget {
   final BoxFit fit;
   final Alignment alignment;
 
+  @override
+  State<SafeImage> createState() => _SafeImageState();
+}
+
+class _SafeImageState extends State<SafeImage> {
+  // Once we've ever painted a decoded frame for this element, we never fade
+  // again. This is what kills the residual swipe-card flicker: when the photo
+  // SWAPS (the [source] changes while gaplessPlayback holds the old frame),
+  // [frameBuilder] briefly reports a null frame for the incoming image. With a
+  // fresh AnimatedOpacity that would dip toward 0 and re-fade in — a faint
+  // opacity blink. By latching here, swaps are truly instant (full opacity,
+  // old frame held until the new one decodes), while the very first load of a
+  // never-shown image still gets a gentle fade-in.
+  bool _hasShownFrame = false;
+
   Widget _animatedFrameBuilder(
     BuildContext context,
     Widget child,
     int? frame,
     bool wasSynchronouslyLoaded,
   ) {
-    if (wasSynchronouslyLoaded) return child;
+    if (wasSynchronouslyLoaded || _hasShownFrame) {
+      _hasShownFrame = true;
+      return child;
+    }
+    if (frame != null && !_hasShownFrame) {
+      _hasShownFrame = true;
+    }
     return AnimatedOpacity(
       opacity: frame == null ? 0.0 : 1.0,
       duration: const Duration(milliseconds: 300),
@@ -34,6 +55,11 @@ class SafeImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final source = widget.source;
+    final fallback = widget.fallback;
+    final fit = widget.fit;
+    final alignment = widget.alignment;
+
     final cleaned = InputSanitizer.sanitizeImageUrl(source);
     if (cleaned == null || cleaned.isEmpty) return fallback;
 
