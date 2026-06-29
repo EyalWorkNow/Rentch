@@ -10,6 +10,7 @@ import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/screens/rent_tracking_screen.dart';
 import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
 import 'package:dating_app/presentation/features/landlord/reminders_screen.dart';
+import 'package:dating_app/presentation/features/broker/broker_tools_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -124,6 +125,15 @@ class LandlordDashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // ── Broker hub (מתווך only) — opens "כלי הסוכן" ──
+                if (context.watch<DatingProvider>().isBroker) ...[
+                  FadeSlideEntrance(
+                    delay: const Duration(milliseconds: 340),
+                    child: const _BrokerToolsCard(),
+                  ),
+                  const SizedBox(height: 24),
+                ],
 
                 // ── Landlord Tools (big, plain-language helpers) ──
                 FadeSlideEntrance(
@@ -1598,6 +1608,92 @@ class _QABtn extends StatelessWidget {
 // Big, plain-Hebrew helpers aimed at older, non-technical landlords. Each row
 // is a large tappable card with an icon, a clear title and a one-line
 // explanation, opening the dedicated tool screen.
+
+// ─── Broker Hub Card (מתווך only) ─────────────────────────────────────────────
+// Highlighted indigo card shown above the landlord tools when the user is a
+// broker. Opens the "כלי הסוכן" hub with all 10 broker tools.
+class _BrokerToolsCard extends StatelessWidget {
+  const _BrokerToolsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    // AppColors.primary/primaryDark are mutable (indigo for brokers) — read
+    // here at build time; this widget must stay outside any const context.
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BrokerToolsScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primary, AppColors.primaryDark],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.30),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                IconsaxPlusLinear.briefcase,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'כלי הסוכן',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'פנקס לקוחות, התאמות, פייפליין, צפיות ועוד',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              IconsaxPlusLinear.arrow_left_2,
+              color: Colors.white,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _LandlordToolsSection extends StatelessWidget {
   const _LandlordToolsSection({required this.properties});

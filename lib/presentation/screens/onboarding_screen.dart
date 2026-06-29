@@ -298,9 +298,9 @@ class _SlideCopy extends StatelessWidget {
             fontWeight: FontWeight.w900,
             shadows: [
               Shadow(
-                color: Color(0x33000000),
-                blurRadius: 10,
-                offset: Offset(0, 2),
+                color: Color(0x4D000000),
+                blurRadius: 14,
+                offset: Offset(0, 3),
               ),
             ],
           ),
