@@ -479,27 +479,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (!provider.isLandlord) ...[
-                      _RoundHeaderButton(
-                        icon: IconsaxPlusLinear.notification_bing,
-                        tooltip: 'חיפושים שמורים',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SavedSearchesScreen(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _RoundHeaderButton(
-                        icon: IconsaxPlusLinear.heart,
-                        tooltip: 'הדירות ששמרתי',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SavedPropertiesScreen(),
-                          ),
-                        ),
-                      ),
-                    ] else
+                    if (!provider.isLandlord)
+                      const _HeaderMenuButton()
+                    else
                       const SizedBox(width: 42),
                     const SizedBox(width: 10),
                     Expanded(
@@ -976,6 +958,78 @@ class _RoundHeaderButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A single 3-dot "more" header button that drops down a menu — replaces the two
+/// separate round buttons (one of which used a bell icon, confusingly mimicking
+/// the real notifications bell). Options: saved searches + saved apartments.
+class _HeaderMenuButton extends StatelessWidget {
+  const _HeaderMenuButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      width: 42,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: PopupMenuButton<int>(
+        tooltip: 'עוד',
+        padding: EdgeInsets.zero,
+        position: PopupMenuPosition.under,
+        icon: const Icon(Icons.more_vert, size: 20, color: AppColors.navy),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        onSelected: (v) {
+          final Widget page =
+              v == 0 ? const SavedSearchesScreen() : const SavedPropertiesScreen();
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => page));
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: 0,
+            child: _HeaderMenuRow(
+                icon: Icons.bookmark_border_rounded, label: 'חיפושים שמורים'),
+          ),
+          PopupMenuItem(
+            value: 1,
+            child: _HeaderMenuRow(
+                icon: Icons.favorite_border_rounded, label: 'הדירות ששמרתי'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderMenuRow extends StatelessWidget {
+  const _HeaderMenuRow({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.navy),
+        const SizedBox(width: 10),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary)),
+      ],
     );
   }
 }

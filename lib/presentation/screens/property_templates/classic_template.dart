@@ -58,23 +58,37 @@ class _ClassicTemplate extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    16,
-                    MediaQuery.of(context).padding.top + 8,
-                    16,
+                    20,
+                    MediaQuery.of(context).padding.top + 12,
+                    20,
                     16,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(32),
-                    child: SizedBox(
-                      height: 380,
-                      child: _ImageGallery(
-                        property: p,
-                        controller: controller,
-                        currentPage: currentPage,
-                        onPageChanged: onPageChanged,
-                        avgRating: avgRating,
-                        onBackTap: onBackTap,
-                        onShareTap: onShareTap,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      // white 3px frame + soft drop shadow → reads like a window.
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 22,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(29),
+                      child: SizedBox(
+                        height: 460,
+                        child: _ImageGallery(
+                          property: p,
+                          controller: controller,
+                          currentPage: currentPage,
+                          onPageChanged: onPageChanged,
+                          avgRating: avgRating,
+                          onBackTap: onBackTap,
+                          onShareTap: onShareTap,
+                        ),
                       ),
                     ),
                   ),
