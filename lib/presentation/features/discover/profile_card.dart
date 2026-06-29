@@ -293,11 +293,13 @@ class _ProfileCardState extends State<ProfileCard> {
                     ),
                   ),
                 ),
-              // Content overlay (bottom layout directly on the dark gradient)
+              // Content overlay (bottom layout directly on the dark gradient).
+              // Lowered so title/price/tags sit ~10px above the action-buttons
+              // row (which floats at bottom:140 and is ~78px tall).
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 120,
+                bottom: 100,
                 child: GestureDetector(
                   onTap: () => _openDetail(context),
                   onDoubleTap: () => _likeCard(context),

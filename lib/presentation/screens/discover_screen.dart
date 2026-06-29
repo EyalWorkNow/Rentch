@@ -414,7 +414,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
                                 // Floating centered action buttons row
                                 Positioned(
-                                  bottom: 125,
+                                  bottom: 140,
                                   left: 0,
                                   right: 0,
                                   child: ActionButtons(
