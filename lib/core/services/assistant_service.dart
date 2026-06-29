@@ -313,10 +313,11 @@ class AssistantService {
   Future<void> speak(String text) async {
     final clean = text.trim();
     if (clean.isEmpty) return;
-    // Cost-saving: dynamic speech uses the device's own (free + very accurate)
-    // Hebrew TTS instead of the paid Gemini TTS. Fixed lines are pre-recorded
-    // clips (see [playPrompt]); Gemini is reserved for validation only.
-    await _speakWithDevice(clean);
+    // Erik's warm, natural Gemini voice is the DEFAULT the user hears. Only if
+    // the Gemini TTS genuinely fails (no audio / network) do we fall back to the
+    // device's own (robotic) Hebrew TTS so Erik is never silent.
+    final ok = await _speakWithGemini(clean);
+    if (!ok) await _speakWithDevice(clean);
   }
 
   /// Plays a pre-recorded prompt clip bundled in assets (instant, zero API cost

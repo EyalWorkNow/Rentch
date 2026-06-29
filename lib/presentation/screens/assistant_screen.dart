@@ -5,7 +5,6 @@ import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
-import 'package:dating_app/core/services/assistant_live_service.dart';
 import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -53,7 +52,6 @@ class AssistantScreen extends StatefulWidget {
 class _AssistantScreenState extends State<AssistantScreen>
     with TickerProviderStateMixin {
   final _service = AssistantService();
-  final _live = AssistantLiveService();
   final _inputCtrl = TextEditingController();
   final _picker = ImagePicker();
   final _storage = StorageService();
@@ -71,18 +69,11 @@ class _AssistantScreenState extends State<AssistantScreen>
   // Whether the text composer (keyboard fallback) is revealed.
   bool _showComposer = false;
 
-  // Hands-free continuous conversation: when on, Erik listens automatically,
-  // the user speaks, Erik answers in voice and immediately resumes listening —
-  // like a phone call, with no buttons. Built for older landlords.
+  // Hands-free voice conversation: when on, Erik listens automatically, the user
+  // speaks, Erik answers in his natural voice and immediately resumes listening —
+  // like a phone call, with no buttons. Built for older landlords. This is the
+  // voice experience (true streaming Live isn't available for this key).
   bool _conversationMode = false;
-
-  // Real-time Gemini Live voice conversation (the premium experience). Audio
-  // streams both ways with sub-second latency and barge-in. Falls back to the
-  // turn-based hands-free loop above if Live can't connect.
-  bool _liveActive = false;
-  LiveStatus _liveStatus = LiveStatus.idle;
-  String _liveUserText = '';
-  String _liveErikText = '';
 
   late final AnimationController _pulse;
   late final AnimationController _composerCtrl;
@@ -104,55 +95,24 @@ class _AssistantScreenState extends State<AssistantScreen>
   /// Maps the screen's many flags into the four expressive presence states that
   /// drive Erik's orb. One place, so the orb and status line stay in sync.
   ErikState get _erikState {
-    if (_liveActive) {
-      switch (_liveStatus) {
-        case LiveStatus.connecting:
-          return ErikState.thinking;
-        case LiveStatus.speaking:
-          return ErikState.speaking;
-        case LiveStatus.listening:
-          return ErikState.listening;
-        case LiveStatus.idle:
-        case LiveStatus.error:
-        case LiveStatus.closed:
-          return ErikState.idle;
-      }
-    }
     if (_thinking) return ErikState.thinking;
     if (_listening) return ErikState.listening;
     return ErikState.idle;
   }
 
-  /// True whenever a voice conversation is going (live, hands-free, or mic on).
-  bool get _callActive => _liveActive || _conversationMode || _listening;
+  /// True whenever a voice conversation is going (hands-free or mic on).
+  bool get _callActive => _conversationMode || _listening;
 
   /// The short status line under the orb, derived from the real state.
   String get _statusLine {
-    if (_liveActive) {
-      switch (_liveStatus) {
-        case LiveStatus.connecting:
-          return 'מתחבר לאריק...';
-        case LiveStatus.speaking:
-          return 'אריק מדבר...';
-        case LiveStatus.listening:
-          return 'מקשיב לך...';
-        case LiveStatus.idle:
-        case LiveStatus.error:
-        case LiveStatus.closed:
-          return 'אריק';
-      }
-    }
     if (_thinking) return 'חושב...';
     if (_listening) return 'מקשיב לך...';
+    if (_conversationMode) return 'מקשיב לך...';
     return 'שלום, אני אריק';
   }
 
-  /// Erik's latest reply text (minimal) — the live partial while speaking, else
-  /// the last committed assistant turn.
+  /// Erik's latest reply text (minimal) — the last committed assistant turn.
   String get _erikReply {
-    if (_liveActive && _liveErikText.trim().isNotEmpty) {
-      return _liveErikText.trim();
-    }
     final last = _turns.lastWhere(
       (t) => t.role == 'assistant',
       orElse: () => const AssistantTurn(role: 'assistant', text: ''),
@@ -164,11 +124,8 @@ class _AssistantScreenState extends State<AssistantScreen>
     return text;
   }
 
-  /// The user's last utterance (live partial > current STT partial > last turn).
+  /// The user's last utterance (current STT partial > last turn).
   String get _userLine {
-    if (_liveActive && _liveUserText.trim().isNotEmpty) {
-      return _liveUserText.trim();
-    }
     if (_listening && _partial.trim().isNotEmpty) return _partial.trim();
     final last = _turns.lastWhere(
       (t) => t.role == 'user',
@@ -215,8 +172,6 @@ class _AssistantScreenState extends State<AssistantScreen>
   @override
   void dispose() {
     _conversationMode = false;
-    _liveActive = false;
-    _live.dispose();
     _pulse.dispose();
     _composerCtrl.dispose();
     _uploadPanelCtrl.dispose();
@@ -392,6 +347,7 @@ class _AssistantScreenState extends State<AssistantScreen>
       final remoteUrl = await _storage.uploadToCloud(localPath);
       if (!mounted) return;
       final mediaPath = remoteUrl ?? localPath;
+      final wasFirstPhoto = _photoUrls.isEmpty;
       setState(() {
         _photoUrls.add(mediaPath);
         _turns.add(AssistantTurn(
@@ -402,6 +358,7 @@ class _AssistantScreenState extends State<AssistantScreen>
         _pickingPhoto = false;
       });
       _saveTranscript();
+      _maybeResumePublish(wasFirstPhoto);
     } catch (_) {
       if (!mounted) return;
       setState(() => _pickingPhoto = false);
@@ -424,6 +381,7 @@ class _AssistantScreenState extends State<AssistantScreen>
       final remoteUrl = await _storage.uploadToCloud(localPath);
       if (!mounted) return;
       final mediaPath = remoteUrl ?? localPath;
+      final wasFirstMedia = _photoUrls.isEmpty;
       setState(() {
         _photoUrls.add(mediaPath);
         _turns.add(AssistantTurn(
@@ -434,11 +392,22 @@ class _AssistantScreenState extends State<AssistantScreen>
         _pickingPhoto = false;
       });
       _saveTranscript();
+      _maybeResumePublish(wasFirstMedia);
     } catch (_) {
       if (!mounted) return;
       setState(() => _pickingPhoto = false);
       _onError('לא הצלחתי להוסיף את הסרטון. אפשר לנסות שוב.');
     }
+  }
+
+  /// When Erik already built a draft and the user just added their FIRST photo
+  /// (the only thing that was blocking publishing), close the upload panel and
+  /// re-surface the publish sheet so the listing actually goes live — the photo
+  /// requirement is now satisfied.
+  void _maybeResumePublish(bool wasFirstMedia) {
+    if (!wasFirstMedia || _draft == null || _publishing) return;
+    _closeUploadPanel();
+    _showDraftSheet(_draft!);
   }
 
   Future<void> _publishDraft([Map<String, dynamic>? draftOverride]) async {
@@ -526,7 +495,33 @@ class _AssistantScreenState extends State<AssistantScreen>
     }
   }
 
-  // ── Hands-free continuous conversation (on-device fallback for Live) ──────────
+  // ── Hands-free voice conversation (turn-based, feels like a phone call) ───────
+
+  /// Tapping the orb starts/stops a hands-free VOICE CONVERSATION: Erik listens,
+  /// the user talks, Erik answers in his natural voice and immediately resumes
+  /// listening — no buttons. True real-time streaming Live isn't available for
+  /// this key, so this snappy turn-based loop is the voice experience.
+  Future<void> _toggleConversation() async {
+    if (_conversationMode) {
+      setState(() => _conversationMode = false);
+      await _service.stopSpeaking();
+      await _service.stopListening();
+      if (mounted) {
+        setState(() {
+          _listening = false;
+        });
+        _soundLevelNotifier.value = 0.0;
+      }
+      return;
+    }
+    setState(() {
+      _conversationMode = true;
+      _voiceReplies = true; // a voice conversation is, by definition, spoken
+    });
+    await _service.stopSpeaking();
+    if (!mounted || !_conversationMode) return;
+    _listenTurn();
+  }
 
   /// One listening turn within conversation mode. On a final result it sends the
   /// text (which then speaks + loops back here). If nothing was heard, it keeps
@@ -570,164 +565,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     }
   }
 
-  // ── Real-time Gemini Live conversation ───────────────────────────────────────
-
-  Future<void> _toggleLive() async {
-    if (_liveActive) {
-      await _stopLive();
-    } else {
-      await _startLive();
-    }
-  }
-
-  Future<void> _startLive() async {
-    // Make sure the turn-based loop + any device speech are fully stopped first.
-    _conversationMode = false;
-    _livePublishedKeys.clear();
-    await _service.stopSpeaking();
-    await _service.stopListening();
-    if (!mounted) return;
-    setState(() {
-      _liveActive = true;
-      _liveStatus = LiveStatus.connecting;
-      _liveUserText = '';
-      _liveErikText = '';
-      _listening = false;
-    });
-    _live
-      ..onStatus = (s) {
-        if (mounted) setState(() => _liveStatus = s);
-      }
-      ..onUserText = (delta) {
-        if (mounted) setState(() => _liveUserText += delta);
-      }
-      ..onErikText = (delta) {
-        if (mounted) setState(() => _liveErikText += delta);
-      }
-      ..onTurnComplete = _commitLivePartials
-      ..onInterrupted = () {
-        if (mounted) setState(() {});
-      }
-      ..onCreateProperty = _onLiveCreateProperty
-      ..onError = (message) {
-        if (!mounted) return;
-        setState(() {
-          _liveActive = false;
-          _liveStatus = LiveStatus.error;
-        });
-        _turns.add(AssistantTurn(
-          role: 'assistant',
-          text: '$message אפשר להמשיך לדבר איתי בשיחה רגילה — אני מקשיב.',
-        ));
-        // Graceful fallback: keep voice working via the on-device hands-free
-        // loop when the live session can't be established.
-        _conversationMode = true;
-        _listenTurn();
-      };
-    await _live.connect();
-  }
-
-  Future<void> _stopLive() async {
-    await _live.disconnect();
-    _commitLivePartials();
-    if (!mounted) return;
-    setState(() {
-      _liveActive = false;
-      _liveStatus = LiveStatus.idle;
-    });
-  }
-
-  /// Folds the streaming partial transcripts into committed turns.
-  void _commitLivePartials() {
-    final u = _liveUserText.trim();
-    final e = _liveErikText.trim();
-    if (u.isEmpty && e.isEmpty) return;
-    if (!mounted) return;
-    setState(() {
-      if (u.isNotEmpty) _turns.add(AssistantTurn(role: 'user', text: u));
-      if (e.isNotEmpty) _turns.add(AssistantTurn(role: 'assistant', text: e));
-      _liveUserText = '';
-      _liveErikText = '';
-    });
-    _saveTranscript();
-  }
-
-  // Dedupe key per published listing so a repeated tool call in one live
-  // session doesn't create the same apartment twice.
-  final Set<String> _livePublishedKeys = {};
-
-  /// Erik emitted a create_property tool call during the live conversation. In a
-  /// voice call the user can't tap a publish button, so we publish the listing
-  /// for real right here — it lands in "הדירות שלי" and is saved to the server.
-  void _onLiveCreateProperty(Map<String, dynamic> args) {
-    if (!mounted) return;
-    _commitLivePartials();
-    unawaited(_publishFromLive(args));
-  }
-
-  Future<void> _publishFromLive(Map<String, dynamic> args) async {
-    final key = [
-      args['city'],
-      args['street'],
-      args['streetNumber'],
-      args['price'],
-      args['rooms'],
-    ].join('|');
-    if (_livePublishedKeys.contains(key)) return; // already created this one
-    _livePublishedKeys.add(key);
-
-    if (_photoUrls.isEmpty) {
-      _livePublishedKeys.remove(key); // allow retry
-      setState(() {
-        _turns.add(const AssistantTurn(
-          role: 'assistant',
-          text:
-              'רק רגע — כדי לפרסם את המודעה צריך להוסיף לפחות תמונה אחת של הדירה. '
-              'העליתי לך את אזור העלאת התמונות למטה, אנא בחר תמונה כדי שנפרסם את הדירה.',
-        ));
-      });
-      _openUploadPanel();
-      return;
-    }
-
-    try {
-      final provider = context.read<DatingProvider>();
-      final ownerName = provider.tenantProfile?.name ?? '';
-      final property = await buildPropertyFromErikDraft(
-        args,
-        ownerName: ownerName,
-        photoUrls: _photoUrls,
-      );
-      await provider.addLandlordProperty(property);
-      if (!mounted) return;
-      final addr = [
-        property.street,
-        property.streetNumber > 0 ? '${property.streetNumber}' : '',
-        property.city,
-      ].where((e) => e.isNotEmpty).join(' ');
-      setState(() {
-        _draft = null;
-        _turns.add(AssistantTurn(
-          role: 'assistant',
-          text:
-              'מצוין! פרסמתי את הדירה${addr.isNotEmpty ? ' ב$addr' : ''} — היא כבר '
-              'מופיעה אצלך ב"הדירות שלי". אפשר להוסיף תמונות בכל רגע משם.',
-        ));
-      });
-      _saveTranscript();
-    } catch (e) {
-      _livePublishedKeys.remove(key); // allow a retry
-      if (kDebugMode) debugPrint('Erik live publish failed: $e');
-      if (!mounted) return;
-      setState(() {
-        _turns.add(const AssistantTurn(
-          role: 'assistant',
-          text: 'הייתה בעיה קטנה בפרסום הדירה. אפשר לנסות שוב בעוד רגע.',
-        ));
-      });
-    }
-  }
-
   bool _asksForPhotos(String text) {
     final clean = text.toLowerCase();
     return clean.contains('תמונה') ||
@@ -741,7 +578,6 @@ class _AssistantScreenState extends State<AssistantScreen>
   // ── End / close ──────────────────────────────────────────────────────────────
 
   Future<void> _close() async {
-    if (_liveActive) await _stopLive();
     await _service.stopSpeaking();
     await _service.stopListening();
     _conversationMode = false;
@@ -837,14 +673,14 @@ class _AssistantScreenState extends State<AssistantScreen>
               return ErikOrbStage(
                 clock: _pulse.value,
                 state: _erikState,
-                connecting: _liveActive && _liveStatus == LiveStatus.connecting,
+                connecting: false,
                 callActive: _callActive,
                 statusLine: _statusLine,
                 erikReply: _erikReply,
                 userLine: _userLine,
                 soundLevel: _soundLevelNotifier,
                 voiceOn: _voiceReplies,
-                onTapOrb: _toggleLive,
+                onTapOrb: _toggleConversation,
                 onToggleMic: _toggleMic,
                 onOpenKeyboard: _openComposer,
                 onToggleVoice: _toggleVoice,
