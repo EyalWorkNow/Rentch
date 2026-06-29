@@ -9,6 +9,7 @@ import 'package:dating_app/core/services/roomplan_service.dart';
 import 'package:dating_app/data/models/scan3d_job.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 import 'package:flutter/material.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_compress/video_compress.dart';
 
@@ -506,7 +507,8 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
     if (job == null || !mounted) return;
     if (!job.isReady) {
       setState(() => _error =
-          'בניית החדר נכשלה. נסו לצלם סרטון שוב באור טוב, ולסובב לאט בכל החדר.');
+          'בניית החדר נכשלה. נסו לצלם סרטון שוב באור טוב, תוך כדי הליכה '
+          'איטית בחדר — לא להסתובב במקום.');
       return;
     }
 
@@ -595,9 +597,10 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
                 ),
               if (widget.supportsRoomPlan) const SizedBox(height: 12),
               _OptionCard(
-                title: 'סריקה עם סרטון',
+                title: 'סריקה עם סרטון (מתקדם)',
                 subtitle:
-                    'מצלמים סרטון קצר של החדר, ואנחנו בונים אותו בתלת-מימד.',
+                    'מצלמים סרטון תוך כדי הליכה איטית בחדר, ואנחנו בונים '
+                    'אותו בתלת-מימד. האיכות תלויה בצילום — נדריך אתכם צעד-צעד.',
                 icon: Icons.videocam_rounded,
                 highlighted: !widget.supportsRoomPlan,
                 busy: false,
@@ -652,10 +655,17 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
 // ════════════════════════════════════════════════════════════════════════════
 // GUIDED VIDEO CAPTURE — in-app camera, big record button, live timer
 // ────────────────────────────────────────────────────────────────────────────
-// Far more foolproof for an older user than aiming 20 stills: they just press
-// record and slowly pan the whole room. KIRI reconstructs video best (it submits
-// to /3dgs/video with the videoFile field). Resolution is capped at 1080p (KIRI
-// max is 1920×1080) — we use 720p for a reliably-uploadable file size.
+// Far more foolproof for an older user than aiming 20 stills: they press record
+// and WALK SLOWLY through/around the room. KIRI reconstructs video best (it
+// submits to /3dgs/video with the videoFile field). Resolution is capped at
+// 1080p (KIRI max is 1920×1080) — we use 720p for a reliably-uploadable size.
+//
+// THE #1 FAILURE: 3D Gaussian-splat reconstruction NEEDS PARALLAX. If the user
+// just rotates in place (like filming a panorama) there's no parallax and the
+// reconstruction collapses to a meaningless scatter of points. So the whole UX
+// here is built to drive ONE behaviour: WALK slowly THROUGH/AROUND the space.
+// A pre-capture steps card hammers this home, and during recording we use the
+// gyroscope (sensors_plus, fail-soft) to warn "לאט יותר" on too-fast turns.
 // ════════════════════════════════════════════════════════════════════════════
 
 class _GuidedVideoCaptureScreen extends StatefulWidget {
@@ -667,10 +677,11 @@ class _GuidedVideoCaptureScreen extends StatefulWidget {
 }
 
 class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
-  // Soft minimum: keep "סיום" disabled until ~15s of footage so the room is
-  // well covered. Hard cap: auto-stop at 2.5 min, safely under KIRI's 3-min
-  // limit (and keeps the upload size manageable).
-  static const Duration _minDuration = Duration(seconds: 15);
+  // Soft minimum: keep "סיום" disabled until ~10s of footage so the room is
+  // covered while walking (matches the "10–40 שניות" coaching). Hard cap:
+  // auto-stop at 2.5 min, safely under KIRI's 3-min limit (and keeps the upload
+  // size manageable).
+  static const Duration _minDuration = Duration(seconds: 10);
   static const Duration _maxDuration = Duration(seconds: 150);
 
   CameraController? _cam;
@@ -680,6 +691,19 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
   Duration _elapsed = Duration.zero;
   // Wall-clock start so the timer stays accurate even if a frame is dropped.
   DateTime? _startedAt;
+
+  // Pre-capture coaching: show the steps card first; recording can't start until
+  // the user taps "הבנתי, מתחילים". This is where we make "WALK, don't rotate"
+  // unmissable for a non-expert.
+  bool _showSteps = true;
+
+  // Live too-fast-motion coaching via the gyroscope (fail-soft: if the sensor
+  // isn't available we simply never warn). Above this rotation rate the user is
+  // spinning rather than walking, which kills parallax.
+  static const double _tooFastRadPerSec = 1.2;
+  StreamSubscription<GyroscopeEvent>? _gyroSub;
+  bool _tooFast = false;
+  DateTime? _tooFastUntil;
 
   @override
   void initState() {
@@ -728,6 +752,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
         _elapsed = Duration.zero;
       });
       _tick();
+      _listenMotion();
     } catch (_) {
       if (mounted) {
         setState(() => _error =
@@ -753,12 +778,38 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
     });
   }
 
+  /// Listens to the gyroscope while recording and flags too-fast rotation, so we
+  /// can flash "לאט יותר". Fully fail-soft — any sensor error just disables it.
+  void _listenMotion() {
+    _gyroSub?.cancel();
+    try {
+      _gyroSub = gyroscopeEventStream().listen(
+        (e) {
+          if (!_recording || !mounted) return;
+          final rate = e.x.abs() + e.y.abs() + e.z.abs();
+          if (rate > _tooFastRadPerSec) {
+            _tooFastUntil = DateTime.now().add(const Duration(milliseconds: 900));
+            if (!_tooFast) setState(() => _tooFast = true);
+          } else if (_tooFast &&
+              (_tooFastUntil == null ||
+                  DateTime.now().isAfter(_tooFastUntil!))) {
+            setState(() => _tooFast = false);
+          }
+        },
+        onError: (_) {/* sensor unavailable — coaching stays silent */},
+        cancelOnError: true,
+      );
+    } catch (_) {/* no gyro on this device — fail soft */}
+  }
+
   Future<void> _stopAndFinish() async {
     final cam = _cam;
     if (cam == null || !_recording || _stopping) return;
+    _gyroSub?.cancel();
     setState(() {
       _stopping = true;
       _recording = false;
+      _tooFast = false;
     });
     try {
       final file = await cam.stopVideoRecording();
@@ -783,6 +834,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
 
   @override
   void dispose() {
+    _gyroSub?.cancel();
     // If we're still mid-recording when leaving, stop it so the controller can
     // be disposed cleanly (best-effort — never throw out of dispose).
     final cam = _cam;
@@ -815,8 +867,15 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
                         child:
                             CircularProgressIndicator(color: Colors.white),
                       ),
-                    _topGuide(),
-                    _bottomControls(),
+                    if (_showSteps)
+                      _PreCaptureSteps(
+                        onStart: () => setState(() => _showSteps = false),
+                        onCancel: () => Navigator.of(context).pop(),
+                      )
+                    else ...[
+                      _topGuide(),
+                      _bottomControls(),
+                    ],
                   ],
                 ),
               ),
@@ -880,7 +939,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
         child: Column(
           children: [
             const Text(
-              'צלמו סרטון של החדר',
+              'צלמו תוך כדי הליכה איטית',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -890,13 +949,40 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
             const SizedBox(height: 6),
             Text(
               _recording
-                  ? 'ממשיכים לסובב לאט — תקרה, רצפה, פינות'
-                  : 'סובבו לאט בכל החדר — תקרה, רצפה, פינות. '
-                      'כ-30–60 שניות, באור טוב.',
+                  ? 'המשיכו ללכת לאט סביב החדר — אל תסתובבו במקום'
+                  : 'הקיפו את החדר והרהיטים תוך כדי הליכה איטית. '
+                      'אל תסתובבו במקום. כ-10–40 שניות, באור טוב.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                   color: Colors.white70, fontSize: 14, height: 1.4),
             ),
+            if (_recording && _tooFast) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.coral,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.slow_motion_video_rounded,
+                        color: Colors.white, size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'לאט יותר',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1065,6 +1151,173 @@ class _CircleAction extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// PRE-CAPTURE STEPS — the coaching card shown before recording starts
+// ────────────────────────────────────────────────────────────────────────────
+// Big, simple, older-user friendly. The non-negotiable message — WALK slowly,
+// don't rotate in place — is given the loudest, most prominent treatment because
+// it's the #1 reason a scan comes out as scattered garbage.
+// ════════════════════════════════════════════════════════════════════════════
+
+class _PreCaptureSteps extends StatelessWidget {
+  const _PreCaptureSteps({required this.onStart, required this.onCancel});
+
+  final VoidCallback onStart;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.82),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  children: [
+                    const SizedBox(height: 4),
+                    const Text(
+                      'איך לצלם סריקת חדר טובה',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'סריקה מתקדמת. האיכות תלויה בצילום — קחו את הזמן.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // THE big one — walk, don't rotate. Loudest treatment.
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: AppColors.coral.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.coral, width: 2),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.directions_walk_rounded,
+                              color: Colors.white, size: 46),
+                          SizedBox(height: 10),
+                          Text(
+                            'הליכו לאט בחדר — אל תסתובבו במקום!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              height: 1.35,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'הקיפו את החדר והרהיטים תוך כדי הליכה. '
+                            'סיבוב במקום (כמו פנורמה) הורס את התלת-מימד.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _StepRow(
+                      icon: Icons.loop_rounded,
+                      text: 'הקיפו את החדר והרהיטים — צלמו מכמה כיוונים',
+                    ),
+                    _StepRow(
+                      icon: Icons.timelapse_rounded,
+                      text: 'שמרו חפיפה — תנועה רציפה ואיטית, בלי קפיצות',
+                    ),
+                    _StepRow(
+                      icon: Icons.wb_sunny_rounded,
+                      text: 'תאורה טובה, בלי תזוזות מהירות',
+                    ),
+                    _StepRow(
+                      icon: Icons.timer_rounded,
+                      text: 'משך הצילום: כ-10 עד 40 שניות',
+                    ),
+                  ],
+                ),
+              ),
+              _BigButton(
+                label: 'הבנתי, מתחילים',
+                icon: Icons.videocam_rounded,
+                onTap: onStart,
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: onCancel,
+                child: const Text(
+                  'ביטול',
+                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepRow extends StatelessWidget {
+  const _StepRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // CLOUD RECONSTRUCT — calm full-screen progress while KIRI builds the room
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1221,8 +1474,8 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
     if (e.isUnauthorized || code == 503) {
       return 'התכונה תיפתח בקרוב.';
     }
-    return 'בניית החדר נכשלה. נסו לצלם שוב באור טוב, '
-        'ולסובב לאט בכל החדר.';
+    return 'בניית החדר נכשלה. נסו לצלם שוב באור טוב, תוך כדי הליכה '
+        'איטית בחדר — לא להסתובב במקום.';
   }
 
   static String _stageLabel(Scan3dStatus status) {

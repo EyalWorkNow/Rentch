@@ -153,6 +153,63 @@ function aimFrom(position, target) {
   yaw = Math.atan2(_fwdFlat.x, -_fwdFlat.z); // 0 → looking toward -Z
 }
 
+// ── Auto-frame: pull the camera back to see the WHOLE splat on load ──────────
+//   On open the camera can start inside / too close to the cloud, so the scene
+//   reads as "scattered random points". We sample the loaded splat centers to
+//   get an axis-aligned bounds, then place the eye back along a gentle 3/4
+//   down-looking direction far enough that the whole bounding sphere fits the
+//   vertical FOV, aim at the center, and seed yaw/pitch so the joysticks
+//   continue smoothly. Returns true if it found real geometry.
+const _bbMin = new THREE.Vector3();
+const _bbMax = new THREE.Vector3();
+const _center = new THREE.Vector3();
+const _eye = new THREE.Vector3();
+const _splatC = new THREE.Vector3();
+function autoFrame() {
+  const mesh = viewer && viewer.splatMesh;
+  if (!mesh || typeof mesh.getSplatCount !== 'function') return false;
+  const count = mesh.getSplatCount();
+  if (!count) return false;
+
+  // Bounds from a capped uniform sample (cheap on huge clouds). World coords:
+  // pass applyTransform=true so the scene's own transform is baked in.
+  _bbMin.set(Infinity, Infinity, Infinity);
+  _bbMax.set(-Infinity, -Infinity, -Infinity);
+  const SAMPLES = Math.min(count, 20000);
+  const stride = Math.max(1, Math.floor(count / SAMPLES));
+  let used = 0;
+  for (let i = 0; i < count; i += stride) {
+    mesh.getSplatCenter(i, _splatC, true);
+    if (!isFinite(_splatC.x) || !isFinite(_splatC.y) || !isFinite(_splatC.z)) continue;
+    _bbMin.min(_splatC); _bbMax.max(_splatC); used++;
+  }
+  if (used < 2 || !isFinite(_bbMin.x)) return false;
+
+  _center.addVectors(_bbMin, _bbMax).multiplyScalar(0.5);
+  const radius = Math.max(0.001, _bbMax.distanceTo(_bbMin) * 0.5); // bounding sphere
+
+  // Distance so the bounding sphere fits the (vertical) FOV, with margin.
+  const cam = viewer.camera;
+  const vFov = ((cam && cam.fov) || 50) * Math.PI / 180;
+  const fit = radius / Math.sin(Math.min(Math.PI / 2 - 0.01, vFov / 2));
+  const dist = fit * 1.25; // 25% breathing room around the room
+
+  // View direction: look slightly DOWN onto the scene from a 3/4 angle so the
+  // floor/room layout is legible (screen-up = -WORLD_UP = world +Y).
+  // dir = forward the camera looks ALONG; eye = center - dir*dist.
+  const screenUp = _tmp.copy(WORLD_UP).multiplyScalar(-1);  // world [0,1,0]
+  const dir = _fwd.set(0.55, 0, -0.835).normalize();        // yaw ≈ 33° heading
+  dir.multiplyScalar(Math.cos(0.5)).addScaledVector(screenUp, -Math.sin(0.5)); // tilt ~29° down
+  dir.normalize();
+  _eye.copy(_center).addScaledVector(dir, -dist);
+
+  // Seed FPS yaw/pitch from this eye→center framing so joysticks continue.
+  aimFrom([_eye.x, _eye.y, _eye.z], [_center.x, _center.y, _center.z]);
+  console.log('rently-splat: auto-frame radius=' + radius.toFixed(2) +
+    ' dist=' + dist.toFixed(2) + ' samples=' + used);
+  return true;
+}
+
 // Rebuild camera basis from yaw/pitch and push it into viewer.camera.
 function applyCamera() {
   if (!viewer) return;
@@ -271,17 +328,25 @@ function frame(now) {
     pitch = THREE.MathUtils.clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
-  // MOVE: left stick translates in the HORIZONTAL facing plane.
+  // MOVE: left stick = true free-fly. FORWARD/BACK follows the FULL look
+  // direction (yaw + pitch), so looking up + pushing the stick forward flies
+  // UP, looking down + forward dives DOWN. STRAFE stays horizontal so you
+  // never roll. This is what unlocks vertical movement — there is no separate
+  // "up" axis, you simply aim where you want to go and push forward.
   if (mx || my) {
-    // Forward = current heading flattened onto the move plane (level walk).
-    _fwdFlat.set(Math.sin(yaw), 0, -Math.cos(yaw));
-    // Right = WORLD_UP × forward. With a Y-DOWN up vector this resolves to the
-    // user's screen-right (verified against the camera basis), so strafe isn't
-    // inverted; forward × WORLD_UP would point the wrong way here.
+    // Full look vector, level horizontal heading, and a horizontal "right".
+    // _fwd carries pitch: y = sin(pitch) * (screen-up = -WORLD_UP = +Y world).
+    _fwdFlat.set(Math.sin(yaw), 0, -Math.cos(yaw)); // level heading (y=0)
+    _tmp.copy(WORLD_UP).multiplyScalar(-1);         // screen-up = world [0,1,0]
+    _fwd.copy(_fwdFlat).multiplyScalar(Math.cos(pitch))
+        .addScaledVector(_tmp, Math.sin(pitch))     // pitch>0 (look up) → +Y
+        .normalize();
+    // Strafe right = WORLD_UP × level-heading (kept horizontal so we never
+    // roll). With the Y-DOWN up vector this resolves to the user's screen-right.
     _right.copy(WORLD_UP).cross(_fwdFlat).normalize();
     const step = MOVE_SPEED * dt;
-    camPos.addScaledVector(_fwdFlat, my * step); // up = forward, down = back
-    camPos.addScaledVector(_right,   mx * step); // right = strafe right
+    camPos.addScaledVector(_fwd,   my * step); // forward follows pitch → fly up/down
+    camPos.addScaledVector(_right, mx * step); // right = strafe right (horizontal)
   }
 
   applyCamera();
@@ -338,11 +403,17 @@ try {
     if (typeof viewer.setRenderMode === 'function') {
       viewer.setRenderMode(GaussianSplats3D.RenderMode.OnChange);
     }
-    // Seed the FPS camera from the first waypoint, wire up the joysticks and
-    // start the continuous free-fly loop.
+    // Seed the FPS camera, wire up the joysticks and start the free-fly loop.
+    // Priority: author-set waypoint[0] (intentional pose) → auto-frame to the
+    // splat bounds (so you immediately see the whole room instead of a faceful
+    // of points) → hard-coded default.
     const w0 = waypoints[0];
-    if (w0) { aimFrom(w0.position, w0.target); if (hudEl) hudEl.textContent = '📍 ' + (w0.label || 'נקודה 1'); }
-    else    { aimFrom([0, 1.5, 3], [0, 1.2, 0]); }
+    if (w0) {
+      aimFrom(w0.position, w0.target);
+      if (hudEl) hudEl.textContent = '📍 ' + (w0.label || 'נקודה 1');
+    } else if (!autoFrame()) {
+      aimFrom([0, 1.5, 3], [0, 1.2, 0]);
+    }
     applyCamera();
     const moveEl = document.getElementById('joyMove');
     const lookEl = document.getElementById('joyLook');

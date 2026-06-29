@@ -883,7 +883,7 @@ class _ParitySections extends StatelessWidget {
     if (has3d) {
       mediaCards.add(_MediaTourCard(
         icon: Icons.view_in_ar_rounded,
-        title: 'סריקת תלת-מימד',
+        title: 'סריקת תלת-מימד (מתקדם)',
         subtitle: '✓ הסריקה מוכנה — סובבו והתקרבו מכל זווית',
         branding: branding,
         surface: _cardSurface,

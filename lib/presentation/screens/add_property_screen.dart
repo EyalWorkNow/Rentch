@@ -2420,6 +2420,17 @@ class _StepPhotos extends StatelessWidget {
               const SizedBox(height: 18),
               const Divider(height: 1, color: AppColors.borderLight),
               const SizedBox(height: 16),
+              // PRIMARY, RECOMMENDED apartment tour: the faithful 360° panorama
+              // (built from real iPhone panoramas). Shown first + prominent.
+              if (onCreatePanoramaTour != null) ...[
+                _Panorama360Tile(
+                  count: panoramaPointCount,
+                  onTap: onCreatePanoramaTour!,
+                ),
+                const SizedBox(height: 16),
+              ],
+              // SECONDARY, "מתקדם" option: casual-video 3D Gaussian-splat scan.
+              // Smaller, clearly labeled, after the recommended 360° tour.
               _Scan3dPanel(
                 tour: scanTourDraft,
                 isSubmitting: isScanSubmitting,
@@ -2433,12 +2444,6 @@ class _StepPhotos extends StatelessWidget {
                 onClear: onClearScan,
               ),
               const SizedBox(height: 16),
-              if (onCreatePanoramaTour != null)
-                _Panorama360Tile(
-                  count: panoramaPointCount,
-                  onTap: onCreatePanoramaTour!,
-                ),
-              if (onCreatePanoramaTour != null) const SizedBox(height: 16),
               _PropertyRightsPanel(
                 acceptedTerms: acceptedTerms,
                 onAcceptedTermsChanged: onAcceptedTermsChanged,
@@ -3106,27 +3111,16 @@ class _Scan3dPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.navy, Color(0xFF1E3A8A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.navy.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: AppColors.navy.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.view_in_ar_rounded,
-                color: Colors.white,
-                size: 24,
+                color: AppColors.navy,
+                size: 20,
               ),
             ),
             const SizedBox(width: 12),
@@ -3135,17 +3129,17 @@ class _Scan3dPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'סריקת 3D לדירה',
+                    'סריקת תלת-מימד (מתקדם)',
                     style: TextStyle(
                       color: AppColors.navy,
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   SizedBox(height: 3),
                   Text(
-                    'סורקים חדר-חדר באיכות גבוהה — וכל החדרים מחוברים יחד. '
-                    '(לסיור הליכה בכל הדירה השתמשו באריח ה־360°.)',
+                    'דורש צילום תוך כדי הליכה לאט בחלל. '
+                    '(לסיור נאמן ומומלץ השתמשו בסיור ה־360° למעלה.)',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12.5,
@@ -5964,11 +5958,13 @@ class _Panorama360Tile extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            const Text('סיור 360° וירטואלי',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16)),
+                            const Flexible(
+                              child: Text('סיור 360° — מומלץ',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16)),
+                            ),
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -5989,7 +5985,7 @@ class _Panorama360Tile extends StatelessWidget {
                         Text(
                           has
                               ? '$count נקודות נוספו · הקש לעריכה או הוספה'
-                              : 'צילום מודרך עם הנחיות AR — כמו Street View',
+                              : 'הסיור המומלץ — נאמן למציאות. צילום מודרך כמו Street View',
                           style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.92),
                               fontSize: 12.5,
