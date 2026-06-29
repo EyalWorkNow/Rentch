@@ -1612,8 +1612,11 @@ async function createScan3d(event) {
     }
   }
 
+  // Fast mode (splat-only, KIRI isMesh=0) → quicker reconstruction; the Gaussian
+  // splat already serves both 360 and the 3D walkthrough, so the mesh bake is skippable.
+  const fast = body.fast === true;
   await putScan3dMeta(jobId, {
-    jobId, propertyId, captureType, scanType, fileKeys,
+    jobId, propertyId, captureType, scanType, fileKeys, fast,
     status: 'pending', createdAt: ts,
   });
   return json(200, { data: { jobId, uploadUrls } });
@@ -1654,7 +1657,9 @@ async function startScan3d(event, jobId) {
       parts.push({ name: 'modelQuality', data: '0' });
       parts.push({ name: 'textureQuality', data: '0' });
     } else {
-      parts.push({ name: 'isMesh', data: '1' });   // also emit a GLB mesh
+      // Fast mode = splat only (isMesh=0) → KIRI skips the slow mesh bake.
+      // Quality mode (default) = also emit a GLB mesh (isMesh=1).
+      parts.push({ name: 'isMesh', data: meta.fast ? '0' : '1' });
       parts.push({ name: 'isMask', data: '0' });
       parts.push({ name: 'fileFormat', data: 'glb' });
     }

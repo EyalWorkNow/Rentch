@@ -1126,6 +1126,9 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         propertyId: widget.propertyId,
         captureType: Scan3dCaptureType.video,
         files: files,
+        // Fast mode: splat-only (KIRI isMesh=0) — much quicker, and the Gaussian
+        // splat already serves both the 360 look-around and the 3D walkthrough.
+        fast: true,
         onSubmitted: (jobId) {
           // KIRI now owns the job and keeps reconstructing even if this screen
           // closes. Persist it so the background finalizer fetches the finished

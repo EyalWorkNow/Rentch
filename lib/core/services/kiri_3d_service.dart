@@ -81,6 +81,7 @@ class Kiri3dService {
     required String propertyId,
     required Scan3dCaptureType captureType,
     required int frameCount,
+    bool fast = false,
   }) async {
     _ensureConfigured();
     if (propertyId.trim().isEmpty) {
@@ -96,6 +97,7 @@ class Kiri3dService {
         'propertyId': propertyId,
         'captureType': captureType.wire,
         'frameCount': frameCount,
+        'fast': fast,
       });
     } on AwsApiException catch (e) {
       throw Kiri3dException('Failed to create scan job: ${e.message}',
@@ -258,6 +260,7 @@ class Kiri3dService {
     required String propertyId,
     required Scan3dCaptureType captureType,
     required List<File> files,
+    bool fast = false,
     void Function(Scan3dJob job)? onUpdate,
     void Function(String jobId)? onSubmitted,
   }) async {
@@ -268,6 +271,7 @@ class Kiri3dService {
       propertyId: propertyId,
       captureType: captureType,
       frameCount: files.length,
+      fast: fast,
     );
 
     final count = files.length < created.uploadUrls.length
