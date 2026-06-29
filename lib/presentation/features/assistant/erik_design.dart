@@ -23,6 +23,7 @@ class ErikTokens {
   // ── Ink ──────────────────────────────────────────────────────────────────
   static const Color ink = Colors.white; // primary text on dark
   static const Color inkSoft = Color(0xFFE6EEF6); // softened body copy
+  static const Color navyText = Color(0xFF072946); // dark text on light surfaces
   static const Color muted = Color(0xFFA6BDD2); // secondary text
   static const Color faint = Color(0xFF7E9BB6); // tertiary / hints
 
