@@ -81,6 +81,11 @@ dependencies:
   # plugin's zonedSchedule requires.
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
+  # Home-screen widget data bridge. We compute the user's activity summary
+  # (matches / unread / likes) and write it under the keys w_matches, w_unread,
+  # w_likes, w_updated. The native widgets (built by other agents, iOS App Group
+  # group.com.eyalatiyawork.rentch) render these keys.
+  home_widget: ^0.7.0
 
 dev_dependencies:
   flutter_test:

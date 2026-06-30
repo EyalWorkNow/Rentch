@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_title">Rently</string>
+    <string name="widget_label_matches">ההתאמות שלך</string>
+    <string name="widget_label_unread">הודעות שלא נקראו</string>
+    <string name="widget_label_likes">לייקים</string>
+    <string name="widget_description">סיכום הפעילות שלך ב‑Rently</string>
+    <string name="widget_default_count">0</string>
+</resources>

@@ -46,6 +46,25 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- FCM: route data-less notification pushes to the reliable high-importance
+             channel created at app start in MainActivity (was falling back to a
+             silent/low-importance channel). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="rently_default" />
+
+        <!-- Home-screen activity-summary widget (matches / unread / likes). -->
+        <receiver
+            android:name=".RentlyWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/rently_widget_info" />
+        </receiver>
         <!-- flutter_local_notifications: scheduled + reboot-persistence receivers -->
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" android:exported="false" />
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver" android:exported="false">

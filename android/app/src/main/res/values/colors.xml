@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rently / Rentch brand palette (teal + navy) used by the home-screen widget. -->
+    <color name="rently_navy">#0F2A43</color>
+    <color name="rently_navy_dark">#0A1E30</color>
+    <color name="rently_teal">#1FB6B0</color>
+    <color name="rently_teal_light">#3FD0CA</color>
+    <color name="rently_white">#FFFFFF</color>
+    <color name="rently_muted">#B9C7D3</color>
+    <color name="rently_divider">#1F3D57</color>
+</resources>

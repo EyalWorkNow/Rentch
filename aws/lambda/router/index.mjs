@@ -122,6 +122,21 @@ const DEVICE_TOKENS_TABLE = `${TABLE_PREFIX}device-tokens`;
 // out-of-band (aws dynamodb create-table, on-demand). pk=userId(S) sk=createdAt(N).
 const NOTIFICATIONS_TABLE = `${TABLE_PREFIX}notifications`;
 
+// Company-broadcast history — one row per admin broadcast, keyed by id (S, a
+// uuid). Stores the rich notification that was fanned out to every device plus
+// the delivery tallies, so the admin console can render a "sent history" feed.
+// Created out-of-band / by the deploy script (aws dynamodb create-table,
+// on-demand). pk=id(S). Sorting newest-first is done in-Lambda after a SCAN.
+const BROADCASTS_TABLE = `${TABLE_PREFIX}broadcasts`;
+
+// Admin gate. The API-Gateway authorizer (aws/lambda/authorizer/index.mjs)
+// verifies the Firebase JWT but only forwards `uid` in its context — it does
+// NOT pass the token's custom claims (e.g. notifAdmin) downstream. So we cannot
+// read a notifAdmin claim from the event; instead we gate the admin broadcast
+// routes by the known admin uid (notifi@notifi.com). See callerIsNotifAdmin().
+const NOTIF_ADMIN_UID = process.env.NOTIF_ADMIN_UID
+  || 'dR46Nv6L3mN1cyzXwxrubHpdqZi2';
+
 // ── Firebase Cloud Messaging (HTTP v1) — SENDING ─────────────────────────────
 // Push delivery using ONLY Node built-ins: we mint a Google OAuth access token
 // by signing a JWT with the service account's RSA private key, cache it in
@@ -479,6 +494,21 @@ function callerUidOf(event) {
   return event.requestContext?.authorizer?.uid || null;
 }
 
+// Gate for the admin-broadcast routes. The TOKEN authorizer only forwards the
+// verified `uid` (not custom claims), so a `notifAdmin === true` claim never
+// reaches this Lambda. We therefore gate by the verified admin uid as the
+// fallback the task allows: the request is authenticated by API Gateway, and we
+// additionally require that the caller IS the notif-admin user. If the
+// authorizer is ever extended to forward claims, honor a notifAdmin claim too.
+function callerIsNotifAdmin(event) {
+  const ctx = event.requestContext?.authorizer || {};
+  // Honor a forwarded custom claim if/when the authorizer starts passing it.
+  // API-Gateway authorizer context values are stringified, so accept the
+  // string 'true' as well as a boolean true.
+  if (ctx.notifAdmin === true || ctx.notifAdmin === 'true') return true;
+  return callerUidOf(event) === NOTIF_ADMIN_UID;
+}
+
 // Force the owner field to the authenticated uid before a write.
 function stampOwner(tableKey, body, uid) {
   if (!uid) return;
@@ -637,6 +667,17 @@ export const handler = async (event) => {
       // "why this one, by the numbers", grounded strictly in the supplied figures.
       if (segments[1] === 'explain') return await handleAssistantExplain(event);
       return await handleAssistant(event);
+    }
+
+    // ── Admin company broadcast ─────────────────────────────────────────────
+    // Both routes are gated to the notif-admin user (see callerIsNotifAdmin).
+    if (segments[0] === 'admin' && segments[1] === 'broadcast'
+        && !segments[2] && method === 'POST') {
+      return await handleAdminBroadcast(event);
+    }
+    if (segments[0] === 'admin' && segments[1] === 'broadcasts'
+        && !segments[2] && method === 'GET') {
+      return await handleAdminListBroadcasts(event);
     }
 
     // ── Table CRUD ──────────────────────────────────────────────────────────
@@ -3534,4 +3575,214 @@ async function handleAssistantTts(event) {
     console.warn('tts error:', e.message);
     return json(200, { audio: null });
   }
+}
+
+// ── Admin company broadcast ──────────────────────────────────────────────────
+// POST /admin/broadcast — fan a single rich push out to EVERY user's devices.
+//   Gate: caller must be the notif-admin (callerIsNotifAdmin) → else 403.
+//   Body: { title, body, imageUrl?, template?, data? }.
+//   Action: SCAN rently-device-tokens for every user's tokens, then send via
+//   FCM v1 one message per token (chunked into batches so a huge user base
+//   doesn't fire tens of thousands of requests at once). The message carries a
+//   rich notification (image, high-priority Android channel, iOS mutable-content
+//   so the Notification Service Extension can attach the image). Dead tokens
+//   (UNREGISTERED / invalid) are pruned from their owning user's row. Persists
+//   one history row to rently-broadcasts. Returns { sent, failed }.
+
+// Read every user's device tokens (full-table SCAN, paginated). Returns
+// [{ userId, tokens:[...] }, ...]. Best-effort: returns what it gathered.
+async function scanAllDeviceTokens() {
+  const rows = [];
+  let lastKey;
+  do {
+    const out = await ddb.send(new ScanCommand({
+      TableName: DEVICE_TOKENS_TABLE,
+      ProjectionExpression: 'userId, tokens',
+      ExclusiveStartKey: lastKey,
+    }));
+    for (const it of (out.Items || [])) {
+      if (it && it.userId && Array.isArray(it.tokens) && it.tokens.length) {
+        rows.push({ userId: it.userId, tokens: it.tokens });
+      }
+    }
+    lastKey = out.LastEvaluatedKey;
+  } while (lastKey);
+  return rows;
+}
+
+async function handleAdminBroadcast(event) {
+  if (!callerIsNotifAdmin(event)) return json(403, { message: 'Forbidden' });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+
+  const title = (body.title || '').toString().trim();
+  const bodyText = (body.body || '').toString().trim();
+  const imageUrl = body.imageUrl ? String(body.imageUrl) : undefined;
+  const template = body.template ? String(body.template) : undefined;
+  if (!title && !bodyText) {
+    return json(400, { message: 'title or body is required' });
+  }
+
+  const token = await fcmAccessToken();
+  if (!token) return json(503, { message: 'Push is not configured.' });
+
+  // Build the FCM v1 data map (strings only). template is folded in so a tapped
+  // push routes the same way the app expects.
+  const dataStr = {};
+  if (body.data && typeof body.data === 'object') {
+    for (const [k, v] of Object.entries(body.data)) {
+      if (v === undefined || v === null) continue;
+      dataStr[k] = typeof v === 'string' ? v : String(v);
+    }
+  }
+  if (template) dataStr.template = template;
+  dataStr.type = dataStr.type || 'broadcast';
+
+  // The rich Android/iOS envelope shared by every token's message.
+  const androidNotification = {
+    channel_id: 'rently_default',
+    notification_priority: 'PRIORITY_MAX',
+    default_sound: true,
+  };
+  if (imageUrl) androidNotification.image = imageUrl;
+  const baseMessage = {
+    notification: { title: title || '', body: bodyText || '' },
+    data: dataStr,
+    android: { priority: 'high', notification: androidNotification },
+    apns: {
+      payload: { aps: { 'mutable-content': 1, sound: 'default' } },
+      ...(imageUrl ? { fcm_options: { image: imageUrl } } : {}),
+    },
+  };
+
+  // Gather all tokens, remembering which user each belongs to so we can prune
+  // dead ones from the right row.
+  let userRows = [];
+  try {
+    userRows = await scanAllDeviceTokens();
+  } catch (e) {
+    console.warn('broadcast: token scan failed:', e.message);
+    return json(500, { message: 'Could not load recipients.' });
+  }
+  const targets = []; // { userId, deviceToken }
+  for (const r of userRows) {
+    for (const t of r.tokens) targets.push({ userId: r.userId, deviceToken: t });
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const deadByUser = new Map(); // userId → Set(deadToken)
+
+  // Chunk so we never open more than CHUNK concurrent FCM connections at once
+  // (handles >500 tokens / huge user bases without a thundering herd).
+  const CHUNK = 500;
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    const slice = targets.slice(i, i + CHUNK);
+    const results = await Promise.all(slice.map(async ({ userId, deviceToken }) => {
+      try {
+        const resp = await fetch(FCM_SEND_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: { ...baseMessage, token: deviceToken } }),
+        });
+        if (resp.ok) return true;
+
+        const errBody = await resp.json().catch(() => ({}));
+        const status = errBody?.error?.status || '';
+        const fcmErr = errBody?.error?.details?.find?.(
+          (d) => d['@type']?.includes('FcmError'))?.errorCode || '';
+        const isDead = resp.status === 404
+          || status === 'UNREGISTERED' || status === 'NOT_FOUND'
+          || fcmErr === 'UNREGISTERED' || fcmErr === 'INVALID_ARGUMENT'
+          || (resp.status === 400 && /registration token|not a valid fcm/i
+            .test(JSON.stringify(errBody)));
+        if (isDead) {
+          if (!deadByUser.has(userId)) deadByUser.set(userId, new Set());
+          deadByUser.get(userId).add(deviceToken);
+        } else {
+          console.warn('broadcast: send failed', resp.status,
+            JSON.stringify(errBody).slice(0, 200));
+        }
+        return false;
+      } catch (e) {
+        console.warn('broadcast: send exception:', e.message);
+        return false;
+      }
+    }));
+    for (const ok of results) { if (ok) sent += 1; else failed += 1; }
+  }
+
+  // Prune dead tokens from each affected user's row (best-effort).
+  await Promise.all([...deadByUser.entries()].map(([userId, set]) =>
+    pruneUserTokens(userId, set)));
+
+  // Persist the broadcast to history (best-effort; never fail the send on this).
+  const id = crypto.randomUUID();
+  const createdAt = Date.now();
+  try {
+    await ddb.send(new PutCommand({
+      TableName: BROADCASTS_TABLE,
+      Item: {
+        id,
+        title,
+        body: bodyText,
+        imageUrl: imageUrl || '',
+        template: template || '',
+        sentCount: sent,
+        failedCount: failed,
+        createdAt,
+        createdBy: callerUidOf(event) || '',
+      },
+    }));
+  } catch (e) {
+    console.warn('broadcast: history persist failed:', e.message);
+  }
+
+  return json(200, { sent, failed });
+}
+
+// GET /admin/broadcasts — recent broadcast history, newest-first, for the admin
+// console. Gated to the notif-admin. The table is keyed only by id, so we SCAN
+// and sort by createdAt in-Lambda (the volume is tiny: one row per broadcast).
+async function handleAdminListBroadcasts(event) {
+  if (!callerIsNotifAdmin(event)) return json(403, { message: 'Forbidden' });
+  const q = event.queryStringParameters || {};
+  const limit = Math.min(Math.max(parseInt(q.limit, 10) || 50, 1), 200);
+
+  let items = [];
+  try {
+    let lastKey;
+    do {
+      const out = await ddb.send(new ScanCommand({
+        TableName: BROADCASTS_TABLE,
+        ExclusiveStartKey: lastKey,
+      }));
+      items = items.concat(out.Items || []);
+      lastKey = out.LastEvaluatedKey;
+    } while (lastKey && items.length < 2000);
+  } catch (e) {
+    console.warn('broadcasts list failed:', e.message);
+  }
+
+  const broadcasts = items
+    .map((it) => ({
+      id: it.id,
+      title: it.title || '',
+      body: it.body || '',
+      imageUrl: it.imageUrl || '',
+      template: it.template || '',
+      sentCount: Number(it.sentCount) || 0,
+      failedCount: Number(it.failedCount) || 0,
+      createdAt: Number(it.createdAt) || 0,
+      createdBy: it.createdBy || '',
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, limit);
+
+  return json(200, { broadcasts, count: broadcasts.length });
 }

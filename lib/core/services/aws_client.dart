@@ -303,6 +303,43 @@ class AwsApiClient {
     await post('/notifications/mark-read', all ? {'all': true} : {'ids': ids});
   }
 
+  // ── Admin broadcast console ───────────────────────────────────────────────
+
+  /// Sends a company/system notification to all users.
+  /// `POST /admin/broadcast` → expects { sent, failed, ... } back.
+  /// Restricted server-side to admins (custom claim `notifAdmin`); the client
+  /// also gates the console UI, so this is a defence-in-depth call.
+  Future<BroadcastResult> broadcastNotification({
+    required String title,
+    required String body,
+    String? imageUrl,
+    required String template,
+    Map<String, dynamic>? data,
+  }) async {
+    final res = await post('/admin/broadcast', {
+      'title': title,
+      'body': body,
+      if (imageUrl != null && imageUrl.trim().isNotEmpty)
+        'imageUrl': imageUrl.trim(),
+      'template': template,
+      'audience': 'all',
+      if (data != null && data.isNotEmpty) 'data': data,
+    });
+    return BroadcastResult.fromJson(res);
+  }
+
+  /// Fetches the broadcast history (newest first). `GET /admin/broadcasts`.
+  /// Fail-soft: returns empty when the backend is unconfigured.
+  Future<List<BroadcastRecord>> getBroadcasts() async {
+    if (!isConfigured) return const [];
+    final res = await get('/admin/broadcasts');
+    final raw = (res['broadcasts'] as List?) ?? (res['items'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => BroadcastRecord.fromJson(Map<String, dynamic>.from(m)))
+        .toList(growable: false);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   static const Duration _timeout = Duration(seconds: 20);
@@ -408,4 +445,70 @@ class AwsApiException implements Exception {
 
   @override
   String toString() => 'AwsApiException($statusCode): $message';
+}
+
+// ─── Admin broadcast models ─────────────────────────────────────────────────
+
+/// Result of a `POST /admin/broadcast` send.
+class BroadcastResult {
+  const BroadcastResult({required this.sent, required this.failed, this.id});
+
+  final int sent;
+  final int failed;
+  final String? id;
+
+  factory BroadcastResult.fromJson(Map<String, dynamic> json) {
+    return BroadcastResult(
+      sent: (json['sent'] as num?)?.toInt() ?? 0,
+      failed: (json['failed'] as num?)?.toInt() ?? 0,
+      id: json['id']?.toString(),
+    );
+  }
+}
+
+/// A single past broadcast as returned by `GET /admin/broadcasts`.
+class BroadcastRecord {
+  const BroadcastRecord({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.imageUrl,
+    required this.template,
+    required this.sent,
+    required this.failed,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final String? imageUrl;
+  final String template;
+  final int sent;
+  final int failed;
+  final DateTime createdAt;
+
+  factory BroadcastRecord.fromJson(Map<String, dynamic> json) {
+    final img = json['imageUrl']?.toString();
+    return BroadcastRecord(
+      id: (json['id'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      body: (json['body'] ?? '').toString(),
+      imageUrl: (img == null || img.isEmpty) ? null : img,
+      template: (json['template'] ?? 'minimal').toString(),
+      sent: (json['sent'] as num?)?.toInt() ?? 0,
+      failed: (json['failed'] as num?)?.toInt() ?? 0,
+      createdAt: _parseTs(json['createdAt']),
+    );
+  }
+
+  static DateTime _parseTs(Object? raw) {
+    if (raw is num) {
+      return DateTime.fromMillisecondsSinceEpoch(raw.toInt()).toLocal();
+    }
+    final s = (raw ?? '').toString();
+    final ms = int.tryParse(s);
+    if (ms != null) return DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
+    return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
+  }
 }

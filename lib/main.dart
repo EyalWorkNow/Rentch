@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
+import 'package:dating_app/core/services/home_widget_service.dart';
+import 'package:dating_app/core/services/notif_admin_gate.dart';
+import 'package:dating_app/core/services/notification_permission_service.dart';
 import 'package:dating_app/core/services/push_notification_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
+import 'package:dating_app/presentation/screens/admin/notif_console_screen.dart';
 import 'package:dating_app/core/widgets/ipad_frame.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
@@ -271,11 +277,57 @@ class _StartupGate extends StatelessWidget {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 provider.markEnteredApp();
               });
-              return const HomeScreen();
+              // The notification-broadcast admin (custom claim notifAdmin) is
+              // routed to the console; everyone else lands on HomeScreen.
+              return const _PostLoginRouter();
             }
             return const OnboardingScreen();
           },
         );
+      },
+    );
+  }
+}
+
+/// Resolves the post-login destination for a returning, signed-in user:
+/// the notification-admin (custom claim `notifAdmin`) gets the broadcast
+/// console; everyone else gets [HomeScreen] and the first-launch notification
+/// permission prompt. The admin claim read is async, so we hold the splash for
+/// the brief moment it takes to resolve (fail-soft → HomeScreen).
+class _PostLoginRouter extends StatefulWidget {
+  const _PostLoginRouter();
+
+  @override
+  State<_PostLoginRouter> createState() => _PostLoginRouterState();
+}
+
+class _PostLoginRouterState extends State<_PostLoginRouter> {
+  late final Future<bool> _isAdmin;
+
+  @override
+  void initState() {
+    super.initState();
+    _isAdmin = NotifAdminGate.isAdmin();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _isAdmin,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _StartupSplash();
+        }
+        if (snapshot.data == true) {
+          return const NotifConsoleScreen();
+        }
+        // Non-admin returning user: ask for notification permission once.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            NotificationPermissionService.maybeRequestOnFirstLaunch(context);
+          }
+        });
+        return const HomeScreen();
       },
     );
   }
@@ -313,14 +365,36 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
   final DateTime _sessionStart = DateTime.now();
   bool _emitted = false;
 
+  DatingProvider? _provider;
+  Timer? _widgetSyncDebounce;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Refresh the home-screen widget after relevant data changes (new match,
+    // like, read state). Debounced so a burst of notifyListeners() coalesces
+    // into a single widget write + network fetch.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _provider = context.read<DatingProvider>();
+      _provider?.addListener(_onProviderChanged);
+      HomeWidgetService.sync(_provider!);
+    });
+  }
+
+  void _onProviderChanged() {
+    _widgetSyncDebounce?.cancel();
+    _widgetSyncDebounce = Timer(const Duration(seconds: 2), () {
+      final p = _provider;
+      if (p != null) HomeWidgetService.sync(p);
+    });
   }
 
   @override
   void dispose() {
+    _widgetSyncDebounce?.cancel();
+    _provider?.removeListener(_onProviderChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -330,6 +404,11 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _emitSessionContext();
+    } else if (state == AppLifecycleState.resumed) {
+      // Refresh the home-screen widget's activity summary whenever the app
+      // comes back to the foreground. Fail-soft inside the service.
+      final provider = context.read<DatingProvider>();
+      HomeWidgetService.sync(provider);
     }
   }
 

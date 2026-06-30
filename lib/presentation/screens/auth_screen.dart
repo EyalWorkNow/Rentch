@@ -5,6 +5,9 @@ import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/services/apple_auth_service.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
+import 'package:dating_app/core/services/notif_admin_gate.dart';
+import 'package:dating_app/core/services/notification_permission_service.dart';
+import 'package:dating_app/presentation/screens/admin/notif_console_screen.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/property_repository.dart';
@@ -67,13 +70,31 @@ class _AuthScreenState extends State<AuthScreen>
     super.dispose();
   }
 
-  void _onEnter() {
+  Future<void> _onEnter() async {
     // Crossing the entry → in-app boundary. Flip the "inside the app" flag that
     // gates broker-black theming, so the accent only switches to black AFTER we
     // leave the entry flow — never on the auth screens themselves. This is the
     // single seam through which welcome/login/register/guest entry all reach
     // HomeScreen, so one call here covers every path.
     context.read<DatingProvider>().markEnteredApp();
+
+    // Admin gate: the notification-broadcast admin (custom claim
+    // `notifAdmin: true`) is routed to the console instead of HomeScreen.
+    final isAdmin = await NotifAdminGate.isAdmin();
+    if (!mounted) return;
+
+    if (isAdmin) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, animation, __) => const NotifConsoleScreen(),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+          transitionDuration: const Duration(milliseconds: 400),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (_, animation, __) => const HomeScreen(),
@@ -82,6 +103,11 @@ class _AuthScreenState extends State<AuthScreen>
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
+
+    // First-launch notification permission rationale + request (once per
+    // install). Runs after we've reached HomeScreen so the dialog sits over it.
+    if (!mounted) return;
+    await NotificationPermissionService.maybeRequestOnFirstLaunch(context);
   }
 
   Future<void> _onGuestEnter() async {
