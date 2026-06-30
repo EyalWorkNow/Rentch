@@ -285,12 +285,13 @@ class AwsApiClient {
   Future<({List<AppNotification> items, int unread})> getNotifications() async {
     if (!isConfigured) return (items: <AppNotification>[], unread: 0);
     final res = await get('/notifications');
-    final rawItems = (res['items'] as List?) ?? const [];
+    // Backend (`GET /notifications`) returns { notifications, unreadCount, count }.
+    final rawItems = (res['notifications'] as List?) ?? const [];
     final items = rawItems
         .whereType<Map>()
         .map((m) => AppNotification.fromJson(Map<String, dynamic>.from(m)))
         .toList(growable: false);
-    final unread = (res['unread'] as num?)?.toInt() ??
+    final unread = (res['unreadCount'] as num?)?.toInt() ??
         items.where((n) => !n.read).length;
     return (items: items, unread: unread);
   }

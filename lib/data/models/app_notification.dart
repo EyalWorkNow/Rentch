@@ -33,9 +33,19 @@ class AppNotification {
         _ => const <String, dynamic>{},
       },
       read: json['read'] == true,
-      createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
-          DateTime.now(),
+      createdAt: _parseCreatedAt(json['createdAt']),
     );
+  }
+
+  // Backend sends createdAt as an epoch-ms Number; tolerate ISO strings too.
+  static DateTime _parseCreatedAt(Object? raw) {
+    if (raw is num) {
+      return DateTime.fromMillisecondsSinceEpoch(raw.toInt()).toLocal();
+    }
+    final s = (raw ?? '').toString();
+    final ms = int.tryParse(s);
+    if (ms != null) return DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
+    return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
   }
 
   AppNotification copyWith({bool? read}) => AppNotification(

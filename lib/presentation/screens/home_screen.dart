@@ -87,7 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
         provider.setTabIndex(matchesTab);
         provider.markMatchesSeen();
       case 'like':
+      case 'property_like': // backend's actual "new interest in your apartment" type
       case 'tour':
+      case 'tour_ready': // backend's actual "your 3D tour is ready" type
       case 'review':
         final property = provider.propertyById(n.propertyId);
         if (property != null) {
