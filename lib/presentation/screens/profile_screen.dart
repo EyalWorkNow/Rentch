@@ -1516,6 +1516,11 @@ String _fmt(int value) {
 // LANDLORD PROFILE — full redesign
 // ===========================================================================
 
+// ponytail: PRO upsell is a dead promise — the "שדרג עכשיו" CTA only shows a
+// "coming soon" snackbar with no real purchase/upgrade flow. Until monetization
+// is built, hide the card behind this flag. Flip to true to re-enable.
+const bool _kProUpsellEnabled = false;
+
 class _LandlordProfileScreen extends StatelessWidget {
   const _LandlordProfileScreen({
     required this.profile,
@@ -1989,8 +1994,10 @@ class _LandlordProfileScreen extends StatelessWidget {
               const SizedBox(height: 24),
               _buildProfileCard(context, tenantName, email, photoUrl),
               const SizedBox(height: 20),
-              _buildProBanner(context),
-              const SizedBox(height: 20),
+              if (_kProUpsellEnabled) ...[
+                _buildProBanner(context),
+                const SizedBox(height: 20),
+              ],
               _buildSettingsGroup(context),
               const SizedBox(height: 20),
               _buildSystemActions(context),

@@ -33,6 +33,12 @@ class PropertyAnalyticsRepository {
 
   static const Duration activeViewerWindow = Duration(seconds: 45);
 
+  // Cap on rows fetched per count. The shim's `total` is just `rows.length` and
+  // it silently drops `greaterThan`/`isNotNull` queries, so counts must be done
+  // client-side. This cap bounds the payload while comfortably covering any
+  // realistic concurrent-viewer / per-day-like volume for a single property.
+  static const int _countFetchLimit = 200;
+
   bool get isConfigured =>
       AppConfig.hasAppwriteCoreConfig &&
       AppConfig.appwriteDatabaseId.isNotEmpty &&
@@ -46,10 +52,12 @@ class PropertyAnalyticsRepository {
     if (!isConfigured || _breaker.isOpen) return null;
     final capturedNow = now ?? DateTime.now();
     final today = _dateKey(capturedNow);
-    final cutoff =
-        capturedNow.toUtc().subtract(activeViewerWindow).toIso8601String();
+    final cutoff = capturedNow.toUtc().subtract(activeViewerWindow);
 
     try {
+      // The shim honours the `equal` filters but drops `greaterThan` and
+      // reports `total` as the returned row count. So fetch the rows matching
+      // the equal filters (capped) and re-apply the time window client-side.
       final activeRows = await _breaker.call(
         () => RetryPolicy.transient.execute(
           () => tables.listRows(
@@ -58,10 +66,8 @@ class PropertyAnalyticsRepository {
             queries: [
               Query.equal('propertyId', propertyId),
               Query.equal('active', true),
-              Query.greaterThan('lastSeenAt', cutoff),
-              Query.limit(1),
+              Query.limit(_countFetchLimit),
             ],
-            total: true,
           ),
         ),
       );
@@ -73,15 +79,27 @@ class PropertyAnalyticsRepository {
             queries: [
               Query.equal('propertyId', propertyId),
               Query.equal('date', today),
-              Query.limit(1),
+              Query.limit(_countFetchLimit),
             ],
-            total: true,
           ),
         ),
       );
+
+      final liveViewers = activeRows.rows.where((row) {
+        // Guard against rows the backend may not have filtered on `active`.
+        if (row.data['active'] == false) return false;
+        final lastSeen = _parseUtc(row.data['lastSeenAt']);
+        return lastSeen != null && lastSeen.isAfter(cutoff);
+      }).length;
+
+      final likesToday = likeRows.rows.where((row) {
+        // Re-confirm the day in case the backend ignored the `date` equal.
+        return row.data['date']?.toString() == today;
+      }).length;
+
       return PropertyAnalyticsSnapshot(
-        liveViewers: activeRows.total,
-        likesToday: likeRows.total,
+        liveViewers: liveViewers,
+        likesToday: likesToday,
         likesTodayDate: today,
       );
     } on CircuitOpenException {
@@ -262,6 +280,12 @@ class PropertyAnalyticsRepository {
   int _durationSeconds(DateTime startedAt, DateTime endedAt) {
     final seconds = endedAt.difference(startedAt).inSeconds;
     return seconds < 0 ? 0 : seconds;
+  }
+
+  DateTime? _parseUtc(Object? value) {
+    if (value == null) return null;
+    final parsed = DateTime.tryParse(value.toString());
+    return parsed?.toUtc();
   }
 
   String _dateKey(DateTime value) {

@@ -12,6 +12,7 @@ import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
 import 'package:dating_app/presentation/features/landlord/reminders_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_tools_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -2773,12 +2774,7 @@ class _PropertyQuickActionsSheet extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.9),
             onTap: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  duration: Duration(milliseconds: 2500),
-                  content: Text('שיתוף בקרוב...'),
-                ),
-              );
+              showPropertyShareSheet(context, property);
             },
           ),
         ],

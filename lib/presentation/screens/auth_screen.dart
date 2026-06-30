@@ -1151,6 +1151,45 @@ class _LoginTabState extends State<_LoginTab> {
     }
   }
 
+  Future<void> _resetPassword() async {
+    FocusScope.of(context).unfocus();
+    final email = _emailCtrl.text.trim();
+    final emailValid =
+        RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+    if (email.isEmpty || !emailValid) {
+      _shakeCtrl.shake();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 2500),
+          content: Text('הזינו קודם את כתובת האימייל שלכם לאיפוס הסיסמה')));
+      return;
+    }
+    try {
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: email)
+          .timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 3000),
+          content: Text('שלחנו קישור לאיפוס סיסמה למייל שלך')));
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'invalid-email' => 'כתובת האימייל אינה תקינה',
+        'user-not-found' => 'לא נמצא חשבון עם האימייל הזה',
+        'too-many-requests' => 'יותר מדי ניסיונות, נסה שוב מאוחר יותר',
+        _ => 'שגיאה בשליחת קישור האיפוס, נסה שוב',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(msg)));
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 3000),
+          content: Text('אין חיבור לרשת. בדוק את החיבור לאינטרנט ונסה שוב.')));
+    }
+  }
+
   Future<void> _loginWithGoogle() async {
     if (_googleLoading) return;
     if (!AppConfig.enableGoogleSignIn) {
@@ -1444,7 +1483,7 @@ class _LoginTabState extends State<_LoginTab> {
                         ],
                       ),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: _resetPassword,
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.zero,
                           minimumSize: Size.zero,

@@ -517,12 +517,11 @@ export const handler = async (event) => {
     }
 
     // ── Scan routes ─────────────────────────────────────────────────────────
+    // Only GET /scans/:id remains in use (the refresh/poll fallback). Creation
+    // and processing moved to the Teleport flow, so the legacy createScan /
+    // processScan (Luma virtual-staging) endpoints were removed.
     if (segments[0] === 'scans') {
       const scanId = segments[1] ? decodeURIComponent(segments[1]) : null;
-      // POST /scans → create scan job + presigned upload URL
-      if (method === 'POST' && !scanId) return await createScan(event);
-      // POST /scans/:id/process → build video viewer HTML
-      if (method === 'POST' && scanId && segments[2] === 'process') return await processScan(scanId);
       // GET /scans/:id → return scan status + viewerUrl
       if (method === 'GET' && scanId) return await getScan(scanId);
       return json(404, { message: 'Unknown scan route' });
@@ -542,11 +541,6 @@ export const handler = async (event) => {
       // GET /panorama/:id → poll status → imageUrl + haov/vaov
       if (method === 'GET' && jobId) return await getPanorama(jobId);
       return json(404, { message: 'Unknown panorama route' });
-    }
-
-    // ── Spatial: single-pano room layout (floorplan + dimensions) ───────────
-    if (segments[0] === 'spatial' && segments[1] === 'layout' && method === 'POST') {
-      return await spatialLayout(event);
     }
 
     // ── Varjo Teleport 3D captures ──────────────────────────────────────────
@@ -587,11 +581,6 @@ export const handler = async (event) => {
     if (segments[0] === 'notifications' && segments[1] === 'register-token'
         && method === 'POST') {
       return await handleRegisterToken(event);
-    }
-    // POST /notifications/test → send a test push to the authenticated caller.
-    if (segments[0] === 'notifications' && segments[1] === 'test'
-        && method === 'POST') {
-      return await handleTestPush(event);
     }
     // POST /notifications/mark-read → mark some/all of the caller's rows read.
     if (segments[0] === 'notifications' && segments[1] === 'mark-read'
@@ -1107,20 +1096,6 @@ async function poleFill(event) {
   }
 }
 
-// POST /spatial/layout — single-pano room layout → floorplan + dimensions.
-// The metric geometry kernel is ready (server/spatial), but recovering wall/floor
-// corners from a raw panorama needs a HorizonNet-class model (torch + the
-// non-commercial-weights trap — see RENTLY_SPATIAL_ARCHITECTURE.md §1bis). Until
-// that model is deployed (retrained on Rently's own panos for clean rights), this
-// route is live but reports not-configured rather than faking measurements.
-async function spatialLayout(event) {
-  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
-  return json(503, {
-    message: 'Room-layout model not yet configured.',
-    detail: 'Pending HorizonNet weights (retrain on own panos — see architecture doc §1bis).',
-  });
-}
-
 // Extract the S3 object key from a public S3 URL (virtual-hosted or path style).
 function keyFromS3Url(u) {
   if (typeof u !== 'string' || !u) return null;
@@ -1393,27 +1368,10 @@ function commonPrefix(values) {
 // ── Scan handlers (video → virtual-tour viewer) ──────────────────────────────
 
 // ── Virtual staging ("הדמיה") via Luma Agents uni-1 image_edit ───────────────
-// Flow: POST /scans → presigned PUT for the source photo; client uploads it;
-// POST /scans/:id/process → kick off a Luma image_edit generation;
-// GET /scans/:id → poll Luma, re-host the result on S3, return the staged URL.
-
-const STAGING_STYLES = ['modern', 'scandinavian', 'cozy', 'luxury', 'empty_to_furnished'];
-
-function sanitizeStyle(value) {
-  const s = (value || '').toString().toLowerCase().trim();
-  return STAGING_STYLES.includes(s) ? s : 'modern';
-}
-
-function stagingPrompt(style) {
-  const styleText = {
-    modern: 'Furnish and decorate this room as a warm, modern living space with contemporary furniture, a sofa, coffee table, rug, plants and soft natural lighting.',
-    scandinavian: 'Furnish this room in a bright Scandinavian style: light wood furniture, neutral tones, cozy textiles, minimal decor and abundant natural light.',
-    cozy: 'Furnish this room as a cozy, inviting home: warm lighting, comfortable sofa, soft rugs, cushions, plants and homely decor.',
-    luxury: 'Furnish this room as a high-end luxury interior: elegant designer furniture, refined materials, tasteful art, ambient lighting and a premium real-estate look.',
-    empty_to_furnished: 'Fully furnish this empty room with tasteful modern furniture and decor appropriate to the space, with pleasant lighting.',
-  }[style] || '';
-  return `${styleText} Photorealistic real-estate listing photo, high quality. Preserve the existing windows, doors, walls, floor, ceiling and overall room architecture exactly as they are — only add furniture, decor and lighting. Do not change the room layout, structure or proportions.`;
-}
+// The createScan / processScan endpoints (presign + kick off a Luma generation)
+// were removed — staging creation moved to the Teleport flow. GET /scans/:id is
+// kept as the poll/refresh fallback; it still polls Luma for any legacy job that
+// already carries a generationId and re-hosts the staged result on S3.
 
 // ── Varjo Teleport helpers ──────────────────────────────────────────────────
 
@@ -1664,6 +1622,7 @@ async function putPanoMeta(jobId, meta) {
 }
 
 async function createPanorama(event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
   const body = event.body ? JSON.parse(event.body) : {};
   const propertyId = sanitizeId(body.propertyId || 'prop');
   const ts = Date.now();
@@ -1760,6 +1719,7 @@ async function createPanorama(event) {
 }
 
 async function stitchPanorama(jobId, event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
   const meta = await getPanoMeta(jobId);
   if (!meta) return json(404, { message: 'Panorama job not found' });
   if (meta.status === 'ready' || meta.status === 'failed') {
@@ -2032,6 +1992,7 @@ async function startScan3d(event, jobId) {
       method: 'POST',
       headers: { Authorization: `Bearer ${KIRI_API_KEY}`, 'Content-Type': contentType },
       body: mpBody,
+      signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS),
     });
     const data = await res.json().catch(() => ({}));
     const serialize = data?.data?.serialize;
@@ -2075,7 +2036,7 @@ async function getScan3d(event, jobId) {
   try {
     const sr = await fetch(
       `${KIRI_API_BASE}/model/getStatus?serialize=${encodeURIComponent(meta.serialize)}`,
-      { headers: { Authorization: `Bearer ${KIRI_API_KEY}` } },
+      { headers: { Authorization: `Bearer ${KIRI_API_KEY}` }, signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS) },
     );
     const sd = await sr.json().catch(() => ({}));
     // KIRI status: -1 Uploading, 0 Processing, 1 Failed, 2 Successful, 3 Queuing, 4 Exported.
@@ -2091,7 +2052,7 @@ async function getScan3d(event, jobId) {
     // Successful → fetch the zip download link, re-host permanently on S3.
     const dr = await fetch(
       `${KIRI_API_BASE}/model/getModelZip?serialize=${encodeURIComponent(meta.serialize)}`,
-      { headers: { Authorization: `Bearer ${KIRI_API_KEY}` } },
+      { headers: { Authorization: `Bearer ${KIRI_API_KEY}` }, signal: AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS) },
     );
     const dd = await dr.json().catch(() => ({}));
     const modelUrl = dd?.data?.modelUrl;
@@ -2102,12 +2063,12 @@ async function getScan3d(event, jobId) {
     // memory, and pull out the real renderable assets: the textured mesh
     // (.glb/.gltf) and — for 3DGS scans — the gaussian splat (.ply). Re-host each
     // extracted file permanently on S3 so the client gets directly-loadable urls.
-    const zipRes = await fetch(modelUrl);
+    const zipRes = await fetchToBuffer(modelUrl, { maxBytes: MAX_KIRI_ZIP_BYTES });
     if (!zipRes.ok) {
-      console.warn('KIRI zip download failed', zipRes.status);
+      console.warn('KIRI zip download failed', zipRes.status, zipRes.tooLarge ? '(over size cap)' : '');
       return json(200, { status: 'processing' });
     }
-    const zipBuf = Buffer.from(await zipRes.arrayBuffer());
+    const zipBuf = zipRes.buffer;
 
     let entries;
     try {
@@ -2383,10 +2344,59 @@ function buildMultipart(parts) {
   return { body: Buffer.concat(chunks), contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
-async function streamToBuffer(stream) {
+// Per-source-file cap when buffering an uploaded scan frame/video from S3 before
+// re-POSTing it to KIRI. Bounds Lambda memory: a malicious/oversized upload can't
+// balloon the function past this. 600 MB comfortably covers a long video capture.
+const MAX_SCAN_FILE_BYTES = 600 * 1024 * 1024;
+// Cap + wall-clock timeout for the KIRI result zip download (the link is remote
+// and untrusted). Bounds both memory (no unbounded buffering) and hang time.
+const MAX_KIRI_ZIP_BYTES = 800 * 1024 * 1024;
+const REMOTE_FETCH_TIMEOUT_MS = 120000;
+
+async function streamToBuffer(stream, maxBytes = MAX_SCAN_FILE_BYTES) {
   const chunks = [];
-  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  let total = 0;
+  for await (const chunk of stream) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buf.length;
+    if (total > maxBytes) {
+      throw new Error(`stream exceeds ${maxBytes} byte cap`);
+    }
+    chunks.push(buf);
+  }
   return Buffer.concat(chunks);
+}
+
+// Download a remote URL into a Buffer with a wall-clock timeout AND a hard size
+// cap, streaming the body so an oversized/slow response is aborted instead of
+// being fully buffered into Lambda memory.
+async function fetchToBuffer(url, { timeoutMs = REMOTE_FETCH_TIMEOUT_MS, maxBytes } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return { ok: false, status: res.status };
+    // Reject early if the server advertises an over-cap length.
+    const declared = Number(res.headers.get('content-length') || 0);
+    if (maxBytes && declared && declared > maxBytes) {
+      controller.abort();
+      return { ok: false, status: res.status, tooLarge: true };
+    }
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of res.body) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (maxBytes && total > maxBytes) {
+        controller.abort();
+        return { ok: false, status: res.status, tooLarge: true };
+      }
+      chunks.push(buf);
+    }
+    return { ok: true, status: res.status, buffer: Buffer.concat(chunks) };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Persist an already-in-memory buffer (e.g. a file extracted from a zip) to S3
@@ -2411,119 +2421,6 @@ async function rehostFile(sourceUrl, key, contentType) {
     CacheControl: 'public, max-age=31536000',
   }));
   return `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
-}
-
-async function createScan(event) {
-  const body = event.body ? JSON.parse(event.body) : {};
-  const propertyId = sanitizeId(body.propertyId || body.id || 'prop');
-  const title = sanitizeText(body.title || 'Rently apartment scan');
-  const style = sanitizeStyle(body.style);
-  const contentType = (body.contentType || 'image/jpeg').toLowerCase();
-  const isVideo = contentType.startsWith('video/');
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 10);
-  const scanId = `st_${ts}_${rand}`;
-  const ext = contentType.includes('png') ? 'png'
-    : contentType.includes('webp') ? 'webp'
-    : contentType.includes('heic') ? 'heic'
-    : contentType.includes('mp4') ? 'mp4'
-    : contentType.includes('quicktime') ? 'mov'
-    : isVideo ? 'mp4'
-    : 'jpg';
-  const folder = isVideo ? 'scan-src' : 'staging-src';
-  const srcKey = `${folder}/${propertyId}/${scanId}.${ext}`;
-
-  const uploadUrl = await getSignedUrl(
-    s3,
-    new PutObjectCommand({ Bucket: S3_BUCKET, Key: srcKey, ContentType: contentType }),
-    { expiresIn: 3600 },
-  );
-
-  const meta = { scanId, propertyId, title, srcKey, style, contentType, provider: isVideo ? 'video-tour' : 'luma-staging', status: 'pending', createdAt: ts };
-  await putScanMeta(scanId, meta);
-  return json(200, { data: { scanId, uploadUrl } });
-}
-
-async function processScan(scanId) {
-  const meta = await getScanMeta(scanId);
-  if (!meta) return json(404, { message: 'Scan not found' });
-
-  // Already terminal — return cached result without re-processing.
-  if (meta.status === 'ready' || meta.status === 'failed') {
-    return scanResponse(meta);
-  }
-
-  // Video scan → build an immersive 360° viewer HTML page and return ready immediately.
-  const isVideo = (meta.contentType || '').toLowerCase().startsWith('video/');
-  if (isVideo) {
-    const videoUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${meta.srcKey}`;
-    const html = renderVideoViewerHtml({
-      title: meta.title || 'Rently Virtual Tour',
-      videoUrl,
-      propertyId: meta.propertyId,
-    });
-    const viewerKey = `scan-viewers/${meta.propertyId}/${scanId}.html`;
-    await s3.send(new PutObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: viewerKey,
-      Body: html,
-      ContentType: 'text/html; charset=utf-8',
-      CacheControl: 'public, max-age=31536000',
-    }));
-    const viewerUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${viewerKey}`;
-    const updated = { ...meta, status: 'ready', viewerUrl, completedAt: Date.now() };
-    await putScanMeta(scanId, updated);
-    return scanResponse(updated);
-  }
-
-  // Image scan → Luma image_edit virtual staging.
-  if (!LUMA_API_KEY) {
-    const updated = { ...meta, status: 'failed', error: 'Staging is not configured (no LUMA_API_KEY).' };
-    await putScanMeta(scanId, updated);
-    return scanResponse(updated);
-  }
-
-  const srcUrl = await getSignedUrl(
-    s3,
-    new GetObjectCommand({ Bucket: S3_BUCKET, Key: meta.srcKey }),
-    { expiresIn: 3600 },
-  );
-  try {
-    const res = await fetch(`${LUMA_BASE}/generations`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LUMA_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        type: 'image_edit',
-        model: 'uni-1',
-        prompt: stagingPrompt(meta.style),
-        source: { url: srcUrl },
-      }),
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      console.warn('Luma create generation failed', res.status, txt);
-      const updated = { ...meta, status: 'failed', error: `Luma error ${res.status}` };
-      await putScanMeta(scanId, updated);
-      return scanResponse(updated);
-    }
-    const data = await res.json();
-    if (!data.id) {
-      const updated = { ...meta, status: 'failed', error: 'Luma returned no generation id' };
-      await putScanMeta(scanId, updated);
-      return scanResponse(updated);
-    }
-    const updated = { ...meta, generationId: data.id, srcUrl, status: 'processing', processedAt: Date.now() };
-    await putScanMeta(scanId, updated);
-    return json(200, { data: { id: scanId, scanId, status: 'processing', viewerUrl: '', previewImageUrl: '', format: 'image', processingStage: 'staging' } });
-  } catch (e) {
-    console.warn('Luma create generation error', e.message);
-    const updated = { ...meta, status: 'failed', error: e.message };
-    await putScanMeta(scanId, updated);
-    return scanResponse(updated);
-  }
 }
 
 async function getScan(scanId) {
@@ -2576,253 +2473,6 @@ async function streamToString(stream) {
   const chunks = [];
   for await (const chunk of stream) chunks.push(chunk);
   return Buffer.concat(chunks).toString('utf-8');
-}
-
-function renderVideoViewerHtml({ title, videoUrl, propertyId }) {
-  const safeTitle = escapeHtml(title);
-  const safePropId = escapeHtml(propertyId);
-  const safeVideoUrl = escapeHtml(videoUrl);
-  return `<!doctype html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <title>${safeTitle} · סיור וירטואלי</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"><\/script>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-    html,body{width:100%;height:100%;background:#07111c;overflow:hidden;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f7fb}
-    a-scene{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0}
-    #overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;pointer-events:none}
-
-    /* Header */
-    #hdr{position:absolute;top:0;left:0;right:0;
-      padding:max(env(safe-area-inset-top,16px),16px) 18px 18px;
-      background:linear-gradient(to bottom,rgba(7,17,28,.92) 0%,rgba(7,17,28,.5) 60%,transparent 100%);
-      display:flex;align-items:center;gap:12px}
-    .logo{width:38px;height:38px;flex-shrink:0;
-      background:linear-gradient(135deg,#0ea5e9,#1d4ed8);border-radius:10px;
-      display:flex;align-items:center;justify-content:center;
-      font-weight:900;font-size:16px;color:#fff;
-      box-shadow:0 2px 14px rgba(14,165,233,.45)}
-    .prop-name{font-size:15px;font-weight:700;letter-spacing:-.3px;line-height:1.25}
-    .prop-sub{font-size:11px;color:rgba(245,247,251,.5);margin-top:2px}
-    .badge{margin-right:auto;white-space:nowrap;
-      background:rgba(14,165,233,.14);border:1px solid rgba(14,165,233,.3);
-      color:#7dd3fc;font-size:11px;font-weight:700;letter-spacing:.5px;
-      padding:4px 11px;border-radius:20px}
-
-    /* Loading */
-    #loading{position:absolute;inset:0;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
-      background:#07111c;transition:opacity .6s ease}
-    #loading.gone{opacity:0;pointer-events:none}
-    .spin{width:52px;height:52px;border-radius:50%;
-      border:3px solid rgba(14,165,233,.15);border-top-color:#0ea5e9;
-      animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .load-lbl{font-size:14px;color:rgba(245,247,251,.55);letter-spacing:.2px}
-
-    /* Toast hint */
-    #toast{position:absolute;bottom:110px;left:50%;transform:translateX(-50%);
-      background:rgba(7,17,28,.88);border:1px solid rgba(255,255,255,.1);
-      border-radius:24px;padding:10px 20px;
-      font-size:13px;color:rgba(245,247,251,.78);text-align:center;white-space:nowrap;
-      transition:opacity .6s ease;pointer-events:none}
-    #toast.gone{opacity:0}
-    #toast.tap{pointer-events:all;cursor:pointer}
-
-    /* Progress */
-    #pgwrap{position:absolute;left:0;right:0;bottom:60px;padding:0 18px;
-      pointer-events:all;cursor:pointer}
-    #pg{height:3px;background:rgba(255,255,255,.18);border-radius:2px;
-      overflow:hidden;transition:height .15s}
-    #pgwrap:hover #pg{height:5px}
-    #pgbar{height:100%;background:#0ea5e9;border-radius:2px;width:0;transition:width .1s linear}
-
-    /* Controls bar */
-    #ctrl{position:absolute;bottom:0;left:0;right:0;
-      padding:10px 18px max(env(safe-area-inset-bottom,12px),12px);
-      background:linear-gradient(to top,rgba(7,17,28,.92) 0%,rgba(7,17,28,.5) 60%,transparent 100%);
-      display:flex;align-items:center;gap:12px;pointer-events:none}
-    .btn{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.13);
-      color:#fff;cursor:pointer;border-radius:50%;width:42px;height:42px;
-      display:flex;align-items:center;justify-content:center;
-      pointer-events:all;transition:background .15s,border-color .15s;flex-shrink:0}
-    .btn:hover,.btn:active{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.25)}
-    .btn svg{display:block}
-    .btnw{border-radius:21px;width:auto;padding:0 14px;gap:6px;
-      font-size:11px;font-weight:700;letter-spacing:.4px}
-    #timer{font-size:12px;color:rgba(245,247,251,.5);pointer-events:none;margin-right:auto}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    #hdr,#ctrl{animation:fadeUp .5s ease both}
-    #ctrl{animation-delay:.08s}
-  </style>
-</head>
-<body>
-
-<a-scene
-  embedded
-  vr-mode-ui="enabled:true"
-  device-orientation-permission-ui="enabled:true"
-  renderer="antialias:true;colorManagement:true"
-  loading-screen="enabled:false"
->
-  <a-assets timeout="30000">
-    <video id="tv" src="${safeVideoUrl}"
-      crossorigin="anonymous" preload="auto"
-      playsinline webkit-playsinline loop>
-    </video>
-  </a-assets>
-
-  <a-sky color="#050d14"></a-sky>
-
-  <!-- Video wraps inner surface of sphere — user stands inside, looking out -->
-  <a-videosphere src="#tv" rotation="0 -90 0"
-    segments-height="64" segments-width="64" radius="100">
-  </a-videosphere>
-
-  <a-light type="ambient" color="#0d2540" intensity="0.5"></a-light>
-
-  <a-camera
-    look-controls="pointerLockEnabled:false;reverseMouseDrag:false;touchEnabled:true;magicWindowTrackingEnabled:true"
-    wasd-controls="enabled:false"
-    fov="80" near="0.1" user-height="0">
-    <a-cursor fuse="false" color="#0ea5e9" opacity="0.45"
-      radius-inner="0.004" radius-outer="0.006" position="0 0 -1">
-    </a-cursor>
-  </a-camera>
-</a-scene>
-
-<div id="overlay">
-  <div id="hdr">
-    <div class="logo">R</div>
-    <div>
-      <div class="prop-name">${safeTitle}</div>
-      <div class="prop-sub">גרור / הטה מכשיר לסיבוב · נכס ${safePropId}</div>
-    </div>
-    <div class="badge">360° סיור</div>
-  </div>
-
-  <div id="loading">
-    <div class="spin"></div>
-    <div class="load-lbl">טוען סיור וירטואלי…</div>
-  </div>
-
-  <div id="toast">📱 הטה את המכשיר לסיבוב המבט &nbsp;·&nbsp; 🖱️ גרור לניווט</div>
-
-  <div id="pgwrap"><div id="pg"><div id="pgbar"></div></div></div>
-
-  <div id="ctrl">
-    <button class="btn" id="btnPlay">
-      <svg id="icPlay" width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
-      <svg id="icPause" width="20" height="20" viewBox="0 0 24 24" fill="#fff" hidden><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-    </button>
-    <span id="timer">0:00 / 0:00</span>
-    <button class="btn" id="btnMute">
-      <svg id="icVol" width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-      <svg id="icMute" width="20" height="20" viewBox="0 0 24 24" fill="#fff" hidden><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
-    </button>
-    <button class="btn" id="btnFs">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-    </button>
-    <button class="btn btnw" id="btnVR">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M20.74 6H3.26C2.01 6 1 7.01 1 8.26v7.48C1 16.99 2.01 18 3.26 18h4.01c.63 0 1.21-.3 1.59-.8l1.84-2.45c.12-.16.31-.25.51-.25h1.59c.2 0 .39.09.51.25l1.84 2.45c.38.5.96.8 1.59.8h4.01C21.99 18 23 16.99 23 15.74V8.26C23 7.01 21.99 6 20.74 6zM7.5 15C5.57 15 4 13.43 4 11.5S5.57 8 7.5 8 11 9.57 11 11.5 9.43 15 7.5 15zm9 0c-1.93 0-3.5-1.57-3.5-3.5S14.57 8 16.5 8 20 9.57 20 11.5 18.43 15 16.5 15z"/></svg>
-      VR
-    </button>
-  </div>
-</div>
-
-<script>
-(function(){
-  const tv=document.getElementById('tv');
-  const loading=document.getElementById('loading');
-  const toast=document.getElementById('toast');
-  const pgbar=document.getElementById('pgbar');
-  const pgwrap=document.getElementById('pgwrap');
-  const timer=document.getElementById('timer');
-  const btnPlay=document.getElementById('btnPlay');
-  const icPlay=document.getElementById('icPlay');
-  const icPause=document.getElementById('icPause');
-  const btnMute=document.getElementById('btnMute');
-  const icVol=document.getElementById('icVol');
-  const icMuteEl=document.getElementById('icMute');
-  const btnFs=document.getElementById('btnFs');
-  const btnVR=document.getElementById('btnVR');
-
-  const fmt=s=>{const m=Math.floor(s/60),sc=Math.floor(s%60);return m+':'+(sc<10?'0':'')+sc};
-
-  // Hide loading when video is ready
-  const hideLoad=()=>{loading.classList.add('gone');tv.play().catch(()=>{})};
-  tv.addEventListener('canplay',hideLoad,{once:true});
-  tv.addEventListener('loadeddata',hideLoad,{once:true});
-  setTimeout(()=>loading.classList.add('gone'),7000);
-
-  // Dismiss hint after 4 seconds
-  setTimeout(()=>toast.classList.add('gone'),4000);
-
-  // Progress bar
-  tv.addEventListener('timeupdate',()=>{
-    if(!tv.duration)return;
-    pgbar.style.width=(tv.currentTime/tv.duration*100).toFixed(2)+'%';
-    timer.textContent=fmt(tv.currentTime)+' / '+fmt(tv.duration);
-  });
-  pgwrap.addEventListener('click',e=>{
-    const r=pgwrap.getBoundingClientRect();
-    tv.currentTime=((e.clientX-r.left)/r.width)*tv.duration;
-  });
-
-  // Play / pause
-  const syncPlay=()=>{icPlay.hidden=!tv.paused;icPause.hidden=tv.paused};
-  tv.addEventListener('play',syncPlay);
-  tv.addEventListener('pause',syncPlay);
-  btnPlay.onclick=()=>tv.paused?tv.play():tv.pause();
-
-  // Mute
-  btnMute.onclick=()=>{
-    tv.muted=!tv.muted;
-    icVol.hidden=tv.muted;icMuteEl.hidden=!tv.muted;
-  };
-
-  // Fullscreen
-  btnFs.onclick=()=>{
-    if(document.fullscreenElement){document.exitFullscreen?.()}
-    else{(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen)?.call(document.documentElement)}
-  };
-
-  // VR button wires into A-Frame's built-in VR mode
-  btnVR.onclick=()=>{
-    const scene=document.querySelector('a-scene');
-    if(scene){scene.enterVR?.()}
-  };
-
-  // iOS 13+ device orientation permission
-  if(typeof DeviceOrientationEvent!=='undefined'&&
-     typeof DeviceOrientationEvent.requestPermission==='function'){
-    toast.textContent='📱 לחץ/י כדי לאפשר ניווט בהטיית מכשיר';
-    toast.classList.remove('gone');
-    toast.classList.add('tap');
-    toast.onclick=()=>{
-      DeviceOrientationEvent.requestPermission()
-        .then(p=>{
-          if(p==='granted'){
-            toast.textContent='✅ ניווט פעיל — הטה את המכשיר!';
-            setTimeout(()=>toast.classList.add('gone'),2500);
-          }
-          toast.classList.remove('tap');
-          toast.onclick=null;
-        }).catch(()=>{toast.classList.add('gone')});
-    };
-  }
-
-  tv.play().catch(()=>{});
-})();
-<\/script>
-</body>
-</html>`;
 }
 
 function escapeHtml(value) {
@@ -3186,21 +2836,6 @@ async function handleRegisterToken(event) {
   return json(200, { ok: true, count: tokens.length });
 }
 
-// POST /notifications/test → send a test push to the caller's own devices.
-// Handy for end-to-end verification once a device token is registered.
-async function handleTestPush(event) {
-  const uid = callerUidOf(event);
-  if (!uid) return json(401, { message: 'Authentication required.' });
-  let body = {};
-  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
-  const sent = await sendPushToUser(uid, {
-    title: (body.title || 'בדיקת התראות 🔔').toString(),
-    body: (body.body || 'אם קיבלת את זה — ההתראות עובדות!').toString(),
-    data: { type: 'test' },
-  });
-  return json(200, { ok: true, sent });
-}
-
 // GET /notifications → the authenticated caller's notification inbox, newest
 // first, plus the count still unread. Query the notifications table by userId
 // (pk) with ScanIndexForward=false so the largest createdAt (newest) comes back
@@ -3312,6 +2947,14 @@ async function handleMatchLeads(event) {
   const landlordKeys = keysFor(landlordProfile.importantDetails, LANDLORD_TAG_KEYS);
   const landlordDealKeys = keysFor(landlordProfile.dealBreakers, LANDLORD_TAG_KEYS);
 
+  // Bound the per-property × per-like fan-out so one landlord with many listings
+  // and many likes can't fan out into thousands of DynamoDB reads + scored pairs
+  // in a single request. Caps: properties scanned, likes pulled per property, and
+  // total (tenant, property) pairs scored.
+  const MAX_LEAD_PROPERTIES = 50;
+  const MAX_LIKES_PER_PROPERTY = 100;
+  const MAX_LEAD_PAIRS = 500;
+
   // 2. The landlord's properties.
   const props = [];
   try {
@@ -3320,23 +2963,28 @@ async function handleMatchLeads(event) {
       IndexName: TABLES.properties.ownerIndex,
       KeyConditionExpression: 'ownerUserId = :o',
       ExpressionAttributeValues: { ':o': uid },
-      Limit: 100,
+      Limit: MAX_LEAD_PROPERTIES,
     }));
     for (const p of out.Items || []) props.push(p);
   } catch (e) { console.warn('match/leads props', e.message); }
+  const cappedProps = props.slice(0, MAX_LEAD_PROPERTIES);
 
-  // 3. For each property, the tenants who liked it.
+  // 3. For each property, the tenants who liked it (capped at MAX_LEAD_PAIRS total).
   const likeRows = [];
-  for (const p of props) {
+  for (const p of cappedProps) {
+    if (likeRows.length >= MAX_LEAD_PAIRS) break;
     try {
       const out = await ddb.send(new QueryCommand({
         TableName: TABLES.property_likes.name,
         IndexName: TABLES.property_likes.gsi.name,
         KeyConditionExpression: 'propertyId = :p',
         ExpressionAttributeValues: { ':p': p.id },
-        Limit: 100,
+        Limit: MAX_LIKES_PER_PROPERTY,
       }));
-      for (const l of out.Items || []) likeRows.push({ like: l, property: p });
+      for (const l of out.Items || []) {
+        likeRows.push({ like: l, property: p });
+        if (likeRows.length >= MAX_LEAD_PAIRS) break;
+      }
     } catch { /* skip */ }
   }
 
@@ -3462,8 +3110,11 @@ async function contractGet(event, cid) {
 async function contractList(event) {
   const uid = callerUidOf(event);
   if (!uid) return json(401, { message: 'Authentication required.' });
+  const query = event.queryStringParameters || {};
+  const MAX_CONTRACT_ITEMS = 200;
   const items = [];
-  let lastKey;
+  // Resume from the caller's cursor if provided; otherwise start a fresh sweep.
+  let lastKey = parseCursor(query.cursor);
   do {
     const out = await ddb.send(new ScanCommand({
       TableName: CONTRACTS_TABLE,
@@ -3473,9 +3124,14 @@ async function contractList(event) {
     }));
     for (const it of out.Items || []) items.push(it);
     lastKey = out.LastEvaluatedKey;
-  } while (lastKey && items.length < 200);
+  } while (lastKey && items.length < MAX_CONTRACT_ITEMS);
   items.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-  return json(200, { items });
+  // Hand back a cursor so a caller with >MAX_CONTRACT_ITEMS contracts can page on.
+  return json(200, {
+    items,
+    hasMore: !!lastKey,
+    lastKey: lastKey ? encodeURIComponent(JSON.stringify(lastKey)) : null,
+  });
 }
 
 async function contractSign(event, cid) {
@@ -3590,12 +3246,12 @@ async function handleContractImprove(event) {
   let draft = str(body.contractText, 8000).trim();
   if (!draft) {
     draft = STANDARD_LEASE_TEMPLATE
-      .replace('{{landlordName}}', facts.landlordName)
-      .replace('{{tenantName}}', facts.tenantName)
-      .replace('{{propertyTitle}}', facts.propertyTitle)
-      .replace('{{durationMonths}}', String(facts.durationMonths))
-      .replace('{{monthlyRent}}', String(facts.monthlyRent))
-      .replace('{{deposit}}', String(facts.deposit));
+      .replaceAll('{{landlordName}}', facts.landlordName)
+      .replaceAll('{{tenantName}}', facts.tenantName)
+      .replaceAll('{{propertyTitle}}', facts.propertyTitle)
+      .replaceAll('{{durationMonths}}', String(facts.durationMonths))
+      .replaceAll('{{monthlyRent}}', String(facts.monthlyRent))
+      .replaceAll('{{deposit}}', String(facts.deposit));
   }
 
   // No model key → degrade to returning the draft unchanged (the UI keeps it).

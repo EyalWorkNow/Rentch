@@ -44,6 +44,7 @@ class ContractRepository {
     }
   }
 
+  // ponytail: unused — wire when contract-cancel UI exists
   Future<RentalContract?> getById(String id) async {
     if (!isEnabled || id.isEmpty) return null;
     try {
@@ -106,6 +107,7 @@ class ContractRepository {
     }
   }
 
+  // ponytail: unused — wire when contract-cancel UI exists
   Future<void> cancel(String contractId) async {
     if (!isEnabled) return;
     try {

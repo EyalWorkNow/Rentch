@@ -761,37 +761,33 @@ class _ChipWrap extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: tags.map((t) {
-        return ScaleBounce(
-          onTap: () {},
-          scaleDownTo: 0.94,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  danger
-                      ? IconsaxPlusLinear.warning_2
-                      : IconsaxPlusLinear.tick_circle,
-                  size: 15,
-                  color: iconColor,
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                danger
+                    ? IconsaxPlusLinear.warning_2
+                    : IconsaxPlusLinear.tick_circle,
+                size: 15,
+                color: iconColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                t,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: danger ? AppColors.coral : _kSlate,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  t,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: danger ? AppColors.coral : _kSlate,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       }).toList(),

@@ -165,7 +165,10 @@ class PropertyLikesRepository {
       final c = res['count'];
       return c is num ? c.toInt() : 0;
     } catch (e) {
-      if (kDebugMode) debugPrint('PropertyLikesRepository._count failed: $e');
+      // ponytail: callers can't tell error-from-empty here — a 401/404/500
+      // returns 0 just like a real zero count. Log the real error distinctly so
+      // failures are observable. Upgrade path: surface an error state to callers.
+      debugPrint('PropertyLikesRepository._count($path) error (returning 0): $e');
       return 0;
     }
   }
@@ -183,9 +186,10 @@ class PropertyLikesRepository {
           .where((l) => l.tenantId.isNotEmpty)
           .toList();
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('PropertyLikesRepository.likesForProperty failed: $e');
-      }
+      // ponytail: callers can't tell error-from-empty here — a 401/404/500
+      // returns [] just like "no likes yet". Log the real error distinctly so
+      // failures are observable. Upgrade path: surface an error state to callers.
+      debugPrint('PropertyLikesRepository.likesForProperty error (returning []): $e');
       return const [];
     }
   }
