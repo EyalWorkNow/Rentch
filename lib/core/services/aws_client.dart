@@ -496,8 +496,13 @@ class BroadcastRecord {
       body: (json['body'] ?? '').toString(),
       imageUrl: (img == null || img.isEmpty) ? null : img,
       template: (json['template'] ?? 'minimal').toString(),
-      sent: (json['sent'] as num?)?.toInt() ?? 0,
-      failed: (json['failed'] as num?)?.toInt() ?? 0,
+      // History rows come back as sentCount/failedCount; live POST as sent/failed.
+      sent: (json['sentCount'] as num?)?.toInt() ??
+          (json['sent'] as num?)?.toInt() ??
+          0,
+      failed: (json['failedCount'] as num?)?.toInt() ??
+          (json['failed'] as num?)?.toInt() ??
+          0,
       createdAt: _parseTs(json['createdAt']),
     );
   }

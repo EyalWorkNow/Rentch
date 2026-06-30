@@ -3624,6 +3624,17 @@ async function handleAdminBroadcast(event) {
   if (!title && !bodyText) {
     return json(400, { message: 'title or body is required' });
   }
+  // Bound payload so a too-large title/body/data doesn't silently fail EVERY
+  // per-token send (FCM rejects >4KB). And only allow https images (no SSRF/junk).
+  if (title.length > 120 || bodyText.length > 300) {
+    return json(400, { message: 'title (≤120) or body (≤300) too long' });
+  }
+  if (imageUrl && !/^https:\/\//i.test(imageUrl)) {
+    return json(400, { message: 'imageUrl must be an https URL' });
+  }
+  if (body.data && JSON.stringify(body.data).length > 2048) {
+    return json(400, { message: 'data payload too large' });
+  }
 
   const token = await fcmAccessToken();
   if (!token) return json(503, { message: 'Push is not configured.' });
@@ -3638,7 +3649,7 @@ async function handleAdminBroadcast(event) {
     }
   }
   if (template) dataStr.template = template;
-  dataStr.type = dataStr.type || 'broadcast';
+  dataStr.type = 'broadcast'; // always — never let client data override tap-routing
 
   // The rich Android/iOS envelope shared by every token's message.
   const androidNotification = {

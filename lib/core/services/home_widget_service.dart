@@ -68,7 +68,11 @@ class HomeWidgetService {
       ]);
 
       await HomeWidget.updateWidget(
-        name: 'RentlyWidgetProvider', // Android provider class (RentlyWidgetProvider.kt)
+        // qualifiedAndroidName bypasses the plugin's applicationId prefix: the
+        // provider lives in the gradle `namespace` com.rentch.app, NOT the
+        // applicationId com.eyalatiyawork.rentch — `name:`/`androidName:` would
+        // throw ClassNotFoundException and the widget would never refresh.
+        qualifiedAndroidName: 'com.rentch.app.RentlyWidgetProvider',
         iOSName: 'RentlyWidget', // iOS widget kind (RentlyWidget.swift)
       );
     } catch (e) {
