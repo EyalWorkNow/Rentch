@@ -8,8 +8,8 @@ import 'package:dating_app/presentation/features/panorama/panorama_align_screen.
 import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_pole_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_photo_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sweep_capture.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_video_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
@@ -116,8 +116,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (choice == null || !mounted) return;
 
     switch (choice) {
-      case _CaptureChoice.video:
-        await _captureWithVideo();
+      case _CaptureChoice.photo:
+        await _captureWithPhotos();
       case _CaptureChoice.sweep:
         await _captureWithSweep();
       case _CaptureChoice.arranged:
@@ -147,13 +147,14 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
   }
 
-  // PRIMARY (default): the in-app "record while turning" video capture. The video
-  // screen records, samples a pose timeline, uploads the video + poses, runs the
-  // server stitch, and returns a finished [PanoramaSweepResult] — we add it as a
-  // node EXACTLY like the sweep/import result (same _addNode call).
-  Future<void> _captureWithVideo() async {
+  // PRIMARY (default): the guided 10-PHOTO 360° capture. The user stands in one
+  // spot and shoots 10 overlapping stills at 0.5× ultra-wide; the screen uploads
+  // them with their known poses, runs the server stitch, and returns a finished
+  // [PanoramaSweepResult] — we add it as a node EXACTLY like the sweep/import
+  // result (same _addNode call). This replaces the broken video→360 flow.
+  Future<void> _captureWithPhotos() async {
     final result = await Navigator.of(context).push<PanoramaSweepResult>(
-      MaterialPageRoute(builder: (_) => const PanoramaVideoCaptureScreen()),
+      MaterialPageRoute(builder: (_) => const PanoramaPhotoCaptureScreen()),
     );
     if (result == null || !mounted) return;
 
@@ -751,9 +752,10 @@ class _NodeTile extends StatelessWidget {
 }
 
 /// Which capture path the landlord chose on the guide screen.
-/// [video] = record a clip while turning (PRIMARY default), [sweep] = the
-/// frame-by-frame guided sweep (advanced), [gallery] = import a native pano.
-enum _CaptureChoice { video, sweep, arranged, gallery }
+/// [photo] = guided 10-photo 360° capture (PRIMARY default), [sweep] = the
+/// frame-by-frame guided sweep (advanced), [arranged] = compose from native
+/// panos, [gallery] = import a native pano.
+enum _CaptureChoice { photo, sweep, arranged, gallery }
 
 /// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
 /// older, non-technical user: the in-app guided sweep now lands one full 360°
@@ -805,7 +807,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'עמדו במרכז החדר וסובבו לאט סיבוב אחד — האפליקציה תלכוד את התמונות לבד ותבנה סיור 360°.',
+                      'עמדו במרכז החדר וצלמו 10 תמונות מסביבכם — האפליקציה תחבר אותן לסיור 360°.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 16,
@@ -817,14 +819,14 @@ class _PanoramaGuideScreen extends StatelessWidget {
                       number: '1',
                       icon: IconsaxPlusBold.user,
                       title: 'עמדו במרכז החדר',
-                      body: 'מחזיקים את הטלפון לפניכם, ישר וקבוע.',
+                      body: 'מחזיקים את הטלפון לאורך (ישר), לפניכם וקבוע.',
                     ),
                     const _GuideStep(
                       number: '2',
-                      icon: IconsaxPlusBold.rotate_right,
-                      title: 'סובבו לאט סיבוב אחד שלם',
+                      icon: IconsaxPlusBold.camera,
+                      title: 'צלמו 10 תמונות מסביב',
                       body:
-                          'מסתובבים על המקום אט-אט, סיבוב אחד מלא. האפליקציה מצלמת לבד תוך כדי.',
+                          'בכל פעם מסתובבים מעט (~36°) וצולמים — האפליקציה מראה לכם בדיוק כמה לסובב.',
                     ),
                     const _GuideStep(
                       number: '3',
@@ -837,8 +839,8 @@ class _PanoramaGuideScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // PRIMARY (default): record a short video while turning once. The
-            // simplest flow for an older user — just press record and spin.
+            // PRIMARY (default): the guided 10-photo 360° capture. Sharp stills,
+            // step-by-step — the simplest reliable flow for an older user.
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
               child: SizedBox(
@@ -849,9 +851,9 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 17),
                   ),
                   onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.video),
-                  icon: const Icon(IconsaxPlusBold.video, size: 22),
-                  label: const Text('צלם עכשיו — סרטון מסתובב',
+                      Navigator.of(context).pop(_CaptureChoice.photo),
+                  icon: const Icon(IconsaxPlusBold.camera, size: 22),
+                  label: const Text('צלם עכשיו — 10 תמונות',
                       style:
                           TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                 ),
