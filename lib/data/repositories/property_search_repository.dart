@@ -93,8 +93,14 @@ class PropertySearchRepository {
     List<RentalProperty> items,
     PropertySearchCriteria c,
   ) {
+    final wantCity = c.city?.trim();
     final matched = items.where((p) {
       if (!p.isActive) return false;
+      // The backend's GSI filters by status, not city, so the city Query is a
+      // no-op server-side — enforce it here or we'd return wrong-city listings.
+      if (wantCity != null && wantCity.isNotEmpty && !_cityMatches(p.city, wantCity)) {
+        return false;
+      }
       if (c.minPrice != null && p.price < c.minPrice!) return false;
       if (c.maxPrice != null && p.price > c.maxPrice!) return false;
       if (c.minRooms != null && p.rooms < c.minRooms!) return false;
@@ -106,6 +112,15 @@ class PropertySearchRepository {
 
     matched.sort((a, b) => _score(b, c).compareTo(_score(a, c)));
     return matched;
+  }
+
+  // Space/case-insensitive city match, tolerant of partials ("תל אביב" vs
+  // "תל אביב יפו") since user-typed and stored city strings vary.
+  bool _cityMatches(String propertyCity, String wanted) {
+    final a = propertyCity.trim();
+    final b = wanted.trim();
+    if (a.isEmpty) return false;
+    return a == b || a.contains(b) || b.contains(a);
   }
 
   // Higher = better match. Rewards proximity to budget midpoint, verified
