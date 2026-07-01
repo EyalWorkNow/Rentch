@@ -71,9 +71,14 @@ class TablesDB {
     required String databaseId,
     required String tableId,
     List<String> queries = const [],
+    // Extra GET params beyond the Appwrite queries — used to pass personalization
+    // signals (e.g. vibe/cohort) that the backend scorer reads but that aren't
+    // listing filters. Ignored by the listing query, consumed by resolveCohort.
+    Map<String, String> params = const {},
     bool total = false, // ignored — RowList.total is derived from row count
   }) async {
     final qMap = _parseQueries(queries);
+    qMap.addAll(params);
     final result = await aws.get('/$tableId', query: qMap);
     final rawRows = result['items'] as List? ?? result['rows'] as List? ?? [];
     return RowList(rawRows

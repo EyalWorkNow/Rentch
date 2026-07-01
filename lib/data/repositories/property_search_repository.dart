@@ -76,6 +76,13 @@ class PropertySearchRepository {
         Query.equal('city', c.city!.trim()),
       Query.limit(limit),
     ];
+    // Route the cohort signal to the backend personalization engine: the current
+    // vibe overrides the stored profile, so the main-feed scorer (attachRankSignals
+    // → resolveCohort) ranks with the full 14-cohort taxonomy + community_fit and
+    // returns a per-listing `rankScore` we order by below.
+    final cohortParams = <String, String>{
+      if (c.vibe != null && c.vibe!.trim().isNotEmpty) 'vibe': c.vibe!.trim(),
+    };
 
     try {
       // Kick off the semantic kNN candidate source in parallel with the city
@@ -88,6 +95,7 @@ class PropertySearchRepository {
             databaseId: appwriteDatabaseId,
             tableId: _tableId,
             queries: queries,
+            params: cohortParams,
           ),
         ),
       );
@@ -214,23 +222,34 @@ class PropertySearchRepository {
       return true;
     }).toList();
 
-    // Score once per candidate (the transparent linear scorer), cache the
-    // feature vectors, then sort high→low. Caching keeps the sort cheap and
-    // lets us log exactly what the ranker saw.
-    final scored = <_Scored>[];
     final maxPop = _maxPopularity(matched);
-    // Pick the weight-set once per search: cohort (from vibe) → dynamic weights.
+    // Client-side cohort (from vibe) drives the transparent client scorer, kept
+    // as the training-log features + the ranking FALLBACK.
     final cohort = cohortFromVibe(c.vibe);
     final weights = weightsFor(cohort);
+    final fvOf = <String, Map<String, double>>{};
+    final clientScoreOf = <String, double>{};
     for (final cand in matched) {
       final fv = _features(cand, c, maxPop, cohort);
-      scored.add(_Scored(cand.property, fv, _scoreFromFeatures(fv, weights)));
+      fvOf[cand.property.id] = fv;
+      clientScoreOf[cand.property.id] = _scoreFromFeatures(fv, weights);
     }
-    scored.sort((a, b) => b.score.compareTo(a.score));
 
-    final ranked = [for (final s in scored) s.property];
+    // ROUTE THROUGH THE BACKEND ENGINE: prefer the per-listing `rankScore` the
+    // main-feed scorer attached (full 14-cohort taxonomy + point-level
+    // community_fit, from the vibe we passed + the user's profile). Fall back to
+    // the client score for any candidate the backend didn't rank (e.g. kNN-only).
+    double sortKey(_Candidate cand) =>
+        _numField(cand.raw, const ['rankScore']) ?? clientScoreOf[cand.property.id]!;
+    matched.sort((a, b) => sortKey(b).compareTo(sortKey(a)));
+
+    final ranked = [for (final cand in matched) cand.property];
+    final scored = [
+      for (final cand in matched)
+        _Scored(cand.property, fvOf[cand.property.id]!, clientScoreOf[cand.property.id]!),
+    ];
     // Fire-and-forget per-impression feature log (the phase-2 LightGBM training
-    // set). Fail-soft — never blocks or breaks the UI.
+    // set), now in the backend-ranked order. Fail-soft — never blocks the UI.
     _logImpressions(scored, c, weights, cohort);
     return ranked;
   }
