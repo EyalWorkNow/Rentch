@@ -410,6 +410,10 @@ class AdvancedMatcher {
     return ((rooms - min) / (max - min)) * 2 - 1; // -1..1
   }
 
+  // Public reuse hook for the production linear scorer (vibe_fit feature).
+  static double neighborhoodVibrancy(String neighborhood, String city) =>
+      _vibeScore(neighborhood, city);
+
   static double _vibeScore(String neighborhood, String city) {
     const vibrancy = {
       'נווה צדק': 0.9,

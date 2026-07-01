@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
+import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
 import 'package:dating_app/core/services/appwrite_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -24,8 +25,24 @@ class PropertySearchCriteria {
   final double? minRooms;
   // PropertyFeatureSet keys, e.g. {'feat_parking','feat_balcony'}.
   final Set<String> amenityKeys;
-  // Soft preference, not used as a hard filter for now.
+  // Soft preference (chip or NL): 'שקט'/'תוסס'/'משפחתי'/'סטודנטיאלי'.
+  // Not a hard filter — feeds the vibe_fit ranking term.
   final String? vibe;
+}
+
+/// Maps a requested vibe to a target neighborhood-vibrancy in [-1,1] (same scale
+/// as AdvancedMatcher.neighborhoodVibrancy). Returns null for empty/unknown vibe
+/// so the scorer stays neutral. Substring match tolerates chips and NL phrasing.
+// ponytail: reuses the existing hardcoded vibrancy map — no embeddings yet.
+// Upgrade path (doc part ג'): replace with cosine(userEmbedding, listingEmbedding).
+double? vibeTargetVibrancy(String? vibe) {
+  final v = vibe?.trim();
+  if (v == null || v.isEmpty) return null;
+  if (v.contains('שקט')) return -0.8; // quiet
+  if (v.contains('תוסס')) return 0.9; // vibrant
+  if (v.contains('משפח')) return -0.3; // family → residential-leaning
+  if (v.contains('סטודנט')) return 0.5; // student → central, lively
+  return null;
 }
 
 // Reads real listings from the AWS-backed properties table and matches them
@@ -121,16 +138,19 @@ class PropertySearchRepository {
     // lets us log exactly what the ranker saw.
     final scored = <_Scored>[];
     final maxPop = _maxPopularity(matched);
+    // Pick the weight-set once per search: cohort (from vibe) → dynamic weights.
+    final cohort = cohortFromVibe(c.vibe);
+    final weights = weightsFor(cohort);
     for (final cand in matched) {
       final fv = _features(cand, c, maxPop);
-      scored.add(_Scored(cand.property, fv, _scoreFromFeatures(fv)));
+      scored.add(_Scored(cand.property, fv, _scoreFromFeatures(fv, weights)));
     }
     scored.sort((a, b) => b.score.compareTo(a.score));
 
     final ranked = [for (final s in scored) s.property];
     // Fire-and-forget per-impression feature log (the phase-2 LightGBM training
     // set). Fail-soft — never blocks or breaks the UI.
-    _logImpressions(scored, c);
+    _logImpressions(scored, c, weights, cohort);
     return ranked;
   }
 
@@ -154,6 +174,48 @@ class PropertySearchRepository {
   static const _wRecency = 0.12;
   static const _wPopularity = 0.15;
   static const _wExplore = 0.08;
+  // ponytail: score is only a sort key, so this extra term needn't renormalise
+  // the others — when no vibe is requested vibe_fit is a constant 0.5 and the
+  // sort order is unchanged; it only differentiates once a vibe is set.
+  static const _wVibeFit = 0.10;
+
+  // Global default weight-set. Per-cohort variants override a few of these.
+  static const Map<String, double> _baseWeights = {
+    'tag_overlap': _wTagOverlap,
+    'price_fit': _wPriceFit,
+    'distance_decay': _wDistanceDecay,
+    'recency': _wRecency,
+    'popularity_prior': _wPopularity,
+    'explore': _wExplore,
+    'vibe_fit': _wVibeFit,
+  };
+
+  // Per-cohort weight overrides (מהיר tier: dynamic weights without ML). Cohort
+  // is inferred from the requested vibe — the only cohort signal available at
+  // search time. Directional starting points, not tuned.
+  // ponytail: heuristic weights; upgrade path is LightGBM lambdarank on the log.
+  static const Map<String, Map<String, double>> _cohortWeights = {
+    // Students: budget-driven, amenities matter less.
+    'student': {'tag_overlap': 0.20, 'price_fit': 0.35},
+    // Families: amenities/space matter, less exploration of cold inventory.
+    'family': {'tag_overlap': 0.38, 'price_fit': 0.20, 'explore': 0.05},
+  };
+
+  /// Cohort from the requested vibe chip. Null → global weights.
+  static String? cohortFromVibe(String? vibe) {
+    final v = vibe?.trim();
+    if (v == null || v.isEmpty) return null;
+    if (v.contains('סטודנט')) return 'student';
+    if (v.contains('משפח')) return 'family';
+    return null;
+  }
+
+  /// Effective weights for a cohort: base with the cohort's overrides applied.
+  static Map<String, double> weightsFor(String? cohort) {
+    final overrides = cohort == null ? null : _cohortWeights[cohort];
+    if (overrides == null) return _baseWeights;
+    return {..._baseWeights, ...overrides};
+  }
 
   /// Highest popularity_prior in the page — normalises the popularity term so a
   /// single viral listing doesn't swamp the budget/tag signals.
@@ -249,6 +311,16 @@ class PropertySearchRepository {
     final views = p.marketSignals.views;
     final explore = (1.0 / math.sqrt(1 + views)).clamp(0.0, 1.0);
 
+    // vibe_fit: closeness of the listing's neighborhood vibrancy to the vibe the
+    // user asked for. Neutral 0.5 when no (or unknown) vibe was requested.
+    final target = vibeTargetVibrancy(crit.vibe);
+    double vibeFit = 0.5;
+    if (target != null) {
+      final propVibrancy =
+          AdvancedMatcher.neighborhoodVibrancy(p.neighborhood, p.city);
+      vibeFit = 1.0 - ((propVibrancy - target).abs() / 2.0);
+    }
+
     return {
       'tag_overlap': tagOverlap.clamp(0.0, 1.0).toDouble(),
       'price_fit': priceFit.clamp(0.0, 1.0).toDouble(),
@@ -256,16 +328,16 @@ class PropertySearchRepository {
       'recency': recency.clamp(0.0, 1.0).toDouble(),
       'popularity_prior': popularity.clamp(0.0, 1.0).toDouble(),
       'explore': explore.toDouble(),
+      'vibe_fit': vibeFit.clamp(0.0, 1.0).toDouble(),
     };
   }
 
-  double _scoreFromFeatures(Map<String, double> f) {
-    return _wTagOverlap * f['tag_overlap']! +
-        _wPriceFit * f['price_fit']! +
-        _wDistanceDecay * f['distance_decay']! +
-        _wRecency * f['recency']! +
-        _wPopularity * f['popularity_prior']! +
-        _wExplore * f['explore']!;
+  double _scoreFromFeatures(Map<String, double> f, Map<String, double> w) {
+    var sum = 0.0;
+    for (final entry in f.entries) {
+      sum += (w[entry.key] ?? 0.0) * entry.value;
+    }
+    return sum;
   }
 
   /// Reads the first numeric value among [keys] from a raw backend map.
@@ -283,7 +355,12 @@ class PropertySearchRepository {
 
   /// Per-impression feature-vector log → `/search/log`. The training set for the
   /// phase-2 LightGBM lambdarank upgrade. Fully fail-soft.
-  void _logImpressions(List<_Scored> scored, PropertySearchCriteria c) {
+  void _logImpressions(
+    List<_Scored> scored,
+    PropertySearchCriteria c,
+    Map<String, double> weights,
+    String? cohort,
+  ) {
     if (scored.isEmpty) return;
     if (!AwsApiClient.instance.isConfigured) return;
     try {
@@ -305,14 +382,10 @@ class PropertySearchRepository {
           'amenities': c.amenityKeys.toList(),
           'vibe': c.vibe,
         },
-        'weights': const {
-          'tag_overlap': _wTagOverlap,
-          'price_fit': _wPriceFit,
-          'distance_decay': _wDistanceDecay,
-          'recency': _wRecency,
-          'popularity_prior': _wPopularity,
-          'explore': _wExplore,
-        },
+        // The actual weight-set used for this search (cohort-dependent), so the
+        // training log reflects what really ranked the results.
+        'weights': weights,
+        'cohort': cohort,
         'ts': DateTime.now().toUtc().toIso8601String(),
         'impressions': impressions,
       };

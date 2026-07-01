@@ -157,10 +157,14 @@ class EventService {
 
   /// (2) Revealed price tolerance at the moment of a swipe decision.
   /// [priceToBudgetRatio] = listing price / user's stated budget (1.0 == on budget).
+  /// [dwellMs] = latency-to-decision (card visible → swipe); null when unknown
+  /// (e.g. first card of a deck). Co-located with the label (direction) so one
+  /// row is a complete training example for the ranker.
   void logSwipeOutcome({
     required String propertyId,
     required SwipeDirection direction,
     required double priceToBudgetRatio,
+    int? dwellMs,
   }) =>
       log(
         UserEventType.swipeOutcome,
@@ -168,6 +172,7 @@ class EventService {
         metadata: {
           'direction': direction.name,
           'priceToBudgetRatio': priceToBudgetRatio,
+          if (dwellMs != null) 'dwellMs': math.max(0, dwellMs),
         },
       );
 

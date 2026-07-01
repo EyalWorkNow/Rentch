@@ -133,6 +133,8 @@ class DatingProvider extends ChangeNotifier {
   List<RentalMatch> _matches = const [];
   String? _pendingMatchPropertyId;
   final List<_SwipeRecord> _swipeHistory = [];
+  // When the current top card became visible — for swipe latency-to-decision.
+  DateTime? _topCardShownAt;
   Set<String> _savedPropertyIds = <String>{};
   int _lastSeenMatchCount = 0;
   int _remainingSuperLikes = 3;
@@ -2542,11 +2544,19 @@ class DatingProvider extends ChangeNotifier {
     if (previousIndex < 0 || previousIndex >= deck.length) return false;
 
     final property = deck[previousIndex];
+    // Latency-to-decision: card visible → swipe. Null on the first card of a
+    // deck (no prior shown-time). Reset the clock for the next top card.
+    // ponytail: first swipe's latency is lost; acceptable vs threading a
+    // card-shown callback through the swiper widget.
+    final shownAt = _topCardShownAt;
+    final decisionMs =
+        shownAt == null ? null : DateTime.now().difference(shownAt).inMilliseconds;
+    _topCardShownAt = DateTime.now();
     if (direction == CardSwiperDirection.left) {
       _passedPropertyIds.add(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: false));
       AppEvents.instance.log(UserEventType.swipeLeft, propertyId: property.id);
-      _recordSwipeSignal(property, SwipeDirection.skip);
+      _recordSwipeSignal(property, SwipeDirection.skip, dwellMs: decisionMs);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       final isNewLike = _likedPropertyIds.add(property.id);
@@ -2559,6 +2569,7 @@ class DatingProvider extends ChangeNotifier {
       _recordSwipeSignal(
         property,
         isSuperLike ? SwipeDirection.superlike : SwipeDirection.like,
+        dwellMs: decisionMs,
       );
 
       // A tenant right-swipe registers the LIKE only — it is NOT a match. A
@@ -2614,7 +2625,11 @@ class DatingProvider extends ChangeNotifier {
   /// event into the in-memory [_userSignals] aggregate (optimistic update), so
   /// the next match score already reflects this swipe. Cheap: the heavy state
   /// write is debounced via [_persist], already called on the swipe path.
-  void _recordSwipeSignal(RentalProperty property, SwipeDirection direction) {
+  void _recordSwipeSignal(
+    RentalProperty property,
+    SwipeDirection direction, {
+    int? dwellMs,
+  }) {
     final now = DateTime.now();
     final ratio = _priceToBudgetRatio(property);
     final liked = direction != SwipeDirection.skip;
@@ -2623,6 +2638,7 @@ class DatingProvider extends ChangeNotifier {
       propertyId: property.id,
       direction: direction,
       priceToBudgetRatio: ratio,
+      dwellMs: dwellMs,
     );
     _foldUserSignal('swipeOutcome', {
       'direction': direction.name,

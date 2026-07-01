@@ -19,6 +19,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  UpdateCommand,
   DeleteCommand,
   QueryCommand,
   ScanCommand,
@@ -92,6 +93,15 @@ const GEMINI_MODELS = (process.env.GEMINI_MODELS
 const GEMINI_LIVE_API_KEY = process.env.GEMINI_LIVE_API_KEY || GEMINI_API_KEY;
 const GEMINI_LIVE_MODEL =
   process.env.GEMINI_LIVE_MODEL || 'models/gemini-2.5-flash-native-audio-latest';
+
+// ── Listing embeddings (בינוני tier — DORMANT until provisioned) ──────────────
+// Off by default. Flip ENABLE_EMBEDDINGS=1 only once a Gemini Embedding 2 quota
+// AND an S3 Vectors index exist. While off, enrichListingOnCreate skips the embed
+// step entirely, so this code ships completely inert (zero extra calls/cost).
+// Set GEMINI_EMBED_MODEL to the Gemini Embedding 2 model id when provisioning.
+const EMBEDDINGS_ENABLED = process.env.ENABLE_EMBEDDINGS === '1';
+const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001';
+const EMBED_DIM = Number(process.env.EMBED_DIM) || 768;
 
 // Varjo Teleport — builds an interactive Gaussian-splat 3D walkthrough of an
 // apartment from an mp4 (or zip of images). The client_secret stays server-side
@@ -502,6 +512,19 @@ async function enrichListingOnCreate(body) {
       const tags = await extractSmartTags(body);
       if (tags && tags.length) body.smartTags = tags;
     } catch (e) { console.warn('enrich: smartTags failed:', e.message); }
+    // Embedding piggybacks on the same enrichment window (runs after tags so
+    // they're in the embed text). Dormant unless ENABLE_EMBEDDINGS=1, and
+    // fail-soft — a missing embedding never blocks the publish.
+    if (EMBEDDINGS_ENABLED) {
+      try {
+        const vec = await geminiEmbed(listingEmbedText(body));
+        if (vec) {
+          body.embedding = vec;
+          body.embeddingDim = EMBED_DIM;
+          body.embeddingModel = GEMINI_EMBED_MODEL;
+        }
+      } catch (e) { console.warn('enrich: embedding failed:', e.message); }
+    }
   })());
 
   // 2→4) Geo chain: geocode first (lat/lng feed the other two), then price badge
@@ -3114,6 +3137,7 @@ function assistantToolsFull() {
     functionDeclarations: [
       ASSISTANT_TOOL.functionDeclarations[0], // create_property
       SEARCH_LISTINGS_TOOL,
+      UPDATE_USER_PROFILE_TOOL,
     ],
   };
 }
@@ -3310,6 +3334,44 @@ async function handleAssistantExplain(event) {
   }
 }
 
+// The text a listing is embedded from — title + description + tags. The backfill
+// script mirrors this so create-path and backfilled rows embed identically.
+function listingEmbedText(body) {
+  const title = (body.title || [body.street, body.city].filter(Boolean).join(' ') || '')
+    .toString();
+  const description = (body.description || '').toString();
+  const tags = Array.isArray(body.smartTags) && body.smartTags.length
+    ? body.smartTags.join(', ')
+    : (Array.isArray(body.featureLabels) ? body.featureLabels.join(', ') : '');
+  return [title, description, tags].filter(Boolean).join('\n').trim();
+}
+
+// One embedding via Gemini's embedContent endpoint. Fail-soft: returns null on
+// any problem (quota/network/bad shape) so callers degrade to no-embedding.
+// ponytail: text-only — the embedContent contract is unambiguous. Multimodal
+// image embedding is a later refinement; images already inform smartTags.
+async function geminiEmbed(text) {
+  if (!GEMINI_API_KEY || !text) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBED_MODEL}:embedContent?key=${GEMINI_API_KEY}`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: `models/${GEMINI_EMBED_MODEL}`,
+        content: { parts: [{ text: String(text).slice(0, 8000) }] },
+        outputDimensionality: EMBED_DIM,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const vec = data?.embedding?.values;
+    return Array.isArray(vec) && vec.length ? vec : null;
+  } catch {
+    return null;
+  }
+}
+
 async function geminiGenerate(systemText, contents, tools, genOverrides) {
   let lastStatus = '';
   for (const model of GEMINI_MODELS) {
@@ -3383,6 +3445,89 @@ async function loadUserProfile(uid) {
     return null;
   }
 }
+
+// ── Live user profile (מהיר tier) ────────────────────────────────────────────
+// A learned search-preference profile, kept as a nested `searchProfile` map on
+// the existing users record (no new table to provision). Written by the
+// update_user_profile tool from any assistant touchpoint (Erik / נועה), read
+// back into the system prompt so the next turn is personalized.
+//
+// Allowlist is the trust boundary: the model may ONLY write these keys, so a
+// hallucinated field name can't pollute the user record.
+const PROFILE_WRITABLE_FIELDS = new Set([
+  'household',    // 'family' | 'single' | 'student' | 'couple' — cohort hint
+  'cityPref',
+  'priceMin',
+  'priceMax',
+  'vibePref',     // שקט / תוסס / משפחתי / סטודנטיאלי
+  'hasPets',
+  'hasChildren',
+  'wfh',
+]);
+
+// Reads the cohort for per-cohort ranking. Prefers an explicit household, else
+// infers from vibePref. Returns null when unknown (scorer falls back to global).
+function profileCohort(profile) {
+  const sp = profile && profile.searchProfile;
+  const hh = sp && sp.household && sp.household.value;
+  if (hh === 'family' || hh === 'single' || hh === 'student' || hh === 'couple') return hh;
+  const vibe = sp && sp.vibePref && sp.vibePref.value;
+  if (typeof vibe === 'string') {
+    if (vibe.includes('משפח')) return 'family';
+    if (vibe.includes('סטודנט')) return 'student';
+  }
+  return null;
+}
+
+// Merge-writes one profile field. Read-modify-write on the whole searchProfile
+// map so a missing parent isn't a problem and the field key can be dynamic.
+// ponytail: last-writer-wins under concurrent writes — fine, a user's assistant
+// turns are serialized; upgrade to a nested UpdateExpression if that changes.
+async function saveUserProfileField(uid, field, value, confidence, source) {
+  if (!uid || !PROFILE_WRITABLE_FIELDS.has(field)) return false;
+  try {
+    const current = await loadUserProfile(uid);
+    const sp = (current && current.searchProfile) || {};
+    sp[field] = {
+      value,
+      confidence: typeof confidence === 'number' ? Math.max(0, Math.min(1, confidence)) : 0.6,
+      source: typeof source === 'string' ? source.slice(0, 40) : 'assistant',
+      updatedAt: new Date().toISOString(),
+    };
+    await ddb.send(new UpdateCommand({
+      TableName: TABLES.users.name,
+      Key: { id: uid },
+      UpdateExpression: 'SET searchProfile = :sp',
+      ExpressionAttributeValues: { ':sp': sp },
+    }));
+    return true;
+  } catch (e) {
+    console.warn('saveUserProfileField failed:', e.message);
+    return false;
+  }
+}
+
+const UPDATE_USER_PROFILE_TOOL = {
+  name: 'update_user_profile',
+  description:
+    'שמור העדפה קבועה שהמשתמש חשף על עצמו (לא חד-פעמית לשיחה) כדי לשפר חיפושים עתידיים. '
+    + 'קרא רק כשהמשתמש מגלה משהו יציב: תקציב, עיר מועדפת, אורח חיים (חיות/ילדים/עבודה מהבית), '
+    + 'או סוג משק בית. אל תשאל שאלות רק כדי למלא — שמור מה שנאמר באופן טבעי.',
+  parameters: {
+    type: 'object',
+    properties: {
+      field: {
+        type: 'string',
+        enum: Array.from(PROFILE_WRITABLE_FIELDS),
+        description: 'שם ההעדפה',
+      },
+      value: { description: 'הערך (מחרוזת/מספר/בוליאני)' },
+      confidence: { type: 'number', description: 'ביטחון 0..1' },
+      source: { type: 'string', description: 'מאיפה נלמד, למשל erik/search' },
+    },
+    required: ['field', 'value'],
+  },
+};
 
 // ── search_listings tool — the real DB query behind Erik's function-calling ───
 // Shared by the assistant tool-loop. Runs an actual catalogue query against the
@@ -3579,6 +3724,16 @@ function buildErikSystemPrompt(profile, properties) {
     ? 'למשתמש אין עדיין דירות מפורסמות.'
     : `למשתמש ${properties.length} דירות (${active.length} פעילות):\n${lines.join('\n')}`;
 
+  // Learned preferences (written by update_user_profile across sessions), folded
+  // back in so the assistant remembers between conversations.
+  const sp = profile && profile.searchProfile;
+  const profileLine = sp
+    ? 'מה שכבר ידוע על המשתמש מהעבר (אל תשאל שוב על אלה): '
+        + Object.entries(sp)
+            .map(([k, v]) => `${k}=${v && v.value}`)
+            .join(', ')
+    : '';
+
   return [
     'אתה "אריק" — אדם אמיתי, חם ונחמד, שעוזר לבעלי דירות לפרסם דירה להשכרה באפליקציית Rently. אתה לא בוט ולא תוכנה — אתה פשוט אריק.',
     'חוק ברזל בסגנון: כתוב עברית טבעית ואנושית לחלוטין, כמו בן אדם שמדבר בטלפון בנעימות. אסור להשתמש בכוכביות (* או **), בסימני עיצוב markdown, בכותרות, ברשימות עם מקפים או נקודות, או באימוג׳ים. לעולם אל תזכיר שאתה בינה מלאכותית, מודל, עוזר ממוחשב או תוכנה. רק טקסט רגיל, חם ואישי.',
@@ -3597,6 +3752,8 @@ function buildErikSystemPrompt(profile, properties) {
     'אל תבטיח דברים שאינך יכול לבצע. אם משהו לא ברור — שאל שוב בעדינות. שמור על תשובות קצרות שקל להקשיב להן.',
     'נתוני המשתמש הנוכחיים (לשימושך בלבד, אל תקריא את כל הרשימה אלא אם ביקשו):',
     snapshot,
+    profileLine,
+    'כשהמשתמש חושף העדפה קבועה (תקציב, עיר, אורח חיים, סוג משק בית) — קרא ל-update_user_profile כדי לזכור אותה לפעם הבאה.',
   ].filter(Boolean).join('\n');
 }
 
@@ -4125,7 +4282,7 @@ async function handleAssistant(event) {
   // owner-property load and no listing-creation tool. Additive: the landlord
   // "Erik" flow below is untouched.
   if (body.mode === 'tenant_search') {
-    return await handleTenantSearchChat(messages);
+    return await handleTenantSearchChat(messages, uid);
   }
 
   const [properties, profile] = await Promise.all([
@@ -4141,7 +4298,7 @@ async function handleAssistant(event) {
     }));
 
   try {
-    const result = await runAssistantToolLoop(systemText, contents, assistantToolsFull());
+    const result = await runAssistantToolLoop(systemText, contents, assistantToolsFull(), uid);
     let reply = stripMarkup(result.reply);
     let suggestions = [];
     const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
@@ -4183,7 +4340,7 @@ const GROUNDING_RULE =
 // terminal (returned as a draft for the app to publish). Capped at MAX_HOPS so a
 // misbehaving model can't loop forever. Returns { reply, propertyDraft, listings }.
 const MAX_TOOL_HOPS = 5;
-async function runAssistantToolLoop(systemText, contents, tools) {
+async function runAssistantToolLoop(systemText, contents, tools, uid = null) {
   const convo = contents.slice();
   let propertyDraft = null;
   let listings = [];
@@ -4207,17 +4364,33 @@ async function runAssistantToolLoop(systemText, contents, tools) {
       return { reply: textOut, propertyDraft, listings };
     }
 
-    const searchCalls = calls.filter((c) => c.name === 'search_listings');
-    if (searchCalls.length === 0) {
+    // Non-terminal tools: search_listings (feeds real listings back) and
+    // update_user_profile (persists a revealed preference). Both get a
+    // functionResponse so the model continues grounded.
+    const toolCalls = calls.filter(
+      (c) => c.name === 'search_listings' || c.name === 'update_user_profile',
+    );
+    if (toolCalls.length === 0) {
       // No tool call → the model answered directly. Done.
       return { reply: textOut, propertyDraft, listings };
     }
 
-    // Echo the model's function-call turn, then feed the real results back so the
-    // next hop answers strictly from them.
     convo.push({ role: 'model', parts: parts.filter((p) => p.functionCall) });
     const responseParts = [];
-    for (const call of searchCalls) {
+    for (const call of toolCalls) {
+      if (call.name === 'update_user_profile') {
+        const a = call.args || {};
+        const saved = await saveUserProfileField(
+          uid, a.field, a.value, a.confidence, a.source,
+        );
+        responseParts.push({
+          functionResponse: {
+            name: 'update_user_profile',
+            response: { saved },
+          },
+        });
+        continue;
+      }
       const results = await runSearchListings(call.args || {});
       listings = results; // expose the latest tool result to the app
       responseParts.push({
@@ -4246,7 +4419,7 @@ async function runAssistantToolLoop(systemText, contents, tools) {
 // ── נועה — tenant apartment-search chat (warm, separate from Erik) ────────────
 // Conversational layer only: helps a renter describe what they want; the app
 // runs the actual catalogue search and shows result cards. No listing tool.
-async function handleTenantSearchChat(messages) {
+async function handleTenantSearchChat(messages, uid = null) {
   const systemText = buildTenantSearchSystemPrompt() + '\n' + GROUNDING_RULE;
   const contents = messages
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
@@ -4254,11 +4427,11 @@ async function handleTenantSearchChat(messages) {
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: String(m.text).slice(0, 2000) }],
     }));
-  // Search-only tool surface (no create_property for tenants). The loop runs the
-  // real search_listings query and feeds results back so נועה answers from them.
-  const tools = { functionDeclarations: [SEARCH_LISTINGS_TOOL] };
+  // Search + profile-write tool surface (no create_property for tenants). Sharing
+  // update_user_profile with Erik is what connects the touchpoints to one store.
+  const tools = { functionDeclarations: [SEARCH_LISTINGS_TOOL, UPDATE_USER_PROFILE_TOOL] };
   try {
-    const result = await runAssistantToolLoop(systemText, contents, tools);
+    const result = await runAssistantToolLoop(systemText, contents, tools, uid);
     let reply = stripMarkup(result.reply);
     let suggestions = [];
     const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
