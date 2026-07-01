@@ -34,6 +34,9 @@ import AdmZip from 'adm-zip';
 // service account (sign a JWT with RS256) and to load that account off disk.
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import {
+  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore,
+} from './lib/ranking.mjs';
 
 // ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
 // These modules live in ./lib and expose the Israeli-data spine used to enrich a
@@ -102,11 +105,8 @@ const GEMINI_LIVE_MODEL =
 const EMBEDDINGS_ENABLED = process.env.ENABLE_EMBEDDINGS === '1';
 const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001';
 const EMBED_DIM = Number(process.env.EMBED_DIM) || 768;
-// S3 Vectors index (step 3). Both must be set for kNN upsert/query to run; when
-// unset, the helpers no-op so nothing breaks. Create the index with the COSINE
-// distance metric and dimension === EMBED_DIM.
-const S3_VECTORS_BUCKET = process.env.S3_VECTORS_BUCKET || '';
-const S3_VECTORS_INDEX = process.env.S3_VECTORS_INDEX || '';
+// Step 3 stores the embedding directly on the property record and computes
+// cosine similarity in-memory at search time — no external vector DB.
 
 // Varjo Teleport — builds an interactive Gaussian-splat 3D walkthrough of an
 // apartment from an mp4 (or zip of images). The client_secret stays server-side
@@ -509,7 +509,7 @@ async function firePushForWrite(tableKey, body, senderUid) {
 //   2. geocode    — GovMap address → lat/lng + gush/helka.
 //   3. priceBadge — nadlan comps + CBS trend → מעל/מתחת לשוק.
 //   4. nbhdScore  — data.gov.il + OSM neighbourhood score.
-async function enrichListingOnCreate(body, id) {
+async function enrichListingOnCreate(body) {
   // 1) Smart tags — independent, so do it in parallel with the geo chain.
   const tasks = [];
   tasks.push((async () => {
@@ -524,17 +524,11 @@ async function enrichListingOnCreate(body, id) {
       try {
         const vec = await geminiEmbed(listingEmbedText(body));
         if (vec) {
+          // Stored directly on the record — this IS the vector store; search
+          // reads it back and scores cosine in-memory (no external vector DB).
           body.embedding = vec;
           body.embeddingDim = EMBED_DIM;
           body.embeddingModel = GEMINI_EMBED_MODEL;
-          // Mirror the vector into the S3 Vectors index for kNN retrieval.
-          // Fail-soft + no-op when the index isn't configured.
-          const listingId = id || body.id || body.propertyId;
-          await s3VectorsUpsert(listingId, vec, {
-            city: body.city || '',
-            price: Number(body.price) || 0,
-            rooms: Number(body.rooms) || 0,
-          });
         }
       } catch (e) { console.warn('enrich: embedding failed:', e.message); }
     }
@@ -583,7 +577,7 @@ async function enrichListingOnCreate(body, id) {
       (async () => {
         try {
           if (!c.neighborhoodScore) return;
-          const ns = await c.neighborhoodScore({ lat, lng });
+          const ns = await c.neighborhoodScore({ lat, lng, locality: body.city });
           if (ns) body.neighborhoodScore = ns; // { score, sub }
         } catch (e) { console.warn('enrich: neighborhoodScore failed:', e.message); }
       })(),
@@ -1077,7 +1071,10 @@ export const handler = async (event) => {
           // LightGBM ranker will be trained against. Properties table only;
           // fail-soft (a signal failure just omits `rankSignals`).
           if (tableKey === 'properties' && listed.statusCode === 200) {
-            return await attachRankSignals(listed, query);
+            // Cohort for the caller → cohort-aware weights/price-target/neighborhood.
+            // Fail-soft: profile load errors → null cohort → default weights.
+            const profile = callerUid ? await loadUserProfile(callerUid).catch(() => null) : null;
+            return await attachRankSignals(listed, query, profileCohort(profile));
           }
           return listed;
         }
@@ -1103,7 +1100,7 @@ export const handler = async (event) => {
             // Budget enrichment so a slow connector/Gemini fetch can't stall the
             // publish (the client blocks on this response). Fail-soft on timeout.
             await Promise.race([
-              enrichListingOnCreate(body, writeId), // mutates body: smartTags, geo, badges
+              enrichListingOnCreate(body), // mutates body: smartTags, geo, badges
               new Promise((res) => setTimeout(res, 4000)),
             ]).catch(() => {});
           }
@@ -1340,19 +1337,22 @@ async function listItems(table, query) {
 //   priceFit      — closeness of the listing price to the query's budget window
 // All numbers are 0..1. `rankScore` is a transparent weighted sum — explainable,
 // zero-infra, good for cold-start. Fail-soft: any error returns the list as-is.
-const RANK_WEIGHTS = {
-  freshness: 0.30, popularity: 0.30, completeness: 0.20, priceFit: 0.20,
-};
 // Bayesian shrinkage prior for like-rate: assume a modest baseline so listings
 // with little traffic regress toward the mean instead of spiking on noise.
 const LIKE_RATE_PRIOR = 0.12;   // assumed global like-per-view rate
 const LIKE_RATE_STRENGTH = 8;   // pseudo-views of prior weight
 
-async function attachRankSignals(listed, query) {
+// Cohort-aware main-feed scorer (Phase 0/1). Weights, price-target and the
+// neighborhood sub-weights all vary by `cohort` (family|single|student|couple|
+// null); neighborhood_fit (public data) and semantic_sim are now folded in.
+async function attachRankSignals(listed, query, cohort = null) {
   try {
     const parsed = JSON.parse(listed.body);
     const items = Array.isArray(parsed.items) ? parsed.items : [];
     if (items.length === 0) return listed;
+
+    const W = rankWeightsFor(cohort);
+    const priceTarget = cohortPriceTarget(cohort);
 
     // Budget window for price-fit: explicit min/max, or ± a band around a target.
     const minBudget = num(query.minBudget) ?? num(query.minPrice);
@@ -1370,17 +1370,29 @@ async function attachRankSignals(listed, query) {
       const freshness = freshnessScore(p.createdAt, now);
       const popularity = shrinkLikeRate(c.likes, c.views);
       const completeness = completenessScore(p);
-      const priceFit = priceFitScore(Number(p.price), { minBudget, maxBudget, targetPrice });
+      const priceFit = priceFitScore(Number(p.price), { minBudget, maxBudget, targetPrice }, priceTarget);
+      // neighborhood_fit: cohort-weighted public-data area sub-scores (0.5 when
+      // the listing has no enriched neighborhood score).
+      const neighborhood = neighborhoodFitScore(p.neighborhoodScore, cohort);
+      // semantic_sim: present only on listings that came through /search/knn;
+      // neutral 0.5 on the plain feed.
+      const semRaw = Number(p.semanticSim);
+      const semantic = Number.isFinite(semRaw) ? Math.max(0, Math.min(1, semRaw)) : 0.5;
       const rankScore =
-        RANK_WEIGHTS.freshness * freshness +
-        RANK_WEIGHTS.popularity * popularity +
-        RANK_WEIGHTS.completeness * completeness +
-        RANK_WEIGHTS.priceFit * priceFit;
+        W.freshness * freshness +
+        W.popularity * popularity +
+        W.completeness * completeness +
+        W.priceFit * priceFit +
+        W.neighborhood * neighborhood +
+        W.semantic * semantic;
       p.rankSignals = {
         freshness: round3(freshness),
         popularity: round3(popularity),
         completeness: round3(completeness),
         priceFit: round3(priceFit),
+        neighborhood: round3(neighborhood),
+        semantic: round3(semantic),
+        cohort: cohort || 'default',
         views: c.views, likes: c.likes,
       };
       p.rankScore = round3(rankScore);
@@ -1437,22 +1449,6 @@ function completenessScore(p) {
 
 // Closeness of price to the requested budget. Inside [min,max] → 1.0; outside,
 // decays with relative overshoot. No budget given → neutral 0.5.
-function priceFitScore(price, { minBudget, maxBudget, targetPrice }) {
-  if (!Number.isFinite(price) || price <= 0) return 0.5;
-  if (minBudget !== undefined || maxBudget !== undefined) {
-    const lo = minBudget ?? 0;
-    const hi = maxBudget ?? Infinity;
-    if (price >= lo && price <= hi) return 1.0;
-    const ref = (hi !== Infinity ? hi : lo) || price;
-    const overshoot = price < lo ? (lo - price) / lo : (price - hi) / ref;
-    return Math.max(0, 1 - Math.min(1, overshoot));
-  }
-  if (targetPrice !== undefined && targetPrice > 0) {
-    const rel = Math.abs(price - targetPrice) / targetPrice;
-    return Math.max(0, 1 - Math.min(1, rel));
-  }
-  return 0.5;
-}
 
 // View + like counts per listing (the popularity signal source). Uses the
 // propertyId-index COUNT query on the analytics tables. Bounded, fail-soft.
@@ -1537,10 +1533,14 @@ async function handleSearchLog(event) {
   return json(200, { ok: true, logged: written, searchId });
 }
 
-// POST /search/knn — embed the query text, kNN against S3 Vectors, return the
-// matching listings (each carrying a `semanticSim` signal for the client ranker).
-// Fully fail-soft: any problem (embeddings off, no index, embed/query/fetch
-// failure) returns { results: [] } so the client's city query still stands.
+// POST /search/knn — embed the query text, then score every active listing that
+// carries an embedding by in-memory cosine similarity and return the top matches
+// (each with a `semanticSim` signal for the client ranker). No external vector
+// DB: the embedding lives on the property record. Fully fail-soft — any problem
+// (embeddings off, embed failure, fetch failure) returns { results: [] } so the
+// client's city query still stands.
+// ponytail: brute-force cosine over the active set (status GSI, capped at 1000).
+// Fine at Phase-1 scale; reinstate a vector index if the catalogue grows large.
 async function handleSearchKnn(event) {
   const uid = callerUidOf(event);
   if (!uid) return json(401, { message: 'Authentication required.' });
@@ -1554,22 +1554,39 @@ async function handleSearchKnn(event) {
   try {
     const vec = await geminiEmbed(text);
     if (!vec) return json(200, { results: [] });
-    const cityFilter = typeof body.city === 'string' && body.city.trim()
-      ? body.city.trim() : undefined;
-    const hits = await s3VectorsQuery(vec, Number(body.topK) || 50, cityFilter);
-    if (!hits.length) return json(200, { results: [] });
+    const wantCity = typeof body.city === 'string' ? body.city.trim().toLowerCase() : '';
+    const topK = Math.max(1, Math.min(200, Number(body.topK) || 50));
 
-    // Fetch the real listing rows and graft on the semanticSim signal.
-    const rows = await Promise.all(hits.map(async (h) => {
+    // Pull the active listings (same status-GSI pattern as search_listings).
+    let rows = [];
+    for (const status of ['available', 'active']) {
       try {
-        const r = await ddb.send(new GetCommand({
-          TableName: TABLES.properties.name, Key: { id: h.id },
+        const out = await ddb.send(new QueryCommand({
+          TableName: TABLES.properties.name,
+          IndexName: TABLES.properties.gsi.name,
+          KeyConditionExpression: '#s = :s',
+          ExpressionAttributeNames: { '#s': TABLES.properties.gsi.pk },
+          ExpressionAttributeValues: { ':s': status },
+          Limit: 1000,
+          ScanIndexForward: false,
         }));
-        if (!r.Item) return null;
-        return { ...r.Item, semanticSim: h.sim };
-      } catch { return null; }
-    }));
-    return json(200, { results: rows.filter(Boolean) });
+        rows = rows.concat(out.Items || []);
+      } catch { /* status value may not exist — ignore */ }
+    }
+
+    const seen = new Set();
+    const scored = [];
+    for (const p of rows) {
+      if (!p || !p.id || seen.has(p.id)) continue;
+      seen.add(p.id);
+      if (p.isActive === false || p.status === 'inactive') continue;
+      if (wantCity && String(p.city || '').toLowerCase() !== wantCity) continue;
+      const emb = p.embedding;
+      if (!Array.isArray(emb) || emb.length !== vec.length) continue;
+      scored.push({ ...p, semanticSim: cosineSim(vec, emb) });
+    }
+    scored.sort((a, b) => b.semanticSim - a.semanticSim);
+    return json(200, { results: scored.slice(0, topK) });
   } catch (e) {
     console.warn('search/knn failed:', e.message);
     return json(200, { results: [] });
@@ -3431,68 +3448,23 @@ async function geminiEmbed(text) {
   }
 }
 
-// ── S3 Vectors (step 3) — lazy, fail-soft ─────────────────────────────────────
-// The S3 Vectors SDK is loaded on first use via dynamic import, so a missing
-// package or an unconfigured index NEVER breaks module load or the request path
-// — every helper degrades to a no-op / empty result. All of this only runs when
-// EMBEDDINGS_ENABLED and both bucket+index are set.
-// NOTE: field names follow the S3 Vectors JS SDK; confirm against your SDK
-// version when provisioning (it's a young service).
-let _s3vClient = null;
-let _s3vMod = null;
-async function s3Vectors() {
-  if (_s3vClient) return { client: _s3vClient, mod: _s3vMod };
-  const mod = await import('@aws-sdk/client-s3vectors');
-  _s3vMod = mod;
-  _s3vClient = new mod.S3VectorsClient({ region: REGION });
-  return { client: _s3vClient, mod };
-}
-
-// cosine distance (ascending, 0..2) → similarity in [0,1].
-function cosDistToSim(d) {
-  if (typeof d !== 'number') return 0.5;
-  return Math.max(0, Math.min(1, 1 - d / 2));
-}
-
-async function s3VectorsUpsert(id, vector, metadata) {
-  if (!EMBEDDINGS_ENABLED || !S3_VECTORS_BUCKET || !S3_VECTORS_INDEX) return false;
-  if (!id || !Array.isArray(vector) || !vector.length) return false;
-  try {
-    const { client, mod } = await s3Vectors();
-    await client.send(new mod.PutVectorsCommand({
-      vectorBucketName: S3_VECTORS_BUCKET,
-      indexName: S3_VECTORS_INDEX,
-      vectors: [{ key: String(id), data: { float32: vector }, metadata: metadata || {} }],
-    }));
-    return true;
-  } catch (e) {
-    console.warn('s3VectorsUpsert failed:', e.message);
-    return false;
+// Cosine similarity of two equal-length vectors, mapped from [-1,1] to a [0,1]
+// score so 0.5 == orthogonal — matching the scorer's neutral-0.5 convention for
+// candidates that carry no semantic signal.
+function cosineSim(a, b) {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
   }
-}
-
-// Returns [{ id, sim }] ranked by similarity, or [] on any problem.
-async function s3VectorsQuery(vector, topK, cityFilter) {
-  if (!EMBEDDINGS_ENABLED || !S3_VECTORS_BUCKET || !S3_VECTORS_INDEX) return [];
-  if (!Array.isArray(vector) || !vector.length) return [];
-  try {
-    const { client, mod } = await s3Vectors();
-    const input = {
-      vectorBucketName: S3_VECTORS_BUCKET,
-      indexName: S3_VECTORS_INDEX,
-      queryVector: { float32: vector },
-      topK: Math.max(1, Math.min(200, topK || 50)),
-      returnDistance: true,
-      returnMetadata: false,
-    };
-    if (cityFilter) input.filter = { city: cityFilter };
-    const out = await client.send(new mod.QueryVectorsCommand(input));
-    const vecs = (out && out.vectors) || [];
-    return vecs.map((v) => ({ id: v.key, sim: cosDistToSim(v.distance) }));
-  } catch (e) {
-    console.warn('s3VectorsQuery failed:', e.message);
-    return [];
-  }
+  if (na === 0 || nb === 0) return 0.5;
+  const s = dot / (Math.sqrt(na) * Math.sqrt(nb));
+  return Math.max(0, Math.min(1, (s + 1) / 2));
 }
 
 async function geminiGenerate(systemText, contents, tools, genOverrides) {

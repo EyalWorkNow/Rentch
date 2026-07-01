@@ -96,4 +96,52 @@ void main() {
           const PropertySearchCriteria(queryText: '   ')), isNull);
     });
   });
+
+  group('neighborhood_fit (public-data personalization)', () {
+    // A: family-friendly area (great schools + safety, poor transit).
+    final areaA = {
+      'neighborhoodScore': {
+        'sub': {'safety': 90, 'schools': 95, 'green': 80, 'walkability': 40, 'transit': 20},
+      },
+    };
+    // B: student-friendly area (great transit + walkability, weak schools).
+    final areaB = {
+      'neighborhoodScore': {
+        'sub': {'safety': 50, 'schools': 30, 'green': 30, 'walkability': 90, 'transit': 95},
+      },
+    };
+
+    test('neutral 0.5 when the listing has no neighborhood score', () {
+      expect(PropertySearchRepository.neighborhoodFit(const {}, 'family'), 0.5);
+      expect(PropertySearchRepository.neighborhoodFit(
+          {'neighborhoodScore': {}}, 'student'), 0.5);
+    });
+
+    test('families rank the schools/safety area above the transit area', () {
+      final famA = PropertySearchRepository.neighborhoodFit(areaA, 'family');
+      final famB = PropertySearchRepository.neighborhoodFit(areaB, 'family');
+      expect(famA, greaterThan(famB));
+    });
+
+    test('students rank the transit area above the schools area (flip)', () {
+      final stuA = PropertySearchRepository.neighborhoodFit(areaA, 'student');
+      final stuB = PropertySearchRepository.neighborhoodFit(areaB, 'student');
+      expect(stuB, greaterThan(stuA));
+    });
+
+    test('renormalizes when a dimension (e.g. safety) is missing', () {
+      final noSafety = {
+        'neighborhoodScore': {'sub': {'schools': 100, 'walkability': 100}},
+      };
+      final fit = PropertySearchRepository.neighborhoodFit(noSafety, 'family');
+      expect(fit, closeTo(1.0, 1e-9)); // all present dims maxed → 1.0
+    });
+
+    test('cohort weights favor the expected dimension', () {
+      expect(PropertySearchRepository.neighborhoodWeightsFor('family')['schools']!,
+          greaterThan(PropertySearchRepository.neighborhoodWeightsFor(null)['schools']!));
+      expect(PropertySearchRepository.neighborhoodWeightsFor('student')['transit']!,
+          greaterThan(PropertySearchRepository.neighborhoodWeightsFor(null)['transit']!));
+    });
+  });
 }

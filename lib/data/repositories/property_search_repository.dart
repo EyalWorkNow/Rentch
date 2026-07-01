@@ -223,7 +223,7 @@ class PropertySearchRepository {
     final cohort = cohortFromVibe(c.vibe);
     final weights = weightsFor(cohort);
     for (final cand in matched) {
-      final fv = _features(cand, c, maxPop);
+      final fv = _features(cand, c, maxPop, cohort);
       scored.add(_Scored(cand.property, fv, _scoreFromFeatures(fv, weights)));
     }
     scored.sort((a, b) => b.score.compareTo(a.score));
@@ -264,6 +264,10 @@ class PropertySearchRepository {
   // the backend has embeddings off) → constant offset, no sort effect until a
   // real semanticSim is present.
   static const _wSemanticSim = 0.20;
+  // Personalized neighborhood-quality fit: matches the listing's public-data
+  // area sub-scores (safety/walkability/schools/transit/green) to the cohort's
+  // priorities. Neutral 0.5 when the listing has no enriched neighborhood score.
+  static const _wNeighborhoodFit = 0.15;
 
   // Global default weight-set. Per-cohort variants override a few of these.
   static const Map<String, double> _baseWeights = {
@@ -275,7 +279,50 @@ class PropertySearchRepository {
     'explore': _wExplore,
     'vibe_fit': _wVibeFit,
     'semantic_sim': _wSemanticSim,
+    'neighborhood_fit': _wNeighborhoodFit,
   };
+
+  // Per-cohort neighborhood-quality weights over the public-data sub-scores
+  // {safety, walkability, schools, transit, green} (from neighborhood.mjs —
+  // data.gov.il schools, OSM POIs/transit/green). THIS is where public area
+  // data becomes personal: families weight schools+safety, students weight
+  // transit+walkability. Unknown cohort → generic quality-of-life (matches the
+  // composite weights in neighborhood.mjs).
+  static const Map<String, double> _baseNeighborhoodWeights = {
+    'safety': 0.30, 'walkability': 0.25, 'schools': 0.20, 'transit': 0.15, 'green': 0.10,
+  };
+  static const Map<String, Map<String, double>> _cohortNeighborhoodWeights = {
+    'family':  {'safety': 0.30, 'walkability': 0.10, 'schools': 0.35, 'transit': 0.05, 'green': 0.20},
+    'student': {'safety': 0.10, 'walkability': 0.35, 'schools': 0.00, 'transit': 0.45, 'green': 0.10},
+  };
+
+  /// Neighborhood-dimension weights for a cohort (defaults to generic QoL).
+  static Map<String, double> neighborhoodWeightsFor(String? cohort) =>
+      (cohort != null ? _cohortNeighborhoodWeights[cohort] : null) ??
+      _baseNeighborhoodWeights;
+
+  /// neighborhood_fit: weighted average of the listing's public-data sub-scores
+  /// (0..100 → [0,1]) under the cohort's neighborhood weights, renormalized over
+  /// whichever dimensions are actually present. Neutral 0.5 when there's no
+  /// enriched neighborhood score at all.
+  static double neighborhoodFit(Map<String, dynamic> raw, String? cohort) {
+    final ns = raw['neighborhoodScore'];
+    final sub = ns is Map ? ns['sub'] : null;
+    if (sub is! Map) return 0.5;
+    final weights = neighborhoodWeightsFor(cohort);
+    double wsum = 0;
+    double acc = 0;
+    weights.forEach((k, w) {
+      final v = sub[k];
+      final d = v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
+      if (d != null && d > 0) {
+        acc += w * (d / 100.0).clamp(0.0, 1.0);
+        wsum += w;
+      }
+    });
+    if (wsum == 0) return 0.5;
+    return (acc / wsum).clamp(0.0, 1.0);
+  }
 
   // Per-cohort weight overrides (מהיר tier: dynamic weights without ML). Cohort
   // is inferred from the requested vibe — the only cohort signal available at
@@ -344,6 +391,7 @@ class PropertySearchRepository {
     _Candidate c,
     PropertySearchCriteria crit,
     double maxPop,
+    String? cohort,
   ) {
     final p = c.property;
 
@@ -413,6 +461,10 @@ class PropertySearchRepository {
     final sem = _serverSignal(c.raw, const ['semanticSim', 'semantic_sim']);
     final semanticSim = (sem ?? 0.5).clamp(0.0, 1.0).toDouble();
 
+    // neighborhood_fit: public-data area sub-scores matched to the cohort's
+    // neighborhood priorities (families→schools/safety, students→transit).
+    final neighborhoodFitVal = neighborhoodFit(c.raw, cohort);
+
     return {
       'tag_overlap': tagOverlap.clamp(0.0, 1.0).toDouble(),
       'price_fit': priceFit.clamp(0.0, 1.0).toDouble(),
@@ -422,6 +474,7 @@ class PropertySearchRepository {
       'explore': explore.toDouble(),
       'vibe_fit': vibeFit.clamp(0.0, 1.0).toDouble(),
       'semantic_sim': semanticSim,
+      'neighborhood_fit': neighborhoodFitVal,
     };
   }
 

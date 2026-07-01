@@ -16,18 +16,24 @@
 // We keep the schools resource_id as a constant; swap it if the portal rotates
 // the resource. Crime/socio-economic resource ids are left configurable too.
 
+import { normalizeLocalityName } from './muni.mjs';
+
 const TIMEOUT_MS = 9000;
 const UA = 'RentlyBot/1.0 (+https://rently.co.il; neighbourhood scoring; attribution: data.gov.il/CBS/OSM)';
 
 // data.gov.il CKAN resource ids (swap if the portal rotates them).
 const RES_SCHOOLS = '5c5d6bb0-755d-470d-84b6-d7dd3135ba9c'; // education institutions, 28,312 rows (coords in UTM_Y=lat, UTM_X=lng)
-// crime + socio-economic resource ids are verified live, BUT the safety
-// sub-score still needs a row-count aggregation + locality join (see below) —
-// so safety stays gracefully omitted for now.
-// ponytail: needs row-count aggregation + locality join
 const RES_CRIME = '5fc13c50-b6f3-4712-b831-a75e0f91a17e';        // police open-data crime-by-locality
 const RES_SOCIOECONOMIC = '7c860e04-9f8d-41c2-9f24-6249958d2081'; // CBS socio-economic cluster by locality
 const SOCIO_FIELD = 'ESHKOL 2019';                                // socio-economic cluster field
+
+// Locality-name field candidates across gov datasets (used for the safety join).
+const LOCALITY_NAME_KEYS = [
+  'שם_ישוב', 'שם ישוב', 'שם_יישוב', 'שם יישוב', 'YISHUV_NAME', 'yishuv_name',
+  'שם_רשות', 'שם רשות', 'רשות', 'Settlement', 'locality', 'MunicipalityName',
+];
+const SOCIO_VALUE_KEYS = [SOCIO_FIELD, 'cluster', 'eshkol', 'אשכול', 'index'];
+const CRIME_VALUE_KEYS = ['TikimSum', 'count', 'crimes', 'value', 'סהכ', 'סה"כ'];
 
 // Overpass mirrors — try in order, fail-soft to next.
 const OVERPASS_ENDPOINTS = [
@@ -159,59 +165,74 @@ async function schoolsScore(lat, lng) {
 }
 
 // ---------------------------------------------------------------------------
-// Safety: police crime rate (lower = better) blended with CBS socio-economic
-// cluster (higher cluster = better). Both optional; whichever exists is used.
-async function safetyScore(lat, lng) {
-  // ponytail: needs row-count aggregation + locality join. RES_CRIME and
-  // RES_SOCIOECONOMIC are verified-live resource ids, but turning them into a
-  // point-level safety score requires (a) aggregating crime rows per locality
-  // and (b) joining on the locality/city_code of THIS point — which the
-  // geocoder would have to supply. Until that lands we OMIT safety (return
-  // null) so the composite renormalises over the working sub-scores rather
-  // than injecting a bogus national-average number. Machinery kept below.
-  return null;
-  // eslint-disable-next-line no-unreachable
+// CKAN page fetch → records array (null on failure).
+async function fetchCkan(resourceId, limit = 5000) {
+  if (!resourceId) return null;
+  const raw = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
+    `?resource_id=${resourceId}&limit=${limit}`);
+  const recs = raw?.result?.records;
+  return Array.isArray(recs) ? recs : null;
+}
+
+// Build a { normalizedLocalityName: value } map from dataset records. `sum`
+// aggregates rows sharing a locality (crime counts); otherwise last-wins (a
+// per-locality attribute like the socio-economic cluster). Pure + exported for
+// testing without network. `valueOf(record) -> number | NaN`.
+export function buildLocalityMap(records, nameKeys, valueOf, sum = false) {
+  const map = {};
+  if (!Array.isArray(records)) return map;
+  for (const r of records) {
+    let name = '';
+    for (const k of nameKeys) { if (r[k]) { name = r[k]; break; } }
+    const key = normalizeLocalityName(name);
+    if (!key) continue;
+    const v = valueOf(r);
+    if (!Number.isFinite(v)) continue;
+    map[key] = sum ? (map[key] || 0) + v : v;
+  }
+  return map;
+}
+
+// crime count → safety score (0–100): fewer crimes vs the national max → safer.
+// ponytail: absolute count, not per-capita (big cities skew high). Upgrade to
+// per-capita once locality population is joined via muni_ids.
+export function crimeCountToSafety(count, maxCount) {
+  if (!Number.isFinite(count) || !Number.isFinite(maxCount) || maxCount <= 0) return NaN;
+  return clamp(100 * (1 - count / maxCount));
+}
+
+// Safety for a NAMED locality: CBS socio-economic cluster (higher = better)
+// blended with police crime (lower = better), joined on the locality name. Both
+// optional; returns null when the locality can't be matched in either source so
+// the composite renormalises rather than inventing a number.
+async function safetyScore(locality) {
+  const key = normalizeLocalityName(locality);
+  if (!key) return null;
   const parts = [];
 
-  if (RES_CRIME) {
-    const url = 'https://data.gov.il/api/3/action/datastore_search' +
-      `?resource_id=${RES_CRIME}&limit=5000`;
-    const raw = await fetchJson(url);
-    const records = raw?.result?.records;
-    if (Array.isArray(records) && records.length) {
-      // crime datasets are per-locality counts; without a locality join we
-      // approximate national distribution and place this point mid-scale.
-      // (A real impl joins on city_code/סמל יישוב from the geocoder.)
-      const counts = records
-        .map((r) => pickNum(r, ['count', 'crimes', 'TikimSum', 'value']))
-        .filter(Number.isFinite);
-      if (counts.length) {
-        // invert: fewer crimes → higher score. Use rank of a "typical" locality.
-        const med = counts.slice().sort((a, b) => a - b)[counts.length >> 1];
-        const max = Math.max(...counts);
-        parts.push(clamp(100 * (1 - med / (max || 1))));
-      }
+  const socioRecs = await fetchCkan(RES_SOCIOECONOMIC);
+  if (socioRecs) {
+    const map = buildLocalityMap(
+      socioRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, SOCIO_VALUE_KEYS), false);
+    const cluster = map[key];
+    if (Number.isFinite(cluster) && cluster >= 1 && cluster <= 10) {
+      parts.push(clamp((cluster / 10) * 100));
     }
   }
 
-  if (RES_SOCIOECONOMIC) {
-    const url = 'https://data.gov.il/api/3/action/datastore_search' +
-      `?resource_id=${RES_SOCIOECONOMIC}&limit=5000`;
-    const raw = await fetchJson(url);
-    const records = raw?.result?.records;
-    if (Array.isArray(records) && records.length) {
-      // CBS socio-economic cluster is 1–10 (10 = highest). Map to 0–100.
-      const clusters = records
-        .map((r) => pickNum(r, [SOCIO_FIELD, 'cluster', 'eshkol', 'אשכול', 'index']))
-        .filter((c) => Number.isFinite(c) && c >= 1 && c <= 10);
-      if (clusters.length) {
-        const avg = clusters.reduce((a, b) => a + b, 0) / clusters.length;
-        parts.push(clamp((avg / 10) * 100));
-      }
+  const crimeRecs = await fetchCkan(RES_CRIME);
+  if (crimeRecs) {
+    const map = buildLocalityMap(
+      crimeRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, CRIME_VALUE_KEYS), true);
+    const mine = map[key];
+    if (Number.isFinite(mine)) {
+      const values = Object.values(map);
+      const s = crimeCountToSafety(mine, values.length ? Math.max(...values) : 0);
+      if (Number.isFinite(s)) parts.push(s);
     }
   }
 
-  if (!parts.length) return null; // neither source configured/available → omit
+  if (!parts.length) return null;
   return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
 
@@ -227,21 +248,23 @@ function pickNum(obj, keys) {
 
 /**
  * Composite neighbourhood quality score for a coordinate.
- * @param {{lat:number,lng:number}} p
+ * @param {{lat:number,lng:number,locality?:string}} p  locality = city name,
+ *   enables the safety sub-score (crime/socio joined by locality name).
  * @returns {Promise<{score:number, sub:{safety:number,walkability:number,
  *   schools:number,transit:number,green:number}}|null>}
  *   Each sub-score is 0–100. Missing sources are OMITTED and the composite
  *   weights are RENORMALISED over the survivors. null only on bad input or if
  *   EVERY source failed.
  */
-export async function neighborhoodScore({ lat, lng }) {
+export async function neighborhoodScore({ lat, lng, locality }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-  // fan out in parallel; each may return null.
+  // fan out in parallel; each may return null. Safety needs the locality NAME
+  // (crime/socio are per-locality, joined by name) — omitted if none supplied.
   const [osm, schools, safety] = await Promise.all([
     osmCounts(lat, lng).catch(() => null),
     schoolsScore(lat, lng).catch(() => null),
-    safetyScore(lat, lng).catch(() => null),
+    safetyScore(locality).catch(() => null),
   ]);
 
   // assemble available sub-scores with their R7 weights.
