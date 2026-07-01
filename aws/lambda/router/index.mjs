@@ -34,11 +34,9 @@ import AdmZip from 'adm-zip';
 // service account (sign a JWT with RS256) and to load that account off disk.
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { scoreListings } from './lib/ranking.mjs';
 import {
-  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, communityFitScore,
-} from './lib/ranking.mjs';
-import {
-  querySignals, profileSignals, definedOnly, cohortFromSignals,
+  querySignals, cohortFromSignals, resolveCohortFrom,
 } from './lib/cohort.mjs';
 
 // ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
@@ -1341,75 +1339,24 @@ async function listItems(table, query) {
 //   priceFit      — closeness of the listing price to the query's budget window
 // All numbers are 0..1. `rankScore` is a transparent weighted sum — explainable,
 // zero-infra, good for cold-start. Fail-soft: any error returns the list as-is.
-// Bayesian shrinkage prior for like-rate: assume a modest baseline so listings
-// with little traffic regress toward the mean instead of spiking on noise.
-const LIKE_RATE_PRIOR = 0.12;   // assumed global like-per-view rate
-const LIKE_RATE_STRENGTH = 8;   // pseudo-views of prior weight
-
-// Cohort-aware main-feed scorer (Phase 0/1). Weights, price-target and the
-// neighborhood sub-weights all vary by `cohort` (family|single|student|couple|
-// null); neighborhood_fit (public data) and semantic_sim are now folded in.
+// Cohort-aware main-feed scorer. Loads popularity counts from DynamoDB, then
+// delegates the (pure, unit-tested) scoring to ranking.scoreListings. Community
+// affinity is a SOFT signal there — no listing is excluded. Fail-soft.
 async function attachRankSignals(listed, query, cohort = null) {
   try {
     const parsed = JSON.parse(listed.body);
-    const allItems = Array.isArray(parsed.items) ? parsed.items : [];
-    if (allItems.length === 0) return listed;
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    if (items.length === 0) return listed;
 
-    // Community affinity is a SOFT ranking signal (community_fit below), NOT a
-    // hard filter — no listing is excluded by religious/ethnic composition.
-    const items = allItems;
-
-    const W = rankWeightsFor(cohort);
-    const priceTarget = cohortPriceTarget(cohort);
-
-    // Budget window for price-fit: explicit min/max, or ± a band around a target.
-    const minBudget = num(query.minBudget) ?? num(query.minPrice);
-    const maxBudget = num(query.maxBudget) ?? num(query.maxPrice);
-    const targetPrice = num(query.price) ?? num(query.budget);
-
-    // Pull popularity counts (views + likes) per listing in parallel, bounded.
+    const ctx = {
+      cohort,
+      minBudget: num(query.minBudget) ?? num(query.minPrice),
+      maxBudget: num(query.maxBudget) ?? num(query.maxPrice),
+      targetPrice: num(query.price) ?? num(query.budget),
+    };
     const ids = items.map((p) => String(p.id || '')).filter(Boolean).slice(0, 60);
     const counts = await loadPopularityCounts(ids);
-
-    const now = Date.now();
-    for (const p of items) {
-      const id = String(p.id || '');
-      const c = counts[id] || { views: 0, likes: 0 };
-      const freshness = freshnessScore(p.createdAt, now);
-      const popularity = shrinkLikeRate(c.likes, c.views);
-      const completeness = completenessScore(p);
-      const priceFit = priceFitScore(Number(p.price), { minBudget, maxBudget, targetPrice }, priceTarget);
-      // neighborhood_fit: cohort-weighted public-data area sub-scores (0.5 when
-      // the listing has no enriched neighborhood score).
-      const neighborhood = neighborhoodFitScore(p.neighborhoodScore, cohort);
-      // semantic_sim: present only on listings that came through /search/knn;
-      // neutral 0.5 on the plain feed.
-      const semRaw = Number(p.semanticSim);
-      const semantic = Number.isFinite(semRaw) ? Math.max(0, Math.min(1, semRaw)) : 0.5;
-      // community_fit: soft affinity to a community cohort's school profile (0.5
-      // neutral otherwise). Down-ranks mismatched areas; never excludes.
-      const communityFit = communityFitScore(cohort, p);
-      const rankScore =
-        W.freshness * freshness +
-        W.popularity * popularity +
-        W.completeness * completeness +
-        W.priceFit * priceFit +
-        W.neighborhood * neighborhood +
-        W.semantic * semantic +
-        (W.community_fit || 0) * communityFit;
-      p.rankSignals = {
-        freshness: round3(freshness),
-        popularity: round3(popularity),
-        completeness: round3(completeness),
-        priceFit: round3(priceFit),
-        neighborhood: round3(neighborhood),
-        semantic: round3(semantic),
-        community_fit: round3(communityFit),
-        cohort: cohort || 'default',
-        views: c.views, likes: c.likes,
-      };
-      p.rankScore = round3(rankScore);
-    }
+    scoreListings(items, ctx, counts, Date.now());
     return json(200, parsed);
   } catch (e) {
     console.warn('attachRankSignals failed:', e.message);
@@ -1422,46 +1369,6 @@ function num(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 }
-const round3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
-
-// Exponential recency decay, 14-day half-life. Missing/garbage date → neutral 0.5.
-function freshnessScore(createdAt, now) {
-  const t = Date.parse(createdAt);
-  if (!Number.isFinite(t)) return 0.5;
-  const ageDays = Math.max(0, (now - t) / 86_400_000);
-  return Math.exp(-Math.LN2 * ageDays / 14);
-}
-
-// Bayesian-shrunk like-rate, normalised so the prior maps to ~0.5.
-function shrinkLikeRate(likes, views) {
-  const l = Math.max(0, Number(likes) || 0);
-  const v = Math.max(l, Number(views) || 0); // views can't be below likes
-  const rate = (l + LIKE_RATE_PRIOR * LIKE_RATE_STRENGTH)
-    / (v + LIKE_RATE_STRENGTH);
-  // Map the like-rate onto 0..1 with the prior sitting at 0.5 (so an unproven
-  // listing is neutral, above-prior is >0.5, below is <0.5).
-  return Math.max(0, Math.min(1, 0.5 * (rate / LIKE_RATE_PRIOR)));
-}
-
-// Fraction of browse-critical fields present → a fuller listing ranks higher.
-function completenessScore(p) {
-  const checks = [
-    Number(p.price) > 0,
-    Number(p.rooms) > 0,
-    !!p.city,
-    !!p.street,
-    Number(p.sizeM2) > 0,
-    Array.isArray(p.imageUrls) && p.imageUrls.length > 0,
-    !!(p.description && String(p.description).trim().length > 20),
-    Array.isArray(p.smartTags) && p.smartTags.length > 0,
-    !!p.neighborhood,
-  ];
-  const hit = checks.filter(Boolean).length;
-  return hit / checks.length;
-}
-
-// Closeness of price to the requested budget. Inside [min,max] → 1.0; outside,
-// decays with relative overshoot. No budget given → neutral 0.5.
 
 // View + like counts per listing (the popularity signal source). Uses the
 // propertyId-index COUNT query on the analytics tables. Bounded, fail-soft.
@@ -3590,21 +3497,15 @@ const PROFILE_WRITABLE_FIELDS = new Set([
   'leaseFlex',
 ]);
 
-// Cohort from a persisted profile (11-cohort taxonomy in lib/cohort.mjs).
-function profileCohort(profile) {
-  return cohortFromSignals(profileSignals(profile));
-}
-
 // Resolve the searcher's cohort for main-feed ranking, cheapest-first: the GET
 // query params alone often determine it (no DB read); only if they don't do we
-// pay for one loadUserProfile and merge (query overrides profile).
+// pay for one loadUserProfile. The pure resolution logic lives in
+// resolveCohortFrom (unit-tested); here we only add the conditional DB load.
 async function resolveCohort(query, callerUid) {
-  const qs = querySignals(query);
-  const fromQuery = cohortFromSignals(qs);
-  if (fromQuery) return fromQuery;
-  if (!callerUid) return null;
+  const fromQuery = cohortFromSignals(querySignals(query));
+  if (fromQuery || !callerUid) return fromQuery || null;
   const profile = await loadUserProfile(callerUid).catch(() => null);
-  return cohortFromSignals({ ...profileSignals(profile), ...definedOnly(qs) });
+  return resolveCohortFrom(query, profile);
 }
 
 // Merge-writes one profile field. Read-modify-write on the whole searchProfile

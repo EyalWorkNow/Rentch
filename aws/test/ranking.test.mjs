@@ -82,3 +82,42 @@ test('neighborhoodFitScore: family vs student flip; fallbacks', () => {
   assert.equal(neighborhoodFitScore(null, 'family'), 0.5);
   assert.equal(neighborhoodFitScore({}, 'student'), 0.5);
 });
+
+// ── Integration: scoreListings (the extracted attachRankSignals core) ─────────
+import { scoreListings } from '../lambda/router/lib/ranking.mjs';
+
+test('scoreListings scores every listing, sets rankSignals, excludes nothing', () => {
+  const items = [
+    { id: 'a', price: 6000, createdAt: '2026-06-30T00:00:00Z' },
+    { id: 'b', price: 6000, createdAt: '2026-06-30T00:00:00Z' },
+  ];
+  scoreListings(items, { cohort: 'family', minBudget: 5000, maxBudget: 8000 },
+    { a: { views: 100, likes: 30 }, b: { views: 100, likes: 1 } }, Date.parse('2026-07-01T00:00:00Z'));
+  assert.equal(items.length, 2); // nothing removed
+  for (const p of items) {
+    assert.ok(Number.isFinite(p.rankScore));
+    assert.ok('community_fit' in p.rankSignals && p.rankSignals.cohort === 'family');
+  }
+  // a (higher like-rate) outranks b, all else equal
+  assert.ok(items[0].rankScore > items[1].rankScore);
+});
+
+test('scoreListings: dati_leumi community_fit lifts a חמ"ד area over a charedi area', () => {
+  const dati = { id: 'd', price: 6000, neighborhoodScore: { sub: { safety: 80 }, schoolsMeta: { pikuah: { mamlachti_dati: 5 }, total: 6 } } };
+  const charedi = { id: 'c', price: 6000, neighborhoodScore: { sub: { safety: 80 }, schoolsMeta: { pikuah: { charedi: 5 }, total: 6 } } };
+  const items = [charedi, dati];
+  scoreListings(items, { cohort: 'dati_leumi', minBudget: 5000, maxBudget: 8000 }, {}, Date.now());
+  const byId = Object.fromEntries(items.map((p) => [p.id, p]));
+  assert.ok(byId.d.rankScore > byId.c.rankScore);            // חמ"ד area wins
+  assert.ok(byId.c.rankScore > 0);                            // but charedi area NOT excluded
+  assert.ok(byId.d.rankSignals.community_fit > byId.c.rankSignals.community_fit);
+});
+
+test('scoreListings: cheaper listing wins for a low-price-target cohort', () => {
+  const cheap = { id: 'cheap', price: 5200 };
+  const pricey = { id: 'pricey', price: 7800 };
+  const items = [pricey, cheap];
+  scoreListings(items, { cohort: 'student', minBudget: 5000, maxBudget: 8000 }, {}, Date.now());
+  const byId = Object.fromEntries(items.map((p) => [p.id, p]));
+  assert.ok(byId.cheap.rankScore > byId.pricey.rankScore);
+});

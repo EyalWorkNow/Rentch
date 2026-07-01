@@ -74,3 +74,29 @@ test('every taxonomy label has ranking weights + a price target', () => {
   assert.equal(cohortPriceTarget('investor'), 'invert');
   assert.equal(cohortPriceTarget('young_professional'), 'high');
 });
+
+// ── Integration: resolveCohortFrom (the extracted resolveCohort core) ─────────
+import { resolveCohortFrom } from '../lambda/router/lib/cohort.mjs';
+
+test('resolveCohortFrom: query params win (no profile needed)', () => {
+  assert.equal(resolveCohortFrom({ household: 'single', vibe: 'תוסס' }, null), 'young_professional');
+  assert.equal(resolveCohortFrom({ isInvestor: 'true' }, null), 'investor');
+});
+
+test('resolveCohortFrom: falls back to profile when query is empty', () => {
+  const profile = { searchProfile: { household: { value: 'family' }, sector: { value: 'arab' } } };
+  assert.equal(resolveCohortFrom({}, profile), 'arab_family');
+});
+
+test('resolveCohortFrom: query OVERRIDES profile, keeps profile gaps', () => {
+  const profile = { searchProfile: { household: { value: 'family' }, vibePref: { value: 'שקט' } } };
+  // query says investor → wins over the profile's family
+  assert.equal(resolveCohortFrom({ isInvestor: 'true' }, profile), 'investor');
+  // query with only a weak field → profile's household still resolves
+  assert.equal(resolveCohortFrom({ langPref: 'he' }, profile), 'family');
+});
+
+test('resolveCohortFrom: null when nothing resolves', () => {
+  assert.equal(resolveCohortFrom({}, null), null);
+  assert.equal(resolveCohortFrom({}, { searchProfile: {} }), null);
+});

@@ -94,3 +94,13 @@ export function cohortFromSignals(s) {
   if (s.household === 'single') return 'single';
   return null;
 }
+
+// Pure cohort resolution: query params win (fast path), else fall back to the
+// (already-loaded) profile with query overriding profile fields. index.mjs wraps
+// this with the DynamoDB profile load; this function is the unit-testable core.
+export function resolveCohortFrom(query, profile) {
+  const qs = querySignals(query);
+  const fromQuery = cohortFromSignals(qs);
+  if (fromQuery) return fromQuery;
+  return cohortFromSignals({ ...profileSignals(profile), ...definedOnly(qs) });
+}

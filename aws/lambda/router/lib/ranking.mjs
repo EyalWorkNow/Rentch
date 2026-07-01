@@ -176,3 +176,65 @@ export function neighborhoodFitScore(ns, cohort) {
   const s = ns && Number(ns.score);
   return Number.isFinite(s) ? clamp01(s / 100) : 0.5;
 }
+
+// ── Pure main-feed scoring (extracted from index.mjs for testability) ─────────
+// These are dependency-free; index.mjs loads the popularity counts from DynamoDB
+// and hands them in, so the whole scoring pipeline unit-tests without aws-sdk.
+const LIKE_RATE_PRIOR = 0.12;   // assumed global like-per-view rate
+const LIKE_RATE_STRENGTH = 8;   // pseudo-views of prior weight
+export const round3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
+
+// Exponential recency decay, 14-day half-life. Missing/garbage date → neutral 0.5.
+export function freshnessScore(createdAt, now) {
+  const t = Date.parse(createdAt);
+  if (!Number.isFinite(t)) return 0.5;
+  const ageDays = Math.max(0, (now - t) / 86_400_000);
+  return Math.exp(-Math.LN2 * ageDays / 14);
+}
+// Bayesian-shrunk like-rate, normalised so the prior maps to ~0.5.
+export function shrinkLikeRate(likes, views) {
+  const l = Math.max(0, Number(likes) || 0);
+  const v = Math.max(l, Number(views) || 0); // views can't be below likes
+  const rate = (l + LIKE_RATE_PRIOR * LIKE_RATE_STRENGTH) / (v + LIKE_RATE_STRENGTH);
+  return Math.max(0, Math.min(1, 0.5 * (rate / LIKE_RATE_PRIOR)));
+}
+export function completenessScore(p) {
+  const checks = [
+    Number(p.price) > 0, Number(p.rooms) > 0, !!p.city, !!p.street,
+    Number(p.sizeM2) > 0, Array.isArray(p.imageUrls) && p.imageUrls.length > 0,
+    !!(p.description && String(p.description).trim().length > 20),
+    Array.isArray(p.smartTags) && p.smartTags.length > 0, !!p.neighborhood,
+  ];
+  return checks.filter(Boolean).length / checks.length;
+}
+
+// Scores every listing in-place (sets p.rankSignals + p.rankScore) for a cohort.
+// `counts` is { id: {views,likes} } loaded upstream. NO exclusion — community_fit
+// is a soft signal. Pure/unit-testable. Returns the same items array.
+export function scoreListings(items, ctx, counts, nowMs) {
+  const { cohort, minBudget, maxBudget, targetPrice } = ctx || {};
+  const W = rankWeightsFor(cohort);
+  const priceTarget = cohortPriceTarget(cohort);
+  for (const p of items) {
+    const c = (counts && counts[String(p.id || '')]) || { views: 0, likes: 0 };
+    const freshness = freshnessScore(p.createdAt, nowMs);
+    const popularity = shrinkLikeRate(c.likes, c.views);
+    const completeness = completenessScore(p);
+    const priceFit = priceFitScore(Number(p.price), { minBudget, maxBudget, targetPrice }, priceTarget);
+    const neighborhood = neighborhoodFitScore(p.neighborhoodScore, cohort);
+    const semRaw = Number(p.semanticSim);
+    const semantic = Number.isFinite(semRaw) ? clamp01(semRaw) : 0.5;
+    const community = communityFitScore(cohort, p);
+    const rankScore = W.freshness * freshness + W.popularity * popularity
+      + W.completeness * completeness + W.priceFit * priceFit
+      + W.neighborhood * neighborhood + W.semantic * semantic
+      + (W.community_fit || 0) * community;
+    p.rankSignals = {
+      freshness: round3(freshness), popularity: round3(popularity), completeness: round3(completeness),
+      priceFit: round3(priceFit), neighborhood: round3(neighborhood), semantic: round3(semantic),
+      community_fit: round3(community), cohort: cohort || 'default', views: c.views, likes: c.likes,
+    };
+    p.rankScore = round3(rankScore);
+  }
+  return items;
+}
