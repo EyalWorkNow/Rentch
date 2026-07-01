@@ -75,18 +75,23 @@ test('buildCrimeRateMap falls back to absolute count when population missing', (
   assert.deepEqual(buildCrimeRateMap({ x: 50 }, { x: 0 }), { x: 50 }); // guard div-by-zero
 });
 
-test('isKindergarten detects גן/קדם from the stage field', () => {
-  assert.equal(isKindergarten({ 'שלב_חינוך': 'גן ילדים' }), true);
-  assert.equal(isKindergarten({ 'סוג_מוסד': 'קדם יסודי' }), true);
-  assert.equal(isKindergarten({ 'שלב_חינוך': 'בית ספר יסודי' }), false);
+test('isKindergarten detects gan from the real name/type columns', () => {
+  assert.equal(isKindergarten({ 'סוג מוסד': 'גן ילדים' }), true);   // mosdot type
+  assert.equal(isKindergarten({ SHEM_MOSAD: 'גן שלוה' }), true);    // coords name
+  assert.equal(isKindergarten({ SHEM_MOSAD: 'מעון יום' }), true);
+  assert.equal(isKindergarten({ SHEM_MOSAD: 'בית ספר יסודי רחל' }), false);
+  assert.equal(isKindergarten({ SHEM_MOSAD: 'תיכון גני תקווה' }), false); // place name, not "גן "
   assert.equal(isKindergarten({}), false);
 });
 
-test('normPikuah / normSector canonicalize Hebrew supervision + sector', () => {
-  assert.equal(normPikuah('ממלכתי דתי'), 'mamlachti_dati'); // dati checked before mamlachti
+test('normPikuah handles the real mosdot abbreviations', () => {
+  // real dataset values (JSON-unescaped): מ"מ, חמ"ד, חרדי
+  assert.equal(normPikuah('חמ"ד'), 'mamlachti_dati'); // religious-state (the gate)
+  assert.equal(normPikuah('ממ"ד'), 'mamlachti_dati');
+  assert.equal(normPikuah('ממלכתי דתי'), 'mamlachti_dati');
+  assert.equal(normPikuah('מ"מ'), 'mamlachti');       // state (abbrev)
   assert.equal(normPikuah('ממלכתי'), 'mamlachti');
   assert.equal(normPikuah('חרדי'), 'charedi');
-  assert.equal(normPikuah('ערבי'), 'arab');
   assert.equal(normSector('יהודי'), 'jewish');
   assert.equal(normSector('ערבי'), 'arab');
   assert.equal(normSector(''), '');

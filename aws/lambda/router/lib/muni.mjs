@@ -50,6 +50,16 @@ function muniTable() {
 }
 
 /// name → { cbs_id, cbs_name, edu_id, tax_id } or null when unknown/not built.
+/// Exact-key first, then a contains-either-way fallback so "תל אביב" resolves to
+/// the canonical "תל אביב-יפו" (and vice versa).
 export function resolveLocality(name) {
-  return muniTable()[normalizeLocalityName(name)] || null;
+  const key = normalizeLocalityName(name);
+  if (!key) return null;
+  const t = muniTable();
+  if (t[key]) return t[key];
+  for (const k in t) {
+    if (k === key) return t[k];
+    if (k.length >= 3 && key.length >= 3 && (k.includes(key) || key.includes(k))) return t[k];
+  }
+  return null;
 }

@@ -16,34 +16,60 @@
 // We keep the schools resource_id as a constant; swap it if the portal rotates
 // the resource. Crime/socio-economic resource ids are left configurable too.
 
-import { normalizeLocalityName } from './muni.mjs';
+import { normalizeLocalityName, resolveLocality } from './muni.mjs';
 
 const TIMEOUT_MS = 9000;
 const UA = 'RentlyBot/1.0 (+https://rently.co.il; neighbourhood scoring; attribution: data.gov.il/CBS/OSM)';
 
-// data.gov.il CKAN resource ids (swap if the portal rotates them).
-const RES_SCHOOLS = '5c5d6bb0-755d-470d-84b6-d7dd3135ba9c'; // education institutions, 28,312 rows (coords in UTM_Y=lat, UTM_X=lng)
-const RES_CRIME = '5fc13c50-b6f3-4712-b831-a75e0f91a17e';        // police open-data crime-by-locality
-const RES_SOCIOECONOMIC = '7c860e04-9f8d-41c2-9f24-6249958d2081'; // CBS socio-economic cluster by locality
-const SOCIO_FIELD = 'ESHKOL 2019';                                // socio-economic cluster field
+// data.gov.il CKAN resource ids (verified live 2026-07). All per-locality joins
+// use the CBS locality code (YeshuvKod / LocalityCode / LOCALITY SYMBOL), bridged
+// from the listing's city via muni_ids (resolveLocality → cbs_id) — robust vs
+// name-format drift. The SQL endpoint (datastore_search_sql) is DISABLED on the
+// portal, so per-locality counts use filters + limit=0 → result.total.
+const RES_SCHOOLS = '5c5d6bb0-755d-470d-84b6-d7dd3135ba9c';        // coordinates only (UTM_Y=lat, UTM_X=lng, SHEM_MOSAD name)
+const RES_SCHOOLS_META = '5548fd63-5868-4053-ad81-98caddc5e232';  // "מאפייני מוסדות חינוך" — פיקוח/מגזר/סוג מוסד by locality name
+const RES_CRIME = '5fc13c50-b6f3-4712-b831-a75e0f91a17e';         // police crime, PER-INCIDENT rows (count via filters+limit=0)
+const RES_POPULATION = '38207cf8-afe2-48ed-a3b0-c8f70c796015';    // 2022 census population by LocalityCode
+const RES_SOCIOECONOMIC = '7c860e04-9f8d-41c2-9f24-6249958d2081'; // CBS socio-economic cluster (partial city coverage)
+const SOCIO_FIELD = 'ESHKOL 2019';
 
-// Locality-name field candidates across gov datasets (used for the safety join).
-const LOCALITY_NAME_KEYS = [
-  'שם_ישוב', 'שם ישוב', 'שם_יישוב', 'שם יישוב', 'YISHUV_NAME', 'yishuv_name',
-  'שם_רשות', 'שם רשות', 'רשות', 'Settlement', 'locality', 'MunicipalityName',
-];
-const SOCIO_VALUE_KEYS = [SOCIO_FIELD, 'cluster', 'eshkol', 'אשכול', 'index'];
-const CRIME_VALUE_KEYS = ['TikimSum', 'count', 'crimes', 'value', 'סהכ', 'סה"כ'];
-// Population per locality → per-capita crime (data.gov.il crime/socio rows often
-// carry it; else we fall back to absolute counts).
-const POPULATION_KEYS = ['אוכלוסיה', 'אוכלוסייה', 'תושבים', 'population', 'pop', 'total_population', 'סהכ_אוכלוסיה'];
+// CBS-locality-code columns per dataset (the join keys).
+const CRIME_CODE_KEY = 'YeshuvKod';
+const POP_CODE_KEY = 'LocalityCode';
+const POP_VALUE_KEY = 'Total_Population';
+const SOCIO_CODE_KEY = 'LOCALITY SYMBOL';
 
-// Education-dataset field candidates (defensive — the portal's column names vary).
-const EDU_LAT_KEYS = ['UTM_Y', 'lat', 'Y', 'latitude', 'kts_y', 'Latitude'];
-const EDU_LNG_KEYS = ['UTM_X', 'lng', 'lon', 'X', 'longitude', 'kts_x', 'Longitude'];
+// National crimes-per-capita benchmark over the dataset's span. Tunable — safety
+// = 100·(1 − rate/benchmark). ponytail: heuristic anchor; recalibrate against the
+// observed distribution if it skews.
+const CRIME_RATE_BENCHMARK = 0.10;
+
+// mosdot (RES_SCHOOLS_META) composition columns.
 const PIKUAH_KEYS = ['פיקוח', 'סוג_פיקוח', 'סמל_פיקוח', 'SUG_PIKUAH', 'pikuah', 'Supervision'];
 const SECTOR_KEYS = ['מגזר', 'מגזר_מוסד', 'SECTOR', 'sector'];
-const STAGE_KEYS = ['שלב_חינוך', 'סוג_מוסד', 'שלב חינוך', 'SUG_MOSAD', 'SHLAV_HINUCH', 'stage', 'type'];
+// Kindergarten detection reads the school NAME/type (coords dataset has SHEM_MOSAD;
+// mosdot has סוג מוסד = "גן ילדים").
+const STAGE_KEYS = ['סוג מוסד', 'סוג_מוסד', 'סוג מסגרת אירגונית', 'SHEM_MOSAD', 'שם מוסד', 'stage', 'type'];
+// Coordinate columns in the coords dataset.
+const EDU_LAT_KEYS = ['UTM_Y', 'lat', 'Y', 'latitude', 'kts_y', 'Latitude'];
+const EDU_LNG_KEYS = ['UTM_X', 'lng', 'lon', 'X', 'longitude', 'kts_x', 'Longitude'];
+
+// Single source of truth for scripts/verify-gov-fields.mjs — the exact resource
+// ids + candidate field lists this module relies on, so the verifier tests the
+// real thing rather than a drifting copy.
+export const GOV_FIELDS = {
+  resources: {
+    RES_SCHOOLS, RES_SCHOOLS_META, RES_CRIME, RES_POPULATION, RES_SOCIOECONOMIC, SOCIO_FIELD,
+  },
+  codes: {
+    CRIME_CODE_KEY, POP_CODE_KEY, POP_VALUE_KEY, SOCIO_CODE_KEY,
+  },
+  eduLat: EDU_LAT_KEYS,
+  eduLng: EDU_LNG_KEYS,
+  pikuah: PIKUAH_KEYS,
+  sector: SECTOR_KEYS,
+  stage: STAGE_KEYS,
+};
 
 // Overpass mirrors — try in order, fail-soft to next.
 const OVERPASS_ENDPOINTS = [
@@ -141,19 +167,23 @@ out tags center 2000;`; // raised from 200: the low cap truncated park ways so g
 }
 
 // ---------------------------------------------------------------------------
-// Is this education row a kindergarten / preschool (גן/קדם) vs a school?
+// Is this education row a kindergarten / preschool vs a school? Reads the name
+// (coords dataset SHEM_MOSAD, e.g. "גן שלוה") or type (mosdot "סוג מוסד" = "גן
+// ילדים"). Tightened so a place-name like "גני תקווה" doesn't false-match.
 export function isKindergarten(r) {
-  return /גן|קדם|preschool|kinder/i.test(pickStr(r, STAGE_KEYS));
+  return /(^|\s)גן\s|גן ילדים|גני ילדים|מעון|טרום.?חובה|preschool|kinder/i.test(pickStr(r, STAGE_KEYS));
 }
 
 // Canonicalise the supervision (פיקוח) so cohort logic can match: religious
 // families want ממ"ד/חרדי, Arab families want Arab-sector schools, etc.
+// Real mosdot פיקוח values are ABBREVIATIONS: מ"מ (ממלכתי), חמ"ד / ממ"ד
+// (ממלכתי-דתי), חרדי. Match those, most-specific first.
 export function normPikuah(s) {
   const t = String(s || '');
+  if (/חמ"?ד|ממ"?ד|ממלכתי.?דתי|דתי/.test(t)) return 'mamlachti_dati';
   if (/חרדי|עצמאי|מוכר/.test(t)) return 'charedi';
-  if (/דתי/.test(t)) return 'mamlachti_dati';   // checked before ממלכתי
   if (/ערבי|בדואי|דרוזי/.test(t)) return 'arab';
-  if (/ממלכתי|רשמי|state/i.test(t)) return 'mamlachti';
+  if (/ממלכתי|מ"?מ|רשמי|state/i.test(t)) return 'mamlachti';
   return '';
 }
 export function normSector(s) {
@@ -172,8 +202,6 @@ export function normSector(s) {
 function proximityScore(records, lat, lng, { radiusM, target, keep }) {
   let near = 0;
   let nearest = Infinity;
-  const pikuah = new Set();
-  const sectors = {};
   for (const r of records) {
     if (keep && !keep(r)) continue;
     const slat = pickNum(r, EDU_LAT_KEYS);
@@ -184,13 +212,11 @@ function proximityScore(records, lat, lng, { radiusM, target, keep }) {
     if (d > radiusM) continue;
     near++;
     if (d < nearest) nearest = d;
-    const pk = normPikuah(pickStr(r, PIKUAH_KEYS)); if (pk) pikuah.add(pk);
-    const sc = normSector(pickStr(r, SECTOR_KEYS)); if (sc) sectors[sc] = (sectors[sc] || 0) + 1;
   }
   const score = Number.isFinite(nearest)
     ? clamp(0.6 * saturate(near, target) + 0.4 * clamp(100 * (1 - nearest / radiusM)))
     : 20; // records exist but none within radius
-  return { score, count: near, pikuah: [...pikuah], sectors };
+  return { score, count: near };
 }
 
 // crime value (count OR per-capita rate) → safety 0–100: lower vs the max → safer.
@@ -239,48 +265,71 @@ export function buildLocalityMap(records, nameKeys, valueOf, sum = false) {
   return map;
 }
 
-// Safety for a NAMED locality: CBS socio-economic cluster (higher = better)
-// blended with police crime (lower = better), joined on the locality name. Both
-// optional; returns null when the locality can't be matched in either source so
-// the composite renormalises rather than inventing a number.
+// CKAN row count for an exact filter (SQL endpoint is disabled → use limit=0).
+async function ckanTotal(resourceId, filters) {
+  const j = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
+    `?resource_id=${resourceId}&filters=${encodeURIComponent(JSON.stringify(filters))}&limit=0`);
+  const t = j?.result?.total;
+  return Number.isFinite(t) ? t : null;
+}
+// CKAN records for an exact filter.
+async function ckanRows(resourceId, filters, limit = 1) {
+  const j = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
+    `?resource_id=${resourceId}&filters=${encodeURIComponent(JSON.stringify(filters))}&limit=${limit}`);
+  return Array.isArray(j?.result?.records) ? j.result.records : null;
+}
+// CKAN full-text search (for name-keyed datasets like mosdot with no code column).
+async function ckanTextSearch(resourceId, q, limit = 300) {
+  const j = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
+    `?resource_id=${resourceId}&q=${encodeURIComponent(q)}&limit=${limit}`);
+  return Array.isArray(j?.result?.records) ? j.result.records : null;
+}
+
+// Safety for a locality: CBS socio-economic cluster (higher = better) blended
+// with PER-CAPITA police crime (lower = better). Joined by CBS locality CODE
+// (robust vs name drift): city → resolveLocality → cbs_id → filter each dataset.
+// Fail-soft: null when the locality can't be resolved or neither source yields a
+// number, so the composite renormalises rather than inventing one.
 async function safetyScore(locality) {
-  const key = normalizeLocalityName(locality);
-  if (!key) return null;
+  const muni = resolveLocality(locality);
+  const cbs = muni ? Number(muni.cbs_id) : NaN;
+  if (!Number.isFinite(cbs)) return null;
   const parts = [];
 
-  const socioRecs = await fetchCkan(RES_SOCIOECONOMIC);
-  if (socioRecs) {
-    const map = buildLocalityMap(
-      socioRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, SOCIO_VALUE_KEYS), false);
-    const cluster = map[key];
-    if (Number.isFinite(cluster) && cluster >= 1 && cluster <= 10) {
-      parts.push(clamp((cluster / 10) * 100));
-    }
-  }
+  const [socioRows, crimeTotal, popRows] = await Promise.all([
+    ckanRows(RES_SOCIOECONOMIC, { [SOCIO_CODE_KEY]: cbs }, 1).catch(() => null),
+    ckanTotal(RES_CRIME, { [CRIME_CODE_KEY]: cbs }).catch(() => null),
+    ckanRows(RES_POPULATION, { [POP_CODE_KEY]: cbs }, 1).catch(() => null),
+  ]);
 
-  const crimeRecs = await fetchCkan(RES_CRIME);
-  if (crimeRecs) {
-    const crimeMap = buildLocalityMap(
-      crimeRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, CRIME_VALUE_KEYS), true);
-    // Population per locality → per-capita rate (else absolute count). Prefer the
-    // crime dataset's own population column, else the socio-economic dataset.
-    let popMap = buildLocalityMap(
-      crimeRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, POPULATION_KEYS), false);
-    if (!Object.keys(popMap).length && socioRecs) {
-      popMap = buildLocalityMap(
-        socioRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, POPULATION_KEYS), false);
-    }
-    const rateMap = buildCrimeRateMap(crimeMap, popMap);
-    const mine = rateMap[key];
-    if (Number.isFinite(mine)) {
-      const values = Object.values(rateMap);
-      const s = crimeCountToSafety(mine, values.length ? Math.max(...values) : 0);
-      if (Number.isFinite(s)) parts.push(s);
-    }
+  // socio-economic cluster 1–10 → 0–100 (partial city coverage → often absent).
+  const eshkol = socioRows && socioRows[0] ? pickNum(socioRows[0], [SOCIO_FIELD]) : NaN;
+  if (Number.isFinite(eshkol) && eshkol >= 1 && eshkol <= 10) parts.push(clamp((eshkol / 10) * 100));
+
+  // per-capita crime vs the national benchmark.
+  const pop = popRows && popRows[0] ? pickNum(popRows[0], [POP_VALUE_KEY]) : NaN;
+  if (Number.isFinite(crimeTotal) && Number.isFinite(pop) && pop > 0) {
+    parts.push(clamp(100 * (1 - (crimeTotal / pop) / CRIME_RATE_BENCHMARK)));
   }
 
   if (!parts.length) return null;
   return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
+}
+
+// Locality school composition (pikuah/sector) for the cohort gates, from mosdot.
+// mosdot has no locality code, so joined by full-text name search. Null when the
+// locality can't be matched → gates stay fail-soft (keep-all).
+async function schoolsComposition(locality) {
+  if (!locality) return null;
+  const recs = await ckanTextSearch(RES_SCHOOLS_META, String(locality).trim()).catch(() => null);
+  if (!recs || !recs.length) return null;
+  const pikuah = new Set();
+  const sectors = {};
+  for (const r of recs) {
+    const pk = normPikuah(pickStr(r, PIKUAH_KEYS)); if (pk) pikuah.add(pk);
+    const sc = normSector(pickStr(r, SECTOR_KEYS)); if (sc) sectors[sc] = (sectors[sc] || 0) + 1;
+  }
+  return { pikuah: [...pikuah], sectors };
 }
 
 function pickNum(obj, keys) {
@@ -313,26 +362,28 @@ function pickStr(obj, keys) {
 export async function neighborhoodScore({ lat, lng, locality }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-  // fan out in parallel; each may return null. Safety needs the locality NAME
-  // (crime/socio are per-locality, joined by name) — omitted if none supplied.
-  // Education is fetched ONCE and split into schools + kindergartens.
-  const [osm, education, safety] = await Promise.all([
+  // fan out in parallel; each may return null.
+  //  - coords dataset → distance-decayed schools + kindergarten proximity
+  //  - safetyScore    → per-capita crime + socio (by cbs_id)
+  //  - composition    → locality school pikuah/sector (by name) for the gates
+  const [osm, education, safety, composition] = await Promise.all([
     osmCounts(lat, lng).catch(() => null),
     fetchCkan(RES_SCHOOLS, 2000).catch(() => null),
     safetyScore(locality).catch(() => null),
+    (locality ? schoolsComposition(locality).catch(() => null) : Promise.resolve(null)),
   ]);
 
   let schools = null;
   let kindergarten = null;
-  let schoolsMeta = null;
   if (Array.isArray(education)) {
     const sc = proximityScore(education, lat, lng, { radiusM: 2000, target: 6, keep: (r) => !isKindergarten(r) });
     const kg = proximityScore(education, lat, lng, { radiusM: 1000, target: 4, keep: isKindergarten });
     schools = sc.score;
     kindergarten = kg.score;
-    // Parsed composition (retained instead of discarded) for cohort matching.
-    schoolsMeta = { count: sc.count, pikuah: sc.pikuah, sectors: sc.sectors, kindergartenCount: kg.count };
   }
+  // Composition (pikuah/sectors) drives the cohort gates; comes from mosdot by
+  // locality, since the coords dataset carries no supervision/sector columns.
+  const schoolsMeta = composition ? { pikuah: composition.pikuah, sectors: composition.sectors } : null;
 
   // assemble available sub-scores with their weights (kindergarten split out).
   const W = { safety: 0.28, walkability: 0.22, schools: 0.18, kindergarten: 0.10, transit: 0.12, green: 0.10 };
