@@ -43,13 +43,17 @@ test('priceFitScore: out-of-window decays; no-signal is neutral', () => {
   assert.equal(priceFitScore(0, win, 'low'), 0.5);   // bad price
 });
 
-test('cohortGateReject: religious_family requires חמ"ד-dominant area (fraction)', () => {
-  // secular-dominant (0% חמ"ד) → excluded
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: { mamlachti: 20 }, total: 20 })), true);
-  // charedi-dominant, 4% חמ"ד → excluded (charedi ≠ דתי-לאומי; the key fix)
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: { charedi: 165, mamlachti_dati: 8 }, total: 204 })), true);
-  // חמ"ד-dominant (83%) → kept
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: { mamlachti_dati: 5, mamlachti: 1 }, total: 6 })), false);
+test('cohortGateReject: dati_leumi vs charedi are INVERSE gates', () => {
+  const charediArea = listingWith({ pikuah: { charedi: 165, mamlachti_dati: 8 }, total: 204 }); // 4% חמ"ד, 81% charedi
+  const datiArea = listingWith({ pikuah: { mamlachti_dati: 5, mamlachti: 1 }, total: 6 });       // 83% חמ"ד
+  const secularArea = listingWith({ pikuah: { mamlachti: 20 }, total: 20 });
+  // dati_leumi keeps חמ"ד-dominant, drops charedi + secular
+  assert.equal(cohortGateReject('dati_leumi', datiArea), false);
+  assert.equal(cohortGateReject('dati_leumi', charediArea), true);
+  assert.equal(cohortGateReject('dati_leumi', secularArea), true);
+  // charedi is the inverse: keeps charedi-dominant, drops the חמ"ד area
+  assert.equal(cohortGateReject('charedi', charediArea), false);
+  assert.equal(cohortGateReject('charedi', datiArea), true);
 });
 
 test('cohortGateReject: arab_family requires Arab-sector-dominant area', () => {
@@ -58,7 +62,7 @@ test('cohortGateReject: arab_family requires Arab-sector-dominant area', () => {
 });
 
 test('cohortGateReject fail-soft: missing/empty metadata never excludes', () => {
-  for (const cohort of ['religious_family', 'arab_family']) {
+  for (const cohort of ['dati_leumi', 'charedi', 'arab_family']) {
     assert.equal(cohortGateReject(cohort, listingWith(undefined)), false); // no schoolsMeta
     assert.equal(cohortGateReject(cohort, { }), false);                    // no neighborhoodScore
     assert.equal(cohortGateReject(cohort, listingWith({ pikuah: {}, sectors: {}, total: 0 })), false); // empty

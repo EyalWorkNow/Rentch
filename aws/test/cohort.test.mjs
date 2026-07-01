@@ -14,7 +14,8 @@ test('taxonomy priority: intent > sector > lifeStage > household', () => {
   // oleh via langPref
   assert.equal(cohortFromSignals({ langPref: 'en', household: 'family' }), 'oleh');
   // religious family
-  assert.equal(cohortFromSignals({ sector: 'jewish-religious', numChildren: 5 }), 'religious_family');
+  assert.equal(cohortFromSignals({ sector: 'jewish-religious', numChildren: 5 }), 'dati_leumi');
+  assert.equal(cohortFromSignals({ sector: 'jewish-religious', household: 'family', religiousStream: 'charedi' }), 'charedi');
   // senior via age
   assert.equal(cohortFromSignals({ age: 70, household: 'couple' }), 'senior');
   // single parent (kids + carFree)
@@ -63,7 +64,7 @@ test('definedOnly lets query override profile without wiping gaps', () => {
 });
 
 test('every taxonomy label has ranking weights + a price target', () => {
-  const labels = ['young_professional', 'new_parents', 'religious_family', 'student',
+  const labels = ['young_professional', 'new_parents', 'dati_leumi', 'charedi', 'student',
     'oleh', 'senior', 'single_parent', 'remote', 'arab_family', 'investor',
     'family', 'couple', 'single'];
   for (const c of labels) {

@@ -27,7 +27,8 @@ export const RANK_WEIGHTS_BY_COHORT = {
   // ── 11 fine cohorts ──
   young_professional: { freshness: 0.25, popularity: 0.10, completeness: 0.15, priceFit: 0.12, neighborhood: 0.20, semantic: 0.18 },
   new_parents:        { freshness: 0.15, popularity: 0.10, completeness: 0.17, priceFit: 0.23, neighborhood: 0.27, semantic: 0.08 },
-  religious_family:   { freshness: 0.10, popularity: 0.08, completeness: 0.20, priceFit: 0.22, neighborhood: 0.30, semantic: 0.10 },
+  dati_leumi:         { freshness: 0.10, popularity: 0.08, completeness: 0.20, priceFit: 0.22, neighborhood: 0.30, semantic: 0.10 },
+  charedi:            { freshness: 0.10, popularity: 0.08, completeness: 0.20, priceFit: 0.22, neighborhood: 0.30, semantic: 0.10 },
   oleh:               { freshness: 0.20, popularity: 0.08, completeness: 0.15, priceFit: 0.12, neighborhood: 0.27, semantic: 0.18 },
   senior:             { freshness: 0.12, popularity: 0.05, completeness: 0.20, priceFit: 0.13, neighborhood: 0.35, semantic: 0.15 },
   single_parent:      { freshness: 0.13, popularity: 0.08, completeness: 0.12, priceFit: 0.27, neighborhood: 0.30, semantic: 0.10 },
@@ -49,7 +50,7 @@ const COHORT_PRICE_TARGET = {
   // coarse
   family: 'low', couple: 'low', student: 'low', single: 'mid',
   // fine (spec §6: price is asymmetric — most want the cheap end, a few premium)
-  young_professional: 'high', new_parents: 'low', religious_family: 'low',
+  young_professional: 'high', new_parents: 'low', dati_leumi: 'low', charedi: 'low',
   oleh: 'high', senior: 'low', single_parent: 'low', remote: 'low',
   arab_family: 'high', investor: 'invert',
 };
@@ -109,7 +110,8 @@ const NB_BY_COHORT = {
   // fine
   young_professional: { safety: 0.70, schools: 0.00, transit: 0.90, walkability: 1.00, green: 0.20 },
   new_parents:        { safety: 0.35, schools: 0.10, kindergarten: 0.45, transit: 0.15, walkability: 0.25, green: 0.15 },
-  religious_family:   { safety: 0.30, schools: 0.35, kindergarten: 0.30, transit: 0.05, walkability: 0.20, green: 0.10 },
+  dati_leumi:         { safety: 0.30, schools: 0.35, kindergarten: 0.30, transit: 0.05, walkability: 0.20, green: 0.10 },
+  charedi:            { safety: 0.30, schools: 0.35, kindergarten: 0.30, transit: 0.05, walkability: 0.20, green: 0.10 },
   oleh:               { safety: 0.95, schools: 0.85, kindergarten: 0.40, transit: 0.25, walkability: 0.80, green: 0.50 },
   senior:             { safety: 0.90, schools: 0.05, transit: 0.25, walkability: 0.95, green: 0.70 },
   single_parent:      { safety: 0.85, schools: 0.70, kindergarten: 0.55, transit: 1.00, walkability: 0.95, green: 0.35 },
@@ -135,20 +137,26 @@ function schoolsMetaOf(listing) {
 // schoolsMeta.pikuah / .sectors are per-stream COUNTS of schools within ~1.5km,
 // with .total. Gates use the FRACTION (dominance), because in dense metros every
 // stream is *present* within range — only dominance distinguishes the community.
-const DATI_MIN_FRACTION = 0.15;  // ≥15% ממלכתי-דתי → a national-religious area
-const ARAB_MIN_FRACTION = 0.15;  // ≥15% Arab-sector schools → an Arab area
+const DATI_MIN_FRACTION = 0.15;    // ≥15% ממלכתי-דתי → a national-religious area
+const CHAREDI_MIN_FRACTION = 0.15; // ≥15% charedi → an ultra-orthodox area
+const ARAB_MIN_FRACTION = 0.15;    // ≥15% Arab-sector schools → an Arab area
 const fractionOf = (counts, key, total) =>
   (total > 0 ? (Number(counts && counts[key]) || 0) / total : 0);
 
 const COHORT_GATES = {
-  // National-religious (דתי-לאומי) families need a ממלכתי-דתי (חמ"ד)-dominant area
-  // — charedi does NOT satisfy it (different community).
-  religious_family: (l) => {
+  // National-religious (דתי-לאומי) → needs a ממלכתי-דתי (חמ"ד)-dominant area.
+  dati_leumi: (l) => {
     const meta = schoolsMetaOf(l);
     if (!meta || !meta.total) return false; // unknown → keep (fail-soft)
     return fractionOf(meta.pikuah, 'mamlachti_dati', meta.total) < DATI_MIN_FRACTION;
   },
-  // Arab families need an Arab-sector-dominant area.
+  // Ultra-orthodox (חרדי) → needs a charedi-dominant area (the inverse community).
+  charedi: (l) => {
+    const meta = schoolsMetaOf(l);
+    if (!meta || !meta.total) return false;
+    return fractionOf(meta.pikuah, 'charedi', meta.total) < CHAREDI_MIN_FRACTION;
+  },
+  // Arab families → an Arab-sector-dominant area.
   arab_family: (l) => {
     const meta = schoolsMetaOf(l);
     if (!meta || !meta.total) return false;

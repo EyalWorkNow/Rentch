@@ -3574,6 +3574,7 @@ const PROFILE_WRITABLE_FIELDS = new Set([
   // Phase 2 — cohort taxonomy signals.
   'sector',           // 'jewish-secular' | 'jewish-religious' | 'arab'
   'isReligious',
+  'religiousStream',  // 'dati_leumi' | 'charedi'
   'isOleh',
   'langPref',         // 'he' | 'en' | 'fr' ...
   'lifeStage',        // 'student' | 'young-professional' | 'family' | 'senior'

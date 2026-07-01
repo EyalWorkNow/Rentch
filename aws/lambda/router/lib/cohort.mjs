@@ -17,6 +17,7 @@ export function querySignals(query) {
   return {
     household: q.household, vibe: q.vibe || q.vibePref, sector: q.sector,
     isOleh: bool(q.isOleh), langPref: q.langPref, isReligious: bool(q.isReligious),
+    religiousStream: q.religiousStream, // 'dati_leumi' | 'charedi'
     lifeStage: q.lifeStage, age: nOrU(q.age),
     wfh: bool(q.wfh), carFree: bool(q.carFree),
     hasChildren: bool(q.hasChildren), expecting: bool(q.expecting),
@@ -33,6 +34,7 @@ export function profileSignals(profile) {
   return {
     household: v('household'), vibe: v('vibePref'), sector: v('sector'),
     isOleh: v('isOleh'), langPref: v('langPref'), isReligious: v('isReligious'),
+    religiousStream: v('religiousStream'),
     lifeStage: v('lifeStage'), age: nOrU(v('age')),
     wfh: v('wfh'), carFree: v('carFree'),
     hasChildren: v('hasChildren'), expecting: v('expecting'),
@@ -69,7 +71,10 @@ export function cohortFromSignals(s) {
   if (s.sector === 'arab') return 'arab_family';
   if (truthy(s.isOleh) || s.langPref === 'en' || s.langPref === 'fr') return 'oleh';
   const religious = s.sector === 'jewish-religious' || truthy(s.isReligious);
-  if (religious && (s.household === 'family' || (s.numChildren || 0) >= 4)) return 'religious_family';
+  if (religious && (s.household === 'family' || (s.numChildren || 0) >= 4)) {
+    // Split by stream — different communities with OPPOSITE school needs.
+    return s.religiousStream === 'charedi' ? 'charedi' : 'dati_leumi';
+  }
 
   // (c) life stage / accessibility.
   if (truthy(s.accessibilityNeed) || (s.age || 0) >= 65 || s.lifeStage === 'senior') return 'senior';
