@@ -35,7 +35,7 @@ import AdmZip from 'adm-zip';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
-  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore,
+  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, cohortGateReject,
 } from './lib/ranking.mjs';
 import {
   querySignals, profileSignals, definedOnly, cohortFromSignals,
@@ -1352,8 +1352,17 @@ const LIKE_RATE_STRENGTH = 8;   // pseudo-views of prior weight
 async function attachRankSignals(listed, query, cohort = null) {
   try {
     const parsed = JSON.parse(listed.body);
-    const items = Array.isArray(parsed.items) ? parsed.items : [];
-    if (items.length === 0) return listed;
+    const allItems = Array.isArray(parsed.items) ? parsed.items : [];
+    if (allItems.length === 0) return listed;
+
+    // Phase 4 — cohort deal-breaker gates (hard-exclude on positive mismatch).
+    // Guardrail: if gating would empty the page, keep the ungated list rather
+    // than return nothing (a heuristic gate on possibly-missing metadata must
+    // not blank the feed). ponytail: page-level fallback, revisit if the gate
+    // should ever be allowed to legitimately return zero results.
+    const gated = cohort ? allItems.filter((p) => !cohortGateReject(cohort, p)) : allItems;
+    const items = gated.length ? gated : allItems;
+    parsed.items = items;
 
     const W = rankWeightsFor(cohort);
     const priceTarget = cohortPriceTarget(cohort);

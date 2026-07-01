@@ -121,6 +121,40 @@ export function neighborhoodWeightsFor(cohort) {
   return NB_BY_COHORT[cohort] || NB_BASE;
 }
 
+// ── Cohort deal-breaker gates (Phase 4) ──────────────────────────────────────
+// A gate HARD-EXCLUDES a listing for a cohort with a strict environmental
+// requirement, using the parsed schoolsMeta (pikuah / sector) from Phase 3.
+// CRITICAL fail-soft rule: exclude ONLY on positive evidence of a mismatch.
+// Missing/empty metadata → keep (we can't verify, so we must not hard-filter, or
+// un-enriched listings would vanish from the feed).
+function schoolsMetaOf(listing) {
+  const ns = listing && listing.neighborhoodScore;
+  return ns && typeof ns === 'object' ? ns.schoolsMeta : null;
+}
+
+const COHORT_GATES = {
+  // Religious families need a religious-stream school (ממ"ד or חרדי) nearby.
+  religious_family: (l) => {
+    const meta = schoolsMetaOf(l);
+    if (!meta || !Array.isArray(meta.pikuah) || meta.pikuah.length === 0) return false;
+    return !(meta.pikuah.includes('mamlachti_dati') || meta.pikuah.includes('charedi'));
+  },
+  // Arab families need Arab-sector schools nearby.
+  arab_family: (l) => {
+    const meta = schoolsMetaOf(l);
+    const sectors = meta && meta.sectors;
+    if (!sectors || typeof sectors !== 'object' || Object.keys(sectors).length === 0) return false;
+    return !(Number(sectors.arab) > 0);
+  },
+};
+
+// True → this listing should be hard-excluded for this cohort.
+export function cohortGateReject(cohort, listing) {
+  const gate = COHORT_GATES[cohort];
+  if (!gate) return false;
+  try { return gate(listing) === true; } catch { return false; }
+}
+
 // neighborhood_fit for the main feed: weight the listing's stored sub-scores
 // (0..100) by the cohort's priorities, renormalizing over present dimensions.
 // Falls back to the stored generic composite `score` when sub-scores are absent,

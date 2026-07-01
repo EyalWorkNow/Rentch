@@ -2,8 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore,
+  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, cohortGateReject,
 } from '../lambda/router/lib/ranking.mjs';
+
+const listingWith = (schoolsMeta) => ({ neighborhoodScore: { sub: {}, schoolsMeta } });
 
 test('rankWeightsFor: family weights neighborhood higher than default', () => {
   assert.ok(rankWeightsFor('family').neighborhood > rankWeightsFor(null).neighborhood);
@@ -39,6 +41,30 @@ test('priceFitScore: out-of-window decays; no-signal is neutral', () => {
   assert.ok(priceFitScore(9000, win, 'low') < priceFitScore(8000, win, 'low'));
   assert.equal(priceFitScore(5000, {}, 'mid'), 0.5); // no budget, no target
   assert.equal(priceFitScore(0, win, 'low'), 0.5);   // bad price
+});
+
+test('cohortGateReject: religious_family needs a religious-stream school', () => {
+  // secular-only nearby → excluded
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['mamlachti'] })), true);
+  // ממ"ד present → kept
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['mamlachti', 'mamlachti_dati'] })), false);
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['charedi'] })), false);
+});
+
+test('cohortGateReject: arab_family needs Arab-sector schools', () => {
+  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { jewish: 5 } })), true);
+  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { arab: 2, jewish: 1 } })), false);
+});
+
+test('cohortGateReject fail-soft: missing/empty metadata never excludes', () => {
+  for (const cohort of ['religious_family', 'arab_family']) {
+    assert.equal(cohortGateReject(cohort, listingWith(undefined)), false); // no schoolsMeta
+    assert.equal(cohortGateReject(cohort, { }), false);                    // no neighborhoodScore
+    assert.equal(cohortGateReject(cohort, listingWith({ pikuah: [], sectors: {} })), false); // empty
+  }
+  // cohorts without a gate are never excluded
+  assert.equal(cohortGateReject('family', listingWith({ pikuah: ['mamlachti'] })), false);
+  assert.equal(cohortGateReject(null, listingWith({ sectors: { jewish: 9 } })), false);
 });
 
 test('neighborhoodFitScore: family vs student flip; fallbacks', () => {
