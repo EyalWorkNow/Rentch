@@ -37,6 +37,9 @@ import { readFileSync } from 'node:fs';
 import {
   rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore,
 } from './lib/ranking.mjs';
+import {
+  querySignals, profileSignals, definedOnly, cohortFromSignals,
+} from './lib/cohort.mjs';
 
 // ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
 // These modules live in ./lib and expose the Israeli-data spine used to enrich a
@@ -1072,9 +1075,10 @@ export const handler = async (event) => {
           // fail-soft (a signal failure just omits `rankSignals`).
           if (tableKey === 'properties' && listed.statusCode === 200) {
             // Cohort for the caller → cohort-aware weights/price-target/neighborhood.
-            // Fail-soft: profile load errors → null cohort → default weights.
-            const profile = callerUid ? await loadUserProfile(callerUid).catch(() => null) : null;
-            return await attachRankSignals(listed, query, profileCohort(profile));
+            // Query params are checked first; the profile is loaded only if they
+            // don't already determine the cohort. Fail-soft → null → default.
+            const cohort = await resolveCohort(query, callerUid).catch(() => null);
+            return await attachRankSignals(listed, query, cohort);
           }
           return listed;
         }
@@ -3558,20 +3562,39 @@ const PROFILE_WRITABLE_FIELDS = new Set([
   'hasPets',
   'hasChildren',
   'wfh',
+  // Phase 2 — cohort taxonomy signals.
+  'sector',           // 'jewish-secular' | 'jewish-religious' | 'arab'
+  'isReligious',
+  'isOleh',
+  'langPref',         // 'he' | 'en' | 'fr' ...
+  'lifeStage',        // 'student' | 'young-professional' | 'family' | 'senior'
+  'age',
+  'carFree',
+  'isInvestor',
+  'intent',           // 'residence' | 'investment'
+  'expecting',
+  'numChildren',
+  'childAge',
+  'accessibilityNeed',
+  'isSolo',
+  'leaseFlex',
 ]);
 
-// Reads the cohort for per-cohort ranking. Prefers an explicit household, else
-// infers from vibePref. Returns null when unknown (scorer falls back to global).
+// Cohort from a persisted profile (11-cohort taxonomy in lib/cohort.mjs).
 function profileCohort(profile) {
-  const sp = profile && profile.searchProfile;
-  const hh = sp && sp.household && sp.household.value;
-  if (hh === 'family' || hh === 'single' || hh === 'student' || hh === 'couple') return hh;
-  const vibe = sp && sp.vibePref && sp.vibePref.value;
-  if (typeof vibe === 'string') {
-    if (vibe.includes('משפח')) return 'family';
-    if (vibe.includes('סטודנט')) return 'student';
-  }
-  return null;
+  return cohortFromSignals(profileSignals(profile));
+}
+
+// Resolve the searcher's cohort for main-feed ranking, cheapest-first: the GET
+// query params alone often determine it (no DB read); only if they don't do we
+// pay for one loadUserProfile and merge (query overrides profile).
+async function resolveCohort(query, callerUid) {
+  const qs = querySignals(query);
+  const fromQuery = cohortFromSignals(qs);
+  if (fromQuery) return fromQuery;
+  if (!callerUid) return null;
+  const profile = await loadUserProfile(callerUid).catch(() => null);
+  return cohortFromSignals({ ...profileSignals(profile), ...definedOnly(qs) });
 }
 
 // Merge-writes one profile field. Read-modify-write on the whole searchProfile

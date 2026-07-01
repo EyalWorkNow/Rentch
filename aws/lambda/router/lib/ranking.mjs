@@ -13,15 +13,27 @@ const clamp01 = (x) => Math.max(0, Math.min(1, x));
 // Per-cohort feature weights (each set sums to ~1 for interpretability; the score
 // is only a sort key so exact sums don't matter). Six features: the original
 // four + neighborhood + semantic.
+// Six-feature weight-sets. Coarse buckets (family/couple/student/single) are the
+// household-only fallback; the 11 fine cohorts (Phase 2, per the persona spec
+// §2) are used when richer signals resolve. Each set sums to ~1 (sort key, so
+// exact sums don't matter). rankWeightsFor() falls back to `default`.
 export const RANK_WEIGHTS_BY_COHORT = {
-  default: { freshness: 0.25, popularity: 0.20, completeness: 0.15, priceFit: 0.20, neighborhood: 0.12, semantic: 0.08 },
-  // Families/couples: neighborhood quality dominates, popularity de-emphasized.
-  family:  { freshness: 0.18, popularity: 0.10, completeness: 0.17, priceFit: 0.22, neighborhood: 0.25, semantic: 0.08 },
-  couple:  { freshness: 0.20, popularity: 0.12, completeness: 0.15, priceFit: 0.22, neighborhood: 0.23, semantic: 0.08 },
-  // Students: budget-driven, transit-heavy neighborhood.
-  student: { freshness: 0.20, popularity: 0.10, completeness: 0.10, priceFit: 0.30, neighborhood: 0.22, semantic: 0.08 },
-  // Singles (young professionals): semantic + freshness up, price less anchored.
-  single:  { freshness: 0.25, popularity: 0.15, completeness: 0.15, priceFit: 0.15, neighborhood: 0.18, semantic: 0.12 },
+  default:            { freshness: 0.25, popularity: 0.20, completeness: 0.15, priceFit: 0.20, neighborhood: 0.12, semantic: 0.08 },
+  // ── coarse household fallbacks ──
+  family:             { freshness: 0.18, popularity: 0.10, completeness: 0.17, priceFit: 0.22, neighborhood: 0.25, semantic: 0.08 },
+  couple:             { freshness: 0.20, popularity: 0.12, completeness: 0.15, priceFit: 0.22, neighborhood: 0.23, semantic: 0.08 },
+  student:            { freshness: 0.20, popularity: 0.10, completeness: 0.10, priceFit: 0.30, neighborhood: 0.22, semantic: 0.08 },
+  single:             { freshness: 0.25, popularity: 0.15, completeness: 0.15, priceFit: 0.15, neighborhood: 0.18, semantic: 0.12 },
+  // ── 11 fine cohorts ──
+  young_professional: { freshness: 0.25, popularity: 0.10, completeness: 0.15, priceFit: 0.12, neighborhood: 0.20, semantic: 0.18 },
+  new_parents:        { freshness: 0.15, popularity: 0.10, completeness: 0.17, priceFit: 0.23, neighborhood: 0.27, semantic: 0.08 },
+  religious_family:   { freshness: 0.10, popularity: 0.08, completeness: 0.20, priceFit: 0.22, neighborhood: 0.30, semantic: 0.10 },
+  oleh:               { freshness: 0.20, popularity: 0.08, completeness: 0.15, priceFit: 0.12, neighborhood: 0.27, semantic: 0.18 },
+  senior:             { freshness: 0.12, popularity: 0.05, completeness: 0.20, priceFit: 0.13, neighborhood: 0.35, semantic: 0.15 },
+  single_parent:      { freshness: 0.13, popularity: 0.08, completeness: 0.12, priceFit: 0.27, neighborhood: 0.30, semantic: 0.10 },
+  remote:             { freshness: 0.22, popularity: 0.10, completeness: 0.13, priceFit: 0.20, neighborhood: 0.17, semantic: 0.18 },
+  arab_family:        { freshness: 0.12, popularity: 0.08, completeness: 0.20, priceFit: 0.13, neighborhood: 0.32, semantic: 0.15 },
+  investor:           { freshness: 0.18, popularity: 0.15, completeness: 0.07, priceFit: 0.20, neighborhood: 0.22, semantic: 0.18 },
 };
 
 export function rankWeightsFor(cohort) {
@@ -33,7 +45,14 @@ export function rankWeightsFor(cohort) {
 //   high   — premium end best (lifestyle buyers)
 //   mid    — peak in the middle (neutral default)
 //   invert — cheaper is always better (investor/yield); treated like `low` here
-const COHORT_PRICE_TARGET = { family: 'low', couple: 'low', student: 'low', single: 'mid' };
+const COHORT_PRICE_TARGET = {
+  // coarse
+  family: 'low', couple: 'low', student: 'low', single: 'mid',
+  // fine (spec §6: price is asymmetric — most want the cheap end, a few premium)
+  young_professional: 'high', new_parents: 'low', religious_family: 'low',
+  oleh: 'high', senior: 'low', single_parent: 'low', remote: 'low',
+  arab_family: 'high', investor: 'invert',
+};
 export function cohortPriceTarget(cohort) {
   return COHORT_PRICE_TARGET[cohort] || 'mid';
 }
@@ -74,12 +93,26 @@ export function priceFitScore(price, { minBudget, maxBudget, targetPrice }, pric
 }
 
 // Per-cohort weights over the public-data neighborhood sub-scores.
+// Per-cohort weights over the neighborhood sub-scores (relative 0..1; the fit
+// renormalizes over present dimensions). Fine-cohort rows are the persona spec
+// §3 (columns there: safety, schools, transit, walkability, green).
 const NB_BASE = { safety: 0.30, walkability: 0.25, schools: 0.20, transit: 0.15, green: 0.10 };
 const NB_BY_COHORT = {
+  // coarse
   family:  { safety: 0.30, walkability: 0.10, schools: 0.35, transit: 0.05, green: 0.20 },
   couple:  { safety: 0.30, walkability: 0.15, schools: 0.25, transit: 0.10, green: 0.20 },
   student: { safety: 0.10, walkability: 0.35, schools: 0.00, transit: 0.45, green: 0.10 },
   single:  { safety: 0.15, walkability: 0.35, schools: 0.00, transit: 0.35, green: 0.15 },
+  // fine
+  young_professional: { safety: 0.70, schools: 0.00, transit: 0.90, walkability: 1.00, green: 0.20 },
+  new_parents:        { safety: 0.35, schools: 0.10, transit: 0.15, walkability: 0.25, green: 0.15 },
+  religious_family:   { safety: 0.30, schools: 0.35, transit: 0.05, walkability: 0.20, green: 0.10 },
+  oleh:               { safety: 0.95, schools: 0.85, transit: 0.25, walkability: 0.80, green: 0.50 },
+  senior:             { safety: 0.90, schools: 0.05, transit: 0.25, walkability: 0.95, green: 0.70 },
+  single_parent:      { safety: 0.85, schools: 0.70, transit: 1.00, walkability: 0.95, green: 0.35 },
+  remote:             { safety: 0.15, schools: 0.00, transit: 0.15, walkability: 0.40, green: 0.30 },
+  arab_family:        { safety: 0.45, schools: 0.90, transit: 0.15, walkability: 0.85, green: 0.30 },
+  investor:           { safety: 0.40, schools: 0.20, transit: 1.00, walkability: 0.55, green: 0.10 },
 };
 export function neighborhoodWeightsFor(cohort) {
   return NB_BY_COHORT[cohort] || NB_BASE;
