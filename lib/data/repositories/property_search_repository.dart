@@ -17,6 +17,7 @@ class PropertySearchCriteria {
     this.minRooms,
     this.amenityKeys = const {},
     this.vibe,
+    this.queryText,
   });
 
   final String? city;
@@ -28,6 +29,9 @@ class PropertySearchCriteria {
   // Soft preference (chip or NL): 'שקט'/'תוסס'/'משפחתי'/'סטודנטיאלי'.
   // Not a hard filter — feeds the vibe_fit ranking term.
   final String? vibe;
+  // Raw NL query text, when available. Enables the semantic kNN candidate
+  // source; when null, retrieval is the city query alone (unchanged behavior).
+  final String? queryText;
 }
 
 /// Maps a requested vibe to a target neighborhood-vibrancy in [-1,1] (same scale
@@ -74,6 +78,10 @@ class PropertySearchRepository {
     ];
 
     try {
+      // Kick off the semantic kNN candidate source in parallel with the city
+      // query (fail-soft — returns [] on any problem, incl. when the backend
+      // has embeddings disabled), then merge the two candidate sets.
+      final knnFuture = _knnCandidates(c);
       final result = await _breaker.call(
         () => RetryPolicy.transient.execute(
           () => tables.listRows(
@@ -92,7 +100,8 @@ class PropertySearchRepository {
         if (p != null) parsed.add(_Candidate(p, row.data));
       }
 
-      return _filterAndRank(parsed, c);
+      final merged = _mergeCandidates(parsed, await knnFuture);
+      return _filterAndRank(merged, c);
     } on CircuitOpenException {
       return const [];
     } catch (e) {
@@ -109,6 +118,78 @@ class PropertySearchRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  /// The text used for semantic kNN: caller-provided raw NL if present,
+  /// otherwise a query synthesized from the active chips/criteria. Returns null
+  /// when there's nothing meaningful to search on (so kNN simply doesn't fire).
+  static String? effectiveQueryText(PropertySearchCriteria c) {
+    final raw = c.queryText?.trim();
+    if (raw != null && raw.isNotEmpty) return raw;
+    final bits = <String>[
+      if (c.vibe != null && c.vibe!.trim().isNotEmpty) c.vibe!.trim(),
+      if (c.minRooms != null) '${_roomsLabel(c.minRooms!)} חדרים',
+      if (c.city != null && c.city!.trim().isNotEmpty) 'ב${c.city!.trim()}',
+      if (c.maxPrice != null) 'עד ${c.maxPrice} ש״ח',
+    ];
+    if (bits.isEmpty) return null;
+    return 'דירה ${bits.join(' ')}';
+  }
+
+  static String _roomsLabel(double r) =>
+      r % 1 == 0 ? r.toStringAsFixed(0) : r.toStringAsFixed(1);
+
+  /// Semantic kNN candidate source. Calls the backend /search/knn with the raw
+  /// query text; the backend embeds it and queries S3 Vectors. Fully fail-soft:
+  /// returns [] when there's no query text, the API is unconfigured, or the
+  /// backend has embeddings disabled (it replies {results: []}).
+  Future<List<_Candidate>> _knnCandidates(PropertySearchCriteria c) async {
+    final text = effectiveQueryText(c);
+    if (text == null || text.isEmpty) return const [];
+    if (!AwsApiClient.instance.isConfigured) return const [];
+    try {
+      final res = await AwsApiClient.instance.post('/search/knn', {
+        'text': text,
+        if (c.city != null && c.city!.trim().isNotEmpty) 'city': c.city!.trim(),
+        'topK': 50,
+      });
+      final list = res['results'];
+      if (list is! List) return const [];
+      final out = <_Candidate>[];
+      for (final row in list) {
+        if (row is! Map) continue;
+        final map = Map<String, dynamic>.from(row);
+        final p = _safeParse(map);
+        if (p != null) out.add(_Candidate(p, map)); // raw carries `semanticSim`
+      }
+      return out;
+    } catch (_) {
+      return const []; // city query still stands
+    }
+  }
+
+  /// Union of the city-query and kNN candidates, deduped by id. For listings in
+  /// both, keep the city-query candidate (its raw has the server rank signals)
+  /// but graft on the kNN `semanticSim` so the scorer sees it.
+  List<_Candidate> _mergeCandidates(List<_Candidate> base, List<_Candidate> knn) {
+    final byId = <String, _Candidate>{for (final c in base) c.property.id: c};
+    for (final c in knn) {
+      final existing = byId[c.property.id];
+      if (existing == null) {
+        byId[c.property.id] = c;
+      } else {
+        final sim = c.raw['semanticSim'];
+        // Rebuild with a merged raw (don't mutate — the backend map may be
+        // unmodifiable): keep the server rank signals, add semanticSim.
+        if (sim != null) {
+          byId[c.property.id] = _Candidate(
+            existing.property,
+            {...existing.raw, 'semanticSim': sim},
+          );
+        }
+      }
+    }
+    return byId.values.toList();
   }
 
   List<RentalProperty> _filterAndRank(
@@ -178,6 +259,11 @@ class PropertySearchRepository {
   // the others — when no vibe is requested vibe_fit is a constant 0.5 and the
   // sort order is unchanged; it only differentiates once a vibe is set.
   static const _wVibeFit = 0.10;
+  // Semantic similarity from the embedding kNN (step 3). Neutral 0.5 for
+  // candidates without an embedding signal (e.g. city-query-only hits, or when
+  // the backend has embeddings off) → constant offset, no sort effect until a
+  // real semanticSim is present.
+  static const _wSemanticSim = 0.20;
 
   // Global default weight-set. Per-cohort variants override a few of these.
   static const Map<String, double> _baseWeights = {
@@ -188,6 +274,7 @@ class PropertySearchRepository {
     'popularity_prior': _wPopularity,
     'explore': _wExplore,
     'vibe_fit': _wVibeFit,
+    'semantic_sim': _wSemanticSim,
   };
 
   // Per-cohort weight overrides (מהיר tier: dynamic weights without ML). Cohort
@@ -321,6 +408,11 @@ class PropertySearchRepository {
       vibeFit = 1.0 - ((propVibrancy - target).abs() / 2.0);
     }
 
+    // semantic_sim: the embedding kNN similarity the backend grafted onto this
+    // candidate's raw map (top-level `semanticSim`). Neutral 0.5 when absent.
+    final sem = _serverSignal(c.raw, const ['semanticSim', 'semantic_sim']);
+    final semanticSim = (sem ?? 0.5).clamp(0.0, 1.0).toDouble();
+
     return {
       'tag_overlap': tagOverlap.clamp(0.0, 1.0).toDouble(),
       'price_fit': priceFit.clamp(0.0, 1.0).toDouble(),
@@ -329,6 +421,7 @@ class PropertySearchRepository {
       'popularity_prior': popularity.clamp(0.0, 1.0).toDouble(),
       'explore': explore.toDouble(),
       'vibe_fit': vibeFit.clamp(0.0, 1.0).toDouble(),
+      'semantic_sim': semanticSim,
     };
   }
 

@@ -102,6 +102,11 @@ const GEMINI_LIVE_MODEL =
 const EMBEDDINGS_ENABLED = process.env.ENABLE_EMBEDDINGS === '1';
 const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001';
 const EMBED_DIM = Number(process.env.EMBED_DIM) || 768;
+// S3 Vectors index (step 3). Both must be set for kNN upsert/query to run; when
+// unset, the helpers no-op so nothing breaks. Create the index with the COSINE
+// distance metric and dimension === EMBED_DIM.
+const S3_VECTORS_BUCKET = process.env.S3_VECTORS_BUCKET || '';
+const S3_VECTORS_INDEX = process.env.S3_VECTORS_INDEX || '';
 
 // Varjo Teleport — builds an interactive Gaussian-splat 3D walkthrough of an
 // apartment from an mp4 (or zip of images). The client_secret stays server-side
@@ -504,7 +509,7 @@ async function firePushForWrite(tableKey, body, senderUid) {
 //   2. geocode    — GovMap address → lat/lng + gush/helka.
 //   3. priceBadge — nadlan comps + CBS trend → מעל/מתחת לשוק.
 //   4. nbhdScore  — data.gov.il + OSM neighbourhood score.
-async function enrichListingOnCreate(body) {
+async function enrichListingOnCreate(body, id) {
   // 1) Smart tags — independent, so do it in parallel with the geo chain.
   const tasks = [];
   tasks.push((async () => {
@@ -522,6 +527,14 @@ async function enrichListingOnCreate(body) {
           body.embedding = vec;
           body.embeddingDim = EMBED_DIM;
           body.embeddingModel = GEMINI_EMBED_MODEL;
+          // Mirror the vector into the S3 Vectors index for kNN retrieval.
+          // Fail-soft + no-op when the index isn't configured.
+          const listingId = id || body.id || body.propertyId;
+          await s3VectorsUpsert(listingId, vec, {
+            city: body.city || '',
+            price: Number(body.price) || 0,
+            rooms: Number(body.rooms) || 0,
+          });
         }
       } catch (e) { console.warn('enrich: embedding failed:', e.message); }
     }
@@ -917,6 +930,13 @@ export const handler = async (event) => {
       return await handleSearchLog(event);
     }
 
+    // ── Semantic kNN candidate source (step 3) ──────────────────────────────
+    // POST /search/knn → embed query text, kNN against S3 Vectors, return the
+    // matching listings. Dormant → {results:[]} unless embeddings+index are on.
+    if (segments[0] === 'search' && segments[1] === 'knn' && method === 'POST') {
+      return await handleSearchKnn(event);
+    }
+
     // ── Per-listing "Ask Rently" Q&A ────────────────────────────────────────
     // POST /listing/ask → answer a question about ONE listing, grounded strictly
     // in that listing + its enrichment. Auth-gated.
@@ -1083,7 +1103,7 @@ export const handler = async (event) => {
             // Budget enrichment so a slow connector/Gemini fetch can't stall the
             // publish (the client blocks on this response). Fail-soft on timeout.
             await Promise.race([
-              enrichListingOnCreate(body), // mutates body: smartTags, geo, badges
+              enrichListingOnCreate(body, writeId), // mutates body: smartTags, geo, badges
               new Promise((res) => setTimeout(res, 4000)),
             ]).catch(() => {});
           }
@@ -1515,6 +1535,45 @@ async function handleSearchLog(event) {
   }));
 
   return json(200, { ok: true, logged: written, searchId });
+}
+
+// POST /search/knn — embed the query text, kNN against S3 Vectors, return the
+// matching listings (each carrying a `semanticSim` signal for the client ranker).
+// Fully fail-soft: any problem (embeddings off, no index, embed/query/fetch
+// failure) returns { results: [] } so the client's city query still stands.
+async function handleSearchKnn(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; }
+  catch { return json(400, { message: 'Invalid JSON body.' }); }
+
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+  if (!EMBEDDINGS_ENABLED || !text) return json(200, { results: [] });
+
+  try {
+    const vec = await geminiEmbed(text);
+    if (!vec) return json(200, { results: [] });
+    const cityFilter = typeof body.city === 'string' && body.city.trim()
+      ? body.city.trim() : undefined;
+    const hits = await s3VectorsQuery(vec, Number(body.topK) || 50, cityFilter);
+    if (!hits.length) return json(200, { results: [] });
+
+    // Fetch the real listing rows and graft on the semanticSim signal.
+    const rows = await Promise.all(hits.map(async (h) => {
+      try {
+        const r = await ddb.send(new GetCommand({
+          TableName: TABLES.properties.name, Key: { id: h.id },
+        }));
+        if (!r.Item) return null;
+        return { ...r.Item, semanticSim: h.sim };
+      } catch { return null; }
+    }));
+    return json(200, { results: rows.filter(Boolean) });
+  } catch (e) {
+    console.warn('search/knn failed:', e.message);
+    return json(200, { results: [] });
+  }
 }
 
 function pageBody(out) {
@@ -3369,6 +3428,70 @@ async function geminiEmbed(text) {
     return Array.isArray(vec) && vec.length ? vec : null;
   } catch {
     return null;
+  }
+}
+
+// ── S3 Vectors (step 3) — lazy, fail-soft ─────────────────────────────────────
+// The S3 Vectors SDK is loaded on first use via dynamic import, so a missing
+// package or an unconfigured index NEVER breaks module load or the request path
+// — every helper degrades to a no-op / empty result. All of this only runs when
+// EMBEDDINGS_ENABLED and both bucket+index are set.
+// NOTE: field names follow the S3 Vectors JS SDK; confirm against your SDK
+// version when provisioning (it's a young service).
+let _s3vClient = null;
+let _s3vMod = null;
+async function s3Vectors() {
+  if (_s3vClient) return { client: _s3vClient, mod: _s3vMod };
+  const mod = await import('@aws-sdk/client-s3vectors');
+  _s3vMod = mod;
+  _s3vClient = new mod.S3VectorsClient({ region: REGION });
+  return { client: _s3vClient, mod };
+}
+
+// cosine distance (ascending, 0..2) → similarity in [0,1].
+function cosDistToSim(d) {
+  if (typeof d !== 'number') return 0.5;
+  return Math.max(0, Math.min(1, 1 - d / 2));
+}
+
+async function s3VectorsUpsert(id, vector, metadata) {
+  if (!EMBEDDINGS_ENABLED || !S3_VECTORS_BUCKET || !S3_VECTORS_INDEX) return false;
+  if (!id || !Array.isArray(vector) || !vector.length) return false;
+  try {
+    const { client, mod } = await s3Vectors();
+    await client.send(new mod.PutVectorsCommand({
+      vectorBucketName: S3_VECTORS_BUCKET,
+      indexName: S3_VECTORS_INDEX,
+      vectors: [{ key: String(id), data: { float32: vector }, metadata: metadata || {} }],
+    }));
+    return true;
+  } catch (e) {
+    console.warn('s3VectorsUpsert failed:', e.message);
+    return false;
+  }
+}
+
+// Returns [{ id, sim }] ranked by similarity, or [] on any problem.
+async function s3VectorsQuery(vector, topK, cityFilter) {
+  if (!EMBEDDINGS_ENABLED || !S3_VECTORS_BUCKET || !S3_VECTORS_INDEX) return [];
+  if (!Array.isArray(vector) || !vector.length) return [];
+  try {
+    const { client, mod } = await s3Vectors();
+    const input = {
+      vectorBucketName: S3_VECTORS_BUCKET,
+      indexName: S3_VECTORS_INDEX,
+      queryVector: { float32: vector },
+      topK: Math.max(1, Math.min(200, topK || 50)),
+      returnDistance: true,
+      returnMetadata: false,
+    };
+    if (cityFilter) input.filter = { city: cityFilter };
+    const out = await client.send(new mod.QueryVectorsCommand(input));
+    const vecs = (out && out.vectors) || [];
+    return vecs.map((v) => ({ id: v.key, sim: cosDistToSim(v.distance) }));
+  } catch (e) {
+    console.warn('s3VectorsQuery failed:', e.message);
+    return [];
   }
 }
 

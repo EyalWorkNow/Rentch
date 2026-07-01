@@ -20,6 +20,10 @@ const MODEL = process.env.GEMINI_EMBED_MODEL || 'gemini-embedding-001';
 const DIM = Number(process.env.EMBED_DIM) || 768;
 const TABLE = `${process.env.TABLE_PREFIX || 'rently-'}properties`;
 const REGION = process.env.AWS_REGION || 'us-east-1';
+// Optional: also upsert into the S3 Vectors index (mirrors the router). Only
+// runs when both are set; otherwise the script just writes embeddings to Dynamo.
+const VEC_BUCKET = process.env.S3_VECTORS_BUCKET || '';
+const VEC_INDEX = process.env.S3_VECTORS_INDEX || '';
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
@@ -66,6 +70,26 @@ async function embed(text) {
   return vec;
 }
 
+// Lazy S3 Vectors upsert — dynamic import so the script still runs (embeddings
+// only) when the SDK isn't installed. No-op unless bucket+index are configured.
+let _s3v = null;
+async function upsertVector(id, vector, item) {
+  if (!VEC_BUCKET || !VEC_INDEX) return;
+  if (!_s3v) {
+    const mod = await import('@aws-sdk/client-s3vectors');
+    _s3v = { mod, client: new mod.S3VectorsClient({ region: REGION }) };
+  }
+  await _s3v.client.send(new _s3v.mod.PutVectorsCommand({
+    vectorBucketName: VEC_BUCKET,
+    indexName: VEC_INDEX,
+    vectors: [{
+      key: String(id),
+      data: { float32: vector },
+      metadata: { city: item.city || '', price: Number(item.price) || 0, rooms: Number(item.rooms) || 0 },
+    }],
+  }));
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
@@ -94,6 +118,7 @@ async function main() {
             UpdateExpression: 'SET embedding = :v, embeddingDim = :d, embeddingModel = :m',
             ExpressionAttributeValues: { ':v': vec, ':d': DIM, ':m': MODEL },
           }));
+          await upsertVector(item.id, vec, item);
         }
         embedded++;
         if (embedded % 25 === 0) console.log(`  embedded ${embedded}…`);

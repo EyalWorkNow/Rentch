@@ -50,6 +50,15 @@ void main() {
       expect(base['tag_overlap'], 0.30);
     });
 
+    test('semantic_sim term is in every weight-set', () {
+      for (final cohort in [null, 'student', 'family']) {
+        final w = PropertySearchRepository.weightsFor(cohort);
+        expect(w['semantic_sim'], isNotNull,
+            reason: 'cohort=$cohort must keep semantic_sim');
+        expect(w['semantic_sim']! > 0, isTrue);
+      }
+    });
+
     test('students weight price higher, families weight amenities higher', () {
       final base = PropertySearchRepository.weightsFor(null);
       final student = PropertySearchRepository.weightsFor('student');
@@ -58,6 +67,33 @@ void main() {
       expect(family['tag_overlap'], greaterThan(base['tag_overlap']!));
       // Overrides don't drop the untouched terms.
       expect(student['vibe_fit'], base['vibe_fit']);
+    });
+  });
+
+  group('effectiveQueryText (kNN query source)', () {
+    test('raw NL text wins when provided', () {
+      const c = PropertySearchCriteria(
+        city: 'תל אביב',
+        vibe: 'שקט',
+        queryText: 'משהו ליד הים עם מרפסת',
+      );
+      expect(PropertySearchRepository.effectiveQueryText(c),
+          'משהו ליד הים עם מרפסת');
+    });
+
+    test('synthesized from chips when no raw text', () {
+      const c = PropertySearchCriteria(city: 'חיפה', vibe: 'משפחתי', minRooms: 3);
+      final q = PropertySearchRepository.effectiveQueryText(c)!;
+      expect(q, contains('משפחתי'));
+      expect(q, contains('חיפה'));
+      expect(q, contains('3 חדרים'));
+    });
+
+    test('null when there is nothing meaningful to search on', () {
+      expect(PropertySearchRepository.effectiveQueryText(
+          const PropertySearchCriteria()), isNull);
+      expect(PropertySearchRepository.effectiveQueryText(
+          const PropertySearchCriteria(queryText: '   ')), isNull);
     });
   });
 }
