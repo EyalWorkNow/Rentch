@@ -43,30 +43,29 @@ test('priceFitScore: out-of-window decays; no-signal is neutral', () => {
   assert.equal(priceFitScore(0, win, 'low'), 0.5);   // bad price
 });
 
-test('cohortGateReject: religious_family strictly requires חמ"ד (mamlachti_dati)', () => {
-  // secular-only → excluded
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['mamlachti'] })), true);
-  // charedi ≠ דתי-לאומי → still excluded (the key fix)
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['charedi'] })), true);
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['charedi', 'mamlachti'] })), true);
-  // חמ"ד present → kept
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['mamlachti', 'mamlachti_dati'] })), false);
+test('cohortGateReject: religious_family requires חמ"ד-dominant area (fraction)', () => {
+  // secular-dominant (0% חמ"ד) → excluded
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: { mamlachti: 20 }, total: 20 })), true);
+  // charedi-dominant, 4% חמ"ד → excluded (charedi ≠ דתי-לאומי; the key fix)
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: { charedi: 165, mamlachti_dati: 8 }, total: 204 })), true);
+  // חמ"ד-dominant (83%) → kept
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: { mamlachti_dati: 5, mamlachti: 1 }, total: 6 })), false);
 });
 
-test('cohortGateReject: arab_family needs Arab-sector schools', () => {
-  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { jewish: 5 } })), true);
-  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { arab: 2, jewish: 1 } })), false);
+test('cohortGateReject: arab_family requires Arab-sector-dominant area', () => {
+  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { jewish: 100 }, total: 100 })), true);
+  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { arab: 5, jewish: 5 }, total: 10 })), false);
 });
 
 test('cohortGateReject fail-soft: missing/empty metadata never excludes', () => {
   for (const cohort of ['religious_family', 'arab_family']) {
     assert.equal(cohortGateReject(cohort, listingWith(undefined)), false); // no schoolsMeta
     assert.equal(cohortGateReject(cohort, { }), false);                    // no neighborhoodScore
-    assert.equal(cohortGateReject(cohort, listingWith({ pikuah: [], sectors: {} })), false); // empty
+    assert.equal(cohortGateReject(cohort, listingWith({ pikuah: {}, sectors: {}, total: 0 })), false); // empty
   }
   // cohorts without a gate are never excluded
-  assert.equal(cohortGateReject('family', listingWith({ pikuah: ['mamlachti'] })), false);
-  assert.equal(cohortGateReject(null, listingWith({ sectors: { jewish: 9 } })), false);
+  assert.equal(cohortGateReject('family', listingWith({ pikuah: { mamlachti: 5 }, total: 5 })), false);
+  assert.equal(cohortGateReject(null, listingWith({ sectors: { jewish: 9 }, total: 9 })), false);
 });
 
 test('neighborhoodFitScore: family vs student flip; fallbacks', () => {

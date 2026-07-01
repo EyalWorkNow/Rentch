@@ -132,20 +132,27 @@ function schoolsMetaOf(listing) {
   return ns && typeof ns === 'object' ? ns.schoolsMeta : null;
 }
 
+// schoolsMeta.pikuah / .sectors are per-stream COUNTS of schools within ~1.5km,
+// with .total. Gates use the FRACTION (dominance), because in dense metros every
+// stream is *present* within range — only dominance distinguishes the community.
+const DATI_MIN_FRACTION = 0.15;  // ≥15% ממלכתי-דתי → a national-religious area
+const ARAB_MIN_FRACTION = 0.15;  // ≥15% Arab-sector schools → an Arab area
+const fractionOf = (counts, key, total) =>
+  (total > 0 ? (Number(counts && counts[key]) || 0) / total : 0);
+
 const COHORT_GATES = {
-  // National-religious (דתי-לאומי) families need a ממלכתי-דתי (חמ"ד) school —
-  // NOT charedi, which is a different community. Strict: require mamlachti_dati.
+  // National-religious (דתי-לאומי) families need a ממלכתי-דתי (חמ"ד)-dominant area
+  // — charedi does NOT satisfy it (different community).
   religious_family: (l) => {
     const meta = schoolsMetaOf(l);
-    if (!meta || !Array.isArray(meta.pikuah) || meta.pikuah.length === 0) return false;
-    return !meta.pikuah.includes('mamlachti_dati');
+    if (!meta || !meta.total) return false; // unknown → keep (fail-soft)
+    return fractionOf(meta.pikuah, 'mamlachti_dati', meta.total) < DATI_MIN_FRACTION;
   },
-  // Arab families need Arab-sector schools nearby.
+  // Arab families need an Arab-sector-dominant area.
   arab_family: (l) => {
     const meta = schoolsMetaOf(l);
-    const sectors = meta && meta.sectors;
-    if (!sectors || typeof sectors !== 'object' || Object.keys(sectors).length === 0) return false;
-    return !(Number(sectors.arab) > 0);
+    if (!meta || !meta.total) return false;
+    return fractionOf(meta.sectors, 'arab', meta.total) < ARAB_MIN_FRACTION;
   },
 };
 

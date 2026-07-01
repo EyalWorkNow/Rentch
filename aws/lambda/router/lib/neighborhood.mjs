@@ -19,7 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { normalizeLocalityName, resolveLocality } from './muni.mjs';
+import { resolveLocality } from './muni.mjs';
 
 const TIMEOUT_MS = 9000;
 const UA = 'RentlyBot/1.0 (+https://rently.co.il; neighbourhood scoring; attribution: data.gov.il/CBS/OSM)';
@@ -199,76 +199,6 @@ export function normSector(s) {
   return '';
 }
 
-// Distance-decayed proximity over a set of geolocated records, plus the sector/
-// supervision composition of the matches. Blend of count-within-radius and
-// proximity-to-nearest. Score null only when the record set is empty; a low
-// floor (20) marks "records exist but none nearby" (a real signal, not unknown).
-function proximityScore(records, lat, lng, { radiusM, target, keep }) {
-  let near = 0;
-  let nearest = Infinity;
-  for (const r of records) {
-    if (keep && !keep(r)) continue;
-    const slat = pickNum(r, EDU_LAT_KEYS);
-    const slng = pickNum(r, EDU_LNG_KEYS);
-    if (!Number.isFinite(slat) || !Number.isFinite(slng)) continue;
-    if (Math.abs(slat) > 90 || Math.abs(slng) > 180) continue; // ITM, not WGS84
-    const d = distM(lat, lng, slat, slng);
-    if (d > radiusM) continue;
-    near++;
-    if (d < nearest) nearest = d;
-  }
-  const score = Number.isFinite(nearest)
-    ? clamp(0.6 * saturate(near, target) + 0.4 * clamp(100 * (1 - nearest / radiusM)))
-    : 20; // records exist but none within radius
-  return { score, count: near };
-}
-
-// crime value (count OR per-capita rate) → safety 0–100: lower vs the max → safer.
-export function crimeCountToSafety(value, maxValue) {
-  if (!Number.isFinite(value) || !Number.isFinite(maxValue) || maxValue <= 0) return NaN;
-  return clamp(100 * (1 - value / maxValue));
-}
-
-// { locality: count } ÷ { locality: population } → { locality: per-capita rate }.
-// Falls back to the raw count for any locality with no population. Pure/exported.
-export function buildCrimeRateMap(crimeMap, popMap) {
-  const rate = {};
-  for (const k in crimeMap) {
-    const pop = popMap && popMap[k];
-    rate[k] = Number.isFinite(pop) && pop > 0 ? crimeMap[k] / pop : crimeMap[k];
-  }
-  return rate;
-}
-
-// ---------------------------------------------------------------------------
-// CKAN page fetch → records array (null on failure).
-async function fetchCkan(resourceId, limit = 5000) {
-  if (!resourceId) return null;
-  const raw = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
-    `?resource_id=${resourceId}&limit=${limit}`);
-  const recs = raw?.result?.records;
-  return Array.isArray(recs) ? recs : null;
-}
-
-// Build a { normalizedLocalityName: value } map from dataset records. `sum`
-// aggregates rows sharing a locality (crime counts); otherwise last-wins (a
-// per-locality attribute like the socio-economic cluster). Pure + exported for
-// testing without network. `valueOf(record) -> number | NaN`.
-export function buildLocalityMap(records, nameKeys, valueOf, sum = false) {
-  const map = {};
-  if (!Array.isArray(records)) return map;
-  for (const r of records) {
-    let name = '';
-    for (const k of nameKeys) { if (r[k]) { name = r[k]; break; } }
-    const key = normalizeLocalityName(name);
-    if (!key) continue;
-    const v = valueOf(r);
-    if (!Number.isFinite(v)) continue;
-    map[key] = sum ? (map[key] || 0) + v : v;
-  }
-  return map;
-}
-
 // Precomputed per-locality features (built offline by scripts/build-locality-
 // features.mjs, keyed by CBS code). Read once, fail-soft to empty if not built —
 // safety/composition then return null and the composite renormalises.
@@ -303,15 +233,60 @@ async function safetyScore(locality) {
   return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
 
-// Locality school composition (pikuah/sector) for the cohort gates, from the
-// precomputed table (exact per-locality, no cross-city q-noise). Null when the
-// locality isn't in the table → gates stay fail-soft (keep-all).
-function schoolsComposition(locality) {
-  const f = localityFeatureFor(locality);
-  if (!f || !Array.isArray(f.pikuah) || !f.pikuah.length) return null;
+// Geolocated schools (built offline: mosdot metadata × coords by SEMEL_MOSAD).
+// Each: {lat, lng, p:pikuah, s:sector, k:isKindergarten}. Fail-soft to [].
+let _schoolsGeo = null;
+function schoolsGeo() {
+  if (_schoolsGeo) return _schoolsGeo;
+  _schoolsGeo = [];
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    _schoolsGeo = JSON.parse(readFileSync(join(here, 'schools_geo.generated.json'), 'utf8'));
+  } catch { /* not built → empty */ }
+  return _schoolsGeo;
+}
+
+// POINT-LEVEL school analysis: scans the geolocated schools around a coordinate
+// (single O(n) pass, n≈30k, sub-millisecond). Returns proximity counts for the
+// schools sub-score + kindergarten sub-score, AND the pikuah/sector composition
+// of schools WITHIN 2km — so the cohort gates reflect the actual surroundings of
+// THIS apartment, not the whole municipality.
+const SCHOOL_RADIUS_M = 2000;      // schools proximity sub-score
+const KG_RADIUS_M = 1500;          // kindergarten proximity sub-score
+const COMPOSITION_RADIUS_M = 1500; // composition for the gates (tighter)
+function schoolsNear(lat, lng) {
+  // Composition uses SCHOOLS ONLY (kindergartens are 70%+ of records and dilute
+  // the signal) and per-stream COUNTS (so gates can use dominance/fraction, not
+  // mere presence — presence is true everywhere in dense metros).
+  const pikuah = {};
   const sectors = {};
-  for (const s of (f.sectors || [])) sectors[s] = 1;
-  return { pikuah: f.pikuah, sectors };
+  let schoolTotal = 0;
+  let sCount = 0;
+  let sNearest = Infinity;
+  let kCount = 0;
+  let kNearest = Infinity;
+  for (const sc of schoolsGeo()) {
+    const d = distM(lat, lng, sc.lat, sc.lng);
+    if (d > SCHOOL_RADIUS_M) continue;
+    if (sc.k) {
+      if (d <= KG_RADIUS_M) { kCount++; if (d < kNearest) kNearest = d; }
+      continue;
+    }
+    sCount++; if (d < sNearest) sNearest = d;
+    if (d <= COMPOSITION_RADIUS_M) {
+      schoolTotal++;
+      if (sc.p) pikuah[sc.p] = (pikuah[sc.p] || 0) + 1;
+      if (sc.s) sectors[sc.s] = (sectors[sc.s] || 0) + 1;
+    }
+  }
+  return { pikuah, sectors, schoolTotal, sCount, sNearest, kCount, kNearest };
+}
+
+// count-within-radius + proximity-to-nearest → 0..100 (20 floor = "some data,
+// none nearby"). null when the schools table isn't loaded at all.
+function proximityFrom(count, nearest, radiusM, target) {
+  if (!Number.isFinite(nearest)) return 20;
+  return clamp(0.6 * saturate(count, target) + 0.4 * clamp(100 * (1 - nearest / radiusM)));
 }
 
 function pickNum(obj, keys) {
@@ -344,29 +319,21 @@ function pickStr(obj, keys) {
 export async function neighborhoodScore({ lat, lng, locality }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-  // fan out in parallel; each may return null.
-  //  - coords dataset → distance-decayed schools + kindergarten proximity
-  //  - safetyScore    → per-capita crime + socio (by cbs_id)
-  //  - composition    → locality school pikuah/sector (by name) for the gates
-  const [osm, education, safety] = await Promise.all([
+  // OSM (live) + safety (precomputed table, no network) in parallel.
+  const [osm, safety] = await Promise.all([
     osmCounts(lat, lng).catch(() => null),
-    fetchCkan(RES_SCHOOLS, 2000).catch(() => null),
     safetyScore(locality).catch(() => null),
   ]);
-  // Composition is a local table lookup (sync, no network).
-  const composition = locality ? schoolsComposition(locality) : null;
 
-  let schools = null;
-  let kindergarten = null;
-  if (Array.isArray(education)) {
-    const sc = proximityScore(education, lat, lng, { radiusM: 2000, target: 6, keep: (r) => !isKindergarten(r) });
-    const kg = proximityScore(education, lat, lng, { radiusM: 1000, target: 4, keep: isKindergarten });
-    schools = sc.score;
-    kindergarten = kg.score;
-  }
-  // Composition (pikuah/sectors) drives the cohort gates; comes from mosdot by
-  // locality, since the coords dataset carries no supervision/sector columns.
-  const schoolsMeta = composition ? { pikuah: composition.pikuah, sectors: composition.sectors } : null;
+  // Point-level schools: one scan of the bundled geolocated schools gives the
+  // schools + kindergarten proximity AND the pikuah/sector composition of what's
+  // actually within 2km of THIS apartment (drives the cohort gates).
+  const geoLoaded = schoolsGeo().length > 0;
+  const near = geoLoaded ? schoolsNear(lat, lng) : null;
+  const schools = near ? proximityFrom(near.sCount, near.sNearest, SCHOOL_RADIUS_M, 6) : null;
+  const kindergarten = near ? proximityFrom(near.kCount, near.kNearest, KG_RADIUS_M, 4) : null;
+  const schoolsMeta = (near && near.schoolTotal)
+    ? { pikuah: near.pikuah, sectors: near.sectors, total: near.schoolTotal } : null;
 
   // assemble available sub-scores with their weights (kindergarten split out).
   const W = { safety: 0.28, walkability: 0.22, schools: 0.18, kindergarten: 0.10, transit: 0.12, green: 0.10 };
