@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/network/circuit_breaker.dart';
 import 'package:dating_app/core/network/retry_policy.dart';
@@ -65,10 +67,13 @@ class PropertySearchRepository {
         ),
       );
 
-      final parsed = result.rows
-          .map((row) => _safeParse(row.data))
-          .whereType<RentalProperty>()
-          .toList();
+      // Keep each listing paired with its raw backend map so the ranker can read
+      // server-supplied ranking signals (popularity / freshness) defensively.
+      final parsed = <_Candidate>[];
+      for (final row in result.rows) {
+        final p = _safeParse(row.data);
+        if (p != null) parsed.add(_Candidate(p, row.data));
+      }
 
       return _filterAndRank(parsed, c);
     } on CircuitOpenException {
@@ -90,11 +95,12 @@ class PropertySearchRepository {
   }
 
   List<RentalProperty> _filterAndRank(
-    List<RentalProperty> items,
+    List<_Candidate> items,
     PropertySearchCriteria c,
   ) {
     final wantCity = c.city?.trim();
-    final matched = items.where((p) {
+    final matched = items.where((cand) {
+      final p = cand.property;
       if (!p.isActive) return false;
       // The backend's GSI filters by status, not city, so the city Query is a
       // no-op server-side — enforce it here or we'd return wrong-city listings.
@@ -110,8 +116,22 @@ class PropertySearchRepository {
       return true;
     }).toList();
 
-    matched.sort((a, b) => _score(b, c).compareTo(_score(a, c)));
-    return matched;
+    // Score once per candidate (the transparent linear scorer), cache the
+    // feature vectors, then sort high→low. Caching keeps the sort cheap and
+    // lets us log exactly what the ranker saw.
+    final scored = <_Scored>[];
+    final maxPop = _maxPopularity(matched);
+    for (final cand in matched) {
+      final fv = _features(cand, c, maxPop);
+      scored.add(_Scored(cand.property, fv, _scoreFromFeatures(fv)));
+    }
+    scored.sort((a, b) => b.score.compareTo(a.score));
+
+    final ranked = [for (final s in scored) s.property];
+    // Fire-and-forget per-impression feature log (the phase-2 LightGBM training
+    // set). Fail-soft — never blocks or breaks the UI.
+    _logImpressions(scored, c);
+    return ranked;
   }
 
   // Space/case-insensitive city match, tolerant of partials ("תל אביב" vs
@@ -123,17 +143,200 @@ class PropertySearchRepository {
     return a == b || a.contains(b) || b.contains(a);
   }
 
-  // Higher = better match. Rewards proximity to budget midpoint, verified
-  // listings, and having photos.
-  double _score(RentalProperty p, PropertySearchCriteria c) {
-    double s = 0;
-    if (c.minPrice != null && c.maxPrice != null && c.maxPrice! > c.minPrice!) {
-      final mid = (c.minPrice! + c.maxPrice!) / 2.0;
-      final span = (c.maxPrice! - c.minPrice!).toDouble();
-      s += 1.0 - ((p.price - mid).abs() / span).clamp(0.0, 1.0);
+  // ── Transparent linear ranker ───────────────────────────────────────────────
+  // score = Σ wᵢ·featureᵢ over the synthesis features:
+  //   tag_overlap · price_fit · distance_decay · recency · popularity_prior · explore
+  // Every term is normalised to [0,1] and the weights are explicit + auditable,
+  // so any rank is explainable and the cost is one pass over the page.
+  static const _wTagOverlap = 0.30;
+  static const _wPriceFit = 0.25;
+  static const _wDistanceDecay = 0.10;
+  static const _wRecency = 0.12;
+  static const _wPopularity = 0.15;
+  static const _wExplore = 0.08;
+
+  /// Highest popularity_prior in the page — normalises the popularity term so a
+  /// single viral listing doesn't swamp the budget/tag signals.
+  double _maxPopularity(List<_Candidate> items) {
+    var maxP = 0.0;
+    for (final c in items) {
+      final p = _rawPopularity(c);
+      if (p > maxP) maxP = p;
     }
-    if (p.isVerifiedListing) s += 0.3;
-    if (p.imageUrl.isNotEmpty) s += 0.2;
-    return s;
+    return maxP;
   }
+
+  /// Raw (un-normalised) popularity from server signals if present, else the
+  /// embedded market signals. Read defensively — backend may add a top-level
+  /// `popularity` field later.
+  /// Reads a ranking signal the backend NESTS under `rankSignals` (with a
+  /// top-level fallback) — the router emits {rankSignals:{popularity,freshness,
+  /// completeness,priceFit,...}}, so reading top-level only would ignore them.
+  double? _serverSignal(Map<String, dynamic> raw, List<String> keys) {
+    final rs = raw['rankSignals'];
+    if (rs is Map) {
+      final v = _numField(Map<String, dynamic>.from(rs), keys);
+      if (v != null) return v;
+    }
+    return _numField(raw, keys);
+  }
+
+  double _rawPopularity(_Candidate c) {
+    final server = _serverSignal(c.raw, const ['popularity', 'popularityScore']);
+    if (server != null) return math.max(0, server);
+    final m = c.property.marketSignals;
+    // A cheap engagement proxy: weighted likes/saves/contacts over views.
+    return (m.likes * 2 + m.saves * 3 + m.contactRequests * 4 + m.views)
+        .toDouble();
+  }
+
+  /// Builds the normalised [0,1] feature vector for one listing.
+  Map<String, double> _features(
+    _Candidate c,
+    PropertySearchCriteria crit,
+    double maxPop,
+  ) {
+    final p = c.property;
+
+    // tag_overlap: fraction of the requested amenities the listing satisfies
+    // (matched listings already satisfy all hard amenities, so this rewards
+    // verified + photographed completeness when no amenities were asked for).
+    double tagOverlap;
+    if (crit.amenityKeys.isEmpty) {
+      tagOverlap = (p.isVerifiedListing ? 0.6 : 0.0) +
+          (p.imageUrl.isNotEmpty ? 0.4 : 0.0);
+    } else {
+      final hit =
+          crit.amenityKeys.where((k) => p.featureFlags.isEnabled(k)).length;
+      tagOverlap = hit / crit.amenityKeys.length;
+    }
+
+    // price_fit: 1 at the budget midpoint, decaying linearly to the edges.
+    double priceFit = 0.5;
+    if (crit.minPrice != null &&
+        crit.maxPrice != null &&
+        crit.maxPrice! > crit.minPrice!) {
+      final mid = (crit.minPrice! + crit.maxPrice!) / 2.0;
+      final span = (crit.maxPrice! - crit.minPrice!).toDouble();
+      priceFit = 1.0 - ((p.price - mid).abs() / span).clamp(0.0, 1.0);
+    }
+
+    // distance_decay: no per-search origin here, so use the server `distanceKm`
+    // if present (exponential decay over ~5 km); neutral 0.5 otherwise.
+    double distanceDecay = 0.5;
+    final dist = _numField(c.raw, const ['distanceKm', 'distance_km']);
+    if (dist != null) distanceDecay = math.exp(-dist.abs() / 5.0);
+
+    // recency / freshness: prefer the server `freshness` ([0,1]) when present,
+    // else derive from createdAt with a 30-day half-life.
+    double recency;
+    final freshness = _serverSignal(c.raw, const ['freshness', 'freshnessScore']);
+    if (freshness != null) {
+      recency = freshness.clamp(0.0, 1.0).toDouble();
+    } else if (p.createdAt != null) {
+      final ageDays = DateTime.now().difference(p.createdAt!).inHours / 24.0;
+      recency = math.exp(-math.max(0, ageDays) / 30.0);
+    } else {
+      recency = p.isNewListing ? 1.0 : 0.4;
+    }
+
+    // popularity_prior: page-normalised engagement.
+    final popularity = maxPop > 0 ? (_rawPopularity(c) / maxPop) : 0.0;
+
+    // explore: UCB/ε-greedy bonus for under-impressed listings — the fewer
+    // views a listing has had, the bigger the exploration nudge, so cold
+    // inventory still surfaces. log-scaled, capped at 1.
+    final views = p.marketSignals.views;
+    final explore = (1.0 / math.sqrt(1 + views)).clamp(0.0, 1.0);
+
+    return {
+      'tag_overlap': tagOverlap.clamp(0.0, 1.0).toDouble(),
+      'price_fit': priceFit.clamp(0.0, 1.0).toDouble(),
+      'distance_decay': distanceDecay.clamp(0.0, 1.0).toDouble(),
+      'recency': recency.clamp(0.0, 1.0).toDouble(),
+      'popularity_prior': popularity.clamp(0.0, 1.0).toDouble(),
+      'explore': explore.toDouble(),
+    };
+  }
+
+  double _scoreFromFeatures(Map<String, double> f) {
+    return _wTagOverlap * f['tag_overlap']! +
+        _wPriceFit * f['price_fit']! +
+        _wDistanceDecay * f['distance_decay']! +
+        _wRecency * f['recency']! +
+        _wPopularity * f['popularity_prior']! +
+        _wExplore * f['explore']!;
+  }
+
+  /// Reads the first numeric value among [keys] from a raw backend map.
+  double? _numField(Map<String, dynamic> raw, List<String> keys) {
+    for (final k in keys) {
+      final v = raw[k];
+      if (v is num) return v.toDouble();
+      if (v is String) {
+        final parsed = num.tryParse(v);
+        if (parsed != null) return parsed.toDouble();
+      }
+    }
+    return null;
+  }
+
+  /// Per-impression feature-vector log → `/search/log`. The training set for the
+  /// phase-2 LightGBM lambdarank upgrade. Fully fail-soft.
+  void _logImpressions(List<_Scored> scored, PropertySearchCriteria c) {
+    if (scored.isEmpty) return;
+    if (!AwsApiClient.instance.isConfigured) return;
+    try {
+      final impressions = [
+        for (var i = 0; i < scored.length; i++)
+          {
+            'propertyId': scored[i].property.id,
+            'rank': i,
+            'score': scored[i].score,
+            'features': scored[i].features,
+          },
+      ];
+      final body = <String, dynamic>{
+        'criteria': {
+          'city': c.city,
+          'minPrice': c.minPrice,
+          'maxPrice': c.maxPrice,
+          'minRooms': c.minRooms,
+          'amenities': c.amenityKeys.toList(),
+          'vibe': c.vibe,
+        },
+        'weights': const {
+          'tag_overlap': _wTagOverlap,
+          'price_fit': _wPriceFit,
+          'distance_decay': _wDistanceDecay,
+          'recency': _wRecency,
+          'popularity_prior': _wPopularity,
+          'explore': _wExplore,
+        },
+        'ts': DateTime.now().toUtc().toIso8601String(),
+        'impressions': impressions,
+      };
+      // Don't await — never block the result list on telemetry.
+      AwsApiClient.instance.post('/search/log', body).catchError(
+        (_) => <String, dynamic>{},
+      );
+    } catch (_) {/* fail-soft */}
+  }
+}
+
+/// A parsed listing paired with its raw backend map (for defensive server-signal
+/// reads during ranking).
+class _Candidate {
+  const _Candidate(this.property, this.raw);
+  final RentalProperty property;
+  final Map<String, dynamic> raw;
+}
+
+/// A scored listing carrying the feature vector that produced its score, so the
+/// rank is both explainable and loggable.
+class _Scored {
+  const _Scored(this.property, this.features, this.score);
+  final RentalProperty property;
+  final Map<String, double> features;
+  final double score;
 }

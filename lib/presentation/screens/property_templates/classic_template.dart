@@ -160,6 +160,15 @@ class _ClassicTemplate extends StatelessWidget {
                       _PropertyFactsCard(p),
                       const SizedBox(height: 24),
 
+                      // ── Phase-1 listing intelligence: price/neighborhood
+                      // badges (shown only if backend enrichment is present)
+                      // + the "שאל את Rently" Q&A entry. Self-hides per-field
+                      // and is omitted entirely in landlord preview.
+                      if (!isLandlordPreview) ...[
+                        _ListingEnrichmentBlock(property: p, title: title),
+                        const SizedBox(height: 24),
+                      ],
+
                       // ── ALL tags/features right under the specs. Shows the
                       // FULL set (no cap) so the tenant sees exactly what the
                       // property has.

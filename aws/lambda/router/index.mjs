@@ -34,6 +34,32 @@ import AdmZip from 'adm-zip';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+// ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
+// These modules live in ./lib and expose the Israeli-data spine used to enrich a
+// listing on create: GovMap geocode (→ lat/lng + gush/helka), nadlan+CBS price
+// badge (מעל/מתחת לשוק) and the neighbourhood score. They may not exist yet at
+// deploy time, so we load them LAZILY via dynamic import wrapped in try/catch —
+// a static top-level import of a missing file would crash the whole Lambda. Once
+// the Connectors agent's files land in ./lib the calls below resolve for real;
+// until then every enrichment step degrades to a no-op (fail-soft).
+//   ./lib/govmap.mjs       → geocode(addressHe) -> { lat, lng, gush, helka }
+//   ./lib/nadlan_cbs.mjs   → priceBadge({lat,lng,rooms,area,price}) -> { medianPpm, deltaPct, badge }
+//   ./lib/neighborhood.mjs → neighborhoodScore({lat,lng}) -> { score, sub }
+let _connectors = null;
+async function connectors() {
+  if (_connectors) return _connectors;
+  const mod = {};
+  // Loaded independently so one missing/broken module doesn't disable the others.
+  try { mod.geocode = (await import('./lib/govmap.mjs')).geocode; }
+  catch (e) { console.warn('connectors: govmap unavailable:', e.message); }
+  try { mod.priceBadge = (await import('./lib/nadlan_cbs.mjs')).priceBadge; }
+  catch (e) { console.warn('connectors: nadlan_cbs unavailable:', e.message); }
+  try { mod.neighborhoodScore = (await import('./lib/neighborhood.mjs')).neighborhoodScore; }
+  catch (e) { console.warn('connectors: neighborhood unavailable:', e.message); }
+  _connectors = mod;
+  return mod;
+}
+
 const REGION = process.env.AWS_REGION;
 const S3_BUCKET = process.env.S3_BUCKET;
 // Python OpenCV stitcher Lambda (container image) — invoked async to build a
@@ -128,6 +154,21 @@ const NOTIFICATIONS_TABLE = `${TABLE_PREFIX}notifications`;
 // Created out-of-band / by the deploy script (aws dynamodb create-table,
 // on-demand). pk=id(S). Sorting newest-first is done in-Lambda after a SCAN.
 const BROADCASTS_TABLE = `${TABLE_PREFIX}broadcasts`;
+
+// Per-impression search-ranking log — the training set for the phase-2 LightGBM
+// lambdarank ranker. One row per (search, listing) impression: the feature
+// vector our transparent linear scorer saw + the outcome (click/like/none).
+// pk=id(S, uuid). GSI userId-createdAt for per-user replay. PAY_PER_REQUEST,
+// created out-of-band (aws dynamodb create-table). Append-only, never read on the
+// hot path.
+const SEARCH_LOG_TABLE = `${TABLE_PREFIX}search-log`;
+
+// Tenant saved searches (server-side mirror of the on-device list). The client
+// syncs each SavedSearch here so a NEW listing can be matched against every
+// tenant's criteria the instant it's published — and fire an FCM alert with no
+// polling. pk=userId(S) sk=id(S). Same field set as lib/data/models/saved_search
+// (city, min/maxBudget, min/maxRooms, transactionType, requiredTags, alertsOn).
+const SAVED_SEARCHES_TABLE = `${TABLE_PREFIX}saved-searches`;
 
 // Admin gate. The API-Gateway authorizer (aws/lambda/authorizer/index.mjs)
 // verifies the Firebase JWT but only forwards `uid` in its context — it does
@@ -444,6 +485,226 @@ async function firePushForWrite(tableKey, body, senderUid) {
   }
 }
 
+// ── New-listing enrichment pipeline ──────────────────────────────────────────
+// Runs once, synchronously, on a genuine listing INSERT. MUTATES `body` in place
+// so the enriched fields are persisted by the very next putItem. Every step is
+// independently fail-soft: a slow/broken Gemini call or a missing Connectors
+// module degrades to "field simply absent", never an error to the client.
+//   1. smartTags  — one cheap Gemini call over title+description(+image URLs).
+//   2. geocode    — GovMap address → lat/lng + gush/helka.
+//   3. priceBadge — nadlan comps + CBS trend → מעל/מתחת לשוק.
+//   4. nbhdScore  — data.gov.il + OSM neighbourhood score.
+async function enrichListingOnCreate(body) {
+  // 1) Smart tags — independent, so do it in parallel with the geo chain.
+  const tasks = [];
+  tasks.push((async () => {
+    try {
+      const tags = await extractSmartTags(body);
+      if (tags && tags.length) body.smartTags = tags;
+    } catch (e) { console.warn('enrich: smartTags failed:', e.message); }
+  })());
+
+  // 2→4) Geo chain: geocode first (lat/lng feed the other two), then price badge
+  // + neighbourhood score in parallel. Uses the lazily-loaded Connectors.
+  tasks.push((async () => {
+    let lat = typeof body.lat === 'number' ? body.lat : undefined;
+    let lng = typeof body.lng === 'number' ? body.lng
+      : (typeof body.lon === 'number' ? body.lon : undefined);
+    try {
+      const c = await connectors();
+      if (c.geocode && (lat === undefined || lng === undefined)) {
+        const addr = [body.street, body.streetNumber, body.city]
+          .filter(Boolean).join(' ').trim();
+        if (addr) {
+          const g = await c.geocode(addr);
+          if (g) {
+            if (typeof g.lat === 'number') { lat = g.lat; body.lat = g.lat; }
+            // The model stores longitude as `lon`; mirror to `lng` too so both
+            // the client field and the connector convention are populated.
+            if (typeof g.lng === 'number') { lng = g.lng; body.lon = g.lng; body.lng = g.lng; }
+            if (g.gush) body.gush = String(g.gush);
+            if (g.helka) body.helka = String(g.helka);
+          }
+        }
+      }
+    } catch (e) { console.warn('enrich: geocode failed:', e.message); }
+
+    if (lat === undefined || lng === undefined) return; // no coords → skip geo-derived
+    const c = await connectors().catch(() => ({}));
+    await Promise.all([
+      (async () => {
+        try {
+          if (!c.priceBadge) return;
+          const badge = await c.priceBadge({
+            lat, lng,
+            rooms: Number(body.rooms) || undefined,
+            area: Number(body.sizeM2) || undefined,
+            price: Number(body.price) || undefined,
+          });
+          if (badge) body.priceBadge = badge; // { medianPpm, deltaPct, badge }
+        } catch (e) { console.warn('enrich: priceBadge failed:', e.message); }
+      })(),
+      (async () => {
+        try {
+          if (!c.neighborhoodScore) return;
+          const ns = await c.neighborhoodScore({ lat, lng });
+          if (ns) body.neighborhoodScore = ns; // { score, sub }
+        } catch (e) { console.warn('enrich: neighborhoodScore failed:', e.message); }
+      })(),
+    ]);
+  })());
+
+  await Promise.all(tasks);
+}
+
+// One cheap, fail-soft Gemini call → a flat array of normalised Hebrew tags
+// extracted from the listing's free text (+ up to 4 image URLs for multimodal
+// signal). Returns [] on any problem so the publish never blocks.
+async function extractSmartTags(body) {
+  if (!GEMINI_API_KEY) return [];
+  const title = (body.title || [body.street, body.city].filter(Boolean).join(' ') || '')
+    .toString().slice(0, 200);
+  const description = (body.description || '').toString().slice(0, 1500);
+  const features = Array.isArray(body.featureLabels)
+    ? body.featureLabels.slice(0, 30).join(', ') : '';
+  if (!title && !description && !features) return [];
+
+  const imageUrls = Array.isArray(body.imageUrls)
+    ? body.imageUrls.filter((u) => typeof u === 'string' && /^https?:\/\//.test(u)).slice(0, 4)
+    : [];
+
+  const sys = 'אתה מחלץ תגיות חיפוש מובנות ממודעת דירה להשכרה. החזר אך ורק JSON תקין '
+    + 'במבנה {"tags":["..."]}. כל תגית: מילה או צירוף קצר בעברית, בלי כפילויות, '
+    + 'עד 12 תגיות. התמקד בתכונות שמחפשים לפיהן: מרפסת, מעלית, חניה, ממ"ד, משופצת, '
+    + 'מרוהטת, מיזוג, סורגים, נוף, קומה גבוהה, פינוי מיידי, גינה, חיות מחמד, '
+    + 'נגישות, סמוך לתחבורה, שקטה וכו׳. אל תמציא תכונות שלא נרמזו בטקסט או בתמונות.';
+
+  const parts = [{
+    text: `כותרת: ${title}\nתיאור: ${description}\nתכונות מסומנות: ${features}`,
+  }];
+  // Attach images as fetched inline data (best multimodal signal). Fail-soft per
+  // image; cap total bytes so we stay cheap and within the request budget.
+  for (const url of imageUrls) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const ct = r.headers.get('content-type') || 'image/jpeg';
+      if (!ct.startsWith('image/')) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 1_500_000) continue; // skip oversized
+      parts.push({ inlineData: { mimeType: ct, data: buf.toString('base64') } });
+    } catch { /* skip this image */ }
+  }
+
+  const contents = [{ role: 'user', parts }];
+  const data = await geminiGenerate(sys, contents, undefined, {
+    temperature: 0.2,
+    maxOutputTokens: 200,
+    responseMimeType: 'application/json',
+  });
+  let text = (data?.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text || '').join('');
+  text = text.replace(/```(?:json)?/gi, '').replace(/```/g, '');
+  const m = text.match(/\{[\s\S]*\}/);
+  const parsed = m ? JSON.parse(m[0]) : {};
+  const raw = Array.isArray(parsed.tags) ? parsed.tags : [];
+  const seen = new Set();
+  const tags = [];
+  for (const t of raw) {
+    const s = String(t || '').trim().slice(0, 40);
+    const k = s.toLowerCase();
+    if (s && !seen.has(k)) { seen.add(k); tags.push(s); }
+    if (tags.length >= 12) break;
+  }
+  return tags;
+}
+
+// ── Instant saved-search alerts ──────────────────────────────────────────────
+// On a NEW listing, scan every tenant's saved search and FCM-notify the ones it
+// matches (same boolean predicate the on-device SavedSearch.matches uses). No
+// polling — fired straight from the create path. Never notifies the landlord who
+// posted it, never throws. Saved searches live in SAVED_SEARCHES_TABLE, synced
+// from the client (SavedSearchesScreen → SavedSearchRepository).
+async function fireSavedSearchAlerts(property, ownerUid) {
+  try {
+    // Pull all active saved searches (small table; Phase-1 scale). Bound the
+    // fan-out so a flood of searches can't blow the request budget.
+    let searches = [];
+    let lastKey;
+    do {
+      const out = await ddb.send(new ScanCommand({
+        TableName: SAVED_SEARCHES_TABLE,
+        ExclusiveStartKey: lastKey,
+      }));
+      searches = searches.concat(out.Items || []);
+      lastKey = out.LastEvaluatedKey;
+    } while (lastKey && searches.length < 5000);
+
+    const notified = new Set(); // one push per user even if several searches hit
+    const addr = [property.street, property.streetNumber, property.city]
+      .filter(Boolean).join(' ').trim();
+    const propTitle = (property.city || addr || 'דירה חדשה');
+    const propId = String(property.id || '');
+
+    for (const s of searches) {
+      const targetUid = String(s.userId || '');
+      if (!targetUid || targetUid === ownerUid) continue;
+      if (notified.has(targetUid)) continue;
+      if (s.alertsOn === false) continue;
+      if (!savedSearchMatches(s, property)) continue;
+      notified.add(targetUid);
+      const name = (s.name || 'החיפוש השמור שלך').toString().slice(0, 60);
+      const price = Number(property.price) > 0 ? ` · ${Number(property.price)} ₪` : '';
+      await notify(
+        targetUid,
+        'saved_search',
+        'דירה חדשה שמתאימה לך 🔔',
+        `${propTitle}${price} — תואם ל"${name}"`,
+        { propertyId: propId, savedSearchId: String(s.id || ''), deepLink: `rently://property/${propId}` },
+      );
+      if (notified.size >= 300) break; // cap fan-out per create (anti-flood)
+    }
+  } catch (e) {
+    console.warn('saved-search alerts failed:', e.message);
+  }
+}
+
+// Boolean predicate mirroring lib/data/models/saved_search.dart `matches`:
+// every criterion that was actually set must pass; unset criteria never exclude.
+function savedSearchMatches(s, p) {
+  const city = (s.city || '').toString().trim();
+  if (city) {
+    if (String(p.city || '').trim().toLowerCase() !== city.toLowerCase()) return false;
+  }
+  const price = Number(p.price);
+  if (s.minBudget != null && price < Number(s.minBudget)) return false;
+  if (s.maxBudget != null && price > Number(s.maxBudget)) return false;
+
+  const rooms = Number(p.rooms);
+  if (s.minRooms != null && rooms < Number(s.minRooms)) return false;
+  if (s.maxRooms != null && rooms > Number(s.maxRooms)) return false;
+
+  const txType = (s.transactionType || '').toString().trim();
+  if (txType) {
+    if (String(p.transactionType || '').trim() !== txType) return false;
+  }
+
+  const required = Array.isArray(s.requiredTags) ? s.requiredTags : [];
+  if (required.length) {
+    const haystack = [
+      p.description, p.city, p.neighborhood, p.street, p.condition, p.propertyType,
+      Array.isArray(p.featureLabels) ? p.featureLabels.join(' ') : '',
+      Array.isArray(p.smartTags) ? p.smartTags.join(' ') : '',
+    ].filter(Boolean).join(' ').toLowerCase();
+    for (const t of required) {
+      const needle = String(t || '').trim().toLowerCase();
+      if (!needle) continue;
+      if (!haystack.includes(needle)) return false;
+    }
+  }
+  return true;
+}
+
 // Rental contracts (pk: id). Stores terms + each party's Ed25519 signature.
 // Only the contract's landlord or tenant can read/sign it.
 const CONTRACTS_TABLE = `${TABLE_PREFIX}contracts`;
@@ -627,6 +888,45 @@ export const handler = async (event) => {
       return await handleMatchLeads(event);
     }
 
+    // ── Ranker impression log (LightGBM training data) ──────────────────────
+    // POST /search/log → append per-impression feature vectors + outcomes.
+    if (segments[0] === 'search' && segments[1] === 'log' && method === 'POST') {
+      return await handleSearchLog(event);
+    }
+
+    // ── Per-listing "Ask Rently" Q&A ────────────────────────────────────────
+    // POST /listing/ask → answer a question about ONE listing, grounded strictly
+    // in that listing + its enrichment. Auth-gated.
+    if (segments[0] === 'listing' && segments[1] === 'ask' && method === 'POST') {
+      return await handleListingAsk(event);
+    }
+
+    // GET /listing/enrichment?listingId=... → the stored enrichment for one
+    // listing (priceBadge / neighborhoodScore / smartTags / gush-helka) so the
+    // detail-screen badges can render. Fail-soft: returns {} when absent.
+    if (segments[0] === 'listing' && segments[1] === 'enrichment' && method === 'GET') {
+      const uid = callerUidOf(event);
+      if (!uid) return json(401, { message: 'Authentication required.' });
+      const lid = (event.queryStringParameters && event.queryStringParameters.listingId) || '';
+      if (!lid) return json(400, { message: 'listingId is required' });
+      try {
+        const r = await ddb.send(new GetCommand({
+          TableName: TABLES.properties.name, Key: { id: lid },
+        }));
+        const it = r.Item || {};
+        return json(200, {
+          listingId: lid,
+          priceBadge: it.priceBadge || null,
+          neighborhoodScore: it.neighborhoodScore || null,
+          smartTags: it.smartTags || [],
+          gush: it.gush || null,
+          helka: it.helka || null,
+        });
+      } catch {
+        return json(200, { listingId: lid }); // fail-soft
+      }
+    }
+
     // ── Rental contracts with e-signatures ──────────────────────────────────
     if (segments[0] === 'contracts') {
       const cid = segments[1] ? decodeURIComponent(segments[1]) : null;
@@ -727,18 +1027,56 @@ export const handler = async (event) => {
             return json(200, { items: [], hasMore: false, lastKey: null });
           }
         }
-        return await listItems(table, query);
+        {
+          const listed = await listItems(table, query);
+          // Attach server-side ranking signals to each property so the client can
+          // order/explain results with the same transparent scorer the future
+          // LightGBM ranker will be trained against. Properties table only;
+          // fail-soft (a signal failure just omits `rankSignals`).
+          if (tableKey === 'properties' && listed.statusCode === 200) {
+            return await attachRankSignals(listed, query);
+          }
+          return listed;
+        }
       case 'POST': {
         stampOwner(tableKey, body, callerUid);
         const writeId = tableKey === 'users'
           ? callerUid
           : (body.id || body.propertyId || body.userId);
+
+        // ── New-listing pipeline (properties only) ──────────────────────────
+        // Detect a genuine INSERT (not a re-PUT of an existing row) so the smart
+        // tags + enrichment + instant saved-search alerts run exactly once. All
+        // of this is fail-soft: an enrichment hiccup never blocks the publish.
+        let isNewListing = false;
+        if (tableKey === 'properties' && writeId) {
+          try {
+            const existing = await ddb.send(new GetCommand({
+              TableName: table.name, Key: { id: writeId },
+            }));
+            isNewListing = !existing.Item;
+          } catch { /* lookup failed → fail CLOSED (treat as existing) so a transient error can't re-enrich/re-alert an edit */ isNewListing = false; }
+          if (isNewListing) {
+            // Budget enrichment so a slow connector/Gemini fetch can't stall the
+            // publish (the client blocks on this response). Fail-soft on timeout.
+            await Promise.race([
+              enrichListingOnCreate(body), // mutates body: smartTags, geo, badges
+              new Promise((res) => setTimeout(res, 4000)),
+            ]).catch(() => {});
+          }
+        }
+
         const written = await putItem(table, writeId, body);
         // Fire-and-forget push notifications on real events. Never block or fail
         // the write on a push problem — awaited so the Lambda doesn't get frozen
         // mid-send, but every error is swallowed inside the helpers.
         if (written.statusCode === 200) {
           await firePushForWrite(tableKey, body, callerUid);
+          // New listing → run every tenant's saved search against it and push
+          // an instant "new match" alert. No polling. Fail-soft.
+          if (tableKey === 'properties' && isNewListing) {
+            await fireSavedSearchAlerts({ ...body, id: writeId }, callerUid);
+          }
         }
         return written;
       }
@@ -946,6 +1284,214 @@ async function listItems(table, query) {
   }
   const out = await ddb.send(new ScanCommand(params));
   return json(200, pageBody(out));
+}
+
+// ── Transparent ranker — per-listing server signals ──────────────────────────
+// Decorates a properties listItems() response with a `rankSignals` block per row
+// (and a `rankScore`), so the client (and the future LightGBM ranker) sees the
+// exact features the linear scorer used. Features:
+//   freshness     — recency decay on createdAt (newer = higher, 14-day half-life)
+//   popularity    — like-rate with Bayesian shrinkage toward the global prior
+//                   (avoids a 1-view/1-like listing ranking above a proven one)
+//   completeness  — fraction of the fields that make a listing browse-worthy
+//   priceFit      — closeness of the listing price to the query's budget window
+// All numbers are 0..1. `rankScore` is a transparent weighted sum — explainable,
+// zero-infra, good for cold-start. Fail-soft: any error returns the list as-is.
+const RANK_WEIGHTS = {
+  freshness: 0.30, popularity: 0.30, completeness: 0.20, priceFit: 0.20,
+};
+// Bayesian shrinkage prior for like-rate: assume a modest baseline so listings
+// with little traffic regress toward the mean instead of spiking on noise.
+const LIKE_RATE_PRIOR = 0.12;   // assumed global like-per-view rate
+const LIKE_RATE_STRENGTH = 8;   // pseudo-views of prior weight
+
+async function attachRankSignals(listed, query) {
+  try {
+    const parsed = JSON.parse(listed.body);
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    if (items.length === 0) return listed;
+
+    // Budget window for price-fit: explicit min/max, or ± a band around a target.
+    const minBudget = num(query.minBudget) ?? num(query.minPrice);
+    const maxBudget = num(query.maxBudget) ?? num(query.maxPrice);
+    const targetPrice = num(query.price) ?? num(query.budget);
+
+    // Pull popularity counts (views + likes) per listing in parallel, bounded.
+    const ids = items.map((p) => String(p.id || '')).filter(Boolean).slice(0, 60);
+    const counts = await loadPopularityCounts(ids);
+
+    const now = Date.now();
+    for (const p of items) {
+      const id = String(p.id || '');
+      const c = counts[id] || { views: 0, likes: 0 };
+      const freshness = freshnessScore(p.createdAt, now);
+      const popularity = shrinkLikeRate(c.likes, c.views);
+      const completeness = completenessScore(p);
+      const priceFit = priceFitScore(Number(p.price), { minBudget, maxBudget, targetPrice });
+      const rankScore =
+        RANK_WEIGHTS.freshness * freshness +
+        RANK_WEIGHTS.popularity * popularity +
+        RANK_WEIGHTS.completeness * completeness +
+        RANK_WEIGHTS.priceFit * priceFit;
+      p.rankSignals = {
+        freshness: round3(freshness),
+        popularity: round3(popularity),
+        completeness: round3(completeness),
+        priceFit: round3(priceFit),
+        views: c.views, likes: c.likes,
+      };
+      p.rankScore = round3(rankScore);
+    }
+    return json(200, parsed);
+  } catch (e) {
+    console.warn('attachRankSignals failed:', e.message);
+    return listed;
+  }
+}
+
+function num(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+const round3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
+
+// Exponential recency decay, 14-day half-life. Missing/garbage date → neutral 0.5.
+function freshnessScore(createdAt, now) {
+  const t = Date.parse(createdAt);
+  if (!Number.isFinite(t)) return 0.5;
+  const ageDays = Math.max(0, (now - t) / 86_400_000);
+  return Math.exp(-Math.LN2 * ageDays / 14);
+}
+
+// Bayesian-shrunk like-rate, normalised so the prior maps to ~0.5.
+function shrinkLikeRate(likes, views) {
+  const l = Math.max(0, Number(likes) || 0);
+  const v = Math.max(l, Number(views) || 0); // views can't be below likes
+  const rate = (l + LIKE_RATE_PRIOR * LIKE_RATE_STRENGTH)
+    / (v + LIKE_RATE_STRENGTH);
+  // Map the like-rate onto 0..1 with the prior sitting at 0.5 (so an unproven
+  // listing is neutral, above-prior is >0.5, below is <0.5).
+  return Math.max(0, Math.min(1, 0.5 * (rate / LIKE_RATE_PRIOR)));
+}
+
+// Fraction of browse-critical fields present → a fuller listing ranks higher.
+function completenessScore(p) {
+  const checks = [
+    Number(p.price) > 0,
+    Number(p.rooms) > 0,
+    !!p.city,
+    !!p.street,
+    Number(p.sizeM2) > 0,
+    Array.isArray(p.imageUrls) && p.imageUrls.length > 0,
+    !!(p.description && String(p.description).trim().length > 20),
+    Array.isArray(p.smartTags) && p.smartTags.length > 0,
+    !!p.neighborhood,
+  ];
+  const hit = checks.filter(Boolean).length;
+  return hit / checks.length;
+}
+
+// Closeness of price to the requested budget. Inside [min,max] → 1.0; outside,
+// decays with relative overshoot. No budget given → neutral 0.5.
+function priceFitScore(price, { minBudget, maxBudget, targetPrice }) {
+  if (!Number.isFinite(price) || price <= 0) return 0.5;
+  if (minBudget !== undefined || maxBudget !== undefined) {
+    const lo = minBudget ?? 0;
+    const hi = maxBudget ?? Infinity;
+    if (price >= lo && price <= hi) return 1.0;
+    const ref = (hi !== Infinity ? hi : lo) || price;
+    const overshoot = price < lo ? (lo - price) / lo : (price - hi) / ref;
+    return Math.max(0, 1 - Math.min(1, overshoot));
+  }
+  if (targetPrice !== undefined && targetPrice > 0) {
+    const rel = Math.abs(price - targetPrice) / targetPrice;
+    return Math.max(0, 1 - Math.min(1, rel));
+  }
+  return 0.5;
+}
+
+// View + like counts per listing (the popularity signal source). Uses the
+// propertyId-index COUNT query on the analytics tables. Bounded, fail-soft.
+async function loadPopularityCounts(ids) {
+  const out = {};
+  await Promise.all(ids.map(async (id) => {
+    const [views, likes] = await Promise.all([
+      countByPropertyId(TABLES.property_views, id),
+      countByPropertyId(TABLES.property_likes, id),
+    ]);
+    out[id] = { views, likes };
+  }));
+  return out;
+}
+
+async function countByPropertyId(table, propertyId) {
+  try {
+    const r = await ddb.send(new QueryCommand({
+      TableName: table.name,
+      IndexName: table.gsi.name,
+      KeyConditionExpression: '#pk = :v',
+      ExpressionAttributeNames: { '#pk': table.gsi.pk },
+      ExpressionAttributeValues: { ':v': propertyId },
+      Select: 'COUNT',
+    }));
+    return r.Count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// POST /search/log — append one row per impression (the LightGBM training set).
+// Body: { searchId?, query?, impressions: [{ propertyId, features:{...}, rank,
+//         score, outcome }] }. outcome ∈ {impression, click, like, contact, none}.
+// Auth-gated. Append-only, fully fail-soft. One Put per impression (capped).
+async function handleSearchLog(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+
+  const impressions = Array.isArray(body.impressions) ? body.impressions.slice(0, 100) : [];
+  if (impressions.length === 0) return json(400, { message: 'impressions[] required' });
+
+  const searchId = (body.searchId || crypto.randomUUID()).toString().slice(0, 64);
+  const queryText = (body.query || '').toString().slice(0, 500);
+  const queryCriteria = (body.criteria && typeof body.criteria === 'object')
+    ? body.criteria : {};
+  const now = Date.now();
+
+  let written = 0;
+  await Promise.all(impressions.map(async (imp, i) => {
+    if (!imp || typeof imp !== 'object') return;
+    // ponytail: outcomes are caller-asserted; sanity-check before training.
+    const propertyId = (imp.propertyId || imp.id || imp.listingId || '').toString();
+    if (!propertyId) return;
+    try {
+      await ddb.send(new PutCommand({
+        TableName: SEARCH_LOG_TABLE,
+        Item: {
+          id: crypto.randomUUID(),
+          userId: uid,
+          createdAt: now + i,             // sk: keep stable per-impression ordering
+          searchId,
+          query: queryText,
+          criteria: queryCriteria,
+          propertyId,
+          // The per-impression feature vector the ranker saw (training input).
+          features: (imp.features && typeof imp.features === 'object') ? imp.features : {},
+          rank: Number.isFinite(Number(imp.rank)) ? Number(imp.rank) : null,
+          score: Number.isFinite(Number(imp.score)) ? Number(imp.score) : null,
+          // The label the model learns to predict.
+          outcome: (imp.outcome || 'impression').toString().slice(0, 24),
+        },
+      }));
+      written += 1;
+    } catch (e) {
+      console.warn('search/log write failed:', e.message);
+    }
+  }));
+
+  return json(200, { ok: true, logged: written, searchId });
 }
 
 function pageBody(out) {
@@ -2558,8 +3104,28 @@ const ASSISTANT_TOOL = {
   ],
 };
 
+// Erik's full tool surface for the function-calling loop: create_property (the
+// landlord publish path) PLUS search_listings (the real DB query). Built lazily
+// (SEARCH_LISTINGS_TOOL is a const declared later → avoid the temporal-dead-zone
+// crash at module init) so the chat handler can hand the model both tools and run
+// the request→functionCall→execute→feed loop.
+function assistantToolsFull() {
+  return {
+    functionDeclarations: [
+      ASSISTANT_TOOL.functionDeclarations[0], // create_property
+      SEARCH_LISTINGS_TOOL,
+    ],
+  };
+}
+
 // Required fields to publish a listing. Everything else is optional polish.
 const LISTING_REQUIRED = ['price', 'rooms', 'city'];
+
+// Closed enum for the responseSchema extraction (matches the app's catalogue).
+const EXTRACT_PROPERTY_TYPE_ENUM = [
+  'דירה', 'דירת גן', 'דירת גג', 'פנטהאוז', 'מיני פנטהאוז', 'דופלקס', 'טריפלקס',
+  'סטודיו', 'יחידת דיור', 'בית פרטי', 'קוטג', 'מרתף',
+];
 
 function missingRequired(fields) {
   return LISTING_REQUIRED.filter((k) => {
@@ -2583,23 +3149,48 @@ async function handleAssistantExtract(event) {
     return json(200, { fields: current, missing: missingRequired(current) });
   }
 
-  const sys = 'אתה מחלץ פרטי דירה להשכרה מטקסט חופשי בעברית. החזר אך ורק JSON תקין '
-    + 'במבנה: {"fields":{"price":number|null,"rooms":number|null,"sizeM2":number|null,'
-    + '"city":string|null,"neighborhood":string|null,"street":string|null,'
-    + '"propertyType":string|null,"entryDate":string|null,"description":string},'
-    + '"suggestedTitle":string}. price=שכר דירה חודשי בשקלים. אל תמציא ערכים — '
-    + 'מה שלא מופיע בטקסט החזר null. description = תקציר נקי וקצר של הדירה.';
+  const sys = 'אתה מחלץ פרטי דירה להשכרה מטקסט חופשי בעברית. price=שכר דירה חודשי '
+    + 'בשקלים. אל תמציא ערכים — מה שלא מופיע בטקסט החזר null. description = תקציר '
+    + 'נקי וקצר של הדירה. propertyType מתוך הרשימה הסגורה בלבד.';
   const contents = [{
     role: 'user',
     parts: [{ text: `תיאור הדירה: ${description}\nשדות ידועים כבר: ${JSON.stringify(current)}` }],
   }];
 
+  // Controlled generation: a full JSON Schema (with enums for city/propertyType)
+  // forces bulletproof structured Hebrew extraction — no fence-stripping, no
+  // "almost-JSON" parse failures.
+  const responseSchema = {
+    type: 'object',
+    properties: {
+      fields: {
+        type: 'object',
+        properties: {
+          price: { type: 'integer', nullable: true },
+          rooms: { type: 'number', nullable: true },
+          sizeM2: { type: 'integer', nullable: true },
+          city: { type: 'string', nullable: true },
+          neighborhood: { type: 'string', nullable: true },
+          street: { type: 'string', nullable: true },
+          propertyType: { type: 'string', nullable: true, enum: EXTRACT_PROPERTY_TYPE_ENUM },
+          entryDate: { type: 'string', nullable: true },
+          description: { type: 'string' },
+        },
+      },
+      suggestedTitle: { type: 'string' },
+    },
+    required: ['fields'],
+  };
+
   try {
-    const data = await geminiGenerate(sys, contents);
+    const data = await geminiGenerate(sys, contents, undefined, {
+      responseMimeType: 'application/json',
+      responseSchema,
+      temperature: 0.2,
+    });
     const text = (data?.candidates?.[0]?.content?.parts || [])
       .map((p) => p.text || '').join('');
-    const m = text.match(/\{[\s\S]*\}/);
-    const parsed = m ? JSON.parse(m[0]) : {};
+    const parsed = text ? JSON.parse(text) : {};
     const ex = (parsed.fields && typeof parsed.fields === 'object') ? parsed.fields : {};
     // Merge: keep already-known values, fill from extraction (non-null only).
     const fields = { ...current };
@@ -2790,6 +3381,185 @@ async function loadUserProfile(uid) {
     return res.Item || null;
   } catch {
     return null;
+  }
+}
+
+// ── search_listings tool — the real DB query behind Erik's function-calling ───
+// Shared by the assistant tool-loop. Runs an actual catalogue query against the
+// properties table (status='available' GSI) and filters in-Lambda by the model's
+// extracted criteria, returning a small set of REAL listings the model is then
+// instructed to answer strictly from.
+const SEARCH_LISTINGS_TOOL = {
+  name: 'search_listings',
+  description:
+    'מחפש דירות אמיתיות בקטלוג של Rently לפי קריטריונים. החזר תוצאות אמת בלבד — '
+    + 'אל תמציא דירות. קרא לפונקציה כשהמשתמש מחפש דירה (עיר/חדרים/תקציב/שכונה).',
+  parameters: {
+    type: 'object',
+    properties: {
+      city: { type: 'string', description: 'עיר' },
+      neighborhood: { type: 'string', description: 'שכונה' },
+      minRooms: { type: 'number', description: 'מינימום חדרים' },
+      maxRooms: { type: 'number', description: 'מקסימום חדרים' },
+      minPrice: { type: 'integer', description: 'מחיר חודשי מינימלי בשקלים' },
+      maxPrice: { type: 'integer', description: 'מחיר חודשי מקסימלי בשקלים' },
+      pets: { type: 'boolean', description: 'מתיר חיות מחמד' },
+      limit: { type: 'integer', description: 'כמה תוצאות להחזיר (ברירת מחדל 6)' },
+    },
+  },
+};
+
+// Execute the search_listings tool. Returns a compact array of real listings
+// (id + the fields the model needs to describe them honestly). Fail-soft → [].
+async function runSearchListings(args = {}) {
+  const limit = Math.min(Math.max(Number(args.limit) || 6, 1), 12);
+  const wantCity = (args.city || '').toString().trim().toLowerCase();
+  const wantHood = (args.neighborhood || '').toString().trim().toLowerCase();
+  const minRooms = num(args.minRooms);
+  const maxRooms = num(args.maxRooms);
+  const minPrice = num(args.minPrice);
+  const maxPrice = num(args.maxPrice);
+  const pets = args.pets === true;
+
+  // Scan the active listings (Phase-1 scale). Query the status GSI for the
+  // common active states, then filter in-Lambda by the soft criteria.
+  let rows = [];
+  for (const status of ['available', 'active']) {
+    try {
+      const out = await ddb.send(new QueryCommand({
+        TableName: TABLES.properties.name,
+        IndexName: TABLES.properties.gsi.name,
+        KeyConditionExpression: '#s = :s',
+        ExpressionAttributeNames: { '#s': TABLES.properties.gsi.pk },
+        ExpressionAttributeValues: { ':s': status },
+        Limit: 200,
+        ScanIndexForward: false,
+      }));
+      rows = rows.concat(out.Items || []);
+    } catch { /* status value may not exist — ignore */ }
+  }
+  // De-dup by id (a listing could match both status reads in theory).
+  const byId = new Map();
+  for (const r of rows) if (r && r.id && !byId.has(r.id)) byId.set(r.id, r);
+  rows = [...byId.values()];
+
+  const matched = rows.filter((p) => {
+    if (p.isActive === false || p.status === 'inactive') return false;
+    if (wantCity && String(p.city || '').toLowerCase() !== wantCity) return false;
+    if (wantHood && !String(p.neighborhood || '').toLowerCase().includes(wantHood)) return false;
+    const rooms = Number(p.rooms);
+    if (minRooms !== undefined && rooms < minRooms) return false;
+    if (maxRooms !== undefined && rooms > maxRooms) return false;
+    const price = Number(p.price);
+    if (minPrice !== undefined && price < minPrice) return false;
+    if (maxPrice !== undefined && price > maxPrice) return false;
+    if (pets) {
+      const hay = [
+        Array.isArray(p.featureLabels) ? p.featureLabels.join(' ') : '',
+        Array.isArray(p.smartTags) ? p.smartTags.join(' ') : '',
+        p.description || '',
+      ].join(' ').toLowerCase();
+      const petFlag = p.features && (p.features.pets === true || p.features.petsAllowed === true);
+      if (!petFlag && !/חיות|חיית מחמד|כלב|חתול|pets?/.test(hay)) return false;
+    }
+    return true;
+  }).slice(0, limit);
+
+  return matched.map((p) => ({
+    id: String(p.id || ''),
+    city: p.city || '',
+    neighborhood: p.neighborhood || '',
+    address: [p.street, p.streetNumber].filter(Boolean).join(' '),
+    rooms: Number(p.rooms) || null,
+    price: Number(p.price) || null,
+    sizeM2: Number(p.sizeM2) || null,
+    floor: p.floor ?? null,
+    condition: p.condition || '',
+    smartTags: Array.isArray(p.smartTags) ? p.smartTags.slice(0, 10) : [],
+    priceBadge: p.priceBadge?.badge || null,
+    description: (p.description || '').toString().slice(0, 240),
+  }));
+}
+
+// POST /listing/ask — per-listing "Ask Rently" Q&A. Given a listingId + question,
+// assemble the listing + its enrichment (neighbourhood score, price badge, POIs)
+// as the ONLY context, then answer in Hebrew strictly from it. Auth-gated.
+async function handleListingAsk(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const listingId = (body.listingId || body.propertyId || '').toString().trim();
+  const question = (body.question || '').toString().trim().slice(0, 500);
+  if (!listingId) return json(400, { message: 'listingId required' });
+  if (!question) return json(400, { message: 'question required' });
+
+  let prop = null;
+  try {
+    const r = await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name, Key: { id: listingId },
+    }));
+    prop = r.Item || null;
+  } catch (e) { console.warn('listing/ask get failed:', e.message); }
+  if (!prop) return json(404, { message: 'Listing not found' });
+
+  if (!GEMINI_API_KEY) {
+    return json(200, { answer: 'העוזר אינו זמין כרגע. נסו שוב מאוחר יותר.', grounded: false });
+  }
+
+  // Build a compact, grounded context object — only honest facts about THIS
+  // listing + its enrichment. The model is told to answer ONLY from this.
+  const context = {
+    כתובת: [prop.street, prop.streetNumber, prop.neighborhood, prop.city].filter(Boolean).join(', '),
+    עיר: prop.city || null,
+    שכונה: prop.neighborhood || null,
+    חדרים: Number(prop.rooms) || null,
+    מחיר_חודשי: Number(prop.price) || null,
+    גודל_מר: Number(prop.sizeM2) || null,
+    קומה: prop.floor ?? null,
+    סהכ_קומות: prop.totalFloors ?? null,
+    מצב: prop.condition || null,
+    תאריך_כניסה: prop.entryDate || null,
+    סוג_עסקה: prop.transactionType || null,
+    תיאור: (prop.description || '').toString().slice(0, 1200),
+    תכונות: Array.isArray(prop.featureLabels) ? prop.featureLabels.slice(0, 40) : [],
+    תגיות: Array.isArray(prop.smartTags) ? prop.smartTags.slice(0, 20) : [],
+    תג_מחיר: prop.priceBadge || null,           // { medianPpm, deltaPct, badge }
+    ציון_שכונה: prop.neighborhoodScore || null, // { score, sub }
+    גוש: prop.gush || null,
+    חלקה: prop.helka || null,
+  };
+
+  const sys = 'אתה "Rently" — עוזר שעונה על שאלות לגבי דירה ספציפית אחת בלבד. '
+    + 'ענה בעברית, חם ותכליתי. חוק ברזל: השתמש אך ורק במידע שמופיע בהקשר הנתון על '
+    + 'הדירה. אסור בהחלט להמציא עובדות, מחירים, מרחקים או פרטים שלא מופיעים בהקשר. '
+    + 'אם המידע לא נמצא בהקשר — אמור בכנות שאין לך את המידע הזה על הדירה והצע לפנות '
+    + 'לבעל הדירה. אל תשתמש ב-markdown או כוכביות. תשובות קצרות וברורות.';
+
+  const contents = [{
+    role: 'user',
+    parts: [{
+      text: `הקשר הדירה (המקור היחיד למידע):\n${JSON.stringify(context, null, 0)}\n\n`
+        + `שאלת המשתמש: ${question}`,
+    }],
+  }];
+
+  try {
+    const data = await geminiGenerate(sys, contents, undefined, {
+      temperature: 0.3, maxOutputTokens: 400,
+    });
+    let answer = (data?.candidates?.[0]?.content?.parts || [])
+      .map((p) => p.text || '').join('');
+    answer = stripMarkup(answer);
+    if (!answer) answer = 'אין לי את המידע הזה על הדירה. כדאי לפנות לבעל הדירה.';
+    return json(200, { answer, listingId, grounded: true });
+  } catch (e) {
+    console.warn('listing/ask error:', e.message);
+    return json(200, {
+      answer: 'יש עומס קטן כרגע, אפשר לנסות שוב בעוד רגע?',
+      listingId, grounded: false,
+    });
   }
 }
 
@@ -3362,7 +4132,7 @@ async function handleAssistant(event) {
     loadOwnerProperties(uid),
     loadUserProfile(uid),
   ]);
-  const systemText = buildErikSystemPrompt(profile, properties);
+  const systemText = buildErikSystemPrompt(profile, properties) + '\n' + GROUNDING_RULE;
   const contents = messages
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
     .map((m) => ({
@@ -3371,31 +4141,25 @@ async function handleAssistant(event) {
     }));
 
   try {
-    const data = await geminiGenerate(systemText, contents, [ASSISTANT_TOOL]);
-    const cand = data.candidates && data.candidates[0];
-    const parts = (cand && cand.content && cand.content.parts) || [];
-    let reply = '';
-    let propertyDraft = null;
-    for (const p of parts) {
-      if (p.text) reply += p.text;
-      if (p.functionCall && p.functionCall.name === 'create_property') {
-        propertyDraft = p.functionCall.args || {};
-      }
-    }
-    reply = stripMarkup(reply);
-    // Pull out the optional [[CHOICES: a | b | c]] line → quick-reply chips.
+    const result = await runAssistantToolLoop(systemText, contents, assistantToolsFull());
+    let reply = stripMarkup(result.reply);
     let suggestions = [];
     const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
     if (cm) {
       suggestions = cm[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 5);
       reply = reply.replace(cm[0], '').trim();
     }
-    if (!reply && propertyDraft) {
+    if (!reply && result.propertyDraft) {
       reply = 'הכנתי טיוטה של הדירה! עכשיו רק צריך להוסיף תמונה אחת של הדירה — '
         + 'אפשר לצלם עכשיו או לבחור תמונה מהטלפון, ואז נפרסם.';
     }
     if (!reply) reply = 'סליחה, לא הבנתי. אפשר לחזור על זה שוב?';
-    return json(200, { reply, propertyDraft, suggestions });
+    return json(200, {
+      reply,
+      propertyDraft: result.propertyDraft,
+      suggestions,
+      listings: result.listings,
+    });
   } catch (e) {
     console.warn('assistant error:', e.message);
     return json(200, {
@@ -3405,24 +4169,97 @@ async function handleAssistant(event) {
   }
 }
 
+// Strict grounding instruction shared by the tool-using chats: the model must
+// answer ONLY from search_listings results — never invent listings/prices.
+const GROUNDING_RULE =
+  'חוק ברזל לגבי דירות: כשמדובר בדירות זמינות לחיפוש — ענה אך ורק על סמך התוצאות '
+  + 'שמחזירה הפונקציה search_listings. אסור בהחלט להמציא דירות, כתובות, מחירים או '
+  + 'פרטים. אם אין תוצאות — אמור בכנות שלא נמצאו דירות מתאימות כרגע. כשהמשתמש מחפש '
+  + 'דירה (עיר/חדרים/תקציב/שכונה/חיות) — קרא ל-search_listings לפני שאתה עונה.';
+
+// ── Gemini function-calling loop ─────────────────────────────────────────────
+// Runs the request → functionCall → execute → feed-result loop (ReAct). Executes
+// search_listings against the real DB and feeds results back; create_property is
+// terminal (returned as a draft for the app to publish). Capped at MAX_HOPS so a
+// misbehaving model can't loop forever. Returns { reply, propertyDraft, listings }.
+const MAX_TOOL_HOPS = 5;
+async function runAssistantToolLoop(systemText, contents, tools) {
+  const convo = contents.slice();
+  let propertyDraft = null;
+  let listings = [];
+
+  for (let hop = 0; hop < MAX_TOOL_HOPS; hop++) {
+    const data = await geminiGenerate(systemText, convo, [tools]);
+    const cand = data.candidates && data.candidates[0];
+    const parts = (cand && cand.content && cand.content.parts) || [];
+
+    let textOut = '';
+    const calls = [];
+    for (const p of parts) {
+      if (p.text) textOut += p.text;
+      if (p.functionCall && p.functionCall.name) calls.push(p.functionCall);
+    }
+
+    // create_property is terminal — capture the draft and stop the loop.
+    const createCall = calls.find((c) => c.name === 'create_property');
+    if (createCall) {
+      propertyDraft = createCall.args || {};
+      return { reply: textOut, propertyDraft, listings };
+    }
+
+    const searchCalls = calls.filter((c) => c.name === 'search_listings');
+    if (searchCalls.length === 0) {
+      // No tool call → the model answered directly. Done.
+      return { reply: textOut, propertyDraft, listings };
+    }
+
+    // Echo the model's function-call turn, then feed the real results back so the
+    // next hop answers strictly from them.
+    convo.push({ role: 'model', parts: parts.filter((p) => p.functionCall) });
+    const responseParts = [];
+    for (const call of searchCalls) {
+      const results = await runSearchListings(call.args || {});
+      listings = results; // expose the latest tool result to the app
+      responseParts.push({
+        functionResponse: {
+          name: 'search_listings',
+          response: { results, count: results.length },
+        },
+      });
+    }
+    convo.push({ role: 'user', parts: responseParts });
+  }
+
+  // Hit the hop cap — make a final no-tools pass so the model summarises what it
+  // already found instead of returning empty.
+  try {
+    const data = await geminiGenerate(systemText, convo);
+    const cand = data.candidates && data.candidates[0];
+    const parts = (cand && cand.content && cand.content.parts) || [];
+    const reply = parts.map((p) => p.text || '').join('');
+    return { reply, propertyDraft, listings };
+  } catch {
+    return { reply: '', propertyDraft, listings };
+  }
+}
+
 // ── נועה — tenant apartment-search chat (warm, separate from Erik) ────────────
 // Conversational layer only: helps a renter describe what they want; the app
 // runs the actual catalogue search and shows result cards. No listing tool.
 async function handleTenantSearchChat(messages) {
-  const systemText = buildTenantSearchSystemPrompt();
+  const systemText = buildTenantSearchSystemPrompt() + '\n' + GROUNDING_RULE;
   const contents = messages
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
     .map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: String(m.text).slice(0, 2000) }],
     }));
+  // Search-only tool surface (no create_property for tenants). The loop runs the
+  // real search_listings query and feeds results back so נועה answers from them.
+  const tools = { functionDeclarations: [SEARCH_LISTINGS_TOOL] };
   try {
-    const data = await geminiGenerate(systemText, contents);
-    const cand = data.candidates && data.candidates[0];
-    const parts = (cand && cand.content && cand.content.parts) || [];
-    let reply = '';
-    for (const p of parts) if (p.text) reply += p.text;
-    reply = stripMarkup(reply);
+    const result = await runAssistantToolLoop(systemText, contents, tools);
+    let reply = stripMarkup(result.reply);
     let suggestions = [];
     const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
     if (cm) {
@@ -3430,7 +4267,9 @@ async function handleTenantSearchChat(messages) {
       reply = reply.replace(cm[0], '').trim();
     }
     if (!reply) reply = 'ספר לי עוד קצת על מה שאתה מחפש, ואני כבר אדאג לדייק 🙂';
-    return json(200, { reply, suggestions, propertyDraft: null });
+    return json(200, {
+      reply, suggestions, propertyDraft: null, listings: result.listings,
+    });
   } catch (e) {
     console.warn('tenant assistant error:', e.message);
     return json(200, {

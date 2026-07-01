@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -40,6 +42,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     with WidgetsBindingObserver {
   DiscoverTab _selectedTab = DiscoverTab.forYou;
 
+  // ── Natural-language search (the hero bar) ────────────────────────────────
+  // Reuses the existing extract→search pipeline: server Gemini extract +
+  // on-device SmartSearch parse → SearchQuery → mapped onto the live filters
+  // so results land straight in the discover deck.
+  final _nlController = TextEditingController();
+  final _nlAssistant = AssistantService();
+  bool _nlBusy = false;
+  String? _nlSummary; // the understood criteria, shown back to the user
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +62,86 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _nlController.dispose();
     super.dispose();
+  }
+
+  /// The hero NL search: takes the user's free Hebrew text, runs it through the
+  /// same extract→parse pipeline the AI-search tab uses, then translates the
+  /// resulting [SearchQuery] into the live [SearchFilters] so the discover deck
+  /// re-filters + re-ranks to match. Fail-soft — a model outage still parses
+  /// on-device, and any error just leaves the current results untouched.
+  Future<void> _runNlSearch(String raw) async {
+    final text = raw.trim();
+    if (text.isEmpty || _nlBusy) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final provider = context.read<DatingProvider>();
+    setState(() => _nlBusy = true);
+
+    // 1) Server Gemini extract (degrades to empty on failure).
+    Map<String, dynamic> llm = const {};
+    try {
+      final r = await _nlAssistant.extractPropertyFields(text, currentFields: {});
+      llm = r.fields;
+    } catch (_) {/* fall back to on-device parse */}
+
+    // 2) On-device parse merged with the model fields → structured query.
+    final query = SmartSearch.parse(text, llm: llm);
+
+    if (!mounted) return;
+    if (query.isEmpty) {
+      setState(() {
+        _nlBusy = false;
+        _nlSummary = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        duration: Duration(milliseconds: 2600),
+        content: Text('לא הצלחתי להבין את החיפוש. נסו למשל: "3 חדרים בתל אביב עד 6000"'),
+      ));
+      return;
+    }
+
+    // 3) Map the NL query onto the live filters → discover deck re-ranks.
+    final next = _filtersFromQuery(provider.filters, query);
+    await provider.updateFilters(next);
+
+    if (!mounted) return;
+    setState(() {
+      _nlBusy = false;
+      _nlSummary = query.describe();
+    });
+  }
+
+  /// Translates a parsed [SearchQuery] into a [SearchFilters] patch over the
+  /// current filters (so anything the NL query didn't mention is preserved).
+  SearchFilters _filtersFromQuery(SearchFilters base, SearchQuery q) {
+    return base.copyWith(
+      query: q.rawText.isEmpty ? null : q.rawText,
+      city: q.city,
+      minBudget: q.minPrice,
+      maxBudget: q.maxPrice,
+      minRooms: q.minRooms,
+      maxRooms: q.maxRooms,
+      transactionType: q.transactionType,
+      // NL amenities become preferred (soft) signals so a single missing tag
+      // doesn't empty the deck for an older user typing casually.
+      preferredFeatures: q.amenities.isEmpty
+          ? null
+          : {...base.preferredFeatures, ...q.amenities},
+    );
+  }
+
+  void _clearNlSearch() {
+    final provider = context.read<DatingProvider>();
+    _nlController.clear();
+    setState(() => _nlSummary = null);
+    // Reset the NL-driven criteria back to neutral, keeping the rest of the deck.
+    unawaited(provider.updateFilters(provider.filters.copyWith(
+      query: '',
+      city: '',
+    )));
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   @override
@@ -139,7 +229,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       return const _NoMorePropertiesState();
     }
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 72, 16, 140),
+      padding: const EdgeInsets.fromLTRB(16, 128, 16, 140),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.72,
@@ -363,7 +453,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                           cardsCount: properties.length,
                                           padding: const EdgeInsets.fromLTRB(
                                             10,
-                                            72,
+                                            128,
                                             10,
                                             130,
                                           ),
@@ -495,6 +585,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   ],
                 ),
               ),
+              // Hero natural-language search bar — the primary way to search.
+              if (!provider.isLandlord)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 58,
+                  left: 16,
+                  right: 16,
+                  child: _NlSearchBar(
+                    controller: _nlController,
+                    busy: _nlBusy,
+                    summary: _nlSummary,
+                    onSubmit: _runNlSearch,
+                    onClear: _clearNlSearch,
+                  ),
+                ),
             ],
           ),
         );
@@ -917,6 +1021,174 @@ class _GlassPillBadge extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The hero natural-language search bar. RTL, large touch target, older-user
+/// friendly. Submitting runs the existing extract→search pipeline; the
+/// understood criteria are echoed back beneath the field as a removable summary.
+class _NlSearchBar extends StatelessWidget {
+  const _NlSearchBar({
+    required this.controller,
+    required this.busy,
+    required this.summary,
+    required this.onSubmit,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final bool busy;
+  final String? summary;
+  final ValueChanged<String> onSubmit;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.primary, width: 1.6),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.16),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(
+            children: [
+              const SizedBox(width: 8),
+              if (busy)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: AppColors.primary,
+                  ),
+                )
+              else
+                RentlyIcon(
+                  IconsaxPlusLinear.search_normal,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  enabled: !busy,
+                  textDirection: TextDirection.rtl,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: onSubmit,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    hintText: 'חפש דירה במילים שלך…',
+                    hintTextDirection: TextDirection.rtl,
+                    hintStyle: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textSecondary.withValues(alpha: 0.8),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+              if (controller.text.isNotEmpty || (summary != null))
+                IconButton(
+                  tooltip: 'נקה',
+                  icon: const RentlyIcon(
+                    IconsaxPlusLinear.close_circle,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: busy ? null : onClear,
+                ),
+              GestureDetector(
+                onTap: busy ? null : () => onSubmit(controller.text),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded, // RTL "go" — points to the start
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+        ),
+        if (summary == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, right: 6),
+            child: Text(
+              'נסו: "3 חדרים בצפון ת״א עד 6000"',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight2,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  RentlyIcon(
+                    IconsaxPlusLinear.search_status,
+                    size: 14,
+                    color: AppColors.primaryDark,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      summary!,
+                      textDirection: TextDirection.rtl,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.primaryDark,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

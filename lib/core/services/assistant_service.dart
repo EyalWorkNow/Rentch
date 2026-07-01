@@ -109,20 +109,87 @@ class AssistantCard {
       };
 }
 
-/// Erik's reply: spoken/written text, optional quick-reply chips, and an
-/// optional property draft to publish.
+/// A single listing returned by the backend `search_listings` tool. This is a
+/// thin, defensive wrapper around whatever DB row shape the tool emits — the
+/// only thing the client guarantees is an [id] (when present) and the raw map,
+/// so the screen can render a result card and deep-link to the real property.
+class AssistantListing {
+  const AssistantListing({
+    required this.id,
+    required this.title,
+    this.subtitle,
+    this.price,
+    this.imageUrl,
+    this.data = const {},
+  });
+
+  final String id;
+  final String title;
+  final String? subtitle;
+  final num? price;
+  final String? imageUrl;
+  final Map<String, dynamic> data;
+
+  factory AssistantListing.fromJson(Map<String, dynamic> json) {
+    String? pick(List<String> keys) {
+      for (final k in keys) {
+        final v = json[k];
+        if (v != null && v.toString().trim().isNotEmpty) return v.toString().trim();
+      }
+      return null;
+    }
+
+    num? pickNum(List<String> keys) {
+      for (final k in keys) {
+        final v = json[k];
+        if (v is num) return v;
+        if (v != null) {
+          final parsed = num.tryParse(v.toString());
+          if (parsed != null) return parsed;
+        }
+      }
+      return null;
+    }
+
+    return AssistantListing(
+      id: pick(['id', 'listingId', 'listing_id', 'propertyId', 'property_id']) ?? '',
+      title: pick(['title', 'name', 'headline']) ?? 'דירה',
+      subtitle: pick(['subtitle', 'address', 'city', 'neighborhood', 'neighbourhood']),
+      price: pickNum(['price', 'rent', 'monthlyPrice', 'monthly_price']),
+      imageUrl: pick(['imageUrl', 'image', 'imageUrls', 'thumbnail', 'photo']),
+      data: json,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (id.isNotEmpty) 'id': id,
+        'title': title,
+        if (subtitle != null && subtitle!.isNotEmpty) 'subtitle': subtitle,
+        if (price != null) 'price': price,
+        if (imageUrl != null && imageUrl!.isNotEmpty) 'imageUrl': imageUrl,
+      };
+}
+
+/// Erik's reply: spoken/written text, optional quick-reply chips, an optional
+/// property draft to publish, structured UI cards, and (new with the backend
+/// tool-loop) the real listings returned by the `search_listings` tool.
 class AssistantReply {
   const AssistantReply({
     required this.reply,
     this.propertyDraft,
     this.suggestions = const [],
     this.cards = const [],
+    this.listings = const [],
   });
 
   final String reply;
   final Map<String, dynamic>? propertyDraft;
   final List<String> suggestions;
   final List<AssistantCard> cards;
+
+  /// Real DB results surfaced by the `search_listings` tool. Empty when the
+  /// reply was plain text (backward-compatible with the pre-tool-loop backend).
+  final List<AssistantListing> listings;
 }
 
 class AssistantException implements Exception {
@@ -187,15 +254,26 @@ class AssistantService {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return (fields: currentFields, missing: fallbackMissing, suggestedTitle: '');
       }
-      final data = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final decoded = jsonDecode(raw);
+      // The schema-validated extract response is plain `{fields, missing,
+      // suggestedTitle}`, but tolerate a `data`-wrapped envelope too.
+      final data = decoded is Map && decoded['data'] is Map
+          ? Map<String, dynamic>.from(decoded['data'] as Map)
+          : Map<String, dynamic>.from(decoded as Map);
+      final rawMissing = data['missing'];
       return (
         fields: data['fields'] is Map
             ? Map<String, dynamic>.from(data['fields'] as Map)
             : currentFields,
-        missing: data['missing'] is List
-            ? List<String>.from(data['missing'] as List)
+        // responseSchema guarantees an array of strings, but stay fail-soft:
+        // drop empty/null entries and ignore a non-list shape.
+        missing: rawMissing is List
+            ? rawMissing
+                .map((e) => e?.toString().trim() ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList()
             : fallbackMissing,
-        suggestedTitle: (data['suggestedTitle'] ?? '').toString(),
+        suggestedTitle: (data['suggestedTitle'] ?? '').toString().trim(),
       );
     } catch (_) {
       return (fields: currentFields, missing: fallbackMissing, suggestedTitle: '');
@@ -242,6 +320,51 @@ class AssistantService {
       final draft = data['propertyDraft'];
       final sugg = data['suggestions'];
       final rawCards = data['cards'] ?? data['items'] ?? data['ui'];
+
+      // The backend tool-loop surfaces real DB rows from the `search_listings`
+      // tool as a results array alongside the text. Be liberal about the field
+      // name and (when nested) the inner array key, and fail soft to an empty
+      // list so a plain-text reply from the old backend still works.
+      final rawResults = data['results'] ??
+          data['listings'] ??
+          data['searchResults'] ??
+          data['search_results'] ??
+          data['properties'];
+      List rawListings;
+      if (rawResults is List) {
+        rawListings = rawResults;
+      } else if (rawResults is Map) {
+        final inner = rawResults['results'] ??
+            rawResults['listings'] ??
+            rawResults['items'] ??
+            rawResults['properties'];
+        rawListings = inner is List ? inner : const [];
+      } else {
+        rawListings = const [];
+      }
+      final listings = rawListings
+          .whereType<Map>()
+          .map((e) => AssistantListing.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+
+      // Surface listings through the SAME structured-card channel the chat
+      // thread already renders, so a results array shows up as inline cards
+      // without the screen needing new wiring. Backend-provided cards (if any)
+      // are preserved and the listings card is appended.
+      final cards = <AssistantCard>[
+        if (rawCards is List)
+          ...rawCards
+              .whereType<Map>()
+              .map((e) => AssistantCard.fromJson(Map<String, dynamic>.from(e))),
+        if (listings.isNotEmpty)
+          AssistantCard(
+            type: 'listings',
+            title: 'תוצאות חיפוש',
+            data: {'count': listings.length},
+            items: listings.map((l) => l.toJson()).toList(),
+          ),
+      ];
+
       return AssistantReply(
         reply: (data['reply'] as String?)?.trim().isNotEmpty == true
             ? (data['reply'] as String).trim()
@@ -253,13 +376,8 @@ class AssistantService {
                 .where((s) => s.isNotEmpty)
                 .toList()
             : const [],
-        cards: rawCards is List
-            ? rawCards
-                .whereType<Map>()
-                .map(
-                    (e) => AssistantCard.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : const [],
+        cards: cards,
+        listings: listings,
       );
     } on TimeoutException {
       throw const AssistantException('העוזר לוקח קצת זמן. נסו שוב.');

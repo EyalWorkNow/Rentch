@@ -5,8 +5,12 @@ import 'package:dating_app/core/finance/affordability.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/widgets/ask_rently_sheet.dart';
+import 'package:dating_app/presentation/widgets/price_badge.dart';
+import 'package:dating_app/presentation/widgets/neighborhood_score_card.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/tenant_rights_sheet.dart';
 import 'package:dating_app/presentation/widgets/term_tooltip.dart';
@@ -308,6 +312,185 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ─── Listing enrichment block (Ask Rently + price/neighborhood badges) ────────
+//
+// Phase-1 per-listing intelligence, mounted inline by every layout (Classic +
+// broker templates). It is built to TOLERATE the backend not having landed yet:
+//
+//  • Price badge & neighborhood score read enrichment fields defensively. The
+//    `RentalProperty` model does not (yet) carry them, so this block fetches
+//    them on demand via the generic AWS client and parses each field
+//    defensively — any missing/malformed/`insufficient_data` value collapses to
+//    nothing. Before the backend exists the fetch simply fails-soft and ONLY
+//    the "שאל את Rently" entry remains.
+//  • "שאל את Rently" is always available (the entry just opens a chat sheet that
+//    itself fails-soft on the network).
+//
+// The whole block is hidden in landlord-preview mode.
+class _ListingEnrichmentBlock extends StatefulWidget {
+  const _ListingEnrichmentBlock({
+    required this.property,
+    this.title = '',
+    this.compact = false,
+  });
+
+  final RentalProperty property;
+  final String title;
+
+  /// Tighter spacing for dense (broker) layouts.
+  final bool compact;
+
+  @override
+  State<_ListingEnrichmentBlock> createState() =>
+      _ListingEnrichmentBlockState();
+}
+
+class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
+  Map<String, dynamic>? _enrichment; // raw {priceBadge, neighborhoodScore, …}
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEnrichment();
+  }
+
+  /// Fetches the listing's enrichment payload defensively. Any failure (no
+  /// backend yet, network blip, odd shape) leaves [_enrichment] null so the
+  /// badges simply don't render — the Ask-Rently entry is unaffected.
+  Future<void> _loadEnrichment() async {
+    try {
+      if (!AwsApiClient.instance.isConfigured) return;
+      final res = await AwsApiClient.instance.get(
+        '/listing/enrichment',
+        query: {'listingId': widget.property.id},
+      );
+      // Accept either a flat map or a {data:{…}} envelope.
+      final data = res['data'];
+      final map = data is Map
+          ? Map<String, dynamic>.from(data)
+          : Map<String, dynamic>.from(res);
+      if (!mounted) return;
+      // Only keep it if it actually carries an enrichment field we render.
+      if (map['priceBadge'] != null || map['neighborhoodScore'] != null) {
+        setState(() => _enrichment = map);
+      }
+    } catch (_) {
+      /* fail-soft: badges stay hidden */
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = widget.compact ? 12.0 : 16.0;
+    final children = <Widget>[];
+
+    final priceBadge = PriceBadge(enrichment: _enrichment);
+    final neighborhood = NeighborhoodScoreCard(enrichment: _enrichment);
+
+    // PriceBadge / NeighborhoodScoreCard each collapse to SizedBox.shrink when
+    // their field is absent, so we add them unconditionally and only insert a
+    // gap when something real precedes the next item.
+    children.add(priceBadge);
+    children.add(neighborhood);
+    children.add(_AskRentlyEntry(
+      property: widget.property,
+      title: widget.title,
+    ));
+
+    // Interleave gaps without leaving a leading/trailing void from shrunk items.
+    final spaced = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) spaced.add(SizedBox(height: gap));
+      spaced.add(children[i]);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: spaced,
+    );
+  }
+}
+
+/// The "שאל את Rently" entry card — opens the per-listing Q&A chat sheet.
+class _AskRentlyEntry extends StatelessWidget {
+  const _AskRentlyEntry({required this.property, this.title = ''});
+
+  final RentalProperty property;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: GestureDetector(
+        onTap: () => showAskRentlySheet(
+          context,
+          listingId: property.id,
+          listingTitle: title,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.10),
+                AppColors.primary.withValues(alpha: 0.04),
+              ],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border:
+                Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(IconsaxPlusBold.message_question,
+                    color: Colors.white, size: 25),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'שאל את Rently',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    const Text(
+                      'שאלו כל דבר על הדירה — חיות, קומה, תחבורה ועוד',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(IconsaxPlusLinear.arrow_left_2,
+                  size: 18, color: AppColors.primary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -808,6 +991,14 @@ class _ParitySections extends StatelessWidget {
     children.add(_header('פרטי הנכס', IconsaxPlusLinear.building_3));
     children.add(_PropertyFactsCard(property));
     children.add(const SizedBox(height: 26));
+
+    // ── Phase-1 listing intelligence: price/neighborhood badges (only when the
+    // backend enrichment is present) + the "שאל את Rently" Q&A entry. Each part
+    // self-hides when its data is absent; omitted entirely in landlord preview.
+    if (!isLandlordPreview) {
+      children.add(_ListingEnrichmentBlock(property: property, compact: true));
+      children.add(const SizedBox(height: 26));
+    }
 
     // ── Source / origin URL ───────────────────────────────────────────────
     if (property.url.isNotEmpty) {

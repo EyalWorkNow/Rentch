@@ -91,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'tour':
       case 'tour_ready': // backend's actual "your 3D tour is ready" type
       case 'review':
+      case 'saved_search': // a new listing matched the user's saved search
         final property = provider.propertyById(n.propertyId);
         if (property != null) {
           Navigator.of(context).push(

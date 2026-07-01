@@ -252,6 +252,8 @@ class _AssistantScreenState extends State<AssistantScreen>
         _turns.add(AssistantTurn(
           role: 'assistant',
           text: reply.reply,
+          // Carry the search_listings tool results so the thread can paint them.
+          cards: reply.cards,
         ));
         // Only replace the pending draft when Erik produced a new one; keep the
         // previous draft otherwise so its publish action never disappears.
