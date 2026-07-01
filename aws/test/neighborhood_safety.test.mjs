@@ -84,12 +84,14 @@ test('isKindergarten detects gan from the real name/type columns', () => {
   assert.equal(isKindergarten({}), false);
 });
 
-test('normPikuah handles the real mosdot abbreviations', () => {
-  // real dataset values (JSON-unescaped): מ"מ, חמ"ד, חרדי
-  assert.equal(normPikuah('חמ"ד'), 'mamlachti_dati'); // religious-state (the gate)
+test('normPikuah handles the real mosdot abbreviations + doubled-quote escaping', () => {
+  // real dataset values carry CSV double-quote escaping
+  assert.equal(normPikuah('"חמ""ד'), 'mamlachti_dati'); // religious-state (the gate)
+  assert.equal(normPikuah('"מ""מ"'), 'mamlachti');      // state, escaped form
+  assert.equal(normPikuah('חמ"ד'), 'mamlachti_dati');
   assert.equal(normPikuah('ממ"ד'), 'mamlachti_dati');
   assert.equal(normPikuah('ממלכתי דתי'), 'mamlachti_dati');
-  assert.equal(normPikuah('מ"מ'), 'mamlachti');       // state (abbrev)
+  assert.equal(normPikuah('מ"מ'), 'mamlachti');
   assert.equal(normPikuah('ממלכתי'), 'mamlachti');
   assert.equal(normPikuah('חרדי'), 'charedi');
   assert.equal(normSector('יהודי'), 'jewish');

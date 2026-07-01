@@ -43,12 +43,14 @@ test('priceFitScore: out-of-window decays; no-signal is neutral', () => {
   assert.equal(priceFitScore(0, win, 'low'), 0.5);   // bad price
 });
 
-test('cohortGateReject: religious_family needs a religious-stream school', () => {
-  // secular-only nearby → excluded
+test('cohortGateReject: religious_family strictly requires חמ"ד (mamlachti_dati)', () => {
+  // secular-only → excluded
   assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['mamlachti'] })), true);
-  // ממ"ד present → kept
+  // charedi ≠ דתי-לאומי → still excluded (the key fix)
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['charedi'] })), true);
+  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['charedi', 'mamlachti'] })), true);
+  // חמ"ד present → kept
   assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['mamlachti', 'mamlachti_dati'] })), false);
-  assert.equal(cohortGateReject('religious_family', listingWith({ pikuah: ['charedi'] })), false);
 });
 
 test('cohortGateReject: arab_family needs Arab-sector schools', () => {

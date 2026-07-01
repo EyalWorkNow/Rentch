@@ -133,11 +133,12 @@ function schoolsMetaOf(listing) {
 }
 
 const COHORT_GATES = {
-  // Religious families need a religious-stream school (ממ"ד or חרדי) nearby.
+  // National-religious (דתי-לאומי) families need a ממלכתי-דתי (חמ"ד) school —
+  // NOT charedi, which is a different community. Strict: require mamlachti_dati.
   religious_family: (l) => {
     const meta = schoolsMetaOf(l);
     if (!meta || !Array.isArray(meta.pikuah) || meta.pikuah.length === 0) return false;
-    return !(meta.pikuah.includes('mamlachti_dati') || meta.pikuah.includes('charedi'));
+    return !meta.pikuah.includes('mamlachti_dati');
   },
   // Arab families need Arab-sector schools nearby.
   arab_family: (l) => {

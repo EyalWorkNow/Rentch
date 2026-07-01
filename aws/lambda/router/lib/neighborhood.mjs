@@ -16,6 +16,9 @@
 // We keep the schools resource_id as a constant; swap it if the portal rotates
 // the resource. Crime/socio-economic resource ids are left configurable too.
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { normalizeLocalityName, resolveLocality } from './muni.mjs';
 
 const TIMEOUT_MS = 9000;
@@ -176,14 +179,15 @@ export function isKindergarten(r) {
 
 // Canonicalise the supervision (פיקוח) so cohort logic can match: religious
 // families want ממ"ד/חרדי, Arab families want Arab-sector schools, etc.
-// Real mosdot פיקוח values are ABBREVIATIONS: מ"מ (ממלכתי), חמ"ד / ממ"ד
-// (ממלכתי-דתי), חרדי. Match those, most-specific first.
+// Real mosdot פיקוח values are ABBREVIATIONS with gershayim, and the portal
+// leaks CSV double-quote escaping ("מ""מ", "חמ""ד). Strip all quote chars first,
+// then match: מ"מ→ממ (ממלכתי), חמ"ד→חמד (ממלכתי-דתי), חרדי. Most-specific first.
 export function normPikuah(s) {
-  const t = String(s || '');
-  if (/חמ"?ד|ממ"?ד|ממלכתי.?דתי|דתי/.test(t)) return 'mamlachti_dati';
+  const t = String(s || '').replace(/["'׳״]/g, '');
+  if (/חמד|ממ"?ד|ממלכתי.?דתי|דתי/.test(t)) return 'mamlachti_dati';
   if (/חרדי|עצמאי|מוכר/.test(t)) return 'charedi';
   if (/ערבי|בדואי|דרוזי/.test(t)) return 'arab';
-  if (/ממלכתי|מ"?מ|רשמי|state/i.test(t)) return 'mamlachti';
+  if (/ממלכתי|ממ|רשמי|state/i.test(t)) return 'mamlachti';
   return '';
 }
 export function normSector(s) {
@@ -265,71 +269,49 @@ export function buildLocalityMap(records, nameKeys, valueOf, sum = false) {
   return map;
 }
 
-// CKAN row count for an exact filter (SQL endpoint is disabled → use limit=0).
-async function ckanTotal(resourceId, filters) {
-  const j = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
-    `?resource_id=${resourceId}&filters=${encodeURIComponent(JSON.stringify(filters))}&limit=0`);
-  const t = j?.result?.total;
-  return Number.isFinite(t) ? t : null;
+// Precomputed per-locality features (built offline by scripts/build-locality-
+// features.mjs, keyed by CBS code). Read once, fail-soft to empty if not built —
+// safety/composition then return null and the composite renormalises.
+let _localityFeatures = null;
+function localityFeatures() {
+  if (_localityFeatures) return _localityFeatures;
+  _localityFeatures = {};
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    _localityFeatures = JSON.parse(readFileSync(join(here, 'locality_features.generated.json'), 'utf8'));
+  } catch { /* not built → empty */ }
+  return _localityFeatures;
 }
-// CKAN records for an exact filter.
-async function ckanRows(resourceId, filters, limit = 1) {
-  const j = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
-    `?resource_id=${resourceId}&filters=${encodeURIComponent(JSON.stringify(filters))}&limit=${limit}`);
-  return Array.isArray(j?.result?.records) ? j.result.records : null;
-}
-// CKAN full-text search (for name-keyed datasets like mosdot with no code column).
-async function ckanTextSearch(resourceId, q, limit = 300) {
-  const j = await fetchJson('https://data.gov.il/api/3/action/datastore_search' +
-    `?resource_id=${resourceId}&q=${encodeURIComponent(q)}&limit=${limit}`);
-  return Array.isArray(j?.result?.records) ? j.result.records : null;
+function localityFeatureFor(locality) {
+  const m = resolveLocality(locality);
+  if (!m) return null;
+  return localityFeatures()[String(Number(m.cbs_id))] || null;
 }
 
-// Safety for a locality: CBS socio-economic cluster (higher = better) blended
-// with PER-CAPITA police crime (lower = better). Joined by CBS locality CODE
-// (robust vs name drift): city → resolveLocality → cbs_id → filter each dataset.
-// Fail-soft: null when the locality can't be resolved or neither source yields a
-// number, so the composite renormalises rather than inventing one.
+// Safety for a locality from the precomputed table: socio-economic cluster
+// (higher = better) blended with PER-CAPITA crime (lower = better vs benchmark).
+// No runtime network → never times out to undefined for a covered locality.
 async function safetyScore(locality) {
-  const muni = resolveLocality(locality);
-  const cbs = muni ? Number(muni.cbs_id) : NaN;
-  if (!Number.isFinite(cbs)) return null;
+  const f = localityFeatureFor(locality);
+  if (!f) return null;
   const parts = [];
-
-  const [socioRows, crimeTotal, popRows] = await Promise.all([
-    ckanRows(RES_SOCIOECONOMIC, { [SOCIO_CODE_KEY]: cbs }, 1).catch(() => null),
-    ckanTotal(RES_CRIME, { [CRIME_CODE_KEY]: cbs }).catch(() => null),
-    ckanRows(RES_POPULATION, { [POP_CODE_KEY]: cbs }, 1).catch(() => null),
-  ]);
-
-  // socio-economic cluster 1–10 → 0–100 (partial city coverage → often absent).
-  const eshkol = socioRows && socioRows[0] ? pickNum(socioRows[0], [SOCIO_FIELD]) : NaN;
-  if (Number.isFinite(eshkol) && eshkol >= 1 && eshkol <= 10) parts.push(clamp((eshkol / 10) * 100));
-
-  // per-capita crime vs the national benchmark.
-  const pop = popRows && popRows[0] ? pickNum(popRows[0], [POP_VALUE_KEY]) : NaN;
-  if (Number.isFinite(crimeTotal) && Number.isFinite(pop) && pop > 0) {
-    parts.push(clamp(100 * (1 - (crimeTotal / pop) / CRIME_RATE_BENCHMARK)));
+  if (Number.isFinite(f.eshkol) && f.eshkol >= 1 && f.eshkol <= 10) parts.push(clamp((f.eshkol / 10) * 100));
+  if (Number.isFinite(f.crime) && Number.isFinite(f.pop) && f.pop > 0) {
+    parts.push(clamp(100 * (1 - (f.crime / f.pop) / CRIME_RATE_BENCHMARK)));
   }
-
   if (!parts.length) return null;
   return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
 
-// Locality school composition (pikuah/sector) for the cohort gates, from mosdot.
-// mosdot has no locality code, so joined by full-text name search. Null when the
-// locality can't be matched → gates stay fail-soft (keep-all).
-async function schoolsComposition(locality) {
-  if (!locality) return null;
-  const recs = await ckanTextSearch(RES_SCHOOLS_META, String(locality).trim()).catch(() => null);
-  if (!recs || !recs.length) return null;
-  const pikuah = new Set();
+// Locality school composition (pikuah/sector) for the cohort gates, from the
+// precomputed table (exact per-locality, no cross-city q-noise). Null when the
+// locality isn't in the table → gates stay fail-soft (keep-all).
+function schoolsComposition(locality) {
+  const f = localityFeatureFor(locality);
+  if (!f || !Array.isArray(f.pikuah) || !f.pikuah.length) return null;
   const sectors = {};
-  for (const r of recs) {
-    const pk = normPikuah(pickStr(r, PIKUAH_KEYS)); if (pk) pikuah.add(pk);
-    const sc = normSector(pickStr(r, SECTOR_KEYS)); if (sc) sectors[sc] = (sectors[sc] || 0) + 1;
-  }
-  return { pikuah: [...pikuah], sectors };
+  for (const s of (f.sectors || [])) sectors[s] = 1;
+  return { pikuah: f.pikuah, sectors };
 }
 
 function pickNum(obj, keys) {
@@ -366,12 +348,13 @@ export async function neighborhoodScore({ lat, lng, locality }) {
   //  - coords dataset → distance-decayed schools + kindergarten proximity
   //  - safetyScore    → per-capita crime + socio (by cbs_id)
   //  - composition    → locality school pikuah/sector (by name) for the gates
-  const [osm, education, safety, composition] = await Promise.all([
+  const [osm, education, safety] = await Promise.all([
     osmCounts(lat, lng).catch(() => null),
     fetchCkan(RES_SCHOOLS, 2000).catch(() => null),
     safetyScore(locality).catch(() => null),
-    (locality ? schoolsComposition(locality).catch(() => null) : Promise.resolve(null)),
   ]);
+  // Composition is a local table lookup (sync, no network).
+  const composition = locality ? schoolsComposition(locality) : null;
 
   let schools = null;
   let kindergarten = null;
