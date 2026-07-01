@@ -2,7 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeLocalityName } from '../lambda/router/lib/muni.mjs';
-import { buildLocalityMap, crimeCountToSafety } from '../lambda/router/lib/neighborhood.mjs';
+import {
+  buildLocalityMap, crimeCountToSafety, buildCrimeRateMap,
+  isKindergarten, normPikuah, normSector,
+} from '../lambda/router/lib/neighborhood.mjs';
 
 test('normalizeLocalityName strips muni prefixes and punctuation', () => {
   const k = normalizeLocalityName('תל אביב');
@@ -53,4 +56,38 @@ test('safety join: low-crime high-cluster locality beats the opposite', () => {
     return ((socio[k] / 10) * 100 + crimeCountToSafety(crime[k], max)) / 2;
   };
   assert.ok(safetyOf('רעננה') > safetyOf('עיר ב'));
+});
+
+// ── Phase 3 ────────────────────────────────────────────────────────────────
+test('per-capita crime flips the ranking vs absolute counts', () => {
+  // Big city: 1000 crimes / 500k people. Small town: 100 crimes / 5k people.
+  const crime = { bigcity: 1000, smalltown: 100 };
+  const pop = { bigcity: 500000, smalltown: 5000 };
+  // Absolute: big city looks far worse. Per-capita: small town is worse (0.02 vs 0.002).
+  const rate = buildCrimeRateMap(crime, pop);
+  assert.ok(rate.smalltown > rate.bigcity);
+  const maxRate = Math.max(...Object.values(rate));
+  assert.ok(crimeCountToSafety(rate.bigcity, maxRate) > crimeCountToSafety(rate.smalltown, maxRate));
+});
+
+test('buildCrimeRateMap falls back to absolute count when population missing', () => {
+  assert.deepEqual(buildCrimeRateMap({ x: 50 }, {}), { x: 50 });
+  assert.deepEqual(buildCrimeRateMap({ x: 50 }, { x: 0 }), { x: 50 }); // guard div-by-zero
+});
+
+test('isKindergarten detects גן/קדם from the stage field', () => {
+  assert.equal(isKindergarten({ 'שלב_חינוך': 'גן ילדים' }), true);
+  assert.equal(isKindergarten({ 'סוג_מוסד': 'קדם יסודי' }), true);
+  assert.equal(isKindergarten({ 'שלב_חינוך': 'בית ספר יסודי' }), false);
+  assert.equal(isKindergarten({}), false);
+});
+
+test('normPikuah / normSector canonicalize Hebrew supervision + sector', () => {
+  assert.equal(normPikuah('ממלכתי דתי'), 'mamlachti_dati'); // dati checked before mamlachti
+  assert.equal(normPikuah('ממלכתי'), 'mamlachti');
+  assert.equal(normPikuah('חרדי'), 'charedi');
+  assert.equal(normPikuah('ערבי'), 'arab');
+  assert.equal(normSector('יהודי'), 'jewish');
+  assert.equal(normSector('ערבי'), 'arab');
+  assert.equal(normSector(''), '');
 });

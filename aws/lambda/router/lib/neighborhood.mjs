@@ -34,6 +34,16 @@ const LOCALITY_NAME_KEYS = [
 ];
 const SOCIO_VALUE_KEYS = [SOCIO_FIELD, 'cluster', 'eshkol', 'אשכול', 'index'];
 const CRIME_VALUE_KEYS = ['TikimSum', 'count', 'crimes', 'value', 'סהכ', 'סה"כ'];
+// Population per locality → per-capita crime (data.gov.il crime/socio rows often
+// carry it; else we fall back to absolute counts).
+const POPULATION_KEYS = ['אוכלוסיה', 'אוכלוסייה', 'תושבים', 'population', 'pop', 'total_population', 'סהכ_אוכלוסיה'];
+
+// Education-dataset field candidates (defensive — the portal's column names vary).
+const EDU_LAT_KEYS = ['UTM_Y', 'lat', 'Y', 'latitude', 'kts_y', 'Latitude'];
+const EDU_LNG_KEYS = ['UTM_X', 'lng', 'lon', 'X', 'longitude', 'kts_x', 'Longitude'];
+const PIKUAH_KEYS = ['פיקוח', 'סוג_פיקוח', 'סמל_פיקוח', 'SUG_PIKUAH', 'pikuah', 'Supervision'];
+const SECTOR_KEYS = ['מגזר', 'מגזר_מוסד', 'SECTOR', 'sector'];
+const STAGE_KEYS = ['שלב_חינוך', 'סוג_מוסד', 'שלב חינוך', 'SUG_MOSAD', 'SHLAV_HINUCH', 'stage', 'type'];
 
 // Overpass mirrors — try in order, fail-soft to next.
 const OVERPASS_ENDPOINTS = [
@@ -131,37 +141,73 @@ out tags center 2000;`; // raised from 200: the low cap truncated park ways so g
 }
 
 // ---------------------------------------------------------------------------
-// Schools: nearest education institutions from data.gov.il, distance-decayed.
-async function schoolsScore(lat, lng) {
-  if (!RES_SCHOOLS) return null;
-  // CKAN datastore_search with a bbox-ish filter is awkward; pull a page and
-  // filter client-side by distance. We request a generous page and trust the
-  // dataset carries lat/lng (X_Y / קואורדינטות) fields, normalising names.
-  const url = 'https://data.gov.il/api/3/action/datastore_search' +
-    `?resource_id=${RES_SCHOOLS}&limit=2000`;
-  const raw = await fetchJson(url);
-  const records = raw?.result?.records;
-  if (!Array.isArray(records)) return null;
+// Is this education row a kindergarten / preschool (גן/קדם) vs a school?
+export function isKindergarten(r) {
+  return /גן|קדם|preschool|kinder/i.test(pickStr(r, STAGE_KEYS));
+}
 
-  let near = 0, nearest = Infinity;
+// Canonicalise the supervision (פיקוח) so cohort logic can match: religious
+// families want ממ"ד/חרדי, Arab families want Arab-sector schools, etc.
+export function normPikuah(s) {
+  const t = String(s || '');
+  if (/חרדי|עצמאי|מוכר/.test(t)) return 'charedi';
+  if (/דתי/.test(t)) return 'mamlachti_dati';   // checked before ממלכתי
+  if (/ערבי|בדואי|דרוזי/.test(t)) return 'arab';
+  if (/ממלכתי|רשמי|state/i.test(t)) return 'mamlachti';
+  return '';
+}
+export function normSector(s) {
+  const t = String(s || '');
+  if (/יהוד|jew/i.test(t)) return 'jewish';
+  if (/ערב|arab/i.test(t)) return 'arab';
+  if (/דרוז|druze/i.test(t)) return 'druze';
+  if (/בדוא|bedouin/i.test(t)) return 'bedouin';
+  return '';
+}
+
+// Distance-decayed proximity over a set of geolocated records, plus the sector/
+// supervision composition of the matches. Blend of count-within-radius and
+// proximity-to-nearest. Score null only when the record set is empty; a low
+// floor (20) marks "records exist but none nearby" (a real signal, not unknown).
+function proximityScore(records, lat, lng, { radiusM, target, keep }) {
+  let near = 0;
+  let nearest = Infinity;
+  const pikuah = new Set();
+  const sectors = {};
   for (const r of records) {
-    // NOTE THE SWAP: this dataset stores lat in UTM_Y and lng in UTM_X (despite
-    // the "UTM" name the values are WGS84 degrees). Do NOT use ITM_X/ITM_Y.
-    const slat = pickNum(r, ['UTM_Y', 'lat', 'Y', 'latitude', 'kts_y', 'Latitude']);
-    const slng = pickNum(r, ['UTM_X', 'lng', 'lon', 'X', 'longitude', 'kts_x', 'Longitude']);
+    if (keep && !keep(r)) continue;
+    const slat = pickNum(r, EDU_LAT_KEYS);
+    const slng = pickNum(r, EDU_LNG_KEYS);
     if (!Number.isFinite(slat) || !Number.isFinite(slng)) continue;
-    // skip rows that are clearly ITM (not lat/lng) — neighbourhood scoring
-    // expects WGS84; coords in the 100k+ range are ITM and unsupported here.
-    if (Math.abs(slat) > 90 || Math.abs(slng) > 180) continue;
+    if (Math.abs(slat) > 90 || Math.abs(slng) > 180) continue; // ITM, not WGS84
     const d = distM(lat, lng, slat, slng);
-    if (d <= 2000) { near++; nearest = Math.min(nearest, d); }
+    if (d > radiusM) continue;
+    near++;
+    if (d < nearest) nearest = d;
+    const pk = normPikuah(pickStr(r, PIKUAH_KEYS)); if (pk) pikuah.add(pk);
+    const sc = normSector(pickStr(r, SECTOR_KEYS)); if (sc) sectors[sc] = (sectors[sc] || 0) + 1;
   }
-  if (!Number.isFinite(nearest)) return 30; // dataset present but none nearby
+  const score = Number.isFinite(nearest)
+    ? clamp(0.6 * saturate(near, target) + 0.4 * clamp(100 * (1 - nearest / radiusM)))
+    : 20; // records exist but none within radius
+  return { score, count: near, pikuah: [...pikuah], sectors };
+}
 
-  // blend: count of schools within 2 km (saturating) + proximity to nearest.
-  const countScore = saturate(near, 6);
-  const proxScore = clamp(100 * (1 - nearest / 2000));
-  return clamp(0.6 * countScore + 0.4 * proxScore);
+// crime value (count OR per-capita rate) → safety 0–100: lower vs the max → safer.
+export function crimeCountToSafety(value, maxValue) {
+  if (!Number.isFinite(value) || !Number.isFinite(maxValue) || maxValue <= 0) return NaN;
+  return clamp(100 * (1 - value / maxValue));
+}
+
+// { locality: count } ÷ { locality: population } → { locality: per-capita rate }.
+// Falls back to the raw count for any locality with no population. Pure/exported.
+export function buildCrimeRateMap(crimeMap, popMap) {
+  const rate = {};
+  for (const k in crimeMap) {
+    const pop = popMap && popMap[k];
+    rate[k] = Number.isFinite(pop) && pop > 0 ? crimeMap[k] / pop : crimeMap[k];
+  }
+  return rate;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,14 +239,6 @@ export function buildLocalityMap(records, nameKeys, valueOf, sum = false) {
   return map;
 }
 
-// crime count → safety score (0–100): fewer crimes vs the national max → safer.
-// ponytail: absolute count, not per-capita (big cities skew high). Upgrade to
-// per-capita once locality population is joined via muni_ids.
-export function crimeCountToSafety(count, maxCount) {
-  if (!Number.isFinite(count) || !Number.isFinite(maxCount) || maxCount <= 0) return NaN;
-  return clamp(100 * (1 - count / maxCount));
-}
-
 // Safety for a NAMED locality: CBS socio-economic cluster (higher = better)
 // blended with police crime (lower = better), joined on the locality name. Both
 // optional; returns null when the locality can't be matched in either source so
@@ -222,11 +260,20 @@ async function safetyScore(locality) {
 
   const crimeRecs = await fetchCkan(RES_CRIME);
   if (crimeRecs) {
-    const map = buildLocalityMap(
+    const crimeMap = buildLocalityMap(
       crimeRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, CRIME_VALUE_KEYS), true);
-    const mine = map[key];
+    // Population per locality → per-capita rate (else absolute count). Prefer the
+    // crime dataset's own population column, else the socio-economic dataset.
+    let popMap = buildLocalityMap(
+      crimeRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, POPULATION_KEYS), false);
+    if (!Object.keys(popMap).length && socioRecs) {
+      popMap = buildLocalityMap(
+        socioRecs, LOCALITY_NAME_KEYS, (r) => pickNum(r, POPULATION_KEYS), false);
+    }
+    const rateMap = buildCrimeRateMap(crimeMap, popMap);
+    const mine = rateMap[key];
     if (Number.isFinite(mine)) {
-      const values = Object.values(map);
+      const values = Object.values(rateMap);
       const s = crimeCountToSafety(mine, values.length ? Math.max(...values) : 0);
       if (Number.isFinite(s)) parts.push(s);
     }
@@ -245,13 +292,20 @@ function pickNum(obj, keys) {
   }
   return NaN;
 }
+function pickStr(obj, keys) {
+  for (const k of keys) {
+    if (obj[k] != null && String(obj[k]).trim()) return String(obj[k]).trim();
+  }
+  return '';
+}
 
 /**
  * Composite neighbourhood quality score for a coordinate.
  * @param {{lat:number,lng:number,locality?:string}} p  locality = city name,
  *   enables the safety sub-score (crime/socio joined by locality name).
  * @returns {Promise<{score:number, sub:{safety:number,walkability:number,
- *   schools:number,transit:number,green:number}}|null>}
+ *   schools:number,kindergarten:number,transit:number,green:number},
+ *   schoolsMeta?:{count:number,pikuah:string[],sectors:object,kindergartenCount:number}}|null>}
  *   Each sub-score is 0–100. Missing sources are OMITTED and the composite
  *   weights are RENORMALISED over the survivors. null only on bad input or if
  *   EVERY source failed.
@@ -261,14 +315,27 @@ export async function neighborhoodScore({ lat, lng, locality }) {
 
   // fan out in parallel; each may return null. Safety needs the locality NAME
   // (crime/socio are per-locality, joined by name) — omitted if none supplied.
-  const [osm, schools, safety] = await Promise.all([
+  // Education is fetched ONCE and split into schools + kindergartens.
+  const [osm, education, safety] = await Promise.all([
     osmCounts(lat, lng).catch(() => null),
-    schoolsScore(lat, lng).catch(() => null),
+    fetchCkan(RES_SCHOOLS, 2000).catch(() => null),
     safetyScore(locality).catch(() => null),
   ]);
 
-  // assemble available sub-scores with their R7 weights.
-  const W = { safety: 0.30, walkability: 0.25, schools: 0.20, transit: 0.15, green: 0.10 };
+  let schools = null;
+  let kindergarten = null;
+  let schoolsMeta = null;
+  if (Array.isArray(education)) {
+    const sc = proximityScore(education, lat, lng, { radiusM: 2000, target: 6, keep: (r) => !isKindergarten(r) });
+    const kg = proximityScore(education, lat, lng, { radiusM: 1000, target: 4, keep: isKindergarten });
+    schools = sc.score;
+    kindergarten = kg.score;
+    // Parsed composition (retained instead of discarded) for cohort matching.
+    schoolsMeta = { count: sc.count, pikuah: sc.pikuah, sectors: sc.sectors, kindergartenCount: kg.count };
+  }
+
+  // assemble available sub-scores with their weights (kindergarten split out).
+  const W = { safety: 0.28, walkability: 0.22, schools: 0.18, kindergarten: 0.10, transit: 0.12, green: 0.10 };
   const sub = {};
   if (Number.isFinite(safety)) sub.safety = round(safety);
   if (osm) {
@@ -277,6 +344,7 @@ export async function neighborhoodScore({ lat, lng, locality }) {
     sub.green = round(osm.green);
   }
   if (Number.isFinite(schools)) sub.schools = round(schools);
+  if (Number.isFinite(kindergarten)) sub.kindergarten = round(kindergarten);
 
   const keys = Object.keys(sub);
   if (!keys.length) return null; // every source failed
@@ -285,7 +353,7 @@ export async function neighborhoodScore({ lat, lng, locality }) {
   const wSum = keys.reduce((s, k) => s + W[k], 0);
   const score = keys.reduce((s, k) => s + (W[k] / wSum) * sub[k], 0);
 
-  return { score: round(score), sub };
+  return { score: round(score), sub, ...(schoolsMeta ? { schoolsMeta } : {}) };
 }
 
 function round(x, d = 0) { const p = 10 ** d; return Math.round(x * p) / p; }

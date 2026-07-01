@@ -96,22 +96,25 @@ export function priceFitScore(price, { minBudget, maxBudget, targetPrice }, pric
 // Per-cohort weights over the neighborhood sub-scores (relative 0..1; the fit
 // renormalizes over present dimensions). Fine-cohort rows are the persona spec
 // §3 (columns there: safety, schools, transit, walkability, green).
+// `kindergarten` (Phase 3) matters to family cohorts with young kids; absent on
+// others (0 weight → ignored). neighborhoodFitScore renormalizes over present
+// dimensions, so listings without a kindergarten sub-score degrade gracefully.
 const NB_BASE = { safety: 0.30, walkability: 0.25, schools: 0.20, transit: 0.15, green: 0.10 };
 const NB_BY_COHORT = {
   // coarse
-  family:  { safety: 0.30, walkability: 0.10, schools: 0.35, transit: 0.05, green: 0.20 },
-  couple:  { safety: 0.30, walkability: 0.15, schools: 0.25, transit: 0.10, green: 0.20 },
+  family:  { safety: 0.28, walkability: 0.10, schools: 0.32, kindergarten: 0.15, transit: 0.05, green: 0.18 },
+  couple:  { safety: 0.30, walkability: 0.15, schools: 0.22, kindergarten: 0.10, transit: 0.10, green: 0.18 },
   student: { safety: 0.10, walkability: 0.35, schools: 0.00, transit: 0.45, green: 0.10 },
   single:  { safety: 0.15, walkability: 0.35, schools: 0.00, transit: 0.35, green: 0.15 },
   // fine
   young_professional: { safety: 0.70, schools: 0.00, transit: 0.90, walkability: 1.00, green: 0.20 },
-  new_parents:        { safety: 0.35, schools: 0.10, transit: 0.15, walkability: 0.25, green: 0.15 },
-  religious_family:   { safety: 0.30, schools: 0.35, transit: 0.05, walkability: 0.20, green: 0.10 },
-  oleh:               { safety: 0.95, schools: 0.85, transit: 0.25, walkability: 0.80, green: 0.50 },
+  new_parents:        { safety: 0.35, schools: 0.10, kindergarten: 0.45, transit: 0.15, walkability: 0.25, green: 0.15 },
+  religious_family:   { safety: 0.30, schools: 0.35, kindergarten: 0.30, transit: 0.05, walkability: 0.20, green: 0.10 },
+  oleh:               { safety: 0.95, schools: 0.85, kindergarten: 0.40, transit: 0.25, walkability: 0.80, green: 0.50 },
   senior:             { safety: 0.90, schools: 0.05, transit: 0.25, walkability: 0.95, green: 0.70 },
-  single_parent:      { safety: 0.85, schools: 0.70, transit: 1.00, walkability: 0.95, green: 0.35 },
+  single_parent:      { safety: 0.85, schools: 0.70, kindergarten: 0.55, transit: 1.00, walkability: 0.95, green: 0.35 },
   remote:             { safety: 0.15, schools: 0.00, transit: 0.15, walkability: 0.40, green: 0.30 },
-  arab_family:        { safety: 0.45, schools: 0.90, transit: 0.15, walkability: 0.85, green: 0.30 },
+  arab_family:        { safety: 0.45, schools: 0.90, kindergarten: 0.40, transit: 0.15, walkability: 0.85, green: 0.30 },
   investor:           { safety: 0.40, schools: 0.20, transit: 1.00, walkability: 0.55, green: 0.10 },
 };
 export function neighborhoodWeightsFor(cohort) {
