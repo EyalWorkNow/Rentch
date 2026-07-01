@@ -35,7 +35,7 @@ import AdmZip from 'adm-zip';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
-  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, cohortGateReject,
+  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, communityFitScore,
 } from './lib/ranking.mjs';
 import {
   querySignals, profileSignals, definedOnly, cohortFromSignals,
@@ -1355,14 +1355,9 @@ async function attachRankSignals(listed, query, cohort = null) {
     const allItems = Array.isArray(parsed.items) ? parsed.items : [];
     if (allItems.length === 0) return listed;
 
-    // Phase 4 — cohort deal-breaker gates (hard-exclude on positive mismatch).
-    // Guardrail: if gating would empty the page, keep the ungated list rather
-    // than return nothing (a heuristic gate on possibly-missing metadata must
-    // not blank the feed). ponytail: page-level fallback, revisit if the gate
-    // should ever be allowed to legitimately return zero results.
-    const gated = cohort ? allItems.filter((p) => !cohortGateReject(cohort, p)) : allItems;
-    const items = gated.length ? gated : allItems;
-    parsed.items = items;
+    // Community affinity is a SOFT ranking signal (community_fit below), NOT a
+    // hard filter — no listing is excluded by religious/ethnic composition.
+    const items = allItems;
 
     const W = rankWeightsFor(cohort);
     const priceTarget = cohortPriceTarget(cohort);
@@ -1391,13 +1386,17 @@ async function attachRankSignals(listed, query, cohort = null) {
       // neutral 0.5 on the plain feed.
       const semRaw = Number(p.semanticSim);
       const semantic = Number.isFinite(semRaw) ? Math.max(0, Math.min(1, semRaw)) : 0.5;
+      // community_fit: soft affinity to a community cohort's school profile (0.5
+      // neutral otherwise). Down-ranks mismatched areas; never excludes.
+      const communityFit = communityFitScore(cohort, p);
       const rankScore =
         W.freshness * freshness +
         W.popularity * popularity +
         W.completeness * completeness +
         W.priceFit * priceFit +
         W.neighborhood * neighborhood +
-        W.semantic * semantic;
+        W.semantic * semantic +
+        (W.community_fit || 0) * communityFit;
       p.rankSignals = {
         freshness: round3(freshness),
         popularity: round3(popularity),
@@ -1405,6 +1404,7 @@ async function attachRankSignals(listed, query, cohort = null) {
         priceFit: round3(priceFit),
         neighborhood: round3(neighborhood),
         semantic: round3(semantic),
+        community_fit: round3(communityFit),
         cohort: cohort || 'default',
         views: c.views, likes: c.likes,
       };

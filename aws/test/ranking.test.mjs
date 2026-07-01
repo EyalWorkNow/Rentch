@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, cohortGateReject,
+  rankWeightsFor, cohortPriceTarget, priceFitScore, neighborhoodFitScore, communityFitScore,
 } from '../lambda/router/lib/ranking.mjs';
 
 const listingWith = (schoolsMeta) => ({ neighborhoodScore: { sub: {}, schoolsMeta } });
@@ -43,33 +43,32 @@ test('priceFitScore: out-of-window decays; no-signal is neutral', () => {
   assert.equal(priceFitScore(0, win, 'low'), 0.5);   // bad price
 });
 
-test('cohortGateReject: dati_leumi vs charedi are INVERSE gates', () => {
+test('communityFitScore: soft signal, dati_leumi vs charedi are INVERSE', () => {
   const charediArea = listingWith({ pikuah: { charedi: 165, mamlachti_dati: 8 }, total: 204 }); // 4% חמ"ד, 81% charedi
   const datiArea = listingWith({ pikuah: { mamlachti_dati: 5, mamlachti: 1 }, total: 6 });       // 83% חמ"ד
-  const secularArea = listingWith({ pikuah: { mamlachti: 20 }, total: 20 });
-  // dati_leumi keeps חמ"ד-dominant, drops charedi + secular
-  assert.equal(cohortGateReject('dati_leumi', datiArea), false);
-  assert.equal(cohortGateReject('dati_leumi', charediArea), true);
-  assert.equal(cohortGateReject('dati_leumi', secularArea), true);
-  // charedi is the inverse: keeps charedi-dominant, drops the חמ"ד area
-  assert.equal(cohortGateReject('charedi', charediArea), false);
-  assert.equal(cohortGateReject('charedi', datiArea), true);
+  // dati_leumi: high fit in the חמ"ד area, LOW (not excluded) in the charedi area
+  assert.ok(communityFitScore('dati_leumi', datiArea) > communityFitScore('dati_leumi', charediArea));
+  assert.equal(communityFitScore('dati_leumi', datiArea), 1); // ≥30% → saturates to 1
+  assert.ok(communityFitScore('dati_leumi', charediArea) < 0.2);
+  // charedi is the inverse
+  assert.ok(communityFitScore('charedi', charediArea) > communityFitScore('charedi', datiArea));
+  assert.equal(communityFitScore('charedi', datiArea), 0);
 });
 
-test('cohortGateReject: arab_family requires Arab-sector-dominant area', () => {
-  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { jewish: 100 }, total: 100 })), true);
-  assert.equal(cohortGateReject('arab_family', listingWith({ sectors: { arab: 5, jewish: 5 }, total: 10 })), false);
+test('communityFitScore: arab_family tracks Arab-sector fraction', () => {
+  assert.equal(communityFitScore('arab_family', listingWith({ sectors: { jewish: 100 }, total: 100 })), 0);
+  assert.ok(communityFitScore('arab_family', listingWith({ sectors: { arab: 5, jewish: 5 }, total: 10 })) >= 1);
 });
 
-test('cohortGateReject fail-soft: missing/empty metadata never excludes', () => {
+test('communityFitScore: neutral 0.5 when unknown or non-community cohort', () => {
   for (const cohort of ['dati_leumi', 'charedi', 'arab_family']) {
-    assert.equal(cohortGateReject(cohort, listingWith(undefined)), false); // no schoolsMeta
-    assert.equal(cohortGateReject(cohort, { }), false);                    // no neighborhoodScore
-    assert.equal(cohortGateReject(cohort, listingWith({ pikuah: {}, sectors: {}, total: 0 })), false); // empty
+    assert.equal(communityFitScore(cohort, listingWith(undefined)), 0.5); // no schoolsMeta
+    assert.equal(communityFitScore(cohort, {}), 0.5);                     // no neighborhoodScore
+    assert.equal(communityFitScore(cohort, listingWith({ pikuah: {}, sectors: {}, total: 0 })), 0.5);
   }
-  // cohorts without a gate are never excluded
-  assert.equal(cohortGateReject('family', listingWith({ pikuah: { mamlachti: 5 }, total: 5 })), false);
-  assert.equal(cohortGateReject(null, listingWith({ sectors: { jewish: 9 }, total: 9 })), false);
+  // cohorts with no community preference → always neutral (no effect)
+  assert.equal(communityFitScore('family', listingWith({ pikuah: { mamlachti: 5 }, total: 5 })), 0.5);
+  assert.equal(communityFitScore(null, listingWith({ sectors: { jewish: 9 }, total: 9 })), 0.5);
 });
 
 test('neighborhoodFitScore: family vs student flip; fallbacks', () => {

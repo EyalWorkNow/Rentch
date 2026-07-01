@@ -27,13 +27,13 @@ export const RANK_WEIGHTS_BY_COHORT = {
   // ── 11 fine cohorts ──
   young_professional: { freshness: 0.25, popularity: 0.10, completeness: 0.15, priceFit: 0.12, neighborhood: 0.20, semantic: 0.18 },
   new_parents:        { freshness: 0.15, popularity: 0.10, completeness: 0.17, priceFit: 0.23, neighborhood: 0.27, semantic: 0.08 },
-  dati_leumi:         { freshness: 0.10, popularity: 0.08, completeness: 0.20, priceFit: 0.22, neighborhood: 0.30, semantic: 0.10 },
-  charedi:            { freshness: 0.10, popularity: 0.08, completeness: 0.20, priceFit: 0.22, neighborhood: 0.30, semantic: 0.10 },
+  dati_leumi:         { freshness: 0.10, popularity: 0.06, completeness: 0.15, priceFit: 0.20, neighborhood: 0.25, semantic: 0.08, community_fit: 0.16 },
+  charedi:            { freshness: 0.10, popularity: 0.06, completeness: 0.15, priceFit: 0.20, neighborhood: 0.25, semantic: 0.08, community_fit: 0.16 },
   oleh:               { freshness: 0.20, popularity: 0.08, completeness: 0.15, priceFit: 0.12, neighborhood: 0.27, semantic: 0.18 },
   senior:             { freshness: 0.12, popularity: 0.05, completeness: 0.20, priceFit: 0.13, neighborhood: 0.35, semantic: 0.15 },
   single_parent:      { freshness: 0.13, popularity: 0.08, completeness: 0.12, priceFit: 0.27, neighborhood: 0.30, semantic: 0.10 },
   remote:             { freshness: 0.22, popularity: 0.10, completeness: 0.13, priceFit: 0.20, neighborhood: 0.17, semantic: 0.18 },
-  arab_family:        { freshness: 0.12, popularity: 0.08, completeness: 0.20, priceFit: 0.13, neighborhood: 0.32, semantic: 0.15 },
+  arab_family:        { freshness: 0.12, popularity: 0.06, completeness: 0.17, priceFit: 0.12, neighborhood: 0.27, semantic: 0.10, community_fit: 0.16 },
   investor:           { freshness: 0.18, popularity: 0.15, completeness: 0.07, priceFit: 0.20, neighborhood: 0.22, semantic: 0.18 },
 };
 
@@ -123,52 +123,36 @@ export function neighborhoodWeightsFor(cohort) {
   return NB_BY_COHORT[cohort] || NB_BASE;
 }
 
-// ── Cohort deal-breaker gates (Phase 4) ──────────────────────────────────────
-// A gate HARD-EXCLUDES a listing for a cohort with a strict environmental
-// requirement, using the parsed schoolsMeta (pikuah / sector) from Phase 3.
-// CRITICAL fail-soft rule: exclude ONLY on positive evidence of a mismatch.
-// Missing/empty metadata → keep (we can't verify, so we must not hard-filter, or
-// un-enriched listings would vanish from the feed).
+// ── Community fit — a SOFT ranking signal (replaced the hard gates) ───────────
+// The earlier design HARD-EXCLUDED listings by religious stream / ethnic sector,
+// which is a housing-discrimination/steering exposure and produced silent
+// all-or-nothing fallbacks. Instead we now emit a soft `community_fit` score in
+// [0,1]: a community-mismatched area ranks LOWER, never disappears. Neutral 0.5
+// for unknown areas and for cohorts with no community preference (no effect).
 function schoolsMetaOf(listing) {
   const ns = listing && listing.neighborhoodScore;
   return ns && typeof ns === 'object' ? ns.schoolsMeta : null;
 }
 
-// schoolsMeta.pikuah / .sectors are per-stream COUNTS of schools within ~1.5km,
-// with .total. Gates use the FRACTION (dominance), because in dense metros every
-// stream is *present* within range — only dominance distinguishes the community.
-const DATI_MIN_FRACTION = 0.15;    // ≥15% ממלכתי-דתי → a national-religious area
-const CHAREDI_MIN_FRACTION = 0.15; // ≥15% charedi → an ultra-orthodox area
-const ARAB_MIN_FRACTION = 0.15;    // ≥15% Arab-sector schools → an Arab area
+// Denominator is meta.total = schools WITH a classified pikuah within ~1.5km
+// (see schoolsNear). Fraction saturates to a full match at COMMUNITY_TARGET.
+const COMMUNITY_TARGET = 0.30;
 const fractionOf = (counts, key, total) =>
   (total > 0 ? (Number(counts && counts[key]) || 0) / total : 0);
-
-const COHORT_GATES = {
-  // National-religious (דתי-לאומי) → needs a ממלכתי-דתי (חמ"ד)-dominant area.
-  dati_leumi: (l) => {
-    const meta = schoolsMetaOf(l);
-    if (!meta || !meta.total) return false; // unknown → keep (fail-soft)
-    return fractionOf(meta.pikuah, 'mamlachti_dati', meta.total) < DATI_MIN_FRACTION;
-  },
-  // Ultra-orthodox (חרדי) → needs a charedi-dominant area (the inverse community).
-  charedi: (l) => {
-    const meta = schoolsMetaOf(l);
-    if (!meta || !meta.total) return false;
-    return fractionOf(meta.pikuah, 'charedi', meta.total) < CHAREDI_MIN_FRACTION;
-  },
-  // Arab families → an Arab-sector-dominant area.
-  arab_family: (l) => {
-    const meta = schoolsMetaOf(l);
-    if (!meta || !meta.total) return false;
-    return fractionOf(meta.sectors, 'arab', meta.total) < ARAB_MIN_FRACTION;
-  },
+const COMMUNITY_SPEC = {
+  dati_leumi: (m) => fractionOf(m.pikuah, 'mamlachti_dati', m.total),
+  charedi: (m) => fractionOf(m.pikuah, 'charedi', m.total),
+  arab_family: (m) => fractionOf(m.sectors, 'arab', m.total),
 };
 
-// True → this listing should be hard-excluded for this cohort.
-export function cohortGateReject(cohort, listing) {
-  const gate = COHORT_GATES[cohort];
-  if (!gate) return false;
-  try { return gate(listing) === true; } catch { return false; }
+// Soft [0,1] fit of an area to a community cohort's school profile. 0.5 neutral
+// when unknown or for non-community cohorts.
+export function communityFitScore(cohort, listing) {
+  const spec = COMMUNITY_SPEC[cohort];
+  if (!spec) return 0.5;
+  const meta = schoolsMetaOf(listing);
+  if (!meta || !meta.total) return 0.5;
+  return clamp01(spec(meta) / COMMUNITY_TARGET);
 }
 
 // neighborhood_fit for the main feed: weight the listing's stored sub-scores
@@ -183,7 +167,9 @@ export function neighborhoodFitScore(ns, cohort) {
     let wsum = 0;
     for (const k in w) {
       const v = Number(sub[k]);
-      if (Number.isFinite(v) && v > 0) { acc += w[k] * clamp01(v / 100); wsum += w[k]; }
+      // A present sub-score of 0 (e.g. no schools within radius) is a real
+      // NEGATIVE signal — include it; only skip genuinely-absent dimensions.
+      if (Number.isFinite(v)) { acc += w[k] * clamp01(v / 100); wsum += w[k]; }
     }
     if (wsum > 0) return clamp01(acc / wsum);
   }

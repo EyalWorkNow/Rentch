@@ -20,7 +20,9 @@ bash "$HERE/build-pano-zip.sh"
 #    index.mjs at the zip root (handler stays index.handler), instead of zipping
 #    the single file. Re-create the zip fresh each time.
 rm -f /tmp/router.zip
-( cd "$HERE/lambda/router" && zip -q -r -X /tmp/router.zip index.mjs package.json node_modules )
+( cd "$HERE/lambda/router" && zip -q -r -X /tmp/router.zip index.mjs lib package.json node_modules )
+unzip -l /tmp/router.zip | grep -q 'lib/ranking.mjs' \
+  || { echo "FATAL: router.zip missing lib/ — aborting deploy"; exit 1; }
 
 # 3. Upload both
 aws s3 cp /tmp/pano-stitch.zip "s3://$CODE_BUCKET/pano-stitch.zip" --region "$REGION"

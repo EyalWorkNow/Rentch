@@ -71,6 +71,11 @@ async function main() {
   }
   const safety = {};
   for (const cbs in feat) safety[cbs] = feat[cbs];
+  // Validation: refuse to write a truncated table (a rotated resource id or a
+  // data.gov.il outage yields empty pages → this would otherwise ship silently).
+  if (Object.keys(safety).length < 500) {
+    throw new Error(`locality_features has only ${Object.keys(safety).length} localities (<500) — aborting, refusing to ship partial data`);
+  }
   writeFileSync(OUT, JSON.stringify(safety));
   console.log(`Wrote ${Object.keys(safety).length} localities → ${OUT}`);
 
@@ -93,6 +98,9 @@ async function main() {
     const lat = numLoose(r.UTM_Y); const lng = numLoose(r.UTM_X); // UTM_Y/X are WGS84 degrees
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
     geo.push({ lat, lng, p: m.p || '', s: m.s || '', k: m.k ? 1 : 0 });
+  }
+  if (geo.length < 5000) {
+    throw new Error(`schools_geo has only ${geo.length} schools (<5000) — aborting, refusing to ship partial data`);
   }
   writeFileSync(SCHOOLS_OUT, JSON.stringify(geo));
   console.log(`Wrote ${geo.length} geolocated schools → ${SCHOOLS_OUT}`);

@@ -23,7 +23,12 @@ fi
 
 # 2. Package Lambdas (no node_modules — runtime provides AWS SDK v3)
 echo "==> Zipping Lambdas"
-cd "$HERE/lambda/router"        && zip -q -j /tmp/router.zip index.mjs
+# router imports ./lib/*.mjs at module load + reads lib/*.generated.json — bundle
+# the whole lib/ tree (NOT -j, which junks paths) or the Lambda crashes on import.
+rm -f /tmp/router.zip
+cd "$HERE/lambda/router"        && zip -q -r /tmp/router.zip index.mjs lib
+[ -f /tmp/router.zip ] && unzip -l /tmp/router.zip | grep -q 'lib/ranking.mjs' \
+  || { echo "FATAL: router.zip missing lib/ — aborting deploy"; exit 1; }
 cd "$HERE/lambda/authorizer"    && zip -q -j /tmp/authorizer.zip index.mjs
 cd "$HERE/lambda/ws"            && zip -q -j /tmp/ws.zip index.mjs
 cd "$HERE/lambda/broadcaster"   && zip -q -j /tmp/broadcaster.zip index.mjs

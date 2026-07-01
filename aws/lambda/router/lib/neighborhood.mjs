@@ -21,7 +21,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { resolveLocality } from './muni.mjs';
 
-const TIMEOUT_MS = 9000;
+// OSM is now the ONLY live call in neighborhoodScore (safety + schools come from
+// bundled tables). Keep it under the enrichment's 4s budget even if BOTH Overpass
+// mirrors are tried (2×1800 + 250 sleep < 4000) so the score is never lost to the
+// Promise.race — a slow OSM just omits walkability/transit/green, fail-soft.
+const TIMEOUT_MS = 1800;
 const UA = 'RentlyBot/1.0 (+https://rently.co.il; neighbourhood scoring; attribution: data.gov.il/CBS/OSM)';
 
 // data.gov.il CKAN resource ids (verified live 2026-07). All per-locality joins
@@ -274,8 +278,10 @@ function schoolsNear(lat, lng) {
     }
     sCount++; if (d < sNearest) sNearest = d;
     if (d <= COMPOSITION_RADIUS_M) {
-      schoolTotal++;
-      if (sc.p) pikuah[sc.p] = (pikuah[sc.p] || 0) + 1;
+      // schoolTotal is the CLASSIFIED denominator — count only schools whose
+      // pikuah we actually know, so the fraction isn't diluted by unclassified
+      // rows (which would wrongly push a community area below its threshold).
+      if (sc.p) { schoolTotal++; pikuah[sc.p] = (pikuah[sc.p] || 0) + 1; }
       if (sc.s) sectors[sc.s] = (sectors[sc.s] || 0) + 1;
     }
   }
