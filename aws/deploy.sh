@@ -27,7 +27,10 @@ echo "==> Zipping Lambdas"
 # the whole lib/ tree (NOT -j, which junks paths) or the Lambda crashes on import.
 rm -f /tmp/router.zip
 cd "$HERE/lambda/router"        && zip -q -r /tmp/router.zip index.mjs lib
-[ -f /tmp/router.zip ] && unzip -l /tmp/router.zip | grep -q 'lib/ranking.mjs' \
+# NB: grep -c (not -q) so the whole `unzip -l` stream is consumed — under
+# `set -o pipefail`, grep -q exits early, SIGPIPEs unzip, and the pipeline is
+# reported as failed even when lib/ IS present (false FATAL).
+[ -f /tmp/router.zip ] && [ "$(unzip -l /tmp/router.zip | grep -c 'lib/ranking.mjs')" -gt 0 ] \
   || { echo "FATAL: router.zip missing lib/ — aborting deploy"; exit 1; }
 cd "$HERE/lambda/authorizer"    && zip -q -j /tmp/authorizer.zip index.mjs
 cd "$HERE/lambda/ws"            && zip -q -j /tmp/ws.zip index.mjs
@@ -42,12 +45,20 @@ done
 
 # 4. Deploy CloudFormation
 echo "==> Deploying CloudFormation stack: $STACK"
+# Secrets are NoEcho CFN params with empty defaults. Pass one only when its env
+# var is set — otherwise CloudFormation keeps the stack's PREVIOUS value, so a
+# deploy never wipes a key you set earlier. Set OPENAI_API_KEY in your shell to
+# (re)configure אתי's live GPT voice: OPENAI_API_KEY=sk-... ./deploy.sh
+PARAM_OVERRIDES=(CodeBucket="$CODE_BUCKET")
+[ -n "${OPENAI_API_KEY:-}" ] && PARAM_OVERRIDES+=(OpenAiApiKey="$OPENAI_API_KEY")
+[ -n "${GEMINI_API_KEY:-}" ] && PARAM_OVERRIDES+=(GeminiApiKey="$GEMINI_API_KEY")
+
 aws cloudformation deploy \
   --region "$REGION" \
   --stack-name "$STACK" \
   --template-file "$HERE/template.yaml" \
   --capabilities CAPABILITY_IAM \
-  --parameter-overrides CodeBucket="$CODE_BUCKET"
+  --parameter-overrides "${PARAM_OVERRIDES[@]}"
 
 # 5. Force-refresh Lambda code (deploy only updates if S3 key changed).
 # Portable across macOS bash 3.2 — no associative arrays.

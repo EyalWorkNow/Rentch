@@ -918,8 +918,10 @@ class _ActionButtons extends StatelessWidget {
           _ActionButton(
             icon: IconsaxPlusBold.heart,
             tooltip: 'אשר מועמד',
-            iconColor: AppColors.primary,
-            backgroundColor: Colors.white,
+            // White heart on a solid accent circle — readable for every theme
+            // (broker's accent is black, so a black-on-white heart was invisible).
+            iconColor: Colors.white,
+            backgroundColor: AppColors.primary,
             size: 72,
             iconSize: 34,
             onPressed: onAccept,

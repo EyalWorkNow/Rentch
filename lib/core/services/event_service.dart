@@ -88,6 +88,7 @@ enum UserEventType {
   comparisonSet, // {propertyIds}
   funnelStage, // {stage, abandoned}
   priceSensitivity, // {maxOverBudgetRatioLiked}
+  personaProfileUpdated, // {version, facts:{key:{value,confidence,source,evidence}}}
 }
 
 /// Direction of a swipe decision, as recorded by [EventService.logSwipeOutcome].

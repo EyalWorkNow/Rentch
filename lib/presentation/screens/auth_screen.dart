@@ -52,7 +52,10 @@ class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   AuthView _currentView = AuthView.welcome;
-  
+
+  // Role chosen via the top "אני בעל דירה" CTA. null → tenant (the default).
+  String? _pendingRole;
+
   final _googleAuthService = GoogleAuthService();
   final _appleAuthService = AppleAuthService();
   bool _googleLoading = false;
@@ -110,6 +113,17 @@ class _AuthScreenState extends State<AuthScreen>
     await NotificationPermissionService.maybeRequestOnFirstLaunch(context);
   }
 
+  // Top "אני בעל דירה" CTA: pick landlord vs agent, then jump into the register
+  // flow with that role pre-set. Tenants never see this — they're the default.
+  Future<void> _onLandlordCta() async {
+    final picked = await _promptLandlordOrAgent(context);
+    if (!mounted || picked == null) return;
+    setState(() {
+      _pendingRole = picked;
+      _currentView = AuthView.register;
+    });
+  }
+
   Future<void> _onGuestEnter() async {
     final role = await showDialog<String>(
       context: context,
@@ -136,10 +150,8 @@ class _AuthScreenState extends State<AuthScreen>
       if (!mounted) return;
 
       final provider = context.read<DatingProvider>();
-      final picked = await _promptSocialRole(context);
-      if (!mounted) return;
-      if (picked == null) return;
-      final role = picked;
+      // Default to tenant; landlord/agent is set via the top "אני בעל דירה" CTA.
+      final role = _pendingRole ?? 'tenant';
 
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: result.photoUrl);
@@ -180,10 +192,8 @@ class _AuthScreenState extends State<AuthScreen>
       if (!mounted) return;
 
       final provider = context.read<DatingProvider>();
-      final picked = await _promptSocialRole(context);
-      if (!mounted) return;
-      if (picked == null) return;
-      final role = picked;
+      // Default to tenant; landlord/agent is set via the top "אני בעל דירה" CTA.
+      final role = _pendingRole ?? 'tenant';
 
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: null, source: 'apple');
@@ -304,6 +314,7 @@ class _AuthScreenState extends State<AuthScreen>
           onGoogleLogin: _loginWithGoogleForWelcome,
           onAppleLogin: _loginWithAppleForWelcome,
           onGuestLogin: _onGuestEnter,
+          onLandlordCta: _onLandlordCta,
         );
       case AuthView.login:
         return Stack(
@@ -364,6 +375,7 @@ class _AuthScreenState extends State<AuthScreen>
                 behavior: HitTestBehavior.translucent,
                 onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
                 child: _RegisterFlow(
+                  initialRole: _pendingRole ?? 'tenant',
                   onDone: _onEnter,
                   onSwitchToLogin: () => setState(() => _currentView = AuthView.login),
                   onBack: () => setState(() => _currentView = AuthView.welcome),
@@ -902,21 +914,21 @@ class _GuestModeDialog extends StatelessWidget {
   }
 }
 
-// ─── Social Sign-In Role Dialog ───────────────────────────────────────────────
+// ─── Landlord / Agent Role Dialog ─────────────────────────────────────────────
 
-/// Shows the landlord/tenant chooser after a social sign-in. Returns the chosen
-/// role ('landlord'/'tenant'), or null if dismissed. Always presented so the
-/// user can pick how they enter the app on every social login.
-Future<String?> _promptSocialRole(BuildContext context) {
+/// Opened by the top "אני בעל דירה" CTA. Lets the user declare a landlord or
+/// real-estate-agent account; tenants are the default and never see this.
+/// Returns 'landlord' / 'broker', or null if dismissed.
+Future<String?> _promptLandlordOrAgent(BuildContext context) {
   return showDialog<String>(
     context: context,
-    barrierDismissible: false,
-    builder: (_) => const _SocialRoleDialog(),
+    barrierDismissible: true,
+    builder: (_) => const _LandlordAgentDialog(),
   );
 }
 
-class _SocialRoleDialog extends StatelessWidget {
-  const _SocialRoleDialog();
+class _LandlordAgentDialog extends StatelessWidget {
+  const _LandlordAgentDialog();
 
   @override
   Widget build(BuildContext context) {
@@ -949,7 +961,7 @@ class _SocialRoleDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'ברוך הבא! 👋',
+                    'כניסה כבעל דירה',
                     style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -957,7 +969,7 @@ class _SocialRoleDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'מה תפקידך ב-Rently?',
+                    'בחרו את סוג החשבון. מחפשי דירה נכנסים כברירת מחדל.',
                     style: TextStyle(
                         fontSize: 15,
                         height: 1.5,
@@ -965,19 +977,19 @@ class _SocialRoleDialog extends StatelessWidget {
                   ),
                   const SizedBox(height: 22),
                   _GuestRoleOption(
-                    title: 'מחפש/ת דירה',
-                    subtitle: 'גלה דירות, שלח בקשות וקבל התאמות.',
-                    icon: IconsaxPlusLinear.profile_circle,
-                    color: _kBrandTeal,
-                    onTap: () => Navigator.of(context).pop('tenant'),
-                  ),
-                  const SizedBox(height: 12),
-                  _GuestRoleOption(
                     title: 'בעל/ת דירה',
                     subtitle: 'פרסם נכסים, נהל בקשות ומצא דיירים.',
                     icon: IconsaxPlusLinear.home,
                     color: _kBrandTeal,
                     onTap: () => Navigator.of(context).pop('landlord'),
+                  ),
+                  const SizedBox(height: 12),
+                  _GuestRoleOption(
+                    title: 'מתווך/ת נדל״ן',
+                    subtitle: 'ניהול נכסים, לידים והתאמות ללקוחות.',
+                    icon: IconsaxPlusLinear.briefcase,
+                    color: BrandPalette.broker.primary,
+                    onTap: () => Navigator.of(context).pop('broker'),
                   ),
                 ],
               ),
@@ -1230,12 +1242,11 @@ class _LoginTabState extends State<_LoginTab> {
       final result = await _googleAuthService.signIn();
       if (!mounted) return;
       final provider = context.read<DatingProvider>();
-      final picked = await _promptSocialRole(context);
-      if (!mounted) return;
-      if (picked == null) return;
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: result.photoUrl);
-      await provider.setUserRole(picked, explicit: true);
+      // Login honours the account's stored role (tenant by default); the
+      // landlord/agent role is chosen up front via the top CTA, not here.
+      await provider.setUserRole(provider.userRole);
       if (!mounted) return;
       widget.onLogin();
     } on GoogleAuthCanceledException {
@@ -1271,12 +1282,10 @@ class _LoginTabState extends State<_LoginTab> {
       final result = await _appleAuthService.signIn();
       if (!mounted) return;
       final provider = context.read<DatingProvider>();
-      final picked = await _promptSocialRole(context);
-      if (!mounted) return;
-      if (picked == null) return;
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: null, source: 'apple');
-      await provider.setUserRole(picked, explicit: true);
+      // Login honours the account's stored role (tenant by default).
+      await provider.setUserRole(provider.userRole);
       if (!mounted) return;
       widget.onLogin();
     } on AppleAuthCanceledException {
@@ -1632,10 +1641,16 @@ class _RegisterFlow extends StatefulWidget {
     required this.onDone,
     required this.onSwitchToLogin,
     required this.onBack,
+    this.initialRole = 'tenant',
   });
   final VoidCallback onDone;
   final VoidCallback onSwitchToLogin;
   final VoidCallback onBack;
+
+  /// Role chosen before entering signup. 'tenant' (default) or 'landlord' /
+  /// 'broker' when the user came in via the top "אני בעל דירה" CTA. There is no
+  /// in-flow role step anymore — the role is fixed here.
+  final String initialRole;
 
   @override
   State<_RegisterFlow> createState() => _RegisterFlowState();
@@ -1644,7 +1659,7 @@ class _RegisterFlow extends StatefulWidget {
 class _RegisterFlowState extends State<_RegisterFlow> {
   final _pageCtrl = PageController();
   int _step = 0;
-  String _role = '';
+  late final String _role = widget.initialRole;
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _passwordObscure = true;
@@ -1661,7 +1676,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
   final _googleAuthService = GoogleAuthService();
   final _appleAuthService = AppleAuthService();
 
-  int get _totalSteps => 3;
+  int get _totalSteps => 2;
 
   @override
   void dispose() {
@@ -1706,13 +1721,6 @@ class _RegisterFlowState extends State<_RegisterFlow> {
         return;
       }
     }
-    if (_step == 1 && _role.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(
-              duration: Duration(milliseconds: 2500),
-              content: Text('יש לבחור תפקיד')));
-      return;
-    }
     if (_step >= _totalSteps - 1) {
       final agreed = await _showEulaDialog();
       if (agreed) _submit();
@@ -1743,7 +1751,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       final provider = context.read<DatingProvider>();
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: result.photoUrl);
-      await provider.setUserRole(provider.userRole);
+      // Sign up with the role chosen before entering the flow (tenant default).
+      await provider.setUserRole(_role, explicit: true);
       if (!mounted) return;
       widget.onDone();
     } on GoogleAuthCanceledException {
@@ -1769,7 +1778,8 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       final provider = context.read<DatingProvider>();
       await provider.applyGoogleIdentity(
           displayName: result.displayName, photoUrl: null);
-      await provider.setUserRole(provider.userRole);
+      // Sign up with the role chosen before entering the flow (tenant default).
+      await provider.setUserRole(_role, explicit: true);
       if (!mounted) return;
       widget.onDone();
     } on AppleAuthCanceledException {
@@ -1931,7 +1941,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
 
   @override
   Widget build(BuildContext context) {
-    final isOptionalStep = _role == 'landlord' && _step == 2;
+    final isOptionalStep = _role == 'landlord' && _step == 1;
     return Column(
       children: [
         Padding(
@@ -1993,11 +2003,6 @@ class _RegisterFlowState extends State<_RegisterFlow> {
                         onGoogle: _loginWithGoogle,
                         onApple: _loginWithApple,
                         onSwitchToLogin: widget.onSwitchToLogin,
-                        isDark: true,
-                      ),
-                      _StepRole(
-                        selected: _role,
-                        onSelect: (role) => setState(() => _role = role),
                         isDark: true,
                       ),
                       if (_role == 'landlord')
@@ -2658,185 +2663,6 @@ class _StepEmailPassword extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Step: Role ───────────────────────────────────────────────────────────────
-
-class _StepRole extends StatelessWidget {
-  const _StepRole({required this.selected, required this.onSelect, this.isDark = false});
-  final String selected;
-  final ValueChanged<String> onSelect;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('מה מביא אותך לכאן?',
-              style: TextStyle(
-                  color: isDark ? Colors.white : AppColors.navy,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5)),
-          const SizedBox(height: 4),
-          Text('בחרו מסלול כדי שנוכל להתאים את החוויה',
-              style: TextStyle(
-                  color: isDark ? Colors.white70 : AppColors.textSecondary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500)),
-          const SizedBox(height: 22),
-          _RoleCard(
-            icon: IconsaxPlusLinear.house_2,
-            title: 'אני מחפש/ת דירה',
-            subtitle: 'שוכר / שוכרת',
-            accent: _kBrandTeal,
-            selected: selected == 'tenant',
-            onTap: () => onSelect('tenant'),
-            isDark: isDark,
-          ),
-          const SizedBox(height: 12),
-          _RoleCard(
-            icon: IconsaxPlusLinear.building,
-            title: 'יש לי דירה להשכרה',
-            subtitle: 'משכיר / משכירה',
-            accent: AppColors.navy,
-            selected: selected == 'landlord',
-            onTap: () => onSelect('landlord'),
-            isDark: isDark,
-          ),
-          const SizedBox(height: 12),
-          _RoleCard(
-            icon: IconsaxPlusLinear.briefcase,
-            title: 'אני מתווך/ת נדל״ן',
-            subtitle: 'ניהול נכסים ולקוחות',
-            accent: BrandPalette.broker.primary,
-            selected: selected == 'broker',
-            onTap: () => onSelect('broker'),
-            isDark: isDark,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.accent,
-    required this.selected,
-    required this.onTap,
-    this.isDark = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color accent;
-  final bool selected;
-  final VoidCallback onTap;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final cardBg = selected
-        ? accent
-        : (isDark ? Colors.white.withOpacity(0.08) : Colors.white);
-    final borderCol = selected
-        ? accent
-        : (isDark ? Colors.white.withOpacity(0.15) : _kInputBorder);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: cardBg,
-          border: Border.all(
-            color: borderCol,
-            width: selected ? 0 : 1.5,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: accent.withValues(alpha: 0.24),
-                    blurRadius: 20,
-                    offset: const Offset(0, 5),
-                  )
-                ]
-              : (isDark
-                  ? const []
-                  : const [
-                      BoxShadow(
-                        color: Color(0x0A072946),
-                        blurRadius: 8,
-                        offset: Offset(0, 5),
-                      )
-                    ]),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: selected
-                    ? Colors.white.withValues(alpha: 0.18)
-                    : (isDark ? Colors.white.withOpacity(0.1) : accent.withValues(alpha: 0.10)),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child:
-                  Icon(icon, color: selected ? Colors.white : (isDark ? Colors.white : accent), size: 26),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          color: selected ? Colors.white : (isDark ? Colors.white : AppColors.navy),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 3),
-                  Text(subtitle,
-                      style: TextStyle(
-                          color: selected
-                              ? Colors.white.withValues(alpha: 0.72)
-                              : (isDark ? Colors.white70 : AppColors.textSecondary),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: selected
-                    ? Colors.white
-                    : (isDark ? Colors.white.withOpacity(0.12) : _kInputBorder.withValues(alpha: 0.6)),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                  selected ? Icons.check_rounded : Icons.circle_outlined,
-                  size: 14,
-                  color: selected ? accent : (isDark ? Colors.white54 : AppColors.textDisabled)),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -3520,12 +3346,57 @@ class _EulaSection extends StatelessWidget {
   }
 }
 
+/// Compact top-of-screen CTA on the welcome portal. Opens the landlord/agent
+/// chooser; the default tenant path never needs it.
+class _LandlordCtaButton extends StatelessWidget {
+  const _LandlordCtaButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(100),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: _kBrandTeal.withOpacity(0.22),
+              borderRadius: BorderRadius.circular(100),
+              border:
+                  Border.all(color: Colors.white.withOpacity(0.45), width: 1.2),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(IconsaxPlusLinear.home, color: Colors.white, size: 17),
+                SizedBox(width: 6),
+                Text(
+                  'אני בעל דירה',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _WelcomePortal extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onRegister;
   final VoidCallback onGoogleLogin;
   final VoidCallback onAppleLogin;
   final VoidCallback onGuestLogin;
+  final VoidCallback onLandlordCta;
 
   const _WelcomePortal({
     super.key,
@@ -3534,6 +3405,7 @@ class _WelcomePortal extends StatelessWidget {
     required this.onGoogleLogin,
     required this.onAppleLogin,
     required this.onGuestLogin,
+    required this.onLandlordCta,
   });
 
   @override
@@ -3587,6 +3459,13 @@ class _WelcomePortal extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Top CTA — landlords / agents declare their account type here.
+                // Tenants (apartment searchers) are the default and skip this.
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _LandlordCtaButton(onTap: onLandlordCta),
+                ),
+                const SizedBox(height: 4),
                 // Top logo / branding
                 Align(
                   alignment: Alignment.center,

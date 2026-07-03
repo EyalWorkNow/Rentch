@@ -441,7 +441,8 @@ class SmartSearch {
     });
 
     final nearTrain = const [
-      'רכבת', 'תחנת רכבת', 'ליד הרכבת', 'קרוב לרכבת', 'train', 'railway'
+      'רכבת', 'תחנת רכבת', 'ליד הרכבת', 'קרוב לרכבת', 'רכבת קלה',
+      'train', 'railway', 'light rail', 'metro', 'תחבורה ציבורית'
     ].any((w) => text.contains(w));
 
     // ── persona soft defaults (only when rooms not stated) ──────────────────
@@ -822,7 +823,12 @@ class SmartSearch {
   static const Map<String, List<String>> _amenityKeywords = {
     'feat_renovated': ['משופצ', 'שיפוץ', 'חדשה', 'renovated'],
     'feat_pets': ['כלב', 'כלבה', 'חתול', 'חיית מחמד', 'חיות מחמד', 'pet', 'dog'],
-    'feat_parking': ['חניה', 'חנייה', 'parking'],
+    'feat_parking': ['חניה', 'חנייה', 'חניית', 'חנית', 'parking'],
+    // ponytail: feat_accessible/feat_roommates exist in the catalogue but the
+    // parser never detected them — real personas (wheelchair, students) were
+    // silently dropped. Keyword rows only; the MAUT engine already scores them.
+    'feat_accessible': ['נגיש', 'נגישות', 'כיסא גלגלים', 'כסא גלגלים', 'נכה', 'accessible', 'wheelchair', 'disabled'],
+    'feat_roommates': ['שותפים', 'שותף', 'שותפה', 'דירת שותפים', 'roommate', 'flatmate'],
     'feat_balcony': ['מרפסת', 'מרפסות', 'balcony'],
     'feat_elevator': ['מעלית', 'elevator'],
     'feat_furnished': ['מרוהט', 'ריהוט', 'מאובזר', 'furnished'],
@@ -892,9 +898,103 @@ class SmartSearch {
         return '🌐 אינטרנט';
       case 'feat_laundry':
         return '🧺 כביסה';
+      case 'feat_accessible':
+        return '♿ נגיש';
+      case 'feat_roommates':
+        return '👥 שותפים';
       default:
         return key.replaceFirst('feat_', '');
     }
+  }
+
+  // ── cohort signals ───────────────────────────────────────────────────────────
+  // Extract the persona/cohort signals the BACKEND 14-cohort engine already reads
+  // (cohort.mjs `querySignals`: household/religiousStream/isOleh/hasChildren/
+  // carFree/wfh/accessibilityNeed/lifeStage/isInvestor/sector/…). Nothing produced
+  // these before, so the whole personalization taxonomy sat dormant for chat search.
+  // Pure keyword scan → a {key:value} map sent verbatim as listRows params.
+  static Map<String, String> cohortSignals(String rawText) {
+    final t = rawText.toLowerCase();
+    bool has(List<String> ws) => ws.any((w) => t.contains(w));
+    final s = <String, String>{};
+
+    // household (also gates charedi/dati_leumi split, which needs family context)
+    if (has(['משפח', 'ילדים', 'ילד ', 'הילד', 'children', 'kids', 'family'])) {
+      s['household'] = 'family';
+    } else if (has(['סטודנט', 'שותפים', 'student', 'roommate'])) {
+      s['household'] = 'student';
+    } else if (has(['זוג', 'couple', 'בן/בת זוג'])) {
+      s['household'] = 'couple';
+    } else if (has(['רווק', 'רווקה', 'לבד', 'single', 'solo'])) {
+      s['household'] = 'single';
+    }
+
+    // religiosity → stream (charedi vs dati_leumi have OPPOSITE school needs)
+    if (has(['חרדי', 'חרדית', 'חיידר', 'תלמוד תורה', 'בני ברק', 'haredi', 'charedi'])) {
+      s['religiousStream'] = 'charedi';
+      s['isReligious'] = 'true';
+    } else if (has(['דתי לאומי', 'דתיה לאומית', 'סרוג', 'אולפנה', 'ישיבה תיכונית', 'dati leumi'])) {
+      s['religiousStream'] = 'dati_leumi';
+      s['isReligious'] = 'true';
+    } else if (has(['דתי', 'דתיה', 'שומר שבת', 'בית כנסת', 'religious', 'synagogue', 'kosher'])) {
+      s['isReligious'] = 'true';
+    }
+
+    // sector (Arabic listing pools / school proximity)
+    if (has(['ערבי', 'ערבית', 'عرب', 'الناصرة', 'مدرسة'])) s['sector'] = 'arab';
+
+    // oleh / language preference
+    if (has(['עולה', 'עולה חדש', 'immigrant', 'oleh', 'new to israel'])) s['isOleh'] = 'true';
+    if (has(['english speaker', 'דובר אנגלית', 'אנגלית'])) s['langPref'] = 'en';
+    if (has(['דובר צרפתית', 'french speaker', 'צרפתית'])) s['langPref'] = 'fr';
+
+    // children / life-stage timing
+    if (has(['ילד', 'ילדים', 'kids', 'children'])) s['hasChildren'] = 'true';
+    if (has(['בהריון', 'הריון', 'pregnant', 'expecting', 'תינוק בדרך'])) s['expecting'] = 'true';
+    if (has(['תינוק', 'רך נולד', 'baby', 'newborn'])) {
+      s['hasChildren'] = 'true';
+      s['childAge'] = '1';
+    }
+
+    // mobility / work
+    if (has(['בלי רכב', 'ללא רכב', 'אין לי רכב', 'אין רכב', 'no car', 'car-free', 'תחבורה ציבורית'])) {
+      s['carFree'] = 'true';
+    }
+    if (has(['עובד מהבית', 'עבודה מהבית', 'מהבית', 'wfh', 'work from home', 'remote work', 'חדר עבודה'])) {
+      s['wfh'] = 'true';
+    }
+
+    // accessibility → senior/accessible cohort
+    if (has(['נגיש', 'נגישות', 'כיסא גלגלים', 'כסא גלגלים', 'נכה', 'wheelchair', 'accessible', 'disabled'])) {
+      s['accessibilityNeed'] = 'true';
+    }
+
+    // life stage
+    if (has(['סטודנט', 'סטודנטית', 'student'])) s['lifeStage'] = 'student';
+    if (has(['גמלאי', 'פנסיונר', 'פנסיונרית', 'קשיש', 'בגיל השלישי', 'retired', 'senior', 'pensioner'])) {
+      s['lifeStage'] = 'senior';
+    }
+    // explicit age ("בן 72" / "age 72")
+    final age = RegExp(r'(?:בן|בת|גיל|age)\s*(\d{2,3})').firstMatch(t);
+    if (age != null) s['age'] = age.group(1)!;
+
+    // intent
+    if (has(['משקיע', 'השקעה', 'תשואה', 'investor', 'investment', 'yield', 'לקנייה', 'לקנות', 'רכישה'])) {
+      s['isInvestor'] = 'true';
+      s['intent'] = 'investment';
+    }
+
+    // vibe (soft neighbourhood-vibrancy target the backend cohort reads)
+    if (has(['תוסס', 'חיי לילה', 'nightlife', 'vibrant', 'לב העיר', 'במרכז'])) {
+      s['vibe'] = 'תוסס';
+    } else if (has(['שקט', 'quiet', 'רגוע', 'peaceful'])) {
+      s['vibe'] = 'שקט';
+    } else if (s['household'] == 'family') {
+      s['vibe'] = 'משפחתי';
+    } else if (s['lifeStage'] == 'student') {
+      s['vibe'] = 'סטודנטיאלי';
+    }
+    return s;
   }
 
   // ── value helpers ────────────────────────────────────────────────────────────

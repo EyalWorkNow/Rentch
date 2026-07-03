@@ -136,7 +136,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final allMatches = provider.matches;
-        final filtered = _applyFilters(allMatches, provider);
+        // One-sided "request to message" threads get their own section; the
+        // normal conversations list excludes them.
+        final requestPairs = allMatches
+            .where((m) => m.isRequest)
+            .map((m) {
+              final p = provider.propertyById(m.propertyId);
+              return p == null ? null : (match: m, property: p);
+            })
+            .whereType<({RentalMatch match, RentalProperty property})>()
+            .toList();
+        final filtered = _applyFilters(
+            allMatches.where((m) => !m.isRequest).toList(), provider);
         final total = allMatches
             .where((m) => provider.propertyById(m.propertyId) != null)
             .length;
@@ -191,27 +202,62 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                 setState(() => _scheduleFilter = value),
                           ),
                           Expanded(
-                            child: filtered.isEmpty
+                            child: (filtered.isEmpty && requestPairs.isEmpty)
                                 ? _EmptyFilterResults(onClear: _clearFilters)
-                                : ListView.separated(
+                                : ListView(
                                     padding: const EdgeInsets.fromLTRB(
                                         16, 12, 16, 120),
-                                    itemCount: filtered.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: 14),
-                                    itemBuilder: (context, index) {
-                                      final pair = filtered[index];
-                                      return _MatchCard(
-                                        match: pair.match,
-                                        property: pair.property,
-                                        onTap: () => Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => MessageScreen(
-                                                matchId: pair.match.id),
+                                    children: [
+                                      if (requestPairs.isNotEmpty) ...[
+                                        _MessagesSectionHeader(
+                                          icon: Icons.mark_email_unread_outlined,
+                                          label: 'מבקשים לשלוח הודעה',
+                                          count: requestPairs.length,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        for (final pair in requestPairs)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 14),
+                                            child: _MatchCard(
+                                              match: pair.match,
+                                              property: pair.property,
+                                              onTap: () =>
+                                                  Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => MessageScreen(
+                                                      matchId: pair.match.id),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        if (filtered.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          _MessagesSectionHeader(
+                                            icon: Icons.chat_bubble_outline_rounded,
+                                            label: 'שיחות',
+                                            count: filtered.length,
+                                          ),
+                                          const SizedBox(height: 10),
+                                        ],
+                                      ],
+                                      for (final pair in filtered)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 14),
+                                          child: _MatchCard(
+                                            match: pair.match,
+                                            property: pair.property,
+                                            onTap: () =>
+                                                Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => MessageScreen(
+                                                    matchId: pair.match.id),
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                      );
-                                    },
+                                    ],
                                   ),
                           ),
                         ],
@@ -219,6 +265,51 @@ class _MatchesScreenState extends State<MatchesScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _MessagesSectionHeader extends StatelessWidget {
+  const _MessagesSectionHeader({
+    required this.icon,
+    required this.label,
+    required this.count,
+  });
+  final IconData icon;
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            color: AppColors.navy,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

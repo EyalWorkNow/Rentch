@@ -111,16 +111,56 @@ class BrokerToolsScreen extends StatelessWidget {
         ),
         body: SafeArea(
           top: false,
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 14,
-              childAspectRatio: 0.92,
-            ),
-            itemCount: tools.length,
-            itemBuilder: (context, i) => _BrokerToolTile(tool: tools[i]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Short intro so the agent knows what this hub is for.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.18)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(IconsaxPlusLinear.briefcase,
+                          color: AppColors.primary, size: 24),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'כל מה שצריך לניהול העסק שלך במקום אחד — לקוחות, '
+                          'לידים, צפיות, עמלות ועוד. הקש על כלי כדי להתחיל.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 0.92,
+                  ),
+                  itemCount: tools.length,
+                  itemBuilder: (context, i) => _BrokerToolTile(tool: tools[i]),
+                ),
+              ),
+            ],
           ),
         ),
       ),

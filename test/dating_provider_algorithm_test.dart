@@ -113,6 +113,54 @@ void main() {
     provider.dispose();
   });
 
+  test('strictMaxBudget hard-caps the deck; soft budget tolerates near-misses',
+      () async {
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([
+        _property(id: 'in-budget', price: 3900, sizeM2: 70),
+        _property(id: 'over-budget', price: 4700, sizeM2: 72),
+      ]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    await provider.initialize();
+
+    const base = SearchFilters(
+      query: '',
+      minBudget: 600,
+      maxBudget: 4000,
+      minRooms: 0,
+      maxRooms: 10,
+      areaId: 'all_israel',
+      requiredFeatures: <String>{},
+      preferredFeatures: <String>{},
+      minSizeM2: 0,
+      maxSizeM2: 200,
+      propertyTypes: <String>{},
+      preferredPropertyTypes: <String>{},
+      conditions: <String>{},
+      preferredConditions: <String>{},
+      listingSource: ListingSourceFilter.any,
+      minFloor: 0,
+      moveInFilter: MoveInFilter.any,
+      sortBy: SearchSortOption.bestMatch,
+      includeUnknownPriceListings: false,
+      customAreaPolygon: <LatLng>[],
+    );
+
+    // Soft (slider) budget: best-match tolerates a ₪4,700 near-miss.
+    await provider.updateFilters(base);
+    expect(provider.filteredProperties.map((p) => p.id),
+        contains('over-budget'));
+
+    // Strict (typed "עד 4000"): the ₪4,700 flat must NOT appear.
+    await provider.updateFilters(base.copyWith(strictMaxBudget: true));
+    final ids = provider.filteredProperties.map((p) => p.id).toList();
+    expect(ids, contains('in-budget'));
+    expect(ids, isNot(contains('over-budget')));
+
+    provider.dispose();
+  });
+
   test('listings without a real price stay hidden until explicitly included',
       () async {
     final provider = DatingProvider(

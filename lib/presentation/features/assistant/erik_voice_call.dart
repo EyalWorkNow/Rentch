@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:dating_app/presentation/features/assistant/erik_design.dart';
 import 'package:dating_app/presentation/features/assistant/erik_presence.dart';
+import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -81,6 +82,20 @@ class ErikOrbStage extends StatelessWidget {
 
   Color get _accent => ErikTokens.accent;
 
+  // Maps Erik's state + mic level to the liquid-glass orb's activity (0..1).
+  double _orbLevel(double lvl) {
+    switch (state) {
+      case ErikState.listening:
+        return (0.25 + lvl * 0.75).clamp(0.0, 1.0);
+      case ErikState.speaking:
+        return 0.85;
+      case ErikState.thinking:
+        return 0.45;
+      case ErikState.idle:
+        return 0.18;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final idle = state == ErikState.idle && !callActive;
@@ -124,12 +139,14 @@ class ErikOrbStage extends StatelessWidget {
                       behavior: HitTestBehavior.opaque,
                       child: FittedBox(
                         fit: BoxFit.contain,
-                        child: ErikPresence(
-                          size: orbSize,
-                          state: state,
-                          accent: ErikTokens.accent,
-                          accentGlow: ErikTokens.accentGlow,
-                          soundLevel: soundLevel,
+                        // Same liquid-glass presence as אתי (shared widget).
+                        child: ValueListenableBuilder<double>(
+                          valueListenable: soundLevel,
+                          builder: (_, lvl, __) => LiquidGlassOrb(
+                            size: orbSize,
+                            level: _orbLevel(lvl),
+                            speaking: state == ErikState.speaking,
+                          ),
                         ),
                       ),
                     ),

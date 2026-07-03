@@ -109,22 +109,42 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
           CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // ─── Hero: padded rounded photo card (Mockup Style) ──────────
+              // ─── Hero: framed "window" photo card — identical treatment to
+              // the property-detail page (white 8px frame + soft shadow). ─────
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(32),
-                    child: SizedBox(
-                      height: 380,
-                      child: _PhotoHero(
-                        tenant: tenant,
-                        controller: _pageController,
-                        currentPage: _currentPage,
-                        rating: _avgRating(widget.reviews),
-                        roomsLabel: _roomsLabel,
-                        onPageChanged: (i) => setState(() => _currentPage = i),
-                        onBackTap: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.fromLTRB(
+                    5,
+                    MediaQuery.of(context).padding.top + 12,
+                    5,
+                    16,
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      border: Border.all(color: Colors.white, width: 8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 22,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: SizedBox(
+                        height: 460,
+                        child: _PhotoHero(
+                          tenant: tenant,
+                          controller: _pageController,
+                          currentPage: _currentPage,
+                          rating: _avgRating(widget.reviews),
+                          roomsLabel: _roomsLabel,
+                          onPageChanged: (i) =>
+                              setState(() => _currentPage = i),
+                          onBackTap: () => Navigator.of(context).pop(),
+                        ),
                       ),
                     ),
                   ),

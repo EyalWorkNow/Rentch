@@ -14,6 +14,8 @@ import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
+import 'package:dating_app/presentation/screens/notifications_screen.dart';
+import 'package:dating_app/presentation/screens/owner_listings_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -325,44 +327,9 @@ class ProfileScreen extends StatelessWidget {
                             color: Color(0xFF0F172A),
                           ),
                         ),
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const RentlyIcon(
-                                IconsaxPlusLinear.notification,
-                                color: Color(0xFF0F172A),
-                                size: 20,
-                              ),
-                              Positioned(
-                                top: 12,
-                                right: 12,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary, // App primary color instead of pink
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        // Real, working notifications bell — far-left next to
+                        // the title (RTL: end of the row).
+                        const NotificationBell(),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -1798,6 +1765,22 @@ class _LandlordProfileScreen extends StatelessWidget {
                   builder: (_) => EditProfileScreen(profile: profile)),
             ),
           ),
+          if (provider.isLandlord) ...[
+            const _SettingsDivider(),
+            _ProfileMenuItem(
+              icon: IconsaxPlusLinear.house_2,
+              label: 'הדירות שלי · שיתוף לינק',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => OwnerListingsScreen(
+                    ownerUserId: '',
+                    ownerName: profile.name,
+                    isSelf: true,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (provider.isBroker) ...[
             const _SettingsDivider(),
             _ProfileMenuItem(

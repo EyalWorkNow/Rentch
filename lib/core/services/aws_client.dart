@@ -303,6 +303,34 @@ class AwsApiClient {
     await post('/notifications/mark-read', all ? {'all': true} : {'ids': ids});
   }
 
+  // ── Live voice (OpenAI Realtime) ──────────────────────────────────────────
+
+  /// Starts an ephemeral OpenAI Realtime session for אתי's live voice
+  /// (`POST /assistant/realtime/session`). Returns `{ session, wsUrl }` where
+  /// `session.client_secret.value` is the short-lived token the audio client
+  /// connects with — the raw OpenAI key never reaches the device. Empty map if
+  /// unconfigured/unavailable.
+  Future<Map<String, dynamic>> startRealtimeVoiceSession() async {
+    if (!isConfigured) return const {};
+    return post('/assistant/realtime/session', const {});
+  }
+
+  // ── Persona dataset ───────────────────────────────────────────────────────
+
+  /// Upserts the caller's accumulated persona (`PUT /persona/{uid}`). The row id
+  /// is forced to the authenticated uid server-side, so [userId] only needs to
+  /// be non-empty. Fail-soft: a no-op when the backend isn't configured.
+  Future<void> upsertPersona(String userId, Map<String, dynamic> persona) async {
+    if (!isConfigured || userId.trim().isEmpty) return;
+    await put('/persona/${Uri.encodeComponent(userId)}', persona);
+  }
+
+  /// Reads the caller's persona row (`GET /persona/{uid}`); empty map if none.
+  Future<Map<String, dynamic>> getPersona(String userId) async {
+    if (!isConfigured || userId.trim().isEmpty) return const {};
+    return get('/persona/${Uri.encodeComponent(userId)}');
+  }
+
   // ── Admin broadcast console ───────────────────────────────────────────────
 
   /// Sends a company/system notification to all users.

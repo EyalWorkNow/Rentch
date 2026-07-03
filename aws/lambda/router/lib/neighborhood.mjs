@@ -326,8 +326,13 @@ export async function neighborhoodScore({ lat, lng, locality }) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
   // OSM (live) + safety (precomputed table, no network) in parallel.
+  // NEIGHBORHOOD_SKIP_OSM=1 skips the flaky Overpass call — used by the bulk
+  // backfill so it doesn't hammer/ban public Overpass over hundreds of listings
+  // (schools + safety, both bundled, still give the cohort-differentiating core).
   const [osm, safety] = await Promise.all([
-    osmCounts(lat, lng).catch(() => null),
+    process.env.NEIGHBORHOOD_SKIP_OSM === '1'
+      ? Promise.resolve(null)
+      : osmCounts(lat, lng).catch(() => null),
     safetyScore(locality).catch(() => null),
   ]);
 

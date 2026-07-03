@@ -22,6 +22,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/models/user_signals.dart';
+import 'package:dating_app/data/models/persona_profile.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/signature_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
@@ -154,6 +155,11 @@ class DatingProvider extends ChangeNotifier {
   // decision, and folded back into the match score so the algorithm personalises
   // from what the user actually does — not just what they declared.
   UserSignals _userSignals = const UserSignals();
+
+  // Declared/inferred persona the assistant accumulates. Local-first (always
+  // improves this user's own personalisation); a consent-gated snapshot is
+  // exported to the dataset. Accuracy safeguards live inside [PersonaProfile].
+  PersonaProfile _persona = PersonaProfile.empty();
 
   // Pagination state — properties are loaded in pages to avoid loading the
   // entire catalog upfront (which would be prohibitive at scale).
@@ -402,6 +408,66 @@ class DatingProvider extends ChangeNotifier {
   /// The per-user revealed-preference aggregate folded into the match score.
   /// Read-only; mutated only via the swipe path and the [UserSignals] reducer.
   UserSignals get userSignals => _userSignals;
+
+  PersonaProfile get personaProfile => _persona;
+
+  // High-confidence persona reads used to personalise defaults for returning
+  // users (null when we aren't sure enough — never guess).
+  String? get personaReligiosity =>
+      _persona.value('religiosity', now: DateTime.now()) as String?;
+  String? get personaCity =>
+      _persona.value('city', now: DateTime.now()) as String?;
+  int? get personaMaxBudget =>
+      (_persona.value('maxBudget', now: DateTime.now()) as num?)?.toInt();
+
+  /// Folds one or more observed persona facts in (each value validated + merged
+  /// with confidence/recency/conflict rules), persists locally, and — only when
+  /// [export] (the user consented) — emits the consent-gated dataset snapshot.
+  /// [export] never affects the local, own-personalisation accumulation.
+  void observePersona(
+    Map<String, Object?> facts,
+    PersonaSource source, {
+    bool export = false,
+  }) {
+    final now = DateTime.now();
+    var next = _persona;
+    facts.forEach((k, v) => next = next.observe(k, v, source, now: now));
+    if (next.version == _persona.version) return; // nothing valid changed
+    _persona = next;
+    unawaited(_persist());
+    if (export) _exportPersona(now);
+  }
+
+  /// Emit the current persona snapshot to the dataset once (call only after the
+  /// user grants consent — e.g. they said yes after we'd already accumulated).
+  void exportPersonaSnapshot() {
+    if (_persona.version == 0) return;
+    _exportPersona(DateTime.now());
+  }
+
+  void _exportPersona(DateTime now) {
+    final meta = _persona.toEventMetadata(now);
+    // 1) Append-only event row (history/analytics) — inherits the events
+    //    pipeline's userId / circuit-breaker / fail-soft guards.
+    AppEvents.instance.log(
+      UserEventType.personaProfileUpdated,
+      metadata: meta,
+    );
+    // 2) Upsert the single authoritative per-user persona row (the dataset the
+    //    backend targeting reads). Row id is forced to the uid server-side; a
+    //    higher [version] lets the server ignore a stale out-of-order write.
+    final uid = _tenantProfile?.id ?? '';
+    if (uid.isEmpty) return;
+    unawaited(() async {
+      try {
+        await AwsApiClient.instance.upsertPersona(uid, {
+          ...meta,
+          'userId': uid,
+          'updatedAt': now.toIso8601String(),
+        });
+      } catch (_) {/* fail-soft: local persona + event row still recorded */}
+    }());
+  }
   bool get roleExplicitlyChosen => _roleExplicitlyChosen;
   bool get isGuestMode => _isGuestMode;
   bool get hasActiveSession => _hasActiveSession;
@@ -829,6 +895,29 @@ class DatingProvider extends ChangeNotifier {
     return _passesStrictFitFilters(property, filters, now);
   }
 
+  // Israeli city names have many spellings ("תל אביב" / "תל אביב-יפו" / "תל אביב
+  // יפו"). Normalise (hyphens→space, drop the יפו suffix, collapse spaces) and
+  // accept an either-way containment so a valid city search isn't emptied by a
+  // format mismatch between the parsed city and the stored one.
+  static String _normCity(String s) {
+    var t = s
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[־\-,]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    // Drop a trailing " יפו" (תל אביב יפו → תל אביב) but keep "יפו" on its own.
+    t = t.replaceAll(RegExp(r'\sיפו$'), '').trim();
+    return t;
+  }
+
+  static bool _cityMatches(String propertyCity, String filterCity) {
+    final a = _normCity(propertyCity);
+    final b = _normCity(filterCity);
+    if (a.isEmpty || b.isEmpty) return true; // unknown → don't exclude
+    return a == b || a.contains(b) || b.contains(a);
+  }
+
   bool _passesStructuralFilters(
     RentalProperty property,
     SearchFilters filters,
@@ -840,7 +929,7 @@ class DatingProvider extends ChangeNotifier {
     }
 
     if (filters.city.trim().isNotEmpty &&
-        property.city.trim() != filters.city.trim()) {
+        !_cityMatches(property.city, filters.city)) {
       return false;
     }
 
@@ -927,8 +1016,15 @@ class DatingProvider extends ChangeNotifier {
           property.price < (filters.minBudget * 0.82).round()) {
         return false;
       }
+      // Over-budget: best-match normally allows a soft near-miss (×1.22) so the
+      // deck can still surface close options. But an explicit typed "עד X"
+      // (strictMaxBudget) is a HARD ceiling — previously a ₪4,700 flat showed
+      // for a ₪4,000 cap, which reads as a bug.
+      final budgetCeiling = filters.strictMaxBudget
+          ? filters.maxBudget
+          : (filters.maxBudget * 1.22).round();
       if (filters.maxBudget < _defaultMaxBudgetFor(filters.transactionType) &&
-          property.price > (filters.maxBudget * 1.22).round()) {
+          property.price > budgetCeiling) {
         return false;
       }
     }
@@ -4669,6 +4765,13 @@ class DatingProvider extends ChangeNotifier {
     _userSignals = userSignalsJson is Map
         ? UserSignals.fromJson(Map<String, dynamic>.from(userSignalsJson))
         : const UserSignals();
+    // Restore the accumulated persona; a higher stored version never regresses.
+    final personaJson = storedState['personaProfile'];
+    if (personaJson is Map) {
+      final restored =
+          PersonaProfile.fromJson(Map<String, dynamic>.from(personaJson));
+      if (restored.version >= _persona.version) _persona = restored;
+    }
     _pendingMatchPropertyId = null;
     _invalidateCatalogCache();
   }
@@ -4711,6 +4814,56 @@ class DatingProvider extends ChangeNotifier {
     _pendingMatchPropertyId = property.id;
   }
 
+  /// A tenant with no mutual like asks to message the owner. Creates (or appends
+  /// to) a private thread flagged as a request → it shows under "מבקשים לשלוח
+  /// הודעה" for the owner until they reply.
+  Future<void> requestToMessage(RentalProperty property,
+      {String note = ''}) async {
+    final matchId = 'match-${property.id}~$_currentOwnerUserId';
+    final now = DateTime.now();
+    final myName = _tenantProfile?.name ?? 'מתעניין/ת';
+    final text = note.trim().isEmpty
+        ? 'שלום, אשמח לשמוע עוד פרטים על הדירה 🙂'
+        : note.trim();
+    final msg = ChatMessage(
+      id: 'req-${property.id}-${now.microsecondsSinceEpoch}',
+      sender: myName,
+      text: text,
+      createdAt: now,
+    );
+    final idx = _matches.indexWhere((m) => m.id == matchId);
+    if (idx >= 0) {
+      final m = _matches[idx];
+      final updated = [..._matches];
+      updated[idx] = m.copyWith(messages: [...m.messages, msg]);
+      _matches = updated;
+    } else {
+      _matches = [
+        ..._matches,
+        RentalMatch(
+          id: matchId,
+          propertyId: property.id,
+          createdAt: now,
+          contractSent: false,
+          ownerSigned: false,
+          tenantSigned: false,
+          isRequest: true,
+          messages: [msg],
+        ),
+      ];
+    }
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Whether the current user already has a thread/request for this property.
+  bool hasThreadForProperty(String propertyId) =>
+      _matches.any((m) => m.id == 'match-$propertyId~$_currentOwnerUserId');
+
+  /// One-sided "request to message" threads, for the dedicated messages section.
+  List<RentalMatch> get messageRequests =>
+      matches.where((m) => m.isRequest).toList();
+
   void _replaceMatch(int index, RentalMatch updatedMatch) {
     final updatedMatches = [..._matches];
     updatedMatches[index] = updatedMatch;
@@ -4747,6 +4900,7 @@ class DatingProvider extends ChangeNotifier {
       'lastSeenMatchCount': _lastSeenMatchCount,
       'autoLikeEnabled': _autoLikeEnabled,
       'userSignals': _userSignals.toJson(),
+      'personaProfile': _persona.toJson(),
     };
 
     await _localStorageService.saveAppState(snapshot, syncRemote: false);

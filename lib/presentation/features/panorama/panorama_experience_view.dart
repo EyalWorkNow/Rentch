@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -50,11 +51,22 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
   bool _gyro = false;
   ui.Image? _overlay; // snapshot of the previous pano during a transition
   bool _navigating = false;
+  bool _showHint = true; // the drag/gyro hint auto-hides so it doesn't clutter
+  Timer? _hintTimer;
+
+  void _flashHint() {
+    _hintTimer?.cancel();
+    if (!_showHint) setState(() => _showHint = true);
+    _hintTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _showHint = false);
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _nodeId = widget.tour.first?.id ?? '';
+    _flashHint();
     _transition = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 650),
@@ -73,6 +85,7 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
 
   @override
   void dispose() {
+    _hintTimer?.cancel();
     _transition.dispose();
     _overlay?.dispose();
     _heading.dispose();
@@ -111,6 +124,7 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
     final target = widget.tour.nodeById(targetId);
     if (target == null) return;
     _navigating = true;
+    _flashHint(); // re-surface the "how to look around" hint in the new room
 
     // 1. snapshot the current pano for the dolly overlay (best-effort).
     ui.Image? snap;
@@ -278,13 +292,16 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
             ),
           ),
 
-          // drag hint
+          // drag hint — auto-hides after a few seconds so it doesn't block the view
           Positioned(
             bottom: 92,
             left: 0,
             right: 0,
             child: IgnorePointer(
-              child: Center(
+              child: AnimatedOpacity(
+                opacity: _showHint ? 1 : 0,
+                duration: const Duration(milliseconds: 450),
+                child: Center(
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -301,6 +318,7 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600),
                   ),
+                ),
                 ),
               ),
             ),

@@ -2,10 +2,17 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/core/search/lifestyle_knowledge.dart';
+import 'package:dating_app/data/models/persona_profile.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/recommendation_explainer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/repositories/property_search_repository.dart';
+import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
@@ -39,12 +46,14 @@ class _ChatMsg {
     this.scored = const [],
     this.chips = const [],
     this.isConsent = false,
+    this.locationRequest = false,
   });
   final String role; // 'user' | 'assistant'
   String text; // mutable: the "how I chose" bubble is upgraded once the LLM returns
   List<ScoredProperty> scored; // mutable: scorecards get llmReason merged in async
   final List<String> chips;
   final bool isConsent;
+  final bool locationRequest; // אתי asking to share GPS → renders a location button
   bool expanded = false; // "show more" toggle for result lists
 }
 
@@ -52,6 +61,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   static const _consentPrefKey = 'dataset_persona_consent_v1';
 
   final _service = AssistantService();
+  final _repo = PropertySearchRepository();
   final _input = TextEditingController();
   final _scroll = ScrollController();
 
@@ -63,6 +73,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   int _userTurns = 0;
   bool _searched = false;
   bool _busy = false;
+  bool _lifestyleNoteShown = false; // show the "considered your lifestyle" note once
+  bool _lastShowedResults = false; // did the last _send render listing cards
   String _lastReply = ''; // last assistant text, for the voice visualizer to speak
   bool? _consent;
   bool _consentAsked = false;
@@ -79,6 +91,26 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     super.initState();
     _messages.add(_greetingMsg());
     _loadConsent();
+    _seedFromPersona();
+  }
+
+  /// Personalise for a returning user: pre-fill what we already know with high
+  /// confidence (religiosity + query defaults they haven't restated). Anything
+  /// they type this session overrides it via [_merge], so this only helps.
+  void _seedFromPersona() {
+    final p = context.read<DatingProvider>().personaProfile;
+    final now = DateTime.now();
+    final rel = p.value('religiosity', now: now) as String?;
+    if (rel != null) _persona['religiosity'] = rel;
+    if (p.value('baby', now: now) == true) _persona['baby'] = 'true';
+    _query = _merge(
+      _query,
+      SearchQuery(
+        city: p.value('city', now: now) as String?,
+        maxPrice: (p.value('maxBudget', now: now) as num?)?.toInt(),
+        minRooms: (p.value('minRooms', now: now) as num?)?.toDouble(),
+      ),
+    );
   }
 
   _ChatMsg _greetingMsg() => _ChatMsg(
@@ -221,7 +253,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _rerunSearch();
   }
 
-  void _rerunSearch() {
+  Future<void> _rerunSearch() async {
     if (!_searched) return;
     if (_query.isEmpty) {
       setState(() => _messages.add(_ChatMsg(
@@ -233,8 +265,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final provider = context.read<DatingProvider>();
     // Commute-aware: routes through the provider so the tenant's stored work
     // coords add the "מרחק מהעבודה" dimension to each scorecard automatically.
-    final results = provider.recommendForTenant(provider.allProperties, _query,
-        limit: 10);
+    final results =
+        _rankByLifestyle(_applyLifestyleFilter(await _cohortRanked(provider, limit: 10)))
+            .take(10)
+            .toList();
+    if (!mounted) return;
     setState(() {
       _messages.add(_ChatMsg(
         role: 'assistant',
@@ -308,27 +343,76 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     super.dispose();
   }
 
-  // Opens the full-screen voice conversation (big, clear visualizer). Speaking
-  // and listening happen there; results flow into the chat behind it.
+  // Opens אתי's liquid-glass voice conversation (turn-based device STT → אתי GPT
+  // → device TTS). Opened straight from the sound button in the input bar.
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
     await Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => _VoiceVisualizer(
+      builder: (_) => AtiVoiceScreen(
         service: _service,
         onUtterance: _processVoiceUtterance,
+        criteria: _voiceCriteria(),
+        resultCount: _lastResultCount,
       ),
     ));
     _scrollToEnd();
   }
 
-  // Runs a spoken sentence through the same pipeline as typed input and returns
-  // אתי's reply text (for the visualizer to read aloud).
-  Future<String> _processVoiceUtterance(String transcript) async {
+  // Understood-criteria chips for the voice screen (mirrors the chat criteria bar).
+  List<String> _voiceCriteria() {
+    final q = _query;
+    final out = <String>[];
+    if (q.city != null && q.city!.trim().isNotEmpty) out.add(q.city!.trim());
+    if (q.neighborhood != null && q.neighborhood!.trim().isNotEmpty) {
+      out.add(q.neighborhood!.trim());
+    }
+    if (q.minRooms != null) {
+      final r = q.minRooms!;
+      final label = r == r.roundToDouble() ? r.toInt().toString() : r.toString();
+      out.add('$label חדרים');
+    }
+    if (q.maxPrice != null) {
+      final p = q.maxPrice!.toString().replaceAllMapped(
+          RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+      out.add('עד $p ₪');
+    }
+    for (final a in q.amenities) {
+      out.add(SmartSearch.amenityTag(a));
+    }
+    if (q.nearTrain) out.add('🚉 ליד הרכבת');
+    return out;
+  }
+
+  // Count of listings אתי last surfaced (drives the voice screen's results peek).
+  int get _lastResultCount {
+    for (final m in _messages.reversed) {
+      if (m.scored.isNotEmpty) return m.scored.length;
+    }
+    return 0;
+  }
+
+  // Runs a spoken sentence through the same pipeline as typed input; returns
+  // אתי's reply text (for the visualizer to read aloud) + whether listing cards
+  // were rendered (so the visualizer can close and reveal them inline).
+  Future<({String reply, bool showResults, List<ScoredProperty> results})>
+      _processVoiceUtterance(String transcript) async {
     await _send(transcript);
-    return _lastReply.isEmpty
-        ? 'ספר לי עוד קצת על מה שאתה מחפש'
-        : _lastReply;
+    return (
+      reply: _lastReply.isEmpty
+          ? 'ספר לי עוד קצת על מה שאתה מחפש'
+          : _lastReply,
+      showResults: _lastShowedResults,
+      results: _latestScored,
+    );
+  }
+
+  // The most recent listing cards אתי surfaced — shown inline in the voice screen.
+  List<ScoredProperty> get _latestScored {
+    for (final m in _messages.reversed) {
+      if (m.scored.isNotEmpty) return m.scored;
+    }
+    return const [];
   }
 
   // ── conversation ──────────────────────────────────────────────────────────
@@ -338,6 +422,95 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   bool _wantsResultsNow(String t) => RegExp(
         r'תראה לי|תראי לי|הצג|בוא נראה|בואי נראה|תמצא לי|תמצאי לי|show me',
       ).hasMatch(t);
+
+  // Deictic "here" → resolve the device GPS to a city via on-device geocoding
+  // (NOT the LLM) and fold it into the query. Fail-soft: no permission / no fix
+  // → we simply don't set a location and the normal flow continues.
+  // True whenever the user refers to their own location ("פה" / "באזור שלי" /
+  // "קרוב אליי" / "my area"…) — the cue to capture GPS instead of asking.
+  static final _locationRelative = RegExp(
+      r'\bפה\b|\bכאן\b|באזור הזה|באיזור הזה|בסביבה הזו|בסביבה שלי|ליד(?:י| שלי| הבית)?|'
+      r'אזור שלי|איזור שלי|באזור שלי|באיזור שלי|האזור שלי|קרוב אלי|קרוב אליי|אצלי|'
+      r'near me|around here|\bhere\b|my area|in my area|close to me|nearby');
+
+  // The USER tapped "share my location" on אתי's request → NOW capture the GPS
+  // (the OS permission prompt is the approval), set the city, and search. This is
+  // the only place that reads location, and only after an explicit user tap.
+  Future<void> _shareLocationNow() async {
+    setState(() {
+      _messages.removeWhere((m) => m.locationRequest);
+      _busy = true;
+    });
+    final city = await _captureGps();
+    if (!mounted) return;
+    if (city == null) {
+      setState(() {
+        _messages.add(_ChatMsg(
+            role: 'assistant',
+            text: 'לא הצלחתי לזהות מיקום כרגע 🙈 אפשר פשוט להגיד לי באיזו עיר לחפש?'));
+        _busy = false;
+      });
+      _scrollToEnd();
+      return;
+    }
+    _query = _merge(_query, SearchQuery(city: city));
+    setState(() => _messages.add(_ChatMsg(
+        role: 'assistant',
+        text: '📍 מצאתי אותך — את/ה ב$city. מחפשת שם עכשיו את מה שהכי מתאים 👇')));
+    final provider = context.read<DatingProvider>();
+    var results = _rankByLifestyle(
+            _applyLifestyleFilter(await _cohortRanked(provider, limit: 40)))
+        .take(10)
+        .toList();
+    if (!mounted) return;
+    setState(() {
+      _searched = true;
+      _busy = false;
+      if (results.isEmpty) {
+        _messages.add(_ChatMsg(
+            role: 'assistant',
+            text:
+                'לא צפו כרגע התאמות מדויקות באזור שלך — נרחיב תקציב או אזור?'));
+      } else {
+        _messages.add(_ChatMsg(
+            role: 'assistant',
+            text: 'הנה מה שהכי מתאים לך באזור שלך 👇',
+            scored: results,
+            chips: _refineChips()));
+      }
+    });
+    _scrollToEnd();
+  }
+
+  // Raw GPS capture → resolved city name (null if unavailable / denied). The OS
+  // permission dialog IS the user's approval.
+  Future<String?> _captureGps() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return null;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.medium),
+      ).timeout(const Duration(seconds: 6));
+      final marks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      for (final m in marks) {
+        final c = (m.locality?.trim().isNotEmpty == true)
+            ? m.locality!.trim()
+            : m.subAdministrativeArea?.trim();
+        if (c != null && c.isNotEmpty) return c;
+      }
+      return null;
+    } catch (_) {
+      return null; // location unavailable → fall back to asking
+    }
+  }
 
   Future<void> _send(String raw) async {
     final text = raw.trim();
@@ -354,6 +527,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     });
     _scrollToEnd();
 
+    // If the user referred to their own area ("אזור שלי" / "פה"), אתי will RAISE a
+    // location request instead of a warm reply (see below).
+    final maybeLoc = _locationRelative.hasMatch(text);
+
     // Criteria understanding: server Gemini (/assistant/extract) + on-device parser.
     Map<String, dynamic> llm = const {};
     try {
@@ -362,7 +539,30 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     } catch (_) {}
     _query = _merge(_query, SmartSearch.parse(text, llm: llm));
 
-    // Warm conversational reply from server נועה (Gemini, tenant_search mode).
+    // Fold lifestyle signals from the whole conversation into the query (e.g.
+    // "דתי לאומי" / "תינוק" → an elevator matters). See _applyLifestyle.
+    _applyLifestyle(text);
+
+    // Location needed but unknown → אתי RAISES a GPS request (a button). The user
+    // approves, then the app captures the location and searches. אתי never grabs
+    // GPS silently herself.
+    if (maybeLoc && _query.city == null) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(_ChatMsg(
+          role: 'assistant',
+          text: 'כדי למצוא לך דירות באזור שלך, אני רק צריכה לזהות איפה את/ה 📍\nלשתף את המיקום?',
+          locationRequest: true,
+        ));
+        _busy = false;
+      });
+      _scrollToEnd();
+      return;
+    }
+
+    // Reply: local template (no tokens) for the common Hebrew criteria turn, GPT
+    // only for ambiguous / non-Hebrew input. Now runs AFTER the parse so the
+    // template sees this turn's fresh criteria.
     final sr = await _serverReply();
     final shouldSearch = !_query.isEmpty &&
         (_searched || _wantsResultsNow(text) || _userTurns >= 2);
@@ -370,20 +570,44 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     List<ScoredProperty> results = const [];
     bool anyExact = false;
     if (shouldSearch) {
-      // Pass the tenant persona so it DRIVES the scores + populates each
-      // scorecard's personaReasons (tag / deal-breaker matches). Routed through
-      // the provider so the tenant's work coords add the commute dimension too.
-      results = provider.recommendForTenant(provider.allProperties, _query,
-          limit: 10);
+      // Over-fetch through the backend cohort engine, then drop lifestyle-
+      // incompatible listings (high floor with no elevator for a stroller /
+      // Shabbat), then keep the top 10.
+      results = await _cohortRanked(provider, limit: 40);
+      results =
+          _rankByLifestyle(_applyLifestyleFilter(results)).take(10).toList();
       anyExact = results.any((r) => r.exact);
+    }
+
+    // Auto-widen: nothing matched → progressively relax (budget → drop
+    // amenities/rooms → drop city) so אתי shows the closest options, not "אין".
+    String? widenNote;
+    if (shouldSearch && results.isEmpty) {
+      for (final step in _wideningLadder(_query)) {
+        final r = _rankByLifestyle(_applyLifestyleFilter(
+                await _cohortRanked(provider, limit: 40, query: step.q)))
+            .take(10)
+            .toList();
+        if (r.isNotEmpty) {
+          results = r;
+          widenNote = step.note;
+          break;
+        }
+      }
     }
 
     if (!mounted) return;
     _lastReply = sr.$1;
     _ChatMsg? howChoseMsg;
     _ChatMsg? resultsMsg;
+    final lifestyleNote = _lifestyleNoteShown ? null : _lifestyleNote();
+    final clarify = shouldSearch ? null : _clarifyingPrompt();
     setState(() {
-      _messages.add(_ChatMsg(role: 'assistant', text: sr.$1, chips: sr.$2));
+      // When GPS located the user, the "📍 מצאתי אותך" message is the reply — no
+      // empty/contradictory bubble.
+      if (sr.$1.isNotEmpty) {
+        _messages.add(_ChatMsg(role: 'assistant', text: sr.$1, chips: sr.$2));
+      }
       if (shouldSearch) {
         if (results.isEmpty) {
           _messages.add(_ChatMsg(
@@ -391,6 +615,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             text: 'עוד לא צף לי משהו מדויק — ננסה אזור אחר או תקציב גמיש יותר?',
           ));
         } else {
+          if (widenNote != null) {
+            _messages.add(_ChatMsg(role: 'assistant', text: '$widenNote 👇'));
+          }
+          // Let the user know a lifestyle constraint shaped the results.
+          if (lifestyleNote != null) {
+            _lifestyleNoteShown = true;
+            _messages.add(_ChatMsg(role: 'assistant', text: lifestyleNote));
+          }
           // Explain what the engine actually analysed/filtered/ranked before
           // showing the cards — turns the multi-dimensional math into a warm,
           // one-paragraph "here's what I checked and why these fit".
@@ -417,6 +649,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           _messages.add(resultsMsg!);
         }
         _searched = true;
+      } else if (clarify != null && !sr.$1.contains('?')) {
+        // Not enough to search yet → Etty proactively asks the single most
+        // useful missing detail (with quick-reply chips) instead of stalling.
+        _messages.add(_ChatMsg(
+            role: 'assistant', text: clarify.$1, chips: clarify.$2));
       }
       _busy = false;
     });
@@ -425,6 +662,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // Fetch the LLM's number-grounded explanations WITHOUT blocking the cards:
     // they're already on screen; this fills llmReason + the "how I chose" bubble
     // when (and if) it returns within a short timeout. Degrades to engine reasons.
+    _lastShowedResults = shouldSearch && results.isNotEmpty;
     if (shouldSearch && results.isNotEmpty && resultsMsg != null) {
       _fetchExplanations(
         results: results,
@@ -551,6 +789,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // returns (replyText, quick-reply suggestions). Falls back to local copy if
   // the server is unavailable (the on-device search still works regardless).
   Future<(String, List<String>)> _serverReply() async {
+    // TOKEN-SAVER: most turns are a clear criteria statement in Hebrew → build a
+    // warm, persona-aware reply LOCALLY from the on-device parse (zero LLM tokens,
+    // reusing templated content). Only spend a GPT call on genuinely ambiguous or
+    // non-Hebrew input (which needs the model for language + nuance).
+    final local = _localReply();
+    if (local != null) return (local, const <String>[]);
     try {
       final history = _messages
           .where((m) => !m.isConsent && m.text.isNotEmpty && m.scored.isEmpty)
@@ -561,6 +805,76 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       if (t.isNotEmpty) return (t, reply.suggestions);
     } catch (_) {}
     return (_warmFallback(), const <String>[]);
+  }
+
+  static final _hebrew = RegExp(r'[֐-׿]');
+  int _openerIdx = 0;
+
+  // Warm, persona-aware reply built with NO LLM call. Returns null when the input
+  // is non-Hebrew or too vague — those go to GPT (correct language / real nuance).
+  String? _localReply() {
+    final lastUser = _messages.lastWhere((m) => m.role == 'user',
+        orElse: () => _ChatMsg(role: 'user'));
+    final text = lastUser.text;
+    if (text.isEmpty || !_hebrew.hasMatch(text)) return null; // → GPT (language)
+
+    final q = _query;
+    final hasCriteria = q.city != null ||
+        q.maxPrice != null ||
+        q.minRooms != null ||
+        q.amenities.isNotEmpty ||
+        q.nearTrain;
+    if (!hasCriteria) return null; // greeting / ambiguous → GPT
+
+    final parts = <String>[];
+    if (q.minRooms != null) {
+      final r = q.minRooms!;
+      parts.add('${r == r.roundToDouble() ? r.toInt() : r} חדרים');
+    }
+    if (q.city != null && q.city!.trim().isNotEmpty) parts.add('ב${q.city!.trim()}');
+    if (q.maxPrice != null) {
+      final p = q.maxPrice!.toString().replaceAllMapped(
+          RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+      parts.add('עד $p ₪');
+    }
+    final summary = parts.join(' ');
+
+    const openers = ['הבנתי 😊', 'מעולה, קלטתי', 'אחלה, הבנתי', 'סבבה, הבנתי'];
+    final opener = openers[(_openerIdx++) % openers.length];
+
+    // Enough to search (city + budget or rooms) → reflect + go straight to results.
+    final enough = q.city != null && (q.maxPrice != null || q.minRooms != null);
+    if (enough || _searched || _userTurns >= 2) {
+      return summary.isEmpty
+          ? '$opener. בודקת מה הכי מתאים לך 👇'
+          : '$opener — $summary. בודקת מה הכי מתאים לך 👇';
+    }
+    // Otherwise ask ONE persona-appropriate follow-up (still no LLM).
+    final follow = _cohortFollowup();
+    return summary.isEmpty ? '$opener. $follow' : '$opener — $summary. $follow';
+  }
+
+  // A warm follow-up question tuned to the detected persona — a fixed, reused
+  // library (no tokens).
+  String _cohortFollowup() {
+    final s = SmartSearch.cohortSignals(_conversationText);
+    if (s['household'] == 'family' || _persona['baby'] == 'true') {
+      return 'מה הכי חשוב לכם — קרבה לגנים ובתי ספר, ממ״ד, או שקט?';
+    }
+    if (s['lifeStage'] == 'student' || s['household'] == 'student') {
+      return 'מעדיפ/ה דירת שותפים או משהו לבד? וכמה קריטית הקרבה לאוניברסיטה?';
+    }
+    if (s['isInvestor'] == 'true') {
+      return 'זו השקעה לשכירות או לקנייה? ומה הכי חשוב לך בתשואה?';
+    }
+    if (s['lifeStage'] == 'senior' || s['accessibilityNeed'] == 'true') {
+      return 'חשוב מעלית וקומה נמוכה? וקרבה לשירותי בריאות?';
+    }
+    if (s['wfh'] == 'true') return 'צריך חדר עבודה נפרד ושקט? ואינטרנט מהיר?';
+    if (_persona['religiosity'] != null || s['isReligious'] == 'true') {
+      return 'חשוב לכם קרבה לבית כנסת ולמוסדות שמתאימים לכם?';
+    }
+    return 'מה עוד חשוב לך — אווירת שכונה, קומה, או משהו ספציפי בדירה?';
   }
 
   int _warmIdx = 0;
@@ -599,9 +913,234 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         rawText: '${a.rawText} ${b.rawText}'.trim(),
       );
 
+  // ── Lifestyle inference ────────────────────────────────────────────────────
+  // Reads plain-language lifestyle cues from the message and remembers them in
+  // _persona: the tenant's religiosity (secular / traditional / religious /
+  // haredi) and whether they have a baby. Religiosity drives an area re-rank
+  // (see _rankByLifestyle) so we actually surface neighbourhoods that fit; a
+  // baby / Shabbat-observance additionally makes an elevator important, so we
+  // fold it into the query and hard-drop high floors without a lift.
+  void _applyLifestyle(String text) {
+    final rel = LifestyleKnowledge.detectReligiosity(text);
+    if (rel != null) _persona['religiosity'] = rel.name;
+    final baby = RegExp(r'תינוק|תינוקת|עגל[הת]|פעוט|רך\s*נולד|עולל')
+        .hasMatch(text);
+    if (baby) _persona['baby'] = 'true';
+    if (_needsElevator) {
+      _query = _merge(_query, SearchQuery(amenities: {'feat_elevator'}));
+    }
+  }
+
+  // The whole conversation, user turns only — the corpus we mine for cohort signals.
+  String get _conversationText =>
+      _messages.where((m) => m.role == 'user').map((m) => m.text).join(' ');
+
+  // Persona/cohort signals for the backend engine: keyword scan of the whole
+  // conversation, enriched with what the lifestyle layer already inferred.
+  Map<String, String> _cohortSignals() {
+    final s = SmartSearch.cohortSignals(_conversationText);
+    final rel = _persona['religiosity'];
+    if (rel == Religiosity.haredi.name) {
+      s['religiousStream'] = 'charedi';
+      s['isReligious'] = 'true';
+    } else if (rel == Religiosity.religious.name) {
+      s['religiousStream'] ??= 'dati_leumi';
+      s['isReligious'] = 'true';
+    } else if (rel == Religiosity.traditional.name) {
+      s['isReligious'] = 'true';
+    }
+    if (_persona['baby'] == 'true') {
+      s['hasChildren'] = 'true';
+      s.putIfAbsent('childAge', () => '1');
+    }
+    return s;
+  }
+
+  // Cohort-aware ranking: routes candidates through the BACKEND 14-cohort engine
+  // (PropertySearchRepository → resolveCohort/attachRankSignals) using the persona
+  // signals mined from the conversation, then decorates the backend's cohort-ordered
+  // candidates with the on-device scorecards for the cards — preserving server order.
+  // Falls back to the pure on-device engine when the backend is unreachable /
+  // unauthenticated (debug/guest) or returns nothing, so behaviour never regresses.
+  // ponytail: community_fit/neighborhood_fit stay neutral until listings are
+  // re-enriched server-side; pre-backfill the win is cohort weighting + price target.
+  Future<List<ScoredProperty>> _cohortRanked(DatingProvider provider,
+      {int limit = 40, SearchQuery? query}) async {
+    final q = query ?? _query;
+    final signals = _cohortSignals();
+    final criteria = PropertySearchCriteria(
+      city: q.city,
+      minPrice: q.minPrice,
+      maxPrice: q.maxPrice,
+      minRooms: q.minRooms,
+      amenityKeys: q.amenities,
+      vibe: signals['vibe'],
+      queryText: _conversationText,
+      cohortSignals: signals,
+    );
+    List<RentalProperty> serverRanked = const [];
+    try {
+      serverRanked = await _repo.search(criteria, limit: limit < 60 ? 60 : limit);
+    } catch (_) {}
+
+    if (serverRanked.isEmpty) {
+      return provider.recommendForTenant(provider.allProperties, q,
+          limit: limit);
+    }
+    final scored = provider.recommendForTenant(serverRanked, q,
+        limit: serverRanked.length);
+    final byId = {for (final s in scored) s.property.id: s};
+    final out = <ScoredProperty>[];
+    for (final p in serverRanked) {
+      final s = byId[p.id];
+      if (s != null) out.add(s);
+      if (out.length >= limit) break;
+    }
+    return out.isNotEmpty
+        ? out
+        : provider.recommendForTenant(provider.allProperties, q, limit: limit);
+  }
+
+  // Progressive relaxation for when nothing matches: widen budget, then drop soft
+  // amenities + room floor, then (last resort) drop the city. So אתי always has
+  // something close to show instead of dead-ending.
+  List<({SearchQuery q, String note})> _wideningLadder(SearchQuery q) {
+    final budget = q.maxPrice;
+    final up = (double f) => budget == null ? null : (budget * f).round();
+    return [
+      (
+        q: SearchQuery(
+            city: q.city,
+            neighborhood: q.neighborhood,
+            minRooms: q.minRooms,
+            maxPrice: up(1.25)),
+        note: 'הרחבתי קצת את התקציב'
+      ),
+      (
+        q: SearchQuery(city: q.city, maxPrice: up(1.6)),
+        note: 'הרחבתי תקציב וויתרתי על חלק מהדרישות'
+      ),
+      (
+        q: SearchQuery(maxPrice: up(1.6)),
+        note: 'לא נמצא בדיוק בעיר הזו — הנה הכי קרוב באזורים אחרים'
+      ),
+    ];
+  }
+
+  // Shabbat-observant (religious/haredi) + a stroller both need a lift upstairs.
+  bool get _needsElevator {
+    final rel = _persona['religiosity'];
+    return _persona['baby'] == 'true' ||
+        rel == Religiosity.religious.name ||
+        rel == Religiosity.haredi.name;
+  }
+
+  // Drops listings with no elevator above a floor a person can reasonably manage
+  // on foot / with a stroller.
+  List<ScoredProperty> _applyLifestyleFilter(List<ScoredProperty> input) {
+    if (!_needsElevator) return input;
+    final cap = _persona['baby'] == 'true' ? 1 : 2;
+    return input.where((r) {
+      final p = r.property;
+      if (p.featureFlags.isEnabled('elevator')) return true;
+      final floor = p.floorNumber;
+      if (floor == null) return true; // unknown floor → don't over-filter
+      return floor <= cap;
+    }).toList();
+  }
+
+  // Re-ranks by how well each area's religious character fits the tenant, layered
+  // on top of the engine's own score. No religiosity stated → order untouched.
+  List<ScoredProperty> _rankByLifestyle(List<ScoredProperty> input) {
+    final relName = _persona['religiosity'];
+    if (relName == null) return input;
+    final rel = Religiosity.values.firstWhere((r) => r.name == relName,
+        orElse: () => Religiosity.traditional);
+    final scored = [
+      for (final r in input)
+        (r, r.score + 0.18 * _religiosityBoost(rel, r.property)),
+    ];
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    return [for (final e in scored) e.$1];
+  }
+
+  double _religiosityBoost(Religiosity rel, RentalProperty p) {
+    final area = LifestyleKnowledge.areaCharacter(
+        neighborhood: p.neighborhood, city: p.city);
+    if (area == null) return 0; // unknown area → neutral
+    return LifestyleKnowledge.religiosityFit(rel, area);
+  }
+
+  String? _lifestyleNote() {
+    final relName = _persona['religiosity'];
+    final rel = relName == null
+        ? null
+        : Religiosity.values.firstWhere((r) => r.name == relName,
+            orElse: () => Religiosity.traditional);
+    final parts = <String>[];
+    if (rel != null) {
+      const label = {
+        'secular': 'חילוני',
+        'traditional': 'מסורתי',
+        'religious': 'דתי',
+        'haredi': 'חרדי',
+      };
+      parts.add('נתתי עדיפות לאזורים שמתאימים לאורח חיים ${label[rel.name]}');
+    }
+    if (_needsElevator) {
+      parts.add('ודילגתי על קומות גבוהות בלי מעלית 🛗');
+    }
+    if (parts.isEmpty) return null;
+    return 'שמתי לב לכמה דברים: ${parts.join(', ')}.';
+  }
+
+  // The single most useful missing detail, as a question + quick-reply chips.
+  (String, List<String>)? _clarifyingPrompt() {
+    if (_query.city == null) {
+      return ('באיזה אזור או עיר לחפש?', const [
+        'תל אביב',
+        'ירושלים',
+        'חיפה',
+        'מרכז',
+      ]);
+    }
+    if (_query.maxPrice == null) {
+      return ('מה התקציב החודשי שלך?', const [
+        'עד ₪5,000',
+        'עד ₪7,000',
+        'עד ₪9,000',
+      ]);
+    }
+    if (_query.minRooms == null && _query.maxRooms == null) {
+      return ('כמה חדרים אתם צריכים?', const ['2 חדרים', '3 חדרים', '4 חדרים']);
+    }
+    return null;
+  }
+
   // ── persona capture (consent-gated) ───────────────────────────────────────
 
   void _maybeCapturePersona(int resultCount) {
+    // Accumulate into the durable per-user persona (local-first; the dataset
+    // snapshot is exported only with consent). Amenities are a heuristic parse
+    // → inferred; the rest the user stated → declared (higher confidence).
+    final provider = context.read<DatingProvider>();
+    if (_query.amenities.isNotEmpty) {
+      provider.observePersona(
+          {'amenities': _query.amenities.toList()}, PersonaSource.inferred);
+    }
+    provider.observePersona(
+      {
+        if (_persona['religiosity'] != null)
+          'religiosity': _persona['religiosity'],
+        if (_persona['baby'] == 'true') 'baby': true,
+        if (_query.city != null) 'city': _query.city,
+        if (_query.maxPrice != null) 'maxBudget': _query.maxPrice,
+        if (_query.minRooms != null) 'minRooms': _query.minRooms,
+      },
+      PersonaSource.declared,
+      export: _consent == true,
+    );
+
     final persona = <String, dynamic>{
       'source': 'ai_chat',
       'criteria': {
@@ -659,6 +1198,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             .log(UserEventType.searchPerformed, metadata: _pendingPersona);
         _pendingPersona = null;
       }
+      // Flush the persona we'd already accumulated (locally) before consent.
+      if (mounted) context.read<DatingProvider>().exportPersonaSnapshot();
     }
     _scrollToEnd();
   }
@@ -690,11 +1231,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryLight],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
                 shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 2),
                 boxShadow: [
                   BoxShadow(
                       color: AppColors.primary.withValues(alpha: 0.35),
@@ -702,8 +1240,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                       offset: const Offset(0, 4))
                 ],
               ),
-              child:
-                  Icon(IconsaxPlusBold.magicpen, color: Colors.white, size: 20),
+              clipBehavior: Clip.antiAlias,
+              child: Image.asset('assets/images/eti.jpg', fit: BoxFit.cover),
             ),
             const SizedBox(width: 10),
             Column(
@@ -808,6 +1346,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           if (m.scored.isNotEmpty) _resultList(m),
           if (m.chips.isNotEmpty) _chipsRow(m.chips),
           if (m.isConsent) _consentButtons(),
+          if (m.locationRequest) _locationButtons(),
         ],
       ),
     );
@@ -840,6 +1379,45 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 ))
             .toList(),
       ),
+    );
+  }
+
+  // אתי's GPS request → the user approves here; only then does the app capture.
+  Widget _locationButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        ElevatedButton.icon(
+          onPressed: _busy ? null : _shareLocationNow,
+          icon: const Icon(Icons.my_location, size: 18),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.textOnPrimary,
+            elevation: 0,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          label: const Text('שתף את המיקום שלי'),
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton(
+          onPressed: _busy
+              ? null
+              : () => setState(() {
+                    _messages.removeWhere((m) => m.locationRequest);
+                    _messages.add(_ChatMsg(
+                        role: 'assistant',
+                        text: 'אין בעיה — באיזו עיר או אזור לחפש?'));
+                  }),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+            side: BorderSide(color: AppColors.borderLight),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('אגיד עיר'),
+        ),
+      ]),
     );
   }
 
@@ -1291,228 +1869,6 @@ class _TypingState extends State<_Typing>
         decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.7),
             shape: BoxShape.circle),
-      ),
-    );
-  }
-}
-
-// ── Voice conversation visualizer ─────────────────────────────────────────────
-// Big, calm, high-contrast full-screen voice mode — designed to be obvious for
-// older users. One large pulsing orb that reacts to the voice; clear status text;
-// tap the orb to talk, אתי listens, thinks, then answers out loud.
-enum _VoiceState { idle, listening, thinking, speaking }
-
-class _VoiceVisualizer extends StatefulWidget {
-  const _VoiceVisualizer({required this.service, required this.onUtterance});
-  final AssistantService service;
-  final Future<String> Function(String transcript) onUtterance;
-
-  @override
-  State<_VoiceVisualizer> createState() => _VoiceVisualizerState();
-}
-
-class _VoiceVisualizerState extends State<_VoiceVisualizer>
-    with SingleTickerProviderStateMixin {
-  _VoiceState _state = _VoiceState.idle;
-  String _transcript = '';
-  String _reply = 'שלום! אני אתי 👋\nלחצו על העיגול ופשוט דברו איתי.';
-  double _level = 0; // 0..1 smoothed mic level
-  late final AnimationController _pulse =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))
-        ..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    widget.service.stopListening();
-    widget.service.stopSpeaking();
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onOrbTap() async {
-    if (_state == _VoiceState.listening) {
-      await widget.service.stopListening();
-      return;
-    }
-    if (_state == _VoiceState.thinking || _state == _VoiceState.speaking) return;
-    await _startListening();
-  }
-
-  Future<void> _startListening() async {
-    setState(() {
-      _state = _VoiceState.listening;
-      _transcript = '';
-    });
-    try {
-      await widget.service.startListening(
-        onResult: (text, isFinal) {
-          if (!mounted) return;
-          setState(() => _transcript = text);
-          if (isFinal) _handleUtterance(text);
-        },
-        onSoundLevelChange: (lvl) {
-          if (!mounted) return;
-          // speech_to_text level is roughly -2..10; normalise to 0..1.
-          final n = ((lvl + 2) / 12).clamp(0.0, 1.0);
-          setState(() => _level = _level * 0.6 + n * 0.4);
-        },
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _state = _VoiceState.idle;
-        _reply = 'לא הצלחתי להפעיל את המיקרופון. בדקו שאישרתם הרשאה.';
-      });
-    }
-  }
-
-  Future<void> _handleUtterance(String text) async {
-    await widget.service.stopListening();
-    if (text.trim().isEmpty) {
-      if (mounted) setState(() => _state = _VoiceState.idle);
-      return;
-    }
-    setState(() {
-      _state = _VoiceState.thinking;
-      _level = 0;
-    });
-    final reply = await widget.onUtterance(text);
-    if (!mounted) return;
-    setState(() {
-      _reply = reply;
-      _state = _VoiceState.speaking;
-    });
-    try {
-      await widget.service.speak(reply);
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() => _state = _VoiceState.idle);
-  }
-
-  ({String label, Color color}) get _statusInfo {
-    switch (_state) {
-      case _VoiceState.listening:
-        return (label: 'מקשיבה לך...', color: AppColors.primary);
-      case _VoiceState.thinking:
-        return (label: 'רגע, חושבת...', color: AppColors.warning);
-      case _VoiceState.speaking:
-        return (label: 'אתי מדברת', color: AppColors.success);
-      case _VoiceState.idle:
-        return (label: 'לחצו על העיגול כדי לדבר', color: AppColors.textSecondary);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final info = _statusInfo;
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0B2138), // calm deep navy
-        body: SafeArea(
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              // status
-              Text(info.label,
-                  style: TextStyle(
-                      color: info.color,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 36),
-              // the orb
-              GestureDetector(
-                onTap: _onOrbTap,
-                child: AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (_, __) {
-                    final base = _state == _VoiceState.listening
-                        ? 0.5 + _level * 0.9
-                        : (_state == _VoiceState.speaking ? 0.55 : 0.35);
-                    final scale = 1.0 + base * (0.10 + 0.10 * _pulse.value);
-                    final ring = 150.0 * scale;
-                    return SizedBox(
-                      width: 300,
-                      height: 300,
-                      child: Center(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: ring + 70,
-                              height: ring + 70,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: info.color.withValues(alpha: 0.10),
-                              ),
-                            ),
-                            Container(
-                              width: ring,
-                              height: ring,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    info.color,
-                                    info.color.withValues(alpha: 0.6)
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                      color: info.color.withValues(alpha: 0.45),
-                                      blurRadius: 40,
-                                      spreadRadius: 6),
-                                ],
-                              ),
-                              child: Icon(
-                                _state == _VoiceState.speaking
-                                    ? Icons.volume_up_rounded
-                                    : Icons.mic_rounded,
-                                color: Colors.white,
-                                size: 64,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 40),
-              // transcript / reply
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Text(
-                  _state == _VoiceState.listening && _transcript.isNotEmpty
-                      ? _transcript
-                      : _reply,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white, fontSize: 19, height: 1.5),
-                ),
-              ),
-              const Spacer(),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Text('סגרו כדי לחזור לצ׳אט ולראות את הדירות',
-                    style: TextStyle(color: Colors.white54, fontSize: 13)),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

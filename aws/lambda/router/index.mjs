@@ -81,6 +81,19 @@ const LUMA_BASE = 'https://agents.lumalabs.ai/v1';
 // every request and nothing about the user is stored server-side.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+// OpenAI Realtime — powers אתי's live voice conversation. The key stays here; the
+// client only ever gets a short-lived ephemeral token (see createRealtimeSession).
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_REALTIME_MODEL =
+  process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-mini';
+// 'marin' — one of the two newest realtime voices, deliberately NOT alloy/echo/
+// verse (the voices ChatGPT users instantly recognize). Warm, female-leaning.
+const OPENAI_REALTIME_VOICE = process.env.OPENAI_REALTIME_VOICE || 'marin';
+// Text chat model for אתי (tenant search). Runs on OpenAI so the warm reply is
+// isolated from the shared Gemini free-tier quota. Falls back to Gemini when the
+// OpenAI account is unfunded/over-quota (see handleTenantSearchChat).
+const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-5.4-mini';
 // Fallback chain — a free-tier model is frequently overloaded (429/503). If the
 // primary is busy we try the next one so the assistant keeps answering instead
 // of telling the user "the server is busy".
@@ -150,6 +163,10 @@ const TABLES = {
   property_views:  { name: `${TABLE_PREFIX}property-views`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
   property_likes:  { name: `${TABLE_PREFIX}property-likes`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
   app_state:       { name: `${TABLE_PREFIX}app-state`,       gsi: null },
+  // Per-user accumulated persona (pk: id == uid). One row per user, upserted by
+  // the client with confidence-scored facts for personalisation + targeting.
+  // Owner-scoped: a caller may only read/write their own row (see below).
+  persona:         { name: `${TABLE_PREFIX}persona`,         gsi: null },
 };
 
 // One row per user (pk: userId) holding the set of their FCM device tokens, so
@@ -780,7 +797,7 @@ function keysFor(tags, map) {
 //
 // Only fields verified to exist in the data model are stamped, to avoid breaking
 // GSI filters: properties.ownerUserId, messages.senderId, users.id (== uid).
-const OWNED_TABLES = new Set(['properties', 'messages', 'users']);
+const OWNED_TABLES = new Set(['properties', 'messages', 'users', 'persona']);
 
 function callerUidOf(event) {
   return event.requestContext?.authorizer?.uid || null;
@@ -996,6 +1013,12 @@ export const handler = async (event) => {
       // POST /assistant/live-token → ephemeral token for the real-time Live voice
       // session (the API key never leaves the backend).
       if (segments[1] === 'live-token') return await handleAssistantLiveToken(event);
+      // POST /assistant/realtime/session → ephemeral OpenAI Realtime session for
+      // אתי's live GPT voice. The OpenAI key stays server-side; the client gets a
+      // short-lived client_secret only.
+      if (segments[1] === 'realtime' && segments[2] === 'session') {
+        return await createRealtimeSession(event);
+      }
       // POST /assistant/extract → the ONLY model call in the cost-optimised
       // listing flow: pull structured property fields out of a free-text
       // description + report which required fields are still missing.
@@ -1036,6 +1059,13 @@ export const handler = async (event) => {
 
     switch (method) {
       case 'GET':
+        // Persona is private: a user may only read THEIR OWN row, never list.
+        if (tableKey === 'persona') {
+          if (!callerUid || id !== callerUid) {
+            return json(id ? 403 : 401, { message: 'Forbidden' });
+          }
+          return await getOne(table, id);
+        }
         // Public aggregate counts (no row data leaked) — how many likes/views a
         // listing has. Enabled only for the analytics tables.
         if (id === 'count') {
@@ -1082,7 +1112,7 @@ export const handler = async (event) => {
         }
       case 'POST': {
         stampOwner(tableKey, body, callerUid);
-        const writeId = tableKey === 'users'
+        const writeId = (tableKey === 'users' || tableKey === 'persona')
           ? callerUid
           : (body.id || body.propertyId || body.userId);
 
@@ -1124,9 +1154,15 @@ export const handler = async (event) => {
       }
       case 'PUT': {
         stampOwner(tableKey, body, callerUid);
-        // For the users table the row id IS the uid — never let a caller PUT to
+        // For users & persona the row id IS the uid — never let a caller PUT to
         // another user's id.
-        const writeId = tableKey === 'users' ? callerUid : id;
+        const writeId =
+          (tableKey === 'users' || tableKey === 'persona') ? callerUid : id;
+        // Persona writes are version-guarded so a slow/out-of-order request can
+        // never clobber a newer persona already stored.
+        if (tableKey === 'persona') {
+          return await putPersonaVersioned(table, writeId, body);
+        }
         return await putItem(table, writeId, body);
       }
       case 'DELETE':
@@ -1540,6 +1576,32 @@ async function putItem(table, id, body) {
   return json(200, item);
 }
 
+// Persona upsert with a monotonic-version guard: the write is applied only when
+// there's no existing row OR the incoming version is >= the stored one. This
+// makes out-of-order / retried writes safe — a stale snapshot can never
+// overwrite a fresher persona (matches the client's version-based restore).
+async function putPersonaVersioned(table, id, body) {
+  if (!id) return json(400, { message: 'Missing id' });
+  const incoming = Number(body.version) || 0;
+  const item = { ...body, id, version: incoming };
+  try {
+    await ddb.send(new PutCommand({
+      TableName: table.name,
+      Item: item,
+      ConditionExpression: 'attribute_not_exists(id) OR #v <= :v',
+      ExpressionAttributeNames: { '#v': 'version' },
+      ExpressionAttributeValues: { ':v': incoming },
+    }));
+    return json(200, item);
+  } catch (e) {
+    if (e && e.name === 'ConditionalCheckFailedException') {
+      // A newer persona is already stored — ignore this stale write, don't error.
+      return json(200, { ignored: true, reason: 'stale_version' });
+    }
+    throw e;
+  }
+}
+
 // DynamoDB GSI key attributes are strongly typed: a row whose GSI-key attribute
 // has the wrong type is rejected (ValidationException: "Type mismatch for Index
 // Key …"). The app writes some GSI keys with a JS type that doesn't match the
@@ -1564,7 +1626,7 @@ async function deleteItem(table, tableKey, id, callerUid) {
   //  • users      — the row id IS the uid, so id must equal the caller.
   //  • properties — fetch the row and compare its ownerUserId.
   // Other tables have no verified owner field; they remain authenticated-only.
-  if (tableKey === 'users') {
+  if (tableKey === 'users' || tableKey === 'persona') {
     if (id !== callerUid) return json(403, { message: 'Forbidden' });
   } else if (tableKey === 'properties') {
     const existing = await ddb.send(
@@ -3764,7 +3826,8 @@ function buildErikSystemPrompt(profile, properties) {
     : '';
 
   return [
-    'אתה "אריק" — אדם אמיתי, חם ונחמד, שעוזר לבעלי דירות לפרסם דירה להשכרה באפליקציית Rently. אתה לא בוט ולא תוכנה — אתה פשוט אריק.',
+    'אתה "אריק" — אדם אמיתי, שעוזר לבעלי דירות לפרסם דירה באפליקציית Rently (להשכרה או למכירה). אתה לא בוט ולא תוכנה — אתה פשוט אריק.',
+    'התנהל כמו סוכן נדל"ן מקצועי ורציני — אמין, בטוח בעצמו, מכובד ומדויק, שמנהל שיחה חיה וזורמת ומוביל אותה ביעילות עד לפרסום. מקצועיות ורצינות קודם כול, אך עדיין חם, סבלני ונגיש.',
     'חוק ברזל בסגנון: כתוב עברית טבעית ואנושית לחלוטין, כמו בן אדם שמדבר בטלפון בנעימות. אסור להשתמש בכוכביות (* או **), בסימני עיצוב markdown, בכותרות, ברשימות עם מקפים או נקודות, או באימוג׳ים. לעולם אל תזכיר שאתה בינה מלאכותית, מודל, עוזר ממוחשב או תוכנה. רק טקסט רגיל, חם ואישי.',
     'הקהל שלך הוא בעלי דירות מבוגרים (גיל 65 ומעלה) שאינם בקיאים בטכנולוגיה. דבר עברית פשוטה, ברורה ונעימה, במשפטים קצרים. בלי מילים באנגלית ובלי ז׳רגון.',
     name ? `שם המשתמש הוא ${name}. אפשר לפנות אליו בשמו מדי פעם, בנימוס.` : '',
@@ -4296,9 +4359,6 @@ async function handleContractImprove(event) {
 async function handleAssistant(event) {
   const uid = callerUidOf(event);
   if (!uid) return json(401, { message: 'Authentication required.' });
-  if (!GEMINI_API_KEY) {
-    return json(200, { reply: 'העוזר האישי אינו זמין כרגע. אנא נסו שוב מאוחר יותר.', propertyDraft: null });
-  }
 
   let body = {};
   try { body = event.body ? JSON.parse(event.body) : {}; }
@@ -4307,9 +4367,8 @@ async function handleAssistant(event) {
   const messages = Array.isArray(body.messages) ? body.messages.slice(-20) : [];
   if (messages.length === 0) return json(400, { message: 'messages required' });
 
-  // נועה — the tenant apartment-search assistant. Separate warm persona, no
-  // owner-property load and no listing-creation tool. Additive: the landlord
-  // "Erik" flow below is untouched.
+  // אתי — the tenant apartment-search assistant, runs on OpenAI (GPT). No Gemini
+  // dependency, so she stays up even if the Gemini key is missing/over-quota.
   if (body.mode === 'tenant_search') {
     return await handleTenantSearchChat(messages, uid);
   }
@@ -4319,15 +4378,23 @@ async function handleAssistant(event) {
     loadUserProfile(uid),
   ]);
   const systemText = buildErikSystemPrompt(profile, properties) + '\n' + GROUNDING_RULE;
-  const contents = messages
-    .filter((m) => m && typeof m.text === 'string' && m.text.trim())
-    .map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: String(m.text).slice(0, 2000) }],
-    }));
 
   try {
-    const result = await runAssistantToolLoop(systemText, contents, assistantToolsFull(), uid);
+    // Primary: OpenAI function-calling → Erik is LIVE + professional off the
+    // dropped Gemini. Fallback: the Gemini tool loop if a Gemini key is set.
+    let result = await openaiToolLoop(systemText, messages, uid);
+    if (!result) {
+      if (!GEMINI_API_KEY) {
+        return json(200, { reply: 'העוזר האישי אינו זמין כרגע. אנא נסו שוב מאוחר יותר.', propertyDraft: null });
+      }
+      const contents = messages
+        .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+        .map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: String(m.text).slice(0, 2000) }],
+        }));
+      result = await runAssistantToolLoop(systemText, contents, assistantToolsFull(), uid);
+    }
     let reply = stripMarkup(result.reply);
     let suggestions = [];
     const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
@@ -4445,23 +4512,170 @@ async function runAssistantToolLoop(systemText, contents, tools, uid = null) {
   }
 }
 
+// Erik's tool loop on OpenAI function-calling — so his conversation is LIVE and
+// professional off the (dropped) Gemini quota. Mirrors runAssistantToolLoop:
+// search_listings / update_user_profile feed back, create_property is terminal.
+// Returns { reply, propertyDraft, listings } or null so the caller can fall back.
+async function openaiToolLoop(systemText, messages, uid = null) {
+  if (!OPENAI_API_KEY) return null;
+  const tools = assistantToolsFull().functionDeclarations.map((d) => ({
+    type: 'function',
+    function: { name: d.name, description: d.description, parameters: d.parameters },
+  }));
+  const convo = [
+    { role: 'system', content: systemText },
+    ...messages
+      .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: String(m.text).slice(0, 2000),
+      })),
+  ];
+  let propertyDraft = null;
+  let listings = [];
+  const call = async (body) => {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({ model: OPENAI_CHAT_MODEL, ...body }),
+    });
+    if (!res.ok) { console.warn('erik openai', res.status); return null; }
+    return res.json();
+  };
+
+  for (let hop = 0; hop < MAX_TOOL_HOPS; hop++) {
+    const data = await call({ messages: convo, tools, tool_choice: 'auto', max_completion_tokens: 500 });
+    if (!data) return null;
+    const msg = data.choices?.[0]?.message;
+    if (!msg) return null;
+    const calls = msg.tool_calls || [];
+    if (calls.length === 0) {
+      return { reply: (msg.content || '').trim(), propertyDraft, listings };
+    }
+    const createCall = calls.find((c) => c.function?.name === 'create_property');
+    if (createCall) {
+      try { propertyDraft = JSON.parse(createCall.function.arguments || '{}'); }
+      catch { propertyDraft = {}; }
+      return { reply: (msg.content || '').trim(), propertyDraft, listings };
+    }
+    convo.push(msg); // assistant message carrying the tool_calls
+    for (const c of calls) {
+      let args = {};
+      try { args = JSON.parse(c.function.arguments || '{}'); } catch {}
+      let result = {};
+      if (c.function?.name === 'update_user_profile') {
+        result = { saved: await saveUserProfileField(uid, args.field, args.value, args.confidence, args.source) };
+      } else if (c.function?.name === 'search_listings') {
+        listings = await runSearchListings(args);
+        result = { results: listings, count: listings.length };
+      }
+      convo.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(result) });
+    }
+  }
+  // hop cap → one final no-tools pass to summarise.
+  const data = await call({ messages: convo, max_completion_tokens: 400 });
+  return { reply: (data?.choices?.[0]?.message?.content || '').trim(), propertyDraft, listings };
+}
+
 // ── נועה — tenant apartment-search chat (warm, separate from Erik) ────────────
 // Conversational layer only: helps a renter describe what they want; the app
 // runs the actual catalogue search and shows result cards. No listing tool.
-async function handleTenantSearchChat(messages, uid = null) {
-  const systemText = buildTenantSearchSystemPrompt() + '\n' + GROUNDING_RULE;
-  const contents = messages
+// OpenAI chat-completion for אתי's warm reply. Plain text, NO tools. Returns the
+// reply string, or null on any failure (unfunded/over-quota/network) so the caller
+// can fall back to Gemini. Isolated from the shared Gemini quota by design.
+async function openaiChat(systemText, messages) {
+  if (!OPENAI_API_KEY) return null;
+  const chat = messages
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
     .map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: String(m.text).slice(0, 2000) }],
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: String(m.text).slice(0, 2000),
     }));
-  // Search + profile-write tool surface (no create_property for tenants). Sharing
-  // update_user_profile with Erik is what connects the touchpoints to one store.
-  const tools = { functionDeclarations: [SEARCH_LISTINGS_TOOL, UPDATE_USER_PROFILE_TOOL] };
   try {
-    const result = await runAssistantToolLoop(systemText, contents, tools, uid);
-    let reply = stripMarkup(result.reply);
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_CHAT_MODEL,
+        messages: [{ role: 'system', content: systemText }, ...chat],
+        // gpt-5.x chat models: max_completion_tokens (not max_tokens) and only
+        // the default temperature — sending the old params returns HTTP 400.
+        max_completion_tokens: 400,
+      }),
+    });
+    if (!res.ok) { console.warn('openai chat', res.status); return null; }
+    const data = await res.json();
+    return (data?.choices?.[0]?.message?.content || '').trim() || null;
+  } catch (e) {
+    console.warn('openai chat', e.message);
+    return null;
+  }
+}
+
+// אתי's warm reply. NO server tool loop: the CLIENT renders listings from its own
+// on-device search, so the server only needs to write the warm conversational
+// text. Primary = OpenAI (off the Gemini quota); fallback = a SINGLE tool-less
+// Gemini call (vs the old MAX_TOOL_HOPS×models fan-out that saturated the quota).
+// Tenant-specific grounding — the app does the search, so אתי must NOT call any
+// tool (the shared GROUNDING_RULE tells the model to call search_listings, which
+// the tenant chat has no tools for → it leaks fake tool-call JSON + spam tokens).
+const TENANT_GROUNDING =
+  'אל תמציאי דירות, כתובות, מחירים או פרטים ספציפיים — האפליקציה עצמה מציגה למשתמש '
+  + 'את הדירות האמיתיות שמתאימות. לעולם אל תכתבי JSON, קוד, שמות פונקציות, קריאות '
+  + 'לכלים (כמו search_listings) או טקסט בשפה זרה — אך ורק עברית טבעית, חמה וקצרה.';
+
+// Detect the language of the user's last message so we can HARD-force the reply
+// language — a Hebrew-heavy system prompt otherwise drags every answer to Hebrew.
+function detectLang(text) {
+  const t = String(text || '');
+  if (/[؀-ۿ]/.test(t)) return 'Arabic (العربية)';
+  if (/[Ѐ-ӿ]/.test(t)) return 'Russian (Русский)';
+  if (/[֐-׿]/.test(t)) return 'Hebrew (עברית)';
+  if (/[a-zA-Z]/.test(t)) {
+    return /\b(je|une?|les?|des|du|bonjour|cherche|pièces?|proche|appartement|quartier|budget)\b/i.test(t)
+      ? 'French (Français)' : 'English';
+  }
+  return 'Hebrew (עברית)';
+}
+
+async function handleTenantSearchChat(messages, uid = null) {
+  const lastUser = [...messages].reverse()
+    .find((m) => m && m.role !== 'assistant' && m.text)?.text || '';
+  const lang = detectLang(lastUser);
+  const langDirective =
+    `\nCRITICAL LANGUAGE RULE: the user is writing in ${lang}. You MUST write your ENTIRE reply ONLY in ${lang}, with the same warmth — never switch to another language.`;
+  const systemText =
+    buildTenantSearchSystemPrompt() + '\n' + TENANT_GROUNDING + langDirective;
+  try {
+    let raw = await openaiChat(systemText, messages);
+    if (!raw) {
+      const contents = messages
+        .filter((m) => m && typeof m.text === 'string' && m.text.trim())
+        .map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: String(m.text).slice(0, 2000) }],
+        }));
+      const data = await geminiGenerate(systemText, contents);
+      raw = ((data?.candidates?.[0]?.content?.parts) || [])
+        .map((p) => p.text || '').join('');
+    }
+    let reply = stripMarkup(raw || '');
+    // Safety net: scrub any leaked tool-call / JSON / foreign-spam artifacts that
+    // slipped through (belt-and-suspenders with TENANT_GROUNDING above).
+    reply = reply
+      .replace(/\{[^{}]*\}/g, ' ')                        // JSON blobs
+      .replace(/\b(to=)?search_listings\b[^\n]*/gi, ' ')  // tool-call text
+      .replace(/[一-鿿]+/g, ' ')                  // CJK spam tokens
+      .replace(/\buserdata\b/gi, ' ')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
     let suggestions = [];
     const cm = /\[\[\s*CHOICES?\s*:\s*([^\]]+)\]\]/i.exec(reply);
     if (cm) {
@@ -4469,9 +4683,7 @@ async function handleTenantSearchChat(messages, uid = null) {
       reply = reply.replace(cm[0], '').trim();
     }
     if (!reply) reply = 'ספר לי עוד קצת על מה שאתה מחפש, ואני כבר אדאג לדייק 🙂';
-    return json(200, {
-      reply, suggestions, propertyDraft: null, listings: result.listings,
-    });
+    return json(200, { reply, suggestions, propertyDraft: null, listings: [] });
   } catch (e) {
     console.warn('tenant assistant error:', e.message);
     return json(200, {
@@ -4484,10 +4696,15 @@ async function handleTenantSearchChat(messages, uid = null) {
 
 function buildTenantSearchSystemPrompt() {
   return [
-    'את "אתי" — בן אדם אמיתי, חמה ונחמדה, שעוזרת לאנשים למצוא דירה להשכרה באפליקציית Rently. את לא בוט ולא תוכנה — את פשוט אתי. לעולם אל תזכירי שאת בינה מלאכותית, מודל או תוכנה.',
-    'סגנון: עברית טבעית, חמה ומשוחררת, כמו חברה שמבינה עניין. משפטים קצרים (שורה־שתיים), בלי רובוטיות, בלי ז׳רגון, בלי כוכביות או markdown. מותר אימוג׳י אחד פה ושם, בטעם.',
+    'את "אתי" — בן אדם אמיתי, חמה ונחמדה, שעוזרת לאנשים למצוא דירה באפליקציית Rently — גם להשכרה וגם לקנייה. את לא בוט ולא תוכנה — את פשוט אתי. לעולם אל תזכירי שאת בינה מלאכותית, מודל או תוכנה.',
+    'שפה: עני תמיד באותה שפה שבה האדם כתב אלייך — כתב בעברית עני בעברית, בערבית עני בערבית, באנגלית באנגלית, בצרפתית בצרפתית, ברוסית ברוסית. שמרי על אותה חמימות וטבעיות בכל שפה.',
+    'Rently תומכת גם בשכירות וגם במכירה, אז לעולם אל תגידי שאנחנו "רק שכירות". אם מישהו מחפש לקנות או להשקיע — עזרי לו: בררי בעדינות אם זו שכירות או קנייה, תקציב, אזור, ולמשקיע גם מה חשוב לו בתשואה.',
+    'סגנון: שפה טבעית, חמה ומשוחררת, כמו חבר/ה שמבינ/ה עניין. משפטים קצרים (שורה־שתיים), בלי רובוטיות, בלי ז׳רגון, בלי כוכביות או markdown. מותר אימוג׳י אחד פה ושם, בטעם.',
     'המטרה: להבין מה האדם באמת מחפש ולגרום לו להרגיש שמקשיבים לו. תני לו לספר על עצמו במילים שלו — אזור, תקציב, כמה חדרים, אורח חיים, חיות מחמד, קרבה לעבודה או לתחבורה, ומה חשוב לו.',
-    'אל תרוצי ישר להציע — קודם שקפי בחום מה הבנת, ושאלי שאלה אחת קצרה ועדינה כדי להכיר אותו יותר (לא חקירה, שאלה אחת בכל פעם). כשכבר יש מספיק מידע (אזור או תקציב או חדרים, או בקשה ברורה) — אמרי בחום שאת בודקת מה הכי מתאים, כי האפליקציה תציג לו את הדירות. אל תמציאי דירות, כתובות או מחירים ספציפיים בעצמך.',
+    'את חכמה ומנוסה — יודעת לזהות מיהו האדם שמולך ולהסיק את הצרכים הסמויים שלו, גם כשלא אמר הכול: משפחות (ממ"ד, שקט, קרבה לגנים/בתי ספר), סטודנטים (זול, שותפים, קרוב לאוניברסיטה ולתחבורה), עולים חדשים ודוברי אנגלית (הקלי, עני גם באנגלית פשוטה אם צריך, הכווני לאזורים ידידותיים), דתיים/חרדים (קרבה לבית כנסת ולמוסדות המתאימים לזרם שלהם), מבוגרים ובעלי צרכי נגישות (מעלית, קומה נמוכה, נגישות, קרבה לשירותי בריאות), זוגות ורווקים (שקט מול תוסס), עובדים מהבית (חדר עבודה, שקט, אינטרנט), בעלי חיות מחמד, ומשקיעים (תשואה, אזורים מבוקשים). התאימי את השאלה והטון לפרסונה.',
+    'אל תרוצי ישר להציע — קודם שקפי בחום מה הבנת, ושאלי שאלה אחת קצרה ועדינה וחכמה (הכי חשובה לפרסונה הזו) כדי להכיר אותו יותר (שאלה אחת בכל פעם). כשכבר יש מספיק מידע (אזור או תקציב או חדרים, או בקשה ברורה) — אמרי בחום שאת בודקת מה הכי מתאים, כי האפליקציה תציג לו את הדירות. אל תמציאי דירות, כתובות או מחירים ספציפיים בעצמך.',
+    'מיקום: אם האדם מדבר על "האזור שלי" / "פה" / "כאן" / "קרוב אליי" — האפליקציה מזהה אוטומטית את המיקום שלו דרך ה-GPS, אז אל תשאלי אותו באיזו עיר; פשוט אמרי בחום שאת מאתרת אותו ומחפשת באזור שלו.',
+    'תמיד כווני להביא לו דירות אמיתיות ולא להיתקע: אם חסר רק פרט קריטי אחד (בדרך כלל אזור או תקציב) בקשי אותו בעדינות, אחרת אמרי שאת מחפשת ומראה לו התאמות. אם משהו מצומצם מדי, הציעי להרחיב אזור/תקציב במקום לומר "אין".',
     'הקלט עלול להיות מסורבל או לא ברור — פרשי בהיגיון, וכשמשהו לא ברור שאלי בעדינות.',
     'כפתורי בחירה: כשיש שאלה עם כמה תשובות נפוצות קצרות (תקציב, מספר חדרים, אווירת שכונה, כן/לא) — הוסיפי בסוף שורה נפרדת בדיוק בפורמט: [[CHOICES: אפשרות1 | אפשרות2 | אפשרות3]] (2 עד 5 אפשרויות קצרות מאוד). תמיד כתבי גם את השאלה במילים. אל תוסיפי שורה כזו כשאין תשובות נפוצות.',
     'תשובות קצרות מאוד, חמות ולעניין. בלי הבטחות שאי אפשר לקיים.',
@@ -4499,6 +4716,100 @@ function buildTenantSearchSystemPrompt() {
 // tool, so the client connects straight to the Live WebSocket without ever
 // seeing the API key and can't repurpose the session. Single use, valid 30 min,
 // must connect within 1 min. Stateless — nothing about the user is stored.
+// Ephemeral OpenAI Realtime session for אתי's live GPT voice. The client connects
+// to wss://api.openai.com/v1/realtime with the returned client_secret — the raw
+// OpenAI key never leaves this Lambda. The session defines a female voice, the
+// Hebrew real-estate-agent persona, and a `search_listings` tool the CLIENT runs
+// (so the live conversation can surface real listings inline).
+async function createRealtimeSession(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!OPENAI_API_KEY) {
+    return json(503, { message: 'Live voice assistant not configured.' });
+  }
+
+  const instructions = [
+    'את "אתי", סוכנת נדל״ן ישראלית — חמה, אנושית, נעימה מאוד ומקצועית מאוד.',
+    'דברי עברית טבעית וזורמת, במשפטים קצרים כמו בשיחת טלפון אמיתית.',
+    'המטרה: תוך 3–4 שאלות ממוקדות להבין מה השוכר צריך — עיר/אזור, תקציב, מספר חדרים, ואורח חיים (משפחה/סטודנט/זוג, דתי/חילוני/מסורתי, חיות מחמד, חניה, מעלית).',
+    'שאלה אחת בכל פעם — הקשיבי, חדדי, ואל תציפי בשאלות.',
+    'ברגע שיש מספיק פרטים קראי לפונקציה search_listings כדי להציג דירות אמיתיות, ואז הציגי אותן בקצרה בקול.',
+    'אם המשתמש אומר "פה"/"כאן" בלי לציין עיר — בקשי אישור לאתר את המיקום שלו.',
+    'היי אמינה: אל תמציאי דירות — הציגי רק מה שחוזר מ-search_listings.',
+  ].join(' ');
+
+  const search_listings = {
+    type: 'function',
+    name: 'search_listings',
+    description:
+      'Search real apartment listings for the tenant once enough criteria are known. The client app runs the search against its catalogue and shows the result cards inline.',
+    parameters: {
+      type: 'object',
+      properties: {
+        city: { type: 'string', description: 'City or area (Hebrew)' },
+        minRooms: { type: 'number' },
+        maxRooms: { type: 'number' },
+        maxPrice: { type: 'number', description: 'Max monthly rent in ILS' },
+        amenities: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'e.g. elevator, parking, balcony, mamad',
+        },
+        lifestyle: {
+          type: 'string',
+          description:
+            'religious | secular | traditional | haredi | family | student | couple',
+        },
+      },
+    },
+  };
+
+  // New Realtime GA API (POST /v1/realtime/client_secrets): the session config is
+  // nested under `session`, audio/voice moved under `audio.output.voice`, and the
+  // ephemeral token comes back at top-level `value` (ek_...). The old flat
+  // /v1/realtime/sessions endpoint 404s on the current models.
+  const body = {
+    session: {
+      type: 'realtime',
+      model: OPENAI_REALTIME_MODEL,
+      instructions,
+      audio: {
+        input: {
+          transcription: { model: 'whisper-1' },
+          turn_detection: { type: 'server_vad' },
+        },
+        output: { voice: OPENAI_REALTIME_VOICE },
+      },
+      tools: [search_listings],
+      tool_choice: 'auto',
+    },
+  };
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.value) {
+      console.error('OpenAI realtime session error:', res.status, data);
+      return json(502, { message: 'Could not start live voice session.' });
+    }
+    // Shape back-compat for the client: it reads session.client_secret.value.
+    return json(200, {
+      session: { ...(data.session || {}), client_secret: { value: data.value } },
+      wsUrl: `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(OPENAI_REALTIME_MODEL)}`,
+    });
+  } catch (e) {
+    console.error('OpenAI realtime session exception:', e);
+    return json(502, { message: 'Could not start live voice session.' });
+  }
+}
+
 async function handleAssistantLiveToken(event) {
   const uid = callerUidOf(event);
   if (!uid) return json(401, { message: 'Authentication required.' });

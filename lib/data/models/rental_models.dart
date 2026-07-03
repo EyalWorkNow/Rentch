@@ -1317,6 +1317,7 @@ class SearchFilters {
     required this.customAreaPolygon,
     this.city = '',
     this.transactionType = TransactionTypeFilter.any,
+    this.strictMaxBudget = false,
   });
 
   final String query;
@@ -1363,6 +1364,11 @@ class SearchFilters {
   final List<LatLng> customAreaPolygon;
   final String city;
   final TransactionTypeFilter transactionType;
+
+  /// When true, [maxBudget] is a HARD ceiling even in best-match mode (set by an
+  /// explicit typed "עד X" search). Transient — deliberately not persisted, so a
+  /// slider budget keeps the soft near-miss behaviour the deck is built around.
+  final bool strictMaxBudget;
 
   bool get hasQuery => query.trim().isNotEmpty;
   bool get hasCustomArea => splitCustomAreaPolygons(customAreaPolygon)
@@ -1506,6 +1512,7 @@ class SearchFilters {
     List<LatLng>? customAreaPolygon,
     String? city,
     TransactionTypeFilter? transactionType,
+    bool? strictMaxBudget,
   }) {
     return SearchFilters(
       query: query ?? this.query,
@@ -1540,6 +1547,7 @@ class SearchFilters {
       customAreaPolygon: customAreaPolygon ?? this.customAreaPolygon,
       city: city ?? this.city,
       transactionType: transactionType ?? this.transactionType,
+      strictMaxBudget: strictMaxBudget ?? this.strictMaxBudget,
     );
   }
 
@@ -1767,6 +1775,7 @@ class RentalMatch {
     required this.contractSent,
     required this.ownerSigned,
     required this.tenantSigned,
+    this.isRequest = false,
   });
 
   final String id;
@@ -1777,11 +1786,16 @@ class RentalMatch {
   final bool ownerSigned;
   final bool tenantSigned;
 
+  /// A one-sided "request to message" — someone with no mutual like reached out.
+  /// Lives in the "מבקשים לשלוח הודעה" section until accepted/replied to.
+  final bool isRequest;
+
   RentalMatch copyWith({
     List<ChatMessage>? messages,
     bool? contractSent,
     bool? ownerSigned,
     bool? tenantSigned,
+    bool? isRequest,
   }) {
     return RentalMatch(
       id: id,
@@ -1791,6 +1805,7 @@ class RentalMatch {
       contractSent: contractSent ?? this.contractSent,
       ownerSigned: ownerSigned ?? this.ownerSigned,
       tenantSigned: tenantSigned ?? this.tenantSigned,
+      isRequest: isRequest ?? this.isRequest,
     );
   }
 
@@ -1806,6 +1821,7 @@ class RentalMatch {
       contractSent: json['contractSent'] as bool? ?? false,
       ownerSigned: json['ownerSigned'] as bool? ?? false,
       tenantSigned: json['tenantSigned'] as bool? ?? false,
+      isRequest: json['isRequest'] as bool? ?? false,
     );
   }
 
@@ -1818,6 +1834,7 @@ class RentalMatch {
       'contractSent': contractSent,
       'ownerSigned': ownerSigned,
       'tenantSigned': tenantSigned,
+      'isRequest': isRequest,
     };
   }
 }

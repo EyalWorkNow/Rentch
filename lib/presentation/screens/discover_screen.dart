@@ -8,6 +8,7 @@ import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/notification_service.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/saved_search_repository.dart';
@@ -16,6 +17,8 @@ import 'package:dating_app/presentation/features/discover/profile_card.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/screens/saved_properties_screen.dart';
 import 'package:dating_app/presentation/screens/saved_searches_screen.dart';
+import 'package:dating_app/presentation/screens/notifications_screen.dart';
+import 'package:dating_app/data/models/app_notification.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
@@ -50,6 +53,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   final _nlAssistant = AssistantService();
   bool _nlBusy = false;
   String? _nlSummary; // the understood criteria, shown back to the user
+  // The NL search bar is collapsed by default (opens from the top-left search
+  // icon) so it never shrinks the swipe card — the card keeps its full size.
+  bool _searchOpen = false;
 
   @override
   void initState() {
@@ -117,13 +123,21 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   /// current filters (so anything the NL query didn't mention is preserved).
   SearchFilters _filtersFromQuery(SearchFilters base, SearchQuery q) {
     return base.copyWith(
-      query: q.rawText.isEmpty ? null : q.rawText,
+      // Do NOT dump the whole sentence into `query` — the deck hard-requires
+      // searchableText.contains(query), so a full sentence like "3 חדרים בתל
+      // אביב עד 6000" matches nothing and empties the deck. The structured
+      // fields below carry the intent; only a parsed neighbourhood (which IS in
+      // searchableText) is kept as a keyword.
+      query: q.neighborhood ?? '',
       city: q.city,
       minBudget: q.minPrice,
       maxBudget: q.maxPrice,
       minRooms: q.minRooms,
       maxRooms: q.maxRooms,
       transactionType: q.transactionType,
+      // A typed "עד X" is a hard ceiling; a search without a stated budget
+      // clears the flag so the deck's normal near-miss behaviour returns.
+      strictMaxBudget: q.maxPrice != null,
       // NL amenities become preferred (soft) signals so a single missing tag
       // doesn't empty the deck for an older user typing casually.
       preferredFeatures: q.amenities.isEmpty
@@ -135,11 +149,16 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   void _clearNlSearch() {
     final provider = context.read<DatingProvider>();
     _nlController.clear();
-    setState(() => _nlSummary = null);
+    // Clearing also collapses the bar back to the icon so the card is full-size.
+    setState(() {
+      _nlSummary = null;
+      _searchOpen = false;
+    });
     // Reset the NL-driven criteria back to neutral, keeping the rest of the deck.
     unawaited(provider.updateFilters(provider.filters.copyWith(
       query: '',
       city: '',
+      strictMaxBudget: false,
     )));
     FocusManager.instance.primaryFocus?.unfocus();
   }
@@ -451,9 +470,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                           controller:
                                               provider.propertySwiperController,
                                           cardsCount: properties.length,
+                                          // Card returns to its full long size —
+                                          // only the floating header sits above it
+                                          // now (the search bar is an overlay).
                                           padding: const EdgeInsets.fromLTRB(
                                             10,
-                                            128,
+                                            72,
                                             10,
                                             130,
                                           ),
@@ -502,23 +524,28 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                       : const _NoMorePropertiesState(),
                                 ),
 
-                                // Floating centered action buttons row
-                                Positioned(
-                                  bottom: 140,
-                                  left: 0,
-                                  right: 0,
-                                  child: ActionButtons(
-                                    onSwipeLeft: provider.swipePropertyLeft,
-                                    onSwipeRight: provider.swipePropertyRight,
-                                    onVirtualTour: () {
-                                      if (properties.isEmpty) return;
-                                      openPropertyTour(context, properties.first);
-                                    },
+                                // Floating centered action buttons row — only
+                                // while there are cards; otherwise it would sit
+                                // on top of the empty-state and swallow taps on
+                                // its quick-action buttons.
+                                if (properties.isNotEmpty)
+                                  Positioned(
+                                    bottom: 140,
+                                    left: 0,
+                                    right: 0,
+                                    child: ActionButtons(
+                                      onSwipeLeft: provider.swipePropertyLeft,
+                                      onSwipeRight: provider.swipePropertyRight,
+                                      onVirtualTour: () {
+                                        if (properties.isEmpty) return;
+                                        openPropertyTour(
+                                            context, properties.first);
+                                      },
+                                    ),
                                   ),
-                                ),
 
                                 // Floating Undo button independently positioned on the bottom-left corner
-                                if (provider.canUndo)
+                                if (properties.isNotEmpty && provider.canUndo)
                                   Positioned(
                                     bottom: 133,
                                     left: 24,
@@ -585,16 +612,21 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   ],
                 ),
               ),
-              // Hero natural-language search bar — the primary way to search.
+              // Natural-language search — a fully-rounded pill on the right that
+              // animates open/closed over ~1s (the circle elongates into the full
+              // bar). Collapsed by default so the swipe card keeps its full size.
               if (!provider.isLandlord)
                 Positioned(
                   top: MediaQuery.paddingOf(context).top + 58,
                   left: 16,
                   right: 16,
-                  child: _NlSearchBar(
+                  child: _AnimatedNlSearch(
+                    open: _searchOpen,
                     controller: _nlController,
                     busy: _nlBusy,
                     summary: _nlSummary,
+                    onOpen: () => setState(() => _searchOpen = true),
+                    onClose: () => setState(() => _searchOpen = false),
                     onSubmit: _runNlSearch,
                     onClear: _clearNlSearch,
                   ),
@@ -1025,192 +1057,363 @@ class _GlassPillBadge extends StatelessWidget {
   }
 }
 
-/// The hero natural-language search bar. RTL, large touch target, older-user
-/// friendly. Submitting runs the existing extract→search pipeline; the
-/// understood criteria are echoed back beneath the field as a removable summary.
-class _NlSearchBar extends StatelessWidget {
-  const _NlSearchBar({
+/// Natural-language search that lives on the right of the discover header as a
+/// fully-rounded pill. Collapsed it's a 52px circle with a search icon; tapping
+/// it animates (~1s) into the full-width search bar — the circle elongates and
+/// widens leftward until it reaches full size. Closing reverses the same way.
+class _AnimatedNlSearch extends StatefulWidget {
+  const _AnimatedNlSearch({
+    required this.open,
     required this.controller,
     required this.busy,
     required this.summary,
+    required this.onOpen,
+    required this.onClose,
     required this.onSubmit,
     required this.onClear,
   });
 
+  final bool open;
   final TextEditingController controller;
   final bool busy;
   final String? summary;
+  final VoidCallback onOpen;
+  final VoidCallback onClose;
   final ValueChanged<String> onSubmit;
   final VoidCallback onClear;
 
   @override
+  State<_AnimatedNlSearch> createState() => _AnimatedNlSearchState();
+}
+
+class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
+    with SingleTickerProviderStateMixin {
+  static const double _h = 52; // pill height == collapsed circle diameter
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 1),
+  );
+  late final Animation<double> _t =
+      CurvedAnimation(parent: _anim, curve: Curves.easeInOutCubic);
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.open) _anim.value = 1;
+    // Focus the field only once fully expanded, so the keyboard doesn't race
+    // the animation.
+    _anim.addStatusListener((s) {
+      if (s == AnimationStatus.completed && widget.open) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedNlSearch old) {
+    super.didUpdateWidget(old);
+    if (widget.open && !old.open) {
+      _anim.forward();
+    } else if (!widget.open && old.open) {
+      _focus.unfocus();
+      _anim.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.primary, width: 1.6),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.16),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Row(
+    final maxW = MediaQuery.sizeOf(context).width - 32; // left16 + right16
+    return Align(
+      alignment: Alignment.centerRight,
+      child: AnimatedBuilder(
+        animation: _t,
+        builder: (context, _) {
+          final t = _t.value;
+          final w = _h + (maxW - _h) * t;
+          final contentOpacity = ((t - 0.55) / 0.45).clamp(0.0, 1.0);
+          final iconOpacity = (1 - t / 0.5).clamp(0.0, 1.0);
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const SizedBox(width: 8),
-              if (busy)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: AppColors.primary,
-                  ),
-                )
-              else
-                RentlyIcon(
-                  IconsaxPlusLinear.search_normal,
-                  size: 20,
-                  color: AppColors.primary,
-                ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  enabled: !busy,
-                  textDirection: TextDirection.rtl,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: onSubmit,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: AppColors.navy,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    hintText: 'חפש דירה במילים שלך…',
-                    hintTextDirection: TextDirection.rtl,
-                    hintStyle: TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textSecondary.withValues(alpha: 0.8),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-              if (controller.text.isNotEmpty || (summary != null))
-                IconButton(
-                  tooltip: 'נקה',
-                  icon: const RentlyIcon(
-                    IconsaxPlusLinear.close_circle,
-                    size: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                  onPressed: busy ? null : onClear,
-                ),
               GestureDetector(
-                onTap: busy ? null : () => onSubmit(controller.text),
+                onTap: widget.open ? null : widget.onOpen,
                 child: Container(
-                  width: 40,
-                  height: 40,
-                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  width: w,
+                  height: _h,
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_rounded, // RTL "go" — points to the start
                     color: Colors.white,
-                    size: 20,
+                    borderRadius: BorderRadius.circular(_h / 2), // fully rounded
+                    border: Border.all(color: AppColors.primary, width: 1.6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.16),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      if (iconOpacity > 0)
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: iconOpacity,
+                            child: Center(
+                              child: RentlyIcon(
+                                IconsaxPlusLinear.search_normal,
+                                size: 22,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (contentOpacity > 0)
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: contentOpacity,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(_h / 2),
+                              child: OverflowBox(
+                                minWidth: maxW,
+                                maxWidth: maxW,
+                                alignment: Alignment.centerRight,
+                                child: _row(),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              if (t > 0.92)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, right: 8, left: 8),
+                  child: _belowText(),
+                ),
             ],
-          ),
-        ),
-        if (summary == null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, right: 6),
-            child: Text(
-              'נסו: "3 חדרים בצפון ת״א עד 6000"',
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _row() {
+    final busy = widget.busy;
+    final hasContent =
+        widget.controller.text.isNotEmpty || widget.summary != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          const SizedBox(width: 10),
+          if (busy)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: AppColors.primary,
+              ),
+            )
+          else
+            RentlyIcon(IconsaxPlusLinear.search_normal,
+                size: 20, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focus,
+              enabled: !busy,
               textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-                fontWeight: FontWeight.w600,
+              textInputAction: TextInputAction.search,
+              onSubmitted: widget.onSubmit,
+              // Vertically centre the text within the pill (it used to sit high).
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.navy,
+                fontWeight: FontWeight.w700,
               ),
-            ),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight2,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  RentlyIcon(
-                    IconsaxPlusLinear.search_status,
-                    size: 14,
-                    color: AppColors.primaryDark,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      summary!,
-                      textDirection: TextDirection.rtl,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.primaryDark,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'חפש דירה במילים שלך…',
+                hintTextDirection: TextDirection.rtl,
+                hintStyle: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.textSecondary.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w600,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
-      ],
+          IconButton(
+            tooltip: hasContent ? 'נקה' : 'סגור',
+            icon: const RentlyIcon(IconsaxPlusLinear.close_circle,
+                size: 18, color: AppColors.textSecondary),
+            onPressed:
+                busy ? null : (hasContent ? widget.onClear : widget.onClose),
+          ),
+          GestureDetector(
+            onTap: busy ? null : () => widget.onSubmit(widget.controller.text),
+            child: Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.arrow_back_rounded,
+                  color: Colors.white, size: 20),
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _belowText() {
+    if (widget.summary == null) {
+      return Text(
+        'נסו: "3 חדרים בצפון ת״א עד 6000"',
+        textDirection: TextDirection.rtl,
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.textSecondary.withValues(alpha: 0.9),
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight2,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          RentlyIcon(IconsaxPlusLinear.search_status,
+              size: 14, color: AppColors.primaryDark),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              widget.summary!,
+              textDirection: TextDirection.rtl,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _RoundHeaderButton extends StatelessWidget {
-  const _RoundHeaderButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
+/// The 3-dot "more" header button (top-right). Holds notifications, saved
+/// searches and saved apartments in one menu, and shows a small unread dot when
+/// notifications are waiting — this is where the tenant reaches notifications.
+class _HeaderMenuButton extends StatefulWidget {
+  const _HeaderMenuButton();
 
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
+  @override
+  State<_HeaderMenuButton> createState() => _HeaderMenuButtonState();
+}
+
+class _HeaderMenuButtonState extends State<_HeaderMenuButton>
+    with WidgetsBindingObserver {
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final res = await AwsApiClient.instance.getNotifications();
+      if (!mounted) return;
+      if (res.unread != _unread) setState(() => _unread = res.unread);
+    } catch (_) {}
+  }
+
+  void _onSelected(int v) {
+    if (v == 0) {
+      Navigator.of(context)
+          .push<AppNotification>(
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()))
+          .then((tapped) {
+        _refresh();
+        if (tapped != null && mounted) _routeNotification(tapped);
+      });
+      return;
+    }
+    final Widget page =
+        v == 1 ? const SavedSearchesScreen() : const SavedPropertiesScreen();
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  }
+
+  /// Routes a tapped notification (tenant context: Matches is tab 1).
+  void _routeNotification(AppNotification n) {
+    final provider = context.read<DatingProvider>();
+    switch (n.type) {
+      case 'match':
+      case 'message':
+        provider.setTabIndex(1);
+        provider.markMatchesSeen();
+      case 'like':
+      case 'property_like':
+      case 'tour':
+      case 'tour_ready':
+      case 'review':
+      case 'saved_search':
+        final property = provider.propertyById(n.propertyId);
+        if (property != null) {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => PropertyDetailScreen(property: property),
+          ));
+        }
+      default:
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
           height: 42,
           width: 42,
           decoration: BoxDecoration(
@@ -1225,83 +1428,111 @@ class _RoundHeaderButton extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: RentlyIcon(icon, size: 20, color: AppColors.navy),
+          child: PopupMenuButton<int>(
+            tooltip: 'עוד',
+            padding: EdgeInsets.zero,
+            position: PopupMenuPosition.under,
+            icon: const Icon(Icons.more_vert, size: 20, color: AppColors.navy),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            onSelected: _onSelected,
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 0,
+                child: _HeaderMenuRow(
+                    icon: IconsaxPlusLinear.notification,
+                    label: 'התראות',
+                    badge: _unread),
+              ),
+              const PopupMenuItem(
+                value: 1,
+                child: _HeaderMenuRow(
+                    icon: Icons.bookmark_border_rounded,
+                    label: 'חיפושים שמורים'),
+              ),
+              const PopupMenuItem(
+                value: 2,
+                child: _HeaderMenuRow(
+                    icon: Icons.favorite_border_rounded,
+                    label: 'הדירות ששמרתי'),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// A single 3-dot "more" header button that drops down a menu — replaces the two
-/// separate round buttons (one of which used a bell icon, confusingly mimicking
-/// the real notifications bell). Options: saved searches + saved apartments.
-class _HeaderMenuButton extends StatelessWidget {
-  const _HeaderMenuButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 42,
-      width: 42,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+        if (_unread > 0)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: const BoxDecoration(
+                color: AppColors.coral,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  _unread > 9 ? '9+' : '$_unread',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ],
-      ),
-      child: PopupMenuButton<int>(
-        tooltip: 'עוד',
-        padding: EdgeInsets.zero,
-        position: PopupMenuPosition.under,
-        icon: const Icon(Icons.more_vert, size: 20, color: AppColors.navy),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onSelected: (v) {
-          final Widget page =
-              v == 0 ? const SavedSearchesScreen() : const SavedPropertiesScreen();
-          Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => page));
-        },
-        itemBuilder: (_) => const [
-          PopupMenuItem(
-            value: 0,
-            child: _HeaderMenuRow(
-                icon: Icons.bookmark_border_rounded, label: 'חיפושים שמורים'),
-          ),
-          PopupMenuItem(
-            value: 1,
-            child: _HeaderMenuRow(
-                icon: Icons.favorite_border_rounded, label: 'הדירות ששמרתי'),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
 
 class _HeaderMenuRow extends StatelessWidget {
-  const _HeaderMenuRow({required this.icon, required this.label});
+  const _HeaderMenuRow(
+      {required this.icon, required this.label, this.badge = 0});
   final IconData icon;
   final String label;
+  final int badge;
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.navy),
-        const SizedBox(width: 10),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary)),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          if (badge > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                badge > 9 ? '9+' : '$badge',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -2538,6 +2769,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                             initialArea: area,
                                             initialPolygon: f.customAreaPolygon,
                                             previewMarkers: _markerPreview,
+                                            filters: _draftFilters,
                                           ),
                                         ),
                                       );
@@ -3499,11 +3731,15 @@ class _AreaLassoScreen extends StatefulWidget {
     required this.initialArea,
     required this.initialPolygon,
     required this.previewMarkers,
+    required this.filters,
   });
 
   final SearchArea initialArea;
   final List<LatLng> initialPolygon;
+  // Snapshot for the very first frame; live markers are recomputed from the
+  // provider each build (so a newly uploaded property shows up immediately).
   final List<RentalProperty> previewMarkers;
+  final SearchFilters filters;
 
   @override
   State<_AreaLassoScreen> createState() => _AreaLassoScreenState();
@@ -3516,13 +3752,19 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
   Offset? _lastDrawOffset;
   bool _drawMode = false; // Lasso mode active by default
   RentalProperty? _selectedProperty;
+  bool _cardsCollapsed = false; // the bottom property strip can be dragged down
   final ScrollController _scrollController = ScrollController();
+
+  // Live property list, refreshed from the provider on every build so new
+  // uploads appear without reopening the map.
+  late List<RentalProperty> _markers;
 
   List<LatLng> get _activePolygon => _currentPolygon;
 
   @override
   void initState() {
     super.initState();
+    _markers = widget.previewMarkers;
     // Default select the first property marker to show the bottom card initially
     _selectedProperty = widget.previewMarkers.firstOrNull;
     _currentPolygon.addAll(widget.initialPolygon);
@@ -3576,7 +3818,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
     _animatedMapMove(property.point, 13.5);
 
     // Scroll horizontal card slider to the selected card
-    final index = widget.previewMarkers.indexWhere((p) => p.id == property.id);
+    final index = _markers.indexWhere((p) => p.id == property.id);
     if (index != -1 && _scrollController.hasClients) {
       // 280 is card width + 12 is separation
       _scrollController.animateTo(
@@ -3632,8 +3874,8 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
   }
 
   void _locateUser() {
-    if (widget.previewMarkers.isNotEmpty) {
-      _animatedMapMove(widget.previewMarkers.first.point, 13.5);
+    if (_markers.isNotEmpty) {
+      _animatedMapMove(_markers.first.point, 13.5);
     } else {
       _animatedMapMove(widget.initialArea.center, 12.5);
     }
@@ -3641,9 +3883,14 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Recompute the visible properties from the live catalogue → a property a
+    // landlord just uploaded (or any catalogue refresh) shows up immediately.
+    _markers = context
+        .watch<DatingProvider>()
+        .previewFilteredProperties(widget.filters);
     final polygon = _activePolygon;
     final canSave = polygon.length >= 3;
-    final hasProperties = widget.previewMarkers.isNotEmpty;
+    final hasProperties = _markers.isNotEmpty;
     final hasPolygon = polygon.length >= 3;
 
     return Scaffold(
@@ -3686,7 +3933,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
               ),
               // Markers Layer: Circular Image Thumbnails inspired by mockup
               MarkerLayer(
-                markers: widget.previewMarkers.map(
+                markers: _markers.map(
                   (property) {
                     final isSelected = property.id == _selectedProperty?.id;
                     return Marker(
@@ -4053,7 +4300,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                                 color: Colors.white.withValues(alpha: 0.08)),
                           ),
                           child: Text(
-                            '${widget.previewMarkers.length} תוצאות',
+                            '${_markers.length} תוצאות',
                             style: const TextStyle(
                               color: Colors.white, // Solid white text
                               fontSize: 11.5,
@@ -4070,37 +4317,88 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
 
           // 2. Carousel: Spans 100% edge-to-edge of the screen
           if (hasProperties)
-            Positioned(
+            // The property strip can be dragged down to get it out of the way of
+            // the map, and pulled/tapped back up. Collapsed → only a small handle
+            // peeks at the bottom.
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: 60 + MediaQuery.of(context).padding.bottom,
-              child: SizedBox(
-                height: 300,
-                child: ListView.separated(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: widget.previewMarkers.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final property = widget.previewMarkers[index];
-                    final isSelected = property.id == _selectedProperty?.id;
-                    return _PropertyPreviewCard(
-                      property: property,
-                      isSelected: isSelected,
-                      onTap: () => _selectProperty(property),
-                      onOpenDetails: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PropertyDetailScreen(property: property),
+              bottom: _cardsCollapsed
+                  ? -(300 - 34) + 60 + MediaQuery.of(context).padding.bottom
+                  : 60 + MediaQuery.of(context).padding.bottom,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragEnd: (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  if (v > 120) setState(() => _cardsCollapsed = true);
+                  if (v < -120) setState(() => _cardsCollapsed = false);
+                },
+                onTap: _cardsCollapsed
+                    ? () => setState(() => _cardsCollapsed = false)
+                    : null,
+                child: SizedBox(
+                  height: 300,
+                  child: Column(
+                    children: [
+                      // Drag handle (also tap-to-toggle).
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () =>
+                            setState(() => _cardsCollapsed = !_cardsCollapsed),
+                        child: Container(
+                          width: 46,
+                          height: 22,
+                          alignment: Alignment.center,
+                          child: Container(
+                            width: 40,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                           ),
-                        );
-                      },
-                    );
-                  },
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.separated(
+                          controller: _scrollController,
+                          scrollDirection: Axis.horizontal,
+                          reverse: true,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _markers.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final property = _markers[index];
+                            final isSelected =
+                                property.id == _selectedProperty?.id;
+                            void openDetails() => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PropertyDetailScreen(
+                                        property: property),
+                                  ),
+                                );
+                            return _PropertyPreviewCard(
+                              property: property,
+                              isSelected: isSelected,
+                              // First tap centres the map; a second tap (already
+                              // selected) opens the page — the arrow always opens.
+                              onTap: () {
+                                if (_selectedProperty?.id == property.id) {
+                                  openDetails();
+                                } else {
+                                  _selectProperty(property);
+                                }
+                              },
+                              onOpenDetails: openDetails,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -4133,7 +4431,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                               _currentPolygon.clear();
                               _lastDrawOffset = null;
                               _selectedProperty =
-                                  widget.previewMarkers.firstOrNull;
+                                  _markers.firstOrNull;
                             });
                           },
                           icon: const Icon(Icons.refresh_rounded,
@@ -4554,26 +4852,31 @@ class _NoMorePropertiesState extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<DatingProvider>();
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+    // Top-aligned + scrollable so the quick actions sit high on the screen
+    // (raised out of the way of the navbar) and always fit.
+    return SafeArea(
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 120, 24, 130),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: RentlyIcon(
-                IconsaxPlusLinear.search_normal,
-                color: AppColors.primary,
-                size: 40,
+            Center(
+              child: Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: RentlyIcon(
+                  IconsaxPlusLinear.search_normal,
+                  color: AppColors.primary,
+                  size: 36,
+                ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             const Text(
               'ראית את כל הדירות!',
               textAlign: TextAlign.center,
@@ -4585,7 +4888,7 @@ class _NoMorePropertiesState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'נסה אחת מהפעולות המהירות כדי למצוא עוד דירות',
+              'הרחב את החיפוש כדי למצוא עוד דירות',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textSecondary,
@@ -4593,7 +4896,7 @@ class _NoMorePropertiesState extends StatelessWidget {
                 fontSize: 14,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 22),
             _QuickActionBtn(
               icon: IconsaxPlusLinear.money,
               label: 'הרחב תקציב ב-₪500',
@@ -4629,12 +4932,12 @@ class _NoMorePropertiesState extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 18),
             _QuickActionBtn(
               icon: IconsaxPlusLinear.undo,
               label: 'אפס דירות שדילגתי',
               onTap: () => provider.resetPassed(),
-              isHighlighted: true,
+              filled: true,
             ),
           ],
         ),
@@ -4648,16 +4951,36 @@ class _QuickActionBtn extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.isHighlighted = false,
+    this.filled = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool isHighlighted;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
+    final shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+    if (filled) {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: onTap,
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape: shape,
+            textStyle:
+                const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -4665,13 +4988,11 @@ class _QuickActionBtn extends StatelessWidget {
         icon: Icon(icon, size: 16),
         label: Text(label),
         style: OutlinedButton.styleFrom(
-          foregroundColor: isHighlighted ? AppColors.primary : AppColors.navy,
-          side: BorderSide(
-            color: isHighlighted ? AppColors.primary : AppColors.borderLight,
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          foregroundColor: AppColors.navy,
+          side: const BorderSide(color: AppColors.borderLight),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: shape,
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ),
     );

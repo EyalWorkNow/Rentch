@@ -18,6 +18,7 @@ class PropertySearchCriteria {
     this.amenityKeys = const {},
     this.vibe,
     this.queryText,
+    this.cohortSignals = const {},
   });
 
   final String? city;
@@ -32,6 +33,10 @@ class PropertySearchCriteria {
   // Raw NL query text, when available. Enables the semantic kNN candidate
   // source; when null, retrieval is the city query alone (unchanged behavior).
   final String? queryText;
+  // Persona/cohort signals (household/religiousStream/isOleh/carFree/wfh/…) sent
+  // verbatim to the backend `resolveCohort` so the 14-cohort taxonomy + community_fit
+  // actually engage. Produced by SmartSearch.cohortSignals(). Empty → old behavior.
+  final Map<String, String> cohortSignals;
 }
 
 /// Maps a requested vibe to a target neighborhood-vibrancy in [-1,1] (same scale
@@ -81,6 +86,7 @@ class PropertySearchRepository {
     // → resolveCohort) ranks with the full 14-cohort taxonomy + community_fit and
     // returns a per-listing `rankScore` we order by below.
     final cohortParams = <String, String>{
+      ...c.cohortSignals,
       if (c.vibe != null && c.vibe!.trim().isNotEmpty) 'vibe': c.vibe!.trim(),
     };
 

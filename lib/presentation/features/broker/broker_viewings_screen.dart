@@ -545,7 +545,9 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
                 initialValue: _property,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(14)),
+                  ),
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
@@ -624,7 +626,9 @@ class _ScheduleViewingSheetState extends State<_ScheduleViewingSheet> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 16),
-        border: const OutlineInputBorder(),
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+        ),
       ),
     );
   }

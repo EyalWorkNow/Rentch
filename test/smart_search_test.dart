@@ -93,4 +93,98 @@ void main() {
     final best = LocalityMatcher.findBestMatch('תל אבו');
     expect(best, 'תל אביב');
   });
+
+  // ── persona-miss regressions (found by the persona test loop, 2026-07-03) ──
+  test('wheelchair persona: נגישות + כיסא גלגלים → feat_accessible', () {
+    final q = SmartSearch.parse(
+      'בן משפחה בכיסא גלגלים, צריך דירת קומת קרקע נגישה עם חניית נכה בנתניה, 3 חדרים, 5500',
+    );
+    expect(q.amenities.contains('feat_accessible'), true);
+    expect(q.amenities.contains('feat_parking'), true); // "חניית נכה" stem
+    expect(q.city, 'נתניה');
+  });
+
+  test('oleh persona: English "light rail" → nearTrain', () {
+    final q = SmartSearch.parse(
+      'looking for a 2 bedroom near the light rail in tel aviv',
+    );
+    expect(q.nearTrain, true);
+  });
+
+  test('single-parent persona: "תחבורה ציבורית" → nearTrain', () {
+    final q = SmartSearch.parse('3 חדרים בירושלים ליד תחבורה ציבורית עד 5000');
+    expect(q.nearTrain, true);
+  });
+
+  test('student persona: "שותפים" → feat_roommates', () {
+    final q = SmartSearch.parse('מחפשת דירת שותפים ליד האוניברסיטה בתל אביב');
+    expect(q.amenities.contains('feat_roommates'), true);
+  });
+
+  // ── cohort signals routed to the backend 14-cohort engine ──────────────────
+  test('charedi family → religiousStream=charedi + household=family', () {
+    final s = SmartSearch.cohortSignals(
+        'משפחה חרדית עם 5 ילדים ליד תלמוד תורה וחיידר בבני ברק');
+    expect(s['religiousStream'], 'charedi');
+    expect(s['isReligious'], 'true');
+    expect(s['household'], 'family');
+    expect(s['hasChildren'], 'true');
+  });
+
+  test('dati-leumi family → religiousStream=dati_leumi', () {
+    final s = SmartSearch.cohortSignals('זוג דתי לאומי עם ילדים ליד אולפנה');
+    expect(s['religiousStream'], 'dati_leumi');
+    expect(s['household'], 'family');
+  });
+
+  test('oleh English speaker → isOleh + langPref=en', () {
+    final s = SmartSearch.cohortSignals(
+        "i'm a new immigrant, english speaker looking in tel aviv");
+    expect(s['isOleh'], 'true');
+    expect(s['langPref'], 'en');
+  });
+
+  test('senior wheelchair → accessibilityNeed + lifeStage=senior + age', () {
+    final s = SmartSearch.cohortSignals('גמלאי בן 72 בכיסא גלגלים צריך נגישות');
+    expect(s['accessibilityNeed'], 'true');
+    expect(s['lifeStage'], 'senior');
+    expect(s['age'], '72');
+  });
+
+  test('single parent car-free → carFree + hasChildren', () {
+    final s = SmartSearch.cohortSignals('אמא חד הורית עם ילד בלי רכב');
+    expect(s['carFree'], 'true');
+    expect(s['hasChildren'], 'true');
+  });
+
+  test('new parents expecting → expecting=true', () {
+    final s = SmartSearch.cohortSignals('זוג צעיר בהריון מחפש 3 חדרים');
+    expect(s['expecting'], 'true');
+    expect(s['household'], 'couple');
+  });
+
+  test('remote worker → wfh=true', () {
+    final s = SmartSearch.cohortSignals('עובד מהבית צריך חדר עבודה שקט');
+    expect(s['wfh'], 'true');
+    expect(s['vibe'], 'שקט');
+  });
+
+  test('investor → isInvestor + intent=investment', () {
+    final s = SmartSearch.cohortSignals('משקיע מחפש דירה עם תשואה טובה לקנייה');
+    expect(s['isInvestor'], 'true');
+    expect(s['intent'], 'investment');
+  });
+
+  test('young professional → vibe=תוסס', () {
+    final s = SmartSearch.cohortSignals('רווק בן 29 רוצה מרכז תוסס עם חיי לילה');
+    expect(s['vibe'], 'תוסס');
+    expect(s['household'], 'single');
+  });
+
+  test('non-persona text → no false signals', () {
+    final s = SmartSearch.cohortSignals('דירת 3 חדרים בחיפה עד 5000');
+    expect(s.containsKey('religiousStream'), false);
+    expect(s.containsKey('isInvestor'), false);
+    expect(s.containsKey('accessibilityNeed'), false);
+  });
 }

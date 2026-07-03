@@ -1,6 +1,8 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/screens/property_detail_screen.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -177,7 +179,8 @@ class _Selector extends StatelessWidget {
   }
 }
 
-/// The actual side-by-side table.
+/// The actual side-by-side table. Numeric rows highlight the best value per row
+/// (cheapest, biggest, best ₪/m², highest match); amenity rows show ✓/✗.
 class _CompareTable extends StatelessWidget {
   const _CompareTable({required this.properties, required this.provider});
 
@@ -187,18 +190,36 @@ class _CompareTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = <_CompareRow>[
-      _CompareRow('מחיר', (p) => p.priceLabel),
-      _CompareRow('₪ למ"ר', _pricePerM2),
-      _CompareRow('חדרים', (p) => p.roomsLabel),
-      _CompareRow('שטח', (p) => p.sizeM2 > 0 ? '${p.sizeM2} מ"ר' : '—'),
-      _CompareRow('קומה', _floorLabel),
-      _CompareRow('התאמה', (p) => _matchLabel(p)),
+      _CompareRow.number('מחיר', (p) => p.price > 0 ? p.price.toDouble() : null,
+          (p) => p.priceLabel,
+          best: _Best.min),
+      _CompareRow.number('₪ למ"ר', _perM2, _perM2Label, best: _Best.min),
+      _CompareRow.text('חדרים', (p) => p.roomsLabel),
+      _CompareRow.number(
+          'שטח', (p) => p.sizeM2 > 0 ? p.sizeM2.toDouble() : null,
+          (p) => p.sizeM2 > 0 ? '${p.sizeM2} מ"ר' : '—',
+          best: _Best.max),
+      _CompareRow.text('קומה', _floorLabel),
+      _CompareRow.flag('מעלית', (p) => p.featureFlags.isEnabled('elevator')),
+      _CompareRow.flag('חניה', (p) => p.featureFlags.isEnabled('parking')),
+      _CompareRow.flag('מרפסת', (p) => p.featureFlags.isEnabled('balcony')),
+      _CompareRow.flag('ממ"ד', (p) => p.featureFlags.isEnabled('mamad')),
+      _CompareRow.text('מצב',
+          (p) => p.condition.trim().isEmpty ? '—' : p.condition.trim()),
+      _CompareRow.number(
+          'התאמה',
+          (p) => (provider.displayMatchScore(p) ?? -1).toDouble(),
+          (p) {
+        final s = provider.displayMatchScore(p);
+        return s == null ? '—' : '$s%';
+      }, best: _Best.max),
     ];
 
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
@@ -220,15 +241,12 @@ class _CompareTable extends StatelessWidget {
     );
   }
 
-  String _matchLabel(RentalProperty p) {
-    final score = provider.displayMatchScore(p);
-    return score == null ? '—' : '$score%';
-  }
+  static double? _perM2(RentalProperty p) =>
+      (p.sizeM2 <= 0 || p.price <= 0) ? null : p.price / p.sizeM2;
 
-  static String _pricePerM2(RentalProperty p) {
+  static String _perM2Label(RentalProperty p) {
     if (p.sizeM2 <= 0 || p.price <= 0) return '—';
-    final perM2 = (p.price / p.sizeM2).round();
-    return '₪$perM2';
+    return '₪${(p.price / p.sizeM2).round()}';
   }
 
   static String _floorLabel(RentalProperty p) {
@@ -239,10 +257,30 @@ class _CompareTable extends StatelessWidget {
   }
 }
 
+enum _Best { none, min, max }
+
 class _CompareRow {
-  const _CompareRow(this.label, this.value);
+  const _CompareRow._(this.label, this.display, this.numeric, this.flag,
+      this.best);
   final String label;
-  final String Function(RentalProperty) value;
+  final String Function(RentalProperty) display;
+  final double? Function(RentalProperty)? numeric;
+  final bool Function(RentalProperty)? flag;
+  final _Best best;
+
+  factory _CompareRow.text(String l, String Function(RentalProperty) d) =>
+      _CompareRow._(l, d, null, null, _Best.none);
+
+  factory _CompareRow.number(
+    String l,
+    double? Function(RentalProperty) numeric,
+    String Function(RentalProperty) display, {
+    required _Best best,
+  }) =>
+      _CompareRow._(l, display, numeric, null, best);
+
+  factory _CompareRow.flag(String l, bool Function(RentalProperty) f) =>
+      _CompareRow._(l, (p) => f(p) ? 'כן' : 'לא', null, f, _Best.none);
 }
 
 class _HeaderRow extends StatelessWidget {
@@ -252,29 +290,49 @@ class _HeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight2,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      color: AppColors.primaryLight2,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _LabelCell(''),
           for (final p in properties)
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 6,
+              child: InkWell(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PropertyDetailScreen(property: p),
+                  ),
                 ),
-                child: Text(
-                  _title(p),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          height: 54,
+                          width: double.infinity,
+                          child: SafeMedia(
+                            media: p.primaryMedia,
+                            fallback: Container(color: AppColors.borderLight),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _title(p),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -305,6 +363,25 @@ class _DataRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Which column(s) hold the best numeric value for this row?
+    final winners = <int>{};
+    if (row.numeric != null && row.best != _Best.none) {
+      final vals = [for (final p in properties) row.numeric!(p)];
+      double? bestVal;
+      for (final v in vals) {
+        if (v == null) continue;
+        if (bestVal == null ||
+            (row.best == _Best.min ? v < bestVal : v > bestVal)) {
+          bestVal = v;
+        }
+      }
+      if (bestVal != null) {
+        for (var i = 0; i < vals.length; i++) {
+          if (vals[i] == bestVal) winners.add(i);
+        }
+      }
+    }
+
     return Container(
       color: shaded ? AppColors.background : AppColors.surface,
       child: IntrinsicHeight(
@@ -312,26 +389,38 @@ class _DataRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _LabelCell(row.label),
-            for (final p in properties)
-              Expanded(
-                child: Container(
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 6,
-                  ),
-                  child: Text(
-                    row.value(p),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
+            for (var i = 0; i < properties.length; i++)
+              Expanded(child: _cell(properties[i], winners.contains(i))),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cell(RentalProperty p, bool isWinner) {
+    if (row.flag != null) {
+      final on = row.flag!(p);
+      return Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+        child: Icon(
+          on ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded,
+          color: on ? AppColors.success : AppColors.textDisabled,
+          size: 22,
+        ),
+      );
+    }
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      color: isWinner ? AppColors.primary.withValues(alpha: 0.10) : null,
+      child: Text(
+        row.display(p),
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 17,
+          fontWeight: isWinner ? FontWeight.w900 : FontWeight.w700,
+          color: isWinner ? AppColors.primary : AppColors.textPrimary,
         ),
       ),
     );

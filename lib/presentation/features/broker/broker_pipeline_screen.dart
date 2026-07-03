@@ -557,7 +557,9 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
                 initialValue: _property,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(14)),
+                  ),
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
@@ -615,7 +617,9 @@ class _AddLeadSheetState extends State<_AddLeadSheet> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 16),
-        border: const OutlineInputBorder(),
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(14)),
+        ),
       ),
     );
   }

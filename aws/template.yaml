@@ -67,6 +67,11 @@ Parameters:
     NoEcho: true
     Default: ''
     Description: KIRI Engine API key for /scan3d 3D reconstruction (Photo Scan + 3DGS) (optional).
+  OpenAiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: OpenAI API key (optional). Wired here so a deploy PRESERVES it — pass OpenAiApiKey=... at deploy time; empty default keeps it unset. Powers GPT features once code consumes OPENAI_API_KEY.
 
 Resources:
 
@@ -257,6 +262,19 @@ Resources:
       KeySchema:
         - { AttributeName: id, KeyType: HASH }
 
+  # One accumulated persona row per user (id == Firebase uid). Confidence-scored
+  # facts for personalisation + (consent-gated) persona targeting. Owner-scoped
+  # in the router; covered by the router role's ${TablePrefix}* wildcard grant.
+  PersonaTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${TablePrefix}persona'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: id, AttributeType: S }
+      KeySchema:
+        - { AttributeName: id, KeyType: HASH }
+
   # ── S3 media bucket ─────────────────────────────────────────────────────────
   MediaBucket:
     Type: AWS::S3::Bucket
@@ -363,6 +381,10 @@ Resources:
           TELEPORT_CLIENT_ID: !Ref TeleportClientId
           TELEPORT_CLIENT_SECRET: !Ref TeleportClientSecret
           KIRI_API_KEY: !Ref KiriApiKey
+          OPENAI_API_KEY: !Ref OpenAiApiKey
+          OPENAI_CHAT_MODEL: gpt-5.4-mini
+          OPENAI_REALTIME_MODEL: gpt-realtime-mini
+          OPENAI_REALTIME_VOICE: marin
 
   PanoStitchRole:
     Type: AWS::IAM::Role

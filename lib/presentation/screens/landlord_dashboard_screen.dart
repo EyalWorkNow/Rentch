@@ -7,6 +7,7 @@ import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
 import 'package:dating_app/presentation/screens/assistant_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
+import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/presentation/screens/rent_tracking_screen.dart';
 import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
 import 'package:dating_app/presentation/features/landlord/reminders_screen.dart';
@@ -282,63 +283,9 @@ class _DashboardHeader extends StatelessWidget {
         // Right: Notification bell + Avatar
         Row(
           children: [
-            // Notification bell
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.black.withValues(alpha: 0.06)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      IconsaxPlusLinear.notification,
-                      size: 20,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (pendingCount > 0)
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: PulseWidget(
-                      scaleUpTo: 1.25,
-                      duration: const Duration(milliseconds: 1000),
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            pendingCount > 9 ? '9+' : '$pendingCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            // Real, working notifications bell (opens the inbox). Shown only
+            // here on the agent/landlord dashboard — replaces the old fake icon.
+            const NotificationBell(),
             const SizedBox(width: 10),
             // Personal assistant ("עוזר אישי") — replaces the avatar. A clear
             // icon + tag opens Erik, the voice/text assistant built for older
@@ -2587,21 +2534,20 @@ class _PropertyMiniCard extends StatelessWidget {
                           statusColor = AppColors.textSecondary;
                         }
 
+                        // Solid accent fill + white text — stays readable even
+                        // when the broker theme makes statusColor black (the old
+                        // translucent-black-on-black badge was unreadable).
                         return Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.2),
+                            color: statusColor,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: statusColor.withValues(alpha: 0.4),
-                              width: 0.8,
-                            ),
                           ),
                           child: Text(
                             statusText,
-                            style: TextStyle(
-                              color: statusColor,
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 9.5,
                               fontWeight: FontWeight.w900,
                             ),

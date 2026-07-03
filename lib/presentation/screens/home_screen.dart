@@ -9,10 +9,7 @@ import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
-import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
-import 'package:dating_app/presentation/screens/property_detail_screen.dart';
-import 'package:dating_app/data/models/app_notification.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
@@ -73,36 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
             MatchCelebrationOverlay(property: property),
       ),
     );
-  }
-
-  /// Routes a tapped notification using its `type` + `data`. Kept deliberately
-  /// simple: match/message → the Matches tab (chats live there for both roles);
-  /// like/tour/review → the property detail if we can resolve it, else a no-op.
-  void _handleNotificationDeepLink(
-      DatingProvider provider, AppNotification n) {
-    final matchesTab = provider.isLandlord ? 2 : 1;
-    switch (n.type) {
-      case 'match':
-      case 'message':
-        provider.setTabIndex(matchesTab);
-        provider.markMatchesSeen();
-      case 'like':
-      case 'property_like': // backend's actual "new interest in your apartment" type
-      case 'tour':
-      case 'tour_ready': // backend's actual "your 3D tour is ready" type
-      case 'review':
-      case 'saved_search': // a new listing matched the user's saved search
-        final property = provider.propertyById(n.propertyId);
-        if (property != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => PropertyDetailScreen(property: property),
-            ),
-          );
-        }
-      default:
-        break; // unknown type → no-op
-    }
   }
 
   void _onTabTap(int index, DatingProvider provider) {
@@ -195,18 +162,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: screens,
                 ),
               ),
-              // Always-reachable notifications bell (both roles). Placed below
-              // any per-screen header band, on the start (RTL: right) edge, so
-              // it never collides with the discover/dashboard headers. It owns
-              // its unread badge and keeps it fresh on resume + on FCM, with no
-              // polling. Tapping a notification deep-links via the provider.
-              Positioned(
-                top: MediaQuery.paddingOf(context).top + 60,
-                right: 16,
-                child: NotificationBell(
-                  onDeepLink: (n) => _handleNotificationDeepLink(provider, n),
-                ),
-              ),
+              // Notifications now live inside the discover 3-dots menu (tenant)
+              // and the dashboard header (landlord/agent), so no floating bell
+              // is drawn over the deck here.
             ],
           ),
           bottomNavigationBar: Theme(

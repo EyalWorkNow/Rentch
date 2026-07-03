@@ -27,6 +27,7 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
+import 'package:dating_app/presentation/screens/owner_listings_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
@@ -634,30 +635,71 @@ class _ImageGallery extends StatelessWidget {
                   ),
                 ),
               ),
-              // Share Button (Mockup style circular white)
-              ScaleBounce(
-                onTap: onShareTap,
-                scaleDownTo: 0.88,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+              // Save + Share buttons (grouped, top-start in RTL).
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Save / bookmark toggle → the listing shows in "הדירות ששמרתי".
+                  Consumer<DatingProvider>(
+                    builder: (context, provider, _) {
+                      final saved = provider.isSaved(property.id);
+                      return ScaleBounce(
+                        onTap: () => provider.toggleSave(property.id),
+                        scaleDownTo: 0.88,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: RentlyIcon(
+                            saved
+                                ? IconsaxPlusBold.save_2
+                                : IconsaxPlusLinear.save_2,
+                            color: saved
+                                ? AppColors.primary
+                                : const Color(0xFF0F172A),
+                            size: 20,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  // Share Button (Mockup style circular white)
+                  ScaleBounce(
+                    onTap: onShareTap,
+                    scaleDownTo: 0.88,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: const RentlyIcon(
+                        IconsaxPlusLinear.export_2,
+                        color: Color(0xFF0F172A),
+                        size: 20,
+                      ),
+                    ),
                   ),
-                  child: const RentlyIcon(
-                    IconsaxPlusLinear.export_2,
-                    color: Color(0xFF0F172A),
-                    size: 20,
-                  ),
-                ),
+                ],
               ),
             ],
           ),
@@ -2077,6 +2119,46 @@ class _OwnerCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              // Tap the owner → their full listings page (also shareable).
+              InkWell(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => OwnerListingsScreen(
+                      ownerUserId: property.ownerUserId,
+                      ownerName: property.ownerName,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        RentlyIcon(IconsaxPlusLinear.house_2,
+                            size: 16, color: Color(0xFF13BEC9)),
+                        SizedBox(width: 6),
+                        Text(
+                          'צפה בכל הדירות של בעל הנכס',
+                          style: TextStyle(
+                            color: Color(0xFF13BEC9),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const RentlyIcon(IconsaxPlusLinear.arrow_left,
+                        size: 14, color: Color(0xFF13BEC9)),
+                  ],
+                ),
+              ),
+              // Tenants (no mutual like) can ask to message the owner. The
+              // request lands in the owner's "מבקשים לשלוח הודעה" inbox.
+              if (!provider.isLandlord) ...[
+                const SizedBox(height: 14),
+                _MessageRequestButton(property: property),
+              ],
             ],
           ),
         );
@@ -2091,6 +2173,121 @@ class _OwnerCard extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _OwnerProfileSheet(property: property, reviews: reviews),
+    );
+  }
+}
+
+/// "בקש לשלוח הודעה" — lets a tenant with no mutual like reach out to the owner.
+/// The request lands in the owner's dedicated messages section.
+class _MessageRequestButton extends StatelessWidget {
+  const _MessageRequestButton({required this.property});
+  final RentalProperty property;
+
+  Future<void> _open(BuildContext context, DatingProvider provider) async {
+    final controller = TextEditingController();
+    final sent = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'בקשה לשלוח הודעה לבעל הנכס',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.navy),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                textDirection: TextDirection.rtl,
+                decoration: InputDecoration(
+                  hintText: 'כתוב הודעה קצרה… (למשל: מתי אפשר לראות?)',
+                  hintTextDirection: TextDirection.rtl,
+                  filled: true,
+                  fillColor: const Color(0xFFF1F5F8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 50,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('שלח בקשה',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (sent == true) {
+      await provider.requestToMessage(property, note: controller.text);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 2600),
+          content: Text('הבקשה נשלחה — היא תופיע אצל בעל הנכס תחת "מבקשים לשלוח הודעה"'),
+        ));
+      }
+    }
+    controller.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<DatingProvider>();
+    final already = provider.hasThreadForProperty(property.id);
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: already ? null : () => _open(context, provider),
+        icon: const RentlyIcon(IconsaxPlusLinear.message_text, size: 18),
+        label: Text(already ? 'הבקשה נשלחה' : 'בקש לשלוח הודעה'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
     );
   }
 }
