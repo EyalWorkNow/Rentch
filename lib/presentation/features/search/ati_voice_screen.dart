@@ -81,6 +81,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   bool _recording = false; // holding the orb to record
   bool _sending = false; // guards against a double-send on release
   bool _needLocation = false; // show the animated "share my location" button
+  bool _locating = false; // guards the share-location tap (independent of _sending)
 
   @override
   void initState() {
@@ -190,18 +191,26 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     if (mounted) setState(() => _state = AtiVoiceState.idle);
   }
 
-  // User tapped "share my location" → capture GPS + run the held search.
+  // User tapped "share my location" → capture GPS + run the held search. NB: this
+  // must NOT be gated by _sending — that flag stays true while אתי is still SPEAKING
+  // the "share location?" prompt, which used to make the button do nothing.
   Future<void> _shareLocation() async {
     final cb = widget.onShareLocation;
-    if (cb == null || _sending) return;
-    setState(() {
-      _needLocation = false;
-      _state = AtiVoiceState.thinking;
-    });
+    if (cb == null || _locating) return;
+    _locating = true;
+    await widget.service.stopSpeaking(); // barge-in over her prompt
+    if (mounted) {
+      setState(() {
+        _needLocation = false;
+        _state = AtiVoiceState.thinking;
+      });
+    }
     try {
       await _applyTurn(await cb());
     } catch (_) {
       if (mounted) setState(() => _state = AtiVoiceState.idle);
+    } finally {
+      _locating = false;
     }
   }
 

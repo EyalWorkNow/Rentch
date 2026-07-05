@@ -80,25 +80,62 @@ class _LiquidGlassOrbState extends State<LiquidGlassOrb>
 
   @override
   Widget build(BuildContext context) {
+    // Give the glow + the grow-pulse room to breathe beyond the orb itself.
+    final box = widget.size * 1.34;
     return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: _glass != null
-          ? ValueListenableBuilder<double>(
-              valueListenable: _clock,
-              builder: (_, t, __) => CustomPaint(
-                painter: _LiquidGlassPainter(
-                    shader: _glass!,
-                    time: t,
-                    level: widget.speaking ? _speechEnvelope(t) : widget.level,
-                    speaking: widget.speaking ? 1.0 : 0.0),
+      width: box,
+      height: box,
+      child: ValueListenableBuilder<double>(
+        valueListenable: _clock,
+        builder: (_, t, __) {
+          // Live amplitude: the model's speech envelope while she talks, the mic
+          // level while listening. Drives BOTH the size and the glow.
+          final lvl = widget.speaking ? _speechEnvelope(t) : widget.level;
+          final scale = 1.0 + lvl * (widget.speaking ? 0.16 : 0.09);
+          // Speaking → warm violet/magenta (matches the shader's talk palette);
+          // otherwise the signature cyan.
+          final glow = Color.lerp(const Color(0xFF35E0E6),
+              const Color(0xFFB44BFF), widget.speaking ? 0.7 : 0.0)!;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              // Interactive glow running BEHIND the orb — grows + brightens with
+              // the voice.
+              Container(
+                width: widget.size * 0.7,
+                height: widget.size * 0.7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: glow.withValues(alpha: 0.10 + 0.45 * lvl),
+                      blurRadius: 22 + 70 * lvl,
+                      spreadRadius: 2 + 20 * lvl,
+                    ),
+                  ],
+                ),
               ),
-            )
-          : ValueListenableBuilder<double>(
-              valueListenable: _clock,
-              builder: (_, t, __) =>
-                  CustomPaint(painter: _FallbackOrbPainter(t: t)),
-            ),
+              // The orb, scaled by the live amplitude so it breathes with the voice.
+              Transform.scale(
+                scale: scale,
+                child: SizedBox(
+                  width: widget.size,
+                  height: widget.size,
+                  child: _glass != null
+                      ? CustomPaint(
+                          painter: _LiquidGlassPainter(
+                              shader: _glass!,
+                              time: t,
+                              level: lvl,
+                              speaking: widget.speaking ? 1.0 : 0.0),
+                        )
+                      : CustomPaint(painter: _FallbackOrbPainter(t: t)),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
