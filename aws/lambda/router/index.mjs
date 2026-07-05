@@ -96,7 +96,7 @@ const OPENAI_REALTIME_VOICE = process.env.OPENAI_REALTIME_VOICE || 'marin';
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-5.4-mini';
 // Natural human text-to-speech for אתי + אריק (real voice, not robotic device TTS).
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts-2025-12-15';
-const OPENAI_STT_MODEL = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
+const OPENAI_STT_MODEL = process.env.OPENAI_STT_MODEL || 'whisper-1';
 // Fallback chain — a free-tier model is frequently overloaded (429/503). If the
 // primary is busy we try the next one so the assistant keeps answering instead
 // of telling the user "the server is busy".
