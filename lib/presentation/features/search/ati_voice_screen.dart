@@ -114,9 +114,11 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       final text = await widget.service.stopRecordingAndTranscribe();
       if (!mounted) return;
       if (text.trim().isEmpty) {
+        final err = widget.service.lastRecordError;
         setState(() {
           _state = AtiVoiceState.idle;
-          _reply = 'לא שמעתי אותך 🙈 החזק/י את הכדור ודבר/י';
+          _reply = 'לא שמעתי אותך 🙈 החזק/י את הכדור ודבר/י'
+              '${err != null ? '\n($err)' : ''}';
         });
         return;
       }

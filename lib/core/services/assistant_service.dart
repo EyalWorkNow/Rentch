@@ -469,15 +469,21 @@ class AssistantService {
     // 2) Start recording. A failure HERE is NOT a permission problem — surface it.
     try {
       _ampTimer?.cancel();
+      // Release the playback audio focus/session so the MIC can actually capture —
+      // if audioplayers/TTS still holds it, the recorder yields a silent/empty clip.
+      try { await _player.stop(); } catch (_) {}
+      try { await _tts.stop(); } catch (_) {}
       // A stale session (previous crash / not stopped) blocks a fresh start.
       if (await _recorder.isRecording()) {
         await _recorder.stop();
       }
       final dir = await getTemporaryDirectory();
-      _recPath = '${dir.path}/eti_rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      // WAV (raw PCM 16-bit): no codec → never a silent/broken encode, and Whisper
+      // reads it directly. Bigger than m4a but tiny for a few seconds of speech.
+      _recPath = '${dir.path}/eti_rec_${DateTime.now().millisecondsSinceEpoch}.wav';
       await _recorder.start(
         const RecordConfig(
-            encoder: AudioEncoder.aacLc, sampleRate: 16000, numChannels: 1),
+            encoder: AudioEncoder.wav, sampleRate: 16000, numChannels: 1),
         path: _recPath!,
       );
       // POLL the amplitude with our OWN timer. The plugin's onAmplitudeChanged()
@@ -502,16 +508,39 @@ class AssistantService {
   /// Stop recording, transcribe via Whisper, return the text ('' if nothing / on
   /// failure). Deletes the temp clip afterwards.
   Future<String> stopRecordingAndTranscribe({String language = 'he'}) async {
+    lastRecordError = null;
     _ampTimer?.cancel();
     _ampTimer = null;
     String? path;
-    try { path = await _recorder.stop(); } catch (_) { path = _recPath; }
-    if (path == null) return '';
     try {
-      final bytes = await File(path).readAsBytes();
-      if (bytes.length < 800) return ''; // too short → nothing said
-      return await _transcribe(base64Encode(bytes), 'audio/m4a', language);
-    } catch (_) {
+      path = await _recorder.stop();
+    } catch (e) {
+      lastRecordError = 'stop:$e';
+      path = _recPath;
+    }
+    if (path == null) {
+      lastRecordError = 'no-path';
+      return '';
+    }
+    try {
+      final f = File(path);
+      if (!await f.exists()) {
+        lastRecordError = 'no-file';
+        return '';
+      }
+      final bytes = await f.readAsBytes();
+      if (bytes.length < 1200) {
+        // A near-empty clip means the mic didn't actually capture (session/focus).
+        lastRecordError = 'empty-audio ${bytes.length}b';
+        return '';
+      }
+      final text = await _transcribe(base64Encode(bytes), 'audio/wav', language);
+      if (text.isEmpty && lastRecordError == null) {
+        lastRecordError = 'transcribe-empty (${bytes.length}b)';
+      }
+      return text;
+    } catch (e) {
+      lastRecordError = 'read:$e';
       return '';
     } finally {
       try { await File(path).delete(); } catch (_) {}
@@ -543,12 +572,16 @@ class AssistantService {
       req.write(jsonEncode({'audio': b64, 'mime': mime, 'language': language}));
       final resp = await req.close().timeout(const Duration(seconds: 25));
       final raw = await utf8.decoder.bind(resp).join();
-      if (resp.statusCode < 200 || resp.statusCode >= 300) return '';
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        lastRecordError = 'http ${resp.statusCode}: ${raw.length > 90 ? raw.substring(0, 90) : raw}';
+        return '';
+      }
       final data = jsonDecode(raw);
       return (data is Map && data['text'] is String)
           ? (data['text'] as String).trim()
           : '';
-    } catch (_) {
+    } catch (e) {
+      lastRecordError = 'net:$e';
       return '';
     } finally {
       client.close(force: true);
