@@ -414,10 +414,9 @@ class AssistantService {
           'לא ניתן להפעיל את המיקרופון. בדקו שההרשאה אושרה.');
     }
     await _speech.listen(
-      // Hands-free turn-taking: auto-finalise only after a GENEROUS ~3.5s pause so
-      // we don't cut the user off mid-thought (they pause to think between
-      // criteria). listenFor caps a single turn generously for a full sentence.
-      pauseFor: const Duration(milliseconds: 3500),
+      // Hands-free turn-taking: auto-finalise after ~2s of silence — the user
+      // asked for at most a 2s gap before אתי responds. listenFor caps one turn.
+      pauseFor: const Duration(seconds: 2),
       listenFor: const Duration(seconds: 45),
       listenOptions: stt.SpeechListenOptions(
         localeId: 'he_IL',
@@ -508,7 +507,11 @@ class AssistantService {
         if (!done.isCompleted) done.complete();
       });
       await _player.play(BytesSource(wav, mimeType: 'audio/wav'));
-      final approxMs = (pcm.length / (rate * 2) * 1000).round() + 2500;
+      // A touch snappier — אתי speaks ~12% faster without sounding chipmunky.
+      try {
+        await _player.setPlaybackRate(1.12);
+      } catch (_) {}
+      final approxMs = (pcm.length / (rate * 2) / 1.12 * 1000).round() + 2000;
       await done.future.timeout(
         Duration(milliseconds: approxMs.clamp(2000, 60000)),
         onTimeout: () {},
@@ -526,7 +529,7 @@ class AssistantService {
     if (!_ttsReady) {
       try {
         await _tts.setLanguage('he-IL');
-        await _tts.setSpeechRate(0.46);
+        await _tts.setSpeechRate(0.54); // a bit faster / snappier
         await _tts.setPitch(1.0);
         await _tts.awaitSpeakCompletion(true);
       } catch (_) {}

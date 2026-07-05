@@ -83,6 +83,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // Voice-only: אתי asks permission before presenting apartments. True once she's
   // gathered enough and is waiting for the user's "כן" to actually show them.
   bool _voiceAwaitingConsent = false;
+  bool _voiceConsented = false; // user already said yes → show results directly
+  List<ScoredProperty> _voicePending = const []; // held results to reveal on "כן"
   bool? _consent;
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
@@ -401,6 +403,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
     _voiceAwaitingConsent = false; // fresh voice session — no pending confirmation
+    _voiceConsented = false;
+    _voicePending = const [];
     await Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => AtiVoiceScreen(
@@ -544,9 +548,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
     // Waiting for the user's go-ahead to present apartments?
     if (_voiceAwaitingConsent) {
+      _voiceAwaitingConsent = false;
       if (_isAffirmative(t) || wantsNow) {
-        _voiceAwaitingConsent = false;
-        final r = _latestScored; // already gathered on the previous turn
+        _voiceConsented = true;
+        // Reveal the apartments we ALREADY found (held from the previous turn).
+        final r = _voicePending.isNotEmpty ? _voicePending : _latestScored;
         return (
           reply: r.isEmpty
               ? 'רגע, בוא נחדד עוד קצת ואמצא לך את המתאימות'
@@ -555,17 +561,19 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           results: r,
         );
       }
-      // Not a yes → treat it as more criteria; drop the pending confirmation and
-      // fold the new detail in below.
-      _voiceAwaitingConsent = false;
+      // Not a yes → treat it as more criteria; fold the new detail in below.
     }
 
     await _send(transcript);
 
-    // Voice etiquette: don't dump apartments unasked. Once אתי has enough to
-    // search, she ASKS first — unless the user explicitly said "תראה לי".
-    if (_lastShowedResults && _latestScored.isNotEmpty && !wantsNow) {
+    // Voice etiquette: don't dump apartments unasked. The FIRST time אתי has enough
+    // to search, she ASKS — unless the user already consented or said "תראה לי".
+    if (_lastShowedResults &&
+        _latestScored.isNotEmpty &&
+        !wantsNow &&
+        !_voiceConsented) {
       _voiceAwaitingConsent = true;
+      _voicePending = _latestScored; // hold them so "כן" reveals exactly these
       return (
         reply: 'מצאתי כמה אפשרויות שמתאימות למה שתיארת. '
             'רוצה שאראה לך אותן עכשיו, או שנוסיף עוד משהו? 🙂',
@@ -574,20 +582,27 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       );
     }
 
+    // Explicit "show me" or a refinement AFTER consent → SHOW whatever she found;
+    // never suppress (this was the "she said she's showing but didn't" bug).
+    if (wantsNow) _voiceConsented = true;
     return (
       reply: _lastReply.isEmpty
           ? 'ספר לי עוד קצת על מה שאתה מחפש'
           : _lastReply,
-      showResults: _lastShowedResults && wantsNow,
-      results: wantsNow ? _latestScored : const <ScoredProperty>[],
+      showResults: _lastShowedResults,
+      results: _lastShowedResults ? _latestScored : const <ScoredProperty>[],
     );
   }
 
-  // Voice affirmatives — the user consenting to see apartments ("כן, בטח, יאללה…").
+  // Voice affirmatives ("כן / בטח / יאללה…"). NB: Hebrew has no \b word boundary,
+  // so single words are matched against a SPACE-PADDED input to avoid false hits
+  // inside longer words (לכן / תוכן) while still catching a bare "כן".
   static final _affirmative = RegExp(
-      r'\bכן\b|בטח|בהחלט|יאללה|יאלה|קדימה|אפשר|סבבה|אוקיי|אוקי|בסדר|נשמע טוב|'
-      r'למה לא|תראי|תראה|בואי|בוא נראה|\byes\b|\bok\b|okay|sure|go ahead');
-  bool _isAffirmative(String t) => _affirmative.hasMatch(t);
+      r'\s(?:כן|בטח|בהחלט|יאללה|יאלה|קדימה|סבבה|אוקיי|אוקי|בסדר|נכון|וודאי|בטוח|בבקשה|נו)\s'
+      r'|נשמע טוב|למה לא|תראי לי|תראה לי|בוא נראה|בואי נראה|קדימה נראה'
+      r'|yes|okay|\bok\b|sure|go ahead',
+      caseSensitive: false);
+  bool _isAffirmative(String t) => _affirmative.hasMatch(' ${t.trim()} ');
 
   // The most recent listing cards אתי surfaced — shown inline in the voice screen.
   List<ScoredProperty> get _latestScored {

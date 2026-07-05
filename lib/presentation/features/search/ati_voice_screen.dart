@@ -5,7 +5,7 @@ import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
-import 'package:dating_app/presentation/widgets/assistant_property_card.dart';
+import 'package:dating_app/presentation/widgets/ati_voice_property_card.dart';
 import 'package:flutter/material.dart';
 
 /// Full-screen voice conversation with אתי — styled after Google Gemini's live
@@ -151,12 +151,10 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           if (isFinal) {
             _handle(text);
           } else if (text.trim().isNotEmpty) {
-            // Backup VAD: only end the turn after a GENEROUS pause so we never cut
-            // the user off mid-thought. People pause to think ("אני מחפש… אֶה…
-            // שלושה חדרים"); 3.5s of true silence means they're actually done.
-            // The timer resets on every new partial word above, so it measures the
-            // gap since the LAST word, not total speech time.
-            _silence = Timer(const Duration(milliseconds: 3500), () {
+            // Backup VAD: end the turn after ~2s of silence (the user wants אתי to
+            // respond within 2s of them stopping). The timer resets on every new
+            // partial word, so it measures the gap since the LAST word.
+            _silence = Timer(const Duration(milliseconds: 2000), () {
               if (mounted && _state == AtiVoiceState.listening) {
                 _handle(_transcript);
               }
@@ -433,15 +431,12 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
               itemCount: _results.length,
               itemBuilder: (_, i) => Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  child: AssistantPropertyCard(
-                    scored: _results[i],
-                    width: double.infinity,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) =>
-                            PropertyDetailScreen(property: _results[i].property))),
-                  ),
+                child: AtiVoicePropertyCard(
+                  scored: _results[i],
+                  width: double.infinity,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) =>
+                          PropertyDetailScreen(property: _results[i].property))),
                 ),
               ),
             ),
