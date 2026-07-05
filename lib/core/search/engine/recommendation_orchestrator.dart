@@ -367,19 +367,20 @@ class RecommendationEngine {
       candidates = gated;
     }
 
-    // City gate (metro-aware): when the user NAMES a city, stay in its METRO —
-    // the named city plus the towns within ~18 km (גוש דן, הקריות, השרון …), so a
-    // "תל אביב" search also surfaces רמת גן / גבעתיים, but never a flat 100 km away.
-    // The soft city penalty still ranks the exact city first; relax to all cities
-    // only when the named city has zero stock.
+    // City gate — the named city is an IDENTITY, not a suggestion. Three cases:
+    //  • ample exact stock (≥3) → show ONLY the named city (a "תל אביב" search must
+    //    never surface פתח תקווה).
+    //  • sparse exact stock (1-2) → widen ONLY to the tightly-CONTIGUOUS metro
+    //    (≤5 km: רמת גן / גבעתיים from ת"א), never a distinct city farther out —
+    //    "עין עירון" must NOT pull אור עקיבא (~7 km away, its own city).
+    //  • ZERO exact stock → return the (empty) named-city set. We do NOT silently
+    //    substitute a different city; the flow says "nothing in <city>". A tiny
+    //    moshav with no listings must never be answered with a neighbouring town.
     final city = query.city?.trim();
     if (city != null && city.isNotEmpty) {
       final inCity = candidates
-          .where((p) => '${p.city} ${p.neighborhood}'.contains(city))
+          .where((p) => _cityMatches(p, city))
           .toList();
-      // Explicit city dominates: when the named city has real stock (≥3), stay
-      // TIGHT to it — a "תל אביב" search must not surface פתח תקווה. The ~18km
-      // metro widening is only a graceful fallback for a SPARSE named city.
       if (inCity.length >= 3) {
         candidates = inCity;
       } else if (inCity.isNotEmpty) {
@@ -389,11 +390,15 @@ class RecommendationEngine {
             inCity.length;
         candidates = candidates
             .where((p) =>
-                '${p.city} ${p.neighborhood}'.contains(city) ||
-                _km(p.lat, p.lon, cLat, cLon) <= 18.0)
+                _cityMatches(p, city) || _km(p.lat, p.lon, cLat, cLon) <= 5.0)
             .toList();
+      } else {
+        candidates = inCity; // empty → honest "no listings in <city>", never a leak
       }
     }
+    // Named city with zero stock → return nothing (the flow says "none in <city>")
+    // rather than crashing or leaking a neighbouring town.
+    if (candidates.isEmpty) return const [];
 
     // Required-feature gate: HARD deal-breakers (mamad חובה / must allow pets /
     // furnished) EXCLUDE listings that lack them — a "must have a mamad" search
@@ -846,6 +851,26 @@ class RecommendationEngine {
   /// Honest downsides: low/negative dimensions that carry weight, plus a
   /// budget-over note when the listing exceeds the stated max budget.
   // Great-circle km between two coordinates (metro-gate radius check).
+  // Normalise a city string for comparison: trim, unify hyphen/maqaf → space,
+  // collapse whitespace. "תל אביב-יפו" and "תל אביב יפו" become comparable.
+  static String _normCity(String s) => s
+      .trim()
+      .replaceAll(RegExp(r'[\-־]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ');
+
+  // Does a listing belong to the NAMED city? Matches the listing's own city (or a
+  // moshav/neighbourhood recorded in [neighborhood]) against the query — full-name
+  // containment only, so "עין עירון" matches "עין עירון" but NOT "אור עקיבא" or a
+  // different "עין …". Distance is handled separately by the metro widening.
+  static bool _cityMatches(RentalProperty p, String city) {
+    final q = _normCity(city);
+    if (q.isEmpty) return false;
+    final pc = _normCity(p.city);
+    if (pc == q || pc.contains(q) || q.contains(pc)) return true;
+    final nb = _normCity(p.neighborhood);
+    return nb.isNotEmpty && (nb == q || nb.contains(q));
+  }
+
   static double _km(double la1, double lo1, double la2, double lo2) {
     if (la1.abs() < 0.1 || la2.abs() < 0.1) return double.infinity; // bad coords
     const r = 6371.0088;

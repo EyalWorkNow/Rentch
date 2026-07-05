@@ -376,6 +376,26 @@ class GovData {
 
   LocalityRecord? localityByCode(int code) => _byCode[code];
 
+  /// The LONGEST known locality name (CBS list — every city, moshav, kibbutz,
+  /// village) that appears in [text]. Returns the record so callers get coords +
+  /// district too. This is how a free-text search recognises tiny places like
+  /// "עין עירון" that no hand-maintained list would contain. Longest-match wins so
+  /// "קרית ביאליק" beats "קרית", and a ≥3-char floor avoids spurious hits.
+  LocalityRecord? findLocalityInText(String text) {
+    if (!_loaded || text.trim().isEmpty) return null;
+    final t = normalizeLocalityName(text);
+    LocalityRecord? best;
+    for (final rec in _byCode.values) {
+      final n = rec.name;
+      if (n.length < 3) continue;
+      if (t.contains(n) &&
+          (best == null || n.length > best!.name.length)) {
+        best = rec;
+      }
+    }
+    return best;
+  }
+
   /// CBS socioeconomic cluster (1..10) for a city, or 0 if unknown.
   int socioeconomic(String city) => localityByName(city)?.ses ?? 0;
 

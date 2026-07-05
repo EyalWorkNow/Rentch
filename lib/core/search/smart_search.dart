@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
@@ -387,6 +388,12 @@ class SmartSearch {
     // City: prefer LLM extraction (Gemini saw the full context);
     // fall back to keyword scan + fuzzy matching only if LLM missed it
     String? city = _str(llm['city']);
+    if (city == null) {
+      // FIRST: the authoritative CBS locality list (every city/moshav/kibbutz) via
+      // GovData — this is how tiny places like "עין עירון" are recognised at all.
+      // Falls through to the legacy hand-list only when GovData isn't loaded.
+      city = GovData.instance.findLocalityInText(text)?.name;
+    }
     if (city == null) {
       // Try exact match on full multi-word localities (e.g. "תל אביב")
       for (final locality in LocalityMatcher.allLocalities) {
