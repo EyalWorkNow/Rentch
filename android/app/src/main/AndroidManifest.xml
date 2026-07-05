@@ -56,7 +56,7 @@
              silent/low-importance channel). -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="rently_default" />
+            android:value="rently_alerts" />
 
         <!-- Home-screen activity-summary widget (matches / unread / likes). -->
         <receiver

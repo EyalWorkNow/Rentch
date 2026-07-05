@@ -317,8 +317,8 @@ class NotificationService {
 
   /// Display an incoming FCM push while the app is in the FOREGROUND — the OS does
   /// NOT auto-show notification messages when the app is open, so without this the
-  /// user sees nothing while using the app. Uses the same `rently_default` channel
-  /// that backgrounded pushes use, so it looks identical.
+  /// user sees nothing while using the app. Uses the high-importance `rently_alerts`
+  /// channel so it heads-up (banner + sound), just like a WhatsApp notification.
   Future<void> showForegroundPush(String title, String body) async {
     if (title.trim().isEmpty && body.trim().isEmpty) return;
     try {
@@ -329,14 +329,25 @@ class NotificationService {
         body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'rently_default',
+            'rently_alerts',
             'Rently',
             channelDescription: 'התראות Rently',
             importance: Importance.high,
             priority: Priority.high,
           ),
-          iOS: DarwinNotificationDetails(),
-          macOS: DarwinNotificationDetails(),
+          // Foreground banner + sound on iOS (default suppresses it while open).
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            presentBanner: true,
+          ),
+          macOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            presentBanner: true,
+          ),
         ),
       );
     } catch (e) {

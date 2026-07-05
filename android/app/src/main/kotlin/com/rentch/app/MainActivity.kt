@@ -23,13 +23,20 @@ class MainActivity : FlutterActivity() {
     private fun createDefaultNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
+        // A channel's importance is FROZEN at creation — the old `rently_default`
+        // shipped as low-importance on early builds, so on updated devices it's
+        // stuck silent (no heads-up banner). Android ignores importance changes to
+        // an existing channel, so we move to a NEW id that's high everywhere and
+        // delete the stale one.
+        manager.deleteNotificationChannel("rently_default")
         val channel = NotificationChannel(
-            "rently_default",
+            "rently_alerts",
             "Rently",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "התראות Rently"
             enableVibration(true)
+            enableLights(true)
         }
         manager.createNotificationChannel(channel)
     }

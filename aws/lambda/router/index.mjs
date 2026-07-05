@@ -363,7 +363,7 @@ async function sendPushToUser(userId, { title, body, data } = {}) {
             // Pin the channel explicitly (matches the app's rently_default channel)
             // so a backgrounded push always displays, even if the manifest default-
             // channel meta-data is missing on some build.
-            notification: { channel_id: 'rently_default', sound: 'default' },
+            notification: { channel_id: 'rently_alerts', sound: 'default' },
           },
         };
         const resp = await fetch(FCM_SEND_URL, {
@@ -5233,7 +5233,7 @@ async function handleAdminBroadcast(event) {
 
   // The rich Android/iOS envelope shared by every token's message.
   const androidNotification = {
-    channel_id: 'rently_default',
+    channel_id: 'rently_alerts',
     notification_priority: 'PRIORITY_MAX',
     default_sound: true,
   };
