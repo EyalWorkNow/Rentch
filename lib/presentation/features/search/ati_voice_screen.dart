@@ -55,6 +55,8 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   late int _resultCount = widget.resultCount;
   List<ScoredProperty> _results = const []; // options shown inline in this screen
   Timer? _silence; // backup end-of-turn detector (auto-submit on a pause)
+  final PageController _carousel = PageController(viewportFraction: 0.88);
+  int _page = 0;
   bool _handling = false; // guards against re-entrant / echo-driven turns
   String _lastHandled = ''; // dedup: skip an identical utterance within a few s
   DateTime? _lastHandledAt;
@@ -89,6 +91,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   @override
   void dispose() {
     _silence?.cancel();
+    _carousel.dispose();
     if (!widget.demoMode) {
       widget.service.stopListening();
       widget.service.stopSpeaking();
@@ -192,38 +195,50 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     _handling = true;
     _lastHandled = t;
     _lastHandledAt = DateTime.now();
-    await widget.service.stopListening();
-    if (!mounted) {
-      _handling = false;
-      return;
-    }
-    setState(() {
-      _state = AtiVoiceState.thinking;
-      _level = 0;
-    });
-    final result = await widget.onUtterance(t);
-    if (!mounted) {
-      _handling = false;
-      return;
-    }
-    setState(() {
-      _reply = result.reply;
-      _state = AtiVoiceState.speaking;
-      // Show the options INSIDE the voice screen (no auto-close).
-      if (result.results.isNotEmpty) _results = result.results;
-      if (result.results.isNotEmpty) _resultCount = result.results.length;
-    });
+    // BULLETPROOF: whatever happens (GPT throws, timeout, no audio) we MUST reset
+    // _handling and re-open the mic — otherwise the guard blocks every future turn
+    // and אתי "won't let you talk". try/finally guarantees it.
     try {
-      await widget.service.speak(result.reply);
-    } catch (_) {}
-    _handling = false;
-    if (!mounted) return;
-    setState(() => _state = AtiVoiceState.idle);
-    // Anti-echo: let the speaker audio fully settle before re-opening the mic,
-    // so אתי doesn't hear the tail of her own reply and start a new turn.
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted || _muted) return;
-    _resumeListening(); // hands-free: auto-open the mic for the next turn
+      await widget.service.stopListening();
+      if (!mounted) return;
+      setState(() {
+        _state = AtiVoiceState.thinking;
+        _level = 0;
+      });
+      final result = await widget.onUtterance(t).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () =>
+            (reply: 'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לחזור על זה?',
+             showResults: false,
+             results: const <ScoredProperty>[]),
+      );
+      if (!mounted) return;
+      setState(() {
+        _reply = result.reply;
+        _state = AtiVoiceState.speaking;
+        if (result.results.isNotEmpty) {
+          _results = result.results;
+          _resultCount = result.results.length;
+          _page = 0;
+        }
+      });
+      if (result.results.isNotEmpty && _carousel.hasClients) {
+        _carousel.jumpToPage(0);
+      }
+      try {
+        await widget.service.speak(result.reply);
+      } catch (_) {}
+    } catch (_) {
+      // Network / GPT error → don't freeze; just keep the conversation open.
+    } finally {
+      _handling = false;
+      if (mounted) {
+        setState(() => _state = AtiVoiceState.idle);
+        // Anti-echo: let the speaker audio settle before re-opening the mic.
+        await Future.delayed(const Duration(milliseconds: 700));
+        if (mounted && !_muted) _resumeListening();
+      }
+    }
   }
 
   // ── copy ───────────────────────────────────────────────────────────────────
@@ -358,10 +373,12 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   }
 
   Widget _blob() {
+    // Shrink the orb once results are on screen so the carousel gets real room.
+    final size = _results.isEmpty ? 175.0 : 104.0;
     return GestureDetector(
       onTap: _toggleListen,
       child: LiquidGlassOrb(
-        size: 175,
+        size: size,
         level: widget.demoMode ? 0.6 : _activity,
         speaking: widget.demoMode || _state == AtiVoiceState.speaking,
       ),
@@ -388,39 +405,70 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   // right inside the voice screen (tap → full details).
   // Inside the voice conversation, apartments use the SAME map/discover ("לאסו")
   // card design, with the detailed "why", in a scrollable vertical list.
+  // A horizontal, swipeable CAROUSEL of the suggested apartments — each card
+  // gets real room and can scroll internally if its "why" is expanded.
   Widget _resultsStrip() {
     return Flexible(
-      flex: 8,
+      flex: 16,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text('מצאתי ${_results.length} דירות שמתאימות לך 👇',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                     color: AppColors.primary,
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700)),
           ),
-          Flexible(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+          Expanded(
+            child: PageView.builder(
+              controller: _carousel,
+              onPageChanged: (i) => setState(() => _page = i),
               itemCount: _results.length,
               itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: AssistantPropertyCard(
-                  scored: _results[i],
-                  width: double.infinity,
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) =>
-                          PropertyDetailScreen(property: _results[i].property))),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: AssistantPropertyCard(
+                    scored: _results[i],
+                    width: double.infinity,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) =>
+                            PropertyDetailScreen(property: _results[i].property))),
+                  ),
                 ),
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          _carouselDots(),
         ],
       ),
+    );
+  }
+
+  Widget _carouselDots() {
+    final n = _results.length.clamp(0, 12);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < n; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == _page ? 20 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: i == _page
+                  ? AppColors.primary
+                  : Colors.white.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+      ],
     );
   }
 

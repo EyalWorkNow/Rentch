@@ -148,8 +148,12 @@ class SearchQuery {
     this.transactionType = TransactionTypeFilter.any,
     this.rawText = '',
     Set<String>? intents,
+    Map<String, double>? weights,
+    Set<String>? requiredFeatures,
   })  : amenities = amenities ?? <String>{},
-        intents = intents ?? <String>{};
+        intents = intents ?? <String>{},
+        weights = weights ?? const <String, double>{},
+        requiredFeatures = requiredFeatures ?? const <String>{};
 
   final String? city;
   final String? neighborhood;
@@ -175,6 +179,20 @@ class SearchQuery {
   /// preference model + gates consume it — so intent is detected in ONE place,
   /// not re-parsed with regexes deep in the ranker. See [SearchIntent].
   final Set<String> intents;
+
+  /// LLM-ASSIGNED importance per factor, 0..1. This is the assistant acting as
+  /// the "brain": after understanding the user it decides WHICH factors to weigh
+  /// and HOW MUCH. When non-empty, the preference model uses ONLY these weights
+  /// (factors the model didn't mention ⇒ 0), instead of its heuristic priors —
+  /// the language model understands the human better than a fixed prior does.
+  /// Keys are factor names (see PreferenceModelBuilder.factorToDimension).
+  final Map<String, double> weights;
+
+  /// HARD deal-breaker features (canonical keys, e.g. 'mamad', 'petsAllowed',
+  /// 'furnished'): a listing that lacks ANY of these is EXCLUDED (relax-if-empty),
+  /// not merely down-weighted. Set by Etti's hard_constraints. Distinct from the
+  /// soft [amenities] "nice-to-have" set.
+  final Set<String> requiredFeatures;
 
   bool get isEmpty =>
       city == null &&

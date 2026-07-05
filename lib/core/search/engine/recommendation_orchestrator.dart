@@ -355,7 +355,17 @@ class RecommendationEngine {
     // provider.recommendForTenant path — is gated, not just SmartSearch.rank.
     final gated = SmartSearch.applyTransactionFilter(candidates, query);
     if (gated.isEmpty) return const [];
-    candidates = gated;
+    // Marketplace default: an UNSPECIFIED search is a RENT search — a family
+    // looking to rent must never see million-shekel sales mixed in. Buying is a
+    // deliberate choice ("למכירה"/"להשקעה"). Relax to all only if there's no rent.
+    if (query.transactionType == TransactionTypeFilter.any) {
+      final rentOnly = gated
+          .where((p) => p.transactionType == PropertyTransactionType.rent)
+          .toList();
+      candidates = rentOnly.isNotEmpty ? rentOnly : gated;
+    } else {
+      candidates = gated;
+    }
 
     // City gate (metro-aware): when the user NAMES a city, stay in its METRO —
     // the named city plus the towns within ~18 km (גוש דן, הקריות, השרון …), so a
@@ -367,8 +377,12 @@ class RecommendationEngine {
       final inCity = candidates
           .where((p) => '${p.city} ${p.neighborhood}'.contains(city))
           .toList();
-      if (inCity.isNotEmpty) {
-        // The named-city listings define its centre.
+      // Explicit city dominates: when the named city has real stock (≥3), stay
+      // TIGHT to it — a "תל אביב" search must not surface פתח תקווה. The ~18km
+      // metro widening is only a graceful fallback for a SPARSE named city.
+      if (inCity.length >= 3) {
+        candidates = inCity;
+      } else if (inCity.isNotEmpty) {
         final cLat = inCity.map((p) => p.lat).reduce((a, b) => a + b) /
             inCity.length;
         final cLon = inCity.map((p) => p.lon).reduce((a, b) => a + b) /
@@ -388,7 +402,50 @@ class RecommendationEngine {
     final maxP = query.maxPrice;
     if (maxP != null && maxP > 0) {
       final within = candidates.where((p) => p.price <= maxP * 1.15).toList();
-      if (within.isNotEmpty) candidates = within;
+      if (within.isNotEmpty) {
+        candidates = within;
+      } else {
+        // Nothing fits the budget → show the CHEAPEST cluster (closest to what the
+        // user can pay), NOT the whole city. A ₪3,200 seeker must never be handed
+        // a ₪16,000 penthouse just because it scores high on other axes.
+        final sorted = [...candidates]..sort((a, b) => a.price.compareTo(b.price));
+        final cheapest = sorted.first.price;
+        candidates =
+            sorted.where((p) => p.price <= cheapest * 1.35).toList();
+      }
+    }
+
+    // Required-feature gate: HARD deal-breakers (mamad חובה / must allow pets /
+    // furnished) EXCLUDE listings that lack them — a "must have a mamad" search
+    // must never surface a flat without one. Relax only if nothing qualifies.
+    if (query.requiredFeatures.isNotEmpty) {
+      final ok = candidates
+          .where((p) =>
+              query.requiredFeatures.every((k) => propertyHasFeature(p, k)))
+          .toList();
+      if (ok.isNotEmpty) {
+        candidates = ok;
+      } else {
+        // No listing has ALL must-haves → fall back to the NON-NEGOTIABLE ones
+        // (a dog can't live in a no-pets building; a family in a shelter zone
+        // needs a mamad). Softer must-haves (parking/furnished/elevator) yield.
+        const absolute = {'petsAllowed', 'mamad'};
+        final reqAbs = query.requiredFeatures.where(absolute.contains).toSet();
+        if (reqAbs.isNotEmpty) {
+          final absOk = candidates
+              .where((p) => reqAbs.every((k) => propertyHasFeature(p, k)))
+              .toList();
+          if (absOk.isNotEmpty) candidates = absOk;
+        }
+      }
+    }
+
+    // Min-rooms gate: a stated minimum ("4+ rooms") should not surface a 3-room
+    // (½-room tolerance for a near-miss). Relax if nothing meets it.
+    final minR = query.minRooms;
+    if (minR != null && minR > 0) {
+      final enough = candidates.where((p) => p.rooms >= minR - 0.5).toList();
+      if (enough.isNotEmpty) candidates = enough;
     }
 
     // Near-sea gate: "קרוב לים" means WITHIN a defined distance of the coast
@@ -781,7 +838,13 @@ class RecommendationEngine {
     if (wsum <= 0) return c.score;
     // Mostly the stated-criteria fit, with a little overall quality so it isn't
     // a single axis. Both are 0..1.
-    return (0.8 * (acc / wsum) + 0.2 * c.score).clamp(0.0, 1.0);
+    // Mostly the stated-criteria fit (weigh it more; the ranking blend carries
+    // trust/popularity the user didn't ask about, which shouldn't drag the %).
+    final m = (0.85 * (acc / wsum) + 0.15 * c.score).clamp(0.0, 1.0);
+    // Display calibration: a genuinely good match (~0.7) should READ as strong
+    // (~0.85). Expand the upper half only — weak matches (≤0.5) are untouched, and
+    // the transform is monotonic so the display order is preserved.
+    return (m <= 0.5 ? m : (0.5 + (m - 0.5) * 1.5)).clamp(0.0, 1.0);
   }
 
   static List<String> _concerns(
@@ -802,13 +865,16 @@ class RecommendationEngine {
         concerns.add(over <= 10
             ? 'מעט מעל התקציב שלך'
             : 'מעל התקציב שלך בכ-$over%');
-      } else if (c.property.transactionType != PropertyTransactionType.sale) {
-        // Rent fits, but arnona + vaad push the true cost over — flag ONLY when
-        // it overshoots by a meaningful margin (>3%), not by a few shekels.
+      } else if (price <= maxBudget * 0.95 &&
+          c.property.transactionType != PropertyTransactionType.sale) {
+        // Budget BLIND-SPOT only: the rent LOOKS comfortably affordable (≤95% of
+        // budget) yet arnona + vaad quietly push the true cost over by a real
+        // margin (>5%). If the rent is already near budget the tenant knows
+        // they're stretching, so we stay quiet — no concern on every card.
         final cost = MonthlyCost.estimate(
             rent: price, sizeM2: c.property.sizeM2, city: c.property.city);
-        if (cost != null && cost.total > maxBudget * 1.03) {
-          concerns.add('שכ״ד בתקציב, אך העלות הכוללת '
+        if (cost != null && cost.total > maxBudget * 1.05) {
+          concerns.add('נראית זולה, אבל העלות הכוללת '
               '(${cost.plainHebrewLabel}) חורגת מהתקציב');
         }
       }

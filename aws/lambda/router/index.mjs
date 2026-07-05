@@ -1012,6 +1012,9 @@ export const handler = async (event) => {
     if (segments[0] === 'assistant' && method === 'POST') {
       // POST /assistant/tts → Gemini natural voice for a reply (audio bytes).
       if (segments[1] === 'tts') return await handleAssistantTts(event);
+      // POST /assistant/extract → Etti intent-extraction engine: free text →
+      // { hard_constraints, soft_weights, inferred_persona } for the ranking.
+      if (segments[1] === 'extract') return await handleEttiExtract(event);
       // POST /assistant/live-token → ephemeral token for the real-time Live voice
       // session (the API key never leaves the backend).
       if (segments[1] === 'live-token') return await handleAssistantLiveToken(event);
@@ -3667,6 +3670,21 @@ const SEARCH_LISTINGS_TOOL = {
         description: 'מאפיינים נדרשים (feat_parking, feat_elevator, feat_pets, ...)',
         items: { type: 'string' },
       },
+      // ── THE BRAIN: you decide WHAT matters and HOW MUCH ──────────────────────
+      // After you understood the user, assign an importance 0..1 to ONLY the
+      // factors that matter to THEM right now. Omit anything irrelevant — the
+      // engine will not consider it. Always include `budget` and `size` when the
+      // user gave a budget / room need. You understand the person better than a
+      // fixed formula — this is where that understanding enters the math.
+      weights: {
+        type: 'object',
+        description:
+          'חשיבות 0..1 לכל גורם שחשוב למשתמש עכשיו (השמט גורמים לא-רלוונטיים). '
+          + 'גורמים אפשריים: budget, location, area_quality, safety, value, size, '
+          + 'amenities, transit, condition, schools, family, near_sea, yield, '
+          + 'university, nightlife, quiet, luxury, view, spacious, accessible',
+        additionalProperties: { type: 'number' },
+      },
       limit: { type: 'integer', description: 'כמה תוצאות להחזיר (ברירת מחדל 6)' },
     },
   },
@@ -4643,6 +4661,76 @@ async function openaiChat(systemText, messages) {
     console.warn('openai chat', e.message);
     return null;
   }
+}
+
+// ── ETTI — intent-extraction engine ─────────────────────────────────────────
+// Reads a free-text query, reasons about Israeli housing culture, and emits a
+// strict JSON plan: hard_constraints (gating), soft_weights (1.0 neutral, up to
+// 2.0), inferred_persona. The client maps it (EttiPlan) into the ranking engine.
+const ETTI_EXTRACT_PROMPT = [
+  '"Etti", an advanced Real Estate Intent Extraction Engine specialized in the',
+  'Israeli housing market. Read BETWEEN THE LINES: infer implicit needs, weighted',
+  'preferences and hard constraints from deep knowledge of Israeli culture & real',
+  'estate dynamics.',
+  '',
+  'SUPER-RULES:',
+  '1. Tight budget ⇒ reliance on transit, periphery, or roommates. High weight for',
+  '   transit, value; flexible on size/location.',
+  '2. Family/kids expansion (baby, "upgrading to 4 rooms", "near parents") ⇒ safety,',
+  '   schools, stroller accessibility (ground_floor/elevator).',
+  '3. Investor/short-term (near universities/hospitals/bases, high budget, "sale") ⇒',
+  '   ignore personal lifestyle fit; focus yield, high_demand_areas, low_vacancy.',
+  '4. Specific community/religious needs (synagogue, Shabbat, Olim communities,',
+  '   Haredi cities, mamad in the South) ⇒ turn location & specific amenities into',
+  '   STRICT HARD CONSTRAINTS that override general preferences.',
+  '',
+  'OUTPUT strictly valid JSON ONLY (no prose), with:',
+  '- "hard_constraints": absolute deal-breakers, e.g. {"city":"תל אביב-יפו","mamad":true,"max_price":6000}',
+  '- "soft_weights": inferred factors → float −1.0..2.0 (1.0 neutral, 2.0 highly desired).',
+  '  Use factor names: budget, value, size, transit, location/central_location, near_sea,',
+  '  nightlife, quiet_neighborhood, safety/security, schools_nearby, family_friendly,',
+  '  accessibility_stroller/ground_floor, luxury, view, yield, university, spacious.',
+  '- "inferred_persona": one short sentence of your reasoning.',
+  '',
+  'EXAMPLES:',
+  'Q: "מחפשים לשדרג ל-4 חדרים, באזור שקט, שיהיה קרוב להורים בפתח תקווה."',
+  'A: {"hard_constraints":{"city":"פתח תקווה"},"soft_weights":{"family_friendly":1.8,"schools_nearby":1.5,"accessibility_stroller":1.5,"quiet_neighborhood":1.5},"inferred_persona":"Young family expanding, needs support from parents, prioritizes safety and child accessibility over nightlife."}',
+  'Q: "סטודיו או חדר במרכז תל אביב, לא אכפת לי הגודל, רק שיהיה קרוב לים."',
+  'A: {"hard_constraints":{"city":"תל אביב-יפו"},"soft_weights":{"near_sea":2.0,"central_location":1.8,"nightlife":1.5,"size":-1.0,"transit":1.2},"inferred_persona":"Single professional/student, willing to sacrifice size and budget for prime location and lifestyle."}',
+  'Q: "דירה באשקלון, חובה ממ\\"ד תקני, עדיפות לקומת קרקע."',
+  'A: {"hard_constraints":{"city":"אשקלון","mamad":true},"soft_weights":{"ground_floor":1.5,"security":2.0,"accessibility":1.2},"inferred_persona":"Security-driven search in the South, prioritizing safety and quick access to shelter."}',
+].join('\n');
+
+// JSON-mode chat: returns a parsed object (or null). Uses OpenAI structured output.
+async function openaiExtractJson(systemText, userText) {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: OPENAI_CHAT_MODEL,
+        messages: [
+          { role: 'system', content: systemText },
+          { role: 'user', content: String(userText || '').slice(0, 1500) },
+        ],
+        max_completion_tokens: 500,
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!res.ok) { console.warn('etti extract', res.status); return null; }
+    const data = await res.json();
+    const txt = (data?.choices?.[0]?.message?.content || '').trim();
+    try { return JSON.parse(txt); } catch { return null; }
+  } catch (e) { console.warn('etti extract', e.message); return null; }
+}
+
+async function handleEttiExtract(event) {
+  let query = '';
+  try { query = (JSON.parse(event.body || '{}').query || '').toString(); } catch {}
+  if (!query.trim()) return json(400, { error: 'missing query' });
+  const plan = await openaiExtractJson(ETTI_EXTRACT_PROMPT, query);
+  return json(200, plan || { hard_constraints: {}, soft_weights: {}, inferred_persona: '' });
 }
 
 // אתי's warm reply. NO server tool loop: the CLIENT renders listings from its own

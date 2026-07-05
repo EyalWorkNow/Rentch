@@ -91,11 +91,29 @@ only when it stays non-empty, so we honour the request without dead-ending:
 3. **budget** — drop listings >15 % over a stated `maxPrice` when cheaper exist.
 4. **near-sea** — `intents.near_sea` ⇒ keep only ≤ `SearchIntent.seaOkKm` (3 km) of the coast (close ≤1.5 km, near ≤3 km, far >3 km).
 
-## Layer 3 — Intent → weights
+## Layer 3 — Weighting: the assistant is the brain
 
-The preference model **consumes** `query.intents` (it never re-parses text). Each
-present intent sharpens the relevant MAUT dimension to a top tier (≈ value/size),
-so an explicitly-requested factor actually re-ranks rather than nudging:
+**The language model decides WHAT matters and HOW MUCH; the algorithm does only
+that math.** The LLM was built to understand people — better than any fixed prior
+— so after the conversation it emits `weights` (factor → importance 0..1) in its
+`search_listings` tool call. The preference model then:
+
+- when `query.weights` is non-empty → uses **only** those importances
+  (`llmWeightForDim`, via `factorToDimension`); a factor the model didn't mention
+  is weight **0** — not considered. `budget`/`location` keep a small floor so
+  price/place are never entirely ignored.
+- when absent (typed search, no assistant) → falls back to the heuristic path
+  below (`SearchIntent` → `sharpen`).
+
+Proven: the same listings reorder purely from the model's weights — `near_sea:0.97`
+puts the beachfront first; `size:0.95` (no sea) does not. The engine obeys the
+brain.
+
+### Fallback heuristic (typed search) — Intent → weights
+
+When no assistant weighed in, the model consumes `query.intents` (never re-parsing
+text). Each present intent sharpens the relevant MAUT dimension to a top tier
+(≈ value/size), so an explicitly-requested factor actually re-ranks:
 
 ```
 near_sea      → coast          quiet         → senior_area

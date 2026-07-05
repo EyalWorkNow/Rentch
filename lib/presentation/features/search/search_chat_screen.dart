@@ -12,10 +12,10 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/recommendation_explainer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/repositories/property_search_repository.dart';
+import 'package:dating_app/core/search/etti_plan.dart';
 import 'package:dating_app/core/search/search_intent.dart';
-import 'package:dating_app/core/services/realtime_voice_service.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
-import 'package:dating_app/presentation/features/search/realtime_voice_screen.dart';
 import 'package:dating_app/presentation/widgets/why_details.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -391,51 +391,28 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _streamTimers.add(t);
   }
 
-  // Opens אתי's voice conversation. Prefers the LIVE realtime session (streaming
-  // voice + native barge-in); if that can't connect it falls back to the reliable
-  // turn-based liquid-glass screen. Opened from the sound button in the input bar.
+  // Opens אתי's voice conversation. Opens the reliable turn-based liquid-glass
+  // screen IMMEDIATELY (never block the tap on a network handshake). The realtime
+  // streaming session is an in-screen upgrade, tried opportunistically — it must
+  // never gate whether the screen appears.
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
-    final realtime = RealtimeVoiceService();
-    bool live = false;
-    try {
-      live = await realtime
-          .start()
-          .timeout(const Duration(seconds: 7), onTimeout: () => false);
-    } catch (_) {
-      live = false;
-    }
-    bool wantFallback = false;
-    if (live) {
-      final res = await Navigator.of(context).push<bool>(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => RealtimeVoiceScreen(
-          service: realtime,
-          onSearch: _handleRealtimeSearch,
-        ),
-      ));
-      await realtime.dispose();
-      wantFallback = res == true; // user tapped "switch to regular chat"
-    } else {
-      await realtime.dispose();
-    }
-    if ((!live || wantFallback) && mounted) {
-      await Navigator.of(context).push(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => AtiVoiceScreen(
-          service: _service,
-          onUtterance: _processVoiceUtterance,
-          criteria: _voiceCriteria(),
-          resultCount: _lastResultCount,
-        ),
-      ));
-    }
+    await Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => AtiVoiceScreen(
+        service: _service,
+        onUtterance: _processVoiceUtterance,
+        criteria: _voiceCriteria(),
+        resultCount: _lastResultCount,
+      ),
+    ));
     _scrollToEnd();
   }
 
   // Runs a `search_listings` tool-call from the live voice agent: builds the query
   // from its args, runs the same cohort search as typed input, drops the cards
   // into the chat, and returns a short spoken summary + the results for אתי.
+  // ignore: unused_element  (ready for the realtime in-screen upgrade)
   Future<({List<ScoredProperty> results, String summary})> _handleRealtimeSearch(
       Map<String, dynamic> args) async {
     final provider = context.read<DatingProvider>();
@@ -470,6 +447,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       'rent' => TransactionTypeFilter.rent,
       _ => TransactionTypeFilter.any,
     };
+    // THE BRAIN: the importances the assistant assigned → drive the ranking math.
+    final llmWeights = <String, double>{};
+    final w = args['weights'];
+    if (w is Map) {
+      w.forEach((k, v) {
+        final d = v is num ? v.toDouble() : double.tryParse(v.toString());
+        if (d != null) llmWeights[k.toString()] = d.clamp(0.0, 1.0);
+      });
+    }
     _query = _merge(
       _query,
       SearchQuery(
@@ -481,6 +467,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         transactionType: txType,
         rawText: rawText,
         intents: intents,
+        weights: llmWeights,
       ),
     );
     final life = (args['lifestyle'] as String?)?.toLowerCase() ?? '';
@@ -663,6 +650,21 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
   }
 
+  // Calls the Etti extraction engine and folds its plan into _query. The
+  // deterministic _query is passed as the fallback so explicit numbers survive.
+  Future<void> _ettiEnrich(String text) async {
+    try {
+      final resp = await AwsApiClient.instance
+          .post('/assistant/extract', {'query': text}).timeout(
+        const Duration(seconds: 6),
+      );
+      final plan = EttiPlan.fromJson(resp);
+      if (!plan.isEmpty) _query = plan.toQuery(fallback: _query);
+    } catch (_) {
+      // graceful — the on-device SmartSearch query already stands
+    }
+  }
+
   Future<void> _send(String raw) async {
     final text = raw.trim();
     if (text.isEmpty || _busy) return;
@@ -682,14 +684,18 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // location request instead of a warm reply (see below).
     final maybeLoc = _locationRelative.hasMatch(text);
 
-    // Criteria understanding: on-device parser only. (The Gemini /assistant/extract
-    // call was retired — it added a whole round-trip of latency for nothing now
-    // that Gemini is off; SmartSearch parses the same fields instantly on-device.)
+    // Deterministic base: SmartSearch parses explicit fields instantly on-device
+    // (city / budget / rooms / features) — the fallback Etti folds over.
     _query = _merge(_query, SmartSearch.parse(text));
 
     // Fold lifestyle signals from the whole conversation into the query (e.g.
     // "דתי לאומי" / "תינוק" → an elevator matters). See _applyLifestyle.
     _applyLifestyle(text);
+
+    // ETTI (the LLM brain): read between the lines → hard_constraints + weighted
+    // soft preferences, folded over the deterministic parse. Bounded + graceful:
+    // on any failure the on-device query stands. See EttiPlan / docs/architecture.
+    await _ettiEnrich(text);
 
     // Location needed but unknown → אתי RAISES a GPS request (a button). The user
     // approves, then the app captures the location and searches. אתי never grabs
@@ -1098,6 +1104,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             : a.transactionType,
         rawText: '${a.rawText} ${b.rawText}'.trim(),
         intents: {...a.intents, ...b.intents},
+        weights: {...a.weights, ...b.weights}, // latest turn's importances win
+        requiredFeatures: {...a.requiredFeatures, ...b.requiredFeatures},
       );
 
   // ── Lifestyle inference ────────────────────────────────────────────────────

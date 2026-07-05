@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/search/etti_plan.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -191,6 +192,48 @@ void main() {
         reason: 'assistant near_sea intent must gate out the 9km-inland flat');
     expect(ids.contains('ta-beach'), true,
         reason: 'the beachfront flat survives the near-sea gate');
+  });
+
+  test('LLM WEIGHTS drive the ranking — the assistant is the brain', () {
+    // The assistant understood the user and decided: the sea matters a lot,
+    // size barely. The engine must obey — beachfront leads despite being smaller.
+    final seaBrain = SearchQuery(
+      city: 'תל אביב',
+      maxPrice: 8500,
+      weights: const {'near_sea': 0.97, 'budget': 0.3, 'size': 0.1},
+    );
+    final r1 = RecommendationEngine.recommendAsScored(
+        candidates: catalogue(), query: seaBrain, limit: 8, seed: 21);
+    expect(r1.first.property.id == 'ta-beach', true,
+        reason: 'a high sea-weight from the model must put the beachfront first');
+
+    // Same listings; now the model decided size matters and the sea does NOT.
+    final sizeBrain = SearchQuery(
+      city: 'תל אביב',
+      maxPrice: 8500,
+      weights: const {'size': 0.95, 'value': 0.6, 'budget': 0.4},
+    );
+    final r2 = RecommendationEngine.recommendAsScored(
+        candidates: catalogue(), query: sizeBrain, limit: 8, seed: 21);
+    expect(r2.first.property.id != 'ta-beach', true,
+        reason: 'with no sea-weight, the small beach flat must NOT lead');
+  });
+
+  test('ETTI E2E — the extracted plan drives the real engine', () {
+    // The full Etti output for "studio in central TA, near the sea, size doesn't
+    // matter" → the plan alone must lead with the beachfront flat.
+    final q = EttiPlan.fromJson({
+      'hard_constraints': {'city': 'תל אביב'},
+      'soft_weights': {'near_sea': 2.0, 'central_location': 1.5, 'size': -1.0},
+      'inferred_persona': 'single professional, sea lifestyle',
+    }).toQuery();
+    final recs = RecommendationEngine.recommendAsScored(
+        candidates: catalogue(), query: q, limit: 8, seed: 21);
+    final ids = recs.map((s) => s.property.id).toList();
+    expect(recs.first.property.id == 'ta-beach', true,
+        reason: 'Etti near_sea:2.0 → the beachfront flat leads');
+    expect(ids.contains('ta-eastfar'), false,
+        reason: 'the near_sea intent from Etti also gates out the inland flat');
   });
 
   test('אבי — משקיע בחיפה לתשואה', () {

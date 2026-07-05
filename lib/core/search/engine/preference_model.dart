@@ -595,6 +595,48 @@ class PreferenceModelBuilder {
   };
   static const double _priorVariance = 0.09; // σ≈0.3 — fairly uncertain prior
 
+  /// Maps the assistant's friendly factor names → internal scoring dimensions.
+  /// The model may also address a dimension by its own name. This is the shared
+  /// vocabulary the assistant is instructed to use when it assigns importances.
+  static const Map<String, String> factorToDimension = {
+    'budget': 'budget', 'price': 'budget', 'affordability': 'budget',
+    'location': 'location', 'central': 'location', 'centrality': 'location',
+    'neighborhood': 'neighborhood', 'area_quality': 'neighborhood',
+    'quality_area': 'neighborhood',
+    'safety': 'safety',
+    'value': 'value',
+    'size': 'size', 'rooms': 'size',
+    'amenities': 'amenities', 'features': 'amenities',
+    'transit': 'transit', 'public_transport': 'transit',
+    'condition': 'condition',
+    'schools': 'schools', 'good_schools': 'schools',
+    'family': 'family', 'family_area': 'family',
+    'health': 'health',
+    'near_sea': 'coast', 'sea': 'coast', 'beach': 'coast', 'coast': 'coast',
+    'yield': 'yield', 'investment': 'yield',
+    'university': 'university', 'campus': 'university',
+    'nightlife': 'young_area', 'young_area': 'young_area', 'vibrant': 'young_area',
+    'quiet': 'senior_area', 'senior_area': 'senior_area', 'calm': 'senior_area',
+    'luxury': 'luxury', 'premium': 'luxury',
+    'view': 'view',
+    'spacious': 'spaciousness', 'spaciousness': 'spaciousness',
+    'accessible': 'accessibility', 'accessibility': 'accessibility',
+  };
+
+  /// The importance the assistant assigned to [dim] (0 if it didn't mention it) —
+  /// the max over any factor name that maps to this dimension, or the dimension
+  /// name used directly.
+  static double llmWeightForDim(String dim, Map<String, double> llm) {
+    double best = (llm[dim] ?? 0.0).toDouble();
+    for (final e in factorToDimension.entries) {
+      if (e.value == dim) {
+        final v = llm[e.key];
+        if (v != null && v > best) best = v;
+      }
+    }
+    return best.clamp(0.0, 1.0);
+  }
+
   static UserPreferenceModel build({
     required SearchQuery query,
     TenantProfile? profile,
@@ -743,6 +785,27 @@ class PreferenceModelBuilder {
       sharpen('health', 0.6, 1.5); // families value clinic access too
     } else if (studentTag) {
       sharpen('family', 0.55, 2.0); // young/family-mix area, mild
+    }
+
+    // ── LLM-DRIVEN WEIGHTS (the assistant is the brain) ───────────────────────
+    // When the assistant supplied importances, they REPLACE all heuristic weights:
+    // the language model understood the human and decided what matters and how
+    // much. A factor it didn't mention drops to 0 (not considered). The algorithm
+    // then does only the math the model asked for. Budget/location keep a small
+    // floor so price/place are never entirely ignored.
+    if (query.weights.isNotEmpty) {
+      stated.clear();
+      for (final dim in kScoringDimensions) {
+        final llmImp = llmWeightForDim(dim, query.weights); // what the model set
+        var imp = llmImp;
+        if (dim == 'budget') imp = math.max(imp, 0.35);
+        if (dim == 'location') imp = math.max(imp, 0.20);
+        weights[dim] = BayesianWeight(imp, 0.02); // confident: the model decided
+        // Only "stated" when the model ACTUALLY weighted it — the budget/location
+        // FLOOR must not mark budget as stated (else a no-budget search shows a
+        // phantom "over budget" concern against the default median budget).
+        if (llmImp > 0) stated.add(dim);
+      }
     }
 
     // ── utilities per dimension ──────────────────────────────────────────────

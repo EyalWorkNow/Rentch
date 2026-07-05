@@ -223,14 +223,47 @@ class IsraelGeoIndex {
     _GeoPlace('באר שבע - מרכז', 31.2520, 34.7910, 0.6),
   ];
 
+  // Israeli higher-education institutions — the universities AND the colleges
+  // (michlalot) students actually live near. Broadened so proximity resolves in
+  // every academic city, not only the 7 research universities.
   static const List<_GeoPlace> _universities = [
+    // research universities
     _GeoPlace('אוניברסיטת ת"א', 32.1133, 34.8044),
     _GeoPlace('הטכניון', 32.7767, 35.0233),
     _GeoPlace('האונ׳ העברית גבעת רם', 31.7770, 35.1970),
+    _GeoPlace('האונ׳ העברית הר הצופים', 31.7940, 35.2440),
     _GeoPlace('בן גוריון', 31.2620, 34.8010),
     _GeoPlace('בר אילן', 32.0690, 34.8430),
     _GeoPlace('אונ׳ חיפה', 32.7610, 35.0200),
+    _GeoPlace('אונ׳ אריאל', 32.1030, 35.2070),
+    _GeoPlace('הפתוחה רעננה', 32.1810, 34.8710),
+    // Rehovot science campus (Weizmann + Faculty of Agriculture)
+    _GeoPlace('מכון ויצמן רחובות', 31.9070, 34.8100),
+    _GeoPlace('הפקולטה לחקלאות רחובות', 31.9050, 34.8060),
+    _GeoPlace('מכללת פרס רחובות', 31.8940, 34.8080),
+    // colleges — Gush Dan / Sharon
     _GeoPlace('רייכמן הרצליה', 32.1740, 34.8390),
+    _GeoPlace('אפקה ת"א', 32.1130, 34.8180),
+    _GeoPlace('לוינסקי ת"א', 32.0940, 34.7830),
+    _GeoPlace('שנקר ר"ג', 32.0640, 34.8280),
+    _GeoPlace('אונו קרית אונו', 32.0560, 34.8560),
+    _GeoPlace('HIT חולון', 32.0150, 34.7740),
+    _GeoPlace('המכללה למינהל ראשל"צ', 31.9670, 34.7930),
+    _GeoPlace('רופין עמק חפר', 32.3400, 34.9170),
+    _GeoPlace('המכללה האקדמית נתניה', 32.3050, 34.8650),
+    // Jerusalem colleges
+    _GeoPlace('בצלאל ירושלים', 31.7900, 35.2020),
+    _GeoPlace('הדסה ירושלים', 31.7810, 35.2210),
+    // South
+    _GeoPlace('סמי שמעון ב"ש', 31.2510, 34.7920),
+    _GeoPlace('ספיר שדרות', 31.5560, 34.5850),
+    _GeoPlace('אחוה', 31.7500, 34.7000),
+    _GeoPlace('בן גוריון אילת', 29.5560, 34.9510),
+    // North
+    _GeoPlace('בראודה כרמיאל', 32.9130, 35.3020),
+    _GeoPlace('תל חי', 33.2340, 35.5760),
+    _GeoPlace('כנרת', 32.7080, 35.5760),
+    _GeoPlace('עמק יזרעאל', 32.6470, 35.2960),
   ];
 
   // Coarse coastline reference points (Mediterranean).
