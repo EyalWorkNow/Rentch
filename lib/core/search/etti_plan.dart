@@ -97,7 +97,9 @@ class EttiPlan {
         fb.maxPrice;
     final minPrice = i(hardConstraints['min_price'] ?? hardConstraints['minPrice']) ??
         fb.minPrice;
-    final minRooms = n(hardConstraints['min_rooms'] ?? hardConstraints['minRooms']) ??
+    final minRooms = n(hardConstraints['min_rooms'] ??
+            hardConstraints['minRooms'] ??
+            hardConstraints['rooms']) ??
         fb.minRooms;
     final maxRooms = n(hardConstraints['max_rooms'] ?? hardConstraints['maxRooms']) ??
         fb.maxRooms;
@@ -132,9 +134,12 @@ class EttiPlan {
     // ── 3. soft weights (continuous; 1.0 neutral → 0, 2.0 → 1.0) ──────────────
     final intents = <String>{...fb.intents};
     softWeights.forEach((k, w) {
-      final factor = _alias[k.toLowerCase()] ?? k.toLowerCase();
       final imp = _importance(w);
-      if (imp > 0) {
+      if (imp <= 0) return;
+      // The model sometimes combines factor names ("safety/security",
+      // "accessibility_stroller/ground_floor") — split and map each part.
+      for (final part in k.toLowerCase().split('/')) {
+        final factor = _alias[part.trim()] ?? part.trim();
         weights[factor] = imp > (weights[factor] ?? 0) ? imp : weights[factor]!;
         if (_intentFactors.contains(factor)) intents.add(factor);
       }
