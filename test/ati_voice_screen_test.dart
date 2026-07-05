@@ -12,14 +12,21 @@ class FakeAssistant extends AssistantService {
   int stopCount = 0;
   final spoken = <String>[];
 
+  void Function(String status)? _onStatus;
+
   @override
   Future<void> startListening({
     required void Function(String text, bool isFinal) onResult,
     void Function(double level)? onSoundLevelChange,
+    void Function(String status)? onStatus,
   }) async {
     startCount++;
     _onResult = onResult;
+    _onStatus = onStatus;
   }
+
+  /// Simulate the recogniser stopping on its own (pauseFor / done).
+  void status(String s) => _onStatus?.call(s);
 
   @override
   Future<void> stopListening() async => stopCount++;
@@ -93,6 +100,33 @@ void main() {
     await tester.pump(const Duration(milliseconds: 3600));
     expect(calls, 1, reason: 'only a true 3.5s silence ends the turn');
     expect(svc.stopCount, greaterThan(0));
+  });
+
+  testWidgets('recogniser stops on its own (no final) → turn finalises, not stuck',
+      (tester) async {
+    final svc = FakeAssistant();
+    final asked = <String>[];
+    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
+        String t) async {
+      asked.add(t);
+      return (reply: 'ok', showResults: false, results: const <ScoredProperty>[]);
+    }
+
+    await tester.pumpWidget(host(svc, onU));
+    await tester.pump();
+
+    // A partial arrives but NO final ever comes (the iOS bug that got users stuck).
+    svc.say('דירה בעין עירון', isFinal: false);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(asked, isEmpty);
+
+    // The recogniser stops itself → 'notListening'. Must finalise the turn.
+    svc.status('notListening');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(asked.single, 'דירה בעין עירון',
+        reason: 'status stop must finalise — never sit on "listening"');
+    await tester.pump(const Duration(milliseconds: 800)); // drain the resume timer
   });
 
   testWidgets('a GPT error never freezes the loop (mic re-opens)', (tester) async {

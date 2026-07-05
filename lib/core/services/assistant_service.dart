@@ -391,12 +391,17 @@ class AssistantService {
 
   // ── Speech to text (Hebrew) ──────────────────────────────────────────────────
 
+  // Live status/error sink for the CURRENT listen session (set by startListening),
+  // so the UI learns the moment the recogniser stops on its own (pauseFor / done /
+  // error) and never gets stuck showing "listening".
+  void Function(String status)? _onSpeechStatus;
+
   Future<bool> initSpeech() async {
     if (_speechReady) return true;
     try {
       _speechReady = await _speech.initialize(
-        onError: (_) {},
-        onStatus: (_) {},
+        onError: (e) => _onSpeechStatus?.call('error'),
+        onStatus: (s) => _onSpeechStatus?.call(s),
       );
     } catch (_) {
       _speechReady = false;
@@ -407,12 +412,14 @@ class AssistantService {
   Future<void> startListening({
     required void Function(String text, bool isFinal) onResult,
     void Function(double level)? onSoundLevelChange,
+    void Function(String status)? onStatus,
   }) async {
     final ok = await initSpeech();
     if (!ok) {
       throw const AssistantException(
           'לא ניתן להפעיל את המיקרופון. בדקו שההרשאה אושרה.');
     }
+    _onSpeechStatus = onStatus;
     await _speech.listen(
       // Hands-free turn-taking: auto-finalise after ~2s of silence — the user
       // asked for at most a 2s gap before אתי responds. listenFor caps one turn.

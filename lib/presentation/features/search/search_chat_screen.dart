@@ -546,12 +546,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final t = transcript.trim();
     final wantsNow = _wantsResultsNow(t);
 
-    // Waiting for the user's go-ahead to present apartments?
+    // Waiting for the user's go-ahead to present apartments? DEFAULT TO SHOWING —
+    // after "רוצה שאראה לך?", almost any reply ("כן"/"תציג"/"בטח"/"נו"/"בוא") means
+    // yes. Only a clear NO or a reply that adds new criteria holds them back. (The
+    // old code whitelisted specific words and missed "תציג" → it re-asked forever.)
     if (_voiceAwaitingConsent) {
       _voiceAwaitingConsent = false;
-      if (_isAffirmative(t) || wantsNow) {
+      final holdsBack = _isNegative(t) || _looksLikeCriteria(t);
+      if (!holdsBack) {
         _voiceConsented = true;
-        // Reveal the apartments we ALREADY found (held from the previous turn).
         final r = _voicePending.isNotEmpty ? _voicePending : _latestScored;
         return (
           reply: r.isEmpty
@@ -561,7 +564,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           results: r,
         );
       }
-      // Not a yes → treat it as more criteria; fold the new detail in below.
+      // A "no" or added criteria → fold it in below (re-search, then re-offer).
     }
 
     await _send(transcript);
@@ -603,6 +606,20 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       r'|yes|okay|\bok\b|sure|go ahead',
       caseSensitive: false);
   bool _isAffirmative(String t) => _affirmative.hasMatch(' ${t.trim()} ');
+
+  // A clear "no / not yet / wait" — hold the apartments back.
+  static final _negative = RegExp(
+      r'\s(?:לא|רגע|חכה|חכי|המתן|עצור)\s|עוד לא|לא עדיין|not yet|\bwait\b',
+      caseSensitive: false);
+  bool _isNegative(String t) => _negative.hasMatch(' ${t.trim()} ');
+
+  // The reply ADDS search criteria (a number, or a place/feature word) rather than
+  // just answering the yes/no — so we refine instead of revealing.
+  static final _criteriaCue = RegExp(
+      r'חדר|מרפסת|מעלית|ממ"?ד|חני|קומה|זול|יקר|גדול|קטן|מרוה|מרוו|נגיש|כלב|חתול|'
+      r'קרוב|ליד|שקט|מרכז|תוסיף|תוסיפי|בנוסף|עוד|גם|באזור|בשכונ|בעיר|למכיר|להשקע|תקציב');
+  bool _looksLikeCriteria(String t) =>
+      RegExp(r'\d').hasMatch(t) || _criteriaCue.hasMatch(t);
 
   // The most recent listing cards אתי surfaced — shown inline in the voice screen.
   List<ScoredProperty> get _latestScored {

@@ -150,13 +150,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           _silence?.cancel();
           if (isFinal) {
             _handle(text);
-          } else if (text.trim().isNotEmpty) {
-            // Backup VAD: end the turn after ~2s of silence (the user wants אתי to
-            // respond within 2s of them stopping). The timer resets on every new
-            // partial word, so it measures the gap since the LAST word.
+          } else {
+            // Backup VAD: end the turn ~2s after the LAST word. Re-armed on EVERY
+            // partial (even empty ones) so an empty/late partial can never leave us
+            // stuck on "listening". Uses whatever transcript we have.
             _silence = Timer(const Duration(milliseconds: 2000), () {
               if (mounted && _state == AtiVoiceState.listening) {
-                _handle(_transcript);
+                _handle(_transcript.trim().isNotEmpty ? _transcript : text);
               }
             });
           }
@@ -165,6 +165,22 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           if (!mounted) return;
           final n = ((lvl + 2) / 12).clamp(0.0, 1.0);
           setState(() => _level = _level * 0.6 + n * 0.4);
+        },
+        // Authoritative stop signal: when the recogniser stops on its own
+        // (pauseFor / done / error) we finalise — never sit on "listening".
+        onStatus: (status) {
+          if (!mounted) return;
+          final stopped = status == 'notListening' || status == 'done' || status == 'error';
+          if (stopped && _state == AtiVoiceState.listening && !_handling) {
+            _silence?.cancel();
+            if (_transcript.trim().length >= 2) {
+              _handle(_transcript);
+            } else {
+              // Nothing said → just re-open the mic so we keep waiting.
+              setState(() => _state = AtiVoiceState.idle);
+              _resumeListening();
+            }
+          }
         },
       );
     } catch (_) {
