@@ -395,26 +395,6 @@ class RecommendationEngine {
       }
     }
 
-    // Budget gate: when the user states a max budget, don't surface listings far
-    // over it (>15%) while in-budget options exist — "עד 5000" shouldn't show a
-    // ₪6,400 flat. Relax only when NOTHING fits (then the "over budget" concern
-    // makes the compromise explicit rather than silent).
-    final maxP = query.maxPrice;
-    if (maxP != null && maxP > 0) {
-      final within = candidates.where((p) => p.price <= maxP * 1.15).toList();
-      if (within.isNotEmpty) {
-        candidates = within;
-      } else {
-        // Nothing fits the budget → show the CHEAPEST cluster (closest to what the
-        // user can pay), NOT the whole city. A ₪3,200 seeker must never be handed
-        // a ₪16,000 penthouse just because it scores high on other axes.
-        final sorted = [...candidates]..sort((a, b) => a.price.compareTo(b.price));
-        final cheapest = sorted.first.price;
-        candidates =
-            sorted.where((p) => p.price <= cheapest * 1.35).toList();
-      }
-    }
-
     // Required-feature gate: HARD deal-breakers (mamad חובה / must allow pets /
     // furnished) EXCLUDE listings that lack them — a "must have a mamad" search
     // must never surface a flat without one. Relax only if nothing qualifies.
@@ -440,14 +420,6 @@ class RecommendationEngine {
       }
     }
 
-    // Min-rooms gate: a stated minimum ("4+ rooms") should not surface a 3-room
-    // (½-room tolerance for a near-miss). Relax if nothing meets it.
-    final minR = query.minRooms;
-    if (minR != null && minR > 0) {
-      final enough = candidates.where((p) => p.rooms >= minR - 0.5).toList();
-      if (enough.isNotEmpty) candidates = enough;
-    }
-
     // Near-sea gate: "קרוב לים" means WITHIN a defined distance of the coast
     // (SearchIntent.seaOkKm = 3km), not merely a soft preference. The coast
     // dimension still orders the survivors by exact distance. Relax if none fit.
@@ -457,6 +429,36 @@ class RecommendationEngine {
         return km != null && km <= SearchIntent.seaOkKm;
       }).toList();
       if (nearSea.isNotEmpty) candidates = nearSea;
+    }
+
+    // Backfill pool captured HERE — after the IDENTITY gates (city, must-have
+    // features, near-sea) but before the SOFT ones (budget, rooms). So topping the
+    // list up to ~10 relaxes only budget/rooms (a "slightly over budget" or
+    // "one room fewer" near-match), NEVER the identity: a "קרוב לים" search is
+    // never backfilled with an inland flat, nor a "must-have mamad" with one lacking it.
+    final backfillPool = List.of(candidates);
+
+    // Budget gate: when the user states a max budget, don't surface listings far
+    // over it (>15%) while in-budget options exist. Relax to the cheapest cluster
+    // when NOTHING fits (the "over budget" concern makes the compromise explicit).
+    final maxP = query.maxPrice;
+    if (maxP != null && maxP > 0) {
+      final within = candidates.where((p) => p.price <= maxP * 1.15).toList();
+      if (within.isNotEmpty) {
+        candidates = within;
+      } else {
+        final sorted = [...candidates]..sort((a, b) => a.price.compareTo(b.price));
+        final cheapest = sorted.first.price;
+        candidates = sorted.where((p) => p.price <= cheapest * 1.35).toList();
+      }
+    }
+
+    // Min-rooms gate: a stated minimum ("4+ rooms") should not surface a 3-room
+    // (½-room tolerance). Relax if nothing meets it.
+    final minR = query.minRooms;
+    if (minR != null && minR > 0) {
+      final enough = candidates.where((p) => p.rooms >= minR - 0.5).toList();
+      if (enough.isNotEmpty) candidates = enough;
     }
 
     // Part 1 — market analysis + feature engineering
@@ -493,6 +495,42 @@ class RecommendationEngine {
       for (final c in selected) c: _statedMatch(c, model),
     };
     selected.sort((a, b) => match[b]!.compareTo(match[a]!));
+
+    // Backfill: the softer gates can leave only a handful of exact matches, but a
+    // user wants ~10 options. Top up from the in-city pool (relaxing budget /
+    // features / rooms / sea, NOT city or rent/sale) with the closest near-matches,
+    // ranked and appended STRICTLY BELOW the exact matches.
+    final want = limit < 10 ? limit : 10;
+    if (selected.length < want) {
+      final have = selected.map((c) => c.property.id).toSet();
+      final extra = backfillPool.where((p) => !have.contains(p.id)).toList();
+      if (extra.isNotEmpty) {
+        final extraRanked = RankingEngine.rank(
+          [for (final p in extra) FeatureEngineer.engineer(p, market)],
+          model,
+        );
+        final fill = DiversityReranker.select(extraRanked,
+            limit: want - selected.length, lambda: diversityLambda);
+        for (final c in fill) {
+          match[c] = _statedMatch(c, model);
+        }
+        // These near-matches violate a stated filter, so they're genuinely weaker:
+        // scale their fit to sit just BELOW the weakest exact match — preserving
+        // both strict-first order AND the fit%-monotonic display invariant.
+        final minStrict = selected.isEmpty ? 1.0 : match[selected.last]!;
+        final maxFill =
+            fill.fold<double>(0, (m, c) => match[c]! > m ? match[c]! : m);
+        // Ceiling: below the weakest exact match AND never in "strong match"
+        // territory — a near-match that breaks a stated filter is a compromise.
+        final ceil = (minStrict * 0.95).clamp(0.0, 0.55);
+        final scale = maxFill > 0 ? ceil / maxFill : 0.0;
+        for (final c in fill) {
+          match[c] = match[c]! * scale;
+        }
+        fill.sort((a, b) => match[b]!.compareTo(match[a]!));
+        selected.addAll(fill); // after the sorted exact matches → strict-first
+      }
+    }
 
     // model confidence: how much intent we captured + behavioral confidence
     final intentCoverage =

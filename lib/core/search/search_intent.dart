@@ -32,7 +32,9 @@ class SearchIntent {
   // >seaOkKm ⇒ not near the sea.
 
   static final Map<String, RegExp> _patterns = {
-    nearSea: RegExp(r'הים|לים|חוף|ליד המים|beach|seaside|seafront', caseSensitive: false),
+    // NB: "לים" must be a WORD ("קרוב לים"), not a suffix — otherwise "גלגלים"
+    // (as in "כיסא גלגלים"/wheelchair) false-matches and sea-gates the search.
+    nearSea: RegExp(r'הים|(?<=\s)לים|חוף|ליד המים|beach|seaside|seafront', caseSensitive: false),
     nightlife: RegExp(
         r'נייטלייף|חיי לילה|בילוי|\bבר\b|ברים|פאב|פאבים|מועדון|מסעד|בית קפה|בתי קפה|תוסס|nightlife|bars|pubs|clubs',
         caseSensitive: false),
