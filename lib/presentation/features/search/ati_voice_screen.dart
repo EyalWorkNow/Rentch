@@ -60,6 +60,10 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   bool _handling = false; // guards against re-entrant / echo-driven turns
   String _lastHandled = ''; // dedup: skip an identical utterance within a few s
   DateTime? _lastHandledAt;
+  DateTime? _lastListenAt; // rate-limit mic restarts (kill the Android beep-loop)
+  Timer? _restartTimer;
+  int _emptyResumes = 0; // consecutive no-speech restarts → back off, stop beeping
+  bool _idlePaused = false; // backed off after silence → "tap to talk"
 
   @override
   void initState() {
@@ -81,16 +85,41 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   // The device STT detects when the user stops talking (isFinal), so אתי answers
   // and then keeps listening on her own — a normal flowing conversation.
   void _resumeListening() {
-    if (widget.demoMode || _muted || !mounted) return;
+    if (widget.demoMode || _muted || !mounted || _idlePaused) return;
     if (_state == AtiVoiceState.listening ||
         _state == AtiVoiceState.thinking ||
         _state == AtiVoiceState.speaking) return;
     _startListening();
   }
 
+  // Re-open the mic, but RATE-LIMITED (≥1.6s between starts) so the Android
+  // recogniser can't beep-loop, and BACKING OFF to a "tap to talk" pause after a
+  // few silent cycles — so אתי never beeps at you forever when you're not talking.
+  void _scheduleResume() {
+    _restartTimer?.cancel();
+    if (!mounted || _muted || widget.demoMode) return;
+    _emptyResumes++;
+    if (_emptyResumes >= 4) {
+      setState(() {
+        _idlePaused = true;
+        _state = AtiVoiceState.idle;
+      });
+      return;
+    }
+    final since = _lastListenAt == null
+        ? const Duration(seconds: 99)
+        : DateTime.now().difference(_lastListenAt!);
+    const minGap = Duration(milliseconds: 1600);
+    final wait = since >= minGap ? const Duration(milliseconds: 250) : minGap - since;
+    _restartTimer = Timer(wait, () {
+      if (mounted && !_idlePaused) _resumeListening();
+    });
+  }
+
   @override
   void dispose() {
     _silence?.cancel();
+    _restartTimer?.cancel();
     _carousel.dispose();
     if (!widget.demoMode) {
       widget.service.stopListening();
@@ -119,6 +148,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   // otherwise pause / resume the hands-free flow.
   Future<void> _toggleListen() async {
     if (widget.demoMode) return;
+    // Backed off after silence → a tap wakes her straight back into listening.
+    if (_idlePaused) {
+      _idlePaused = false;
+      _emptyResumes = 0;
+      _resumeListening();
+      return;
+    }
     if (_state == AtiVoiceState.speaking) {
       // Barge-in: cut her off and immediately start listening to the user.
       await widget.service.stopSpeaking();
@@ -138,8 +174,11 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   }
 
   Future<void> _startListening() async {
+    _restartTimer?.cancel();
+    _lastListenAt = DateTime.now();
     setState(() {
       _state = AtiVoiceState.listening;
+      _idlePaused = false;
       _transcript = '';
     });
     try {
@@ -148,6 +187,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           if (!mounted) return;
           setState(() => _transcript = text);
           _silence?.cancel();
+          if (text.trim().isNotEmpty) _emptyResumes = 0; // real speech → reset backoff
           if (isFinal) {
             _handle(text);
           } else {
@@ -167,18 +207,20 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           setState(() => _level = _level * 0.6 + n * 0.4);
         },
         // Authoritative stop signal: when the recogniser stops on its own
-        // (pauseFor / done / error) we finalise — never sit on "listening".
+        // (pauseFor / done / error) we finalise or re-arm — but NEVER in a tight
+        // loop (that is what caused the constant Android start/stop beeps + the
+        // flickering orb: the recogniser fires ERROR_NO_MATCH back-to-back).
         onStatus: (status) {
           if (!mounted) return;
           final stopped = status == 'notListening' || status == 'done' || status == 'error';
           if (stopped && _state == AtiVoiceState.listening && !_handling) {
             _silence?.cancel();
             if (_transcript.trim().length >= 2) {
+              _emptyResumes = 0;
               _handle(_transcript);
             } else {
-              // Nothing said → just re-open the mic so we keep waiting.
               setState(() => _state = AtiVoiceState.idle);
-              _resumeListening();
+              _scheduleResume(); // rate-limited + backs off after silence
             }
           }
         },
@@ -210,6 +252,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       return;
     }
     _handling = true;
+    _emptyResumes = 0; // a real turn → clear the silence backoff
     _lastHandled = t;
     _lastHandledAt = DateTime.now();
     // BULLETPROOF: whatever happens (GPT throws, timeout, no audio) we MUST reset
@@ -261,6 +304,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   // ── copy ───────────────────────────────────────────────────────────────────
   String get _statusLabel {
     if (_muted) return 'מושהה — הקישו כדי להמשיך';
+    if (_idlePaused) return 'הקישו כדי לדבר';
     switch (_state) {
       case AtiVoiceState.listening:
         return 'מקשיבה לך…';

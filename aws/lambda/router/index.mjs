@@ -96,6 +96,7 @@ const OPENAI_REALTIME_VOICE = process.env.OPENAI_REALTIME_VOICE || 'marin';
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-5.4-mini';
 // Natural human text-to-speech for אתי + אריק (real voice, not robotic device TTS).
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts-2025-12-15';
+const OPENAI_STT_MODEL = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
 // Fallback chain — a free-tier model is frequently overloaded (429/503). If the
 // primary is busy we try the next one so the assistant keeps answering instead
 // of telling the user "the server is busy".
@@ -1012,6 +1013,9 @@ export const handler = async (event) => {
     if (segments[0] === 'assistant' && method === 'POST') {
       // POST /assistant/tts → Gemini natural voice for a reply (audio bytes).
       if (segments[1] === 'tts') return await handleAssistantTts(event);
+      // POST /assistant/transcribe → Whisper STT: base64 audio → Hebrew text.
+      // Far more accurate than the device recogniser AND silent (no beeps).
+      if (segments[1] === 'transcribe') return await handleTranscribe(event);
       // POST /assistant/extract → Etti intent-extraction engine: free text →
       // { hard_constraints, soft_weights, inferred_persona } for the ranking.
       if (segments[1] === 'extract') return await handleEttiExtract(event);
@@ -4723,6 +4727,85 @@ async function openaiExtractJson(systemText, userText) {
     const txt = (data?.choices?.[0]?.message?.content || '').trim();
     try { return JSON.parse(txt); } catch { return null; }
   } catch (e) { console.warn('etti extract', e.message); return null; }
+}
+
+// Whisper STT — base64 audio (m4a/aac/wav/webm) → transcript. Runs OpenAI's
+// audio transcription (much better Hebrew than the device recogniser). The key
+// stays server-side; the client just uploads the recorded clip.
+async function handleTranscribe(event) {
+  let body = {};
+  try { body = JSON.parse(event.body || '{}'); } catch {}
+  const b64 = (body.audio || '').toString();
+  if (!b64) return json(400, { error: 'missing audio' });
+  const bytes = Buffer.from(b64, 'base64');
+  if (!bytes.length) return json(400, { error: 'empty audio' });
+  const mime = (body.mime || 'audio/m4a').toString();
+  const lang = (body.language || 'he').toString();
+
+  // Primary: OpenAI Whisper family (best quality) — used only if the project has
+  // access. Secondary: Gemini multimodal transcription (this project's key does).
+  const viaOpenAi = await openaiTranscribe(bytes, mime, lang);
+  if (viaOpenAi != null) return json(200, { text: viaOpenAi, engine: 'openai' });
+  const viaGemini = await geminiTranscribe(bytes, mime);
+  if (viaGemini != null) return json(200, { text: viaGemini, engine: 'gemini' });
+  return json(502, { error: 'stt failed' });
+}
+
+async function openaiTranscribe(bytes, mime, lang) {
+  if (!OPENAI_API_KEY) return null;
+  const ext = mime.includes('wav') ? 'wav'
+    : mime.includes('webm') ? 'webm'
+    : mime.includes('mpeg') || mime.includes('mp3') ? 'mp3'
+    : mime.includes('ogg') ? 'ogg' : 'm4a';
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: mime }), `audio.${ext}`);
+    form.append('model', OPENAI_STT_MODEL);
+    form.append('language', lang);
+    form.append('temperature', '0');
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: form,
+    });
+    if (!res.ok) return null; // model not enabled → fall through to Gemini
+    const data = await res.json();
+    return (data.text || '').toString().trim();
+  } catch { return null; }
+}
+
+async function geminiTranscribe(bytes, mime) {
+  if (!GEMINI_API_KEY) return null;
+  const gmime = mime.includes('wav') ? 'audio/wav'
+    : mime.includes('webm') ? 'audio/webm'
+    : mime.includes('ogg') ? 'audio/ogg'
+    : mime.includes('mp3') || mime.includes('mpeg') ? 'audio/mp3'
+    : 'audio/aac'; // m4a/aacLc from the recorder
+  const reqBody = {
+    contents: [{
+      parts: [
+        { text: 'תמלל במדויק את האודיו הבא לעברית. החזר אך ורק את הטקסט המדובר — בלי הקדמות, בלי מרכאות, בלי הסברים. אם אין דיבור, החזר מחרוזת ריקה.' },
+        { inlineData: { mimeType: gmime, data: bytes.toString('base64') } },
+      ],
+    }],
+    generationConfig: { temperature: 0 },
+  };
+  for (const model of ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest']) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(reqBody),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const text = (data?.candidates?.[0]?.content?.parts || [])
+        .map((p) => p.text || '').join('').trim();
+      return text.replace(/^["'״]+|["'״]+$/g, '').trim();
+    } catch { /* next model */ }
+  }
+  return null;
 }
 
 async function handleEttiExtract(event) {

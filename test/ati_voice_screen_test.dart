@@ -129,6 +129,30 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800)); // drain the resume timer
   });
 
+  testWidgets('Android no-match storm does NOT beep-loop — restarts bounded + backs off',
+      (tester) async {
+    final svc = FakeAssistant();
+    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
+        String t) async => (reply: 'ok', showResults: false, results: const <ScoredProperty>[]);
+
+    await tester.pumpWidget(host(svc, onU));
+    await tester.pump();
+    expect(svc.startCount, 1);
+
+    // The recogniser keeps stopping with NO speech (ERROR_NO_MATCH back-to-back).
+    for (var i = 0; i < 8; i++) {
+      svc.status('notListening');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1700)); // past the rate-limit gap
+    }
+    // Must NOT have restarted 8 times (that was the beep storm); rate-limited to a
+    // few, then backed off to a "tap to talk" pause.
+    expect(svc.startCount, lessThanOrEqualTo(5),
+        reason: 'restarts are rate-limited, not a tight beep loop');
+    expect(find.text('הקישו כדי לדבר'), findsOneWidget,
+        reason: 'after silence it pauses instead of beeping forever');
+  });
+
   testWidgets('a GPT error never freezes the loop (mic re-opens)', (tester) async {
     final svc = FakeAssistant();
     Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
