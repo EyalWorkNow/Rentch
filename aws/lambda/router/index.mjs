@@ -165,6 +165,9 @@ const TABLES = {
   reviews:         { name: `${TABLE_PREFIX}reviews`,         gsi: { name: 'targetKey-createdAt', pk: 'targetKey', filterKey: 'targetKey' } },
   property_views:  { name: `${TABLE_PREFIX}property-views`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
   property_likes:  { name: `${TABLE_PREFIX}property-likes`,  gsi: { name: 'propertyId-index', pk: 'propertyId', filterKey: 'propertyId' } },
+  // Mutual matches — created by the landlord on accept, SYNCED so the tenant sees
+  // the chat. Query by tenantUid (tenant's list) or landlordUid (landlord's list).
+  matches:         { name: `${TABLE_PREFIX}matches`,         gsi: { name: 'tenantUid-createdAt', pk: 'tenantUid', filterKey: 'tenantUid' }, indexes: { landlord: { name: 'landlordUid-createdAt', pk: 'landlordUid', filterKey: 'landlordUid' } } },
   app_state:       { name: `${TABLE_PREFIX}app-state`,       gsi: null },
   // Per-user accumulated persona (pk: id == uid). One row per user, upserted by
   // the client with confidence-scored facts for personalisation + targeting.
@@ -468,6 +471,31 @@ async function firePushForWrite(tableKey, body, senderUid) {
         propTitle ? `${who} התעניין/ה בדירה שלך ב${propTitle}`
           : `${who} התעניין/ה בדירה שלך`,
         { propertyId: String(propertyId) },
+      );
+      return;
+    }
+
+    if (tableKey === 'matches') {
+      // A mutual match was created (landlord accepted). Push the TENANT so they
+      // know a chat is now open — the #1 gap: they used to only hear about it once
+      // the landlord actually messaged.
+      const tenant = (body.tenantUid || '').toString();
+      if (!tenant || tenant === senderUid) return;
+      let propTitle = '';
+      try {
+        const prop = await ddb.send(new GetCommand({
+          TableName: TABLES.properties.name, Key: { id: body.propertyId },
+        }));
+        propTitle = (prop.Item && (prop.Item.street || prop.Item.city)) || '';
+      } catch { /* ignore */ }
+      await notify(
+        tenant,
+        'match',
+        'יש לך התאמה! 🎉',
+        propTitle
+            ? `בעל הדירה ב${propTitle} אישר — אפשר להתחיל לשוחח`
+            : 'בעל הדירה אישר — אפשר להתחיל לשוחח',
+        { matchId: String(body.id || ''), propertyId: String(body.propertyId || '') },
       );
       return;
     }

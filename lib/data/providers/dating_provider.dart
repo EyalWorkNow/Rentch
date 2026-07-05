@@ -1499,6 +1499,9 @@ class DatingProvider extends ChangeNotifier {
       unawaited(restoreAuthenticatedSession());
       unawaited(_refreshRemoteCatalogAfterAuth());
       unawaited(_refreshCurrentTenantReviewsAfterAuth());
+      // Pull mutual matches a landlord created for this tenant on another device,
+      // so the chat shows up in their conversations (was local-only → invisible).
+      unawaited(_loadMatchesFromBackend());
     }
 
     _isLoading = false;
@@ -4812,6 +4815,75 @@ class DatingProvider extends ChangeNotifier {
       ),
     ];
     _pendingMatchPropertyId = property.id;
+    // SYNC the match to the backend so the TENANT's app learns about it (matches
+    // were local-only → the tenant never saw the chat). Fire-and-forget.
+    _syncMatchToBackend(
+        matchId: matchId, propertyId: property.id, tenantUid: threadUser);
+  }
+
+  // Landlord → backend: persist a mutual match so the tenant can fetch it and the
+  // server pushes them "you have a match". Fail-soft (the local match still holds).
+  Future<void> _syncMatchToBackend({
+    required String matchId,
+    required String propertyId,
+    required String tenantUid,
+  }) async {
+    final landlordUid = _firebaseAuthOrNull?.currentUser?.uid;
+    if (landlordUid == null ||
+        landlordUid.isEmpty ||
+        tenantUid.isEmpty ||
+        tenantUid == landlordUid) {
+      return;
+    }
+    try {
+      await AwsApiClient.instance.post('/matches', {
+        'id': matchId,
+        'propertyId': propertyId,
+        'tenantUid': tenantUid,
+        'landlordUid': landlordUid,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {/* fail-soft */}
+  }
+
+  // Tenant → backend: fetch matches created by landlords who accepted this user, so
+  // the chat appears in their conversations even though the match was made on
+  // another device. Merges any not already present locally.
+  Future<void> _loadMatchesFromBackend() async {
+    final uid = _firebaseAuthOrNull?.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+    try {
+      final resp =
+          await AwsApiClient.instance.get('/matches', query: {'tenantUid': uid});
+      final items = resp['items'];
+      if (items is! List) return;
+      var added = false;
+      for (final it in items) {
+        if (it is! Map) continue;
+        final matchId = (it['id'] ?? '').toString();
+        final propertyId = (it['propertyId'] ?? '').toString();
+        if (matchId.isEmpty || propertyId.isEmpty) continue;
+        if (_matches.any((m) => m.id == matchId)) continue;
+        _matches = [
+          ..._matches,
+          RentalMatch(
+            id: matchId,
+            propertyId: propertyId,
+            createdAt: DateTime.tryParse((it['createdAt'] ?? '').toString()) ??
+                DateTime.now(),
+            contractSent: false,
+            ownerSigned: false,
+            tenantSigned: false,
+            messages: const [],
+          ),
+        ];
+        added = true;
+      }
+      if (added) {
+        await _persist();
+        notifyListeners();
+      }
+    } catch (_) {/* fail-soft */}
   }
 
   /// A tenant with no mutual like asks to message the owner. Creates (or appends

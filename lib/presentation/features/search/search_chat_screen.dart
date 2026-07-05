@@ -576,9 +576,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       if (city != null && city.isNotEmpty && mounted) {
         _query = _merge(_query, SearchQuery(city: city));
       } else {
-        // GPS / permission unavailable → don't search blindly with no city; ASK.
+        // GPS / permission unavailable → don't search blindly with no city; guide
+        // the user (settings if permanently denied) or ask which city.
         return (
-          reply: 'לא הצלחתי לזהות איפה את/ה 📍 באיזו עיר לחפש?',
+          reply: _locationDeniedForever
+              ? 'כדי לחפש באזור שלך צריך לאשר גישה למיקום בהגדרות 📍 — או פשוט תגיד/י לי באיזו עיר לחפש'
+              : 'רק שנייה, לא הצלחתי לזהות איפה את/ה 📍 באיזו עיר לחפש?',
           showResults: false,
           results: const <ScoredProperty>[],
         );
@@ -663,7 +666,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   static final _locationRelative = RegExp(
       r'\bפה\b|\bכאן\b|באזור הזה|באיזור הזה|בסביבה הזו|בסביבה שלי|ליד(?:י| שלי| הבית)?|'
       r'אזור שלי|איזור שלי|באזור שלי|באיזור שלי|האזור שלי|קרוב אלי|קרוב אליי|אצלי|'
-      r'near me|around here|\bhere\b|my area|in my area|close to me|nearby');
+      r'ה?מיקום שלי|במיקום שלי|איפה שאני|היכן שאני|ליד המיקום|ליד איפה ש|כאן לידי|'
+      r'near me|around here|\bhere\b|my area|in my area|close to me|nearby|my location');
 
   // The USER tapped "share my location" on אתי's request → NOW capture the GPS
   // (the OS permission prompt is the approval), set the city, and search. This is
@@ -714,23 +718,38 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _scrollToEnd();
   }
 
+  // Set when the OS reported location permission is permanently denied — the voice
+  // flow uses it to tell the user to enable it in Settings (a re-prompt won't show).
+  bool _locationDeniedForever = false;
+
   // Raw GPS capture → resolved city name (null if unavailable / denied). The OS
   // permission dialog IS the user's approval.
   Future<String?> _captureGps() async {
+    _locationDeniedForever = false;
     try {
       if (!await Geolocator.isLocationServiceEnabled()) return null;
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.deniedForever) {
+        _locationDeniedForever = true;
         return null;
       }
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.medium),
-      ).timeout(const Duration(seconds: 8));
+      if (perm == LocationPermission.denied) return null;
+      // Last-known position first (instant, works indoors), then try a fresh fix —
+      // so a slow/blocked GPS lock doesn't leave "my area" empty.
+      Position? pos;
+      try {
+        pos = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          locationSettings:
+              const LocationSettings(accuracy: LocationAccuracy.medium),
+        ).timeout(const Duration(seconds: 10));
+      } catch (_) {/* keep last-known if the fresh fix timed out */}
+      if (pos == null) return null;
       // PRIMARY: resolve the city from the on-device CBS locality index. This is
       // reliable and IDENTICAL on iOS/Android — unlike the platform reverse-
       // geocoder (`placemarkFromCoordinates`), whose Android Geocoder needs Google
