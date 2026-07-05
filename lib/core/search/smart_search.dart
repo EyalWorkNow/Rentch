@@ -399,6 +399,18 @@ class SmartSearch {
     }
 
     // ── city & neighborhood ─────────────────────────────────────────────────
+    // DEICTIC "my area / near me" phrases contain substrings that are REAL towns
+    // ("אזור שלי"→the town אזור, "קרוב אליי"→the settlement אלי-עד), which would be
+    // searched as a random city instead of the user's actual GPS location. Strip
+    // those phrases before matching a city so "my area" stays city-less → GPS flow.
+    // NB: "אזור" is a real town — strip it ONLY with a deictic suffix ("אזור שלי"),
+    // never bare (so "דירה באזור" still searches the town Azor).
+    final cityText = text.replaceAll(
+        RegExp(r'ה?א[יִ]?זור\s+(?:שלי|שלנו|הזה|הזאת)|'
+            r'בסביבה(?:\s+(?:שלי|שלנו|הזו))?|קרוב\s*אלי+|קרוב\s*אלינו|'
+            r'אצל[יי]|ליד[יי]|near me|around here|nearby|my area|close to me'),
+        ' ');
+
     // City: prefer LLM extraction (Gemini saw the full context);
     // fall back to keyword scan + fuzzy matching only if LLM missed it
     String? city = _str(llm['city']);
@@ -406,19 +418,22 @@ class SmartSearch {
       // FIRST: the authoritative CBS locality list (every city/moshav/kibbutz) via
       // GovData — this is how tiny places like "עין עירון" are recognised at all.
       // Falls through to the legacy hand-list only when GovData isn't loaded.
-      city = GovData.instance.findLocalityInText(text)?.name;
+      city = GovData.instance.findLocalityInText(cityText)?.name;
     }
     if (city == null) {
       // Try exact match on full multi-word localities (e.g. "תל אביב")
       for (final locality in LocalityMatcher.allLocalities) {
-        if (text.contains(locality)) {
+        if (cityText.contains(locality)) {
           city = locality;
           break;
         }
       }
       // If no exact match, try fuzzy: collect all matches, take the last (most recent mention)
       if (city == null) {
-        final words = text.split(RegExp(r'[\s,،،.!?،؛]'));
+        final words = cityText
+            .split(RegExp(r'[\s,،،.!?،؛]'))
+            .where((w) => w.trim().isNotEmpty)
+            .toList();
         // Strip Hebrew proclitic prefixes (ב, ל, מ, כ) before fuzzy matching
         String stripPrefix(String w) {
           if (w.length > 1 && 'בלמכ'.contains(w[0])) {

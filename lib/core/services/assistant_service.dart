@@ -447,7 +447,7 @@ class AssistantService {
   // → no beeps, no flicker), then send it to /assistant/transcribe (Whisper). Far
   // more accurate for Hebrew and fully deterministic (the user controls start/stop).
   final AudioRecorder _recorder = AudioRecorder();
-  StreamSubscription<Amplitude>? _ampSub;
+  Timer? _ampTimer;
   String? _recPath;
 
   /// Why the last startRecording failed — 'permission' (mic denied) vs a real
@@ -468,7 +468,7 @@ class AssistantService {
     }
     // 2) Start recording. A failure HERE is NOT a permission problem — surface it.
     try {
-      await _ampSub?.cancel();
+      _ampTimer?.cancel();
       // A stale session (previous crash / not stopped) blocks a fresh start.
       if (await _recorder.isRecording()) {
         await _recorder.stop();
@@ -480,12 +480,16 @@ class AssistantService {
             encoder: AudioEncoder.aacLc, sampleRate: 16000, numChannels: 1),
         path: _recPath!,
       );
+      // POLL the amplitude with our OWN timer. The plugin's onAmplitudeChanged()
+      // hands back a SINGLE-SUBSCRIPTION stream it creates once and reuses, so a
+      // second recording's .listen() throws "Stream has already been listened to".
       if (onLevel != null) {
-        _ampSub = _recorder
-            .onAmplitudeChanged(const Duration(milliseconds: 120))
-            .listen((a) {
-          // dBFS (~-45 quiet .. 0 loud) → 0..1 for the orb.
-          onLevel(((a.current + 45) / 45).clamp(0.0, 1.0));
+        _ampTimer =
+            Timer.periodic(const Duration(milliseconds: 140), (_) async {
+          try {
+            final a = await _recorder.getAmplitude();
+            onLevel(((a.current + 45) / 45).clamp(0.0, 1.0)); // dBFS → 0..1
+          } catch (_) {}
         });
       }
       return true;
@@ -498,8 +502,8 @@ class AssistantService {
   /// Stop recording, transcribe via Whisper, return the text ('' if nothing / on
   /// failure). Deletes the temp clip afterwards.
   Future<String> stopRecordingAndTranscribe({String language = 'he'}) async {
-    await _ampSub?.cancel();
-    _ampSub = null;
+    _ampTimer?.cancel();
+    _ampTimer = null;
     String? path;
     try { path = await _recorder.stop(); } catch (_) { path = _recPath; }
     if (path == null) return '';
@@ -515,8 +519,8 @@ class AssistantService {
   }
 
   Future<void> cancelRecording() async {
-    await _ampSub?.cancel();
-    _ampSub = null;
+    _ampTimer?.cancel();
+    _ampTimer = null;
     try { await _recorder.stop(); } catch (_) {}
   }
 
