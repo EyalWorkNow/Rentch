@@ -37,6 +37,7 @@ class AtiVoiceScreen extends StatefulWidget {
     required this.service,
     required this.onUtterance,
     this.onShareLocation,
+    this.onNewConversation,
     this.criteria = const [],
     this.resultCount = 0,
     this.demoMode = false,
@@ -48,6 +49,9 @@ class AtiVoiceScreen extends StatefulWidget {
   /// Called when the user taps the "share my location" button — capture GPS and
   /// run the held search, returning the resulting turn.
   final Future<VoiceTurn> Function()? onShareLocation;
+
+  /// Called when the user starts a fresh conversation (clears the held query).
+  final VoidCallback? onNewConversation;
 
   /// Understood search criteria to show as glassy chips (city / rooms / budget…).
   final List<String> criteria;
@@ -328,10 +332,30 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             ],
           ),
           const Spacer(),
-          const SizedBox(width: 48),
+          IconButton(
+            tooltip: 'שיחה חדשה',
+            icon: const Icon(Icons.edit_note_rounded,
+                color: Colors.white70, size: 28),
+            onPressed: _newConversation,
+          ),
         ],
       ),
     );
+  }
+
+  // Start over — clears the held query (via the callback) and the on-screen state.
+  void _newConversation() {
+    widget.onNewConversation?.call();
+    if (!mounted) return;
+    setState(() {
+      _reply = 'שיחה חדשה 👋 מה נחפש עכשיו?';
+      _transcript = '';
+      _results = const [];
+      _resultCount = 0;
+      _criteria = [];
+      _needLocation = false;
+      _state = AtiVoiceState.idle;
+    });
   }
 
   Widget _criteriaChips() {

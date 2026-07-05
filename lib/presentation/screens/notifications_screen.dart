@@ -59,6 +59,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  // Self-serve check: push a real notification to THIS device via the backend, so
+  // the user can confirm phone pushes actually arrive.
+  Future<void> _sendTest() async {
+    try {
+      await AwsApiClient.instance.post('/notifications/test', const {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('שלחתי התראת בדיקה 🔔 אמורה להופיע על המסך תוך רגע'),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('לא הצלחתי לשלוח כרגע, נסה שוב')));
+      }
+    }
+  }
+
   Future<void> _onTap(AppNotification n) async {
     if (!n.read) {
       setState(() => _items = _items
@@ -96,6 +114,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           ),
           actions: [
+            IconButton(
+              tooltip: 'שליחת התראת בדיקה',
+              icon: const Icon(Icons.notifications_active_outlined),
+              onPressed: _sendTest,
+            ),
             if (_unreadCount > 0)
               TextButton(
                 onPressed: _markAllRead,

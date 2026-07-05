@@ -967,6 +967,16 @@ export const handler = async (event) => {
     if (segments[0] === 'notifications' && !segments[1] && method === 'GET') {
       return await handleListNotifications(event);
     }
+    // POST /notifications/test → push a real test notification to the CALLER's own
+    // device (self-serve "am I actually getting phone pushes?" check).
+    if (segments[0] === 'notifications' && segments[1] === 'test'
+        && method === 'POST') {
+      const uid = callerUidOf(event);
+      if (!uid) return json(401, { message: 'auth required' });
+      await notify(uid, 'test', 'בדיקת התראה 🔔 Rently',
+          'ההתראות עובדות! זו התראת אמת מהשרת ✅', { type: 'test' });
+      return json(200, { ok: true });
+    }
 
     // ── Two-sided match ranking (landlord's leads) ──────────────────────────
     if (segments[0] === 'match' && segments[1] === 'leads' && method === 'POST') {

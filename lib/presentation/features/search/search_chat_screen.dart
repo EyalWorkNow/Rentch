@@ -141,6 +141,13 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _query = SearchQuery();
       _userTurns = 0;
       _searched = false;
+      // Voice session flags — so a new conversation truly starts clean.
+      _voiceAwaitingConsent = false;
+      _voiceConsented = false;
+      _voicePending = const [];
+      _voicePendingLocationText = null;
+      _lastReply = '';
+      _lastShowedResults = false;
       _messages.add(_greetingMsg());
     });
     _scrollToEnd();
@@ -404,17 +411,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // never gate whether the screen appears.
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
-    _voiceAwaitingConsent = false; // fresh voice session — no pending confirmation
-    _voiceConsented = false;
-    _voicePending = const [];
+    _resetConversation(); // every voice conversation is brand new
     await Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => AtiVoiceScreen(
         service: _service,
         onUtterance: _processVoiceUtterance,
         onShareLocation: _shareLocationVoice,
-        criteria: _voiceCriteria(),
-        resultCount: _lastResultCount,
+        onNewConversation: _resetConversation,
+        criteria: const [], // fresh — no stale tags
+        resultCount: 0,
       ),
     ));
     _scrollToEnd();
