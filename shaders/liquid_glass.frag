@@ -10,22 +10,30 @@
 
 uniform vec2 uSize;   // 175, 175 (logical)
 uniform float uTime;
-uniform float uLevel; // 0..1 speaking intensity
+uniform float uLevel;    // 0..1 speaking intensity
+uniform float uSpeaking; // 0 idle → 1 speaking: shifts to a livelier palette
 
 out vec4 fragColor;
 
 const vec3 GLASS = vec3(0.137, 0.251, 0.290); // #23404A
 
+// Idle palette — cool teal / indigo / rose / amber.
 const vec3 C0 = vec3(0.09, 0.78, 0.82); // teal
 const vec3 C1 = vec3(0.40, 0.46, 1.00); // indigo
 const vec3 C2 = vec3(1.00, 0.42, 0.52); // rose
 const vec3 C3 = vec3(1.00, 0.80, 0.34); // amber
 
+// Speaking palette — warmer, more electric (violet / magenta / coral / gold), so
+// אתי's orb visibly "lights up" and shifts hue the moment she starts talking.
+const vec3 S0 = vec3(0.55, 0.30, 1.00); // violet
+const vec3 S1 = vec3(0.98, 0.32, 0.80); // magenta
+const vec3 S2 = vec3(1.00, 0.46, 0.36); // coral
+const vec3 S3 = vec3(1.00, 0.72, 0.20); // gold
+
 vec3 ballColor(int i) {
-  if (i == 0) return C0;
-  if (i == 1) return C1;
-  if (i == 2) return C2;
-  return C3;
+  vec3 idle = (i == 0) ? C0 : (i == 1) ? C1 : (i == 2) ? C2 : C3;
+  vec3 talk = (i == 0) ? S0 : (i == 1) ? S1 : (i == 2) ? S2 : S3;
+  return mix(idle, talk, clamp(uSpeaking, 0.0, 1.0));
 }
 
 const float RMIN = 0.286; // Ø50px / R(87.5px)

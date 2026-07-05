@@ -34,12 +34,20 @@ class _LiquidGlassOrbState extends State<LiquidGlassOrb>
   final ValueNotifier<double> _clock = ValueNotifier(0);
   late final Ticker _ticker;
   ui.FragmentShader? _glass;
+  Duration _lastTick = Duration.zero;
+  double _animTime = 0; // accumulated so we can vary speed WITHOUT a time jump
 
   @override
   void initState() {
     super.initState();
-    _ticker = createTicker((el) => _clock.value = el.inMicroseconds / 1e6)
-      ..start();
+    _ticker = createTicker((el) {
+      final dt = (el - _lastTick).inMicroseconds / 1e6;
+      _lastTick = el;
+      // Colours drift 20% FASTER while אתי speaks — accumulate so toggling speed
+      // never causes a discontinuity in the animation phase.
+      _animTime += dt.clamp(0.0, 0.1) * (widget.speaking ? 1.2 : 1.0);
+      _clock.value = _animTime;
+    })..start();
     _load();
   }
 
@@ -82,7 +90,8 @@ class _LiquidGlassOrbState extends State<LiquidGlassOrb>
                 painter: _LiquidGlassPainter(
                     shader: _glass!,
                     time: t,
-                    level: widget.speaking ? _speechEnvelope(t) : widget.level),
+                    level: widget.speaking ? _speechEnvelope(t) : widget.level,
+                    speaking: widget.speaking ? 1.0 : 0.0),
               ),
             )
           : ValueListenableBuilder<double>(
@@ -100,11 +109,13 @@ class _LiquidGlassPainter extends CustomPainter {
     required this.shader,
     required this.time,
     required this.level,
+    required this.speaking,
   });
 
   final ui.FragmentShader shader;
   final double time;
   final double level;
+  final double speaking;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -112,13 +123,14 @@ class _LiquidGlassPainter extends CustomPainter {
       ..setFloat(0, size.width)
       ..setFloat(1, size.height)
       ..setFloat(2, time)
-      ..setFloat(3, level.clamp(0.0, 1.0));
+      ..setFloat(3, level.clamp(0.0, 1.0))
+      ..setFloat(4, speaking);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
   @override
   bool shouldRepaint(_LiquidGlassPainter old) =>
-      old.time != time || old.level != level;
+      old.time != time || old.level != level || old.speaking != speaking;
 }
 
 // Painted fallback for platforms where the fragment shader can't load: a soft

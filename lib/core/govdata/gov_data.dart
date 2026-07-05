@@ -385,12 +385,17 @@ class GovData {
     if (!_loaded || text.trim().isEmpty) return null;
     final t = normalizeLocalityName(text);
     LocalityRecord? best;
+    var bestLen = 0;
     for (final rec in _byCode.values) {
       final n = rec.name;
-      if (n.length < 3) continue;
-      if (t.contains(n) &&
-          (best == null || n.length > best!.name.length)) {
-        best = rec;
+      // Match the full CBS name OR, for a MERGED municipality ("בנימינה-גבעת עדה",
+      // "מעלות-תרשיחא", "פרדס חנה-כרכור"), the primary settlement people actually
+      // say ("בנימינה"). Longest match wins so specificity is preserved.
+      for (final v in {n, if (n.contains('-')) n.split('-').first.trim()}) {
+        if (v.length >= 3 && v.length > bestLen && t.contains(v)) {
+          best = rec;
+          bestLen = v.length;
+        }
       }
     }
     return best;
