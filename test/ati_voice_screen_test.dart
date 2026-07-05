@@ -1,44 +1,36 @@
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
+import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Fake speech service: captures the STT callback so the test can simulate the
-/// user speaking, and records what אתי "spoke" — no real mic/TTS.
+/// Fake push-to-talk service: records nothing real, returns a canned Whisper
+/// transcript, and captures what אתי "spoke".
 class FakeAssistant extends AssistantService {
-  void Function(String text, bool isFinal)? _onResult;
-  int startCount = 0;
-  int stopCount = 0;
+  String nextTranscript = 'דירה בתל אביב';
+  bool micOk = true;
+  int recordCount = 0;
   final spoken = <String>[];
 
-  void Function(String status)? _onStatus;
-
   @override
-  Future<void> startListening({
-    required void Function(String text, bool isFinal) onResult,
-    void Function(double level)? onSoundLevelChange,
-    void Function(String status)? onStatus,
-  }) async {
-    startCount++;
-    _onResult = onResult;
-    _onStatus = onStatus;
+  Future<bool> startRecording({void Function(double level)? onLevel}) async {
+    recordCount++;
+    return micOk;
   }
 
-  /// Simulate the recogniser stopping on its own (pauseFor / done).
-  void status(String s) => _onStatus?.call(s);
+  @override
+  Future<String> stopRecordingAndTranscribe({String language = 'he'}) async =>
+      nextTranscript;
 
   @override
-  Future<void> stopListening() async => stopCount++;
+  Future<void> cancelRecording() async {}
 
   @override
   Future<void> speak(String text) async => spoken.add(text);
 
   @override
   Future<void> stopSpeaking() async {}
-
-  /// Simulate the user's mic producing a (partial or final) transcript.
-  void say(String text, {bool isFinal = true}) => _onResult?.call(text, isFinal);
 }
 
 void main() {
@@ -47,127 +39,71 @@ void main() {
               Function(String) onUtterance) =>
       MaterialApp(home: AtiVoiceScreen(service: svc, onUtterance: onUtterance));
 
-  testWidgets('a full turn: utterance → reply spoken → mic re-opens (no freeze)',
+  // Hold the orb, then release — the push-to-talk gesture.
+  Future<void> holdAndRelease(WidgetTester tester) async {
+    final orb = find.byType(LiquidGlassOrb).first;
+    final g = await tester.startGesture(tester.getCenter(orb));
+    await tester.pump(); // onPointerDown → startRecording
+    await tester.pump(const Duration(milliseconds: 50));
+    await g.up(); // onPointerUp → stopAndSend → transcribe → respond
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+  }
+
+  testWidgets('hold-to-record → Whisper transcript → onUtterance → אתי speaks',
       (tester) async {
-    final svc = FakeAssistant();
+    final svc = FakeAssistant()..nextTranscript = 'דירה בתל אביב עד 8000';
     final asked = <String>[];
     Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
         String t) async {
       asked.add(t);
-      return (reply: 'רוצה שאראה לך אותן עכשיו?', showResults: false, results: const <ScoredProperty>[]);
+      return (reply: 'הנה מה שמצאתי', showResults: false, results: const <ScoredProperty>[]);
     }
 
     await tester.pumpWidget(host(svc, onU));
-    await tester.pump(); // postFrame → startListening
-    expect(svc.startCount, 1, reason: 'starts listening hands-free on open');
+    await tester.pump();
+    // Nothing auto-starts — push-to-talk.
+    expect(svc.recordCount, 0);
 
-    svc.say('שלוש חדרים בתל אביב עד 8000', isFinal: true);
-    await tester.pump(); // enter _handle → thinking
-    await tester.pump(const Duration(milliseconds: 50)); // await onUtterance
-    expect(asked.single, 'שלוש חדרים בתל אביב עד 8000');
-    expect(svc.spoken.single, contains('רוצה שאראה'),
-        reason: 'אתי speaks the consent question');
+    await holdAndRelease(tester);
 
-    // finally-block: 700ms settle then re-open the mic — proves it never freezes.
-    await tester.pump(const Duration(milliseconds: 800));
-    expect(svc.startCount, 2, reason: 're-opens the mic for the next turn');
+    expect(svc.recordCount, 1, reason: 'press starts recording');
+    expect(asked.single, 'דירה בתל אביב עד 8000',
+        reason: 'the Whisper transcript is sent on release');
+    expect(svc.spoken.single, contains('הנה'), reason: 'אתי speaks the reply');
   });
 
-  testWidgets('does NOT cut the user off: a mid-sentence pause under 3.5s waits',
-      (tester) async {
-    final svc = FakeAssistant();
+  testWidgets('empty transcript → gentle retry, no crash', (tester) async {
+    final svc = FakeAssistant()..nextTranscript = '   ';
     var calls = 0;
     Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
         String t) async {
       calls++;
-      return (reply: 'ok', showResults: false, results: const <ScoredProperty>[]);
+      return (reply: 'x', showResults: false, results: const <ScoredProperty>[]);
     }
 
     await tester.pumpWidget(host(svc, onU));
     await tester.pump();
+    await holdAndRelease(tester);
 
-    // Partial words, then a THINKING pause (not final) — must not submit yet.
-    svc.say('אני מחפש', isFinal: false);
-    await tester.pump(const Duration(milliseconds: 1500));
-    expect(calls, 0, reason: 'a 1.5s pause is NOT the end of the turn');
-
-    // The user resumes — the timer resets on the new word.
-    svc.say('אני מחפש שלושה חדרים', isFinal: false);
-    await tester.pump(const Duration(milliseconds: 1500));
-    expect(calls, 0, reason: 'still mid-thought after the reset');
-
-    // Now a genuine long silence (>3.5s) — the backup VAD ends the turn.
-    await tester.pump(const Duration(milliseconds: 3600));
-    expect(calls, 1, reason: 'only a true 3.5s silence ends the turn');
-    expect(svc.stopCount, greaterThan(0));
+    expect(calls, 0, reason: 'nothing said → do not call the model');
+    expect(find.textContaining('לא שמעתי'), findsOneWidget);
   });
 
-  testWidgets('recogniser stops on its own (no final) → turn finalises, not stuck',
-      (tester) async {
-    final svc = FakeAssistant();
-    final asked = <String>[];
+  testWidgets('mic permission denied → clear message', (tester) async {
+    final svc = FakeAssistant()..micOk = false;
     Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
-        String t) async {
-      asked.add(t);
-      return (reply: 'ok', showResults: false, results: const <ScoredProperty>[]);
-    }
+        String t) async => (reply: 'x', showResults: false, results: const <ScoredProperty>[]);
 
     await tester.pumpWidget(host(svc, onU));
     await tester.pump();
-
-    // A partial arrives but NO final ever comes (the iOS bug that got users stuck).
-    svc.say('דירה בעין עירון', isFinal: false);
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(asked, isEmpty);
-
-    // The recogniser stops itself → 'notListening'. Must finalise the turn.
-    svc.status('notListening');
+    final orb = find.byType(LiquidGlassOrb).first;
+    final g = await tester.startGesture(tester.getCenter(orb));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    expect(asked.single, 'דירה בעין עירון',
-        reason: 'status stop must finalise — never sit on "listening"');
-    await tester.pump(const Duration(milliseconds: 800)); // drain the resume timer
-  });
-
-  testWidgets('Android no-match storm does NOT beep-loop — restarts bounded + backs off',
-      (tester) async {
-    final svc = FakeAssistant();
-    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
-        String t) async => (reply: 'ok', showResults: false, results: const <ScoredProperty>[]);
-
-    await tester.pumpWidget(host(svc, onU));
+    await g.up();
     await tester.pump();
-    expect(svc.startCount, 1);
 
-    // The recogniser keeps stopping with NO speech (ERROR_NO_MATCH back-to-back).
-    for (var i = 0; i < 8; i++) {
-      svc.status('notListening');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 1700)); // past the rate-limit gap
-    }
-    // Must NOT have restarted 8 times (that was the beep storm); rate-limited to a
-    // few, then backed off to a "tap to talk" pause.
-    expect(svc.startCount, lessThanOrEqualTo(5),
-        reason: 'restarts are rate-limited, not a tight beep loop');
-    expect(find.text('הקישו כדי לדבר'), findsOneWidget,
-        reason: 'after silence it pauses instead of beeping forever');
-  });
-
-  testWidgets('a GPT error never freezes the loop (mic re-opens)', (tester) async {
-    final svc = FakeAssistant();
-    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
-        String t) async {
-      throw Exception('network down');
-    }
-
-    await tester.pumpWidget(host(svc, onU));
-    await tester.pump();
-    expect(svc.startCount, 1);
-
-    svc.say('תל אביב', isFinal: true);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-    // try/finally must have re-opened the mic despite the thrown error.
-    expect(svc.startCount, 2, reason: 'error path still resumes listening');
+    expect(find.textContaining('הרשאת מיקרופון'), findsOneWidget);
   });
 }

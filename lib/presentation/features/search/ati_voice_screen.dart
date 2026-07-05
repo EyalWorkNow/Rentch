@@ -50,20 +50,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   String _transcript = '';
   String _reply = 'שלום, אני אתי 👋\nספרו לי מה אתם מחפשים.';
   double _level = 0; // smoothed mic level 0..1
-  bool _muted = false;
   late List<String> _criteria = List.of(widget.criteria);
   late int _resultCount = widget.resultCount;
   List<ScoredProperty> _results = const []; // options shown inline in this screen
-  Timer? _silence; // backup end-of-turn detector (auto-submit on a pause)
   final PageController _carousel = PageController(viewportFraction: 0.88);
   int _page = 0;
-  bool _handling = false; // guards against re-entrant / echo-driven turns
-  String _lastHandled = ''; // dedup: skip an identical utterance within a few s
-  DateTime? _lastHandledAt;
-  DateTime? _lastListenAt; // rate-limit mic restarts (kill the Android beep-loop)
-  Timer? _restartTimer;
-  int _emptyResumes = 0; // consecutive no-speech restarts → back off, stop beeping
-  bool _idlePaused = false; // backed off after silence → "tap to talk"
+  bool _recording = false; // holding the orb to record
+  bool _sending = false; // guards against a double-send on release
 
   @override
   void initState() {
@@ -73,56 +66,102 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       _criteria = const ['תל אביב', '3 חדרים', 'עד 8,000 ₪', 'מרפסת', 'ליד הים'];
       _resultCount = 7;
       _level = 0.6;
-    } else {
-      // Hands-free: the conversation starts on its own — no tap needed.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _startListening();
-      });
     }
+    // Push-to-talk: nothing starts on its own — the user HOLDS the orb to record.
   }
 
-  // Hands-free loop: after a turn, automatically re-open the mic (unless paused).
-  // The device STT detects when the user stops talking (isFinal), so אתי answers
-  // and then keeps listening on her own — a normal flowing conversation.
-  void _resumeListening() {
-    if (widget.demoMode || _muted || !mounted || _idlePaused) return;
-    if (_state == AtiVoiceState.listening ||
-        _state == AtiVoiceState.thinking ||
-        _state == AtiVoiceState.speaking) return;
-    _startListening();
-  }
-
-  // Re-open the mic, but RATE-LIMITED (≥1.6s between starts) so the Android
-  // recogniser can't beep-loop, and BACKING OFF to a "tap to talk" pause after a
-  // few silent cycles — so אתי never beeps at you forever when you're not talking.
-  void _scheduleResume() {
-    _restartTimer?.cancel();
-    if (!mounted || _muted || widget.demoMode) return;
-    _emptyResumes++;
-    if (_emptyResumes >= 4) {
-      setState(() {
-        _idlePaused = true;
-        _state = AtiVoiceState.idle;
-      });
-      return;
+  // Press-and-HOLD the orb → record with the `record` plugin (NO native
+  // recogniser → no beeps, no flicker, never stuck). Release → Whisper transcribes
+  // → onUtterance → אתי answers. The user fully controls start/stop.
+  Future<void> _startRecording() async {
+    if (widget.demoMode || _recording || _sending) return;
+    if (_state == AtiVoiceState.speaking) {
+      await widget.service.stopSpeaking(); // barge-in
     }
-    final since = _lastListenAt == null
-        ? const Duration(seconds: 99)
-        : DateTime.now().difference(_lastListenAt!);
-    const minGap = Duration(milliseconds: 1600);
-    final wait = since >= minGap ? const Duration(milliseconds: 250) : minGap - since;
-    _restartTimer = Timer(wait, () {
-      if (mounted && !_idlePaused) _resumeListening();
+    if (!mounted) return;
+    setState(() {
+      _recording = true;
+      _state = AtiVoiceState.listening;
+      _transcript = '';
+      _level = 0;
     });
+    final ok = await widget.service.startRecording(onLevel: (l) {
+      if (mounted) setState(() => _level = _level * 0.5 + l * 0.5);
+    });
+    if (!ok && mounted) {
+      setState(() {
+        _recording = false;
+        _state = AtiVoiceState.idle;
+        _reply = 'צריך הרשאת מיקרופון כדי לדבר איתי 🎙️';
+      });
+    }
+  }
+
+  Future<void> _stopAndSend() async {
+    if (!_recording || _sending) return;
+    _recording = false;
+    _sending = true;
+    if (mounted) {
+      setState(() {
+        _state = AtiVoiceState.thinking;
+        _level = 0;
+      });
+    }
+    try {
+      final text = await widget.service.stopRecordingAndTranscribe();
+      if (!mounted) return;
+      if (text.trim().isEmpty) {
+        setState(() {
+          _state = AtiVoiceState.idle;
+          _reply = 'לא שמעתי אותך 🙈 החזק/י את הכדור ודבר/י';
+        });
+        return;
+      }
+      setState(() => _transcript = text);
+      await _respond(text);
+    } finally {
+      _sending = false;
+    }
+  }
+
+  Future<void> _respond(String text) async {
+    try {
+      final result = await widget.onUtterance(text).timeout(
+        const Duration(seconds: 25),
+        onTimeout: () => (
+          reply: 'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לנסות שוב?',
+          showResults: false,
+          results: const <ScoredProperty>[],
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _reply = result.reply;
+        _state = AtiVoiceState.speaking;
+        if (result.results.isNotEmpty) {
+          _results = result.results;
+          _resultCount = result.results.length;
+          _page = 0;
+        }
+      });
+      if (result.results.isNotEmpty && _carousel.hasClients) {
+        _carousel.jumpToPage(0);
+      }
+      try {
+        await widget.service.speak(result.reply);
+      } catch (_) {}
+    } catch (_) {
+      // network / model error → keep the screen usable
+    } finally {
+      if (mounted) setState(() => _state = AtiVoiceState.idle);
+    }
   }
 
   @override
   void dispose() {
-    _silence?.cancel();
-    _restartTimer?.cancel();
     _carousel.dispose();
     if (!widget.demoMode) {
-      widget.service.stopListening();
+      widget.service.cancelRecording();
       widget.service.stopSpeaking();
     }
     super.dispose();
@@ -143,177 +182,18 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     }
   }
 
-  // ── voice loop ─────────────────────────────────────────────────────────────
-  // Tapping the orb: BARGE-IN while אתי is speaking (interrupt her and listen),
-  // otherwise pause / resume the hands-free flow.
-  Future<void> _toggleListen() async {
-    if (widget.demoMode) return;
-    // Backed off after silence → a tap wakes her straight back into listening.
-    if (_idlePaused) {
-      _idlePaused = false;
-      _emptyResumes = 0;
-      _resumeListening();
-      return;
-    }
-    if (_state == AtiVoiceState.speaking) {
-      // Barge-in: cut her off and immediately start listening to the user.
-      await widget.service.stopSpeaking();
-      if (!mounted) return;
-      setState(() => _state = AtiVoiceState.idle);
-      await _startListening();
-      return;
-    }
-    setState(() => _muted = !_muted);
-    if (_muted) {
-      await widget.service.stopListening();
-      await widget.service.stopSpeaking();
-      if (mounted) setState(() => _state = AtiVoiceState.idle);
-    } else {
-      _resumeListening();
-    }
-  }
-
-  Future<void> _startListening() async {
-    _restartTimer?.cancel();
-    _lastListenAt = DateTime.now();
-    setState(() {
-      _state = AtiVoiceState.listening;
-      _idlePaused = false;
-      _transcript = '';
-    });
-    try {
-      await widget.service.startListening(
-        onResult: (text, isFinal) {
-          if (!mounted) return;
-          setState(() => _transcript = text);
-          _silence?.cancel();
-          if (text.trim().isNotEmpty) _emptyResumes = 0; // real speech → reset backoff
-          if (isFinal) {
-            _handle(text);
-          } else {
-            // Backup VAD: end the turn ~2s after the LAST word. Re-armed on EVERY
-            // partial (even empty ones) so an empty/late partial can never leave us
-            // stuck on "listening". Uses whatever transcript we have.
-            _silence = Timer(const Duration(milliseconds: 2000), () {
-              if (mounted && _state == AtiVoiceState.listening) {
-                _handle(_transcript.trim().isNotEmpty ? _transcript : text);
-              }
-            });
-          }
-        },
-        onSoundLevelChange: (lvl) {
-          if (!mounted) return;
-          final n = ((lvl + 2) / 12).clamp(0.0, 1.0);
-          setState(() => _level = _level * 0.6 + n * 0.4);
-        },
-        // Authoritative stop signal: when the recogniser stops on its own
-        // (pauseFor / done / error) we finalise or re-arm — but NEVER in a tight
-        // loop (that is what caused the constant Android start/stop beeps + the
-        // flickering orb: the recogniser fires ERROR_NO_MATCH back-to-back).
-        onStatus: (status) {
-          if (!mounted) return;
-          final stopped = status == 'notListening' || status == 'done' || status == 'error';
-          if (stopped && _state == AtiVoiceState.listening && !_handling) {
-            _silence?.cancel();
-            if (_transcript.trim().length >= 2) {
-              _emptyResumes = 0;
-              _handle(_transcript);
-            } else {
-              setState(() => _state = AtiVoiceState.idle);
-              _scheduleResume(); // rate-limited + backs off after silence
-            }
-          }
-        },
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _state = AtiVoiceState.idle;
-        _reply = 'לא הצלחתי להפעיל את המיקרופון. בדקו שאישרתם הרשאה.';
-      });
-    }
-  }
-
-  Future<void> _handle(String text) async {
-    _silence?.cancel();
-    final t = text.trim();
-    // Re-entrancy / echo / noise / duplicate guards — the #1 cause of a looping,
-    // repeating conversation is the mic catching אתי's own voice and re-firing.
-    if (_handling) return;
-    final isEchoDup = t == _lastHandled &&
-        _lastHandledAt != null &&
-        DateTime.now().difference(_lastHandledAt!) < const Duration(seconds: 5);
-    if (t.length < 2 || isEchoDup) {
-      await widget.service.stopListening();
-      if (mounted) {
-        setState(() => _state = AtiVoiceState.idle);
-        _resumeListening(); // ignore echo/noise → keep waiting for real speech
-      }
-      return;
-    }
-    _handling = true;
-    _emptyResumes = 0; // a real turn → clear the silence backoff
-    _lastHandled = t;
-    _lastHandledAt = DateTime.now();
-    // BULLETPROOF: whatever happens (GPT throws, timeout, no audio) we MUST reset
-    // _handling and re-open the mic — otherwise the guard blocks every future turn
-    // and אתי "won't let you talk". try/finally guarantees it.
-    try {
-      await widget.service.stopListening();
-      if (!mounted) return;
-      setState(() {
-        _state = AtiVoiceState.thinking;
-        _level = 0;
-      });
-      final result = await widget.onUtterance(t).timeout(
-        const Duration(seconds: 20),
-        onTimeout: () =>
-            (reply: 'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לחזור על זה?',
-             showResults: false,
-             results: const <ScoredProperty>[]),
-      );
-      if (!mounted) return;
-      setState(() {
-        _reply = result.reply;
-        _state = AtiVoiceState.speaking;
-        if (result.results.isNotEmpty) {
-          _results = result.results;
-          _resultCount = result.results.length;
-          _page = 0;
-        }
-      });
-      if (result.results.isNotEmpty && _carousel.hasClients) {
-        _carousel.jumpToPage(0);
-      }
-      try {
-        await widget.service.speak(result.reply);
-      } catch (_) {}
-    } catch (_) {
-      // Network / GPT error → don't freeze; just keep the conversation open.
-    } finally {
-      _handling = false;
-      if (mounted) {
-        setState(() => _state = AtiVoiceState.idle);
-        // Anti-echo: let the speaker audio settle before re-opening the mic.
-        await Future.delayed(const Duration(milliseconds: 700));
-        if (mounted && !_muted) _resumeListening();
-      }
-    }
-  }
 
   // ── copy ───────────────────────────────────────────────────────────────────
   String get _statusLabel {
-    if (_muted) return 'מושהה — הקישו כדי להמשיך';
-    if (_idlePaused) return 'הקישו כדי לדבר';
     switch (_state) {
       case AtiVoiceState.listening:
-        return 'מקשיבה לך…';
+        return 'מקשיבה… שחרר/י כדי לשלוח';
       case AtiVoiceState.thinking:
         return 'רגע, חושבת…';
       case AtiVoiceState.speaking:
-        return 'אתי מדברת · הקישו כדי לענות';
+        return 'אתי מדברת · החזק/י כדי לענות';
       case AtiVoiceState.idle:
-        return 'רגע…';
+        return 'החזק/י את הכדור כדי לדבר 🎙️';
     }
   }
 
@@ -436,8 +316,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   Widget _blob() {
     // Shrink the orb once results are on screen so the carousel gets real room.
     final size = _results.isEmpty ? 175.0 : 104.0;
-    return GestureDetector(
-      onTap: _toggleListen,
+    // Press-and-HOLD to record, release to send. Listener fires on the raw
+    // pointer down/up so the hold can last any length (unlike a tap/long-press).
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => _startRecording(),
+      onPointerUp: (_) => _stopAndSend(),
+      onPointerCancel: (_) => _stopAndSend(),
       child: LiquidGlassOrb(
         size: size,
         level: widget.demoMode ? 0.6 : _activity,
@@ -570,10 +455,17 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _roundBtn(
-            icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
-            bg: Colors.white.withValues(alpha: 0.12),
-            onTap: _toggleListen,
+          Listener(
+            onPointerDown: (_) => _startRecording(),
+            onPointerUp: (_) => _stopAndSend(),
+            onPointerCancel: (_) => _stopAndSend(),
+            child: _roundBtn(
+              icon: _recording ? Icons.mic_rounded : Icons.mic_none_rounded,
+              bg: _recording
+                  ? const Color(0xFF7CE0E6).withValues(alpha: 0.30)
+                  : Colors.white.withValues(alpha: 0.12),
+              onTap: () {},
+            ),
           ),
           _roundBtn(
             icon: _state == AtiVoiceState.speaking

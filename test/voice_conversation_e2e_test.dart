@@ -1,38 +1,10 @@
 import 'dart:io';
 
 import 'package:dating_app/core/govdata/gov_data.dart';
-import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/data/models/rental_models.dart';
-import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
-import 'package:dating_app/presentation/widgets/ati_voice_property_card.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
-import 'package:dating_app/data/providers/dating_provider.dart';
-
-// ── Fake STT (feeds transcripts as if spoken) ──────────────────────────────
-class FakeAssistant extends AssistantService {
-  void Function(String, bool)? _onResult;
-  int startCount = 0;
-  @override
-  Future<void> startListening({
-    required void Function(String, bool) onResult,
-    void Function(double)? onSoundLevelChange,
-    void Function(String)? onStatus,
-  }) async {
-    startCount++;
-    _onResult = onResult;
-  }
-  @override
-  Future<void> stopListening() async {}
-  @override
-  Future<void> speak(String text) async {}
-  @override
-  Future<void> stopSpeaking() async {}
-  void say(String t) => _onResult?.call(t, true); // final result
-}
 
 RentalProperty prop(String id, String city, double lat, double lon, {int price = 4300, double rooms = 3, List<String> f = const ['ac']}) =>
     RentalProperty(
@@ -105,41 +77,22 @@ void main() {
   });
   tearDownAll(() => GovData.instance.resetForTest());
 
-  testWidgets('REAL voice conversation: עין עירון → consent → apartments SHOW (no leak)', (tester) async {
-    final svc = FakeAssistant();
+  // The full conversation logic through the REAL engine + gov-data. (The
+  // push-to-talk SCREEN mechanics — hold→record→Whisper→onUtterance→speak — are
+  // covered in ati_voice_screen_test; here we drive the same 3 transcripts.)
+  test('push-to-talk conversation: עין עירון → consent → reveal, no leak', () async {
     final convo = _Convo();
-    await tester.pumpWidget(ChangeNotifierProvider<DatingProvider>.value(
-      value: DatingProvider(),
-      child: MaterialApp(home: AtiVoiceScreen(service: svc, onUtterance: convo.turn)),
-    ));
-    await tester.pump();
+    await convo.turn('היי אתי, אני מחפש דירה בעין עירון'); // turn 1
+    await convo.turn('עד 5000 שקל שלושה חדרים משהו שקט'); // turn 2
 
-    // Turn 1 — the user's real opening line.
-    svc.say('היי אתי, אני מחפש דירה בעין עירון');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-    // Turn 2 — budget + rooms + quiet.
-    svc.say('עד 5000 שקל שלושה חדרים משהו שקט');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
+    expect(convo.awaiting, true, reason: 'אתי asks before revealing');
+    expect(convo.consented, false);
 
-    // At this point אתי should be ASKING consent, NOT showing cards yet.
-    expect(find.byType(AtiVoicePropertyCard), findsNothing,
-        reason: 'apartments must not appear before consent');
-    expect(convo.awaiting, true);
+    final r = await convo.turn('כן תציגי לי אותן בבקשה'); // turn 3
 
-    // Turn 3 — the exact reply that used to fail.
-    svc.say('כן תציגי לי אותן בבקשה');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-
-    // THE FIX: apartments must now actually render in the carousel.
-    expect(find.byType(AtiVoicePropertyCard), findsWidgets,
-        reason: 'after "תציגי לי אותן" the apartments MUST show');
-
-    // And every shown apartment is in עין עירון — no אור עקיבא leak.
-    final cities = convo.pending.map((s) => s.property.city).toSet();
+    expect(convo.consented, true, reason: '"תציגי לי אותן" is understood as consent');
+    expect(r.results.isNotEmpty, true, reason: 'apartments revealed');
+    final cities = r.results.map((s) => s.property.city).toSet();
     expect(cities, {'עין עירון'}, reason: 'no cross-city leak: $cities');
-    expect(convo.pending.isNotEmpty, true);
   });
 }

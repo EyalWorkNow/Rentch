@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/smart_search.dart';
@@ -567,6 +568,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       // A "no" or added criteria → fold it in below (re-search, then re-offer).
     }
 
+    // Voice "באזור שלי / קרוב אליי" → capture GPS ourselves (the spoken request IS
+    // the consent; the OS prompt gates the first time) and fold the city in, so we
+    // actually search — instead of raising a chat button the voice user can't tap.
+    if (_locationRelative.hasMatch(t) && _query.city == null) {
+      final city = await _captureGps();
+      if (city != null && mounted) {
+        _query = _merge(_query, SearchQuery(city: city));
+      }
+    }
+
     await _send(transcript);
 
     // Voice etiquette: don't dump apartments unasked. The FIRST time אתי has enough
@@ -712,14 +723,28 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings:
             const LocationSettings(accuracy: LocationAccuracy.medium),
-      ).timeout(const Duration(seconds: 6));
-      final marks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-      for (final m in marks) {
-        final c = (m.locality?.trim().isNotEmpty == true)
-            ? m.locality!.trim()
-            : m.subAdministrativeArea?.trim();
-        if (c != null && c.isNotEmpty) return c;
-      }
+      ).timeout(const Duration(seconds: 8));
+      // PRIMARY: resolve the city from the on-device CBS locality index. This is
+      // reliable and IDENTICAL on iOS/Android — unlike the platform reverse-
+      // geocoder (`placemarkFromCoordinates`), whose Android Geocoder needs Google
+      // Play Services + network and frequently returns nothing (why "my area"
+      // silently failed on Android).
+      final loc = GovData.instance.nearestLocality(pos.latitude, pos.longitude);
+      if (loc != null && loc.name.trim().isNotEmpty) return loc.name.trim();
+      // FALLBACK: platform reverse-geocoding (dependable on iOS).
+      try {
+        final marks =
+            await placemarkFromCoordinates(pos.latitude, pos.longitude)
+                .timeout(const Duration(seconds: 5));
+        for (final m in marks) {
+          final c = (m.locality?.trim().isNotEmpty == true)
+              ? m.locality!.trim()
+              : (m.subLocality?.trim().isNotEmpty == true)
+                  ? m.subLocality!.trim()
+                  : m.subAdministrativeArea?.trim();
+          if (c != null && c.isNotEmpty) return c;
+        }
+      } catch (_) {/* geocoder flaky on Android → GovData already tried */}
       return null;
     } catch (_) {
       return null; // location unavailable → fall back to asking

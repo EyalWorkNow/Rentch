@@ -7,6 +7,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// One turn in a conversation with Erik.
@@ -438,6 +440,95 @@ class AssistantService {
 
   Future<void> stopListening() async {
     if (_speech.isListening) await _speech.stop();
+  }
+
+  // ── Push-to-talk recording → Whisper STT ─────────────────────────────────────
+  // Hold-to-record: capture a clip with the `record` plugin (NO native recogniser
+  // → no beeps, no flicker), then send it to /assistant/transcribe (Whisper). Far
+  // more accurate for Hebrew and fully deterministic (the user controls start/stop).
+  final AudioRecorder _recorder = AudioRecorder();
+  StreamSubscription<Amplitude>? _ampSub;
+  String? _recPath;
+
+  Future<bool> startRecording({void Function(double level)? onLevel}) async {
+    try {
+      if (!await _recorder.hasPermission()) return false;
+      final dir = await getTemporaryDirectory();
+      _recPath = '${dir.path}/eti_rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(
+            encoder: AudioEncoder.aacLc, sampleRate: 16000, numChannels: 1),
+        path: _recPath!,
+      );
+      await _ampSub?.cancel();
+      if (onLevel != null) {
+        _ampSub = _recorder
+            .onAmplitudeChanged(const Duration(milliseconds: 120))
+            .listen((a) {
+          // dBFS (~-45 quiet .. 0 loud) → 0..1 for the orb.
+          onLevel(((a.current + 45) / 45).clamp(0.0, 1.0));
+        });
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Stop recording, transcribe via Whisper, return the text ('' if nothing / on
+  /// failure). Deletes the temp clip afterwards.
+  Future<String> stopRecordingAndTranscribe({String language = 'he'}) async {
+    await _ampSub?.cancel();
+    _ampSub = null;
+    String? path;
+    try { path = await _recorder.stop(); } catch (_) { path = _recPath; }
+    if (path == null) return '';
+    try {
+      final bytes = await File(path).readAsBytes();
+      if (bytes.length < 800) return ''; // too short → nothing said
+      return await _transcribe(base64Encode(bytes), 'audio/m4a', language);
+    } catch (_) {
+      return '';
+    } finally {
+      try { await File(path).delete(); } catch (_) {}
+    }
+  }
+
+  Future<void> cancelRecording() async {
+    await _ampSub?.cancel();
+    _ampSub = null;
+    try { await _recorder.stop(); } catch (_) {}
+  }
+
+  Future<String> _transcribe(String b64, String mime, String language) async {
+    if (!isConfigured) return '';
+    final client = HttpClient();
+    try {
+      final req = await client
+          .openUrl('POST', _resolve('/assistant/transcribe'))
+          .timeout(_timeout);
+      req.headers.contentType = ContentType.json;
+      final apiKey = AppConfig.awsApiKey.trim();
+      if (apiKey.isNotEmpty) req.headers.add('x-api-key', apiKey);
+      try {
+        final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+        if (token != null && token.isNotEmpty) {
+          req.headers.add(HttpHeaders.authorizationHeader, 'Bearer $token');
+        }
+      } catch (_) {}
+      req.write(jsonEncode({'audio': b64, 'mime': mime, 'language': language}));
+      final resp = await req.close().timeout(const Duration(seconds: 25));
+      final raw = await utf8.decoder.bind(resp).join();
+      if (resp.statusCode < 200 || resp.statusCode >= 300) return '';
+      final data = jsonDecode(raw);
+      return (data is Map && data['text'] is String)
+          ? (data['text'] as String).trim()
+          : '';
+    } catch (_) {
+      return '';
+    } finally {
+      client.close(force: true);
+    }
   }
 
   // ── Text to speech — Gemini's natural voice (device TTS as fallback) ─────────
