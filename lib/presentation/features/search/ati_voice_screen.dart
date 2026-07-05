@@ -89,10 +89,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       if (mounted) setState(() => _level = _level * 0.5 + l * 0.5);
     });
     if (!ok && mounted) {
+      final err = widget.service.lastRecordError;
       setState(() {
         _recording = false;
         _state = AtiVoiceState.idle;
-        _reply = 'צריך הרשאת מיקרופון כדי לדבר איתי 🎙️';
+        _reply = err == 'permission'
+            ? 'צריך הרשאת מיקרופון — אשרו בהגדרות המכשיר 🎙️'
+            : 'לא הצלחתי להתחיל הקלטה 🙈\n${err ?? ''}';
       });
     }
   }

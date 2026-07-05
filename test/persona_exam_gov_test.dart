@@ -138,8 +138,12 @@ void main() {
     const q = 'דירה בתל אביב לבעל כלב קומת קרקע עד 7000';
     final recs = run(q);
     show('קובי · כלב · קומת קרקע · ת״א', q, recs);
-    expect(rankOf(recs, 'ta-ground-pet') < rankOf(recs, 'ta-high-nopet'), true,
-        reason: 'pet-friendly ground floor should beat the high no-pet flat');
+    // A dog owner CANNOT take a no-pets flat → it must be EXCLUDED, not just
+    // out-ranked (pets is now a hard requirement whenever a pet is mentioned).
+    expect(recs.any((r) => r.property.id == 'ta-ground-pet'), true,
+        reason: 'the pet-friendly ground floor must be shown');
+    expect(recs.every((r) => r.property.features.contains('petsAllowed')), true,
+        reason: 'no no-pets flat may be offered to a dog owner');
   });
 
   test('רון — יש לי מכונית, צריך חניה', () {

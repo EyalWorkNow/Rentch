@@ -16,6 +16,7 @@ class FakeAssistant extends AssistantService {
   @override
   Future<bool> startRecording({void Function(double level)? onLevel}) async {
     recordCount++;
+    lastRecordError = micOk ? null : 'permission';
     return micOk;
   }
 

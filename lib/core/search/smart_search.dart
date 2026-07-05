@@ -333,9 +333,11 @@ class SmartSearch {
       return n != null ? int.tryParse(n.group(0)!) : null;
     }
 
-    // Capture a number + optional unit ("2 מיליון", "6 אלף", "6000") — the unit
-    // must stay in the group, so the terminator can't cut at the space before it.
-    const amt = r'(\d[\d.,]*\s*(?:אלף|אלפים|מיליון)?)';
+    // Capture a number + optional unit ("2 מיליון", "6 אלף", "6000") OR a
+    // digit-less "מיליון"/"מיליון וחצי" (common for sale budgets). The unit must
+    // stay in the group so the terminator can't cut at the space before it.
+    const amt =
+        r'(\d[\d.,]*\s*(?:אלף|אלפים|מיליון(?:\s*וחצי)?)?|מיליון(?:\s*וחצי)?)';
     final between = RegExp('בין\\s*$amt\\s*ל[-־]?\\s*$amt').firstMatch(text);
     final around =
         RegExp('(?:בערך|סביב|כ[-־]|בסביבות)\\s*$amt').firstMatch(text);
@@ -383,6 +385,18 @@ class SmartSearch {
     }
     transactionType =
         _parseTransactionFilter(llm['transactionType']) ?? transactionType;
+
+    // Price-magnitude inference (no explicit rent/sale word): the AMOUNT decides.
+    // You cannot BUY an apartment in Israel for < ₪100k — that number is a monthly
+    // RENT. And a monthly rent is never ₪500k+ — that's a purchase price. So we
+    // don't need to ask "rent or buy?" when the budget already makes it obvious.
+    if (transactionType == TransactionTypeFilter.any && maxPrice != null) {
+      if (maxPrice < 100000) {
+        transactionType = TransactionTypeFilter.rent;
+      } else if (maxPrice >= 500000) {
+        transactionType = TransactionTypeFilter.sale;
+      }
+    }
 
     // ── city & neighborhood ─────────────────────────────────────────────────
     // City: prefer LLM extraction (Gemini saw the full context);
@@ -506,6 +520,32 @@ class SmartSearch {
       }
     }
 
+    // ── HARD requirements (dealbreakers → excluded, not down-ranked) ─────────
+    // Some things a searcher states are non-negotiable, so we must NOT offer a
+    // listing that lacks them (see RecommendationEngine.recommend's feature gate).
+    final required = <String>{};
+    // PETS: a dog/cat owner literally cannot take a no-pets flat — always hard.
+    if (amenities.contains('feat_pets') ||
+        RegExp(r'מאפשר.{0,8}חיות|אפשר.{0,12}חיות|מרשה.{0,8}חיות|ידידותי לכלב|'
+                r'עם כלב|יש לי כלב|יש לי חתול|pet.?friendly|dog.?friendly')
+            .hasMatch(text)) {
+      required.add('petsAllowed');
+    }
+    // Explicit "חייב/חובה/מוכרח/הכרחי + <feature>" → that feature is a must.
+    if (RegExp(r'חייב|חובה|מוכרח|הכרחי|בהכרח|רק עם|must have|required')
+        .hasMatch(text)) {
+      const canon = {
+        'feat_elevator': 'elevator',
+        'feat_parking': 'parking',
+        'feat_mamad': 'mamad',
+        'feat_furnished': 'furnished',
+        'feat_pets': 'petsAllowed',
+      };
+      for (final e in canon.entries) {
+        if (amenities.contains(e.key)) required.add(e.value);
+      }
+    }
+
     return SearchQuery(
       city: city,
       neighborhood: neighborhood,
@@ -515,6 +555,7 @@ class SmartSearch {
       maxRooms: maxRooms,
       propertyType: propertyType,
       amenities: amenities,
+      requiredFeatures: required,
       nearTrain: nearTrain,
       cheapPreference: cheap,
       transactionType: transactionType,

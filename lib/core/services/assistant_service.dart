@@ -450,9 +450,29 @@ class AssistantService {
   StreamSubscription<Amplitude>? _ampSub;
   String? _recPath;
 
+  /// Why the last startRecording failed — 'permission' (mic denied) vs a real
+  /// recording error (shown to the user so a device issue is diagnosable).
+  String? lastRecordError;
+
   Future<bool> startRecording({void Function(double level)? onLevel}) async {
+    lastRecordError = null;
+    // 1) Permission — request/check. Only THIS is a "need mic permission" case.
     try {
-      if (!await _recorder.hasPermission()) return false;
+      if (!await _recorder.hasPermission()) {
+        lastRecordError = 'permission';
+        return false;
+      }
+    } catch (e) {
+      lastRecordError = 'permission';
+      return false;
+    }
+    // 2) Start recording. A failure HERE is NOT a permission problem — surface it.
+    try {
+      await _ampSub?.cancel();
+      // A stale session (previous crash / not stopped) blocks a fresh start.
+      if (await _recorder.isRecording()) {
+        await _recorder.stop();
+      }
       final dir = await getTemporaryDirectory();
       _recPath = '${dir.path}/eti_rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _recorder.start(
@@ -460,7 +480,6 @@ class AssistantService {
             encoder: AudioEncoder.aacLc, sampleRate: 16000, numChannels: 1),
         path: _recPath!,
       );
-      await _ampSub?.cancel();
       if (onLevel != null) {
         _ampSub = _recorder
             .onAmplitudeChanged(const Duration(milliseconds: 120))
@@ -470,7 +489,8 @@ class AssistantService {
         });
       }
       return true;
-    } catch (_) {
+    } catch (e) {
+      lastRecordError = 'start: $e';
       return false;
     }
   }

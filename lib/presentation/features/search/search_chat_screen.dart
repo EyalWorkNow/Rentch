@@ -573,12 +573,19 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // actually search — instead of raising a chat button the voice user can't tap.
     if (_locationRelative.hasMatch(t) && _query.city == null) {
       final city = await _captureGps();
-      if (city != null && mounted) {
+      if (city != null && city.isNotEmpty && mounted) {
         _query = _merge(_query, SearchQuery(city: city));
+      } else {
+        // GPS / permission unavailable → don't search blindly with no city; ASK.
+        return (
+          reply: 'לא הצלחתי לזהות איפה את/ה 📍 באיזו עיר לחפש?',
+          showResults: false,
+          results: const <ScoredProperty>[],
+        );
       }
     }
 
-    await _send(transcript);
+    await _send(transcript, enrich: false); // voice: skip the slow enrich round-trip
 
     // Voice etiquette: don't dump apartments unasked. The FIRST time אתי has enough
     // to search, she ASKS — unless the user already consented or said "תראה לי".
@@ -757,7 +764,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     try {
       final resp = await AwsApiClient.instance
           .post('/assistant/extract', {'query': text}).timeout(
-        const Duration(seconds: 6),
+        const Duration(seconds: 4),
       );
       final plan = EttiPlan.fromJson(resp);
       if (!plan.isEmpty) _query = plan.toQuery(fallback: _query);
@@ -766,7 +773,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
   }
 
-  Future<void> _send(String raw) async {
+  // [enrich] runs the extra backend LLM extraction. Voice passes false — the
+  // on-device SmartSearch (city via CBS data + budget/rooms/features + the
+  // transaction & required-feature inference rules) is enough, and dropping the
+  // second network round-trip makes אתי answer MUCH faster (she was too slow).
+  Future<void> _send(String raw, {bool enrich = true}) async {
     final text = raw.trim();
     if (text.isEmpty || _busy) return;
 
@@ -794,9 +805,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _applyLifestyle(text);
 
     // ETTI (the LLM brain): read between the lines → hard_constraints + weighted
-    // soft preferences, folded over the deterministic parse. Bounded + graceful:
-    // on any failure the on-device query stands. See EttiPlan / docs/architecture.
-    await _ettiEnrich(text);
+    // soft preferences, folded over the deterministic parse. Skipped in voice for
+    // speed (the on-device parse already covers city/budget/rooms/features/intent).
+    if (enrich) await _ettiEnrich(text);
 
     // Location needed but unknown → אתי RAISES a GPS request (a button). The user
     // approves, then the app captures the location and searches. אתי never grabs
