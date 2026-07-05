@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -139,7 +140,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       borderRadius: BorderRadius.circular(8),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () {
+                        onTap: () async {
+                          // DEBUG: sign in anonymously so the server voice + GPT
+                          // endpoints (which require a Firebase JWT) actually work.
+                          // Needs Anonymous auth enabled in the Firebase console.
+                          try {
+                            if (FirebaseAuth.instance.currentUser == null) {
+                              await FirebaseAuth.instance.signInAnonymously();
+                            }
+                          } catch (_) {}
+                          if (!context.mounted) return;
                           context.read<DatingProvider>().markEnteredApp();
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(

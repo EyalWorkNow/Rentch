@@ -3,7 +3,7 @@ import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
-import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/map_style_property_card.dart';
 import 'package:flutter/material.dart';
 
 /// Full-screen voice conversation with אתי — styled after Google Gemini's live
@@ -61,7 +61,23 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       _criteria = const ['תל אביב', '3 חדרים', 'עד 8,000 ₪', 'מרפסת', 'ליד הים'];
       _resultCount = 7;
       _level = 0.6;
+    } else {
+      // Hands-free: the conversation starts on its own — no tap needed.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startListening();
+      });
     }
+  }
+
+  // Hands-free loop: after a turn, automatically re-open the mic (unless paused).
+  // The device STT detects when the user stops talking (isFinal), so אתי answers
+  // and then keeps listening on her own — a normal flowing conversation.
+  void _resumeListening() {
+    if (widget.demoMode || _muted || !mounted) return;
+    if (_state == AtiVoiceState.listening ||
+        _state == AtiVoiceState.thinking ||
+        _state == AtiVoiceState.speaking) return;
+    _startListening();
   }
 
   @override
@@ -89,17 +105,26 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   }
 
   // ── voice loop ─────────────────────────────────────────────────────────────
+  // Tapping the orb: BARGE-IN while אתי is speaking (interrupt her and listen),
+  // otherwise pause / resume the hands-free flow.
   Future<void> _toggleListen() async {
     if (widget.demoMode) return;
-    if (_state == AtiVoiceState.listening) {
-      await widget.service.stopListening();
+    if (_state == AtiVoiceState.speaking) {
+      // Barge-in: cut her off and immediately start listening to the user.
+      await widget.service.stopSpeaking();
+      if (!mounted) return;
       setState(() => _state = AtiVoiceState.idle);
+      await _startListening();
       return;
     }
-    if (_state == AtiVoiceState.thinking || _state == AtiVoiceState.speaking) {
-      return;
+    setState(() => _muted = !_muted);
+    if (_muted) {
+      await widget.service.stopListening();
+      await widget.service.stopSpeaking();
+      if (mounted) setState(() => _state = AtiVoiceState.idle);
+    } else {
+      _resumeListening();
     }
-    await _startListening();
   }
 
   Future<void> _startListening() async {
@@ -132,7 +157,10 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   Future<void> _handle(String text) async {
     await widget.service.stopListening();
     if (text.trim().isEmpty) {
-      if (mounted) setState(() => _state = AtiVoiceState.idle);
+      if (mounted) {
+        setState(() => _state = AtiVoiceState.idle);
+        _resumeListening(); // silence → keep waiting for the user to speak
+      }
       return;
     }
     setState(() {
@@ -153,19 +181,21 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     } catch (_) {}
     if (!mounted) return;
     setState(() => _state = AtiVoiceState.idle);
+    _resumeListening(); // hands-free: auto-open the mic for the next turn
   }
 
   // ── copy ───────────────────────────────────────────────────────────────────
   String get _statusLabel {
+    if (_muted) return 'מושהה — הקישו כדי להמשיך';
     switch (_state) {
       case AtiVoiceState.listening:
         return 'מקשיבה לך…';
       case AtiVoiceState.thinking:
         return 'רגע, חושבת…';
       case AtiVoiceState.speaking:
-        return 'אתי מדברת';
+        return 'אתי מדברת · הקישו כדי לענות';
       case AtiVoiceState.idle:
-        return 'הקישו כדי לדבר';
+        return 'רגע…';
     }
   }
 
@@ -314,85 +344,37 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
 
   // The property options אתי found — shown as a horizontal strip of glassy cards
   // right inside the voice screen (tap → full details).
+  // Inside the voice conversation, apartments use the SAME map/discover ("לאסו")
+  // card design, with the detailed "why", in a scrollable vertical list.
   Widget _resultsStrip() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Flexible(
+      flex: 8,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
             child: Text('מצאתי ${_results.length} דירות שמתאימות לך 👇',
                 style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700)),
           ),
-          SizedBox(
-            height: 176,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+          Flexible(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _results.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _miniCard(_results[i]),
+              itemBuilder: (_, i) => MapStylePropertyCard(
+                scored: _results[i],
+                imageHeight: 150,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =>
+                        PropertyDetailScreen(property: _results[i].property))),
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _miniCard(ScoredProperty s) {
-    final p = s.property;
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => PropertyDetailScreen(property: p))),
-      child: Container(
-        width: 156,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 100,
-              child: SafeMedia(
-                media: p.primaryMedia,
-                fallback: Container(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  child: const Icon(Icons.home_rounded,
-                      color: Colors.white24, size: 32),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(p.priceLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 2),
-                  Text('${p.roomsLabel} · ${p.city}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 12)),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -440,7 +422,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           _roundBtn(
             icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
             bg: Colors.white.withValues(alpha: 0.12),
-            onTap: () => setState(() => _muted = !_muted),
+            onTap: _toggleListen,
           ),
           _roundBtn(
             icon: _state == AtiVoiceState.speaking

@@ -166,7 +166,15 @@ class _AssistantScreenState extends State<AssistantScreen>
       curve: Curves.easeOutBack,
     ));
 
+    _service.ttsVoice = 'onyx'; // אריק — a natural male voice (אתי stays 'coral')
     _loadTranscript();
+
+    // Hands-free by default: the voice conversation starts on its own so the
+    // landlord can just talk — no tap to start, no tap per turn (Erik listens,
+    // answers, and resumes listening automatically).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_conversationMode) _toggleConversation();
+    });
   }
 
   @override

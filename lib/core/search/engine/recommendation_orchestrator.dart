@@ -20,6 +20,8 @@
 import 'dart:math' as math;
 
 import 'package:dating_app/core/finance/commute.dart';
+import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/govdata/gov_sources.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
@@ -191,6 +193,15 @@ class Explainer {
     'schools': 'מוסדות חינוך',
     'family': 'אזור משפחתי',
     'health': 'נגישות בריאות',
+    'coast': 'קרבה לים',
+    'yield': 'תשואה להשקעה',
+    'university': 'קרבה לאוניברסיטה',
+    'young_area': 'אזור צעיר ותוסס',
+    'senior_area': 'אזור שקט ומבוגר',
+    'luxury': 'רמת יוקרה',
+    'view': 'קומה גבוהה / נוף',
+    'spaciousness': 'מרווחות',
+    'accessibility': 'נגישות',
   };
 
   /// Public Hebrew label for a scoring dimension key (used by the Scorecard
@@ -338,6 +349,37 @@ class RecommendationEngine {
   }) {
     if (candidates.isEmpty) return const [];
 
+    // Hard rent/sale gate: an investor's "דירה להשקעה" must never surface
+    // rentals (and vice-versa). Enforced here so EVERY caller — incl. the chat's
+    // provider.recommendForTenant path — is gated, not just SmartSearch.rank.
+    final gated = SmartSearch.applyTransactionFilter(candidates, query);
+    if (gated.isEmpty) return const [];
+    candidates = gated;
+
+    // City gate (metro-aware): when the user NAMES a city, stay in its METRO —
+    // the named city plus the towns within ~18 km (גוש דן, הקריות, השרון …), so a
+    // "תל אביב" search also surfaces רמת גן / גבעתיים, but never a flat 100 km away.
+    // The soft city penalty still ranks the exact city first; relax to all cities
+    // only when the named city has zero stock.
+    final city = query.city?.trim();
+    if (city != null && city.isNotEmpty) {
+      final inCity = candidates
+          .where((p) => '${p.city} ${p.neighborhood}'.contains(city))
+          .toList();
+      if (inCity.isNotEmpty) {
+        // The named-city listings define its centre.
+        final cLat = inCity.map((p) => p.lat).reduce((a, b) => a + b) /
+            inCity.length;
+        final cLon = inCity.map((p) => p.lon).reduce((a, b) => a + b) /
+            inCity.length;
+        candidates = candidates
+            .where((p) =>
+                '${p.city} ${p.neighborhood}'.contains(city) ||
+                _km(p.lat, p.lon, cLat, cLon) <= 18.0)
+            .toList();
+      }
+    }
+
     // Part 1 — market analysis + feature engineering
     final market = MarketContext.analyze(candidates);
     final pfvs = [
@@ -364,10 +406,14 @@ class RecommendationEngine {
       ranked,
       limit: limit,
       lambda: diversityLambda,
-    )
-      // MMR diversifies the SELECTED set; present it in descending fit order so
-      // the displayed % is monotonic (no "82% above 85%" confusion).
-      ..sort((a, b) => b.score.compareTo(a.score));
+    );
+    // The ranking blend (c.score) selects WHICH listings + diversity; but the
+    // user-facing order and the fit% must speak one language, so present the
+    // selected set best-match-first by the SAME stated-match that drives fit%.
+    final match = <RankedCandidate, double>{
+      for (final c in selected) c: _statedMatch(c, model),
+    };
+    selected.sort((a, b) => match[b]!.compareTo(match[a]!));
 
     // model confidence: how much intent we captured + behavioral confidence
     final intentCoverage =
@@ -379,7 +425,7 @@ class RecommendationEngine {
     return [
       for (final c in selected)
         () {
-          final fitPct = (c.score * 100).round();
+          final fitPct = (match[c]! * 100).round();
           final explanation = Explainer.explain(c, model);
           final highlights = Explainer.highlights(c, model);
           final confidence =
@@ -399,7 +445,7 @@ class RecommendationEngine {
           );
           return Recommendation(
             property: c.property,
-            fitScore: c.score * 100,
+            fitScore: match[c]! * 100,
             fitPct: fitPct,
             explanation: explanation,
             highlights: highlights,
@@ -444,6 +490,9 @@ class RecommendationEngine {
     // Iterate the canonical dimension list so keys align with ScorecardStats /
     // the preference model exactly.
     for (final key in kScoringDimensions) {
+      // coast/yield are added below as rich, stat-carrying dimensions (with the
+      // real km / yield%); skip them here to avoid a bare duplicate.
+      if (key == kCoastDimensionKey || key == kYieldDimensionKey) continue;
       // BAR = how well THIS apartment scores on the axis — its MAUT satisfaction
       // u∈[0,1] — NOT the weighted contribution. The contribution is w·u/Σw, which
       // is tiny by construction, so showing it made a 68% match read as
@@ -474,6 +523,19 @@ class RecommendationEngine {
     // the property has usable coordinates. Off by default → fully back-compat.
     final commuteDim = _commuteDimension(c.property, workLat, workLon);
     if (commuteDim != null) dimensions.add(commuteDim);
+
+    // True monthly cost (rent + arnona + vaad) — a listing can fit on rent yet
+    // blow the budget once municipal tax + maintenance are added.
+    final costDim = _totalCostDimension(c.property);
+    if (costDim != null) dimensions.add(costDim);
+
+    // Investor lens: gross rental yield, shown only for for-sale listings.
+    final yieldDim = _yieldDimension(c.property, model, weightSum);
+    if (yieldDim != null) dimensions.add(yieldDim);
+
+    // Beach proximity — a real deciding factor in coastal Israel.
+    final coastDim = _coastDimension(c.property, model, weightSum);
+    if (coastDim != null) dimensions.add(coastDim);
 
     // Most-relevant axes first (what matters to the user); strongest as tiebreak.
     dimensions.sort((a, b) {
@@ -533,6 +595,89 @@ class RecommendationEngine {
     );
   }
 
+  /// Stable engine key for the informational "total monthly cost" axis.
+  static const String kTotalCostDimensionKey = 'total_cost';
+
+  /// Informational "עלות חודשית כוללת" axis from a coarse [MonthlyCost] estimate.
+  /// Weight 0 → it explains, never re-ranks (promote to a preference weight later
+  /// if we want total cost to actually reorder results). Null when size is unknown.
+  static ScorecardDimension? _totalCostDimension(RentalProperty property) {
+    if (property.transactionType == PropertyTransactionType.sale) return null;
+    final est = MonthlyCost.estimate(
+      rent: property.price,
+      sizeM2: property.sizeM2,
+      city: property.city,
+    );
+    if (est == null) return null;
+    // Smaller add-on over rent = better. ≤0% ≈ 1, ≥30% ≈ 0.
+    final addOnRatio = (est.total - est.rent) / est.rent;
+    final score = (1.0 - addOnRatio / 0.30).clamp(0.0, 1.0).toDouble();
+    return ScorecardDimension(
+      key: kTotalCostDimensionKey,
+      label: 'עלות חודשית כוללת',
+      weightPct: 0.0,
+      contributionPct: score,
+      stat: est.plainHebrewLabel,
+      positive: score >= _kStrongScore,
+    );
+  }
+
+  /// Stable engine key for the informational "rental yield" axis (sale listings).
+  static const String kYieldDimensionKey = 'yield';
+
+  /// Informational "תשואה להשקעה" axis for FOR-SALE listings, from a coarse
+  /// [RentalYield] estimate. Weight 0 → explains, never re-ranks (owner-occupier
+  /// ordering by default; weight it for the investor cohort later). Null for
+  /// rentals / unusable size.
+  static ScorecardDimension? _yieldDimension(
+      RentalProperty property, UserPreferenceModel model, double weightSum) {
+    if (property.transactionType != PropertyTransactionType.sale) return null;
+    final est = RentalYield.estimate(
+      salePrice: property.price,
+      sizeM2: property.sizeM2,
+      city: property.city,
+    );
+    if (est == null) return null;
+    // 2% ≈ 0, 5% ≈ 1.
+    final score = ((est.grossYieldPct - 2.0) / 3.0).clamp(0.0, 1.0).toDouble();
+    final weightPct = weightSum > 0
+        ? (model.weight(kYieldDimensionKey) / weightSum).clamp(0.0, 1.0)
+        : 0.0;
+    return ScorecardDimension(
+      key: kYieldDimensionKey,
+      label: 'תשואה להשקעה',
+      weightPct: weightPct,
+      contributionPct: score,
+      stat: est.plainHebrewLabel,
+      positive: score >= _kStrongScore,
+    );
+  }
+
+  /// Stable engine key for the informational "beach proximity" axis.
+  static const String kCoastDimensionKey = 'coast';
+
+  /// Informational "קרבה לים" axis from the real coastline geo-index. Shown only
+  /// when the property is within ~8 km of the sea; weight 0 (explains, doesn't
+  /// re-rank). Null inland.
+  static ScorecardDimension? _coastDimension(
+      RentalProperty property, UserPreferenceModel model, double weightSum) {
+    final km = IsraelGeoIndex.coastKm(property.lat, property.lon);
+    if (km == null || km > 8) return null;
+    final score = IsraelGeoIndex.proximityKernel(km, scaleKm: 3.0);
+    final kmLabel = km < 10 ? km.toStringAsFixed(1) : km.round().toString();
+    final weightPct = weightSum > 0
+        ? (model.weight(kCoastDimensionKey) / weightSum).clamp(0.0, 1.0)
+        : 0.0;
+    return ScorecardDimension(
+      key: kCoastDimensionKey,
+      label: 'קרבה לים',
+      weightPct: weightPct,
+      contributionPct: score,
+      stat: 'כ-$kmLabel ק״מ מהחוף',
+      positive: score >= _kStrongScore,
+    );
+  }
+
   // matchKey → property feature catalogue key (only the keys that correspond to
   // a concrete property amenity can be satisfied by the listing itself).
   static const Map<String, String> _personaKeyToFeature = {
@@ -583,6 +728,40 @@ class RecommendationEngine {
 
   /// Honest downsides: low/negative dimensions that carry weight, plus a
   /// budget-over note when the listing exceeds the stated max budget.
+  // Great-circle km between two coordinates (metro-gate radius check).
+  static double _km(double la1, double lo1, double la2, double lo2) {
+    if (la1.abs() < 0.1 || la2.abs() < 0.1) return double.infinity; // bad coords
+    const r = 6371.0088;
+    final dLa = (la2 - la1) * math.pi / 180.0;
+    final dLo = (lo2 - lo1) * math.pi / 180.0;
+    final a = math.sin(dLa / 2) * math.sin(dLa / 2) +
+        math.cos(la1 * math.pi / 180.0) *
+            math.cos(la2 * math.pi / 180.0) *
+            math.sin(dLo / 2) *
+            math.sin(dLo / 2);
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  /// Display "match %": how well the listing satisfies WHAT THE USER ASKED FOR
+  /// (the stated dimensions), lightly blended with overall quality. The raw
+  /// ranking score (c.score) includes trust/popularity/freshness the user never
+  /// asked about, so it under-reads a perfect city+budget+size match as ~57%.
+  static double _statedMatch(RankedCandidate c, UserPreferenceModel model) {
+    final stated = model.statedDimensions;
+    if (stated.isEmpty) return c.score;
+    double wsum = 0, acc = 0;
+    for (final dim in stated) {
+      final w = model.weight(dim);
+      if (w <= 0) continue;
+      wsum += w;
+      acc += w * model.satisfaction(dim, c.pfv);
+    }
+    if (wsum <= 0) return c.score;
+    // Mostly the stated-criteria fit, with a little overall quality so it isn't
+    // a single axis. Both are 0..1.
+    return (0.8 * (acc / wsum) + 0.2 * c.score).clamp(0.0, 1.0);
+  }
+
   static List<String> _concerns(
     RankedCandidate c,
     UserPreferenceModel model,
@@ -590,24 +769,37 @@ class RecommendationEngine {
   ) {
     final concerns = <String>[];
 
-    // Budget overrun against the model's stated max budget.
+    // Budget concerns ONLY when the user actually stated a budget — otherwise
+    // maxBudget is a synthetic median default and "over budget" is a phantom.
     final price = c.property.price;
     final maxBudget = model.maxBudget;
-    if (maxBudget > 0 && price > maxBudget) {
-      final over = ((price - maxBudget) / maxBudget * 100).round();
-      concerns.add(over <= 10
-          ? 'מעט מעל התקציב שלך'
-          : 'מעל התקציב שלך בכ-$over%');
+    final budgetStated = model.statedDimensions.contains('budget');
+    if (budgetStated && maxBudget > 0) {
+      if (price > maxBudget) {
+        final over = ((price - maxBudget) / maxBudget * 100).round();
+        concerns.add(over <= 10
+            ? 'מעט מעל התקציב שלך'
+            : 'מעל התקציב שלך בכ-$over%');
+      } else if (c.property.transactionType != PropertyTransactionType.sale) {
+        // Rent fits, but arnona + vaad push the true cost over — flag ONLY when
+        // it overshoots by a meaningful margin (>3%), not by a few shekels.
+        final cost = MonthlyCost.estimate(
+            rent: price, sizeM2: c.property.sizeM2, city: c.property.city);
+        if (cost != null && cost.total > maxBudget * 1.03) {
+          concerns.add('שכ״ד בתקציב, אך העלות הכוללת '
+              '(${cost.plainHebrewLabel}) חורגת מהתקציב');
+        }
+      }
     }
 
-    // Weighted dimensions the listing scores poorly on (only ones the user
-    // actually cares about, to avoid noise).
+    // Only GENUINELY weak spots on axes the user cares about — not axes that are
+    // merely mediocre. Capped at 2 so a card isn't a wall of caveats.
     for (final d in dimensions) {
-      if (concerns.length >= 3) break;
-      if (d.positive) continue;
+      if (concerns.length >= 2) break;
       if (d.key == 'budget') continue; // covered above
-      final weighty = model.statedDimensions.contains(d.key) ||
-          d.weightPct >= 0.12;
+      if (d.contributionPct >= 0.35) continue; // genuinely weak only
+      final weighty =
+          model.statedDimensions.contains(d.key) || d.weightPct >= 0.12;
       if (!weighty) continue;
       concerns.add('${d.label} פחות חזק כאן');
     }

@@ -212,6 +212,9 @@ class AssistantService {
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer();
 
+  /// OpenAI TTS voice — 'coral' (warm female) for אתי, 'onyx' (male) for אריק.
+  String ttsVoice = 'coral';
+
   bool _speechReady = false;
   bool _ttsReady = false;
 
@@ -477,7 +480,7 @@ class AssistantService {
           request.headers.add(HttpHeaders.authorizationHeader, 'Bearer $token');
         }
       } catch (_) {}
-      request.write(jsonEncode({'text': text}));
+      request.write(jsonEncode({'text': text, 'voice': ttsVoice}));
       final response = await request.close().timeout(_timeout);
       final raw = await utf8.decoder.bind(response).join().timeout(_timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) return false;

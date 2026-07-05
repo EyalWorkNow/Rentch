@@ -286,6 +286,15 @@ class SmartSearch {
     int? minPrice;
     int? maxPrice;
     int? amount(String s) {
+      // millions (sale budgets): "2 מיליון", "2.5 מיליון", "מיליון וחצי"
+      final mil = RegExp(r'(\d+(?:[.,]\d+)?)\s*מיליון').firstMatch(s);
+      if (mil != null) {
+        final base = double.tryParse(mil.group(1)!.replaceAll(',', '.')) ?? 0;
+        return (base * 1000000).round() + (s.contains('וחצי') ? 500000 : 0);
+      }
+      if (s.contains('מיליון')) {
+        return 1000000 + (s.contains('וחצי') ? 500000 : 0);
+      }
       final e = RegExp(r'(\d+)\s*(וחצי\s*)?(?:אלף|אלפים)').firstMatch(s);
       if (e != null) {
         return (int.tryParse(e.group(1)!) ?? 0) * 1000 +
@@ -295,14 +304,16 @@ class SmartSearch {
       return n != null ? int.tryParse(n.group(0)!) : null;
     }
 
-    final between = RegExp(r'בין\s*(.{1,12}?)\s*ל[-־]?\s*(.{1,12}?)(?:\s|$|,)')
+    // Capture a number + optional unit ("2 מיליון", "6 אלף", "6000") — the unit
+    // must stay in the group, so the terminator can't cut at the space before it.
+    const amt = r'(\d[\d.,]*\s*(?:אלף|אלפים|מיליון)?)';
+    final between = RegExp('בין\\s*$amt\\s*ל[-־]?\\s*$amt').firstMatch(text);
+    final around =
+        RegExp('(?:בערך|סביב|כ[-־]|בסביבות)\\s*$amt').firstMatch(text);
+    final upto = RegExp('(?:עד|מקסימום|מקס|לכל היותר|מתחת ל[-־]?)\\s*$amt')
         .firstMatch(text);
-    final around = RegExp(r'(?:בערך|סביב|כ[-־]|בסביבות)\s*(.{1,12}?)(?:\s|$|,)')
-        .firstMatch(text);
-    final upto = RegExp(r'(?:עד|מקסימום|מקס|לכל היותר|מתחת ל[-־]?)\s*(.{1,12}?)(?:\s|$|,)')
-        .firstMatch(text);
-    final from = RegExp(r'(?:מ[-־]|לפחות|מעל|החל מ[-־]?)\s*(.{1,12}?)(?:\s|$|,)')
-        .firstMatch(text);
+    final from =
+        RegExp('(?:מ[-־]|לפחות|מעל|החל מ[-־]?)\\s*$amt').firstMatch(text);
 
     if (between != null) {
       minPrice = amount(between.group(1)!);
@@ -334,7 +345,9 @@ class SmartSearch {
     // phrase ("להשכרה"/"לשכור"/"שכירות") pins it to rent; if neither appears we
     // leave it [any] so the existing rent-first behaviour is preserved.
     var transactionType = TransactionTypeFilter.any;
-    if (RegExp(r'למכירה|למכור|לקנות|לרכוש|רכישה|מכירה').hasMatch(text)) {
+    // Investment phrasing ("להשקעה"/"תשואה") also means buying → sale.
+    if (RegExp(r'למכירה|למכור|לקנות|לרכוש|רכישה|מכירה|השקע|השקי|תשוא')
+        .hasMatch(text)) {
       transactionType = TransactionTypeFilter.sale;
     } else if (RegExp(r'להשכרה|לשכור|שכירות|להשכיר').hasMatch(text)) {
       transactionType = TransactionTypeFilter.rent;
@@ -491,7 +504,7 @@ class SmartSearch {
     TenantProfile? profile,
   }) {
     // Hard rent/sale gate first so neither ranking path can mix the two.
-    final pool = _applyTransactionFilter(props, q);
+    final pool = applyTransactionFilter(props, q);
     // Use advanced multi-dimensional matching if query has enough signal;
     // fall back to simpler scoring if vague.
     if (q.hasEssentials && pool.isNotEmpty) {
@@ -513,7 +526,7 @@ class SmartSearch {
     int limit = 10,
     TenantProfile? profile,
   }) {
-    final pool = _applyTransactionFilter(props, q);
+    final pool = applyTransactionFilter(props, q);
     if (pool.isEmpty) return [];
     try {
       final scored = RecommendationEngine.recommendAsScored(
@@ -641,7 +654,7 @@ class SmartSearch {
 
   // Drops listings of the wrong transaction type up-front so rent and sale
   // results never blend, regardless of which ranking path runs.
-  static List<RentalProperty> _applyTransactionFilter(
+  static List<RentalProperty> applyTransactionFilter(
     List<RentalProperty> props,
     SearchQuery q,
   ) {
@@ -823,7 +836,7 @@ class SmartSearch {
   static const Map<String, List<String>> _amenityKeywords = {
     'feat_renovated': ['משופצ', 'שיפוץ', 'חדשה', 'renovated'],
     'feat_pets': ['כלב', 'כלבה', 'חתול', 'חיית מחמד', 'חיות מחמד', 'pet', 'dog'],
-    'feat_parking': ['חניה', 'חנייה', 'חניית', 'חנית', 'parking'],
+    'feat_parking': ['חניה', 'חנייה', 'חניית', 'חנית', 'parking', 'מכונית', 'רכב פרטי'],
     // ponytail: feat_accessible/feat_roommates exist in the catalogue but the
     // parser never detected them — real personas (wheelchair, students) were
     // silently dropped. Keyword rows only; the MAUT engine already scores them.

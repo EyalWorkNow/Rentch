@@ -1,0 +1,186 @@
+import 'dart:io';
+
+import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
+import 'package:dating_app/data/models/rental_models.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+Future<String> _diskReader(String path) => File(path).readAsString();
+
+RentalProperty flat({
+  required String id,
+  required int price,
+  required double rooms,
+  required int sizeM2,
+  required String city,
+  required double lat,
+  required double lon,
+  String floor = '3',
+  List<String> features = const [],
+  PropertyTransactionType type = PropertyTransactionType.rent,
+}) =>
+    RentalProperty(
+      id: id, price: price, rooms: rooms, sizeM2: sizeM2, floor: floor,
+      totalFloors: '20', city: city, neighborhood: '', street: 'הרצל',
+      streetNumber: 10, lat: lat, lon: lon, propertyType: 'דירה',
+      transactionType: type, entryDate: '', condition: 'טוב',
+      ownerName: 'בעלים', agencyListing: false, features: features,
+      media: const [
+        PropertyMedia(url: 'http://x/a.jpg', type: PropertyMediaType.image)
+      ],
+      marketSignals: const PropertyMarketSignals(views: 120, likes: 14, saves: 4),
+      verification: PropertyVerification.cameraVideo(
+          videoUrl: 'http://x/v.mp4', capturedAt: DateTime(2026, 6, 1)),
+    );
+
+int rankOf(List<ScoredProperty> l, String id) =>
+    l.indexWhere((s) => s.property.id == id);
+
+void show(String persona, String q, List<ScoredProperty> recs) {
+  // ignore: avoid_print
+  print('\n════════ $persona ════════\n   🔎 "$q"');
+  for (final s in recs.take(3)) {
+    final p = s.property;
+    final sc = s.scorecard!;
+    final top = (List.of(sc.dimensions)
+          ..sort((a, b) => b.weightPct.compareTo(a.weightPct)))
+        .take(5)
+        .map((d) => '${d.label} ${(d.contributionPct * 100).round()}%')
+        .join(', ');
+    // ignore: avoid_print
+    print('   • ${p.id}: ${p.priceLabel}, ${p.rooms.toInt()}חד׳/${p.sizeM2}מ״ר, '
+        '${p.city} · fit ${sc.fitPct}%\n       $top');
+    if (sc.concerns.isNotEmpty) {
+      // ignore: avoid_print
+      print('       ⚠ ${sc.concerns.join(" | ")}');
+    }
+  }
+}
+
+// Real Tel-Aviv-area + Haifa stock at real coordinates.
+List<RentalProperty> catalogue() => [
+      // near a rail station (TA השלום ~32.073,34.792) vs far east
+      flat(id: 'ta-rail', price: 6100, rooms: 3, sizeM2: 80, city: 'תל אביב',
+          lat: 32.073, lon: 34.792, features: ['ac']),
+      flat(id: 'ta-eastfar', price: 6100, rooms: 3, sizeM2: 80, city: 'תל אביב',
+          lat: 32.058, lon: 34.86, features: ['ac']),
+      // beachfront vs inland
+      flat(id: 'ta-beach', price: 8000, rooms: 2, sizeM2: 56, city: 'תל אביב',
+          lat: 32.081, lon: 34.767, features: ['ac', 'balcony']),
+      // by Tel Aviv University
+      flat(id: 'tau', price: 5400, rooms: 2, sizeM2: 55, city: 'תל אביב',
+          lat: 32.113, lon: 34.805, features: ['ac']),
+      // pet-friendly ground floor
+      flat(id: 'ta-ground-pet', price: 6800, rooms: 3, sizeM2: 78,
+          city: 'תל אביב', lat: 32.07, lon: 34.79, floor: '0',
+          features: ['ac', 'petsAllowed', 'garden']),
+      flat(id: 'ta-high-nopet', price: 6700, rooms: 3, sizeM2: 80,
+          city: 'תל אביב', lat: 32.072, lon: 34.79, floor: '9',
+          features: ['ac', 'elevator']),
+      // Ramat Gan (metro) — family
+      flat(id: 'rg-family', price: 5900, rooms: 4, sizeM2: 96, city: 'רמת גן',
+          lat: 32.083, lon: 34.814, features: ['ac', 'elevator', 'mamad']),
+      // Haifa sale stock (investor)
+      flat(id: 'hf-sale-cheap', price: 1150000, rooms: 4, sizeM2: 92,
+          city: 'חיפה', lat: 32.80, lon: 34.99,
+          type: PropertyTransactionType.sale),
+      flat(id: 'hf-sale-pricey', price: 1950000, rooms: 3, sizeM2: 78,
+          city: 'חיפה', lat: 32.81, lon: 34.98,
+          type: PropertyTransactionType.sale),
+    ];
+
+List<ScoredProperty> run(String q) => RecommendationEngine.recommendAsScored(
+    candidates: catalogue(), query: SmartSearch.parse(q), limit: 8, seed: 21);
+
+void main() {
+  setUpAll(() async {
+    GovData.instance.resetForTest();
+    await GovData.instance.init(reader: _diskReader);
+  });
+  tearDownAll(() => GovData.instance.resetForTest());
+
+  test('gov data actually loaded', () {
+    expect(GovData.instance.loaded, true);
+  });
+
+  test('דן — קרוב לרכבת בתל אביב', () {
+    const q = 'דירה בתל אביב קרוב לרכבת עד 6800';
+    final recs = run(q);
+    show('דן · רכבת · ת״א', q, recs);
+    expect(rankOf(recs, 'ta-rail') < rankOf(recs, 'ta-eastfar'), true,
+        reason: 'near-rail flat should beat the far-east one');
+  });
+
+  test('נועה — ליד הים בתל אביב', () {
+    const q = 'דירה בתל אביב קרוב לים עד 8500';
+    final recs = run(q);
+    show('נועה · ים · ת״א', q, recs);
+    expect(recs.take(2).any((s) => s.property.id == 'ta-beach'), true,
+        reason: 'the beachfront flat should be near the top');
+  });
+
+  test('יעל — סטודנטית ליד אוניברסיטת תל אביב', () {
+    const q = 'דירה לסטודנטית ליד האוניברסיטה בתל אביב עד 6000';
+    final recs = run(q);
+    show('יעל · סטודנטית · TAU', q, recs);
+    expect(recs.first.property.id == 'tau', true,
+        reason: 'the flat by the campus should lead for a student');
+  });
+
+  test('קובי — בעל כלב, קומת קרקע', () {
+    const q = 'דירה בתל אביב לבעל כלב קומת קרקע עד 7000';
+    final recs = run(q);
+    show('קובי · כלב · קומת קרקע · ת״א', q, recs);
+    expect(rankOf(recs, 'ta-ground-pet') < rankOf(recs, 'ta-high-nopet'), true,
+        reason: 'pet-friendly ground floor should beat the high no-pet flat');
+  });
+
+  test('רון — יש לי מכונית, צריך חניה', () {
+    final candidates = [
+      flat(id: 'with-parking', price: 6500, rooms: 3, sizeM2: 78,
+          city: 'תל אביב', lat: 32.07, lon: 34.79,
+          features: ['ac', 'parking']),
+      flat(id: 'no-parking', price: 6500, rooms: 3, sizeM2: 78, city: 'תל אביב',
+          lat: 32.07, lon: 34.79, features: ['ac']),
+    ];
+    final recs = RecommendationEngine.recommendAsScored(
+        candidates: candidates,
+        query: SmartSearch.parse('דירה בתל אביב יש לי מכונית עד 7000'),
+        limit: 8,
+        seed: 21);
+    show('רון · מכונית · חניה', 'דירה בתל אביב יש לי מכונית עד 7000', recs);
+    expect(recs.first.property.id == 'with-parking', true,
+        reason: '"יש לי מכונית" should imply a parking need');
+  });
+
+  test('דנה — דירה מרכזית', () {
+    final candidates = [
+      flat(id: 'central', price: 6800, rooms: 3, sizeM2: 78, city: 'תל אביב',
+          lat: 32.0733, lon: 34.7800, features: ['ac']), // TA core
+      flat(id: 'peripheral', price: 6800, rooms: 3, sizeM2: 78, city: 'תל אביב',
+          lat: 32.052, lon: 34.872, features: ['ac']), // TA edge
+    ];
+    final recs = RecommendationEngine.recommendAsScored(
+        candidates: candidates,
+        query: SmartSearch.parse('דירה מרכזית בתל אביב עד 7000'),
+        limit: 8,
+        seed: 21);
+    show('דנה · מרכזי', 'דירה מרכזית בתל אביב עד 7000', recs);
+    expect(rankOf(recs, 'central') < rankOf(recs, 'peripheral'), true,
+        reason: 'a central flat should beat a peripheral one for "מרכזית"');
+  });
+
+  test('אבי — משקיע בחיפה לתשואה', () {
+    const q = 'דירה להשקעה בחיפה עם תשואה טובה עד 1500000';
+    final recs = run(q);
+    show('אבי · משקיע · חיפה · תשואה', q, recs);
+    expect(
+        recs.every(
+            (s) => s.property.transactionType == PropertyTransactionType.sale),
+        true,
+        reason: 'investor search must be sales only');
+    expect(recs.first.property.price <= 1500000, true,
+        reason: '"עד 1500000" caps the budget');
+  });
+}

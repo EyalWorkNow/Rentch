@@ -12,7 +12,10 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/recommendation_explainer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/repositories/property_search_repository.dart';
+import 'package:dating_app/core/services/realtime_voice_service.dart';
 import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
+import 'package:dating_app/presentation/features/search/realtime_voice_screen.dart';
+import 'package:dating_app/presentation/widgets/why_details.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
@@ -277,7 +280,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             ? 'אחרי העדכון לא נשארו התאמות. אפשר להוסיף משהו אחר?'
             : 'עדכנתי לפי השינוי 👇',
         scored: results,
-        chips: results.isEmpty ? const [] : _refineChips(),
+        chips: results.isEmpty ? const [] : _refinePromptChips(),
       ));
     });
     _scrollToEnd();
@@ -290,11 +293,23 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       for (int i = 0; i < show; i++)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
-          child: _AssistantPropertyCard(
-            scored: m.scored[i],
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) =>
-                    PropertyDetailScreen(property: m.scored[i].property))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Chat = the clean Messages-page card design.
+              _AssistantPropertyCard(
+                scored: m.scored[i],
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =>
+                        PropertyDetailScreen(property: m.scored[i].property))),
+              ),
+              // …with the detailed, personal "why I picked this for you".
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.82),
+                child: WhyDetails(scored: m.scored[i]),
+              ),
+            ],
           ),
         ),
       if (!m.expanded && total > 3)
@@ -338,25 +353,130 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   @override
   void dispose() {
+    for (final t in _streamTimers) {
+      t.cancel();
+    }
     _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  // Opens אתי's liquid-glass voice conversation (turn-based device STT → אתי GPT
-  // → device TTS). Opened straight from the sound button in the input bar.
+  final List<Timer> _streamTimers = [];
+
+  // Streaming reveal: flows `full` into `msg.text` word-by-word (a gentle "she's
+  // typing/talking" effect) instead of the text popping in all at once.
+  void _streamText(_ChatMsg msg, String full) {
+    final tokens = full.split(RegExp(r'(?<= )'));
+    if (tokens.length <= 1) {
+      setState(() => msg.text = full);
+      return;
+    }
+    int shown = 0;
+    late final Timer t;
+    t = Timer.periodic(const Duration(milliseconds: 38), (_) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      shown++;
+      setState(() =>
+          msg.text = shown >= tokens.length ? full : tokens.take(shown).join());
+      _scrollToEnd();
+      if (shown >= tokens.length) {
+        t.cancel();
+        _streamTimers.remove(t);
+      }
+    });
+    _streamTimers.add(t);
+  }
+
+  // Opens אתי's voice conversation. Prefers the LIVE realtime session (streaming
+  // voice + native barge-in); if that can't connect it falls back to the reliable
+  // turn-based liquid-glass screen. Opened from the sound button in the input bar.
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
-    await Navigator.of(context).push(MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => AtiVoiceScreen(
-        service: _service,
-        onUtterance: _processVoiceUtterance,
-        criteria: _voiceCriteria(),
-        resultCount: _lastResultCount,
-      ),
-    ));
+    final realtime = RealtimeVoiceService();
+    bool live = false;
+    try {
+      live = await realtime
+          .start()
+          .timeout(const Duration(seconds: 7), onTimeout: () => false);
+    } catch (_) {
+      live = false;
+    }
+    bool wantFallback = false;
+    if (live) {
+      final res = await Navigator.of(context).push<bool>(MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => RealtimeVoiceScreen(
+          service: realtime,
+          onSearch: _handleRealtimeSearch,
+        ),
+      ));
+      await realtime.dispose();
+      wantFallback = res == true; // user tapped "switch to regular chat"
+    } else {
+      await realtime.dispose();
+    }
+    if ((!live || wantFallback) && mounted) {
+      await Navigator.of(context).push(MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => AtiVoiceScreen(
+          service: _service,
+          onUtterance: _processVoiceUtterance,
+          criteria: _voiceCriteria(),
+          resultCount: _lastResultCount,
+        ),
+      ));
+    }
     _scrollToEnd();
+  }
+
+  // Runs a `search_listings` tool-call from the live voice agent: builds the query
+  // from its args, runs the same cohort search as typed input, drops the cards
+  // into the chat, and returns a short spoken summary + the results for אתי.
+  Future<({List<ScoredProperty> results, String summary})> _handleRealtimeSearch(
+      Map<String, dynamic> args) async {
+    final provider = context.read<DatingProvider>();
+    final amenities = ((args['amenities'] as List?) ?? const [])
+        .map((e) => 'feat_${e.toString().trim()}')
+        .where((s) => s.length > 5)
+        .toSet();
+    _query = _merge(
+      _query,
+      SearchQuery(
+        city: args['city'] as String?,
+        minRooms: (args['minRooms'] as num?)?.toDouble(),
+        maxRooms: (args['maxRooms'] as num?)?.toDouble(),
+        maxPrice: (args['maxPrice'] as num?)?.toInt(),
+        amenities: amenities,
+      ),
+    );
+    final life = (args['lifestyle'] as String?)?.toLowerCase() ?? '';
+    final rel = LifestyleKnowledge.detectReligiosity(life);
+    if (rel != null) _persona['religiosity'] = rel.name;
+
+    var results = _rankByLifestyle(
+            _applyLifestyleFilter(await _cohortRanked(provider, limit: 40)))
+        .take(10)
+        .toList();
+    if (mounted) {
+      setState(() {
+        _searched = true;
+        if (results.isNotEmpty) {
+          _messages.add(_ChatMsg(
+              role: 'assistant',
+              text: 'הנה כמה דירות שמתאימות למה שסיפרת 👇',
+              scored: results,
+              chips: _refinePromptChips()));
+        }
+      });
+      _scrollToEnd();
+    }
+    final summary = results.isEmpty
+        ? 'לא מצאתי דירה מדויקת, אפשר להרחיב אזור או תקציב?'
+        : 'מצאתי ${results.length} דירות שמתאימות, הן מופיעות עכשיו על המסך';
+    return (results: results, summary: summary);
   }
 
   // Understood-criteria chips for the voice screen (mirrors the chat criteria bar).
@@ -476,7 +596,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             role: 'assistant',
             text: 'הנה מה שהכי מתאים לך באזור שלך 👇',
             scored: results,
-            chips: _refineChips()));
+            chips: _refinePromptChips()));
       }
     });
     _scrollToEnd();
@@ -531,13 +651,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // location request instead of a warm reply (see below).
     final maybeLoc = _locationRelative.hasMatch(text);
 
-    // Criteria understanding: server Gemini (/assistant/extract) + on-device parser.
-    Map<String, dynamic> llm = const {};
-    try {
-      final r = await _service.extractPropertyFields(text, currentFields: {});
-      llm = r.fields;
-    } catch (_) {}
-    _query = _merge(_query, SmartSearch.parse(text, llm: llm));
+    // Criteria understanding: on-device parser only. (The Gemini /assistant/extract
+    // call was retired — it added a whole round-trip of latency for nothing now
+    // that Gemini is off; SmartSearch parses the same fields instantly on-device.)
+    _query = _merge(_query, SmartSearch.parse(text));
 
     // Fold lifestyle signals from the whole conversation into the query (e.g.
     // "דתי לאומי" / "תינוק" → an elevator matters). See _applyLifestyle.
@@ -560,22 +677,23 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       return;
     }
 
-    // Reply: local template (no tokens) for the common Hebrew criteria turn, GPT
-    // only for ambiguous / non-Hebrew input. Now runs AFTER the parse so the
-    // template sees this turn's fresh criteria.
-    final sr = await _serverReply();
     final shouldSearch = !_query.isEmpty &&
         (_searched || _wantsResultsNow(text) || _userTurns >= 2);
 
+    // SPEED: run the warm reply (GPT) and the cohort search IN PARALLEL — the user
+    // waits for the slower of the two, not their sum.
+    final replyFuture = _serverReply();
+    final searchFuture =
+        shouldSearch ? _cohortRanked(provider, limit: 40) : null;
+
+    final sr = await replyFuture;
     List<ScoredProperty> results = const [];
     bool anyExact = false;
-    if (shouldSearch) {
-      // Over-fetch through the backend cohort engine, then drop lifestyle-
-      // incompatible listings (high floor with no elevator for a stroller /
-      // Shabbat), then keep the top 10.
-      results = await _cohortRanked(provider, limit: 40);
-      results =
-          _rankByLifestyle(_applyLifestyleFilter(results)).take(10).toList();
+    if (searchFuture != null) {
+      // Drop lifestyle-incompatible listings (high floor w/o elevator), top 10.
+      results = _rankByLifestyle(_applyLifestyleFilter(await searchFuture))
+          .take(10)
+          .toList();
       anyExact = results.any((r) => r.exact);
     }
 
@@ -602,12 +720,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _ChatMsg? resultsMsg;
     final lifestyleNote = _lifestyleNoteShown ? null : _lifestyleNote();
     final clarify = shouldSearch ? null : _clarifyingPrompt();
+    // Streaming reveal: add the reply with empty text, then flow the words in.
+    final replyMsg = sr.$1.isNotEmpty
+        ? _ChatMsg(role: 'assistant', text: '', chips: sr.$2)
+        : null;
     setState(() {
       // When GPS located the user, the "📍 מצאתי אותך" message is the reply — no
       // empty/contradictory bubble.
-      if (sr.$1.isNotEmpty) {
-        _messages.add(_ChatMsg(role: 'assistant', text: sr.$1, chips: sr.$2));
-      }
+      if (replyMsg != null) _messages.add(replyMsg);
       if (shouldSearch) {
         if (results.isEmpty) {
           _messages.add(_ChatMsg(
@@ -644,7 +764,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 ? 'מצאתי ${results.length} דירות שמתאימות לך 🎯'
                 : 'אלה הכי קרובות למה שחיפשת 👇',
             scored: results,
-            chips: _refineChips(),
+            chips: _refinePromptChips(),
           );
           _messages.add(resultsMsg!);
         }
@@ -657,6 +777,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       }
       _busy = false;
     });
+    if (replyMsg != null) _streamText(replyMsg, sr.$1);
     _scrollToEnd();
 
     // Fetch the LLM's number-grounded explanations WITHOUT blocking the cards:
@@ -789,12 +910,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // returns (replyText, quick-reply suggestions). Falls back to local copy if
   // the server is unavailable (the on-device search still works regardless).
   Future<(String, List<String>)> _serverReply() async {
-    // TOKEN-SAVER: most turns are a clear criteria statement in Hebrew → build a
-    // warm, persona-aware reply LOCALLY from the on-device parse (zero LLM tokens,
-    // reusing templated content). Only spend a GPT call on genuinely ambiguous or
-    // non-Hebrew input (which needs the model for language + nuance).
-    final local = _localReply();
-    if (local != null) return (local, const <String>[]);
+    // NATURAL LANGUAGE FIRST: אתי always speaks via the model (warm, natural,
+    // multilingual). The local template is ONLY a graceful fallback if the model
+    // is unreachable — never the primary voice. (Token savings come from the
+    // server's prompt-caching + short outputs, NOT from replacing her language.)
     try {
       final history = _messages
           .where((m) => !m.isConsent && m.text.isNotEmpty && m.scored.isEmpty)
@@ -804,7 +923,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       final t = reply.reply.trim();
       if (t.isNotEmpty) return (t, reply.suggestions);
     } catch (_) {}
-    return (_warmFallback(), const <String>[]);
+    return (_localReply() ?? _warmFallback(), const <String>[]);
   }
 
   static final _hebrew = RegExp(r'[֐-׿]');
@@ -887,6 +1006,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     return lines[(_warmIdx++) % lines.length];
   }
 
+  // Concrete refinement suggestions — shown only AFTER the user opts to refine.
   List<String> _refineChips() {
     final chips = <String>[];
     if (_query.maxPrice != null) {
@@ -897,6 +1017,38 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (!_query.nearTrain) chips.add('קרוב לרכבת');
     if (!_query.amenities.contains('feat_elevator')) chips.add('עם מעלית');
     return chips.take(4).toList();
+  }
+
+  // Gentle refine prompt shown WITH the results (instead of dumping the options)
+  // so אתי isn't naggy — she just offers to refine, and only asks the next
+  // question if the user says yes.
+  static const _kRefineYes = '✨ כן, בוא נדייק';
+  static const _kRefineNo = 'זה מצוין, תודה';
+  List<String> _refinePromptChips() =>
+      _refineChips().isEmpty ? const [] : const [_kRefineYes, _kRefineNo];
+
+  // Routes a quick-reply chip: the refine prompt is handled locally (no LLM),
+  // everything else goes through the normal turn.
+  void _onChipTap(String c) {
+    if (_busy) return;
+    if (c == _kRefineYes) {
+      setState(() => _messages.add(_ChatMsg(
+            role: 'assistant',
+            text: 'מעולה 😊 מה נדייק כדי לצמצם למה שהכי מתאים לך?',
+            chips: _refineChips(),
+          )));
+      _scrollToEnd();
+      return;
+    }
+    if (c == _kRefineNo) {
+      setState(() => _messages.add(_ChatMsg(
+            role: 'assistant',
+            text: 'מקסים! 🙏 אם תרצה לחדד עוד משהו בהמשך — אני כאן.',
+          )));
+      _scrollToEnd();
+      return;
+    }
+    _send(c);
   }
 
   SearchQuery _merge(SearchQuery a, SearchQuery b) => SearchQuery(
@@ -1358,26 +1510,30 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: chips
-            .map((c) => GestureDetector(
-                  onTap: _busy ? null : () => _send(c),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight2,
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.35)),
-                    ),
-                    child: Text(c,
-                        style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13)),
+        children: [
+          for (int i = 0; i < chips.length; i++)
+            _AnimatedChip(
+              delayMs: i * 70,
+              child: GestureDetector(
+                onTap: _busy ? null : () => _onChipTap(chips[i]),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight2,
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.35)),
                   ),
-                ))
-            .toList(),
+                  child: Text(chips[i],
+                      style: TextStyle(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1535,6 +1691,51 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 }
 
 // ── Property card — mirrors the Messages-page (_MatchCard) design ─────────────
+// Quick-reply chip that springs in (fade + scale + rise), staggered by index —
+// a small, pleasant motion for the buttons אתי offers.
+class _AnimatedChip extends StatefulWidget {
+  const _AnimatedChip({required this.child, required this.delayMs});
+  final Widget child;
+  final int delayMs;
+  @override
+  State<_AnimatedChip> createState() => _AnimatedChipState();
+}
+
+class _AnimatedChipState extends State<_AnimatedChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 340));
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curve = CurvedAnimation(parent: _c, curve: Curves.easeOutBack);
+    return FadeTransition(
+      opacity: _c,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.8, end: 1.0).animate(curve),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero)
+              .animate(curve),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
 class _AssistantPropertyCard extends StatelessWidget {
   const _AssistantPropertyCard({required this.scored, required this.onTap});
   final ScoredProperty scored;

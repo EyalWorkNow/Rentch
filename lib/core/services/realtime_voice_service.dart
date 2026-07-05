@@ -32,6 +32,7 @@ class RealtimeVoiceService {
   StreamSubscription<Uint8List>? _micSub;
   bool _pcmReady = false;
   bool _closed = false;
+  bool _userSpeaking = false; // barge-in: drop model audio while the user talks
 
   // ── Public event streams the UI listens to ────────────────────────────────
   final _state = StreamController<RealtimeState>.broadcast();
@@ -66,12 +67,11 @@ class RealtimeVoiceService {
         return false;
       }
 
+      // GA realtime: connect with the ephemeral client secret as a bearer. The
+      // old 'OpenAI-Beta: realtime=v1' header is retired.
       _ws = IOWebSocketChannel.connect(
         Uri.parse(wsUrl),
-        headers: {
-          'Authorization': 'Bearer $secret',
-          'OpenAI-Beta': 'realtime=v1',
-        },
+        headers: {'Authorization': 'Bearer $secret'},
       );
       _wsSub = _ws!.stream.listen(_onServerEvent,
           onError: (_) => _emit(RealtimeState.error), onDone: dispose);
@@ -118,16 +118,26 @@ class RealtimeVoiceService {
     }
     switch (e['type']) {
       case 'input_audio_buffer.speech_started':
+        // BARGE-IN: the server VAD heard the user — cut אתי off (stop feeding her
+        // audio) and go back to listening.
+        _userSpeaking = true;
         _emit(RealtimeState.listening);
       case 'input_audio_buffer.speech_stopped':
         _emit(RealtimeState.thinking);
+      case 'response.created':
+        _userSpeaking = false; // a fresh reply may now play
       case 'conversation.item.input_audio_transcription.completed':
         final t = e['transcript'] as String?;
         if (t != null && t.trim().isNotEmpty) _userTranscript.add(t.trim());
+      // GA renamed the streamed audio/transcript events (kept the old names too
+      // for safety).
+      case 'response.output_audio_transcript.delta':
       case 'response.audio_transcript.delta':
         final d = e['delta'] as String?;
         if (d != null) _assistantTranscript.add(d);
+      case 'response.output_audio.delta':
       case 'response.audio.delta':
+        if (_userSpeaking) break; // barge-in → don't play over the user
         _emit(RealtimeState.speaking);
         final b64 = e['delta'] as String?;
         if (b64 != null && _pcmReady) {

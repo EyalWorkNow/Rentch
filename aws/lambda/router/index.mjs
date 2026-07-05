@@ -94,6 +94,8 @@ const OPENAI_REALTIME_VOICE = process.env.OPENAI_REALTIME_VOICE || 'marin';
 // isolated from the shared Gemini free-tier quota. Falls back to Gemini when the
 // OpenAI account is unfunded/over-quota (see handleTenantSearchChat).
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-5.4-mini';
+// Natural human text-to-speech for אתי + אריק (real voice, not robotic device TTS).
+const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts-2025-12-15';
 // Fallback chain — a free-tier model is frequently overloaded (429/503). If the
 // primary is busy we try the next one so the assistant keeps answering instead
 // of telling the user "the server is busy".
@@ -4880,49 +4882,35 @@ const TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Kore';
 async function handleAssistantTts(event) {
   const uid = callerUidOf(event);
   if (!uid) return json(401, { message: 'Authentication required.' });
-  if (!GEMINI_API_KEY) return json(200, { audio: null });
+  if (!OPENAI_API_KEY) return json(200, { audio: null });
 
   let body = {};
   try { body = event.body ? JSON.parse(event.body) : {}; }
   catch { return json(400, { message: 'Invalid JSON.' }); }
   const text = stripMarkup((body.text || '').toString()).slice(0, 1200);
   if (!text) return json(400, { message: 'text required' });
-  const voice = (body.voice || TTS_VOICE).toString();
+  // Warm female (coral) for אתי by default; the client sends 'onyx' for אריק.
+  const voice = (body.voice || 'coral').toString();
 
-  const reqBody = {
-    contents: [{ parts: [{ text }] }],
-    generationConfig: {
-      responseModalities: ['AUDIO'],
-      speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
-      },
-    },
-  };
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    let res;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqBody),
-      });
-      if (res.ok) break;
-      if (res.status === 429 || res.status === 500 || res.status === 503) {
-        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-        continue;
-      }
-      break;
-    }
-    if (!res || !res.ok) return json(200, { audio: null });
-    const data = await res.json();
-    const part = data.candidates?.[0]?.content?.parts?.[0];
-    const inline = part && part.inlineData;
-    if (!inline || !inline.data) return json(200, { audio: null });
-    let sampleRate = 24000;
-    const m = /rate=(\d+)/.exec(inline.mimeType || '');
-    if (m) sampleRate = parseInt(m[1], 10);
-    return json(200, { audio: inline.data, sampleRate });
+    // OpenAI TTS → raw 24kHz 16-bit mono PCM (response_format:'pcm'), which the
+    // client wraps into a WAV — so no client change is needed. Real human voice.
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_TTS_MODEL,
+        voice,
+        input: text,
+        response_format: 'pcm',
+      }),
+    });
+    if (!res.ok) { console.warn('tts', res.status); return json(200, { audio: null }); }
+    const buf = Buffer.from(await res.arrayBuffer());
+    return json(200, { audio: buf.toString('base64'), sampleRate: 24000 });
   } catch (e) {
     console.warn('tts error:', e.message);
     return json(200, { audio: null });

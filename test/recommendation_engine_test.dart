@@ -152,7 +152,10 @@ void main() {
       limit: 20,
       explore: false,
     );
-    expect(rankOf(recs, 'rightCity') < rankOf(recs, 'wrongCity'), true);
+    // The city gate now EXCLUDES the wrong-city listing when the named city has
+    // stock (stronger than merely ranking it lower).
+    expect(rankOf(recs, 'rightCity') >= 0, true);
+    expect(rankOf(recs, 'wrongCity'), -1);
   });
 
   test('Wilson bound: confident demand beats a lucky 1/1', () {
@@ -265,9 +268,13 @@ void main() {
           reason: 'dimensions must be populated');
       expect(card.tier, isNotEmpty, reason: 'tier label required');
       expect(card.fitPct >= 0 && card.fitPct <= 100, true);
-      // dimension keys must come from the canonical list.
+      // dimension keys are either scoring dims or known informational axes
+      // (commute / total-cost explain but don't re-rank).
+      const informational = {'commute', 'total_cost'};
       for (final d in card.dimensions) {
-        expect(kScoringDimensions.contains(d.key), true,
+        expect(
+            kScoringDimensions.contains(d.key) || informational.contains(d.key),
+            true,
             reason: 'dim key ${d.key} aligns with kScoringDimensions');
       }
     }

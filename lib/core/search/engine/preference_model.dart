@@ -23,6 +23,8 @@
 
 import 'dart:math' as math;
 
+import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
@@ -46,6 +48,15 @@ const List<String> kScoringDimensions = [
   'schools', // CBS education-institution density around the property (gov data)
   'family', // CBS share of children 0-19 — family-friendliness of the locality
   'health', // CBS health-facility availability for the locality (gov data)
+  'coast', // proximity to the sea — weighted only on beach intent
+  'yield', // gross rental yield (sale listings) — weighted only on investment intent
+  'university', // proximity to a university/college — weighted on student intent
+  'young_area', // CBS share of young adults — weighted on young/nightlife intent
+  'senior_area', // CBS share of seniors — weighted on quiet/retiree intent
+  'luxury', // luxury-amenity tier — weighted on premium intent
+  'view', // floor height (view) — weighted on view/high-floor intent
+  'spaciousness', // m² per room — weighted on "מרווח" / roommate / WFH intent
+  'accessibility', // elevator or low floor — weighted on elderly/stroller/wheelchair
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -407,7 +418,19 @@ class UserPreferenceModel {
       case 'safety':
         return pfv.get('safety', 0.5);
       case 'budget':
-        return pfv.property.price.toDouble();
+        // Sale listings: the price is a purchase price, not a monthly cost.
+        if (pfv.property.transactionType == PropertyTransactionType.sale) {
+          return pfv.property.price.toDouble();
+        }
+        // Judge the TRUE monthly cost (rent + arnona + vaad), not just rent, so
+        // two listings at the same rent but different size/city rank by what the
+        // tenant actually pays. Falls back to rent when size is unknown.
+        return MonthlyCost.estimate(
+              rent: pfv.property.price,
+              sizeM2: pfv.property.sizeM2,
+              city: pfv.property.city,
+            )?.total.toDouble() ??
+            pfv.property.price.toDouble();
       case 'value':
         return pfv.valueScore;
       case 'size':
@@ -431,6 +454,47 @@ class UserPreferenceModel {
         return pfv.get('demo_child', 0.5).clamp(0.0, 1.0);
       case 'health':
         return pfv.get('health_access', 0.5).clamp(0.0, 1.0);
+      case 'coast':
+        return pfv.get('coast_access', 0.0).clamp(0.0, 1.0);
+      case 'yield':
+        // Sale listings only; rentals stay neutral (weight is 0 there anyway).
+        final est = RentalYield.estimate(
+          salePrice: pfv.property.price,
+          sizeM2: pfv.property.sizeM2,
+          city: pfv.property.city,
+        );
+        if (est == null) return 0.5;
+        return ((est.grossYieldPct - 2.0) / 3.0).clamp(0.0, 1.0);
+      case 'university':
+        return pfv.get('university_access', 0.0).clamp(0.0, 1.0);
+      case 'young_area':
+        return pfv.get('demo_young', 0.5).clamp(0.0, 1.0);
+      case 'senior_area':
+        return pfv.get('demo_senior', 0.5).clamp(0.0, 1.0);
+      case 'luxury':
+        // "Premium" = upscale + comfort amenities, priced above the local market.
+        // luxury_amenities is count/6 and comfort is count/8 (both harsh), so
+        // recover the raw counts: ~4 nice features already reads as premium.
+        final luxCount = pfv.get('luxury_amenities', 0.0) * 6;
+        final comfortCount = pfv.get('comfort_amenities', 0.0) * 8;
+        final amen = ((luxCount + comfortCount) / 4).clamp(0.0, 1.0);
+        final pricey = pfv.get('price_per_sqm_percentile', 0.5);
+        return (0.55 * amen + 0.45 * pricey).clamp(0.0, 1.0);
+      case 'view':
+        // Higher floor ⇒ better view; ~12th floor saturates to 1.
+        return (pfv.get('floor_num', 0.0) / 12.0).clamp(0.0, 1.0);
+      case 'spaciousness':
+        // m² per room; ~28 m²/room reads as very roomy.
+        return (pfv.get('size_per_room', 20.0) / 28.0).clamp(0.0, 1.0);
+      case 'accessibility':
+        // Step-free access: an elevator makes any floor accessible; otherwise a
+        // ground/low floor is fine, a walk-up higher up is near-unusable.
+        if (propertyHasFeature(pfv.property, 'elevator')) return 1.0;
+        final floor = pfv.get('floor_num', 0.0);
+        if (floor <= 0) return 0.9; // ground floor, step-free
+        if (floor <= 1) return 0.7;
+        if (floor <= 2) return 0.35;
+        return 0.05; // 3rd+ walk-up
       default:
         return 0.5;
     }
@@ -515,6 +579,18 @@ class PreferenceModelBuilder {
     'schools': 0.3,
     'family': 0.3,
     'health': 0.3,
+    // Off by default — they only matter once the user's intent turns them on
+    // (beach / investment / student / young / quiet / luxury / view), so they
+    // don't skew ordinary searches.
+    'coast': 0.0,
+    'yield': 0.0,
+    'university': 0.0,
+    'young_area': 0.0,
+    'senior_area': 0.0,
+    'luxury': 0.0,
+    'view': 0.0,
+    'spaciousness': 0.0,
+    'accessibility': 0.0,
   };
   static const double _priorVariance = 0.09; // σ≈0.3 — fairly uncertain prior
 
@@ -584,7 +660,100 @@ class PreferenceModelBuilder {
       sharpen('amenities', (0.6 + 0.1 * requested.length).clamp(0.6, 0.97), 5.0);
     }
     if (query.nearTrain) {
-      sharpen('transit', 0.95, 6.0);
+      // Explicitly asking to be near transit is a top-tier criterion, not a nudge.
+      sharpen('transit', 0.95, 12.0);
+    }
+    // Beach intent → proximity-to-sea starts to matter.
+    // ponytail: substring match; 'הים'/'חוף' cover the common phrasings, may miss
+    // "קרוב לים" — widen the regex if users phrase it that way.
+    // An EXPLICITLY-requested lifestyle factor must be a top-tier weight (≈value/
+    // size), not a 3% nudge — else "קרוב לים" loses to a cheaper inland flat.
+    // precision ~12 on a 0-prior lands the weight near 0.5.
+    if (RegExp(r'הים|לים|חוף|beach', caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('coast', 0.97, 18.0);
+    }
+    // Investment intent → gross yield is a primary criterion for the buyer.
+    if (RegExp(r'השקע|תשוא|invest|yield', caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('yield', 0.95, 12.0);
+    }
+    // Student intent → proximity to a campus (primary) + a young area (secondary).
+    if (RegExp(r'אוניברסיט|סטודנט|קמפוס|מכלל|student|campus', caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('university', 0.95, 12.0);
+      sharpen('young_area', 0.85, 6.0);
+    }
+    // Young / nightlife intent → a young, vibrant locality.
+    if (RegExp(r'צעיר|רווק|נייטלייף|חיי לילה|בילוי|young|nightlife',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('young_area', 0.9, 9.0);
+    }
+    // Quiet / retiree intent → a calmer, older locality (a strong preference).
+    if (RegExp(r'שקט|מבוגר|גמלא|פנסי|קשיש|retire|quiet', caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('senior_area', 0.95, 10.0);
+    }
+    // Premium intent → luxury-amenity tier.
+    if (RegExp(r'יוקר|מפואר|פרימיום|luxur|penthouse|פנטהאוז',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('luxury', 0.9, 9.0);
+    }
+    // View / high-floor intent.
+    if (RegExp(r'נוף|קומה גבוה|פנטהאוז|view|penthouse', caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('view', 0.9, 9.0);
+    }
+    // Spacious intent → roomy m²/room.
+    if (RegExp(r'מרווח|מרווחת|מרווחים|מרווחות|חדרים גדולים|spacious',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('spaciousness', 0.9, 10.0);
+    }
+    // Roommate / sharing intent → enough room for each + a spacious common area.
+    if (RegExp(r'שותפ|שותפות|roommate|flatmate', caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('size', 0.85, 4.0);
+      sharpen('spaciousness', 0.85, 6.0);
+    }
+    // Work-from-home intent → space for a work room + a good condition.
+    if (RegExp(r'עבודה מהבית|עובד מהבית|עובדת מהבית|חדר עבודה|מהבית|רימוט|remote|wfh|work from home',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('spaciousness', 0.85, 7.0);
+      sharpen('condition', 0.7, 2.5);
+    }
+    // Accessibility intent → step-free access. A wheelchair/mobility need makes a
+    // high walk-up almost unusable, so weight it decisively (near value/size tier).
+    if (RegExp(r'נגיש|נגישות|כיסא גלגלים|מוגבלות|קשיש|מבוגר|עגלה|wheelchair|accessible',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('accessibility', 0.97, 20.0);
+    }
+    // Central / urban intent → centrality (real gov centrality data).
+    if (RegExp(r'מרכזי|מרכז העיר|לב העיר|במרכז|סנטר|central|downtown',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('location', 0.9, 8.0);
+    }
+    // Explicit good-schools intent → school-access (beyond the family persona).
+    if (RegExp(r'בתי ספר|בית ספר|בית הספר|חינוך|מוסדות חינוך|schools?',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('schools', 0.9, 8.0);
+    }
+    // Quality-area intent → the locality's socioeconomic cluster (gov data).
+    if (RegExp(r'שכונה טובה|אזור טוב|אזור איכותי|אזור יוקרתי|שכונה יוקרתית|שכונה שקטה|good area|nice area',
+            caseSensitive: false)
+        .hasMatch(query.rawText)) {
+      sharpen('neighborhood', 0.9, 8.0);
+    }
+    // Pet owner (requested pet-friendly) → a ground/low floor is easier with a
+    // dog, so give accessibility a mild boost on top of the amenity match.
+    if (requested.contains('petsAllowed')) {
+      sharpen('accessibility', 0.7, 3.0);
     }
     if (profile != null && profile.importantDetails.isNotEmpty) {
       // a tenant who curated details cares about condition & trust
@@ -662,6 +831,15 @@ class PreferenceModelBuilder {
       'schools': const LinearUtility(),
       'family': const LinearUtility(),
       'health': const LinearUtility(),
+      'coast': const LinearUtility(), // coast_access is already a [0,1] proximity
+      'yield': const LinearUtility(), // yield score already normalised to [0,1]
+      'university': const LinearUtility(),
+      'young_area': const LinearUtility(),
+      'senior_area': const LinearUtility(),
+      'luxury': const LinearUtility(),
+      'view': const LinearUtility(),
+      'spaciousness': const LinearUtility(),
+      'accessibility': const LinearUtility(),
     };
 
     final constraints = HardConstraints(
