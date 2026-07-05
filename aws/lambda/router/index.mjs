@@ -358,7 +358,13 @@ async function sendPushToUser(userId, { title, body, data } = {}) {
           notification: { title: title || '', body: body || '' },
           data: dataStr,
           apns: { payload: { aps: { sound: 'default' } } },
-          android: { priority: 'high' },
+          android: {
+            priority: 'high',
+            // Pin the channel explicitly (matches the app's rently_default channel)
+            // so a backgrounded push always displays, even if the manifest default-
+            // channel meta-data is missing on some build.
+            notification: { channel_id: 'rently_default', sound: 'default' },
+          },
         };
         const resp = await fetch(FCM_SEND_URL, {
           method: 'POST',

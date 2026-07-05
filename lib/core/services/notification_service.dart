@@ -315,6 +315,35 @@ class NotificationService {
     }
   }
 
+  /// Display an incoming FCM push while the app is in the FOREGROUND — the OS does
+  /// NOT auto-show notification messages when the app is open, so without this the
+  /// user sees nothing while using the app. Uses the same `rently_default` channel
+  /// that backgrounded pushes use, so it looks identical.
+  Future<void> showForegroundPush(String title, String body) async {
+    if (title.trim().isEmpty && body.trim().isEmpty) return;
+    try {
+      await init(); // idempotent — the plugin may not be initialised yet at launch
+      await _plugin.show(
+        DateTime.now().millisecondsSinceEpoch.remainder(0x7fffffff),
+        title.isEmpty ? 'Rently' : title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'rently_default',
+            'Rently',
+            channelDescription: 'התראות Rently',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+          macOS: DarwinNotificationDetails(),
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('NotificationService.showForegroundPush: $e');
+    }
+  }
+
   // ── Internals ───────────────────────────────────────────────────────────────
 
   NotificationDetails _searchDetails() {

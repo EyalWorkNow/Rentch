@@ -8,6 +8,7 @@ import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/home_widget_service.dart';
 import 'package:dating_app/core/services/notif_admin_gate.dart';
 import 'package:dating_app/core/services/notification_permission_service.dart';
+import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/core/services/push_notification_service.dart';
 import 'package:dating_app/core/services/scaniverse_service.dart';
 import 'package:dating_app/presentation/screens/admin/notif_console_screen.dart';
@@ -44,6 +45,14 @@ void main() async {
     // whenever a user is signed in, so the server-side tour poller can reach
     // them while the app is closed.
     try {
+      // Show incoming pushes even while the app is OPEN (the OS won't auto-show
+      // them in the foreground) — otherwise the user "gets no notifications".
+      PushNotificationService.instance.onForegroundMessage = (message) {
+        final n = message.notification;
+        final title = (n?.title ?? message.data['title'] ?? '').toString();
+        final body = (n?.body ?? message.data['body'] ?? '').toString();
+        NotificationService.instance.showForegroundPush(title, body);
+      };
       await PushNotificationService.instance.initialize();
       FirebaseAuth.instance.authStateChanges().listen((user) {
         if (user != null) PushNotificationService.instance.registerForUser();
