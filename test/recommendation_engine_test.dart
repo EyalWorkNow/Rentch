@@ -113,7 +113,10 @@ void main() {
       limit: 20,
       explore: false,
     );
-    expect(rankOf(recs, 'inBudget') < rankOf(recs, 'overBudget'), true);
+    // The budget gate excludes a listing far over the stated max (₪13k vs ₪7k)
+    // when in-budget options exist — stronger than merely ranking it lower.
+    expect(rankOf(recs, 'inBudget') >= 0, true);
+    expect(rankOf(recs, 'overBudget'), -1);
   });
 
   test('requested amenity present outranks absent (feat_ bug fixed)', () {

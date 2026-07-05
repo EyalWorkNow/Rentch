@@ -1,0 +1,663 @@
+openapi: "3.1.0"
+info:
+  title: Rently Listings API
+  version: "1.0.0"
+  description: >
+    Rental & sale property listings for the Rently marketplace — search, view,
+    create, update, media, verification, and per-user saved listings. Formalises
+    the informal `rentch-router` Lambda endpoints.
+
+
+    **Auth:** all endpoints require a Firebase-issued JWT as a Bearer token.
+
+    **Errors:** RFC 7807 `application/problem+json`; field errors under `errors[]`.
+
+    **Pagination:** opaque cursor (`cursor` + `limit`), never offset.
+  license:
+    name: Proprietary
+  contact:
+    name: Rently API
+    url: https://api.rently.co.il
+servers:
+  - url: https://api.rently.co.il/v1
+    description: Production
+  - url: https://staging-api.rently.co.il/v1
+    description: Staging
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Listings
+    description: Property listings (rent & sale)
+  - name: Media
+    description: Photos, videos, and 360 / walkable-scan assets
+  - name: Verification
+    description: Camera-captured listing verification
+  - name: Saved
+    description: The authenticated user's saved listings
+
+paths:
+  /listings:
+    get:
+      summary: Search & list properties
+      description: >
+        Returns a cursor-paginated, filtered list of listings. All filters are
+        AND-combined. Geo search (`near`) returns results within `radius_km`,
+        nearest first. The rent/sale gate is hard — `transaction_type` never mixes.
+      operationId: listListings
+      tags: [Listings]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: transaction_type
+          in: query
+          description: Rent or sale. Omitted ⇒ rent (the marketplace default).
+          schema: { $ref: "#/components/schemas/TransactionType" }
+        - name: city
+          in: query
+          description: City name (Hebrew). Matches the city and its ~18km metro.
+          schema: { type: string, example: "תל אביב" }
+        - name: min_price
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: max_price
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: min_rooms
+          in: query
+          schema: { type: number, minimum: 0, example: 3 }
+        - name: max_rooms
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: property_type
+          in: query
+          schema: { $ref: "#/components/schemas/PropertyType" }
+        - name: features
+          in: query
+          description: Required amenity keys (all must be present).
+          style: form
+          explode: true
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/FeatureKey" }
+        - name: near
+          in: query
+          description: "Geo centre as `lat,lon` (e.g. `32.0733,34.7800`)."
+          schema: { type: string, pattern: '^-?\d+(\.\d+)?,-?\d+(\.\d+)?$' }
+        - name: radius_km
+          in: query
+          description: Radius for `near` search (default 5, max 50).
+          schema: { type: number, default: 5, maximum: 50 }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [best_match, price_asc, price_desc, newest, distance]
+            default: best_match
+      responses:
+        "200":
+          description: Paginated listings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Listing" }
+                  pagination: { $ref: "#/components/schemas/CursorPage" }
+              examples:
+                page:
+                  $ref: "#/components/examples/ListingsPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      summary: Create a listing
+      description: Creates a listing owned by the authenticated user (in `draft` status).
+      operationId: createListing
+      tags: [Listings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ListingCreate" }
+            examples:
+              create: { $ref: "#/components/examples/ListingCreate" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              description: URI of the created listing
+              schema: { type: string, format: uri }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Listing" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+
+  /listings/{listing_id}:
+    parameters:
+      - $ref: "#/components/parameters/ListingId"
+    get:
+      summary: Get a listing
+      operationId: getListing
+      tags: [Listings]
+      responses:
+        "200":
+          description: Listing found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Listing" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      summary: Update a listing
+      description: Partial update. Only the owner may modify. `id`, `owner`, timestamps and market signals are read-only.
+      operationId: updateListing
+      tags: [Listings]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: "#/components/schemas/ListingUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Listing" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+    delete:
+      summary: Delete a listing
+      description: Soft-deletes the listing. Only the owner may delete.
+      operationId: deleteListing
+      tags: [Listings]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /listings/{listing_id}/media:
+    parameters:
+      - $ref: "#/components/parameters/ListingId"
+    post:
+      summary: Add media to a listing
+      description: Registers an already-uploaded asset URL (image / video / 360 / scan).
+      operationId: addListingMedia
+      tags: [Media]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MediaCreate" }
+      responses:
+        "201":
+          description: Media added
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Media" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+
+  /listings/{listing_id}/media/{media_id}:
+    parameters:
+      - $ref: "#/components/parameters/ListingId"
+      - name: media_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      summary: Remove a media asset
+      operationId: deleteListingMedia
+      tags: [Media]
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /listings/{listing_id}/verification:
+    parameters:
+      - $ref: "#/components/parameters/ListingId"
+    get:
+      summary: Get verification status
+      operationId: getListingVerification
+      tags: [Verification]
+      responses:
+        "200":
+          description: Verification state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Verification" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Submit / replace listing verification
+      description: Attaches a camera-captured video proving the listing is real.
+      operationId: putListingVerification
+      tags: [Verification]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerificationCreate" }
+      responses:
+        "200":
+          description: Verification submitted (status → `pending`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Verification" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+
+  /me/listings:
+    get:
+      summary: List my own listings
+      operationId: listMyListings
+      tags: [Listings]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/ListingStatus" }
+      responses:
+        "200":
+          description: The authenticated user's listings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Listing" }
+                  pagination: { $ref: "#/components/schemas/CursorPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/saved-listings:
+    get:
+      summary: List my saved listings
+      operationId: listSavedListings
+      tags: [Saved]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Saved listings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Listing" }
+                  pagination: { $ref: "#/components/schemas/CursorPage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /me/saved-listings/{listing_id}:
+    parameters:
+      - $ref: "#/components/parameters/ListingId"
+    put:
+      summary: Save a listing
+      description: Idempotent — saving an already-saved listing returns 200.
+      operationId: saveListing
+      tags: [Saved]
+      responses:
+        "200": { description: Already saved }
+        "201": { description: Saved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Unsave a listing
+      operationId: unsaveListing
+      tags: [Saved]
+      responses:
+        "204": { description: Unsaved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase-issued ID token.
+
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque pagination cursor from a previous `pagination.next_cursor`.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    ListingId:
+      name: listing_id
+      in: path
+      required: true
+      schema: { type: string, example: "prop_01HZY8" }
+
+  schemas:
+    TransactionType:
+      type: string
+      enum: [rent, sale]
+      default: rent
+    PropertyType:
+      type: string
+      enum: [apartment, house, penthouse, studio, garden_apartment, duplex, unit, other]
+    Condition:
+      type: string
+      enum: [new, renovated, good, needs_renovation]
+    ListingStatus:
+      type: string
+      enum: [draft, active, rented, sold, archived]
+      description: Lifecycle. `draft` on create; owner publishes to `active`.
+    FeatureKey:
+      type: string
+      description: Amenity key (Rently `feat_*` namespace).
+      enum:
+        - feat_parking
+        - feat_elevator
+        - feat_balcony
+        - feat_mamad
+        - feat_furnished
+        - feat_air
+        - feat_pets
+        - feat_garden
+        - feat_storage
+        - feat_pool
+        - feat_accessible
+        - feat_renovated
+
+    GeoPoint:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90, example: 32.0733 }
+        lon: { type: number, minimum: -180, maximum: 180, example: 34.7800 }
+
+    Media:
+      type: object
+      required: [id, type, url]
+      properties:
+        id: { type: string, readOnly: true }
+        type:
+          type: string
+          enum: [image, video, panorama_360, scan_3d]
+        url: { type: string, format: uri }
+        preview_image_url: { type: string, format: uri }
+        viewer_url:
+          type: string
+          format: uri
+          description: External viewer for 360 / walkable scans.
+    MediaCreate:
+      type: object
+      required: [type, url]
+      properties:
+        type:
+          type: string
+          enum: [image, video, panorama_360, scan_3d]
+        url: { type: string, format: uri }
+        preview_image_url: { type: string, format: uri }
+        viewer_url: { type: string, format: uri }
+
+    Verification:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [unverified, pending, verified, rejected]
+          readOnly: true
+        method:
+          type: string
+          enum: [camera_video]
+        video_url: { type: string, format: uri }
+        captured_at: { type: string, format: date-time }
+        verified_at: { type: string, format: date-time, readOnly: true }
+    VerificationCreate:
+      type: object
+      required: [method, video_url, captured_at]
+      properties:
+        method: { type: string, enum: [camera_video] }
+        video_url: { type: string, format: uri }
+        captured_at: { type: string, format: date-time }
+
+    MarketSignals:
+      type: object
+      description: Engagement counters (read-only, server-maintained).
+      readOnly: true
+      properties:
+        views: { type: integer, minimum: 0 }
+        detail_views: { type: integer, minimum: 0 }
+        likes: { type: integer, minimum: 0 }
+        saves: { type: integer, minimum: 0 }
+        live_viewers: { type: integer, minimum: 0 }
+
+    Listing:
+      type: object
+      required:
+        - id
+        - transaction_type
+        - price
+        - rooms
+        - size_m2
+        - city
+        - location
+        - property_type
+        - status
+        - created_at
+      properties:
+        id: { type: string, readOnly: true, example: "prop_01HZY8" }
+        transaction_type: { $ref: "#/components/schemas/TransactionType" }
+        status: { $ref: "#/components/schemas/ListingStatus" }
+        price:
+          type: integer
+          minimum: 0
+          description: Monthly rent (rent) or purchase price (sale), ₪.
+          example: 6500
+        rooms: { type: number, minimum: 0, example: 3 }
+        size_m2: { type: integer, minimum: 0, example: 78 }
+        floor: { type: integer, example: 3 }
+        total_floors: { type: integer, example: 20 }
+        property_type: { $ref: "#/components/schemas/PropertyType" }
+        condition: { $ref: "#/components/schemas/Condition" }
+        city: { type: string, example: "תל אביב" }
+        neighborhood: { type: string }
+        street: { type: string }
+        street_number: { type: integer }
+        location: { $ref: "#/components/schemas/GeoPoint" }
+        entry_date: { type: string, format: date }
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/FeatureKey" }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/Media" }
+        verification: { $ref: "#/components/schemas/Verification" }
+        market_signals: { $ref: "#/components/schemas/MarketSignals" }
+        owner:
+          type: object
+          readOnly: true
+          properties:
+            user_id: { type: string }
+            name: { type: string }
+            is_agency: { type: boolean }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+
+    ListingCreate:
+      type: object
+      required: [transaction_type, price, rooms, size_m2, city, location, property_type]
+      properties:
+        transaction_type: { $ref: "#/components/schemas/TransactionType" }
+        price: { type: integer, minimum: 0 }
+        rooms: { type: number, minimum: 0 }
+        size_m2: { type: integer, minimum: 0 }
+        floor: { type: integer }
+        total_floors: { type: integer }
+        property_type: { $ref: "#/components/schemas/PropertyType" }
+        condition: { $ref: "#/components/schemas/Condition" }
+        city: { type: string }
+        neighborhood: { type: string }
+        street: { type: string }
+        street_number: { type: integer }
+        location: { $ref: "#/components/schemas/GeoPoint" }
+        entry_date: { type: string, format: date }
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/FeatureKey" }
+
+    ListingUpdate:
+      type: object
+      description: Merge-patch; any subset of the writable Listing fields.
+      properties:
+        status: { $ref: "#/components/schemas/ListingStatus" }
+        price: { type: integer, minimum: 0 }
+        rooms: { type: number, minimum: 0 }
+        size_m2: { type: integer, minimum: 0 }
+        floor: { type: integer }
+        total_floors: { type: integer }
+        property_type: { $ref: "#/components/schemas/PropertyType" }
+        condition: { $ref: "#/components/schemas/Condition" }
+        neighborhood: { type: string }
+        street: { type: string }
+        street_number: { type: integer }
+        entry_date: { type: string, format: date }
+        features:
+          type: array
+          items: { $ref: "#/components/schemas/FeatureKey" }
+
+    CursorPage:
+      type: object
+      required: [next_cursor, has_more]
+      properties:
+        next_cursor: { type: [string, "null"] }
+        has_more: { type: boolean }
+
+    Problem:
+      type: object
+      description: RFC 7807 Problem Details.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri, example: "https://api.rently.co.il/errors/validation-error" }
+        title: { type: string, example: "Validation Error" }
+        status: { type: integer, example: 422 }
+        detail: { type: string, example: "The 'price' field must be a positive integer." }
+        instance: { type: string, example: "/listings/req_abc123" }
+        errors:
+          type: array
+          description: Field-level failures (validation).
+          items:
+            type: object
+            properties:
+              field: { type: string, example: "price" }
+              message: { type: string, example: "Must be a positive integer." }
+
+  responses:
+    BadRequest:
+      description: Malformed request or invalid query parameters.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or invalid authentication.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: Authenticated, but not the listing owner.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    UnprocessableEntity:
+      description: Well-formed but semantically invalid (field validation).
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until the client may retry.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  examples:
+    ListingCreate:
+      summary: Create a 3-room Tel Aviv rental
+      value:
+        transaction_type: rent
+        price: 6500
+        rooms: 3
+        size_m2: 78
+        floor: 3
+        total_floors: 20
+        property_type: apartment
+        condition: good
+        city: "תל אביב"
+        neighborhood: "לב תל אביב"
+        street: "הרצל"
+        street_number: 10
+        location: { lat: 32.0733, lon: 34.7800 }
+        entry_date: "2026-08-01"
+        features: [feat_elevator, feat_balcony, feat_air]
+    ListingsPage:
+      summary: One page of results
+      value:
+        data:
+          - id: "prop_01HZY8"
+            transaction_type: rent
+            status: active
+            price: 6500
+            rooms: 3
+            size_m2: 78
+            floor: 3
+            total_floors: 20
+            property_type: apartment
+            condition: good
+            city: "תל אביב"
+            neighborhood: "לב תל אביב"
+            street: "הרצל"
+            street_number: 10
+            location: { lat: 32.0733, lon: 34.7800 }
+            entry_date: "2026-08-01"
+            features: [feat_elevator, feat_balcony, feat_air]
+            media:
+              - id: "med_1"
+                type: image
+                url: "https://cdn.rently.co.il/p/01HZY8/1.jpg"
+            verification: { status: verified, method: camera_video, verified_at: "2026-06-01T09:00:00Z" }
+            market_signals: { views: 340, detail_views: 88, likes: 21, saves: 12, live_viewers: 0 }
+            owner: { user_id: "u_123", name: "דנה", is_agency: false }
+            created_at: "2026-06-01T08:00:00Z"
+            updated_at: "2026-06-20T12:00:00Z"
+        pagination:
+          next_cursor: "eyJvIjoyMH0"
+          has_more: true

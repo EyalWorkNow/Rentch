@@ -116,8 +116,13 @@ void main() {
     const q = 'דירה בתל אביב קרוב לים עד 8500';
     final recs = run(q);
     show('נועה · ים · ת״א', q, recs);
-    expect(recs.take(2).any((s) => s.property.id == 'ta-beach'), true,
-        reason: 'the beachfront flat should be near the top');
+    final ids = recs.map((s) => s.property.id).toList();
+    // The gate: the far-from-sea flat (~9km inland) is excluded, and the actual
+    // beachfront flat is present — no more "far from the sea despite asking".
+    expect(ids.contains('ta-eastfar'), false,
+        reason: 'a flat ~9km from the sea must be gated out for "קרוב לים"');
+    expect(ids.contains('ta-beach'), true,
+        reason: 'the beachfront flat must be in the near-sea results');
   });
 
   test('יעל — סטודנטית ליד אוניברסיטת תל אביב', () {
@@ -169,6 +174,23 @@ void main() {
     show('דנה · מרכזי', 'דירה מרכזית בתל אביב עד 7000', recs);
     expect(rankOf(recs, 'central') < rankOf(recs, 'peripheral'), true,
         reason: 'a central flat should beat a peripheral one for "מרכזית"');
+  });
+
+  test('CONTRACT — assistant-supplied intents gate the SAME as typed text', () {
+    // Simulate the assistant emitting the structured contract DIRECTLY (no
+    // rawText to regex) — the way GPT's search_listings tool now fills intents[].
+    final q = SearchQuery(
+      city: 'תל אביב',
+      maxPrice: 8500,
+      intents: const {'near_sea'},
+    );
+    final recs = RecommendationEngine.recommendAsScored(
+        candidates: catalogue(), query: q, limit: 8, seed: 21);
+    final ids = recs.map((s) => s.property.id).toList();
+    expect(ids.contains('ta-eastfar'), false,
+        reason: 'assistant near_sea intent must gate out the 9km-inland flat');
+    expect(ids.contains('ta-beach'), true,
+        reason: 'the beachfront flat survives the near-sea gate');
   });
 
   test('אבי — משקיע בחיפה לתשואה', () {

@@ -5,7 +5,7 @@ import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
 import 'package:dating_app/core/services/realtime_voice_service.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
-import 'package:dating_app/presentation/widgets/map_style_property_card.dart';
+import 'package:dating_app/presentation/widgets/assistant_property_card.dart';
 import 'package:flutter/material.dart';
 
 /// Live streaming voice with אתי over the OpenAI Realtime API (GA) — natural
@@ -210,12 +210,15 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _results.length,
-              itemBuilder: (_, i) => MapStylePropertyCard(
-                scored: _results[i],
-                imageHeight: 150,
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) =>
-                        PropertyDetailScreen(property: _results[i].property))),
+              itemBuilder: (_, i) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AssistantPropertyCard(
+                  scored: _results[i],
+                  width: double.infinity,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) =>
+                          PropertyDetailScreen(property: _results[i].property))),
+                ),
               ),
             ),
           ),

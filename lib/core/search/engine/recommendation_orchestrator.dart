@@ -21,6 +21,7 @@ import 'dart:math' as math;
 
 import 'package:dating_app/core/finance/commute.dart';
 import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/govdata/gov_sources.dart';
 import 'package:dating_app/core/matching/match_models.dart';
@@ -378,6 +379,27 @@ class RecommendationEngine {
                 _km(p.lat, p.lon, cLat, cLon) <= 18.0)
             .toList();
       }
+    }
+
+    // Budget gate: when the user states a max budget, don't surface listings far
+    // over it (>15%) while in-budget options exist — "עד 5000" shouldn't show a
+    // ₪6,400 flat. Relax only when NOTHING fits (then the "over budget" concern
+    // makes the compromise explicit rather than silent).
+    final maxP = query.maxPrice;
+    if (maxP != null && maxP > 0) {
+      final within = candidates.where((p) => p.price <= maxP * 1.15).toList();
+      if (within.isNotEmpty) candidates = within;
+    }
+
+    // Near-sea gate: "קרוב לים" means WITHIN a defined distance of the coast
+    // (SearchIntent.seaOkKm = 3km), not merely a soft preference. The coast
+    // dimension still orders the survivors by exact distance. Relax if none fit.
+    if (query.intents.contains(SearchIntent.nearSea)) {
+      final nearSea = candidates.where((p) {
+        final km = IsraelGeoIndex.coastKm(p.lat, p.lon);
+        return km != null && km <= SearchIntent.seaOkKm;
+      }).toList();
+      if (nearSea.isNotEmpty) candidates = nearSea;
     }
 
     // Part 1 — market analysis + feature engineering

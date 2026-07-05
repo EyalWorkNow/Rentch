@@ -12,6 +12,7 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/recommendation_explainer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/repositories/property_search_repository.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/services/realtime_voice_service.dart';
 import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
 import 'package:dating_app/presentation/features/search/realtime_voice_screen.dart';
@@ -438,10 +439,37 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   Future<({List<ScoredProperty> results, String summary})> _handleRealtimeSearch(
       Map<String, dynamic> args) async {
     final provider = context.read<DatingProvider>();
-    final amenities = ((args['amenities'] as List?) ?? const [])
-        .map((e) => 'feat_${e.toString().trim()}')
-        .where((s) => s.length > 5)
-        .toSet();
+    // Amenities: accept both the legacy `amenities` and the new `features` (feat_*)
+    // the tool now emits.
+    final amenities = <String>{
+      for (final e in ((args['amenities'] as List?) ?? const []))
+        'feat_${e.toString().trim()}',
+      for (final e in ((args['features'] as List?) ?? const []))
+        e.toString().trim().startsWith('feat_')
+            ? e.toString().trim()
+            : 'feat_${e.toString().trim()}',
+    }.where((s) => s.length > 5).toSet();
+    // Carry the user's own words into rawText so the intent detectors still fire
+    // as a fallback if the model didn't fill `intents` explicitly.
+    final rawText = [
+      args['city'],
+      args['lifestyle'],
+      args['notes'],
+      args['query'],
+    ].whereType<String>().where((s) => s.trim().isNotEmpty).join(' ');
+    // Intent CONTRACT: prefer what the assistant explicitly distilled (args.intents),
+    // unioned with the text-derived fallback — a single structured set the engine
+    // consumes (see SearchIntent + preference_model).
+    final intents = <String>{
+      ...SearchIntent.fromText(rawText),
+      for (final e in ((args['intents'] as List?) ?? const []))
+        e.toString().trim(),
+    }..removeWhere((s) => s.isEmpty);
+    final txType = switch ((args['transactionType'] as String?)?.toLowerCase()) {
+      'sale' => TransactionTypeFilter.sale,
+      'rent' => TransactionTypeFilter.rent,
+      _ => TransactionTypeFilter.any,
+    };
     _query = _merge(
       _query,
       SearchQuery(
@@ -450,6 +478,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         maxRooms: (args['maxRooms'] as num?)?.toDouble(),
         maxPrice: (args['maxPrice'] as num?)?.toInt(),
         amenities: amenities,
+        transactionType: txType,
+        rawText: rawText,
+        intents: intents,
       ),
     );
     final life = (args['lifestyle'] as String?)?.toLowerCase() ?? '';
@@ -1062,7 +1093,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         amenities: {...a.amenities, ...b.amenities},
         nearTrain: a.nearTrain || b.nearTrain,
         cheapPreference: a.cheapPreference || b.cheapPreference,
+        transactionType: b.transactionType != TransactionTypeFilter.any
+            ? b.transactionType
+            : a.transactionType,
         rawText: '${a.rawText} ${b.rawText}'.trim(),
+        intents: {...a.intents, ...b.intents},
       );
 
   // ── Lifestyle inference ────────────────────────────────────────────────────

@@ -24,6 +24,7 @@
 import 'dart:math' as math;
 
 import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/smart_search.dart';
@@ -663,91 +664,41 @@ class PreferenceModelBuilder {
       // Explicitly asking to be near transit is a top-tier criterion, not a nudge.
       sharpen('transit', 0.95, 12.0);
     }
-    // Beach intent → proximity-to-sea starts to matter.
-    // ponytail: substring match; 'הים'/'חוף' cover the common phrasings, may miss
-    // "קרוב לים" — widen the regex if users phrase it that way.
-    // An EXPLICITLY-requested lifestyle factor must be a top-tier weight (≈value/
-    // size), not a 3% nudge — else "קרוב לים" loses to a cheaper inland flat.
-    // precision ~12 on a 0-prior lands the weight near 0.5.
-    if (RegExp(r'הים|לים|חוף|beach', caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('coast', 0.97, 18.0);
-    }
-    // Investment intent → gross yield is a primary criterion for the buyer.
-    if (RegExp(r'השקע|תשוא|invest|yield', caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('yield', 0.95, 12.0);
-    }
-    // Student intent → proximity to a campus (primary) + a young area (secondary).
-    if (RegExp(r'אוניברסיט|סטודנט|קמפוס|מכלל|student|campus', caseSensitive: false)
-        .hasMatch(query.rawText)) {
+    // ── intent-driven weights — CONSUME the structured SearchIntent contract ──
+    // The model never re-parses free text; SmartSearch / the voice assistant have
+    // already distilled the conversation into `query.intents`. An explicitly-
+    // requested lifestyle factor is a top-tier weight (≈value/size), not a nudge.
+    final intents = query.intents;
+    if (intents.contains(SearchIntent.nearSea)) sharpen('coast', 0.97, 18.0);
+    if (intents.contains(SearchIntent.investment)) sharpen('yield', 0.95, 12.0);
+    if (intents.contains(SearchIntent.nearUniversity)) {
       sharpen('university', 0.95, 12.0);
       sharpen('young_area', 0.85, 6.0);
     }
-    // Young / nightlife intent → a young, vibrant locality.
-    if (RegExp(r'צעיר|רווק|נייטלייף|חיי לילה|בילוי|young|nightlife',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('young_area', 0.9, 9.0);
+    if (intents.contains(SearchIntent.nightlife)) {
+      sharpen('young_area', 0.92, 11.0);
+      sharpen('location', 0.7, 3.0); // vibrant areas are central
     }
-    // Quiet / retiree intent → a calmer, older locality (a strong preference).
-    if (RegExp(r'שקט|מבוגר|גמלא|פנסי|קשיש|retire|quiet', caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('senior_area', 0.95, 10.0);
-    }
-    // Premium intent → luxury-amenity tier.
-    if (RegExp(r'יוקר|מפואר|פרימיום|luxur|penthouse|פנטהאוז',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('luxury', 0.9, 9.0);
-    }
-    // View / high-floor intent.
-    if (RegExp(r'נוף|קומה גבוה|פנטהאוז|view|penthouse', caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('view', 0.9, 9.0);
-    }
-    // Spacious intent → roomy m²/room.
-    if (RegExp(r'מרווח|מרווחת|מרווחים|מרווחות|חדרים גדולים|spacious',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
+    if (intents.contains(SearchIntent.quiet)) sharpen('senior_area', 0.95, 10.0);
+    if (intents.contains(SearchIntent.luxury)) sharpen('luxury', 0.9, 9.0);
+    if (intents.contains(SearchIntent.view)) sharpen('view', 0.9, 9.0);
+    if (intents.contains(SearchIntent.spacious)) {
       sharpen('spaciousness', 0.9, 10.0);
     }
-    // Roommate / sharing intent → enough room for each + a spacious common area.
-    if (RegExp(r'שותפ|שותפות|roommate|flatmate', caseSensitive: false)
-        .hasMatch(query.rawText)) {
+    if (intents.contains(SearchIntent.roommates)) {
       sharpen('size', 0.85, 4.0);
       sharpen('spaciousness', 0.85, 6.0);
     }
-    // Work-from-home intent → space for a work room + a good condition.
-    if (RegExp(r'עבודה מהבית|עובד מהבית|עובדת מהבית|חדר עבודה|מהבית|רימוט|remote|wfh|work from home',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
+    if (intents.contains(SearchIntent.wfh)) {
       sharpen('spaciousness', 0.85, 7.0);
       sharpen('condition', 0.7, 2.5);
     }
-    // Accessibility intent → step-free access. A wheelchair/mobility need makes a
-    // high walk-up almost unusable, so weight it decisively (near value/size tier).
-    if (RegExp(r'נגיש|נגישות|כיסא גלגלים|מוגבלות|קשיש|מבוגר|עגלה|wheelchair|accessible',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
+    if (intents.contains(SearchIntent.accessible)) {
       sharpen('accessibility', 0.97, 20.0);
     }
-    // Central / urban intent → centrality (real gov centrality data).
-    if (RegExp(r'מרכזי|מרכז העיר|לב העיר|במרכז|סנטר|central|downtown',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('location', 0.9, 8.0);
-    }
-    // Explicit good-schools intent → school-access (beyond the family persona).
-    if (RegExp(r'בתי ספר|בית ספר|בית הספר|חינוך|מוסדות חינוך|schools?',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
-      sharpen('schools', 0.9, 8.0);
-    }
-    // Quality-area intent → the locality's socioeconomic cluster (gov data).
-    if (RegExp(r'שכונה טובה|אזור טוב|אזור איכותי|אזור יוקרתי|שכונה יוקרתית|שכונה שקטה|good area|nice area',
-            caseSensitive: false)
-        .hasMatch(query.rawText)) {
+    if (intents.contains(SearchIntent.central)) sharpen('location', 0.9, 8.0);
+    if (intents.contains(SearchIntent.goodSchools)) sharpen('schools', 0.9, 8.0);
+    if (intents.contains(SearchIntent.qualityArea)) {
       sharpen('neighborhood', 0.9, 8.0);
     }
     // Pet owner (requested pet-friendly) → a ground/low floor is easier with a

@@ -1,0 +1,271 @@
+import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
+import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/features/search/scorecard_view.dart';
+import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
+import 'package:flutter/material.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:provider/provider.dart';
+
+/// The clean, Messages/matches-page style apartment card אתי suggests — a white
+/// rounded card with the hero media, verified/type badges, save+share actions,
+/// address/price, info chips, and the expandable data-grounded "why this one"
+/// (ScorecardView). Shared by the chat AND the voice conversation.
+class AssistantPropertyCard extends StatelessWidget {
+  const AssistantPropertyCard({
+    super.key,
+    required this.scored,
+    required this.onTap,
+    this.width,
+  });
+
+  final ScoredProperty scored;
+  final VoidCallback onTap;
+  final double? width;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = scored.property;
+    final w = width ?? MediaQuery.of(context).size.width * 0.82;
+    final saved = context.watch<DatingProvider>().isSaved(p.id);
+    return ScaleBounce(
+      onTap: onTap,
+      scaleDownTo: 0.97,
+      child: Container(
+        width: w,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: const Color(0xFFE2ECF1), width: 1),
+          boxShadow: [
+            BoxShadow(
+                color: AppColors.navy.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 8)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(5),
+              child: AspectRatio(
+                aspectRatio: 1.84,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Stack(fit: StackFit.expand, children: [
+                    SafeMedia(
+                      media: p.media.any((m) => m.isVideo)
+                          ? p.media.firstWhere((m) => m.isVideo)
+                          : p.primaryMedia,
+                      fallback: Container(
+                        color: AppColors.primaryLight2,
+                        child: Icon(IconsaxPlusLinear.building,
+                            color: AppColors.primary, size: 48),
+                      ),
+                      fit: BoxFit.cover,
+                      videoMode: SafeVideoDisplayMode.playback,
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2)),
+                          ],
+                        ),
+                        child: Text(p.propertyType,
+                            style: const TextStyle(
+                                color: AppColors.navy,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12)),
+                      ),
+                    ),
+                    if (p.isVerifiedListing)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2)),
+                            ],
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.verified,
+                                size: 13, color: AppColors.success),
+                            const SizedBox(width: 3),
+                            const Text('מאומת',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy)),
+                          ]),
+                        ),
+                      ),
+                    Positioned(
+                      bottom: 10,
+                      left: 10,
+                      child: Row(children: [
+                        _circleAction(
+                          icon: saved ? Icons.favorite : Icons.favorite_border,
+                          color: saved ? AppColors.coral : AppColors.navy,
+                          onTap: () =>
+                              context.read<DatingProvider>().toggleSave(p.id),
+                        ),
+                        const SizedBox(width: 8),
+                        _circleAction(
+                          icon: Icons.ios_share,
+                          color: AppColors.navy,
+                          onTap: () => showPropertyShareSheet(context, p),
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.street.isNotEmpty
+                                  ? '${p.street} ${p.streetNumber}'
+                                  : p.address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.navy),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              p.neighborhood.isNotEmpty
+                                  ? '${p.city}, ${p.neighborhood}'
+                                  : p.city,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(p.priceLabel,
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.navy)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      _InfoChip(
+                          icon: IconsaxPlusLinear.home,
+                          label: '${p.roomsLabel} חדרים'),
+                      const SizedBox(width: 8),
+                      _InfoChip(
+                          icon: IconsaxPlusLinear.maximize_3,
+                          label: '${p.sizeM2} מ״ר'),
+                      for (final t in scored.tags) ...[
+                        const SizedBox(width: 8),
+                        _InfoChip(label: t),
+                      ],
+                    ]),
+                  ),
+                  // Expandable transparency panel — the data-grounded "why this
+                  // one" (dimensions + stats + persona + reason).
+                  if (scored.scorecard != null)
+                    ScorecardView(card: scored.scorecard!),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _circleAction({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Icon(icon, size: 17, color: color),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({this.icon, required this.label});
+  final IconData? icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F7FA),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (icon != null) ...[
+          Icon(icon, size: 14, color: AppColors.navy),
+          const SizedBox(width: 6),
+        ],
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.navy)),
+      ]),
+    );
+  }
+}

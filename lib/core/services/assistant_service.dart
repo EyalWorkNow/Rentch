@@ -414,6 +414,11 @@ class AssistantService {
           'לא ניתן להפעיל את המיקרופון. בדקו שההרשאה אושרה.');
     }
     await _speech.listen(
+      // Hands-free turn-taking: auto-finalise after ~2s of silence (the user
+      // stopped talking) so אתי answers on her own — no tap needed. listenFor is
+      // a safety cap for a single turn.
+      pauseFor: const Duration(seconds: 2),
+      listenFor: const Duration(seconds: 30),
       listenOptions: stt.SpeechListenOptions(
         localeId: 'he_IL',
         partialResults: true,

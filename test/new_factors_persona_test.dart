@@ -173,8 +173,11 @@ void main() {
     // ignore: avoid_print
     print('C ranks: beach=${rankOf(scored, "beach")} '
         'inland=${rankOf(scored, "inland")}');
-    expect(rankOf(scored, 'beach') < rankOf(scored, 'inland'), true,
-        reason: 'near-sea flat should outrank the identical inland one');
+    // Beach intent now either GATES OUT the far inland flat, or (if it's within
+    // the 3km near-sea band) still ranks the beachfront one above it.
+    final inlandRank = rankOf(scored, 'inland');
+    expect(inlandRank == -1 || rankOf(scored, 'beach') < inlandRank, true,
+        reason: 'a far-from-sea flat is gated out / ranked below the beachfront');
   });
 
   test('PERSONA D — student: campus proximity weighted + re-ranks', () {

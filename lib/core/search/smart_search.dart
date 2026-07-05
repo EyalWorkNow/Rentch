@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:dating_app/core/search/advanced_matcher.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
 // Helper for fuzzy locality matching
@@ -146,7 +147,9 @@ class SearchQuery {
     this.cheapPreference = false,
     this.transactionType = TransactionTypeFilter.any,
     this.rawText = '',
-  }) : amenities = amenities ?? <String>{};
+    Set<String>? intents,
+  })  : amenities = amenities ?? <String>{},
+        intents = intents ?? <String>{};
 
   final String? city;
   final String? neighborhood;
@@ -165,6 +168,13 @@ class SearchQuery {
   /// listings never mix in the results.
   final TransactionTypeFilter transactionType;
   final String rawText;
+
+  /// Structured lifestyle/spatial intent — the CONTRACT between the assistant and
+  /// the ranking engine (e.g. 'near_sea', 'nightlife', 'quiet', 'central'). Both
+  /// typed search (via [SearchIntent]) and the voice assistant fill this, and the
+  /// preference model + gates consume it — so intent is detected in ONE place,
+  /// not re-parsed with regexes deep in the ranker. See [SearchIntent].
+  final Set<String> intents;
 
   bool get isEmpty =>
       city == null &&
@@ -484,6 +494,7 @@ class SmartSearch {
       cheapPreference: cheap,
       transactionType: transactionType,
       rawText: text,
+      intents: SearchIntent.fromText(text),
     );
   }
 

@@ -3642,6 +3642,31 @@ const SEARCH_LISTINGS_TOOL = {
       minPrice: { type: 'integer', description: 'מחיר חודשי מינימלי בשקלים' },
       maxPrice: { type: 'integer', description: 'מחיר חודשי מקסימלי בשקלים' },
       pets: { type: 'boolean', description: 'מתיר חיות מחמד' },
+      // ── the intent CONTRACT (mirrors client SearchIntent keys) ───────────────
+      // The assistant distils the conversation into these; the ranking engine
+      // consumes them directly (gates + intent-weighted scoring). Keep in sync
+      // with lib/core/search/search_intent.dart.
+      transactionType: {
+        type: 'string', enum: ['rent', 'sale'],
+        description: 'שכירות או מכירה (השקעה⇒sale)',
+      },
+      intents: {
+        type: 'array',
+        description: 'תגי אורח-חיים/מרחב שהמשתמש ביקש (בחר רק מה שנאמר במפורש)',
+        items: {
+          type: 'string',
+          enum: [
+            'near_sea', 'nightlife', 'quiet', 'central', 'spacious',
+            'accessible', 'luxury', 'view', 'student', 'near_university',
+            'investment', 'roommates', 'wfh', 'good_schools', 'quality_area',
+          ],
+        },
+      },
+      features: {
+        type: 'array',
+        description: 'מאפיינים נדרשים (feat_parking, feat_elevator, feat_pets, ...)',
+        items: { type: 'string' },
+      },
       limit: { type: 'integer', description: 'כמה תוצאות להחזיר (ברירת מחדל 6)' },
     },
   },

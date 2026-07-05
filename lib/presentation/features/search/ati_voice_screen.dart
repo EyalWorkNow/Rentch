@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
-import 'package:dating_app/presentation/widgets/map_style_property_card.dart';
+import 'package:dating_app/presentation/widgets/assistant_property_card.dart';
 import 'package:flutter/material.dart';
 
 /// Full-screen voice conversation with אתי — styled after Google Gemini's live
@@ -52,6 +54,10 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   late List<String> _criteria = List.of(widget.criteria);
   late int _resultCount = widget.resultCount;
   List<ScoredProperty> _results = const []; // options shown inline in this screen
+  Timer? _silence; // backup end-of-turn detector (auto-submit on a pause)
+  bool _handling = false; // guards against re-entrant / echo-driven turns
+  String _lastHandled = ''; // dedup: skip an identical utterance within a few s
+  DateTime? _lastHandledAt;
 
   @override
   void initState() {
@@ -82,6 +88,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
 
   @override
   void dispose() {
+    _silence?.cancel();
     if (!widget.demoMode) {
       widget.service.stopListening();
       widget.service.stopSpeaking();
@@ -137,7 +144,18 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
         onResult: (text, isFinal) {
           if (!mounted) return;
           setState(() => _transcript = text);
-          if (isFinal) _handle(text);
+          _silence?.cancel();
+          if (isFinal) {
+            _handle(text);
+          } else if (text.trim().isNotEmpty) {
+            // Backup VAD: if no new words arrive for ~1.8s, the user finished —
+            // end the turn on our own (iOS sometimes never fires finalResult).
+            _silence = Timer(const Duration(milliseconds: 1800), () {
+              if (mounted && _state == AtiVoiceState.listening) {
+                _handle(_transcript);
+              }
+            });
+          }
         },
         onSoundLevelChange: (lvl) {
           if (!mounted) return;
@@ -155,20 +173,39 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   }
 
   Future<void> _handle(String text) async {
-    await widget.service.stopListening();
-    if (text.trim().isEmpty) {
+    _silence?.cancel();
+    final t = text.trim();
+    // Re-entrancy / echo / noise / duplicate guards — the #1 cause of a looping,
+    // repeating conversation is the mic catching אתי's own voice and re-firing.
+    if (_handling) return;
+    final isEchoDup = t == _lastHandled &&
+        _lastHandledAt != null &&
+        DateTime.now().difference(_lastHandledAt!) < const Duration(seconds: 5);
+    if (t.length < 2 || isEchoDup) {
+      await widget.service.stopListening();
       if (mounted) {
         setState(() => _state = AtiVoiceState.idle);
-        _resumeListening(); // silence → keep waiting for the user to speak
+        _resumeListening(); // ignore echo/noise → keep waiting for real speech
       }
+      return;
+    }
+    _handling = true;
+    _lastHandled = t;
+    _lastHandledAt = DateTime.now();
+    await widget.service.stopListening();
+    if (!mounted) {
+      _handling = false;
       return;
     }
     setState(() {
       _state = AtiVoiceState.thinking;
       _level = 0;
     });
-    final result = await widget.onUtterance(text);
-    if (!mounted) return;
+    final result = await widget.onUtterance(t);
+    if (!mounted) {
+      _handling = false;
+      return;
+    }
     setState(() {
       _reply = result.reply;
       _state = AtiVoiceState.speaking;
@@ -179,8 +216,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     try {
       await widget.service.speak(result.reply);
     } catch (_) {}
+    _handling = false;
     if (!mounted) return;
     setState(() => _state = AtiVoiceState.idle);
+    // Anti-echo: let the speaker audio fully settle before re-opening the mic,
+    // so אתי doesn't hear the tail of her own reply and start a new turn.
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted || _muted) return;
     _resumeListening(); // hands-free: auto-open the mic for the next turn
   }
 
@@ -365,12 +407,15 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _results.length,
-              itemBuilder: (_, i) => MapStylePropertyCard(
-                scored: _results[i],
-                imageHeight: 150,
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) =>
-                        PropertyDetailScreen(property: _results[i].property))),
+              itemBuilder: (_, i) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AssistantPropertyCard(
+                  scored: _results[i],
+                  width: double.infinity,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) =>
+                          PropertyDetailScreen(property: _results[i].property))),
+                ),
               ),
             ),
           ),
