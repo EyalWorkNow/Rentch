@@ -36,8 +36,7 @@ class FakeAssistant extends AssistantService {
 
 void main() {
   Widget host(FakeAssistant svc,
-          Future<({String reply, bool showResults, List<ScoredProperty> results})>
-              Function(String) onUtterance) =>
+          Future<VoiceTurn> Function(String) onUtterance) =>
       MaterialApp(home: AtiVoiceScreen(service: svc, onUtterance: onUtterance));
 
   // Hold the orb, then release — the push-to-talk gesture.
@@ -55,10 +54,10 @@ void main() {
       (tester) async {
     final svc = FakeAssistant()..nextTranscript = 'דירה בתל אביב עד 8000';
     final asked = <String>[];
-    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
+    Future<VoiceTurn> onU(
         String t) async {
       asked.add(t);
-      return (reply: 'הנה מה שמצאתי', showResults: false, results: const <ScoredProperty>[]);
+      return VoiceTurn(reply: 'הנה מה שמצאתי', showResults: false, results: const <ScoredProperty>[]);
     }
 
     await tester.pumpWidget(host(svc, onU));
@@ -77,10 +76,10 @@ void main() {
   testWidgets('empty transcript → gentle retry, no crash', (tester) async {
     final svc = FakeAssistant()..nextTranscript = '   ';
     var calls = 0;
-    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
+    Future<VoiceTurn> onU(
         String t) async {
       calls++;
-      return (reply: 'x', showResults: false, results: const <ScoredProperty>[]);
+      return VoiceTurn(reply: 'x', showResults: false, results: const <ScoredProperty>[]);
     }
 
     await tester.pumpWidget(host(svc, onU));
@@ -93,8 +92,8 @@ void main() {
 
   testWidgets('mic permission denied → clear message', (tester) async {
     final svc = FakeAssistant()..micOk = false;
-    Future<({String reply, bool showResults, List<ScoredProperty> results})> onU(
-        String t) async => (reply: 'x', showResults: false, results: const <ScoredProperty>[]);
+    Future<VoiceTurn> onU(
+        String t) async => VoiceTurn(reply: 'x', showResults: false, results: const <ScoredProperty>[]);
 
     await tester.pumpWidget(host(svc, onU));
     await tester.pump();
@@ -106,5 +105,32 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('הרשאת מיקרופון'), findsOneWidget);
+  });
+
+  testWidgets('needLocation → animated share-location button → onShareLocation',
+      (tester) async {
+    final svc = FakeAssistant()..nextTranscript = 'דירה באזור שלי';
+    var shared = 0;
+    Future<VoiceTurn> onU(String t) async =>
+        const VoiceTurn(reply: 'אפשר לשתף מיקום?', needLocation: true);
+    Future<VoiceTurn> onShare() async {
+      shared++;
+      return const VoiceTurn(reply: 'מצאתי!');
+    }
+
+    await tester.pumpWidget(MaterialApp(
+        home: AtiVoiceScreen(
+            service: svc, onUtterance: onU, onShareLocation: onShare)));
+    await tester.pump();
+    await holdAndRelease(tester);
+
+    // The animated button appears (no silent GPS grab).
+    expect(find.text('שיתוף המיקום שלי'), findsOneWidget);
+    expect(shared, 0);
+
+    await tester.tap(find.text('שיתוף המיקום שלי'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(shared, 1, reason: 'tapping the button captures location + searches');
   });
 }

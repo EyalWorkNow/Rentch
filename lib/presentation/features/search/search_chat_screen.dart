@@ -86,6 +86,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   bool _voiceAwaitingConsent = false;
   bool _voiceConsented = false; // user already said yes → show results directly
   List<ScoredProperty> _voicePending = const []; // held results to reveal on "כן"
+  String? _voicePendingLocationText; // held utterance until "share location" tapped
   bool? _consent;
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
@@ -411,6 +412,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       builder: (_) => AtiVoiceScreen(
         service: _service,
         onUtterance: _processVoiceUtterance,
+        onShareLocation: _shareLocationVoice,
         criteria: _voiceCriteria(),
         resultCount: _lastResultCount,
       ),
@@ -542,22 +544,20 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // Runs a spoken sentence through the same pipeline as typed input; returns
   // אתי's reply text (for the visualizer to read aloud) + whether listing cards
   // were rendered (so the visualizer can close and reveal them inline).
-  Future<({String reply, bool showResults, List<ScoredProperty> results})>
-      _processVoiceUtterance(String transcript) async {
+  Future<VoiceTurn> _processVoiceUtterance(String transcript) async {
     final t = transcript.trim();
     final wantsNow = _wantsResultsNow(t);
 
     // Waiting for the user's go-ahead to present apartments? DEFAULT TO SHOWING —
     // after "רוצה שאראה לך?", almost any reply ("כן"/"תציג"/"בטח"/"נו"/"בוא") means
-    // yes. Only a clear NO or a reply that adds new criteria holds them back. (The
-    // old code whitelisted specific words and missed "תציג" → it re-asked forever.)
+    // yes. Only a clear NO or a reply that adds new criteria holds them back.
     if (_voiceAwaitingConsent) {
       _voiceAwaitingConsent = false;
       final holdsBack = _isNegative(t) || _looksLikeCriteria(t);
       if (!holdsBack) {
         _voiceConsented = true;
         final r = _voicePending.isNotEmpty ? _voicePending : _latestScored;
-        return (
+        return VoiceTurn(
           reply: r.isEmpty
               ? 'רגע, בוא נחדד עוד קצת ואמצא לך את המתאימות'
               : 'מעולה! הנה מה שמצאתי בשבילך 👇',
@@ -568,24 +568,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       // A "no" or added criteria → fold it in below (re-search, then re-offer).
     }
 
-    // Voice "באזור שלי / קרוב אליי" → capture GPS ourselves (the spoken request IS
-    // the consent; the OS prompt gates the first time) and fold the city in, so we
-    // actually search — instead of raising a chat button the voice user can't tap.
+    // Voice "באזור שלי / קרוב אליי" → pop the animated "share my location" button
+    // (don't grab GPS silently). The held utterance runs once the user taps it.
     if (_locationRelative.hasMatch(t) && _query.city == null) {
-      final city = await _captureGps();
-      if (city != null && city.isNotEmpty && mounted) {
-        _query = _merge(_query, SearchQuery(city: city));
-      } else {
-        // GPS / permission unavailable → don't search blindly with no city; guide
-        // the user (settings if permanently denied) or ask which city.
-        return (
-          reply: _locationDeniedForever
-              ? 'כדי לחפש באזור שלך צריך לאשר גישה למיקום בהגדרות 📍 — או פשוט תגיד/י לי באיזו עיר לחפש'
-              : 'רק שנייה, לא הצלחתי לזהות איפה את/ה 📍 באיזו עיר לחפש?',
-          showResults: false,
-          results: const <ScoredProperty>[],
-        );
-      }
+      _voicePendingLocationText = transcript;
+      return const VoiceTurn(
+        reply: 'כדי לחפש לך דירות באזור שלך אני צריכה לדעת איפה את/ה 📍 אפשר לשתף מיקום?',
+        needLocation: true,
+      );
     }
 
     await _send(transcript, enrich: false); // voice: skip the slow enrich round-trip
@@ -598,24 +588,39 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         !_voiceConsented) {
       _voiceAwaitingConsent = true;
       _voicePending = _latestScored; // hold them so "כן" reveals exactly these
-      return (
+      return const VoiceTurn(
         reply: 'מצאתי כמה אפשרויות שמתאימות למה שתיארת. '
             'רוצה שאראה לך אותן עכשיו, או שנוסיף עוד משהו? 🙂',
-        showResults: false,
-        results: const <ScoredProperty>[],
       );
     }
 
-    // Explicit "show me" or a refinement AFTER consent → SHOW whatever she found;
-    // never suppress (this was the "she said she's showing but didn't" bug).
+    // Explicit "show me" or a refinement AFTER consent → SHOW whatever she found.
     if (wantsNow) _voiceConsented = true;
-    return (
+    return VoiceTurn(
       reply: _lastReply.isEmpty
           ? 'ספר לי עוד קצת על מה שאתה מחפש'
           : _lastReply,
       showResults: _lastShowedResults,
       results: _lastShowedResults ? _latestScored : const <ScoredProperty>[],
     );
+  }
+
+  // The user tapped the animated "share my location" button in the voice screen →
+  // capture GPS, fold in the city, and run the utterance we held.
+  Future<VoiceTurn> _shareLocationVoice() async {
+    final held = _voicePendingLocationText ?? 'דירה';
+    _voicePendingLocationText = null;
+    final city = await _captureGps();
+    if (city == null || city.isEmpty) {
+      return VoiceTurn(
+        reply: _locationDeniedForever
+            ? 'צריך לאשר גישה למיקום בהגדרות 📍 — או פשוט תגיד/י לי באיזו עיר לחפש'
+            : 'לא הצלחתי לזהות מיקום כרגע 🙈 באיזו עיר לחפש?',
+      );
+    }
+    if (mounted) _query = _merge(_query, SearchQuery(city: city));
+    // City is now set, so the location branch is skipped → this runs the search.
+    return _processVoiceUtterance(held);
   }
 
   // Voice affirmatives ("כן / בטח / יאללה…"). NB: Hebrew has no \b word boundary,

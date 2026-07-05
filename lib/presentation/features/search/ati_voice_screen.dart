@@ -16,19 +16,38 @@ import 'package:flutter/material.dart';
 /// [demoMode] flag renders a live-looking still (no mic) for previews/screenshots.
 enum AtiVoiceState { idle, listening, thinking, speaking }
 
+/// What one spoken turn produces. [needLocation] asks the voice screen to pop an
+/// animated "share my location" button instead of grabbing GPS silently.
+class VoiceTurn {
+  const VoiceTurn({
+    required this.reply,
+    this.showResults = false,
+    this.results = const [],
+    this.needLocation = false,
+  });
+  final String reply;
+  final bool showResults;
+  final List<ScoredProperty> results;
+  final bool needLocation;
+}
+
 class AtiVoiceScreen extends StatefulWidget {
   const AtiVoiceScreen({
     super.key,
     required this.service,
     required this.onUtterance,
+    this.onShareLocation,
     this.criteria = const [],
     this.resultCount = 0,
     this.demoMode = false,
   });
 
   final AssistantService service;
-  final Future<({String reply, bool showResults, List<ScoredProperty> results})>
-      Function(String transcript) onUtterance;
+  final Future<VoiceTurn> Function(String transcript) onUtterance;
+
+  /// Called when the user taps the "share my location" button — capture GPS and
+  /// run the held search, returning the resulting turn.
+  final Future<VoiceTurn> Function()? onShareLocation;
 
   /// Understood search criteria to show as glassy chips (city / rooms / budget…).
   final List<String> criteria;
@@ -57,6 +76,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   int _page = 0;
   bool _recording = false; // holding the orb to record
   bool _sending = false; // guards against a double-send on release
+  bool _needLocation = false; // show the animated "share my location" button
 
   @override
   void initState() {
@@ -133,33 +153,71 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     try {
       final result = await widget.onUtterance(text).timeout(
         const Duration(seconds: 25),
-        onTimeout: () => (
-          reply: 'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לנסות שוב?',
-          showResults: false,
-          results: const <ScoredProperty>[],
-        ),
+        onTimeout: () => const VoiceTurn(
+            reply: 'סליחה, לקח לי רגע יותר מדי 🙈 אפשר לנסות שוב?'),
       );
-      if (!mounted) return;
-      setState(() {
-        _reply = result.reply;
-        _state = AtiVoiceState.speaking;
-        if (result.results.isNotEmpty) {
-          _results = result.results;
-          _resultCount = result.results.length;
-          _page = 0;
-        }
-      });
-      if (result.results.isNotEmpty && _carousel.hasClients) {
-        _carousel.jumpToPage(0);
-      }
-      try {
-        await widget.service.speak(result.reply);
-      } catch (_) {}
+      await _applyTurn(result);
     } catch (_) {
       // network / model error → keep the screen usable
-    } finally {
       if (mounted) setState(() => _state = AtiVoiceState.idle);
     }
+  }
+
+  // Renders a turn: reply text, results carousel, TTS, and — when the assistant
+  // needs the user's whereabouts — the animated "share my location" button.
+  Future<void> _applyTurn(VoiceTurn result) async {
+    if (!mounted) return;
+    setState(() {
+      _reply = result.reply;
+      _needLocation = result.needLocation && widget.onShareLocation != null;
+      _state = AtiVoiceState.speaking;
+      if (result.results.isNotEmpty) {
+        _results = result.results;
+        _resultCount = result.results.length;
+        _page = 0;
+      }
+    });
+    if (result.results.isNotEmpty && _carousel.hasClients) {
+      _carousel.jumpToPage(0);
+    }
+    try {
+      await widget.service.speak(result.reply);
+    } catch (_) {}
+    if (mounted) setState(() => _state = AtiVoiceState.idle);
+  }
+
+  // User tapped "share my location" → capture GPS + run the held search.
+  Future<void> _shareLocation() async {
+    final cb = widget.onShareLocation;
+    if (cb == null || _sending) return;
+    setState(() {
+      _needLocation = false;
+      _state = AtiVoiceState.thinking;
+    });
+    try {
+      await _applyTurn(await cb());
+    } catch (_) {
+      if (mounted) setState(() => _state = AtiVoiceState.idle);
+    }
+  }
+
+  // The animated "share my location" button — springs in when אתי needs to know
+  // where the user is (voice "דירה באזור שלי").
+  Widget _locationButton() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 350),
+      switchInCurve: Curves.elasticOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, anim) =>
+          ScaleTransition(scale: anim, child: FadeTransition(opacity: anim, child: child)),
+      child: !_needLocation
+          ? const SizedBox.shrink(key: ValueKey('no-loc'))
+          : Padding(
+              key: const ValueKey('loc-btn'),
+              padding: const EdgeInsets.only(top: 20),
+              child: _PulseLocationCta(onTap: _shareLocation),
+            ),
+    );
   }
 
   @override
@@ -230,6 +288,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                 _blob(),
                 const SizedBox(height: 30),
                 _captionText(caption),
+                _locationButton(),
                 const Spacer(),
                 if (_results.isNotEmpty)
                   _resultsStrip()
@@ -504,6 +563,75 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
         height: size,
         decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
         child: Icon(icon, color: Colors.white, size: big ? 30 : 26),
+      ),
+    );
+  }
+}
+
+// A location-pin CTA with a continuous soft pulse, so it clearly invites a tap
+// when אתי needs to know where the user is ("דירה באזור שלי").
+class _PulseLocationCta extends StatefulWidget {
+  const _PulseLocationCta({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  State<_PulseLocationCta> createState() => _PulseLocationCtaState();
+}
+
+class _PulseLocationCtaState extends State<_PulseLocationCta>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1400))
+    ..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF7CE0E6);
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, child) {
+          final t = _c.value;
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.5 * (1 - t)),
+                  blurRadius: 8 + 26 * t,
+                  spreadRadius: 1 + 6 * t,
+                ),
+              ],
+            ),
+            child: child,
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+                colors: [Color(0xFF17C7D1), Color(0xFF6675FF)]),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Text('שיתוף המיקום שלי',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
       ),
     );
   }
