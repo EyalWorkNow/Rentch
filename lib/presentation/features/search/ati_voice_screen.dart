@@ -151,9 +151,12 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           if (isFinal) {
             _handle(text);
           } else if (text.trim().isNotEmpty) {
-            // Backup VAD: if no new words arrive for ~1.8s, the user finished —
-            // end the turn on our own (iOS sometimes never fires finalResult).
-            _silence = Timer(const Duration(milliseconds: 1800), () {
+            // Backup VAD: only end the turn after a GENEROUS pause so we never cut
+            // the user off mid-thought. People pause to think ("אני מחפש… אֶה…
+            // שלושה חדרים"); 3.5s of true silence means they're actually done.
+            // The timer resets on every new partial word above, so it measures the
+            // gap since the LAST word, not total speech time.
+            _silence = Timer(const Duration(milliseconds: 3500), () {
               if (mounted && _state == AtiVoiceState.listening) {
                 _handle(_transcript);
               }

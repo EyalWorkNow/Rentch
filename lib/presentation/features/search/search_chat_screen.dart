@@ -80,6 +80,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   bool _lifestyleNoteShown = false; // show the "considered your lifestyle" note once
   bool _lastShowedResults = false; // did the last _send render listing cards
   String _lastReply = ''; // last assistant text, for the voice visualizer to speak
+  // Voice-only: אתי asks permission before presenting apartments. True once she's
+  // gathered enough and is waiting for the user's "כן" to actually show them.
+  bool _voiceAwaitingConsent = false;
   bool? _consent;
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
@@ -397,6 +400,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // never gate whether the screen appears.
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
+    _voiceAwaitingConsent = false; // fresh voice session — no pending confirmation
     await Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => AtiVoiceScreen(
@@ -535,15 +539,55 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // were rendered (so the visualizer can close and reveal them inline).
   Future<({String reply, bool showResults, List<ScoredProperty> results})>
       _processVoiceUtterance(String transcript) async {
+    final t = transcript.trim();
+    final wantsNow = _wantsResultsNow(t);
+
+    // Waiting for the user's go-ahead to present apartments?
+    if (_voiceAwaitingConsent) {
+      if (_isAffirmative(t) || wantsNow) {
+        _voiceAwaitingConsent = false;
+        final r = _latestScored; // already gathered on the previous turn
+        return (
+          reply: r.isEmpty
+              ? 'רגע, בוא נחדד עוד קצת ואמצא לך את המתאימות'
+              : 'מעולה! הנה מה שמצאתי בשבילך 👇',
+          showResults: r.isNotEmpty,
+          results: r,
+        );
+      }
+      // Not a yes → treat it as more criteria; drop the pending confirmation and
+      // fold the new detail in below.
+      _voiceAwaitingConsent = false;
+    }
+
     await _send(transcript);
+
+    // Voice etiquette: don't dump apartments unasked. Once אתי has enough to
+    // search, she ASKS first — unless the user explicitly said "תראה לי".
+    if (_lastShowedResults && _latestScored.isNotEmpty && !wantsNow) {
+      _voiceAwaitingConsent = true;
+      return (
+        reply: 'מצאתי כמה אפשרויות שמתאימות למה שתיארת. '
+            'רוצה שאראה לך אותן עכשיו, או שנוסיף עוד משהו? 🙂',
+        showResults: false,
+        results: const <ScoredProperty>[],
+      );
+    }
+
     return (
       reply: _lastReply.isEmpty
           ? 'ספר לי עוד קצת על מה שאתה מחפש'
           : _lastReply,
-      showResults: _lastShowedResults,
-      results: _latestScored,
+      showResults: _lastShowedResults && wantsNow,
+      results: wantsNow ? _latestScored : const <ScoredProperty>[],
     );
   }
+
+  // Voice affirmatives — the user consenting to see apartments ("כן, בטח, יאללה…").
+  static final _affirmative = RegExp(
+      r'\bכן\b|בטח|בהחלט|יאללה|יאלה|קדימה|אפשר|סבבה|אוקיי|אוקי|בסדר|נשמע טוב|'
+      r'למה לא|תראי|תראה|בואי|בוא נראה|\byes\b|\bok\b|okay|sure|go ahead');
+  bool _isAffirmative(String t) => _affirmative.hasMatch(t);
 
   // The most recent listing cards אתי surfaced — shown inline in the voice screen.
   List<ScoredProperty> get _latestScored {
