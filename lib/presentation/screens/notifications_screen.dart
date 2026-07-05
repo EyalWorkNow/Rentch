@@ -63,11 +63,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // the user can confirm phone pushes actually arrive.
   Future<void> _sendTest() async {
     try {
-      await AwsApiClient.instance.post('/notifications/test', const {});
+      final res = await AwsApiClient.instance.post('/notifications/test', const {});
+      final tokens = (res['tokensRegistered'] as num?)?.toInt() ?? 0;
+      final pushed = (res['pushed'] as num?)?.toInt() ?? 0;
+      final msg = tokens == 0
+          ? 'המכשיר עוד לא רשום להתראות 📵 סגור ופתח מחדש את האפליקציה ונסה שוב'
+          : pushed > 0
+              ? 'שלחתי התראה 🔔 אמורה לקפוץ תוך רגע (נשלח ל-$pushed מכשירים)'
+              : 'הטוקן רשום אבל השליחה נכשלה — כנראה טוקן ישן, סגור ופתח את האפליקציה';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('שלחתי התראת בדיקה 🔔 אמורה להופיע על המסך תוך רגע'),
-        ));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (e) {
       if (mounted) {

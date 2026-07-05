@@ -92,6 +92,9 @@ class RentalDataService {
       if (rows is! List) return const [];
       return rows
           .whereType<Map>()
+          // Soft-deleted listings stay in the DB but must not come back into the
+          // landlord's active list (nor anyone's search).
+          .where((row) => row['status']?.toString() != 'removed')
           .map((row) => _propertyFromRow(Map<String, dynamic>.from(row)))
           .where((p) => p.id.trim().isNotEmpty)
           .toList();

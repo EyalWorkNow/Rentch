@@ -2101,8 +2101,14 @@ class DatingProvider extends ChangeNotifier {
     _customProperties =
         _customProperties.where((p) => p.id != propertyId).toList();
     _invalidateCatalogCache();
+    // Drop it from the browse/search cache immediately so seekers stop seeing it.
+    AppCache.instance.propertyPages.clear();
     await _persist();
-    unawaited(_propertyRepository.deleteProperty(propertyId));
+    // SOFT delete: keep the row in the DB (audit/history) but flip its status off
+    // 'active' so apartment-seekers no longer see it in search/discovery.
+    unawaited(_propertyRepository.saveProperty(existing,
+        ownerUserId: existing.ownerUserId,
+        status: PropertyRecordStatus.removed));
     notifyListeners();
   }
 

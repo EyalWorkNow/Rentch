@@ -9,7 +9,7 @@ import 'package:dating_app/core/services/legal_consent_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/foundation.dart';
 
-enum PropertyRecordStatus { draft, active, paused, rented }
+enum PropertyRecordStatus { draft, active, paused, rented, removed }
 
 // Reason a property save was rejected.
 enum PropertySaveRejection {

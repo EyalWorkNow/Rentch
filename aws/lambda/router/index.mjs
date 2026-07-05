@@ -973,9 +973,17 @@ export const handler = async (event) => {
         && method === 'POST') {
       const uid = callerUidOf(event);
       if (!uid) return json(401, { message: 'auth required' });
+      const tokens = await getUserTokens(uid);
+      const sent = await sendPushToUser(uid, {
+        title: 'בדיקת התראה 🔔 Rently',
+        body: 'ההתראות עובדות! זו התראת אמת מהשרת ✅',
+        data: { type: 'test' },
+      });
+      // Also drop it in the inbox.
       await notify(uid, 'test', 'בדיקת התראה 🔔 Rently',
           'ההתראות עובדות! זו התראת אמת מהשרת ✅', { type: 'test' });
-      return json(200, { ok: true });
+      // Diagnostics so the client can tell the user exactly what happened.
+      return json(200, { ok: true, tokensRegistered: tokens.length, pushed: sent });
     }
 
     // ── Two-sided match ranking (landlord's leads) ──────────────────────────
