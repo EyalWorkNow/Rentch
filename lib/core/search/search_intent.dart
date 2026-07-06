@@ -76,10 +76,27 @@ class SearchIntent {
     for (final e in _patterns.entries) {
       if (e.value.hasMatch(text)) out.add(e.key);
     }
-    // Implications.
-    if (RegExp(r'מבוגר|גמלא|פנסי|קשיש|retire').hasMatch(text)) {
-      out.add(accessible);
+    // ── Phase 2: life-stage inference ──────────────────────────────────────
+    // A real agent reads a SINGLE cue about who the seeker is and fills in the
+    // whole bundle of priorities that life-stage implies — even when the seeker
+    // didn't spell each one out.
+    //
+    // Family / kids / a baby on the way → schools, a quiet & good area, and space.
+    if (RegExp(r'משפח|ילד|תינוק|בהריון|הריון|פעוט|בייבי|family|kids|child|baby')
+        .hasMatch(text)) {
+      out..add(goodSchools)..add(quiet)..add(spacious)..add(qualityArea);
     }
+    // Retiree / elderly → step-free access + a quiet area.
+    if (RegExp(r'מבוגר|גמלא|פנסי|קשיש|בגיל השלישי|retire|senior|elderly')
+        .hasMatch(text)) {
+      out..add(accessible)..add(quiet);
+    }
+    // Young couple → they lean central/lively.
+    if (RegExp(r'זוג צעיר|זוג|בני זוג|נשואים טריים|couple|newlywed')
+        .hasMatch(text)) {
+      out.add(central);
+    }
+    // Student → near a campus (kept from before).
     if (out.contains(student)) out.add(nearUniversity);
     return out;
   }
