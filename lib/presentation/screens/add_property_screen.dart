@@ -130,6 +130,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   // the add flow — the 'פרסום תיווך מאומת' switch was removed from the details step.
   final bool _agencyListing = false;
   final Set<String> _selectedFeatures = {};
+  // Where the (broker) listing is advertised. Rently is ON by default — you're
+  // publishing here; brokers can also mark other channels for their own tracking.
+  final Set<String> _publishChannels = {'rently'};
   bool _isSaving = false;
   bool _isSubmittingTour = false;
   bool _isScanSubmitting = false;
@@ -863,6 +866,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             context.read<DatingProvider>().tenantProfile?.name ?? 'בעל הדירה',
         agencyListing: _agencyListing,
         features: _selectedFeatures.toList(),
+        publishChannels: _publishChannels.toList(),
         media: media,
         transactionType: transactionType,
         virtualTour: _scanTourDraft ?? _virtualTourDraft,
@@ -976,6 +980,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   _selectedFeatures.remove(f);
                 } else {
                   _selectedFeatures.add(f);
+                }
+              }),
+              publishChannels: _publishChannels,
+              onChannelToggle: (c) => setState(() {
+                if (_publishChannels.contains(c)) {
+                  _publishChannels.remove(c);
+                } else {
+                  _publishChannels.add(c);
                 }
               }),
             ),
@@ -1922,10 +1934,14 @@ class _StepFeatures extends StatelessWidget {
     required this.allFeatures,
     required this.selectedFeatures,
     required this.onToggle,
+    required this.publishChannels,
+    required this.onChannelToggle,
   });
   final List<String> allFeatures;
   final Set<String> selectedFeatures;
   final ValueChanged<String> onToggle;
+  final Set<String> publishChannels;
+  final ValueChanged<String> onChannelToggle;
 
   IconData _getFeatureIcon(String label) {
     switch (label) {
@@ -2103,6 +2119,44 @@ class _StepFeatures extends StatelessWidget {
                   );
                 }).toList(),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _SectionHint(
+          icon: IconsaxPlusLinear.export_3,
+          title: 'ערוצי פרסום',
+          subtitle: 'איפה הנכס מפורסם? (Rently מסומן כברירת מחדל)',
+        ),
+        const SizedBox(height: 12),
+        _FormCard(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final ch in const [
+                ('rently', 'Rently'),
+                ('yad2', 'יד2'),
+                ('madlan', 'מדלן'),
+                ('facebook', 'פייסבוק'),
+                ('komo', 'קומו'),
+              ])
+                FilterChip(
+                  selected: publishChannels.contains(ch.$1),
+                  onSelected: (_) => onChannelToggle(ch.$1),
+                  label: Text(ch.$2),
+                  labelStyle: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: publishChannels.contains(ch.$1)
+                        ? Colors.white
+                        : AppColors.textSecondary,
+                  ),
+                  selectedColor: AppColors.primary,
+                  backgroundColor: AppColors.background,
+                  checkmarkColor: Colors.white,
+                  side: BorderSide(color: AppColors.borderLight),
+                ),
             ],
           ),
         ),
@@ -4509,6 +4563,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late String _designTemplate;
   late int _designAccent;
   late final Set<String> _selectedFeatures;
+  late final Set<String> _publishChannels;
   bool _isSaving = false;
   bool _isSubmittingTour = false;
   bool _isScanSubmitting = false;
@@ -4598,6 +4653,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _designTemplate = p.designTemplate;
     _designAccent = p.designAccent;
     _selectedFeatures = Set<String>.from(p.features);
+    _publishChannels = p.publishChannels.isEmpty
+        ? <String>{'rently'}
+        : Set<String>.from(p.publishChannels);
     _virtualTourDraft = p.virtualTour;
     _panoramaTourDraft = p.panoramaTour;
     _scanTourDraft = null;
@@ -5188,6 +5246,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         ownerName: widget.property.ownerName,
         agencyListing: _agencyListing,
         features: _selectedFeatures.toList(),
+        publishChannels: _publishChannels.toList(),
         media: media,
         transactionType: transactionType,
         virtualTour: _scanTourDraft ?? _virtualTourDraft,
@@ -5306,6 +5365,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       _selectedFeatures.remove(f);
                     } else {
                       _selectedFeatures.add(f);
+                    }
+                  }),
+                  publishChannels: _publishChannels,
+                  onChannelToggle: (c) => setState(() {
+                    if (_publishChannels.contains(c)) {
+                      _publishChannels.remove(c);
+                    } else {
+                      _publishChannels.add(c);
                     }
                   }),
                 ),

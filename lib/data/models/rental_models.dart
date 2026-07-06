@@ -718,6 +718,7 @@ class RentalProperty {
     required this.agencyListing,
     required List<String> features,
     PropertyFeatureSet? featureFlags,
+    List<String>? publishChannels,
     required this.media,
     this.transactionType = PropertyTransactionType.rent,
     this.virtualTour,
@@ -747,7 +748,9 @@ class RentalProperty {
         verification = verification ?? const PropertyVerification(),
         features = List.unmodifiable(
           _resolveFeatureLabels(features, featureFlags),
-        );
+        ),
+        publishChannels =
+            List.unmodifiable(publishChannels ?? const <String>[]);
 
   final String id;
   final String sourceUrl;
@@ -770,6 +773,10 @@ class RentalProperty {
   final bool agencyListing;
   final List<String> features;
   final PropertyFeatureSet featureFlags;
+
+  /// Where the (broker) listing is being advertised — e.g. ['rently','yad2',
+  /// 'madlan','facebook']. Broker-facing tracking; empty for regular owners.
+  final List<String> publishChannels;
   final List<PropertyMedia> media;
   final PropertyTransactionType transactionType;
   final PropertyVirtualTour? virtualTour;
@@ -873,6 +880,7 @@ class RentalProperty {
     String? ownerName,
     bool? agencyListing,
     List<String>? features,
+    List<String>? publishChannels,
     PropertyFeatureSet? featureFlags,
     List<PropertyMedia>? media,
     PropertyTransactionType? transactionType,
@@ -909,6 +917,7 @@ class RentalProperty {
       ownerName: ownerName ?? this.ownerName,
       agencyListing: agencyListing ?? this.agencyListing,
       features: features ?? this.features,
+      publishChannels: publishChannels ?? this.publishChannels,
       featureFlags: featureFlags ?? this.featureFlags,
       media: media ?? this.media,
       transactionType: transactionType ?? this.transactionType,
@@ -992,6 +1001,7 @@ class RentalProperty {
       ownerName: json['ownerName'] as String? ?? 'בעל הנכס',
       agencyListing: json['agencyListing'] as bool? ?? false,
       features: resolvedFeatures,
+      publishChannels: _decodeStringListValue(json['publishChannels']),
       featureFlags: featureFlags,
       media: media,
       transactionType: parsedTransactionType,
@@ -1044,6 +1054,7 @@ class RentalProperty {
       'ownerName': ownerName,
       'agencyListing': agencyListing,
       'features': featureFlags.toJson(),
+      'publishChannels': publishChannels,
       'featureLabels': features,
       'media': media.map((item) => item.toJson()).toList(),
       'imageUrls': imageUrls,
