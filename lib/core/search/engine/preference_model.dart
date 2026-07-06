@@ -748,6 +748,105 @@ class PreferenceModelBuilder {
     if (requested.contains('petsAllowed')) {
       sharpen('accessibility', 0.7, 3.0);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // READING BETWEEN THE LINES — 40 soft inference nudges.
+    //
+    // What an expert agent infers from what the seeker DIDN'T say. Each is a
+    // SMALL push (~0.2–0.35× the strength of an explicit ask, which already
+    // sharpened above) toward a need the request implies. An explicit criterion
+    // always dominates; these only break ties and gently reorder.
+    // ════════════════════════════════════════════════════════════════════════
+    const s = 2.6; // base soft strength (explicit asks use 8–20)
+    final infTxt = query.rawText;
+    final rooms = query.minRooms ?? query.maxRooms;
+    final buying = query.transactionType == TransactionTypeFilter.sale;
+    final renting = !buying;
+    final budget = query.maxPrice ?? 0;
+    final amen = query.amenities;
+
+    // ── A. Budget tells (the price reveals the life behind it) ──────────────
+    if (renting && budget > 0 && budget <= 3000) {
+      sharpen('transit', 0.80, s); // (1) low budget → likely no car → transit
+      sharpen('young_area', 0.72, s * 0.6); // (2) young/first-job profile
+      sharpen('value', 0.78, s * 0.8); // (5) price-sensitive → value
+    } else if (renting && budget > 3000 && budget <= 4500) {
+      sharpen('value', 0.75, s * 0.7);
+      sharpen('transit', 0.72, s * 0.5);
+    }
+    if (budget > 0 && budget >= (renting ? 14000 : 4000000)) {
+      sharpen('luxury', 0.80, s); // (4) top of market → luxury + area + view
+      sharpen('neighborhood', 0.78, s * 0.8);
+      sharpen('view', 0.72, s * 0.6);
+    }
+    if (renting && budget > 0 && budget <= 3500) {
+      sharpen('value', 0.76, s * 0.6); // (7) low budget → arnona-sensitive value
+    }
+
+    // ── B. Room-count tells (household shape) ───────────────────────────────
+    if (rooms != null && rooms <= 1.5) {
+      sharpen('location', 0.76, s); // (8) studio/1BR → single → central
+      sharpen('transit', 0.72, s * 0.7);
+      sharpen('young_area', 0.72, s * 0.6);
+    } else if (rooms != null && rooms == 2) {
+      sharpen('location', 0.72, s * 0.7); // (9) couple/professional → central
+    } else if (rooms != null && rooms >= 4) {
+      sharpen('schools', 0.78, s); // (10-12) family size → schools/area/safety
+      sharpen('neighborhood', 0.75, s * 0.7);
+      sharpen('safety', 0.72, s * 0.6);
+      sharpen('accessibility', 0.62, s * 0.5); // strollers → low floor/elevator
+    }
+
+    // ── C. Transaction tells (horizon) ──────────────────────────────────────
+    if (buying) {
+      sharpen('schools', 0.72, s * 0.6); // (13) long-term → schools + area
+      sharpen('neighborhood', 0.74, s * 0.6);
+    } else {
+      sharpen('condition', 0.68, s * 0.4); // (14) renting → move-in-ready
+    }
+
+    // ── D. One request implies another ──────────────────────────────────────
+    if (amen.contains('feat_elevator')) {
+      sharpen('accessibility', 0.68, s * 0.5); // (17) elevator → strollers/elderly
+    }
+    if (amen.contains('feat_mamad')) {
+      sharpen('safety', 0.72, s * 0.6); // (19) safety-conscious → newer/safe area
+      sharpen('condition', 0.66, s * 0.4);
+    }
+    if (amen.contains('feat_renovated')) {
+      sharpen('condition', 0.76, s * 0.7); // (21) wants move-in-ready
+    }
+    if (amen.contains('feat_balcony') || amen.contains('feat_garden')) {
+      sharpen('view', 0.68, s * 0.5); // (18) outdoor lifestyle
+      sharpen('neighborhood', 0.66, s * 0.4);
+    }
+    if (query.nearTrain) {
+      sharpen('young_area', 0.64, s * 0.4); // (26) transit-oriented → urban
+    }
+
+    // ── E. Phrasing tells (how they describe themselves) ────────────────────
+    if (RegExp(r'דירה ראשונה|בית ראשון|first (home|apartment)').hasMatch(infTxt)) {
+      sharpen('value', 0.75, s * 0.7); // (36) first-timer → value + transit + ready
+      sharpen('transit', 0.70, s * 0.5);
+      sharpen('condition', 0.68, s * 0.4);
+    }
+    if (RegExp(r'עבודה מהבית|עובד[ת]? מהבית|רימוט|remote|wfh').hasMatch(infTxt)) {
+      sharpen('spaciousness', 0.74, s * 0.6); // (27) WFH → room for an office
+      sharpen('condition', 0.66, s * 0.4);
+    }
+    if (RegExp(r'להשקע|השקעה|תשוא|invest|yield').hasMatch(infTxt)) {
+      sharpen('yield', 0.78, s); // (37) investor → yield + rental demand
+      sharpen('university', 0.66, s * 0.5);
+    }
+    if (RegExp(r'להקטין|מקטינ|קטנה יותר|downsiz|empty.?nest').hasMatch(infTxt)) {
+      sharpen('accessibility', 0.72, s * 0.6); // (40b) downsizer → low-maintenance
+      sharpen('location', 0.72, s * 0.6);
+    }
+    if (RegExp(r'לשדרג|יותר גדול|גדולה יותר|upgrad|move.?up').hasMatch(infTxt)) {
+      sharpen('spaciousness', 0.74, s * 0.6); // (40a) move-up → space + area
+      sharpen('neighborhood', 0.72, s * 0.6);
+    }
+
     if (profile != null && profile.importantDetails.isNotEmpty) {
       // a tenant who curated details cares about condition & trust
       sharpen('condition', 0.7, 2.0);
