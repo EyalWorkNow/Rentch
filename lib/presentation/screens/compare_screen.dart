@@ -25,10 +25,19 @@ class _CompareScreenState extends State<CompareScreen> {
   /// Property ids the user picked to compare (only used when >3 saved).
   final Set<String> _selected = <String>{};
 
+  /// Properties the user pulled in via the search — so comparison isn't limited
+  /// to saved listings.
+  final List<RentalProperty> _searchAdded = <RentalProperty>[];
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DatingProvider>();
-    final saved = provider.savedProperties;
+    // Compare set = saved + anything added via search (deduped).
+    final saved = <RentalProperty>[
+      ...provider.savedProperties,
+      ..._searchAdded.where((a) =>
+          !provider.savedProperties.any((s) => s.id == a.id)),
+    ];
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -39,10 +48,35 @@ class _CompareScreenState extends State<CompareScreen> {
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
+          actions: [
+            IconButton(
+              tooltip: 'חיפוש דירה להשוואה',
+              icon: const Icon(Icons.search),
+              onPressed: () => _openSearch(provider),
+            ),
+          ],
         ),
         body: _buildBody(context, provider, saved),
       ),
     );
+  }
+
+  // Search the catalog and add a property into the comparison.
+  Future<void> _openSearch(DatingProvider provider) async {
+    final picked = await showModalBottomSheet<RentalProperty>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ComparePickerSheet(properties: provider.allProperties),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (!_searchAdded.any((p) => p.id == picked.id)) {
+        _searchAdded.add(picked);
+      }
+      // Auto-select it so it shows even when there are >3 in the set.
+      if (_selected.length < CompareScreen.maxColumns) _selected.add(picked.id);
+    });
   }
 
   Widget _buildBody(
@@ -480,6 +514,108 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Searchable list of the catalog → returns the tapped property to add to the
+/// comparison.
+class _ComparePickerSheet extends StatefulWidget {
+  const _ComparePickerSheet({required this.properties});
+  final List<RentalProperty> properties;
+  @override
+  State<_ComparePickerSheet> createState() => _ComparePickerSheetState();
+}
+
+class _ComparePickerSheetState extends State<_ComparePickerSheet> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _q.trim().toLowerCase();
+    final list = q.isEmpty
+        ? widget.properties
+        : widget.properties.where((p) {
+            return p.city.toLowerCase().contains(q) ||
+                p.neighborhood.toLowerCase().contains(q) ||
+                p.address.toLowerCase().contains(q);
+          }).toList();
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scroll) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerRight,
+                child: Text('הוספת דירה להשוואה',
+                    style:
+                        TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                textDirection: TextDirection.rtl,
+                autofocus: true,
+                onChanged: (v) => setState(() => _q = v),
+                decoration: InputDecoration(
+                  hintText: 'חיפוש לפי עיר / שכונה / כתובת…',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: list.isEmpty
+                    ? const Center(
+                        child: Text('אופס! לא נמצאו דירות תואמות',
+                            style:
+                                TextStyle(color: AppColors.textSecondary)))
+                    : ListView.builder(
+                        controller: scroll,
+                        itemCount: list.length,
+                        itemBuilder: (_, i) {
+                          final p = list[i];
+                          final where = p.neighborhood.trim().isNotEmpty
+                              ? '${p.neighborhood}, ${p.city}'
+                              : p.city;
+                          return ListTile(
+                            leading: Icon(Icons.home_outlined,
+                                color: AppColors.primary),
+                            title: Text(where,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                                '${p.priceLabel} · ${p.roomsLabel} חד׳'),
+                            onTap: () => Navigator.of(context).pop(p),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

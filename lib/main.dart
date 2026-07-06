@@ -120,7 +120,14 @@ class RentlyApp extends StatelessWidget {
             builder: (context, child) {
               return Directionality(
                 textDirection: TextDirection.rtl,
-                child: IpadFrame(child: child ?? const SizedBox.shrink()),
+                // Tap anywhere outside a field to dismiss the keyboard — app-wide,
+                // so it works on every page. translucent → real buttons/fields
+                // still get their taps; only "empty" taps unfocus.
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                  child: IpadFrame(child: child ?? const SizedBox.shrink()),
+                ),
               );
             },
             home: const _SessionLifecycleTracker(child: _StartupGate()),

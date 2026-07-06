@@ -4856,6 +4856,19 @@ class _NoMorePropertiesState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DatingProvider>();
+    // Distinguish "you searched an area and there's nothing" (an OOPS empty state)
+    // from "you swiped through everything" — the copy should match the situation.
+    final city = provider.filters.city.trim();
+    final hasActiveSearch = city.isNotEmpty ||
+        provider.filters.minBudget != null ||
+        provider.filters.maxBudget != 0 ||
+        provider.filters.minRooms > 1;
+    final title = hasActiveSearch
+        ? (city.isNotEmpty ? 'אופס! לא מצאנו דירות ב$city' : 'אופס! אין דירות שמתאימות')
+        : 'ראית את כל הדירות!';
+    final subtitle = hasActiveSearch
+        ? 'לא נמצאו דירות זמינות לפי החיפוש הזה. אפשר להרחיב טווח, אזור או תקציב 👇'
+        : 'הרחב את החיפוש כדי למצוא עוד דירות';
 
     // Top-aligned + scrollable so the quick actions sit high on the screen
     // (raised out of the way of the navbar) and always fit.
@@ -4875,27 +4888,29 @@ class _NoMorePropertiesState extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: RentlyIcon(
-                  IconsaxPlusLinear.search_normal,
+                  hasActiveSearch
+                      ? IconsaxPlusLinear.emoji_sad
+                      : IconsaxPlusLinear.search_normal,
                   color: AppColors.primary,
                   size: 36,
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'ראית את כל הדירות!',
+            Text(
+              title,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.navy,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'הרחב את החיפוש כדי למצוא עוד דירות',
+            Text(
+              subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 height: 1.5,
                 fontSize: 14,
