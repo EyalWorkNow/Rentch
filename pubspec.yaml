@@ -38,6 +38,7 @@ dependencies:
   provider: ^6.1.4
   flutter_card_swiper: ^7.2.0
   shared_preferences: ^2.5.3
+  flutter_contacts: ^1.1.9+2
   flutter_map: ^8.3.0
   latlong2: ^0.9.1
   iconsax_plus: ^1.0.0

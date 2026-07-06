@@ -169,6 +169,9 @@ const TABLES = {
   // the chat. Query by tenantUid (tenant's list) or landlordUid (landlord's list).
   matches:         { name: `${TABLE_PREFIX}matches`,         gsi: { name: 'tenantUid-createdAt', pk: 'tenantUid', filterKey: 'tenantUid' }, indexes: { landlord: { name: 'landlordUid-createdAt', pk: 'landlordUid', filterKey: 'landlordUid' } } },
   app_state:       { name: `${TABLE_PREFIX}app-state`,       gsi: null },
+  // Broker tools cloud store — one row per (broker, data-type), id = `{uid}:{name}`.
+  // Owner-scoped via the dedicated /broker_data route (never the generic handler).
+  broker_data:     { name: `${TABLE_PREFIX}broker-data`,     gsi: null },
   // Per-user accumulated persona (pk: id == uid). One row per user, upserted by
   // the client with confidence-scored facts for personalisation + targeting.
   // Owner-scoped: a caller may only read/write their own row (see below).
@@ -984,6 +987,32 @@ export const handler = async (event) => {
           'ההתראות עובדות! זו התראת אמת מהשרת ✅', { type: 'test' });
       // Diagnostics so the client can tell the user exactly what happened.
       return json(200, { ok: true, tokensRegistered: tokens.length, pushed: sent });
+    }
+
+    // ── Broker tools cloud sync ─────────────────────────────────────────────
+    // GET/PUT /broker_data/{name} — a broker's clients/leads/deals/viewings/
+    // exclusivity/branding blob. The row id is ALWAYS `{callerUid}:{name}`,
+    // derived server-side from the verified identity — a caller can NEVER read
+    // or write another broker's data. Fully private CRM in the cloud.
+    if (segments[0] === 'broker_data') {
+      const uid = callerUidOf(event);
+      if (!uid) return json(401, { message: 'Unauthorized' });
+      const name = (segments[1] || '').replace(/[^a-zA-Z0-9_]/g, '');
+      if (!name) return json(400, { message: 'name required' });
+      const rowId = `${uid}:${name}`;
+      const T = TABLES.broker_data.name;
+      if (method === 'GET') {
+        const out = await ddb.send(new GetCommand({ TableName: T, Key: { id: rowId } }));
+        return json(200, out.Item || { id: rowId, data: null, updatedAt: null });
+      }
+      if (method === 'PUT' || method === 'POST') {
+        const body = event.body ? JSON.parse(event.body) : {};
+        await ddb.send(new PutCommand({ TableName: T, Item: {
+          id: rowId, uid, data: body.data ?? null, updatedAt: body.updatedAt || '',
+        }}));
+        return json(200, { ok: true });
+      }
+      return json(405, { message: 'Method not allowed' });
     }
 
     // ── Two-sided match ranking (landlord's leads) ──────────────────────────

@@ -54,6 +54,8 @@
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSLocationUsageDescription</key>
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
+	<key>NSContactsUsageDescription</key>
+	<string>גישה לאנשי הקשר כדי לייבא לקוחות לפנקס הסוכן</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>נדרשת גישה למיקום כדי למלא אוטומטית את הפרטים</string>
 	<key>NSMicrophoneUsageDescription</key>

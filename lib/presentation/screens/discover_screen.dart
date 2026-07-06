@@ -85,15 +85,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final provider = context.read<DatingProvider>();
     setState(() => _nlBusy = true);
 
-    // 1) Server Gemini extract (degrades to empty on failure).
-    Map<String, dynamic> llm = const {};
-    try {
-      final r = await _nlAssistant.extractPropertyFields(text, currentFields: {});
-      llm = r.fields;
-    } catch (_) {/* fall back to on-device parse */}
-
-    // 2) On-device parse merged with the model fields → structured query.
-    final query = SmartSearch.parse(text, llm: llm);
+    // Etti's COMPLEX ALGORITHM, zero AI tokens: run the full on-device
+    // SmartSearch parse only (GovData locality resolution, budget/rooms/features,
+    // intents, inference rules like <100k→rent). No LLM round-trip → instant + free.
+    // The deck then re-ranks (community-fit) over the structured query below.
+    final query = SmartSearch.parse(text);
 
     if (!mounted) return;
     if (query.isEmpty) {
@@ -1146,7 +1142,8 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
                 onTap: widget.open ? null : widget.onOpen,
                 child: Container(
                   width: w,
-                  height: _h,
+                  // Min height keeps the collapsed circle; grows for multi-line text.
+                  constraints: BoxConstraints(minHeight: _h),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(_h / 2), // fully rounded
@@ -1233,8 +1230,11 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
               focusNode: _focus,
               enabled: !busy,
               textDirection: TextDirection.rtl,
-              textInputAction: TextInputAction.search,
-              onSubmitted: widget.onSubmit,
+              // Multi-line: Enter inserts a line-break; the arrow button searches.
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 1,
+              maxLines: 4,
               // Vertically centre the text within the pill (it used to sit high).
               textAlignVertical: TextAlignVertical.center,
               cursorColor: AppColors.primary,

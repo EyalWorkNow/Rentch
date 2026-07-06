@@ -26,6 +26,7 @@ import 'package:dating_app/data/models/persona_profile.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/signature_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
+import 'package:dating_app/data/repositories/broker_cloud_sync.dart';
 import 'package:dating_app/data/repositories/contract_repository.dart';
 import 'package:dating_app/data/repositories/moderation_repository.dart';
 import 'package:dating_app/data/repositories/property_analytics_repository.dart';
@@ -1502,6 +1503,12 @@ class DatingProvider extends ChangeNotifier {
       // Pull mutual matches a landlord created for this tenant on another device,
       // so the chat shows up in their conversations (was local-only → invisible).
       unawaited(_loadMatchesFromBackend());
+      // Restore the broker's tools (clients/leads/deals/viewings/exclusivity) from
+      // the cloud so their book survives a lost/replaced device + syncs across
+      // devices — the #1 gap every agent flagged.
+      if (isBroker) {
+        unawaited(BrokerCloudSync.instance.pullAllToLocal());
+      }
     }
 
     _isLoading = false;

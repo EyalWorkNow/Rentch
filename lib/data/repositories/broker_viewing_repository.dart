@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dating_app/data/models/broker_viewing.dart';
+import 'package:dating_app/data/repositories/broker_cloud_sync.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -59,9 +60,8 @@ class BrokerViewingRepository {
 
   Future<void> _persist(List<BrokerViewing> viewings) async {
     final prefs = await _prefsFuture;
-    await prefs.setString(
-      _key,
-      jsonEncode(viewings.map((v) => v.toJson()).toList()),
-    );
+    final raw = jsonEncode(viewings.map((v) => v.toJson()).toList());
+    await prefs.setString(_key, raw);
+    BrokerCloudSync.instance.push(_key, raw); // cloud backup (fire-and-forget)
   }
 }

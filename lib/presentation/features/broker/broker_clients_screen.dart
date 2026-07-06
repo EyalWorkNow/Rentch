@@ -7,6 +7,7 @@ import 'package:dating_app/data/repositories/broker_client_repository.dart';
 import 'package:dating_app/presentation/features/broker/broker_hot_matches_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:provider/provider.dart';
 
 /// "פנקס לקוחות" — the broker's (מתווך) client book / CRM.
@@ -71,6 +72,61 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
     setState(() => _clients = next);
   }
 
+  // Bulk-import clients from the phone's contacts — the "won't hand-type 800
+  // clients" fix. Picks name + first phone; criteria are filled in later per
+  // client. Skips contacts whose number already exists in the book.
+  Future<void> _importFromContacts() async {
+    final granted = await FlutterContacts.requestPermission(readonly: true);
+    if (!mounted) return;
+    if (!granted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('צריך הרשאת גישה לאנשי קשר כדי לייבא')));
+      return;
+    }
+    final contacts = await FlutterContacts.getContacts(withProperties: true);
+    final pickable = contacts
+        .where((c) => c.displayName.trim().isNotEmpty && c.phones.isNotEmpty)
+        .toList()
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+    if (!mounted) return;
+    if (pickable.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('לא נמצאו אנשי קשר עם מספר טלפון')));
+      return;
+    }
+    final selected = await showModalBottomSheet<List<Contact>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ContactPickerSheet(contacts: pickable),
+    );
+    if (selected == null || selected.isEmpty) return;
+
+    final existing = _clients
+        .map((c) => c.phone.replaceAll(RegExp(r'\D'), ''))
+        .where((p) => p.isNotEmpty)
+        .toSet();
+    var added = 0;
+    var next = _clients;
+    for (var i = 0; i < selected.length; i++) {
+      final c = selected[i];
+      final phone = c.phones.first.number;
+      final digits = phone.replaceAll(RegExp(r'\D'), '');
+      if (digits.isNotEmpty && existing.contains(digits)) continue;
+      next = await _repo.save(BrokerClient(
+        id: 'c-${DateTime.now().microsecondsSinceEpoch}-$i',
+        name: c.displayName.trim(),
+        phone: phone,
+      ));
+      if (digits.isNotEmpty) existing.add(digits);
+      added++;
+    }
+    if (!mounted) return;
+    setState(() => _clients = next);
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('יובאו $added אנשי קשר לפנקס')));
+  }
+
   void _openMatches(BrokerClient client) {
     final matches = _matcher.rank(client, _myProperties);
     Navigator.of(context).push(
@@ -96,6 +152,13 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
             'פנקס לקוחות',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'ייבוא מאנשי קשר',
+              icon: const Icon(Icons.contacts_outlined),
+              onPressed: _importFromContacts,
+            ),
+          ],
         ),
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: AppColors.primary,
@@ -764,4 +827,122 @@ String _money(int v) {
     buf.write(s[i]);
   }
   return buf.toString();
+}
+
+/// Searchable multi-select of phone contacts → returns the chosen ones.
+class _ContactPickerSheet extends StatefulWidget {
+  const _ContactPickerSheet({required this.contacts});
+  final List<Contact> contacts;
+  @override
+  State<_ContactPickerSheet> createState() => _ContactPickerSheetState();
+}
+
+class _ContactPickerSheetState extends State<_ContactPickerSheet> {
+  final _selected = <String>{}; // contact ids
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _q.trim();
+    final list = q.isEmpty
+        ? widget.contacts
+        : widget.contacts
+            .where((c) => c.displayName.toLowerCase().contains(q.toLowerCase()))
+            .toList();
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scroll) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('בחירת אנשי קשר לייבוא',
+                        style: TextStyle(
+                            fontSize: 19, fontWeight: FontWeight.bold)),
+                  ),
+                  Text('${_selected.length} נבחרו',
+                      style: const TextStyle(color: AppColors.textSecondary)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                textDirection: TextDirection.rtl,
+                onChanged: (v) => setState(() => _q = v),
+                decoration: InputDecoration(
+                  hintText: 'חיפוש איש קשר…',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.builder(
+                  controller: scroll,
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final c = list[i];
+                    final on = _selected.contains(c.id);
+                    return CheckboxListTile(
+                      value: on,
+                      activeColor: AppColors.primary,
+                      title: Text(c.displayName,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                          c.phones.isNotEmpty ? c.phones.first.number : '',
+                          textDirection: TextDirection.ltr),
+                      onChanged: (_) => setState(() =>
+                          on ? _selected.remove(c.id) : _selected.add(c.id)),
+                    );
+                  },
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                    onPressed: _selected.isEmpty
+                        ? null
+                        : () => Navigator.of(context).pop(widget.contacts
+                            .where((c) => _selected.contains(c.id))
+                            .toList()),
+                    child: Text('ייבא ${_selected.length} לקוחות',
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
