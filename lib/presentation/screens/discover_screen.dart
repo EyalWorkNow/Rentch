@@ -1237,6 +1237,7 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
               onSubmitted: widget.onSubmit,
               // Vertically centre the text within the pill (it used to sit high).
               textAlignVertical: TextAlignVertical.center,
+              cursorColor: AppColors.primary,
               style: const TextStyle(
                 fontSize: 15,
                 color: AppColors.navy,
@@ -1244,6 +1245,10 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
               ),
               decoration: InputDecoration(
                 isDense: true,
+                // The global InputDecorationTheme fills fields with a light-gray
+                // (0xFFF1F5F8) — override to keep the pill fully white.
+                filled: true,
+                fillColor: Colors.white,
                 hintText: 'חפש דירה במילים שלך…',
                 hintTextDirection: TextDirection.rtl,
                 hintStyle: TextStyle(
