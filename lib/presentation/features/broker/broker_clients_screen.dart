@@ -76,18 +76,22 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
   // clients" fix. Picks name + first phone; criteria are filled in later per
   // client. Skips contacts whose number already exists in the book.
   Future<void> _importFromContacts() async {
-    final granted = await FlutterContacts.requestPermission(readonly: true);
+    final status =
+        await FlutterContacts.permissions.request(PermissionType.read);
     if (!mounted) return;
-    if (!granted) {
+    if (status != PermissionStatus.granted &&
+        status != PermissionStatus.limited) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('צריך הרשאת גישה לאנשי קשר כדי לייבא')));
       return;
     }
-    final contacts = await FlutterContacts.getContacts(withProperties: true);
+    final contacts = await FlutterContacts.getAll(
+        properties: {ContactProperty.name, ContactProperty.phone});
     final pickable = contacts
-        .where((c) => c.displayName.trim().isNotEmpty && c.phones.isNotEmpty)
+        .where((c) =>
+            (c.displayName ?? '').trim().isNotEmpty && c.phones.isNotEmpty)
         .toList()
-      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+      ..sort((a, b) => (a.displayName ?? '').compareTo(b.displayName ?? ''));
     if (!mounted) return;
     if (pickable.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -115,7 +119,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
       if (digits.isNotEmpty && existing.contains(digits)) continue;
       next = await _repo.save(BrokerClient(
         id: 'c-${DateTime.now().microsecondsSinceEpoch}-$i',
-        name: c.displayName.trim(),
+        name: (c.displayName ?? '').trim(),
         phone: phone,
       ));
       if (digits.isNotEmpty) existing.add(digits);
@@ -847,7 +851,8 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
     final list = q.isEmpty
         ? widget.contacts
         : widget.contacts
-            .where((c) => c.displayName.toLowerCase().contains(q.toLowerCase()))
+            .where((c) =>
+                (c.displayName ?? '').toLowerCase().contains(q.toLowerCase()))
             .toList();
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -904,18 +909,19 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                   itemCount: list.length,
                   itemBuilder: (_, i) {
                     final c = list[i];
-                    final on = _selected.contains(c.id);
+                    final id = c.id ?? '';
+                    final on = _selected.contains(id);
                     return CheckboxListTile(
                       value: on,
                       activeColor: AppColors.primary,
-                      title: Text(c.displayName,
+                      title: Text(c.displayName ?? '',
                           style:
                               const TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: Text(
                           c.phones.isNotEmpty ? c.phones.first.number : '',
                           textDirection: TextDirection.ltr),
                       onChanged: (_) => setState(() =>
-                          on ? _selected.remove(c.id) : _selected.add(c.id)),
+                          on ? _selected.remove(id) : _selected.add(id)),
                     );
                   },
                 ),
@@ -931,7 +937,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                     onPressed: _selected.isEmpty
                         ? null
                         : () => Navigator.of(context).pop(widget.contacts
-                            .where((c) => _selected.contains(c.id))
+                            .where((c) => _selected.contains(c.id ?? ''))
                             .toList()),
                     child: Text('ייבא ${_selected.length} לקוחות',
                         style: const TextStyle(
