@@ -96,6 +96,18 @@ class SearchIntent {
         .hasMatch(text)) {
       out.add(central);
     }
+    // Olim / anglo (English-speaking) seekers — a distinct Israeli factor: they
+    // cluster in established, community-oriented areas with good (often English-
+    // friendly) schools. Without a dedicated anglo-area feed we map to the closest
+    // proxies the model already scores: a quality area + schools.
+    if (RegExp(
+            r'עולה חדש|עולים חדשים|עולה חדשה|עלייה לארץ|עליתי לארץ|'
+            r'דובר אנגלית|דוברת אנגלית|דוברי אנגלית|אנגלו[- ]?סקסי|'
+            r'\banglo\b|\bolim\b|\boleh\b|new immigrant|english.speaking',
+            caseSensitive: false)
+        .hasMatch(text)) {
+      out..add(qualityArea)..add(goodSchools);
+    }
     // Student → near a campus (kept from before).
     if (out.contains(student)) out.add(nearUniversity);
     return out;
