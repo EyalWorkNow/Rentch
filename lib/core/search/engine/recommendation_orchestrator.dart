@@ -970,9 +970,23 @@ class RecommendationEngine {
     if (budgetStated && maxBudget > 0) {
       if (price > maxBudget) {
         final over = ((price - maxBudget) / maxBudget * 100).round();
-        concerns.add(over <= 10
+        final base = over <= 10
             ? 'מעט מעל התקציב שלך'
-            : 'מעל התקציב שלך בכ-$over%');
+            : 'מעל התקציב שלך בכ-$over%';
+        // Phase 4 — trade-off narration: a real agent doesn't just flag "over
+        // budget", they say what you GET for it. Tie the concern to the single
+        // strongest offsetting quality so the compromise is explicit, not scary.
+        ScorecardDimension? strength;
+        for (final d in dimensions) {
+          if (d.key == 'budget' || d.key == 'total_cost') continue;
+          if (d.contributionPct < 0.6) continue;
+          if (strength == null || d.contributionPct > strength.contributionPct) {
+            strength = d;
+          }
+        }
+        concerns.add(strength != null
+            ? '$base — אבל ${strength.label} מצוין, ששווה את זה'
+            : base);
       } else if (price <= maxBudget * 0.95 &&
           c.property.transactionType != PropertyTransactionType.sale) {
         // Budget BLIND-SPOT only: the rent LOOKS comfortably affordable (≤95% of
