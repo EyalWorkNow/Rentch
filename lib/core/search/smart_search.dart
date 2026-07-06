@@ -265,6 +265,9 @@ class ScoredProperty {
 // Never dead-ends — always returns the best matches.
 class SmartSearch {
   static SearchQuery parse(String text, {Map<String, dynamic> llm = const {}}) {
+    // Phase 1 — Israeli lexicon: expand everyday abbreviations/slang up-front so
+    // "תחב״צ" behaves exactly like "תחבורה ציבורית", "שכ״ד" like "שכר דירה", etc.
+    text = expandLexicon(text);
     final t = text.toLowerCase();
 
     // ── rooms (range / half / studio / "+") ─────────────────────────────────
@@ -519,7 +522,10 @@ class SmartSearch {
 
     final nearTrain = const [
       'רכבת', 'תחנת רכבת', 'ליד הרכבת', 'קרוב לרכבת', 'רכבת קלה',
-      'train', 'railway', 'light rail', 'metro', 'תחבורה ציבורית'
+      'train', 'railway', 'light rail', 'metro', 'תחבורה ציבורית',
+      // Phase 1 lexicon: תחב״צ/רק״ל expand to the two phrases above; add the rest
+      // of public transport (bus / line / stop) so "קרוב לתחב״צ" is understood.
+      'אוטובוס', 'תחנת אוטובוס', 'קו אוטובוס', 'מטרו', 'תחנה מרכזית',
     ].any((w) => text.contains(w));
 
     // ── persona soft defaults (only when rooms not stated) ──────────────────
@@ -934,6 +940,36 @@ class SmartSearch {
   ];
 
   // ── keyword maps ────────────────────────────────────────────────────────────
+  // ── Phase 1: Israeli everyday terms + abbreviations ─────────────────────────
+  // Expanded to their canonical phrase BEFORE parsing, so a search typed in
+  // real-life shorthand ("תחב״צ", "שכ״ד", "3 חד׳") is understood exactly like the
+  // full words. Gershayim can be ASCII (") or Hebrew (״); a geresh apostrophe can
+  // be ASCII (') or Hebrew (׳).
+  static final List<List<Object>> _lexicon = [
+    [RegExp('תחב["״]?צ'), ' תחבורה ציבורית '], // public transport
+    [RegExp('רק["״]?ל'), ' רכבת קלה '], // light rail
+    [RegExp('שכ["״]?ד'), ' שכר דירה '], // rent
+    [RegExp('יח["״]?ד'), ' יחידת דיור '], // housing unit
+    [RegExp('ממ["״]?ד'), ' ממ"ד '], // protected room (canonicalise)
+    [RegExp('ממ["״]?ק'), ' מרחב מוגן '], // floor shelter
+    [RegExp('ק["״]ק'), ' קומת קרקע '], // ground floor
+    [RegExp('מ["״]ר'), ' מטר '], // square metres
+    [RegExp("חד['׳](?=\\s|\$)"), ' חדרים '], // "3 חד׳" → rooms
+    [RegExp('צמוד[ותה]? קרקע'), ' צמוד קרקע '],
+    [RegExp('דו[- ]?משפחתי'), ' דו משפחתי '],
+    [RegExp('מרפסת\\s*שמש'), ' מרפסת שמש '],
+    [RegExp('כ["״]?\\s*מיידית'), ' כניסה מיידית '],
+  ];
+
+  /// Rewrites Israeli abbreviations/slang to their full phrase (see [_lexicon]).
+  static String expandLexicon(String text) {
+    var out = text;
+    for (final row in _lexicon) {
+      out = out.replaceAll(row[0] as RegExp, row[1] as String);
+    }
+    return out;
+  }
+
   static const Map<String, List<String>> _amenityKeywords = {
     'feat_renovated': ['משופצ', 'שיפוץ', 'חדשה', 'renovated'],
     'feat_pets': ['כלב', 'כלבה', 'חתול', 'חיית מחמד', 'חיות מחמד', 'pet', 'dog'],
