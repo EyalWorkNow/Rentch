@@ -95,19 +95,20 @@ class BrokerToolsScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
-          surfaceTintColor: Colors.transparent,
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          surfaceTintColor: AppColors.primary,
           elevation: 0,
           centerTitle: true,
           title: const Text(
             'כלי הסוכן',
             style: TextStyle(
-              color: AppColors.textPrimary,
+              color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
           ),
-          iconTheme: const IconThemeData(color: AppColors.textPrimary),
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
         body: SafeArea(
           top: false,

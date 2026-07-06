@@ -126,8 +126,9 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
-          foregroundColor: AppColors.textPrimary,
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          surfaceTintColor: AppColors.primary,
           elevation: 0,
           title: const Text(
             'התאמות חמות',
@@ -137,7 +138,8 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
             if (_hot.isNotEmpty)
               TextButton(
                 onPressed: _dismissAll,
-                child: const Text('סמן הכל כנקרא'),
+                child: const Text('סמן הכל כנקרא',
+                    style: TextStyle(color: Colors.white)),
               ),
           ],
         ),

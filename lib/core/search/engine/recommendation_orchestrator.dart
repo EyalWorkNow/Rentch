@@ -376,13 +376,29 @@ class RecommendationEngine {
     //  • ZERO exact stock → return the (empty) named-city set. We do NOT silently
     //    substitute a different city; the flow says "nothing in <city>". A tiny
     //    moshav with no listings must never be answered with a neighbouring town.
+    // property id → km from the searched city, for listings in a DIFFERENT but
+    // adjacent (≤4km) town. Kept later only if they score >70%, and flagged with
+    // the reason. Lets "דירה בעיר X" surface a great match hugging X's border.
+    final nearbyKm = <String, double>{};
     final city = query.city?.trim();
     if (city != null && city.isNotEmpty) {
       final inCity = candidates
           .where((p) => _cityMatches(p, city))
           .toList();
       if (inCity.length >= 3) {
-        candidates = inCity;
+        final cLat =
+            inCity.map((p) => p.lat).reduce((a, b) => a + b) / inCity.length;
+        final cLon =
+            inCity.map((p) => p.lon).reduce((a, b) => a + b) / inCity.length;
+        final nearby = candidates
+            .where((p) =>
+                !_cityMatches(p, city) &&
+                _km(p.lat, p.lon, cLat, cLon) <= 4.0)
+            .toList();
+        for (final p in nearby) {
+          nearbyKm[p.id] = _km(p.lat, p.lon, cLat, cLon);
+        }
+        candidates = [...inCity, ...nearby];
       } else if (inCity.isNotEmpty) {
         final cLat = inCity.map((p) => p.lat).reduce((a, b) => a + b) /
             inCity.length;
@@ -537,6 +553,14 @@ class RecommendationEngine {
       }
     }
 
+    // Adjacent-town results are a BONUS, not the search: keep one only if it's a
+    // genuinely strong fit (>70%), so a weak out-of-city listing never dilutes the
+    // named-city results. (Backfilled fills are already capped ≤0.55 → dropped here.)
+    if (nearbyKm.isNotEmpty) {
+      selected.removeWhere((c) =>
+          nearbyKm.containsKey(c.property.id) && (match[c] ?? 0) <= 0.70);
+    }
+
     // model confidence: how much intent we captured + behavioral confidence
     final intentCoverage =
         model.statedDimensions.length / kScoringDimensions.length;
@@ -549,7 +573,14 @@ class RecommendationEngine {
         () {
           final fitPct = (match[c]! * 100).round();
           final explanation = Explainer.explain(c, model);
-          final highlights = Explainer.highlights(c, model);
+          // Flag WHY an out-of-city listing surfaced: it hugs the searched city's
+          // border and still scored high — so the user understands the suggestion.
+          final nearKm = nearbyKm[c.property.id];
+          final highlights = <String>[
+            if (nearKm != null)
+              '📍 בעיר שכנה — ${nearKm.toStringAsFixed(nearKm < 10 ? 1 : 0)} ק"מ מ${city ?? ''}, אבל התאמה גבוהה',
+            ...Explainer.highlights(c, model),
+          ];
           final confidence =
               (baseConfidence * (0.7 + 0.3 * c.constraintSatisfaction))
                   .clamp(0.0, 1.0);

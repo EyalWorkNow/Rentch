@@ -149,8 +149,9 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
-          foregroundColor: AppColors.textPrimary,
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          surfaceTintColor: AppColors.primary,
           elevation: 0,
           title: const Text(
             'פנקס לקוחות',

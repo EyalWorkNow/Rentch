@@ -111,7 +111,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (!mounted) return;
     setState(() {
       _nlBusy = false;
-      _nlSummary = query.describe();
+      // Make the search AREA explicit so "אזור" is never ambiguous: we show the
+      // city + that nearby areas are included (the engine widens to the metro
+      // ring when the exact city is sparse).
+      final city = query.city?.trim() ?? '';
+      _nlSummary = city.isEmpty
+          ? query.describe()
+          : '${query.describe()}  ·  📍 $city והסביבה הקרובה';
     });
   }
 

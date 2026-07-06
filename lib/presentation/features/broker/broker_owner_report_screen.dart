@@ -34,8 +34,9 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF6F7FC),
         appBar: AppBar(
-          backgroundColor: AppColors.background,
-          surfaceTintColor: AppColors.background,
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          surfaceTintColor: AppColors.primary,
           elevation: 0,
           centerTitle: false,
           title: const Text(
@@ -43,7 +44,7 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
-              color: AppColors.navy,
+              color: Colors.white,
             ),
           ),
         ),
