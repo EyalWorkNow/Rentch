@@ -381,11 +381,25 @@ class RecommendationEngine {
     // the reason. Lets "דירה בעיר X" surface a great match hugging X's border.
     final nearbyKm = <String, double>{};
     final city = query.city?.trim();
+    // "אזור X" (SearchIntent.cityArea) EXPLICITLY asks for X + its adjacent
+    // settlements, so the gate widens to the neighbouring towns (≤8km) and shows
+    // them as full results — not the >70%-only bonus that a bare "בעיר X" gets.
+    final areaMode = query.intents.contains(SearchIntent.cityArea);
     if (city != null && city.isNotEmpty) {
       final inCity = candidates
           .where((p) => _cityMatches(p, city))
           .toList();
-      if (inCity.length >= 3) {
+      if (areaMode && inCity.isNotEmpty) {
+        final cLat =
+            inCity.map((p) => p.lat).reduce((a, b) => a + b) / inCity.length;
+        final cLon =
+            inCity.map((p) => p.lon).reduce((a, b) => a + b) / inCity.length;
+        candidates = candidates
+            .where((p) =>
+                _cityMatches(p, city) ||
+                _km(p.lat, p.lon, cLat, cLon) <= 8.0)
+            .toList();
+      } else if (inCity.length >= 3) {
         final cLat =
             inCity.map((p) => p.lat).reduce((a, b) => a + b) / inCity.length;
         final cLon =

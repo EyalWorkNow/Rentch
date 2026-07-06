@@ -26,6 +26,10 @@ class SearchIntent {
   static const goodSchools = 'good_schools';
   static const qualityArea = 'quality_area';
 
+  /// "אזור X" (as opposed to the city X itself) — the user wants X PLUS its
+  /// adjacent settlements, so the city gate widens to the neighbouring towns.
+  static const cityArea = 'city_area';
+
   // Distance-from-sea thresholds (km) — a shared, explicit definition of "close".
   static const double seaCloseKm = 1.5; // "on the sea" / walkable to the beach
   static const double seaOkKm = 3.0; // still "near the sea"

@@ -1,4 +1,5 @@
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,5 +56,21 @@ void main() {
 
     // Tel Aviv itself is always present.
     expect(cities.contains('תל אביב'), isTrue);
+  });
+
+  test('"אזור X" = X + adjacent settlements (widened, full results)', () {
+    final q = SmartSearch.parse('דירה באזור תל אביב');
+    expect(q.intents.contains(SearchIntent.cityArea), isTrue,
+        reason: '"אזור <city>" must flag the area intent');
+
+    final res = RecommendationEngine.recommendAsScored(
+        candidates: cat, query: q, limit: 10, seed: 1);
+    final cities = res.map((s) => s.property.city).toSet();
+
+    // The adjacent town (≤8km) is included as a FULL result, not a >70% bonus.
+    expect(cities.contains('רמת גן'), isTrue,
+        reason: 'אזור תל אביב includes adjacent Ramat Gan');
+    // A town beyond the area ring (~13km) is still excluded.
+    expect(cities.contains('ראשון לציון'), isFalse);
   });
 }

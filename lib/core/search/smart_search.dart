@@ -575,7 +575,16 @@ class SmartSearch {
       cheapPreference: cheap,
       transactionType: transactionType,
       rawText: text,
-      intents: SearchIntent.fromText(text),
+      intents: {
+        ...SearchIntent.fromText(text),
+        // "אזור <city>" (not the bare town אזור, and not the deictic "אזור שלי"
+        // which is already stripped) → the user wants the city PLUS its adjacent
+        // settlements, so flag the engine to widen the city gate.
+        if (city != null &&
+            city != 'אזור' &&
+            (text.contains('אזור $city') || text.contains('איזור $city')))
+          SearchIntent.cityArea,
+      },
     );
   }
 
