@@ -1148,8 +1148,10 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
                 onTap: widget.open ? null : widget.onOpen,
                 child: Container(
                   width: w,
-                  // Min height keeps the collapsed circle; grows for multi-line text.
-                  constraints: BoxConstraints(minHeight: _h),
+                  // Fixed height — the collapse animation morphs a 52px circle (with
+                  // the search icon) into the bar; the icon overlay is Positioned.fill
+                  // so this MUST stay a definite height or the icon disappears.
+                  height: _h,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(_h / 2), // fully rounded
@@ -1236,11 +1238,9 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
               focusNode: _focus,
               enabled: !busy,
               textDirection: TextDirection.rtl,
-              // Multi-line: Enter inserts a line-break; the arrow button searches.
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              minLines: 1,
-              maxLines: 4,
+              textInputAction: TextInputAction.search,
+              onSubmitted: widget.onSubmit,
+              maxLines: 1,
               // Vertically centre the text within the pill (it used to sit high).
               textAlignVertical: TextAlignVertical.center,
               cursorColor: AppColors.primary,
