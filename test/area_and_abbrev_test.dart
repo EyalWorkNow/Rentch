@@ -55,4 +55,23 @@ void main() {
       expect(city('דירה בראשון לציון'), 'ראשון לציון');
     });
   });
+
+  group('English city names', () {
+    test('major cities in English → Hebrew', () {
+      expect(city('apartment in tel aviv, cheap, max 4000'), 'תל אביב - יפו');
+      expect(city('nice flat in jerusalem'), 'ירושלים');
+      expect(city('2 rooms in haifa'), isNotNull);
+      expect(city('cheap place in beer sheva for a student'), 'באר שבע');
+      expect(city('apartment in rishon lezion'), 'ראשון לציון');
+      expect(city('flat in ramat gan near the train'), 'רמת גן');
+      expect(city('herzliya near the beach'), 'הרצליה');
+    });
+
+    test('English city + English intent + budget all parse together', () {
+      final q = SmartSearch.parse('apartment in tel aviv near the beach max 4000');
+      expect(q.city, isNotNull);
+      expect(q.maxPrice, 4000);
+      expect(q.intents.contains(SearchIntent.nearSea), isTrue);
+    });
+  });
 }
