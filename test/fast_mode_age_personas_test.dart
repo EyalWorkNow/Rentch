@@ -53,8 +53,9 @@ final _cat = <RentalProperty>[
   // Rishon LeZion — divorced parent, mamad, near school.
   p('rish_mamad', city: 'ראשון לציון', lat: 31.9730, lon: 34.7925, price: 5800, rooms: 4, feats: ['ac', 'mamad', 'parking']),
   p('rish_no', city: 'ראשון לציון', lat: 31.9600, lon: 34.8000, price: 5500, rooms: 4, feats: ['ac']),
-  // Jerusalem — religious retiree, quiet.
+  // Jerusalem — religious retiree, quiet. One in a religious neighbourhood.
   p('jer_quiet', city: 'ירושלים', lat: 31.7780, lon: 35.2100, price: 5000, rooms: 3, feats: ['ac', 'elevator']),
+  p('jer_relig', city: 'ירושלים', neighborhood: 'מאה שערים', lat: 31.7870, lon: 35.2230, price: 4900, rooms: 3, feats: ['ac', 'elevator']),
   // Periphery sale — investor.
   p('afula_sale', city: 'עפולה', lat: 32.6100, lon: 35.2900, price: 900000, rooms: 3, tx: PropertyTransactionType.sale),
 ];
@@ -197,5 +198,13 @@ void main() {
     report('O5 · 67, religious retiree', 'זוג דתי קרוב לביה"כ שקט ירושלים 3חד', r);
     expect(r.q.city, isNotNull);
     expect(r.q.intents.contains('quiet'), isTrue);
+    expect(r.q.intents.contains('religious_area'), isTrue,
+        reason: '"דתי"/"בית כנסת" must register the religious-area intent');
+    // The מאה שערים flat should out-rank the secular one on a religious search.
+    final ids = r.shown.map((s) => s.property.id).toList();
+    if (ids.contains('jer_relig') && ids.contains('jer_quiet')) {
+      expect(ids.indexOf('jer_relig') < ids.indexOf('jer_quiet'), isTrue,
+          reason: 'religious-neighbourhood flat should rank first for a דתי seeker');
+    }
   });
 }

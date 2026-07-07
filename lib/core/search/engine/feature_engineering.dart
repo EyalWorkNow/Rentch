@@ -199,6 +199,37 @@ class IsraelGeoIndex {
   static double? parkKm(double lat, double lon) =>
       _parks.isEmpty ? null : _nearest(lat, lon, _parks);
 
+  // Well-established religious localities (charedi + dati-leumi) and neighbourhoods
+  // — a curated, VERIFIED proxy (these ARE observant communities), since CBS
+  // religiosity shares aren't in the bundled data. 1.0 = strongly religious.
+  static const _religiousLocalities = <String, double>{
+    'בני ברק': 1.0, 'ביתר עילית': 1.0, 'מודיעין עילית': 1.0, 'אלעד': 1.0,
+    'עמנואל': 1.0, 'רכסים': 0.9, 'קרית ספר': 1.0, 'ירושלים': 0.6,
+    'בית שמש': 0.8, 'אשדוד': 0.5, 'צפת': 0.7, 'טבריה': 0.55, 'נתיבות': 0.7,
+    'אופקים': 0.6, 'רחובות': 0.4,
+    // dati-leumi
+    'אפרת': 0.85, 'קרני שומרון': 0.8, 'אלקנה': 0.85, 'בית אל': 0.9, 'עפרה': 0.9,
+    'קדומים': 0.85, 'שילה': 0.85, 'אלון שבות': 0.9, 'נווה דניאל': 0.85,
+    'כרמי צור': 0.85, 'מעלה אדומים': 0.6, 'גבעת שמואל': 0.6, 'קרית ארבע': 0.9,
+    'אורנית': 0.55, 'טלמון': 0.9, 'שבי שומרון': 0.85, 'עתניאל': 0.9,
+  };
+  static const _religiousNeighbourhoods = {
+    'מאה שערים', 'גאולה', 'הר נוף', 'רמות', 'סנהדריה', 'רמת שלמה',
+    'בית וגן', 'קרית משה', 'רמת בית שמש', 'רובע ז'
+  };
+
+  /// 0..1 — how religiously-observant the property's community is (verified list).
+  static double religiousAreaScore(String city, String neighborhood) {
+    final c = city.trim();
+    final direct = _religiousLocalities[c];
+    if (direct != null) return direct;
+    final n = neighborhood.trim();
+    for (final rn in _religiousNeighbourhoods) {
+      if (n.contains(rn) || c.contains(rn)) return 0.95;
+    }
+    return 0.0;
+  }
+
   /// The nearest park's NAME (for the "קרוב ל<park>" reason), or null.
   static String? nearestParkName(double lat, double lon) {
     if (_parks.isEmpty || !_hasCoords(lat, lon)) return null;
@@ -792,6 +823,8 @@ class FeatureEngineer {
     f['park_access'] = IsraelGeoIndex.proximityKernel(
         IsraelGeoIndex.parkKm(p.lat, p.lon),
         scaleKm: 0.7);
+    f['religious_area'] =
+        IsraelGeoIndex.religiousAreaScore(p.city, p.neighborhood);
 
     // ── price / value econometrics ───────────────────────────────────────────
     f['price'] = p.price.toDouble();

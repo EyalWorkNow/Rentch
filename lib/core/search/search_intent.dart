@@ -26,6 +26,10 @@ class SearchIntent {
   static const goodSchools = 'good_schools';
   static const qualityArea = 'quality_area';
 
+  /// The seeker wants a religiously-observant community (חרדי / דתי-לאומי) or a
+  /// place near a synagogue → prefer known religious localities/neighbourhoods.
+  static const religiousArea = 'religious_area';
+
   /// "אזור X" (as opposed to the city X itself) — the user wants X PLUS its
   /// adjacent settlements, so the city gate widens to the neighbouring towns.
   static const cityArea = 'city_area';
@@ -65,6 +69,11 @@ class SearchIntent {
         caseSensitive: false),
     qualityArea: RegExp(
         r'שכונה טובה|אזור טוב|אזור איכותי|אזור יוקרתי|שכונה יוקרתית|שכונה שקטה|good area|nice area',
+        caseSensitive: false),
+    religiousArea: RegExp(
+        r'דתי|דתיה|דתיים|חרדי|חרדית|חרדים|שומר שבת|שומרי שבת|בית כנסת|בתי כנסת|'
+        r'קהילה דתית|אזור דתי|שכונה דתית|כשר|מקווה|עירוב|ישיבה|אולפנה|תלמוד תורה|'
+        r'religious|synagogue|kosher|haredi|observant',
         caseSensitive: false),
   };
 

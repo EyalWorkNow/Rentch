@@ -51,6 +51,7 @@ const List<String> kScoringDimensions = [
   'health', // CBS health-facility availability for the locality (gov data)
   'coast', // proximity to the sea — weighted only on beach intent
   'park', // proximity to a public park/garden — weighted for families/kids
+  'religious_area', // observant community — weighted only on a religious intent
   'yield', // gross rental yield (sale listings) — weighted only on investment intent
   'university', // proximity to a university/college — weighted on student intent
   'young_area', // CBS share of young adults — weighted on young/nightlife intent
@@ -460,6 +461,8 @@ class UserPreferenceModel {
         return pfv.get('coast_access', 0.0).clamp(0.0, 1.0);
       case 'park':
         return pfv.get('park_access', 0.0).clamp(0.0, 1.0);
+      case 'religious_area':
+        return pfv.get('religious_area', 0.0).clamp(0.0, 1.0);
       case 'yield':
         // Sale listings only; rentals stay neutral (weight is 0 there anyway).
         final est = RentalYield.estimate(
@@ -588,6 +591,7 @@ class PreferenceModelBuilder {
     // don't skew ordinary searches.
     'coast': 0.0,
     'park': 0.0,
+    'religious_area': 0.0,
     'yield': 0.0,
     'university': 0.0,
     'young_area': 0.0,
@@ -750,6 +754,10 @@ class PreferenceModelBuilder {
     }
     if (intents.contains(SearchIntent.qualityArea)) {
       sharpen('neighborhood', 0.9, 8.0);
+    }
+    // A religious/observant community is a strong, defining ask — weight it high.
+    if (intents.contains(SearchIntent.religiousArea)) {
+      sharpen('religious_area', 0.95, 14.0);
     }
     // Pet owner (requested pet-friendly) → a ground/low floor is easier with a
     // dog, so give accessibility a mild boost on top of the amenity match.
