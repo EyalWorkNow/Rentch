@@ -590,6 +590,23 @@ class GovData {
     return best.isFinite ? best : null;
   }
 
+  /// Nearest rail / light-rail station → (name, km), or null.
+  ({String name, double km})? nearestRailStation(double lat, double lon) {
+    if (!_loaded || _railLatLon.isEmpty || !_validCoord(lat, lon)) return null;
+    double best = double.infinity;
+    var bestI = -1;
+    for (var i = 0; i < _railLatLon.length; i++) {
+      final s = _railLatLon[i];
+      final d = _haversineKm(lat, lon, s[0], s[1]);
+      if (d < best) {
+        best = d;
+        bestI = i;
+      }
+    }
+    if (bestI < 0 || !best.isFinite) return null;
+    return (name: _railName[bestI], km: best);
+  }
+
   // ── geo helpers ──────────────────────────────────────────────────────────────
   static bool _validCoord(double lat, double lon) =>
       lat.abs() > 0.1 && lon.abs() > 0.1;

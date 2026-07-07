@@ -30,6 +30,10 @@ class SearchIntent {
   /// place near a synagogue → prefer known religious localities/neighbourhoods.
   static const religiousArea = 'religious_area';
 
+  /// Age of the kids → which school type matters: young → גן/יסודי, teens → תיכון.
+  static const youngChildren = 'young_children';
+  static const teens = 'teens';
+
   /// "אזור X" (as opposed to the city X itself) — the user wants X PLUS its
   /// adjacent settlements, so the city gate widens to the neighbouring towns.
   static const cityArea = 'city_area';
@@ -117,6 +121,18 @@ class SearchIntent {
     }
     if (emptyNest) {
       out..add(quiet)..add(accessible);
+    }
+    // Age of the kids picks the relevant school type (only for a real family).
+    if (!emptyNest) {
+      if (RegExp(r'תינוק|פעוט|רך נולד|בהריון|הריון|גן ילדים|ילד קטן|'
+              r'ילדים קטנים|בייבי|baby|toddler')
+          .hasMatch(text)) {
+        out.add(youngChildren);
+      }
+      if (RegExp(r'מתבגר|מתבגרת|מתבגרים|נוער|גיל העשרה|בני נוער|תיכון|teen')
+          .hasMatch(text)) {
+        out.add(teens);
+      }
     }
     // Retiree / elderly → step-free access + a quiet area.
     if (RegExp(r'מבוגר|גמלא|פנסי|קשיש|בגיל השלישי|retire|senior|elderly')

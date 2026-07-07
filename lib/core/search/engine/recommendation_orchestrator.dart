@@ -26,6 +26,7 @@ import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/govdata/gov_sources.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/engine/preference_model.dart';
 import 'package:dating_app/core/search/engine/ranking_engine.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
@@ -226,12 +227,19 @@ class Explainer {
       chips.add('₪${p.pricePerSquareMeter}/מ״ר — נמוך לאזור');
     }
 
-    // transit — real gov-data signals
+    // transit — real gov-data signals. Name the actual nearest station when close.
     final railKm = pfv.get('rail_km', 99);
-    if (railKm < 1.2) {
-      chips.add('צמוד לרכבת');
-    } else if (railKm < 3.0) {
-      chips.add('כ-${railKm.toStringAsFixed(1)} ק״מ מהרכבת');
+    if (railKm < 3.0) {
+      final st = GovData.instance
+          .nearestRailStation(pfv.property.lat, pfv.property.lon);
+      final dist = railKm < 1.0
+          ? '${(railKm * 1000).round()} מ׳'
+          : '${railKm.toStringAsFixed(1)} ק"מ';
+      if (st != null && st.name.trim().isNotEmpty) {
+        chips.add('🚉 $dist מתחנת ${st.name}');
+      } else {
+        chips.add(railKm < 1.2 ? 'צמוד לרכבת' : 'כ-$dist מהרכבת');
+      }
     } else if (pfv.get('transit_density') > 0.6) {
       chips.add('מחובר היטב לתחבורה');
     }

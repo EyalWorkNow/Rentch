@@ -240,7 +240,7 @@ class IsraelGeoIndex {
     _School? best;
     double? bestD;
     for (final s in _schools) {
-      if (type != null && s.type != type) continue;
+      if (type != null && !_typeMatches(s.type, type)) continue;
       final d = haversineKm(lat, lon, s.lat, s.lon);
       if (bestD == null || d < bestD) {
         bestD = d;
@@ -254,6 +254,26 @@ class IsraelGeoIndex {
   /// Distance (km) to the nearest school of any type, or null.
   static double? nearestSchoolKm(double lat, double lon) =>
       nearestSchool(lat, lon)?.km;
+
+  // Most OSM schools are the generic 'בית ספר' — in Israel that's the default
+  // ELEMENTARY school (חטיבה/תיכון are named explicitly), so treat generic as
+  // elementary when the caller asks for יסודי.
+  static bool _typeMatches(String actual, String wanted) {
+    if (wanted == 'יסודי') return actual == 'יסודי' || actual == 'בית ספר';
+    return actual == wanted;
+  }
+
+  /// Best walk-proximity (0..1) to ANY of the given school [types] — e.g. young
+  /// kids care about a nearby גן/יסודי, teens about a תיכון.
+  static double schoolTypeProximity(
+      double lat, double lon, List<String> types) {
+    double? best;
+    for (final t in types) {
+      final km = nearestSchool(lat, lon, type: t)?.km;
+      if (km != null && (best == null || km < best)) best = km;
+    }
+    return proximityKernel(best, scaleKm: 1.0);
+  }
 
   // Well-established religious localities (charedi + dati-leumi) and neighbourhoods
   // — a curated, VERIFIED proxy (these ARE observant communities), since CBS
@@ -1031,6 +1051,11 @@ class FeatureEngineer {
     f['school_density'] = schoolDensity;
     f['school_proximity'] = schoolProximity;
     f['school_access'] = math.max(schoolDensity, schoolProximity);
+    // Age-targeted school proximity: young kids → גן/יסודי; teens → חטיבה/תיכון.
+    f['school_young_prox'] =
+        IsraelGeoIndex.schoolTypeProximity(p.lat, p.lon, ['גן', 'יסודי']);
+    f['school_teen_prox'] =
+        IsraelGeoIndex.schoolTypeProximity(p.lat, p.lon, ['תיכון', 'חטיבה']);
     f['health_access'] = gov.healthAccessScore(p.city);
     final demo = gov.demographics(p.city);
     f['demo_young'] = demo?['youngShare'] ?? 0.5; // working-age share (20-64)

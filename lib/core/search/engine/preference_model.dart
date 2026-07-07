@@ -52,6 +52,8 @@ const List<String> kScoringDimensions = [
   'coast', // proximity to the sea — weighted only on beach intent
   'park', // proximity to a public park/garden — weighted for families/kids
   'religious_area', // observant community — weighted only on a religious intent
+  'school_young', // proximity to גן/יסודי — weighted for young kids
+  'school_teen', // proximity to חטיבה/תיכון — weighted for teens
   'yield', // gross rental yield (sale listings) — weighted only on investment intent
   'university', // proximity to a university/college — weighted on student intent
   'young_area', // CBS share of young adults — weighted on young/nightlife intent
@@ -463,6 +465,10 @@ class UserPreferenceModel {
         return pfv.get('park_access', 0.0).clamp(0.0, 1.0);
       case 'religious_area':
         return pfv.get('religious_area', 0.0).clamp(0.0, 1.0);
+      case 'school_young':
+        return pfv.get('school_young_prox', 0.0).clamp(0.0, 1.0);
+      case 'school_teen':
+        return pfv.get('school_teen_prox', 0.0).clamp(0.0, 1.0);
       case 'yield':
         // Sale listings only; rentals stay neutral (weight is 0 there anyway).
         final est = RentalYield.estimate(
@@ -592,6 +598,8 @@ class PreferenceModelBuilder {
     'coast': 0.0,
     'park': 0.0,
     'religious_area': 0.0,
+    'school_young': 0.0,
+    'school_teen': 0.0,
     'yield': 0.0,
     'university': 0.0,
     'young_area': 0.0,
@@ -751,6 +759,13 @@ class PreferenceModelBuilder {
       sharpen('schools', 0.9, 8.0);
       // Families with kids value a park within a short walk.
       sharpen('park', 0.82, 6.0);
+    }
+    // Age-targeted school type: young kids → a גן/יסודי nearby; teens → a תיכון.
+    if (intents.contains(SearchIntent.youngChildren)) {
+      sharpen('school_young', 0.9, 9.0);
+    }
+    if (intents.contains(SearchIntent.teens)) {
+      sharpen('school_teen', 0.9, 9.0);
     }
     if (intents.contains(SearchIntent.qualityArea)) {
       sharpen('neighborhood', 0.9, 8.0);
