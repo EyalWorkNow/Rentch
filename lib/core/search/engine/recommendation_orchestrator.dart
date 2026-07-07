@@ -273,6 +273,23 @@ class Explainer {
           : '${parkKm.toStringAsFixed(1)} ק"מ';
       chips.add('🌳 $dist מ${name ?? 'פארק'}');
     }
+    // Distance to the sea (beach seekers).
+    final seaKm = IsraelGeoIndex.coastKm(pfv.property.lat, pfv.property.lon);
+    if (seaKm != null && seaKm <= 1.2) {
+      final dist = seaKm < 1.0
+          ? '${(seaKm * 1000).round()} מ׳'
+          : '${seaKm.toStringAsFixed(1)} ק"מ';
+      chips.add('🏖️ $dist מהחוף');
+    }
+    // Nearest university / college (a selling point + relevant for students).
+    final uni = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon,
+        type: 'אוניברסיטה');
+    if (uni != null && uni.km <= 1.5) {
+      final dist = uni.km < 1.0
+          ? '${(uni.km * 1000).round()} מ׳'
+          : '${uni.km.toStringAsFixed(1)} ק"מ';
+      chips.add('🎓 $dist מ${uni.name}');
+    }
     if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
       chips.add('שכונה צעירה');
     } else if (pfv.get('demo_child') > 0.6) {

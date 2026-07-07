@@ -191,11 +191,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SafeArea(
               bottom: false,
               child: Padding(
-                // Lifted ~15px higher than the previous bottom:16 so the glass
-                // bar floats a touch further from the home indicator / screen
-                // edge. SafeArea(bottom:false) above already keeps it clear of
-                // the inset; this is purely the extra breathing room.
-                padding: const EdgeInsets.only(bottom: 31),
+                // Hug the bottom — a tight float above the home indicator. (Was 31;
+                // the extra breathing room read as an empty "footer" strip below
+                // the bar, which added nothing.)
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
