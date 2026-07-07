@@ -1735,10 +1735,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         ),
         body: Column(children: [
           // Speed slider — fast (on-device) ↔ personalization (background AI).
+          // Styled identically to the discover pill selector, centred.
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
-            child: Align(
-              alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            child: Center(
               child: SpeedModeSlider(
                 immediate: _immediateMode,
                 onChanged: _setImmediateMode,

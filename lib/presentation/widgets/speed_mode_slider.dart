@@ -1,5 +1,9 @@
+import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Shared "מהיר ↔ מותאם אישית" speed mode, persisted so the chat and the voice
@@ -31,14 +35,14 @@ class SpeedMode {
   }
 }
 
-/// A compact two-segment slider: **🎯 מותאם אישית ↔ ⚡ מהיר**. The selected
-/// segment slides under an animated accent pill.
+/// A two-segment slider — **🎯 מותאם אישית ↔ ⚡ מהיר** — styled IDENTICALLY to the
+/// discover "גלה" pill selector (glass pill, sliding gradient thumb, iconsax icons).
 class SpeedModeSlider extends StatelessWidget {
   const SpeedModeSlider({
     super.key,
     required this.immediate,
     required this.onChanged,
-    this.width = 208,
+    this.width = 300,
   });
 
   /// true = fast/immediate mode; false = personalization mode.
@@ -48,72 +52,214 @@ class SpeedModeSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const h = 34.0;
-    // Self-contained (opaque) so it looks IDENTICAL on the light chat and the
-    // dark voice screen.
-    const base = Color(0xFFECECF3);
-    final idle = AppColors.textSecondary;
+    const h = 52.0;
+    const pad = 5.0;
+    final inner = math.max(0.0, width - pad * 2);
+    final half = inner / 2;
+    // Visual order left→right: [מותאם אישית, מהיר]. Thumb over the selected half.
+    final thumbLeft = immediate ? half : 0.0;
+
     return SizedBox(
       width: width,
       height: h,
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: base,
-                borderRadius: BorderRadius.circular(h / 2),
-              ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.96),
+              const Color(0xFFEAF9FB).withValues(alpha: 0.94),
+              const Color(0xFFF8FBFD).withValues(alpha: 0.98),
+            ],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.78),
+            width: 1.4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.navy.withValues(alpha: 0.10),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
-            // Sliding accent pill — right segment (RTL) is "מותאם", left is "מהיר".
-            AnimatedAlign(
-              alignment:
-                  immediate ? Alignment.centerLeft : Alignment.centerRight,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              child: Container(
-                width: width / 2,
-                height: h,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(h / 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      blurRadius: 8,
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.14),
+              blurRadius: 18,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Padding(
+              padding: const EdgeInsets.all(pad),
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      left: thumbLeft,
+                      width: half,
+                      top: 0,
+                      bottom: 0,
+                      child: const _SpeedThumb(),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _seg(
+                            icon: IconsaxPlusBold.magicpen,
+                            label: 'מותאם אישית',
+                            selected: !immediate,
+                            onTap: () => onChanged(false),
+                          ),
+                        ),
+                        Expanded(
+                          child: _seg(
+                            icon: IconsaxPlusBold.flash,
+                            label: 'מהיר',
+                            selected: immediate,
+                            onTap: () => onChanged(true),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-            Row(
-              children: [
-                _seg('🎯 מותאם אישית', !immediate, idle, () => onChanged(false)),
-                _seg('⚡ מהיר', immediate, idle, () => onChanged(true)),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _seg(String label, bool selected, Color idle, VoidCallback onTap) {
-    return Expanded(
+  Widget _seg({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
+    final selectedShadow = [
+      Shadow(
+        color: AppColors.navy.withValues(alpha: 0.22),
+        offset: const Offset(0, 1),
+        blurRadius: 5,
+      ),
+    ];
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : idle,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          scale: selected ? 1.03 : 1,
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 17,
+                    color: selected ? Colors.white : inactiveColor,
+                    shadows: selected ? selectedShadow : null,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1,
+                      fontWeight: selected ? FontWeight.w900 : FontWeight.w800,
+                      color: selected ? Colors.white : inactiveColor,
+                      shadows: selected ? selectedShadow : null,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SpeedThumb extends StatelessWidget {
+  const _SpeedThumb();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF14D3DC), Color(0xFF12B7C6), Color(0xFF2F80ED)],
+          stops: [0, 0.52, 1],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.30), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 13,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(23),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.30),
+                    Colors.white.withValues(alpha: 0.05),
+                    Colors.black.withValues(alpha: 0.07),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          PositionedDirectional(
+            top: 6,
+            start: 12,
+            width: 38,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.48),
+                    Colors.white.withValues(alpha: 0.02),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

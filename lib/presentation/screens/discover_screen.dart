@@ -5916,9 +5916,9 @@ class _PillSelector extends StatefulWidget {
 class _PillSelectorState extends State<_PillSelector> {
   // Variable widths so "במיוחד בשבילך" gets the room it needs, while "גלה" (short)
   // and the map icon stay compact. The sliding thumb resizes to the selected tab.
-  static const _wForYou = 1.95;
-  static const _wDiscover = 1.02;
-  static const _wMap = 1.0;
+  static const _wForYou = 2.0;
+  static const _wDiscover = 1.12;
+  static const _wMap = 0.58;
 
   DiscoverTab? _pressedTab;
   bool _mapPressed = false;
@@ -6132,27 +6132,7 @@ class _PillSelectorState extends State<_PillSelector> {
           curve: Curves.easeOutCubic,
           scale: _mapPressed ? 0.9 : 1,
           child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(IconsaxPlusLinear.map_1, size: 17, color: inactiveColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    'מפה',
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1,
-                      fontWeight: FontWeight.w800,
-                      color: inactiveColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: Icon(IconsaxPlusLinear.map_1, size: 20, color: inactiveColor),
           ),
         ),
       ),
