@@ -609,15 +609,30 @@ class SmartSearch {
       rawText: text,
       intents: {
         ...SearchIntent.fromText(text),
-        // "אזור <city>" (not the bare town אזור, and not the deictic "אזור שלי"
-        // which is already stripped) → the user wants the city PLUS its adjacent
-        // settlements, so flag the engine to widen the city gate.
-        if (city != null &&
-            city != 'אזור' &&
-            (text.contains('אזור $city') || text.contains('איזור $city')))
-          SearchIntent.cityArea,
+        // "אזור <city>" → the user wants the city PLUS its adjacent settlements,
+        // so flag the engine to widen the city gate. See _isAreaSearch.
+        if (_isAreaSearch(text, city)) SearchIntent.cityArea,
       },
     );
+  }
+
+  /// "אזור X" / "באזור X" / "בסביבות X" / "X והסביבה" → the seeker wants X PLUS
+  /// its adjacent settlements. Matched against the city's FIRST word so it works
+  /// even when the city resolved to a CBS name ("תל אביב - יפו") that differs from
+  /// what the user typed ("אזור תל אביב"). "אזור שקט בנתניה" does NOT trigger it.
+  static bool _isAreaSearch(String text, String? city) {
+    if (city == null || city == 'אזור') return false;
+    final parts =
+        city.split(RegExp(r'[\s\-]')).where((s) => s.isNotEmpty).toList();
+    if (parts.isEmpty) return false;
+    final first = parts.first;
+    if (first.length < 2) return false;
+    final esc = RegExp.escape(first);
+    if (RegExp('(אזור|איזור|בסביבות|סביבת)\\s*$esc').hasMatch(text)) return true;
+    if (RegExp('$esc.{0,18}(והסביבה|וסביבתה|והאזור|וסביבותיה)').hasMatch(text)) {
+      return true;
+    }
+    return false;
   }
 
   static TransactionTypeFilter? _parseTransactionFilter(dynamic v) {
@@ -985,6 +1000,19 @@ class SmartSearch {
     [RegExp('דו[- ]?משפחתי'), ' דו משפחתי '],
     [RegExp('מרפסת\\s*שמש'), ' מרפסת שמש '],
     [RegExp('כ["״]?\\s*מיידית'), ' כניסה מיידית '],
+    // City short-forms / nicknames → their full CBS-resolvable names, the way
+    // people actually speak ("ראשון", "רשל״צ", "פ״ת", "ר״ג"…).
+    [RegExp(r'ראשל["״]?צ|רשל["״]?צ|רשלצ|ראשלצ'), ' ראשון לציון '],
+    // bare "ראשון" (the city) — but NOT "יום ראשון" (Sunday), "הראשון" (the first),
+    // or the already-full "ראשון לציון".
+    [RegExp(r'(?<!יום )(?<!ה)ראשון(?! לציון)'), ' ראשון לציון '],
+    [RegExp(r'פ["״]ת(?![א-ת])'), ' פתח תקווה '],
+    [RegExp(r'ר["״]ג(?![א-ת])'), ' רמת גן '],
+    [RegExp(r'ב["״]ש(?![א-ת])'), ' באר שבע '],
+    [RegExp(r'ת["״]א(?![א-ת])'), ' תל אביב '],
+    [RegExp(r'כ["״]ס(?![א-ת])'), ' כפר סבא '],
+    [RegExp(r'כפ["״]ס(?![א-ת])'), ' כפר סבא '],
+    [RegExp(r'י["״]ם(?![א-ת])'), ' ירושלים '],
   ];
 
   /// Rewrites Israeli abbreviations/slang to their full phrase (see [_lexicon]).
