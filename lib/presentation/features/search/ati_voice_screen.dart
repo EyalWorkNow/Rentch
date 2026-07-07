@@ -5,6 +5,7 @@ import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
+import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
 import 'package:dating_app/presentation/widgets/ati_voice_property_card.dart';
 import 'package:flutter/material.dart';
 
@@ -294,10 +295,23 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             child: Column(
               children: [
                 _topBar(),
+                // Speed mode — fast (on-device) ↔ personalization (AI). Shared
+                // live with the text chat.
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 2),
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: SpeedMode.immediate,
+                    builder: (_, immediate, __) => SpeedModeSlider(
+                      immediate: immediate,
+                      onChanged: SpeedMode.set,
+                      dark: true,
+                    ),
+                  ),
+                ),
                 if (_criteria.isNotEmpty) _criteriaChips(),
                 const Spacer(),
                 _statusPill(),
-                const SizedBox(height: 26),
+                const SizedBox(height: 12),
                 _blob(),
                 const SizedBox(height: 30),
                 _captionText(caption),

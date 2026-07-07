@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/smart_search.dart';
@@ -92,8 +93,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // Speed mode. Progressive rendering is ALWAYS on (instant on-device results,
   // then a background personalisation upgrade). In _immediateMode the background
   // LLM/cohort upgrade is skipped entirely → purely local, nothing to wait for.
-  static const _immediateModePrefKey = 'etti_immediate_mode';
-  bool _immediateMode = false;
+  bool _immediateMode = false; // mirror of SpeedMode.immediate (shared with voice)
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
 
@@ -109,6 +109,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _messages.add(_greetingMsg());
     _loadConsent();
     _seedFromPersona();
+    SpeedMode.immediate.addListener(_onSpeedModeChanged);
   }
 
   /// Personalise for a returning user: pre-fill what we already know with high
@@ -369,21 +370,21 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         _consent = prefs.getBool(_consentPrefKey);
         _consentAsked = true;
       }
-      final im = prefs.getBool(_immediateModePrefKey) ?? false;
-      if (im != _immediateMode && mounted) setState(() => _immediateMode = im);
     } catch (_) {}
+    // Speed mode is shared with the voice screen via a global notifier.
+    await SpeedMode.init();
+    if (mounted) setState(() => _immediateMode = SpeedMode.immediate.value);
   }
 
-  Future<void> _setImmediateMode(bool v) async {
-    setState(() => _immediateMode = v);
-    try {
-      (await SharedPreferences.getInstance())
-          .setBool(_immediateModePrefKey, v);
-    } catch (_) {}
+  void _onSpeedModeChanged() {
+    if (mounted) setState(() => _immediateMode = SpeedMode.immediate.value);
   }
+
+  Future<void> _setImmediateMode(bool v) => SpeedMode.set(v);
 
   @override
   void dispose() {
+    SpeedMode.immediate.removeListener(_onSpeedModeChanged);
     for (final t in _streamTimers) {
       t.cancel();
     }
@@ -600,7 +601,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       );
     }
 
-    await _send(transcript, enrich: false); // voice: skip the slow enrich round-trip
+    // Voice honours the speed mode: fast → on-device only; personalization → the
+    // background AI upgrade runs too (still shows instant results first).
+    await _send(transcript, enrich: !_immediateMode);
 
     // Voice etiquette: don't dump apartments unasked. The FIRST time אתי has enough
     // to search, she ASKS — unless the user already consented or said "תראה לי".
@@ -1720,27 +1723,6 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           ]),
           actions: [
             IconButton(
-              tooltip: _immediateMode
-                  ? 'מצב מיידי ⚡ (בלי המתנה ל-AI)'
-                  : 'מצב התאמה אישית 🎯 (חידוד חכם ברקע)',
-              icon: Icon(
-                _immediateMode ? Icons.bolt : Icons.auto_awesome,
-                color:
-                    _immediateMode ? AppColors.primary : AppColors.textSecondary,
-                size: 24,
-              ),
-              onPressed: () {
-                final next = !_immediateMode;
-                _setImmediateMode(next);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  duration: const Duration(seconds: 2),
-                  content: Text(next
-                      ? 'מצב מיידי ⚡ — תוצאות מיד, בלי המתנה ל-AI'
-                      : 'מצב התאמה אישית 🎯 — תוצאות מיד + חידוד חכם ברקע'),
-                ));
-              },
-            ),
-            IconButton(
               tooltip: 'שיחה חדשה',
               icon: Icon(Icons.refresh,
                   color: AppColors.textSecondary, size: 24),
@@ -1749,6 +1731,17 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           ],
         ),
         body: Column(children: [
+          // Speed slider — fast (on-device) ↔ personalization (background AI).
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SpeedModeSlider(
+                immediate: _immediateMode,
+                onChanged: _setImmediateMode,
+              ),
+            ),
+          ),
           _criteriaBar(),
           Expanded(
             // Tap anywhere on the conversation to dismiss the keyboard.
