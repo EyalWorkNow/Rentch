@@ -321,18 +321,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Chat = the clean Messages-page card design.
+              // Chat = the clean Messages-page card design. The card already
+              // carries the full "למה זו?" breakdown (ScorecardView) — the old
+              // separate "למה בחרתי לך את זו?" panel duplicated it and was removed.
               _AssistantPropertyCard(
                 scored: m.scored[i],
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) =>
                         PropertyDetailScreen(property: m.scored[i].property))),
-              ),
-              // …with the detailed, personal "why I picked this for you".
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.82),
-                child: WhyDetails(scored: m.scored[i]),
               ),
             ],
           ),
