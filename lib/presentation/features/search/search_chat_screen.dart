@@ -937,21 +937,18 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // Instant canned reply now; the warm GPT reply is upgraded in the background.
     final sr = (_instantReply(shouldSearch, results, anyExact), const <String>[]);
 
-    // Auto-widen: nothing matched → progressively relax (budget → drop
-    // amenities/rooms → drop city) so אתי shows the closest options, not "אין".
+    // ANTI-HALLUCINATION: when the EXACT request has no match, do NOT silently
+    // drop filters and show mismatched flats. First look for the SAME filters
+    // within 10km of the city; if found, show them and say clearly they're just
+    // nearby (not exact). If even that is empty, be honest and offer to relax.
     String? widenNote;
     if (shouldSearch && results.isEmpty) {
-      for (final step in _wideningLadder(_query)) {
-        final r = _rankByLifestyle(_applyLifestyleFilter(
-                provider.recommendForTenant(provider.allProperties, step.q,
-                    limit: 40)))
-            .take(10)
-            .toList();
-        if (r.isNotEmpty) {
-          results = r;
-          widenNote = step.note;
-          break;
-        }
+      final nearby = _nearbySameFilters(_query, provider, km: 10);
+      if (nearby.isNotEmpty) {
+        results = nearby;
+        final city = _query.city?.trim() ?? 'שם';
+        widenNote = 'לא מצאתי דירות שעונות בדיוק לבקשה ב$city עם הסינונים האלה — '
+            'אבל אלה עד 10 ק"מ מ$city, עם אותם סינונים בדיוק (לא רחוק!)';
       }
     }
 
@@ -971,9 +968,19 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       if (replyMsg != null) _messages.add(replyMsg);
       if (shouldSearch) {
         if (results.isEmpty) {
+          // Honest — nothing matched, not even within 10km with the same filters.
+          // Offer concrete ways to relax (tapping a chip re-runs the search).
+          final city = _query.city?.trim() ?? 'האזור הזה';
+          final chips = <String>[];
+          if (_query.city != null) chips.add('אזור ${_query.city}');
+          if (_query.maxPrice != null) {
+            chips.add('עד ${(_query.maxPrice! * 1.2).round()} ₪');
+          }
           _messages.add(_ChatMsg(
             role: 'assistant',
-            text: 'עוד לא צף לי משהו מדויק — ננסה אזור אחר או תקציב גמיש יותר?',
+            text: 'לא מצאתי דירות שעונות לבקשה ב$city עם הסינונים האלה 😕\n'
+                'אפשר להרחיב את האזור, להעלות תקציב או להוריד סינונים כדי למצוא אופציות מתאימות.',
+            chips: chips,
           ));
         } else {
           if (widenNote != null) {
@@ -1406,6 +1413,43 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     return out.isNotEmpty
         ? out
         : provider.recommendForTenant(provider.allProperties, q, limit: limit);
+  }
+
+  // Anti-hallucination: when NOTHING matches the exact request, look within [km]
+  // of the searched city's centre with the SAME filters (budget/rooms/features
+  // kept — only the town widened). Never invents a mismatch; returns [] if the
+  // city centre is unknown or nothing within the radius fits.
+  List<ScoredProperty> _nearbySameFilters(SearchQuery q, DatingProvider provider,
+      {double km = 10}) {
+    final city = q.city?.trim();
+    if (city == null || city.isEmpty) return const [];
+    final loc = GovData.instance.localityByName(city);
+    if (loc == null) return const [];
+    final near = provider.allProperties
+        .where((p) =>
+            Geolocator.distanceBetween(p.lat, p.lon, loc.lat, loc.lon) / 1000 <=
+            km)
+        .toList();
+    if (near.isEmpty) return const [];
+    // Same query WITHOUT the town name → the city gate won't re-exclude the
+    // neighbours; budget / rooms / features still apply, so it's not a hallucination.
+    final q2 = SearchQuery(
+      minPrice: q.minPrice,
+      maxPrice: q.maxPrice,
+      minRooms: q.minRooms,
+      maxRooms: q.maxRooms,
+      propertyType: q.propertyType,
+      amenities: q.amenities,
+      requiredFeatures: q.requiredFeatures,
+      transactionType: q.transactionType,
+      nearTrain: q.nearTrain,
+      intents: q.intents,
+      weights: q.weights,
+    );
+    return _rankByLifestyle(_applyLifestyleFilter(
+            provider.recommendForTenant(near, q2, limit: 40)))
+        .take(10)
+        .toList();
   }
 
   // Progressive relaxation for when nothing matches: widen budget, then drop soft
