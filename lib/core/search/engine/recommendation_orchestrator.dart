@@ -661,6 +661,23 @@ class RecommendationEngine {
     if (nearbyKm.isNotEmpty) {
       selected.removeWhere((c) =>
           nearbyKm.containsKey(c.property.id) && (match[c] ?? 0) <= 0.70);
+      // A neighbour-city match is a FALLBACK to the searched city — even a strong
+      // one always sits LAST, after every in-city result, so it reads as "and if
+      // you'd consider next door…". A stable partition keeps each group's order.
+      final inCity = [
+        for (final c in selected)
+          if (!nearbyKm.containsKey(c.property.id)) c
+      ];
+      final nearby = [
+        for (final c in selected)
+          if (nearbyKm.containsKey(c.property.id)) c
+      ];
+      if (nearby.isNotEmpty) {
+        selected
+          ..clear()
+          ..addAll(inCity)
+          ..addAll(nearby);
+      }
     }
 
     // model confidence: how much intent we captured + behavioral confidence

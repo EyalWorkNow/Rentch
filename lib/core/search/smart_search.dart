@@ -558,8 +558,10 @@ class SmartSearch {
         // branch; ceiling left open so a 3-room still fits.
         minRooms = 2;
       } else if (RegExp(r'משפח|ילדים|ילד').hasMatch(text)) {
-        // An established family with kids → 3+.
-        minRooms = 3;
+        // An established family with kids → estimate the rooms they realistically
+        // need from the number of children they mentioned (salon + parents'
+        // bedroom + ~1 per two kids), defaulting to 3 when no count is given.
+        minRooms = _estimateFamilyRooms(text);
       }
     }
 
@@ -633,6 +635,47 @@ class SmartSearch {
       return true;
     }
     return false;
+  }
+
+  /// Estimate the rooms a family realistically needs from a stated family size.
+  /// Israeli "חדרים" counts the salon, so bedrooms = rooms − 1; a household needs
+  /// one bedroom for the parents plus roughly one per two children:
+  ///   rooms ≈ 2 (salon + parents) + ceil(children / 2), clamped to 3..6.
+  /// Called only once the text is known to describe a family with kids (couples,
+  /// students and empty-nesters are handled by their own persona branches), so it
+  /// always returns a sensible floor — defaulting to 3 when no count is given.
+  static double _estimateFamilyRooms(String text) {
+    int ceilDiv(int a, int b) => (a + b - 1) ~/ b;
+    double clampRooms(int rooms) => rooms.clamp(3, 6).toDouble();
+
+    // Explicit children count: "3 ילדים" / "שלושה ילדים" / "ילד אחד".
+    final kidsDigit = RegExp(r'(\d+)\s*ילד').firstMatch(text);
+    final kidsWord = RegExp(
+            r'(ילד אחד|אחד ילד|שני ילדים|שתי ילד|שלושה ילדים|שלוש ילד|'
+            r'ארבעה ילדים|ארבע ילד|חמישה ילדים|חמש ילד|שישה ילדים|שש ילד)')
+        .firstMatch(text);
+    int? kids;
+    if (kidsDigit != null) {
+      kids = int.tryParse(kidsDigit.group(1)!);
+    } else if (kidsWord != null) {
+      const wordKids = {
+        'ילד אחד': 1, 'אחד ילד': 1, 'שני ילדים': 2, 'שתי ילד': 2,
+        'שלושה ילדים': 3, 'שלוש ילד': 3, 'ארבעה ילדים': 4, 'ארבע ילד': 4,
+        'חמישה ילדים': 5, 'חמש ילד': 5, 'שישה ילדים': 6, 'שש ילד': 6,
+      };
+      kids = wordKids[kidsWord.group(1)!];
+    }
+    if (kids != null && kids >= 0) return clampRooms(2 + ceilDiv(kids, 2));
+
+    // Household size: "משפחה בת 5 נפשות" / "5 נפשות" → assume 2 adults.
+    final peopleDigit = RegExp(r'(\d+)\s*נפש').firstMatch(text);
+    if (peopleDigit != null) {
+      final n = int.tryParse(peopleDigit.group(1)!) ?? 0;
+      if (n > 0) return clampRooms(2 + ceilDiv((n - 2).clamp(0, 12), 2));
+    }
+
+    // Family with kids but no count → the existing modest 3-room floor.
+    return 3.0;
   }
 
   static TransactionTypeFilter? _parseTransactionFilter(dynamic v) {

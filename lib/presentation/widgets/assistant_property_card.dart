@@ -30,6 +30,12 @@ class AssistantPropertyCard extends StatelessWidget {
     final p = scored.property;
     final w = width ?? MediaQuery.of(context).size.width * 0.82;
     final saved = context.watch<DatingProvider>().isSaved(p.id);
+    // A neighbour-city fallback ("📍 בעיר שכנה …") gets a distinct amber stroke +
+    // a top badge, so it reads as "not in the city you searched — but a strong fit
+    // next door". It's already sorted to the end of the list by the engine.
+    final neighborTag =
+        scored.tags.firstWhere(isNeighborCityTag, orElse: () => '');
+    final isNeighbor = neighborTag.isNotEmpty;
     return ScaleBounce(
       onTap: onTap,
       scaleDownTo: 0.97,
@@ -39,10 +45,15 @@ class AssistantPropertyCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFE2ECF1), width: 1),
+          border: Border.all(
+              color: isNeighbor
+                  ? AppColors.warning.withValues(alpha: 0.85)
+                  : const Color(0xFFE2ECF1),
+              width: isNeighbor ? 1.6 : 1),
           boxShadow: [
             BoxShadow(
-                color: AppColors.navy.withValues(alpha: 0.05),
+                color: (isNeighbor ? AppColors.warning : AppColors.navy)
+                    .withValues(alpha: isNeighbor ? 0.12 : 0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 8)),
           ],
@@ -121,6 +132,38 @@ class AssistantPropertyCard extends StatelessWidget {
                           ]),
                         ),
                       ),
+                    if (isNeighbor)
+                      Positioned(
+                        top: 10,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2)),
+                              ],
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.location_on,
+                                  size: 13, color: Colors.white),
+                              const SizedBox(width: 4),
+                              Text(_neighborBadgeLabel(neighborTag),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white)),
+                            ]),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       bottom: 10,
                       left: 10,
@@ -190,6 +233,9 @@ class AssistantPropertyCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
+                  // Plain facts only — rooms + size. The personalisation / match
+                  // reasons (price-vs-market, central, geo proximity, family/young
+                  // area, religious fit…) live in "למה זו", not this carousel.
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
@@ -200,19 +246,16 @@ class AssistantPropertyCard extends StatelessWidget {
                       _InfoChip(
                           icon: IconsaxPlusLinear.maximize_3,
                           label: '${p.sizeM2} מ״ר'),
-                      for (final t in scored.tags.where((t) => !_isGeoTag(t))) ...[
-                        const SizedBox(width: 8),
-                        _InfoChip(label: t),
-                      ],
                     ]),
                   ),
-                  // "Why here" — the real named places (X מ׳ from park/school/…), as
-                  // a WRAP of iconsax tags (not a carousel) so each reads clearly.
-                  ..._geoWhy(scored.tags),
                   // Expandable transparency panel — the data-grounded "why this
-                  // one" (dimensions + stats + persona + reason).
+                  // one" (dimensions + stats + persona + geo/lifestyle reasons).
+                  // Only when no scorecard is attached do we fall back to a compact
+                  // geo-tag wrap so the named places still surface.
                   if (scored.scorecard != null)
-                    ScorecardView(card: scored.scorecard!),
+                    ScorecardView(card: scored.scorecard!)
+                  else
+                    ..._geoWhy(scored.tags),
                 ],
               ),
             ),
@@ -257,6 +300,15 @@ const Map<String, IconData> _geoIcon = {
 };
 
 bool _isGeoTag(String t) => _geoIcon.keys.any(t.startsWith);
+
+/// Compact label for the neighbour-city badge: drop the 📍 prefix and the
+/// trailing "…, אבל התאמה גבוהה" so the pill stays short (e.g. "בעיר שכנה — 3 ק"מ מתל אביב").
+String _neighborBadgeLabel(String raw) {
+  var s = raw.replaceFirst('📍', '').trim();
+  final comma = s.indexOf(',');
+  if (comma > 0) s = s.substring(0, comma).trim();
+  return s;
+}
 
 /// Render the geo tags (if any) as a wrap under the quick facts.
 List<Widget> _geoWhy(List<String> tags) {

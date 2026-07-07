@@ -163,15 +163,20 @@ class _ScorecardViewState extends State<ScorecardView> {
           const SizedBox(height: 12),
           _llmReason(c.llmReason!.trim()),
         ],
-        // Named geo "why here" tags (X מ׳ from park/school/station/…) — a WRAP of
-        // iconsax tags, shown inside "למה זו" above the data sources.
-        if (c.highlights.any(isGeoTag)) ...[
+        // Personalisation "why here" chips — the match-specific reasons that belong
+        // in "למה זו", NOT in the card's plain-facts carousel: named geo proximity
+        // (X מ׳ from park/school/bars/…) rendered with an icon, plus the lifestyle
+        // highlights (attractive price, central, sought-after area, young/family
+        // neighbourhood, religious fit…). The neighbour-city flag (📍) is shown as
+        // its own card badge, so it's excluded here.
+        if (_personalTags(c).isNotEmpty) ...[
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final t in c.highlights.where(isGeoTag)) _GeoTag(t),
+              for (final t in _personalTags(c))
+                isGeoTag(t) ? _GeoTag(t) : _PersonalChip(t),
             ],
           ),
         ],
@@ -459,6 +464,49 @@ const Map<String, IconData> _geoIcon = {
 
 /// True if [t] is a named geo proximity tag (park/school/station/sea/uni/nightlife).
 bool isGeoTag(String t) => _geoIcon.keys.any(t.startsWith);
+
+/// True if [t] is the neighbour-city flag ("📍 בעיר שכנה …") — surfaced as a card
+/// badge, not a personalisation chip.
+bool isNeighborCityTag(String t) => t.startsWith('📍');
+
+/// True if [t] is a personalisation / match-reason tag that belongs in "למה זו"
+/// rather than the card's plain-facts carousel. That's everything the ranker adds
+/// as a highlight (geo proximity + lifestyle) EXCEPT the fit-percent header and
+/// the neighbour-city badge. The fit tag reads like "NN% התאמה".
+final RegExp _fitTag = RegExp(r'^\d+%');
+bool isPersonalTag(String t) =>
+    !isNeighborCityTag(t) && !_fitTag.hasMatch(t.trim());
+
+/// The personalisation chips to render inside "למה זו" for [c].
+List<String> _personalTags(Scorecard c) =>
+    c.highlights.where(isPersonalTag).toList();
+
+/// A plain personalisation chip (lifestyle highlight without a geo emoji).
+class _PersonalChip extends StatelessWidget {
+  const _PersonalChip(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(IconsaxPlusLinear.magic_star, size: 14, color: AppColors.primary),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.navy)),
+      ]),
+    );
+  }
+}
 
 class _GeoTag extends StatelessWidget {
   const _GeoTag(this.raw);
