@@ -2109,6 +2109,17 @@ const List<PropertyFeatureDefinition> _propertyFeatureCatalog = [
     label: 'ריהוט אופציונלי',
     aliases: ['optional_furniture', 'furniture_negotiable'],
   ),
+  // Geo-derived (auto-tagged on upload from verified coordinates).
+  PropertyFeatureDefinition(
+    key: 'nearSea',
+    label: 'קרוב לים',
+    aliases: ['near_sea', 'sea', 'beach', 'קרוב לחוף'],
+  ),
+  PropertyFeatureDefinition(
+    key: 'nearPark',
+    label: 'קרוב לפארק',
+    aliases: ['near_park', 'park', 'garden', 'קרוב לגן', 'גן ציבורי'],
+  ),
 ];
 
 final Map<String, PropertyFeatureDefinition> _featureDefinitionByKey = {

@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:dating_app/core/search/geo_auto_tags.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:image_picker/image_picker.dart';
@@ -842,6 +843,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (geocodingFailed && kDebugMode) {
         debugPrint('Property geocoding failed for: $street, $city');
       }
+
+      // Auto-complete VERIFIED geo tags (near sea / near park) the owner may have
+      // missed — computed from the coordinates with strict thresholds, and still
+      // removable like any other tag.
+      _selectedFeatures.addAll(GeoAutoTags.compute(lat, lon));
 
       final property = RentalProperty(
         id: _draftPropertyId,
