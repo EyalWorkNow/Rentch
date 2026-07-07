@@ -242,7 +242,29 @@ class Explainer {
 
     // livability (real gov data)
     if (pfv.get('safety') > 0.7) chips.add('אזור בטוח יחסית');
-    if (pfv.get('school_access') > 0.6) chips.add('קרוב למוסדות חינוך');
+    if (pfv.get('school_access') > 0.6) {
+      // Name the actual nearest school + exact distance when one is genuinely
+      // within a short walk; otherwise the generic area chip.
+      final near = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon);
+      if (near != null && near.km <= 1.2) {
+        final dist = near.km < 1.0
+            ? '${(near.km * 1000).round()} מ׳'
+            : '${near.km.toStringAsFixed(1)} ק"מ';
+        chips.add('🏫 $dist מ${near.name}');
+      } else {
+        chips.add('קרוב למוסדות חינוך');
+      }
+    }
+    // Name the actual nearest park when it's a short walk away.
+    final parkKm = IsraelGeoIndex.parkKm(pfv.property.lat, pfv.property.lon);
+    if (parkKm != null && parkKm <= 0.7) {
+      final name =
+          IsraelGeoIndex.nearestParkName(pfv.property.lat, pfv.property.lon);
+      final dist = parkKm < 1.0
+          ? '${(parkKm * 1000).round()} מ׳'
+          : '${parkKm.toStringAsFixed(1)} ק"מ';
+      chips.add('🌳 $dist מ${name ?? 'פארק'}');
+    }
     if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
       chips.add('שכונה צעירה');
     } else if (pfv.get('demo_child') > 0.6) {

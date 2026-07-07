@@ -132,6 +132,14 @@ class _GeoPlace {
   final double weight;
 }
 
+class _School {
+  const _School(this.name, this.type, this.lat, this.lon);
+  final String name;
+  final String type; // גן / יסודי / חטיבה / תיכון / מכללה / אוניברסיטה / בית ספר
+  final double lat;
+  final double lon;
+}
+
 class IsraelGeoIndex {
   const IsraelGeoIndex._();
 
@@ -198,6 +206,54 @@ class IsraelGeoIndex {
   /// Distance (km) to the nearest public park/garden, or null if unknown/unloaded.
   static double? parkKm(double lat, double lon) =>
       _parks.isEmpty ? null : _nearest(lat, lon, _parks);
+
+  // Named education institutions with a TYPE (גן / יסודי / חטיבה / תיכון / מכללה /
+  // אוניברסיטה), bundled from OSM. Enables "250m from יסודי X" instead of a coarse
+  // density score, plus filtering by school type.
+  static List<_School> _schools = const <_School>[];
+  static bool _schoolsLoaded = false;
+
+  static Future<void> loadSchools() async {
+    if (_schoolsLoaded) return;
+    _schoolsLoaded = true;
+    try {
+      final raw =
+          await rootBundle.loadString('assets/data/govdata/schools.json');
+      final list = (jsonDecode(raw) as List);
+      _schools = [
+        for (final s in list)
+          if (s is Map)
+            _School((s['n'] ?? '').toString(), (s['t'] ?? '').toString(),
+                (s['lat'] as num).toDouble(), (s['lon'] as num).toDouble()),
+      ];
+    } catch (_) {
+      _schools = const <_School>[];
+    }
+  }
+
+  /// The nearest school (optionally restricted to a [type]) → (name, type, km),
+  /// or null. [type] is one of גן/יסודי/חטיבה/תיכון/מכללה/אוניברסיטה.
+  static ({String name, String type, double km})? nearestSchool(
+      double lat, double lon,
+      {String? type}) {
+    if (_schools.isEmpty || !_hasCoords(lat, lon)) return null;
+    _School? best;
+    double? bestD;
+    for (final s in _schools) {
+      if (type != null && s.type != type) continue;
+      final d = haversineKm(lat, lon, s.lat, s.lon);
+      if (bestD == null || d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    if (best == null) return null;
+    return (name: best.name, type: best.type, km: bestD!);
+  }
+
+  /// Distance (km) to the nearest school of any type, or null.
+  static double? nearestSchoolKm(double lat, double lon) =>
+      nearestSchool(lat, lon)?.km;
 
   // Well-established religious localities (charedi + dati-leumi) and neighbourhoods
   // — a curated, VERIFIED proxy (these ARE observant communities), since CBS
@@ -965,7 +1021,16 @@ class FeatureEngineer {
     // ── livability (real gov data: crime, schools, demographics, health, air) ──
     final gov = GovData.instance;
     f['safety'] = gov.safetyScore(p.city) ?? 0.5; // 1 = safest (per-capita crime)
-    f['school_access'] = gov.schoolDensityScore(p.lat, p.lon);
+    // Schools: BLEND the area density (many schools around) with the exact
+    // distance to the nearest named school (a school within a short walk counts
+    // even if the wider density is moderate).
+    final schoolDensity = gov.schoolDensityScore(p.lat, p.lon);
+    final schoolProximity = IsraelGeoIndex.proximityKernel(
+        IsraelGeoIndex.nearestSchoolKm(p.lat, p.lon),
+        scaleKm: 0.9);
+    f['school_density'] = schoolDensity;
+    f['school_proximity'] = schoolProximity;
+    f['school_access'] = math.max(schoolDensity, schoolProximity);
     f['health_access'] = gov.healthAccessScore(p.city);
     final demo = gov.demographics(p.city);
     f['demo_young'] = demo?['youngShare'] ?? 0.5; // working-age share (20-64)
