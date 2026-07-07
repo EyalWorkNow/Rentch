@@ -88,6 +88,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   List<ScoredProperty> _voicePending = const []; // held results to reveal on "כן"
   String? _voicePendingLocationText; // held utterance until "share location" tapped
   bool? _consent;
+
+  // Speed mode. Progressive rendering is ALWAYS on (instant on-device results,
+  // then a background personalisation upgrade). In _immediateMode the background
+  // LLM/cohort upgrade is skipped entirely → purely local, nothing to wait for.
+  static const _immediateModePrefKey = 'etti_immediate_mode';
+  bool _immediateMode = false;
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
 
@@ -363,6 +369,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         _consent = prefs.getBool(_consentPrefKey);
         _consentAsked = true;
       }
+      final im = prefs.getBool(_immediateModePrefKey) ?? false;
+      if (im != _immediateMode && mounted) setState(() => _immediateMode = im);
+    } catch (_) {}
+  }
+
+  Future<void> _setImmediateMode(bool v) async {
+    setState(() => _immediateMode = v);
+    try {
+      (await SharedPreferences.getInstance())
+          .setBool(_immediateModePrefKey, v);
     } catch (_) {}
   }
 
@@ -807,6 +823,52 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // on-device SmartSearch (city via CBS data + budget/rooms/features + the
   // transaction & required-feature inference rules) is enough, and dropping the
   // second network round-trip makes אתי answer MUCH faster (she was too slow).
+  /// A short, instant reply shown the moment the on-device results render (or the
+  /// only reply, in immediate mode). Empty when not searching → clarify handles it.
+  String _instantReply(bool shouldSearch, List<ScoredProperty> results,
+      bool anyExact) {
+    if (!shouldSearch || results.isEmpty) return '';
+    return anyExact
+        ? 'הנה מה שמצאתי בשבילך 👇'
+        : 'הנה הכי קרובות למה שחיפשת 👇';
+  }
+
+  /// Background personalisation: after the instant on-device results are on
+  /// screen, run the LLM enrich + the cohort/community-fit ranking + the warm
+  /// reply, then quietly swap in the richer set. Skipped in immediate mode.
+  Future<void> _upgradeSearch(String text, DatingProvider provider,
+      _ChatMsg resultsMsg, _ChatMsg? howChoseMsg, _ChatMsg? replyMsg) async {
+    try {
+      await _ettiEnrich(text);
+    } catch (_) {}
+    List<ScoredProperty> cohort;
+    try {
+      cohort = _rankByLifestyle(_applyLifestyleFilter(
+              await _cohortRanked(provider, limit: 40)))
+          .take(10)
+          .toList();
+    } catch (_) {
+      cohort = const [];
+    }
+    final sr = await _serverReply();
+    if (!mounted) return;
+    final upgraded = cohort.isNotEmpty ? cohort : resultsMsg.scored;
+    setState(() {
+      resultsMsg.scored = upgraded; // _latestScored getter reflects this
+      _lastShowedResults = upgraded.isNotEmpty;
+      if (sr.$1.isNotEmpty && replyMsg != null) replyMsg.text = sr.$1;
+    });
+    if (sr.$1.isNotEmpty) _lastReply = sr.$1;
+    if (upgraded.isNotEmpty && howChoseMsg != null) {
+      _fetchExplanations(
+        results: upgraded,
+        persona: _personaLabels(provider),
+        howChoseMsg: howChoseMsg,
+        resultsMsg: resultsMsg,
+      );
+    }
+  }
+
   Future<void> _send(String raw, {bool enrich = true}) async {
     final text = raw.trim();
     if (text.isEmpty || _busy) return;
@@ -834,10 +896,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // "דתי לאומי" / "תינוק" → an elevator matters). See _applyLifestyle.
     _applyLifestyle(text);
 
-    // ETTI (the LLM brain): read between the lines → hard_constraints + weighted
-    // soft preferences, folded over the deterministic parse. Skipped in voice for
-    // speed (the on-device parse already covers city/budget/rooms/features/intent).
-    if (enrich) await _ettiEnrich(text);
+    // SPEED: the LLM enrich no longer BLOCKS here. The deterministic on-device
+    // parse (+ the 40 inference rules) is enough to rank instantly; the enrich +
+    // cohort personalisation run in the background upgrade below and quietly
+    // refine the ranking — so the user never waits on the network for results.
 
     // Location needed but unknown → אתי RAISES a GPS request (a button). The user
     // approves, then the app captures the location and searches. אתי never grabs
@@ -859,22 +921,21 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     final shouldSearch = !_query.isEmpty &&
         (_searched || _wantsResultsNow(text) || _userTurns >= 2);
 
-    // SPEED: run the warm reply (GPT) and the cohort search IN PARALLEL — the user
-    // waits for the slower of the two, not their sum.
-    final replyFuture = _serverReply();
-    final searchFuture =
-        shouldSearch ? _cohortRanked(provider, limit: 40) : null;
-
-    final sr = await replyFuture;
+    // ⚡ IMMEDIATE — rank ON-DEVICE right now (no network, no LLM) so results +
+    // a reply appear in well under a second. The community-fit cohort ranking +
+    // the warm GPT reply arrive in the background upgrade and swap in silently.
     List<ScoredProperty> results = const [];
     bool anyExact = false;
-    if (searchFuture != null) {
-      // Drop lifestyle-incompatible listings (high floor w/o elevator), top 10.
-      results = _rankByLifestyle(_applyLifestyleFilter(await searchFuture))
+    if (shouldSearch) {
+      results = _rankByLifestyle(_applyLifestyleFilter(
+              provider.recommendForTenant(provider.allProperties, _query,
+                  limit: 40)))
           .take(10)
           .toList();
       anyExact = results.any((r) => r.exact);
     }
+    // Instant canned reply now; the warm GPT reply is upgraded in the background.
+    final sr = (_instantReply(shouldSearch, results, anyExact), const <String>[]);
 
     // Auto-widen: nothing matched → progressively relax (budget → drop
     // amenities/rooms → drop city) so אתי shows the closest options, not "אין".
@@ -882,7 +943,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (shouldSearch && results.isEmpty) {
       for (final step in _wideningLadder(_query)) {
         final r = _rankByLifestyle(_applyLifestyleFilter(
-                await _cohortRanked(provider, limit: 40, query: step.q)))
+                provider.recommendForTenant(provider.allProperties, step.q,
+                    limit: 40)))
             .take(10)
             .toList();
         if (r.isNotEmpty) {
@@ -963,16 +1025,24 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // they're already on screen; this fills llmReason + the "how I chose" bubble
     // when (and if) it returns within a short timeout. Degrades to engine reasons.
     _lastShowedResults = shouldSearch && results.isNotEmpty;
-    if (shouldSearch && results.isNotEmpty && resultsMsg != null) {
-      _fetchExplanations(
-        results: results,
-        persona: _personaLabels(provider),
-        howChoseMsg: howChoseMsg!,
-        resultsMsg: resultsMsg!,
-      );
-    }
+    // Immediate mode stays PURELY on-device — the engine's own "how I chose"
+    // fallback is already shown; we don't call the LLM explainer. Progressive mode
+    // fetches the richer LLM explanations inside _upgradeSearch on the final set.
 
     if (shouldSearch && results.isNotEmpty) _maybeCapturePersona(results.length);
+
+    // 🎯 BACKGROUND personalisation — the instant results are already on screen;
+    // now quietly upgrade them with the LLM enrich + community-fit cohort ranking
+    // + the warm GPT reply. Skipped in immediate mode (purely on-device) and for
+    // the voice path (enrich:false), which runs its own fast loop.
+    if (!_immediateMode &&
+        enrich &&
+        shouldSearch &&
+        results.isNotEmpty &&
+        resultsMsg != null) {
+      unawaited(
+          _upgradeSearch(text, provider, resultsMsg!, howChoseMsg, replyMsg));
+    }
   }
 
   // Persona labels driving the ranking + sent to the explainer.
@@ -1605,6 +1675,27 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             ),
           ]),
           actions: [
+            IconButton(
+              tooltip: _immediateMode
+                  ? 'מצב מיידי ⚡ (בלי המתנה ל-AI)'
+                  : 'מצב התאמה אישית 🎯 (חידוד חכם ברקע)',
+              icon: Icon(
+                _immediateMode ? Icons.bolt : Icons.auto_awesome,
+                color:
+                    _immediateMode ? AppColors.primary : AppColors.textSecondary,
+                size: 24,
+              ),
+              onPressed: () {
+                final next = !_immediateMode;
+                _setImmediateMode(next);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  duration: const Duration(seconds: 2),
+                  content: Text(next
+                      ? 'מצב מיידי ⚡ — תוצאות מיד, בלי המתנה ל-AI'
+                      : 'מצב התאמה אישית 🎯 — תוצאות מיד + חידוד חכם ברקע'),
+                ));
+              },
+            ),
             IconButton(
               tooltip: 'שיחה חדשה',
               icon: Icon(Icons.refresh,
