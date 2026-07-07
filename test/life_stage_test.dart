@@ -26,6 +26,18 @@ void main() {
     expect(f.contains(SearchIntent.qualityArea), isFalse);
   });
 
+  test('kids mention → goodSchools intent (drives schools + park boost)', () {
+    // "ילד"/"ילדים" must fire the family bundle, which the preference model then
+    // weights up for BOTH schools and public-park proximity.
+    expect(SearchIntent.fromText('דירה למשפחה עם ילדים בפתח תקווה')
+        .contains(SearchIntent.goodSchools), isTrue);
+    expect(SearchIntent.fromText('דירה עם ילד קטן')
+        .contains(SearchIntent.goodSchools), isTrue);
+    // But an empty-nester who mentions "ילדים" must NOT (opposite need).
+    expect(SearchIntent.fromText('הילדים עזבו, דירה קטנה')
+        .contains(SearchIntent.goodSchools), isFalse);
+  });
+
   test('neutral search infers no life-stage bundle', () {
     final n = SearchIntent.fromText('דירת 3 חדרים בתל אביב');
     expect(n.contains(SearchIntent.goodSchools), isFalse);
