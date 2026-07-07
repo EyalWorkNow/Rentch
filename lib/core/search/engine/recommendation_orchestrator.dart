@@ -210,6 +210,26 @@ class Explainer {
   /// builder). Falls back to the raw key when unmapped.
   static String dimLabel(String key) => _dimLabel[key] ?? key;
 
+  static String _dist(double km) =>
+      km < 1.0 ? '${(km * 1000).round()} מ׳' : '${km.toStringAsFixed(1)} ק"מ';
+
+  /// "פארק <name>" unless the name already carries its own descriptor.
+  static String _parkLabel(String? name) {
+    final n = (name ?? '').trim();
+    if (n.isEmpty) return 'פארק';
+    return RegExp(r'^(גן|פארק|שדרות|יער|חורש|כיכר)').hasMatch(n) ? n : 'פארק $n';
+  }
+
+  /// Prefix the school type so "<name>" reads clearly ("בית ספר X", "גן X").
+  static String _schoolLabel(String name, String type) {
+    final n = name.trim();
+    if (type == 'גן') return n.startsWith('גן') ? n : 'גן $n';
+    if (type == 'אוניברסיטה' || type == 'מכללה') return n;
+    if (type == 'תיכון') return RegExp(r'תיכון').hasMatch(n) ? n : 'תיכון $n';
+    if (type == 'חטיבה') return RegExp(r'חטיב').hasMatch(n) ? n : 'חטיבת $n';
+    return RegExp('בית.?ספר|בי"?ס|יסודי').hasMatch(n) ? n : 'בית ספר $n';
+  }
+
   /// Concrete, data-driven chips for a candidate.
   static List<String> highlights(
     RankedCandidate c,
@@ -232,13 +252,10 @@ class Explainer {
     if (railKm < 3.0) {
       final st = GovData.instance
           .nearestRailStation(pfv.property.lat, pfv.property.lon);
-      final dist = railKm < 1.0
-          ? '${(railKm * 1000).round()} מ׳'
-          : '${railKm.toStringAsFixed(1)} ק"מ';
       if (st != null && st.name.trim().isNotEmpty) {
-        chips.add('🚉 $dist מתחנת ${st.name}');
+        chips.add('🚉 ${_dist(railKm)} מתחנת ${st.name}');
       } else {
-        chips.add(railKm < 1.2 ? 'צמוד לרכבת' : 'כ-$dist מהרכבת');
+        chips.add(railKm < 1.2 ? 'צמוד לרכבת' : 'כ-${_dist(railKm)} מהרכבת');
       }
     } else if (pfv.get('transit_density') > 0.6) {
       chips.add('מחובר היטב לתחבורה');
@@ -255,10 +272,7 @@ class Explainer {
       // within a short walk; otherwise the generic area chip.
       final near = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon);
       if (near != null && near.km <= 1.2) {
-        final dist = near.km < 1.0
-            ? '${(near.km * 1000).round()} מ׳'
-            : '${near.km.toStringAsFixed(1)} ק"מ';
-        chips.add('🏫 $dist מ${near.name}');
+        chips.add('🏫 ${_dist(near.km)} מ${_schoolLabel(near.name, near.type)}');
       } else {
         chips.add('קרוב למוסדות חינוך');
       }
@@ -268,27 +282,18 @@ class Explainer {
     if (parkKm != null && parkKm <= 0.7) {
       final name =
           IsraelGeoIndex.nearestParkName(pfv.property.lat, pfv.property.lon);
-      final dist = parkKm < 1.0
-          ? '${(parkKm * 1000).round()} מ׳'
-          : '${parkKm.toStringAsFixed(1)} ק"מ';
-      chips.add('🌳 $dist מ${name ?? 'פארק'}');
+      chips.add('🌳 ${_dist(parkKm)} מ${_parkLabel(name)}');
     }
     // Distance to the sea (beach seekers).
     final seaKm = IsraelGeoIndex.coastKm(pfv.property.lat, pfv.property.lon);
     if (seaKm != null && seaKm <= 1.2) {
-      final dist = seaKm < 1.0
-          ? '${(seaKm * 1000).round()} מ׳'
-          : '${seaKm.toStringAsFixed(1)} ק"מ';
-      chips.add('🏖️ $dist מהחוף');
+      chips.add('🏖️ ${_dist(seaKm)} מהחוף');
     }
     // Nearest university / college (a selling point + relevant for students).
     final uni = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon,
         type: 'אוניברסיטה');
     if (uni != null && uni.km <= 1.5) {
-      final dist = uni.km < 1.0
-          ? '${(uni.km * 1000).round()} מ׳'
-          : '${uni.km.toStringAsFixed(1)} ק"מ';
-      chips.add('🎓 $dist מ${uni.name}');
+      chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
     }
     if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
       chips.add('שכונה צעירה');
