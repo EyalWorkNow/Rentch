@@ -602,7 +602,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       const _HeaderMenuButton()
                     else
                       const SizedBox(width: 42),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    // Map + lasso — sits right next to the "גלה" selector.
+                    if (!provider.isLandlord)
+                      _buildLassoButton(context, provider),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Align(
                         alignment: Alignment.center,
@@ -637,6 +641,72 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           ),
         );
       },
+    );
+  }
+
+  // Map + lasso access, moved out of the filter sheet into a dedicated round
+  // button that sits next to the "גלה" selector.
+  Future<void> _openAreaLasso(
+      BuildContext context, DatingProvider provider) async {
+    final f = provider.filters;
+    final area = f.hasCustomArea
+        ? SearchArea.custom(polygon: f.customAreaPolygon)
+        : provider.searchAreas.firstWhere(
+            (item) => item.id == f.areaId,
+            orElse: () => provider.selectedArea,
+          );
+    final polygon = await Navigator.of(context).push<List<LatLng>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _AreaLassoScreen(
+          initialArea: area,
+          initialPolygon: f.customAreaPolygon,
+          previewMarkers: provider.previewFilteredProperties(f),
+          filters: f,
+        ),
+      ),
+    );
+    if (!mounted || polygon == null) return;
+    await provider.updateFilters(f.copyWith(
+      city: '',
+      areaId: 'all_israel',
+      customAreaPolygon: polygon,
+    ));
+  }
+
+  Widget _buildLassoButton(BuildContext context, DatingProvider provider) {
+    return GestureDetector(
+      onTap: provider.isLoading ? null : () => _openAreaLasso(context, provider),
+      child: Container(
+        height: 42,
+        width: 42,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: provider.filters.hasCustomArea
+                ? AppColors.primary
+                : const Color(0xFFE2E8F0),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: RentlyIcon(
+            IconsaxPlusLinear.map_1,
+            size: 20,
+            color: provider.filters.hasCustomArea
+                ? AppColors.primary
+                : AppColors.navy,
+          ),
+        ),
+      ),
     );
   }
 
@@ -2736,155 +2806,6 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               ],
                             ),
                           ),
-                        const SizedBox(height: 14),
-                        // Mini map
-                        Container(
-                          height: 160,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: const Color(0xFFE2E8F0),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
-                            child: Stack(
-                              children: [
-                                FlutterMap(
-                                  key: ValueKey(
-                                    '${f.areaId}-${f.city}-${f.customAreaPolygon.length}',
-                                  ),
-                                  options: MapOptions(
-                                    initialCenter: area.center,
-                                    initialZoom:
-                                        area.id == 'all_israel' ? 7.5 : 11,
-                                    interactionOptions:
-                                        const InteractionOptions(
-                                      flags: InteractiveFlag.all,
-                                    ),
-                                    onTap: (_, __) async {
-                                      final polygon =
-                                          await Navigator.of(context)
-                                              .push<List<LatLng>>(
-                                        MaterialPageRoute(
-                                          fullscreenDialog: true,
-                                          builder: (_) => _AreaLassoScreen(
-                                            initialArea: area,
-                                            initialPolygon: f.customAreaPolygon,
-                                            previewMarkers: _markerPreview,
-                                            filters: _draftFilters,
-                                          ),
-                                        ),
-                                      );
-                                      if (!mounted || polygon == null) return;
-                                      _setDraftFilters(
-                                        f.copyWith(
-                                          city: '',
-                                          areaId: 'all_israel',
-                                          customAreaPolygon: polygon,
-                                        ),
-                                        provider,
-                                      );
-                                    },
-                                  ),
-                                  children: [
-                                    TileLayer(
-                                      urlTemplate:
-                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                      userAgentPackageName: 'com.rentch.app',
-                                    ),
-                                    PolygonLayer(
-                                      polygons: [
-                                        Polygon(
-                                          points: area.polygon,
-                                          color: AppColors.primary
-                                              .withValues(alpha: 0.2),
-                                          borderColor: AppColors.primary,
-                                          borderStrokeWidth: 3,
-                                        ),
-                                      ],
-                                    ),
-                                    MarkerLayer(
-                                      markers: _markerPreview
-                                          .map((p) => Marker(
-                                                point: p.point,
-                                                width: 28,
-                                                height: 28,
-                                                child: RentlyIcon(
-                                                    IconsaxPlusLinear.building,
-                                                    color: AppColors.primary,
-                                                    size: 22),
-                                              ))
-                                          .toList(),
-                                    ),
-                                  ],
-                                ),
-                                // Interactive overlay hint
-                                Positioned(
-                                  top: 12,
-                                  right: 12,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.9),
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.1),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.edit_location_alt_rounded,
-                                          size: 14,
-                                          color: AppColors.primary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          f.hasCustomArea
-                                              ? 'ערוך אזור'
-                                              : 'סמן אזור',
-                                          style: const TextStyle(
-                                            color: AppColors.navy,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          f.hasCustomArea
-                              ? 'האזור מסומן ידנית. אפשר להזיז את המפה וללחוץ עליה כדי לערוך את הלאסו.'
-                              : 'אפשר להזיז את המפה. לחיצה עליה תפתח סימון ידני עם לאסו.',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                         const SizedBox(height: 24),
                         // ── מיון ──
                         _FilterSection(

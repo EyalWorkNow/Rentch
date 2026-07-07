@@ -12,6 +12,7 @@ import 'package:dating_app/presentation/screens/landlord_properties_screen.dart'
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -316,31 +317,46 @@ class _HomeScreenState extends State<HomeScreen> {
                                                       fit: BoxFit.cover,
                                                     ),
                                                   )
-                                                : AnimatedScale(
-                                                    key: ValueKey(
-                                                        'ic-$index-$isSelected'),
-                                                    scale:
-                                                        isSelected ? 1.12 : 1.0,
-                                                    duration: const Duration(
-                                                        milliseconds: 300),
-                                                    curve: Curves.elasticOut,
-                                                    child: RentlyIcon(
-                                                      isEtti
-                                                          ? IconsaxPlusLinear
-                                                              .magicpen
-                                                          : (isSelected
+                                                : isEtti
+                                                    // The voice-assistant orb —
+                                                    // always alive, colours drifting
+                                                    // — sits in her nav circle.
+                                                    ? SizedBox(
+                                                        key: const ValueKey(
+                                                            'etti-orb'),
+                                                        width: circleSize,
+                                                        height: circleSize,
+                                                        child: Center(
+                                                          child: LiquidGlassOrb(
+                                                            size:
+                                                                circleSize * 0.6,
+                                                            speaking: true,
+                                                          ),
+                                                        ),
+                                                      )
+                                                    : AnimatedScale(
+                                                        key: ValueKey(
+                                                            'ic-$index-$isSelected'),
+                                                        scale: isSelected
+                                                            ? 1.12
+                                                            : 1.0,
+                                                        duration: const Duration(
+                                                            milliseconds: 300),
+                                                        curve: Curves.elasticOut,
+                                                        child: RentlyIcon(
+                                                          isSelected
                                                               ? item.activeIcon
-                                                              : item.icon),
-                                                      color: Colors.white,
-                                                      size: isCompact
-                                                          ? (isNotDiscover
-                                                              ? 26.0
-                                                              : 24.0)
-                                                          : (isNotDiscover
-                                                              ? 31.0
-                                                              : 28.0),
-                                                    ),
-                                                  ),
+                                                              : item.icon,
+                                                          color: Colors.white,
+                                                          size: isCompact
+                                                              ? (isNotDiscover
+                                                                  ? 26.0
+                                                                  : 24.0)
+                                                              : (isNotDiscover
+                                                                  ? 31.0
+                                                                  : 28.0),
+                                                        ),
+                                                      ),
                                           ),
                                           if (showBadge)
                                             Positioned(

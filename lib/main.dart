@@ -218,15 +218,16 @@ class RentlyApp extends StatelessWidget {
       // background (no flat white-on-white boxes, no hard borders).
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFFF1F5F8),
+        // White fields (with a subtle border so they stay visible on any surface).
+        fillColor: Colors.white,
         hintStyle: const TextStyle(color: AppColors.textDisabled),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
