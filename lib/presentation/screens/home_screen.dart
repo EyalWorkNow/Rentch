@@ -12,7 +12,7 @@ import 'package:dating_app/presentation/screens/landlord_properties_screen.dart'
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
-import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
+import 'package:dating_app/presentation/widgets/nav_assistant_orb.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -327,10 +327,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         width: circleSize,
                                                         height: circleSize,
                                                         child: Center(
-                                                          child: LiquidGlassOrb(
-                                                            size:
-                                                                circleSize * 0.6,
-                                                            speaking: true,
+                                                          child: NavAssistantOrb(
+                                                            size: circleSize *
+                                                                0.98,
                                                           ),
                                                         ),
                                                       )
