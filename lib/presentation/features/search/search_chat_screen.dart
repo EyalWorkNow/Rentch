@@ -961,7 +961,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           .toList();
       // GEO-VERIFY: never surface a flat grossly far from the requested place.
       // Catches any name-gate leak — e.g. "כרכור" must NOT return רמת גן (~50km).
-      results = _geoVerify(results);
+      results = _verifyResults(results);
       anyExact = results.any((r) => r.exact);
     }
     // Instant canned reply now; the warm GPT reply is upgraded in the background.
@@ -1449,26 +1449,47 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         : provider.recommendForTenant(provider.allProperties, q, limit: limit);
   }
 
-  // GEO-VERIFY (anti-hallucination safety net): drop any result that is grossly
-  // far from the requested place, in case the name-based city gate leaked (bad
-  // labels, aliases, misspellings). Uses the town's real centre from GovData; if
-  // the town can't be resolved we can't verify, so we leave the list untouched.
-  List<ScoredProperty> _geoVerify(List<ScoredProperty> results) {
+  // VERIFICATION GATE (fast-mode anti-hallucination): before showing anything,
+  // confirm every result really matches what the user asked for, so אתי never
+  // presents something wrong. Two gross-mismatch checks that the engine's soft
+  // ranking could otherwise let through when stock is thin:
+  //   • GEO — a flat grossly far from the requested town (name-gate leak).
+  //   • BUDGET — a flat far over the stated ceiling isn't a "match".
+  // Each check only prunes when something still remains (never invents empties),
+  // and the honest "nothing here, but nearby…" flow catches a full wipe.
+  List<ScoredProperty> _verifyResults(List<ScoredProperty> results) {
+    if (results.isEmpty) return results;
+    var out = results;
+
+    // Geo — drop flats grossly far from the requested town's real GovData centre.
     final city = _query.city?.trim();
-    if (city == null || city.isEmpty || results.isEmpty) return results;
-    final loc = GovData.instance.localityByName(city);
-    if (loc == null) return results;
-    // Coarse gate: trust the engine's fine ≤4–8km widening, only cut gross leaks.
-    final maxKm =
-        _query.intents.contains(SearchIntent.cityArea) ? 20.0 : 15.0;
-    final verified = results
-        .where((r) =>
-            Geolocator.distanceBetween(
-                    r.property.lat, r.property.lon, loc.lat, loc.lon) /
-                1000 <=
-            maxKm)
-        .toList();
-    return verified;
+    if (city != null && city.isNotEmpty) {
+      final loc = GovData.instance.localityByName(city);
+      if (loc != null) {
+        final maxKm =
+            _query.intents.contains(SearchIntent.cityArea) ? 20.0 : 15.0;
+        final near = out
+            .where((r) =>
+                Geolocator.distanceBetween(
+                        r.property.lat, r.property.lon, loc.lat, loc.lon) /
+                    1000 <=
+                maxKm)
+            .toList();
+        if (near.isNotEmpty) out = near;
+      }
+    }
+
+    // Budget — a flat >35% over the stated ceiling is not a match (a small
+    // overshoot is fine — the engine discloses it as a trade-off).
+    final cap = _query.maxPrice;
+    if (cap != null && cap > 0) {
+      final within = out
+          .where((r) => r.property.price <= 0 || r.property.price <= cap * 1.35)
+          .toList();
+      if (within.isNotEmpty) out = within;
+    }
+
+    return out;
   }
 
   // Anti-hallucination: when NOTHING matches the exact request, look within [km]
