@@ -177,6 +177,8 @@ void main() {
     final r = run('דירה לזוג צעיר בהרצליה מצפים לילד עד 4500 לא רחוק מהים');
     report('P2 · Young couple Herzliya sea', 'זוג צעיר הרצליה עד 4500 קרוב לים', r);
     expect(r.q.city, isNotNull, reason: 'must parse הרצליה');
+    expect(r.q.minRooms, 2,
+        reason: 'a couple expecting their FIRST child → minRooms 2, not a hard 3');
     for (final s in r.shown) {
       expect(s.property.price <= 4500 * 1.35, isTrue,
           reason: '${s.property.id} ₪${s.property.price} grossly over ₪4500');

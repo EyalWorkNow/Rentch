@@ -533,11 +533,17 @@ class SmartSearch {
       if (RegExp(r'סטודנט').hasMatch(text)) {
         minRooms = 1;
         maxRooms = 2;
-      } else if (RegExp(r'משפח|ילד').hasMatch(text)) {
-        minRooms = 3;
-      } else if (RegExp(r'\bזוג\b|זוגי|בני זוג').hasMatch(text)) {
+      } else if (RegExp(r'\bזוג\b|זוגי|בני זוג|נשואים טריים|'
+              r'מצפים לילד|תינוק בדרך|בהריון|הריון ראשון')
+          .hasMatch(text)) {
+        // A COUPLE — even expecting their FIRST child — needs ~2 rooms (bedroom +
+        // a nursery), NOT a hard 3-room floor. Checked BEFORE the family branch,
+        // so "זוג מצפים לילד" isn't mistaken for an established family. Ceiling
+        // left open so a 3-room still fits.
         minRooms = 2;
-        maxRooms = 3;
+      } else if (RegExp(r'משפח|ילדים|ילד').hasMatch(text)) {
+        // An established family with kids → 3+.
+        minRooms = 3;
       }
     }
 
