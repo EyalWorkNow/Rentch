@@ -292,6 +292,14 @@ class SmartSearch {
         minRooms = (_wordToNum(half.group(1)!) ?? 0) + 0.5;
       } else if (single != null) {
         minRooms = double.tryParse(single.group(1)!);
+      } else {
+        // Spelled-out room counts ("שלושה חדרים") — common in formal/older speech.
+        final spelled = RegExp(
+                r'(אחד|שני|שתי|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה)\s*(?:חדר|חדרים)')
+            .firstMatch(text);
+        if (spelled != null) {
+          minRooms = _wordToNum(spelled.group(1)!)?.toDouble();
+        }
       }
       // "3+" → open-ended max (just a min).
       if (single != null && RegExp(r'\d\s*\+').hasMatch(text)) {
@@ -530,16 +538,24 @@ class SmartSearch {
 
     // ── persona soft defaults (only when rooms not stated) ──────────────────
     if (minRooms == null && maxRooms == null) {
+      // Empty-nesters DOWNSIZING ("הילדים עזבו") — the opposite of a family with
+      // kids, even though the text contains "ילדים". Handle FIRST so it's not
+      // mistaken for a family and floored at 3 rooms.
+      final emptyNest = RegExp(r'הילדים עזבו|הילדים גדלו|אחרי שהילדים|'
+              r'קן ריק|נשארנו לבד|הבית התרוקן|דירה קטנה יותר')
+          .hasMatch(text);
       if (RegExp(r'סטודנט').hasMatch(text)) {
         minRooms = 1;
         maxRooms = 2;
-      } else if (RegExp(r'\bזוג\b|זוגי|בני זוג|נשואים טריים|'
+      } else if (emptyNest) {
+        minRooms = 2;
+      } else if (RegExp(r'(?<![א-ת])זוג|בני זוג|נשואים טריים|'
               r'מצפים לילד|תינוק בדרך|בהריון|הריון ראשון')
           .hasMatch(text)) {
         // A COUPLE — even expecting their FIRST child — needs ~2 rooms (bedroom +
-        // a nursery), NOT a hard 3-room floor. Checked BEFORE the family branch,
-        // so "זוג מצפים לילד" isn't mistaken for an established family. Ceiling
-        // left open so a 3-room still fits.
+        // a nursery), NOT a hard 3-room floor. (\b doesn't work on Hebrew, so a
+        // Hebrew-letter lookbehind gates the word.) Checked before the family
+        // branch; ceiling left open so a 3-room still fits.
         minRooms = 2;
       } else if (RegExp(r'משפח|ילדים|ילד').hasMatch(text)) {
         // An established family with kids → 3+.

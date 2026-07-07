@@ -81,10 +81,20 @@ class SearchIntent {
     // whole bundle of priorities that life-stage implies — even when the seeker
     // didn't spell each one out.
     //
+    // Empty-nesters DOWNSIZING ("הילדים עזבו") — text mentions "ילדים" but they
+    // want the OPPOSITE of a family flat. Treat like a quiet/accessible downsizer,
+    // never schools/space.
+    final emptyNest = RegExp(r'הילדים עזבו|הילדים גדלו|אחרי שהילדים|קן ריק|'
+            r'נשארנו לבד|הבית התרוקן|דירה קטנה יותר|empty nest')
+        .hasMatch(text);
     // Family / kids / a baby on the way → schools, a quiet & good area, and space.
-    if (RegExp(r'משפח|ילד|תינוק|בהריון|הריון|פעוט|בייבי|family|kids|child|baby')
-        .hasMatch(text)) {
+    if (!emptyNest &&
+        RegExp(r'משפח|ילד|תינוק|בהריון|הריון|פעוט|בייבי|family|kids|child|baby')
+            .hasMatch(text)) {
       out..add(goodSchools)..add(quiet)..add(spacious)..add(qualityArea);
+    }
+    if (emptyNest) {
+      out..add(quiet)..add(accessible);
     }
     // Retiree / elderly → step-free access + a quiet area.
     if (RegExp(r'מבוגר|גמלא|פנסי|קשיש|בגיל השלישי|retire|senior|elderly')
