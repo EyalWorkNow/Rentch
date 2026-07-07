@@ -388,6 +388,10 @@ class GovData {
     var bestLen = 0;
     for (final rec in _byCode.values) {
       final n = rec.name;
+      // Locality names that ARE extremely common Hebrew words ("אזור"=area,
+      // "חמד"=lovely) hallucinate a city out of ordinary phrasing ("אזור שקט").
+      // Skip them in free-text matching — they're rare as an actual search target.
+      if (_ambiguousLocalityNames.contains(n)) continue;
       // Match the full CBS name OR, for a MERGED municipality ("בנימינה-גבעת עדה",
       // "מעלות-תרשיחא", "פרדס חנה-כרכור"), ANY settlement people actually say
       // ("בנימינה", "כרכור", "מכבים"). Longest match wins so specificity is kept.
@@ -396,13 +400,44 @@ class GovData {
         if (n.contains('-'))
           ...n.split('-').map((s) => s.trim()).where((s) => s.length >= 4),
       }) {
-        if (v.length >= 3 && v.length > bestLen && t.contains(v)) {
+        if (v.length >= 3 && v.length > bestLen && _containsWord(t, v)) {
           best = rec;
           bestLen = v.length;
         }
       }
     }
     return best;
+  }
+
+  static const _ambiguousLocalityNames = {'אזור', 'חמד', 'גן', 'אור', 'נס'};
+  static const _hebrewPrefixes = {'ב', 'ל', 'מ', 'ה', 'ו', 'ש', 'כ'};
+
+  static bool _isHebrewLetter(int c) => c >= 0x05D0 && c <= 0x05EA;
+
+  /// True only if [word] appears as a WHOLE word in [text] — not glued inside a
+  /// larger Hebrew word. A single inseparable prefix (ב/ל/מ/ה/ו/ש/כ) is allowed,
+  /// so "בכרכור"/"להרצליה" still match, but "נחמד" does NOT match "חמד".
+  static bool _containsWord(String text, String word) {
+    var i = text.indexOf(word);
+    while (i >= 0) {
+      final afterIdx = i + word.length;
+      final after = afterIdx < text.length ? text.codeUnitAt(afterIdx) : 0;
+      final afterOk = !_isHebrewLetter(after);
+      bool beforeOk;
+      if (i == 0) {
+        beforeOk = true;
+      } else if (!_isHebrewLetter(text.codeUnitAt(i - 1))) {
+        beforeOk = true;
+      } else if (_hebrewPrefixes.contains(text[i - 1]) &&
+          (i == 1 || !_isHebrewLetter(text.codeUnitAt(i - 2)))) {
+        beforeOk = true; // a single attached prefix: "בכרכור", "לתל אביב"
+      } else {
+        beforeOk = false; // glued mid-word: "נחמד" ≠ "חמד"
+      }
+      if (beforeOk && afterOk) return true;
+      i = text.indexOf(word, i + 1);
+    }
+    return false;
   }
 
   /// CBS socioeconomic cluster (1..10) for a city, or 0 if unknown.

@@ -1479,14 +1479,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       }
     }
 
-    // Budget — a flat >35% over the stated ceiling is not a match (a small
-    // overshoot is fine — the engine discloses it as a trade-off).
+    // Budget — a flat >35% over the stated ceiling is NOT a match (a small
+    // overshoot is fine — the engine discloses it as a trade-off). This is
+    // STRICT: if nothing is within reach, we return empty so אתי honestly says
+    // "nothing in budget — raise it?" instead of presenting way-over-budget flats.
     final cap = _query.maxPrice;
     if (cap != null && cap > 0) {
-      final within = out
+      out = out
           .where((r) => r.property.price <= 0 || r.property.price <= cap * 1.35)
           .toList();
-      if (within.isNotEmpty) out = within;
     }
 
     return out;

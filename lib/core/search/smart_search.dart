@@ -558,8 +558,12 @@ class SmartSearch {
       const canon = {
         'feat_elevator': 'elevator',
         'feat_parking': 'parking',
+        'feat_balcony': 'balcony',
         'feat_mamad': 'mamad',
         'feat_furnished': 'furnished',
+        'feat_ac': 'ac',
+        'feat_storage': 'storage',
+        'feat_accessible': 'accessible',
         'feat_pets': 'petsAllowed',
       };
       for (final e in canon.entries) {
