@@ -299,7 +299,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                 // Speed mode — fast (on-device) ↔ personalization (AI). Shared
                 // live with the text chat.
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 2),
+                  padding: const EdgeInsets.only(top: 2),
                   child: ValueListenableBuilder<bool>(
                     valueListenable: SpeedMode.immediate,
                     builder: (_, immediate, __) => SpeedModeSlider(
@@ -311,9 +311,9 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                 if (_criteria.isNotEmpty) _criteriaChips(),
                 const Spacer(),
                 _statusPill(),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 _blob(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 _captionText(caption),
                 _locationButton(),
                 const Spacer(),
@@ -322,7 +322,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                 else if (_resultCount > 0)
                   _resultsPeek(),
                 _controls(),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
               ],
             ),
           ),
@@ -333,7 +333,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
 
   Widget _topBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+      padding: const EdgeInsets.fromLTRB(6, 1, 6, 0),
       child: Row(
         children: [
           IconButton(
@@ -342,16 +342,57 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           const Spacer(),
-          Column(
-            children: const [
-              Text('אתי',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3)),
-              Text('שיחה קולית • Rently',
-                  style: TextStyle(color: Colors.white38, fontSize: 11)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.6),
+                          width: 1.5),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset('assets/images/eti.jpg',
+                          fit: BoxFit.cover),
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _state == AtiVoiceState.idle
+                            ? Colors.white38
+                            : const Color(0xFF34D399),
+                        border: Border.all(
+                            color: const Color(0xFF071726), width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('אתי',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3)),
+                  Text('העוזרת החכמה שלך',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
             ],
           ),
           const Spacer(),
@@ -409,16 +450,51 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
   }
 
   Widget _statusPill() {
+    final IconData icon;
+    switch (_state) {
+      case AtiVoiceState.listening:
+        icon = IconsaxPlusBold.microphone_2;
+        break;
+      case AtiVoiceState.thinking:
+        icon = IconsaxPlusBold.magicpen;
+        break;
+      case AtiVoiceState.speaking:
+        icon = IconsaxPlusBold.voice_square;
+        break;
+      case AtiVoiceState.idle:
+        icon = IconsaxPlusLinear.microphone;
+        break;
+    }
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: Text(
-        _statusLabel,
+      duration: const Duration(milliseconds: 260),
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(
+            scale: Tween(begin: 0.9, end: 1.0).animate(anim), child: child),
+      ),
+      child: Container(
         key: ValueKey(_statusLabel),
-        style: TextStyle(
-          color: AppColors.primary,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.4,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.32)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              _statusLabel,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -429,30 +505,59 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     final size = _results.isEmpty ? 175.0 : 104.0;
     // Press-and-HOLD to record, release to send. Listener fires on the raw
     // pointer down/up so the hold can last any length (unlike a tap/long-press).
+    final active = widget.demoMode || _state != AtiVoiceState.idle;
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (_) => _startRecording(),
       onPointerUp: (_) => _stopAndSend(),
       onPointerCancel: (_) => _stopAndSend(),
-      child: LiquidGlassOrb(
-        size: size,
-        level: widget.demoMode ? 0.6 : _activity,
-        speaking: widget.demoMode || _state == AtiVoiceState.speaking,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // A soft aura that breathes brighter while she's active — presence.
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: active ? 0.34 : 0.16),
+              blurRadius: active ? 72 : 44,
+              spreadRadius: active ? 8 : 2,
+            ),
+          ],
+        ),
+        child: LiquidGlassOrb(
+          size: size,
+          level: widget.demoMode ? 0.6 : _activity,
+          speaking: widget.demoMode || _state == AtiVoiceState.speaking,
+        ),
       ),
     );
   }
 
   Widget _captionText(String caption) {
+    // The user's own words (live transcript) read as a soft italic quote; אתי's
+    // reply is solid white — so you can tell who's "talking".
+    final isUserSpeaking =
+        _state == AtiVoiceState.listening && _transcript.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: Text(
-          caption,
-          key: ValueKey(caption),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              color: Colors.white, fontSize: 19, height: 1.5, fontWeight: FontWeight.w500),
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Text(
+            caption,
+            key: ValueKey(caption),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isUserSpeaking ? Colors.white70 : Colors.white,
+              fontSize: 19,
+              height: 1.5,
+              fontStyle:
+                  isUserSpeaking ? FontStyle.italic : FontStyle.normal,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
       ),
     );
