@@ -22,8 +22,10 @@
 //   - No external deps beyond dart:math and the rental models.
 // ════════════════════════════════════════════════════════════════════════════
 
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:dating_app/core/govdata/geo_intelligence.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/govdata/market_intelligence.dart';
@@ -168,6 +170,49 @@ class IsraelGeoIndex {
   /// coastal reference point.
   static double? coastKm(double lat, double lon) =>
       _nearest(lat, lon, _coast);
+
+  // Public parks / gardens (bundled from OSM `leisure=park`, 1400+ named). Loaded
+  // once at startup so park_access scoring + the "קרוב לפארק" auto-tag can use
+  // real, verified coordinates.
+  static List<_GeoPlace> _parks = const <_GeoPlace>[];
+  static bool _parksLoaded = false;
+
+  static Future<void> loadParks() async {
+    if (_parksLoaded) return;
+    _parksLoaded = true;
+    try {
+      final raw =
+          await rootBundle.loadString('assets/data/govdata/parks.json');
+      final list = (jsonDecode(raw) as List).cast<dynamic>();
+      _parks = [
+        for (final p in list)
+          if (p is Map)
+            _GeoPlace((p['n'] ?? '').toString(),
+                (p['lat'] as num).toDouble(), (p['lon'] as num).toDouble()),
+      ];
+    } catch (_) {
+      _parks = const <_GeoPlace>[];
+    }
+  }
+
+  /// Distance (km) to the nearest public park/garden, or null if unknown/unloaded.
+  static double? parkKm(double lat, double lon) =>
+      _parks.isEmpty ? null : _nearest(lat, lon, _parks);
+
+  /// The nearest park's NAME (for the "קרוב ל<park>" reason), or null.
+  static String? nearestParkName(double lat, double lon) {
+    if (_parks.isEmpty || !_hasCoords(lat, lon)) return null;
+    _GeoPlace? best;
+    double? bestD;
+    for (final p in _parks) {
+      final d = haversineKm(lat, lon, p.lat, p.lon);
+      if (bestD == null || d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    return best?.name;
+  }
 
   static double? _nearest(double lat, double lon, List<_GeoPlace> places) {
     if (!_hasCoords(lat, lon)) return null;
@@ -742,6 +787,11 @@ class FeatureEngineer {
     f['university_access'] =
         IsraelGeoIndex.proximityKernel(uniKm, scaleKm: 3.0);
     f['coast_access'] = IsraelGeoIndex.proximityKernel(coastKm, scaleKm: 3.0);
+    // Public-park proximity — hyper-local (a park matters within a short walk), so
+    // a tight 0.7km kernel: ~1.0 next to a park, ~0.37 at 700m, ~0 past ~2km.
+    f['park_access'] = IsraelGeoIndex.proximityKernel(
+        IsraelGeoIndex.parkKm(p.lat, p.lon),
+        scaleKm: 0.7);
 
     // ── price / value econometrics ───────────────────────────────────────────
     f['price'] = p.price.toDouble();

@@ -50,6 +50,7 @@ const List<String> kScoringDimensions = [
   'family', // CBS share of children 0-19 — family-friendliness of the locality
   'health', // CBS health-facility availability for the locality (gov data)
   'coast', // proximity to the sea — weighted only on beach intent
+  'park', // proximity to a public park/garden — weighted for families/kids
   'yield', // gross rental yield (sale listings) — weighted only on investment intent
   'university', // proximity to a university/college — weighted on student intent
   'young_area', // CBS share of young adults — weighted on young/nightlife intent
@@ -457,6 +458,8 @@ class UserPreferenceModel {
         return pfv.get('health_access', 0.5).clamp(0.0, 1.0);
       case 'coast':
         return pfv.get('coast_access', 0.0).clamp(0.0, 1.0);
+      case 'park':
+        return pfv.get('park_access', 0.0).clamp(0.0, 1.0);
       case 'yield':
         // Sale listings only; rentals stay neutral (weight is 0 there anyway).
         final est = RentalYield.estimate(
@@ -584,6 +587,7 @@ class PreferenceModelBuilder {
     // (beach / investment / student / young / quiet / luxury / view), so they
     // don't skew ordinary searches.
     'coast': 0.0,
+    'park': 0.0,
     'yield': 0.0,
     'university': 0.0,
     'young_area': 0.0,
@@ -739,7 +743,11 @@ class PreferenceModelBuilder {
       sharpen('accessibility', 0.97, 20.0);
     }
     if (intents.contains(SearchIntent.central)) sharpen('location', 0.9, 8.0);
-    if (intents.contains(SearchIntent.goodSchools)) sharpen('schools', 0.9, 8.0);
+    if (intents.contains(SearchIntent.goodSchools)) {
+      sharpen('schools', 0.9, 8.0);
+      // Families with kids value a park within a short walk.
+      sharpen('park', 0.82, 6.0);
+    }
     if (intents.contains(SearchIntent.qualityArea)) {
       sharpen('neighborhood', 0.9, 8.0);
     }
@@ -869,6 +877,7 @@ class PreferenceModelBuilder {
     if (familyPersona) {
       sharpen('safety', 0.9, 4.0);
       sharpen('neighborhood', 0.7, 2.0);
+      sharpen('park', 0.8, 3.5); // a nearby park matters for a household with kids
     } else {
       sharpen('safety', 0.6, 1.0); // soft default — safety still counts
     }

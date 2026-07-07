@@ -4,6 +4,7 @@ import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/home_widget_service.dart';
 import 'package:dating_app/core/services/notif_admin_gate.dart';
@@ -74,6 +75,7 @@ void main() async {
   // built-in heuristics if the assets can't be read.
   try {
     await GovData.instance.init();
+    await IsraelGeoIndex.loadParks(); // public-park proximity for the ranker
   } catch (error) {
     debugPrint('GovData init skipped: $error');
   }
