@@ -46,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Gated by the seen_intro_v1 flag inside AppIntro, so it only appears on a
     // genuine first launch and never blocks returning users.
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
-    _ettiPeekTimer = Timer(const Duration(seconds: 2), () {
+    _ettiPeekTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) setState(() => _ettiPeek = false);
     });
   }
@@ -251,10 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   key: Key('nav_tab_$index'),
                                   onTap: () => _onTabTap(index, provider),
                                   scaleDownTo: 0.90,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      AnimatedContainer(
+                                  child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeOutCubic,
                                     width: circleSize,
@@ -266,11 +263,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                       color: isSelected
                                           ? AppColors.primary
                                           : const Color(0xFF1A1A1A),
-                                      // תכלת stroke around the selected circle.
-                                      border: isSelected
+                                      // תכלת stroke marks ONLY the אתי CTA circle.
+                                      border: isEtti
                                           ? Border.all(
                                               color: const Color(0xFF7CE0E6),
-                                              width: 1.6)
+                                              width: 1.8)
                                           : null,
                                       boxShadow: isSelected
                                           ? [
@@ -286,18 +283,26 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Stack(
                                         clipBehavior: Clip.none,
                                         children: [
+                                          // אתי stacks a small icon + the "אתי ai"
+                                          // label INSIDE the circle, so every tab
+                                          // stays exactly the same size.
+                                          Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
                                           AnimatedScale(
-                                            scale: isSelected ? 1.15 : 1.0,
+                                            scale: isSelected ? 1.12 : 1.0,
                                             duration: const Duration(milliseconds: 300),
                                             curve: Curves.elasticOut,
-                                            // On entry, אתי's tab shows her face for
-                                            // 2s, then reverts to the icon.
+                                            // On entry, אתי's circle shows her face
+                                            // for a few seconds, then the icon.
                                             child: (isEtti && _ettiPeek)
                                                 ? ClipOval(
                                                     child: Image.asset(
                                                       'assets/images/eti.jpg',
-                                                      width: circleSize * 0.84,
-                                                      height: circleSize * 0.84,
+                                                      width: circleSize * 0.86,
+                                                      height: circleSize * 0.86,
                                                       fit: BoxFit.cover,
                                                     ),
                                                   )
@@ -306,14 +311,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         ? item.activeIcon
                                                         : item.icon,
                                                     color: Colors.white,
-                                                    size: isCompact
-                                                        ? (isNotDiscover
-                                                            ? 26.0
-                                                            : 24.0)
-                                                        : (isNotDiscover
-                                                            ? 31.0
-                                                            : 28.0),
+                                                    size: isEtti
+                                                        ? (isCompact ? 20.0 : 22.0)
+                                                        : (isCompact
+                                                            ? (isNotDiscover
+                                                                ? 26.0
+                                                                : 24.0)
+                                                            : (isNotDiscover
+                                                                ? 31.0
+                                                                : 28.0)),
                                                   ),
+                                          ),
+                                              if (isEtti && !_ettiPeek) ...[
+                                                const SizedBox(height: 1),
+                                                const Text(
+                                                  'אתי ai',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w800,
+                                                    height: 1.0,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                           if (showBadge)
                                             Positioned(
@@ -353,19 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                     ),
-                                      ),
-                                      if (isEtti) ...[
-                                        const SizedBox(height: 3),
-                                        const Text(
-                                          'דבר עם אתי',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
                                   ),
                                 );
                               }),
