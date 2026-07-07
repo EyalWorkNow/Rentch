@@ -959,6 +959,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                   limit: 40)))
           .take(10)
           .toList();
+      // GEO-VERIFY: never surface a flat grossly far from the requested place.
+      // Catches any name-gate leak — e.g. "כרכור" must NOT return רמת גן (~50km).
+      results = _geoVerify(results);
       anyExact = results.any((r) => r.exact);
     }
     // Instant canned reply now; the warm GPT reply is upgraded in the background.
@@ -1444,6 +1447,28 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     return out.isNotEmpty
         ? out
         : provider.recommendForTenant(provider.allProperties, q, limit: limit);
+  }
+
+  // GEO-VERIFY (anti-hallucination safety net): drop any result that is grossly
+  // far from the requested place, in case the name-based city gate leaked (bad
+  // labels, aliases, misspellings). Uses the town's real centre from GovData; if
+  // the town can't be resolved we can't verify, so we leave the list untouched.
+  List<ScoredProperty> _geoVerify(List<ScoredProperty> results) {
+    final city = _query.city?.trim();
+    if (city == null || city.isEmpty || results.isEmpty) return results;
+    final loc = GovData.instance.localityByName(city);
+    if (loc == null) return results;
+    // Coarse gate: trust the engine's fine ≤4–8km widening, only cut gross leaks.
+    final maxKm =
+        _query.intents.contains(SearchIntent.cityArea) ? 20.0 : 15.0;
+    final verified = results
+        .where((r) =>
+            Geolocator.distanceBetween(
+                    r.property.lat, r.property.lon, loc.lat, loc.lon) /
+                1000 <=
+            maxKm)
+        .toList();
+    return verified;
   }
 
   // Anti-hallucination: when NOTHING matches the exact request, look within [km]
