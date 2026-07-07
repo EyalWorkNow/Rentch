@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -29,6 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool? _cachedIsLandlord;
   bool _introChecked = false;
 
+  // "דבר עם אתי" CTA: on every app entry the nav circle shows Etti's face for 2s,
+  // then reverts to the icon — a gentle nudge toward the assistant.
+  bool _ettiPeek = true;
+  Timer? _ettiPeekTimer;
+
   static const int _landlordSwipesTabIndex = 1;
   static const int _landlordMatchesTabIndex = 2;
   static const int _landlordPropertiesTabIndex = 3;
@@ -40,6 +46,15 @@ class _HomeScreenState extends State<HomeScreen> {
     // Gated by the seen_intro_v1 flag inside AppIntro, so it only appears on a
     // genuine first launch and never blocks returning users.
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
+    _ettiPeekTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _ettiPeek = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ettiPeekTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _maybeShowIntro() async {
@@ -222,6 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: List.generate(items.length, (index) {
                                 final item = items[index];
                                 final isSelected = index == safeIndex;
+                                final isEtti = item.isAssistant;
                                 final showBadge =
                                     index == (isLandlord ? 2 : 1) &&
                                         unseenCount > 0;
@@ -235,7 +251,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                   key: Key('nav_tab_$index'),
                                   onTap: () => _onTabTap(index, provider),
                                   scaleDownTo: 0.90,
-                                  child: AnimatedContainer(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeOutCubic,
                                     width: circleSize,
@@ -247,6 +266,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       color: isSelected
                                           ? AppColors.primary
                                           : const Color(0xFF1A1A1A),
+                                      // תכלת stroke around the selected circle.
+                                      border: isSelected
+                                          ? Border.all(
+                                              color: const Color(0xFF7CE0E6),
+                                              width: 1.6)
+                                          : null,
                                       boxShadow: isSelected
                                           ? [
                                               BoxShadow(
@@ -265,15 +290,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                             scale: isSelected ? 1.15 : 1.0,
                                             duration: const Duration(milliseconds: 300),
                                             curve: Curves.elasticOut,
-                                            child: RentlyIcon(
-                                              isSelected
-                                                  ? item.activeIcon
-                                                  : item.icon,
-                                              color: Colors.white,
-                                              size: isCompact
-                                                  ? (isNotDiscover ? 26.0 : 24.0)
-                                                  : (isNotDiscover ? 31.0 : 28.0),
-                                            ),
+                                            // On entry, אתי's tab shows her face for
+                                            // 2s, then reverts to the icon.
+                                            child: (isEtti && _ettiPeek)
+                                                ? ClipOval(
+                                                    child: Image.asset(
+                                                      'assets/images/eti.jpg',
+                                                      width: circleSize * 0.84,
+                                                      height: circleSize * 0.84,
+                                                      fit: BoxFit.cover,
+                                                    ),
+                                                  )
+                                                : RentlyIcon(
+                                                    isSelected
+                                                        ? item.activeIcon
+                                                        : item.icon,
+                                                    color: Colors.white,
+                                                    size: isCompact
+                                                        ? (isNotDiscover
+                                                            ? 26.0
+                                                            : 24.0)
+                                                        : (isNotDiscover
+                                                            ? 31.0
+                                                            : 28.0),
+                                                  ),
                                           ),
                                           if (showBadge)
                                             Positioned(
@@ -313,6 +353,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ],
                                       ),
                                     ),
+                                      ),
+                                      if (isEtti) ...[
+                                        const SizedBox(height: 3),
+                                        const Text(
+                                          'דבר עם אתי',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 );
                               }),
@@ -344,9 +397,10 @@ const _tenantItems = [
     activeIcon: IconsaxPlusLinear.message,
   ),
   _NavItem(
-    label: 'חיפוש חכם',
+    label: 'דבר עם אתי',
     icon: IconsaxPlusLinear.search_normal_1,
     activeIcon: IconsaxPlusLinear.search_normal_1,
+    isAssistant: true,
   ),
   _NavItem(
     label: 'פרופיל',
@@ -388,9 +442,14 @@ class _NavItem {
     required this.label,
     required this.icon,
     required this.activeIcon,
+    this.isAssistant = false,
   });
 
   final String label;
   final IconData icon;
   final IconData activeIcon;
+
+  /// The "דבר עם אתי" assistant tab — gets a label under the icon + the 2s avatar
+  /// peek on entry.
+  final bool isAssistant;
 }
