@@ -163,6 +163,18 @@ class _ScorecardViewState extends State<ScorecardView> {
           const SizedBox(height: 12),
           _llmReason(c.llmReason!.trim()),
         ],
+        // Named geo "why here" tags (X מ׳ from park/school/station/…) — a WRAP of
+        // iconsax tags, shown inside "למה זו" above the data sources.
+        if (c.highlights.any(isGeoTag)) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in c.highlights.where(isGeoTag)) _GeoTag(t),
+            ],
+          ),
+        ],
         // SEPARATE "מקורות הנתונים" dropdown — its own expand/collapse, shown
         // only when at least one dimension carries a real figure + source.
         if (_sourcedDimensions(c).isNotEmpty) ...[
@@ -431,5 +443,54 @@ class _ScorecardViewState extends State<ScorecardView> {
     if (fitPct >= 80) return AppColors.success;
     if (fitPct >= 60) return AppColors.primary;
     return AppColors.warning;
+  }
+}
+
+// Geo "why here" tags are emoji-prefixed by the engine; map the emoji → an iconsax
+// icon and strip it from the label so each tag reads clearly.
+const Map<String, IconData> _geoIcon = {
+  '🏫': IconsaxPlusLinear.buildings_2,
+  '🌳': IconsaxPlusLinear.tree,
+  '🚉': IconsaxPlusLinear.bus,
+  '🏖️': IconsaxPlusLinear.sun_1,
+  '🎓': IconsaxPlusLinear.teacher,
+  '🍸': IconsaxPlusLinear.coffee,
+};
+
+/// True if [t] is a named geo proximity tag (park/school/station/sea/uni/nightlife).
+bool isGeoTag(String t) => _geoIcon.keys.any(t.startsWith);
+
+class _GeoTag extends StatelessWidget {
+  const _GeoTag(this.raw);
+  final String raw;
+
+  @override
+  Widget build(BuildContext context) {
+    var icon = IconsaxPlusLinear.location;
+    var label = raw;
+    for (final e in _geoIcon.entries) {
+      if (raw.startsWith(e.key)) {
+        icon = e.value;
+        label = raw.substring(e.key.length).trim();
+        break;
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 15, color: AppColors.primary),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.navy)),
+      ]),
+    );
   }
 }

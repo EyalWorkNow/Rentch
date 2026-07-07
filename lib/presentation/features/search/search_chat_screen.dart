@@ -2307,7 +2307,9 @@ class _AssistantPropertyCard extends StatelessWidget {
                       _InfoChip(
                           icon: IconsaxPlusLinear.maximize_3,
                           label: '${p.sizeM2} מ״ר'),
-                      for (final t in scored.tags) ...[
+                      // Geo "X מ׳ from …" tags moved into "למה זו" (above the data
+                      // sources); only plain facts stay on this quick-facts row.
+                      for (final t in scored.tags.where((t) => !isGeoTag(t))) ...[
                         const SizedBox(width: 8),
                         _InfoChip(label: t),
                       ],

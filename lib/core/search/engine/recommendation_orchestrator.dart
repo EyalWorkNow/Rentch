@@ -230,10 +230,13 @@ class Explainer {
     return RegExp('בית.?ספר|בי"?ס|יסודי').hasMatch(n) ? n : 'בית ספר $n';
   }
 
-  /// Concrete, data-driven chips for a candidate.
+  /// Concrete, data-driven chips for a candidate. [intents] gates the lifestyle
+  /// geo chips to what THIS seeker actually asked for — a nightlife-seeker never
+  /// gets school/family chips, and vice-versa (relevant + brief).
   static List<String> highlights(
     RankedCandidate c,
     UserPreferenceModel model,
+    Set<String> intents,
   ) {
     final pfv = c.pfv;
     final p = pfv.property;
@@ -267,9 +270,11 @@ class Explainer {
 
     // livability (real gov data)
     if (pfv.get('safety') > 0.7) chips.add('אזור בטוח יחסית');
-    if (pfv.get('school_access') > 0.6) {
-      // Name the actual nearest school + exact distance when one is genuinely
-      // within a short walk; otherwise the generic area chip.
+    // Schools — only for a family / kids-focused search.
+    final wantsSchools = intents.contains(SearchIntent.goodSchools) ||
+        intents.contains(SearchIntent.youngChildren) ||
+        intents.contains(SearchIntent.teens);
+    if (wantsSchools && pfv.get('school_access') > 0.6) {
       final near = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon);
       if (near != null && near.km <= 1.2) {
         chips.add('🏫 ${_dist(near.km)} מ${_schoolLabel(near.name, near.type)}');
@@ -277,30 +282,36 @@ class Explainer {
         chips.add('קרוב למוסדות חינוך');
       }
     }
-    // Name the actual nearest park when it's a short walk away.
-    final parkKm = IsraelGeoIndex.parkKm(pfv.property.lat, pfv.property.lon);
-    if (parkKm != null && parkKm <= 0.7) {
-      final name =
-          IsraelGeoIndex.nearestParkName(pfv.property.lat, pfv.property.lon);
-      chips.add('🌳 ${_dist(parkKm)} מ${_parkLabel(name)}');
+    // Parks — families + quiet-seekers value them; not a nightlife-seeker.
+    if (wantsSchools || intents.contains(SearchIntent.quiet)) {
+      final parkKm = IsraelGeoIndex.parkKm(pfv.property.lat, pfv.property.lon);
+      if (parkKm != null && parkKm <= 0.7) {
+        final name =
+            IsraelGeoIndex.nearestParkName(pfv.property.lat, pfv.property.lon);
+        chips.add('🌳 ${_dist(parkKm)} מ${_parkLabel(name)}');
+      }
     }
-    // Distance to the sea (beach seekers).
-    final seaKm = IsraelGeoIndex.coastKm(pfv.property.lat, pfv.property.lon);
-    if (seaKm != null && seaKm <= 1.2) {
-      chips.add('🏖️ ${_dist(seaKm)} מהחוף');
+    // Sea — only a beach-seeker.
+    if (intents.contains(SearchIntent.nearSea)) {
+      final seaKm = IsraelGeoIndex.coastKm(pfv.property.lat, pfv.property.lon);
+      if (seaKm != null && seaKm <= 1.2) chips.add('🏖️ ${_dist(seaKm)} מהחוף');
     }
-    // Nearest university / college (a selling point + relevant for students).
-    final uni = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon,
-        type: 'אוניברסיטה');
-    if (uni != null && uni.km <= 1.5) {
-      chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
+    // University — only a student / near-campus search.
+    if (intents.contains(SearchIntent.student) ||
+        intents.contains(SearchIntent.nearUniversity)) {
+      final uni = IsraelGeoIndex.nearestSchool(
+          pfv.property.lat, pfv.property.lon,
+          type: 'אוניברסיטה');
+      if (uni != null && uni.km <= 1.5) chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
     }
-    // Vibrant / nightlife area (real bar/pub/café density).
-    final nl = pfv.get('nightlife', 0.0);
-    if (nl > 0.6) {
-      chips.add('🍸 אזור תוסס — חיי לילה');
-    } else if (nl > 0.35) {
-      chips.add('🍸 קרוב לברים ובתי קפה');
+    // Nightlife — only a nightlife / vibrant-area search.
+    if (intents.contains(SearchIntent.nightlife)) {
+      final nl = pfv.get('nightlife', 0.0);
+      if (nl > 0.6) {
+        chips.add('🍸 אזור תוסס — חיי לילה');
+      } else if (nl > 0.35) {
+        chips.add('🍸 קרוב לברים ובתי קפה');
+      }
     }
     if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
       chips.add('שכונה צעירה');
@@ -655,7 +666,7 @@ class RecommendationEngine {
           final highlights = <String>[
             if (nearKm != null)
               '📍 בעיר שכנה — ${nearKm.toStringAsFixed(nearKm < 10 ? 1 : 0)} ק"מ מ${city ?? ''}, אבל התאמה גבוהה',
-            ...Explainer.highlights(c, model),
+            ...Explainer.highlights(c, model, query.intents),
           ];
           final confidence =
               (baseConfidence * (0.7 + 0.3 * c.constraintSatisfaction))
