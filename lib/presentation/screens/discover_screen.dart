@@ -658,7 +658,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         builder: (_) => _AreaLassoScreen(
           initialArea: area,
           initialPolygon: f.customAreaPolygon,
-          previewMarkers: provider.previewFilteredProperties(f),
+          previewMarkers: provider.previewFilteredProperties(f, limit: 70),
           filters: f,
         ),
       ),
@@ -3778,9 +3778,11 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
   Widget build(BuildContext context) {
     // Recompute the visible properties from the live catalogue → a property a
     // landlord just uploaded (or any catalogue refresh) shows up immediately.
+    // Cap the map pins: each marker loads a network image, so 500 of them made the
+    // screen crawl. ~70 is plenty for an area overview + drawing a lasso.
     _markers = context
         .watch<DatingProvider>()
-        .previewFilteredProperties(widget.filters);
+        .previewFilteredProperties(widget.filters, limit: 70);
     final polygon = _activePolygon;
     final canSave = polygon.length >= 3;
     final hasProperties = _markers.isNotEmpty;

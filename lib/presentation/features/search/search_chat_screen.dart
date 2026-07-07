@@ -831,6 +831,24 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // second network round-trip makes אתי answer MUCH faster (she was too slow).
   /// A short, instant reply shown the moment the on-device results render (or the
   /// only reply, in immediate mode). Empty when not searching → clarify handles it.
+  /// A first message that already carries a real request (a city + at least one
+  /// concrete constraint) → search RIGHT AWAY instead of waiting for turn 2, so a
+  /// detailed ask like "דירה בהרצליה עד 4500 לא רחוק מהים" gets results immediately.
+  bool _queryIsRich() =>
+      _query.city != null &&
+      (_query.maxPrice != null ||
+          _query.minRooms != null ||
+          _query.amenities.isNotEmpty);
+
+  /// A friendly on-device acknowledgement so fast mode never leaves אתי silent
+  /// when there's nothing to search or clarify yet.
+  String _localAck() {
+    if (_query.isEmpty) {
+      return 'ספר/י לי מה מחפשים — עיר, תקציב, כמה חדרים, ומה חשוב לך 🙂';
+    }
+    return 'קיבלתי 👍 עוד משהו שחשוב לך, או שאראה לך דירות עכשיו?';
+  }
+
   String _instantReply(bool shouldSearch, List<ScoredProperty> results,
       bool anyExact) {
     if (!shouldSearch || results.isEmpty) return '';
@@ -925,7 +943,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
 
     final shouldSearch = !_query.isEmpty &&
-        (_searched || _wantsResultsNow(text) || _userTurns >= 2);
+        (_searched ||
+            _wantsResultsNow(text) ||
+            _userTurns >= 2 ||
+            _queryIsRich());
 
     // ⚡ IMMEDIATE — rank ON-DEVICE right now (no network, no LLM) so results +
     // a reply appear in well under a second. The community-fit cohort ranking +
@@ -1028,6 +1049,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         // useful missing detail (with quick-reply chips) instead of stalling.
         _messages.add(_ChatMsg(
             role: 'assistant', text: clarify.$1, chips: clarify.$2));
+      } else if (sr.$1.isEmpty) {
+        // Fast mode (no warm LLM reply) with nothing to search OR clarify → never
+        // leave her silent; acknowledge on-device so she always answers.
+        _messages.add(_ChatMsg(role: 'assistant', text: _localAck()));
       }
       _busy = false;
     });
