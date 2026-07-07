@@ -238,6 +238,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           _selectedTab = tab;
         });
       },
+      onMapTap: () => _openAreaLasso(context, context.read<DatingProvider>()),
     );
   }
 
@@ -602,11 +603,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       const _HeaderMenuButton()
                     else
                       const SizedBox(width: 42),
-                    const SizedBox(width: 8),
-                    // Map + lasso — sits right next to the "גלה" selector.
-                    if (!provider.isLandlord)
-                      _buildLassoButton(context, provider),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Align(
                         alignment: Alignment.center,
@@ -672,42 +669,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       areaId: 'all_israel',
       customAreaPolygon: polygon,
     ));
-  }
-
-  Widget _buildLassoButton(BuildContext context, DatingProvider provider) {
-    return GestureDetector(
-      onTap: provider.isLoading ? null : () => _openAreaLasso(context, provider),
-      child: Container(
-        height: 42,
-        width: 42,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: provider.filters.hasCustomArea
-                ? AppColors.primary
-                : const Color(0xFFE2E8F0),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Center(
-          child: RentlyIcon(
-            IconsaxPlusLinear.map_1,
-            size: 20,
-            color: provider.filters.hasCustomArea
-                ? AppColors.primary
-                : AppColors.navy,
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildFiltersButton(BuildContext context, DatingProvider provider) {
@@ -5941,95 +5902,26 @@ class _PillSelector extends StatefulWidget {
   const _PillSelector({
     required this.selectedTab,
     required this.onTabChanged,
+    required this.onMapTap,
   });
 
   final DiscoverTab selectedTab;
   final ValueChanged<DiscoverTab> onTabChanged;
+  final VoidCallback onMapTap;
 
   @override
   State<_PillSelector> createState() => _PillSelectorState();
 }
 
-class _PillSelectorState extends State<_PillSelector>
-    with SingleTickerProviderStateMixin {
-  static const _selectorSpring = SpringDescription(
-    mass: 0.72,
-    stiffness: 520,
-    damping: 30,
-  );
+class _PillSelectorState extends State<_PillSelector> {
+  // Variable widths so "במיוחד בשבילך" gets the room it needs, while "גלה" (short)
+  // and the map icon stay compact. The sliding thumb resizes to the selected tab.
+  static const _wForYou = 1.95;
+  static const _wDiscover = 1.02;
+  static const _wMap = 1.0;
 
-  late final AnimationController _controller;
-  bool _hasSyncedInitialPosition = false;
-
-  bool _isDiscoverPressed = false;
-  bool _isForYouPressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController.unbounded(
-      vsync: this,
-      value: 0,
-    );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final target = _targetFor(widget.selectedTab);
-    if (!_hasSyncedInitialPosition) {
-      _controller.value = target;
-      _hasSyncedInitialPosition = true;
-    } else if (!_controller.isAnimating) {
-      _controller.value = target;
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _PillSelector oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedTab != widget.selectedTab) {
-      _springToSelected();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  double _targetFor(DiscoverTab tab) {
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-    if (tab == DiscoverTab.discover) {
-      return isRtl ? 1.0 : -1.0;
-    }
-    return isRtl ? -1.0 : 1.0;
-  }
-
-  void _springToSelected() {
-    final target = _targetFor(widget.selectedTab);
-    final delta = target - _controller.value;
-    final kick = delta.sign * math.max(3.4, delta.abs() * 3.1);
-    _controller.animateWith(
-      SpringSimulation(
-        _selectorSpring,
-        _controller.value,
-        target,
-        kick,
-      ),
-    );
-  }
-
-  void _setPressed(DiscoverTab tab, bool isPressed) {
-    setState(() {
-      if (tab == DiscoverTab.discover) {
-        _isDiscoverPressed = isPressed;
-      } else {
-        _isForYouPressed = isPressed;
-      }
-    });
-  }
+  DiscoverTab? _pressedTab;
+  bool _mapPressed = false;
 
   void _selectTab(DiscoverTab tab) {
     if (widget.selectedTab == tab) {
@@ -6047,118 +5939,104 @@ class _PillSelectorState extends State<_PillSelector>
         final fallbackWidth = MediaQuery.sizeOf(context).width - 128;
         final maxWidth =
             constraints.hasBoundedWidth ? constraints.maxWidth : fallbackWidth;
-        final width = math.max(0.0, math.min(306.0, maxWidth));
+        final width = math.max(0.0, math.min(340.0, maxWidth));
+        const pad = 5.0;
+        final inner = math.max(0.0, width - pad * 2);
+        final unit = inner / (_wForYou + _wDiscover + _wMap);
+        final mapW = _wMap * unit;
+        final discW = _wDiscover * unit;
+        final forW = _wForYou * unit;
+        // Visual order left→right: [map, גלה, במיוחד בשבילך].
+        final isDiscover = widget.selectedTab == DiscoverTab.discover;
+        final thumbLeft = isDiscover ? mapW : (mapW + discW);
+        final thumbW = isDiscover ? discW : forW;
 
         return Semantics(
           label: 'בחירת תצוגת דירות',
           child: SizedBox(
             width: width,
             height: 52,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                final alignmentX =
-                    _controller.value.clamp(-1.08, 1.08).toDouble();
-                final targetX = _targetFor(widget.selectedTab);
-                final velocity =
-                    (_controller.velocity.abs() / 14).clamp(0.0, 1.0).toDouble();
-                final distance =
-                    (targetX - _controller.value).abs().clamp(0.0, 1.0).toDouble();
-                final energy = math.max(velocity, distance * 0.65);
-                final stretch = 1.0 + energy * 0.22;
-                final squeeze = 1.0 - energy * 0.08;
-                final isDiscoverSelected =
-                    widget.selectedTab == DiscoverTab.discover;
-
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.96),
-                        const Color(0xFFEAF9FB).withValues(alpha: 0.94),
-                        const Color(0xFFF8FBFD).withValues(alpha: 0.98),
-                      ],
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.78),
-                      width: 1.4,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.navy.withValues(alpha: 0.10),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
-                      ),
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.14),
-                        blurRadius: 18,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.96),
+                    const Color(0xFFEAF9FB).withValues(alpha: 0.94),
+                    const Color(0xFFF8FBFD).withValues(alpha: 0.98),
+                  ],
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.10),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                      child: Padding(
-                        padding: const EdgeInsets.all(5),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: _SelectorEnergyPainter(
-                                  alignmentX: alignmentX,
-                                  energy: energy,
-                                  isDiscoverSelected: isDiscoverSelected,
-                                ),
-                              ),
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(pad),
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AnimatedPositioned(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                            left: thumbLeft,
+                            width: thumbW,
+                            top: 0,
+                            bottom: 0,
+                            child: _SlidingSelectorThumb(
+                              energy: 0,
+                              isDiscoverSelected: isDiscover,
                             ),
-                            Positioned.fill(
-                              child: Align(
-                                alignment: Alignment(alignmentX, 0),
-                                child: FractionallySizedBox(
-                                  widthFactor: 0.5,
-                                  heightFactor: 1,
-                                  child: Transform.scale(
-                                    scaleX: stretch,
-                                    scaleY: squeeze,
-                                    child: _SlidingSelectorThumb(
-                                      energy: energy,
-                                      isDiscoverSelected: isDiscoverSelected,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                _buildSegment(
+                          ),
+                          Row(
+                            children: [
+                              SizedBox(width: mapW, child: _mapSegment()),
+                              SizedBox(
+                                width: discW,
+                                child: _segment(
                                   tab: DiscoverTab.discover,
                                   icon: IconsaxPlusLinear.location,
                                   label: 'גלה',
-                                  isSelected: isDiscoverSelected,
-                                  isPressed: _isDiscoverPressed,
+                                  isSelected: isDiscover,
                                 ),
-                                _buildSegment(
+                              ),
+                              SizedBox(
+                                width: forW,
+                                child: _segment(
                                   tab: DiscoverTab.forYou,
                                   icon: IconsaxPlusBold.flash,
                                   label: 'במיוחד בשבילך',
-                                  isSelected: !isDiscoverSelected,
-                                  isPressed: _isForYouPressed,
+                                  isSelected: !isDiscover,
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
         );
@@ -6166,14 +6044,14 @@ class _PillSelectorState extends State<_PillSelector>
     );
   }
 
-  Widget _buildSegment({
+  Widget _segment({
     required DiscoverTab tab,
     required IconData icon,
     required String label,
     required bool isSelected,
-    required bool isPressed,
   }) {
     final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
+    final pressed = _pressedTab == tab;
     final selectedShadow = [
       Shadow(
         color: AppColors.navy.withValues(alpha: 0.22),
@@ -6181,81 +6059,98 @@ class _PillSelectorState extends State<_PillSelector>
         blurRadius: 5,
       ),
     ];
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressedTab = tab),
+        onTapUp: (_) => setState(() => _pressedTab = null),
+        onTapCancel: () => setState(() => _pressedTab = null),
+        onTap: () => _selectTab(tab),
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          scale: pressed ? 0.93 : (isSelected ? 1.03 : 1),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutBack,
+                    scale: isSelected ? 1.14 : 1,
+                    child: Icon(
+                      icon,
+                      size: 17,
+                      color: isSelected ? Colors.white : inactiveColor,
+                      shadows: isSelected ? selectedShadow : null,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1,
+                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w800,
+                      color: isSelected ? Colors.white : inactiveColor,
+                      shadows: isSelected ? selectedShadow : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-    return Expanded(
-      child: Semantics(
-        button: true,
-        selected: isSelected,
-        label: label,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => _setPressed(tab, true),
-          onTapUp: (_) => _setPressed(tab, false),
-          onTapCancel: () => _setPressed(tab, false),
-          onTap: () => _selectTab(tab),
-          child: AnimatedScale(
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOutCubic,
-            scale: isPressed ? 0.93 : (isSelected ? 1.03 : 1),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 6,
+  // Map + lasso — a selectable-looking icon segment that opens the area screen.
+  Widget _mapSegment() {
+    final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
+    return Semantics(
+      button: true,
+      label: 'מפה',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _mapPressed = true),
+        onTapUp: (_) => setState(() => _mapPressed = false),
+        onTapCancel: () => setState(() => _mapPressed = false),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onMapTap();
+        },
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          scale: _mapPressed ? 0.9 : 1,
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(IconsaxPlusLinear.map_1, size: 17, color: inactiveColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'מפה',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1,
+                      fontWeight: FontWeight.w800,
+                      color: inactiveColor,
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: isPressed && !isSelected
-                        ? AppColors.navy.withValues(alpha: 0.06)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedRotation(
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOutBack,
-                        turns: isSelected && tab == DiscoverTab.forYou
-                            ? -0.06
-                            : 0,
-                        child: AnimatedScale(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutBack,
-                          scale: isSelected ? 1.16 : 1,
-                          child: Icon(
-                            icon,
-                            size: 16,
-                            color: isSelected ? Colors.white : inactiveColor,
-                            shadows: isSelected ? selectedShadow : null,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 160),
-                        curve: Curves.easeOutCubic,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1,
-                          letterSpacing: 0,
-                          fontWeight:
-                              isSelected ? FontWeight.w900 : FontWeight.w800,
-                          color: isSelected ? Colors.white : inactiveColor,
-                          shadows: isSelected ? selectedShadow : null,
-                        ),
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
             ),
           ),
@@ -6352,64 +6247,3 @@ class _SlidingSelectorThumb extends StatelessWidget {
   }
 }
 
-class _SelectorEnergyPainter extends CustomPainter {
-  _SelectorEnergyPainter({
-    required this.alignmentX,
-    required this.energy,
-    required this.isDiscoverSelected,
-  });
-
-  final double alignmentX;
-  final double energy;
-  final bool isDiscoverSelected;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final activeCenter = Offset(
-      size.width * (0.25 + ((alignmentX + 1) / 2) * 0.5),
-      size.height / 2,
-    );
-    final railPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = AppColors.primary.withValues(alpha: 0.12 + energy * 0.08);
-    final rail = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      const Radius.circular(24),
-    ).deflate(0.5);
-    canvas.drawRRect(rail, railPaint);
-
-    final sparkPaint = Paint()..style = PaintingStyle.fill;
-    final leadColor =
-        isDiscoverSelected ? AppColors.superLike : AppColors.coral;
-    final sparks = <({Offset offset, double radius, Color color})>[
-      (
-        offset: Offset(-size.width * 0.18, -size.height * 0.25),
-        radius: 2.1 + energy * 1.4,
-        color: leadColor,
-      ),
-      (
-        offset: Offset(size.width * 0.18, size.height * 0.23),
-        radius: 1.7 + energy * 1.1,
-        color: AppColors.primary,
-      ),
-      (
-        offset: Offset(size.width * 0.04, -size.height * 0.30),
-        radius: 1.2 + energy * 0.9,
-        color: Colors.white,
-      ),
-    ];
-
-    for (final spark in sparks) {
-      sparkPaint.color = spark.color.withValues(alpha: 0.20 + energy * 0.35);
-      canvas.drawCircle(activeCenter + spark.offset, spark.radius, sparkPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SelectorEnergyPainter oldDelegate) {
-    return oldDelegate.alignmentX != alignmentX ||
-        oldDelegate.energy != energy ||
-        oldDelegate.isDiscoverSelected != isDiscoverSelected;
-  }
-}
