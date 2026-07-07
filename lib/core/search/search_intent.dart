@@ -77,13 +77,26 @@ class SearchIntent {
         caseSensitive: false),
   };
 
+  static final RegExp _negator =
+      RegExp(r'(בלי|ללא|לא ליד|לא רוצה|לא צריך|לא מעוניין|without|no)\s*$');
+
+  /// True if the intent keyword at [matchStart] is preceded (within ~14 chars) by
+  /// a negation like "בלי" / "לא" — so we don't add the opposite intent.
+  static bool _isNegated(String text, int matchStart) {
+    final from = matchStart - 14 < 0 ? 0 : matchStart - 14;
+    return _negator.hasMatch(text.substring(from, matchStart));
+  }
+
   /// The set of intents present in [text]. Elderly/retiree phrasing implies both
   /// quiet and accessibility; a student implies being near a campus.
   static Set<String> fromText(String text) {
     if (text.trim().isEmpty) return <String>{};
     final out = <String>{};
     for (final e in _patterns.entries) {
-      if (e.value.hasMatch(text)) out.add(e.key);
+      final m = e.value.firstMatch(text);
+      // Honour NEGATION: "בלי קומה גבוהה" / "לא ליד הים" must NOT add the intent
+      // (previously it flipped meaning and added view / near_sea).
+      if (m != null && !_isNegated(text, m.start)) out.add(e.key);
     }
     // ── Phase 2: life-stage inference ──────────────────────────────────────
     // A real agent reads a SINGLE cue about who the seeker is and fills in the
