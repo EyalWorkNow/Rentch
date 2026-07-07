@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,13 +29,16 @@ Future<void> showPropertyShareSheet(
 }
 
 String _shareMessage(RentalProperty property) {
+  // The Rently share link renders a rich banner (photo + price) in WhatsApp via
+  // the backend OpenGraph page (GET /p/:id).
+  final shareLink = '${AppConfig.awsApiGatewayUrl}/p/${property.id}';
   final details = <String>[
     'מצאתי נכס מעניין ב-Rently',
     property.address,
     '${property.priceLabel} ${property.priceSuffixLabel}',
     '${property.roomsLabel} חדרים',
     '${property.sizeM2} מ"ר',
-    if (property.url.trim().isNotEmpty) property.url.trim(),
+    shareLink,
   ];
   return details.join('\n');
 }

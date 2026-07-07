@@ -877,13 +877,128 @@ const json = (status, body) => ({
   body: JSON.stringify(body),
 });
 
+const html = (status, body) => ({
+  statusCode: status,
+  headers: {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'public, max-age=300',
+  },
+  body,
+});
+
+const _esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const SHARE_BASE = process.env.SHARE_BASE ||
+  'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod';
+const APP_STORE_URL = process.env.APP_STORE_URL ||
+  'https://apps.apple.com/app/rently';
+
+// Public share page: rich OpenGraph tags so WhatsApp/Telegram/social render a
+// banner (photo + title + price) when the listing link is sent.
+// Social link-preview crawlers that need the OG tags (all anonymous).
+const _OG_CRAWLERS =
+  /facebookexternalhit|whatsapp|twitterbot|telegrambot|slackbot|linkedinbot|discordbot|pinterest|redditbot|embedly|skypeuripreview|googlebot|bingbot|opengraph|vkshare|whatsapp\/|line-podcast/i;
+
+async function propertyOgPage(id, ua = '') {
+  // ANTI-SCRAPE: the rich card is served ONLY to link-preview crawlers. A real
+  // person (or a scraper) that opens the URL is bounced straight into the app,
+  // so the page can't be used to harvest listings. Combined with the random,
+  // unguessable 8-char ids (≈2.8e12 space → no enumeration), the endpoint leaks
+  // nothing beyond the single card the sharer chose to send.
+  if (ua && !_OG_CRAWLERS.test(ua)) {
+    return {
+      statusCode: 302,
+      headers: { Location: APP_STORE_URL, 'Cache-Control': 'no-store' },
+      body: '',
+    };
+  }
+
+  let p = null;
+  try {
+    const r = await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name, Key: { id },
+    }));
+    p = r.Item || null;
+  } catch { /* fall through to a generic card */ }
+
+  const shareUrl = `${SHARE_BASE}/p/${encodeURIComponent(id)}`;
+  const img = p
+    ? ((Array.isArray(p.imageUrls) && p.imageUrls[0]) ||
+       (Array.isArray(p.media) && p.media[0] && p.media[0].url) || '')
+    : '';
+  const isSale = p && p.transactionType === 'sale';
+  const priceTxt = p && p.price
+    ? `₪${Number(p.price).toLocaleString('en-US')}${isSale ? '' : ' לחודש'}`
+    : '';
+  const title = p
+    ? `${p.address || p.city || 'דירה'}${priceTxt ? ' · ' + priceTxt : ''}`
+    : 'Rently';
+  const parts = [];
+  if (p) {
+    if (p.rooms) parts.push(`${p.rooms} חדרים`);
+    if (p.sizeM2) parts.push(`${p.sizeM2} מ"ר`);
+    if (p.city) parts.push(p.city);
+  }
+  const desc = parts.join(' · ') || 'דירות להשכרה ולמכירה ב-Rently';
+
+  const t = _esc(title), d = _esc(desc), i = _esc(img), u = _esc(shareUrl);
+  const body = `<!doctype html><html lang="he" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${t}</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rently">
+<meta property="og:title" content="${t}">
+<meta property="og:description" content="${d}">
+${i ? `<meta property="og:image" content="${i}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">` : ''}
+<meta property="og:url" content="${u}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${t}">
+<meta name="twitter:description" content="${d}">
+${i ? `<meta name="twitter:image" content="${i}">` : ''}
+<style>body{font-family:-apple-system,system-ui,Arial,sans-serif;margin:0;background:#0f1220;color:#fff;text-align:center}
+.card{max-width:520px;margin:0 auto;padding:22px}
+.card img.hero{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:18px;display:block}
+h1{font-size:20px;margin:18px 12px 6px}p{color:#c9cfe0;margin:0 12px 22px}
+a.btn{display:inline-block;background:#14D3DC;color:#04222b;font-weight:800;text-decoration:none;padding:14px 30px;border-radius:999px}</style>
+</head><body><div class="card">
+${i ? `<img class="hero" src="${i}" alt="">` : ''}
+<h1>${t}</h1><p>${d}</p>
+<a class="btn" href="${_esc(APP_STORE_URL)}">פתח ב-Rently</a>
+</div></body></html>`;
+  return html(200, body);
+}
+
 export const handler = async (event) => {
   try {
+    // Lambda Function URL (public, no authorizer) → ONLY the public OpenGraph
+    // share page is served here; every other route still requires the
+    // authenticated API Gateway. This keeps the Function URL from exposing any
+    // data/mutations.
+    if (!event.httpMethod && event.requestContext?.http) {
+      const segs = (event.rawPath || '/').split('/').filter(Boolean);
+      if (event.requestContext.http.method === 'GET' &&
+          segs[0] === 'p' && segs[1]) {
+        const ua = event.headers?.['user-agent'] ||
+          event.headers?.['User-Agent'] || '';
+        return await propertyOgPage(decodeURIComponent(segs[1]), ua);
+      }
+      return json(404, { message: 'Not found' });
+    }
+
     const method = event.httpMethod;
     const path = event.path || '';
     const segments = path.split('/').filter(Boolean);
 
     if (method === 'OPTIONS') return json(200, {});
+
+    // ── Public share page (OpenGraph banner for WhatsApp/social) ────────────
+    // GET /p/:id → HTML with og:image/title/description. No auth (the WhatsApp
+    // crawler is anonymous).
+    if (segments[0] === 'p' && segments[1] && method === 'GET') {
+      return await propertyOgPage(decodeURIComponent(segments[1]));
+    }
 
     // ── Storage routes ──────────────────────────────────────────────────────
     if (segments[0] === 'storage') {
