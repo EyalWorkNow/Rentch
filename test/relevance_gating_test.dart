@@ -5,19 +5,31 @@ import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// The geo "why" chips must be RELEVANT to the search: a nightlife seeker never
-// gets school/family chips, and vice-versa.
-RentalProperty tlvFlat(String id, double dLat) => RentalProperty(
-      id: id, price: 6000, rooms: 4, sizeM2: 90, floor: '2', totalFloors: '6',
-      city: 'תל אביב', neighborhood: '', street: 'דיזנגוף', streetNumber: 100,
-      lat: 32.078 + dLat, lon: 34.774, propertyType: 'דירה',
+// The geo "why" chips must ALWAYS be relevant to the search: each persona names a
+// need, and only the matching lifestyle chips may appear — never the others.
+//
+// Geo emojis: 🏫 school · 🌳 park · 🏖️ sea · 🎓 university · 🍸 nightlife.
+
+RentalProperty tlvFlat(String id, double rooms, int price, double dLat) =>
+    RentalProperty(
+      id: id, price: price, rooms: rooms,
+      sizeM2: (55 + rooms * 12).toInt(), floor: '2',
+      totalFloors: '6', city: 'תל אביב', neighborhood: '', street: 'דיזנגוף',
+      streetNumber: 100, lat: 32.078 + dLat, lon: 34.774, propertyType: 'דירה',
       transactionType: PropertyTransactionType.rent, entryDate: '',
-      condition: 'טוב', ownerName: 'o', agencyListing: false,
-      features: const [],
+      condition: 'טוב', ownerName: 'o', agencyListing: false, features: const [],
       media: const [
         PropertyMedia(url: 'http://x/a.jpg', type: PropertyMediaType.image)
       ],
     );
+
+class _Persona {
+  const _Persona(this.name, this.query, this.forbid, [this.require = '']);
+  final String name;
+  final String query;
+  final List<String> forbid; // geo emojis that must NOT appear
+  final String require; // a geo emoji that MUST appear (empty = skip)
+}
 
 void main() {
   setUpAll(() async {
@@ -30,27 +42,56 @@ void main() {
     await IsraelGeoIndex.loadNightlife();
   });
 
-  final cat = [for (var i = 0; i < 6; i++) tlvFlat('p$i', i * 0.002)];
+  // Mixed stock (2–4 rooms) in central TLV — near schools, bars, ~1.4km from sea.
+  final cat = [
+    tlvFlat('a', 2.0, 5000, 0.000),
+    tlvFlat('b', 2.0, 5500, 0.002),
+    tlvFlat('c', 3.0, 6000, 0.004),
+    tlvFlat('d', 3.0, 6500, 0.006),
+    tlvFlat('e', 4.0, 7000, 0.008),
+    tlvFlat('f', 4.0, 7500, 0.010),
+  ];
 
-  List<String> allTags(String text) {
+  List<String> tagsFor(String text) {
     final q = SmartSearch.parse(text);
     final res = RecommendationEngine.recommendAsScored(
         candidates: cat, query: q, limit: 10, seed: 7);
     return [for (final s in res) ...s.tags];
   }
 
-  bool hasSchool(List<String> t) =>
-      t.any((s) => s.contains('בית ספר') || s.contains('🏫') || s.contains('מוסדות חינוך'));
+  const personas = [
+    _Persona('חיי לילה', 'אזור צעיר עם ברים ומסעדות בתל אביב עד 8000',
+        ['🏫', '🎓', '🏖️'], '🍸'),
+    _Persona('משפחה', 'דירה למשפחה עם ילדים בתל אביב עד 9000',
+        ['🍸', '🎓', '🏖️'], '🏫'),
+    _Persona('משפחה עם תינוק', 'משפחה עם תינוק בתל אביב עד 9000',
+        ['🍸', '🎓', '🏖️'], '🏫'),
+    _Persona('משפחה עם מתבגרים', 'משפחה עם ילדים מתבגרים בתל אביב עד 9000',
+        ['🍸', '🎓', '🏖️'], '🏫'),
+    _Persona('סטודנט', 'סטודנט מחפש דירה ליד האוניברסיטה בתל אביב',
+        ['🏫', '🍸', '🏖️']),
+    _Persona('חוף ים', 'דירה קרוב לים בתל אביב עד 9000', ['🏫', '🎓', '🍸']),
+    _Persona('זוג מבוגר שקט', 'זוג מבוגר מחפש דירה שקטה בתל אביב עד 9000',
+        ['🏫', '🍸', '🎓', '🏖️']),
+    _Persona('השקעה', 'דירה להשקעה בתל אביב עד 9000',
+        ['🏫', '🍸', '🎓', '🏖️']),
+    _Persona('שותפים', 'דירה לשותפים בתל אביב עד 8000', ['🏫', '🏖️', '🎓']),
+    _Persona('ניטרלי', 'דירת 3 חדרים בתל אביב עד 8000',
+        ['🏫', '🍸', '🎓', '🏖️']),
+  ];
 
-  test('nightlife search → NO school chip, YES nightlife chip', () {
-    final tags = allTags('מקום עם בארים ומסעדות בתל אביב עד 7000');
-    expect(hasSchool(tags), isFalse, reason: tags.join(' | '));
-    expect(tags.any((t) => t.contains('🍸')), isTrue, reason: tags.join(' | '));
-  });
-
-  test('family search → YES school chip, NO nightlife chip', () {
-    final tags = allTags('דירה למשפחה עם ילדים בתל אביב עד 9000');
-    expect(hasSchool(tags), isTrue, reason: tags.join(' | '));
-    expect(tags.any((t) => t.contains('🍸')), isFalse, reason: tags.join(' | '));
-  });
+  for (final p in personas) {
+    test('${p.name}: only relevant chips', () {
+      final tags = tagsFor(p.query);
+      final joined = tags.join(' | ');
+      for (final f in p.forbid) {
+        expect(tags.any((t) => t.contains(f)), isFalse,
+            reason: '[${p.name}] must NOT show "$f" — got: $joined');
+      }
+      if (p.require.isNotEmpty) {
+        expect(tags.any((t) => t.contains(p.require)), isTrue,
+            reason: '[${p.name}] expected "${p.require}" — got: $joined');
+      }
+    });
+  }
 }
