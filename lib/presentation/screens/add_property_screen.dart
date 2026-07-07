@@ -25,6 +25,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:dating_app/core/search/geo_auto_tags.dart';
 import 'package:dating_app/core/listing_score.dart';
+import 'package:dating_app/core/finance/price_realism.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:image_picker/image_picker.dart';
@@ -887,6 +888,18 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         createdAt: DateTime.now(),
       );
 
+      // ANTI-BAIT: if the price is wildly off the market for this size + city
+      // (a typo, or lead-bait), ask the owner to confirm or fix before it goes up.
+      final realism = PriceRealism.check(property);
+      if (realism.flag == PriceFlag.tooLow ||
+          realism.flag == PriceFlag.tooHigh) {
+        final proceed = await _confirmPriceRealism(realism);
+        if (proceed != true) {
+          if (mounted) setState(() => _isSaving = false);
+          return; // back to the form to fix the price
+        }
+      }
+
       await context.read<DatingProvider>().addLandlordProperty(property);
 
       if (!mounted) return;
@@ -909,6 +922,36 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  Future<bool?> _confirmPriceRealism(
+      ({PriceFlag flag, int fair, int expectedLow, int expectedHigh, double ratio})
+          r) {
+    final low = r.flag == PriceFlag.tooLow;
+    String fmt(int v) => '₪${v.toString().replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')}';
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(low ? 'המחיר נמוך מהרגיל 🤔' : 'המחיר גבוה מהרגיל 🤔'),
+        content: Text(
+          'המחיר שהזנת נראה ${low ? 'נמוך' : 'גבוה'} משמעותית מהשוק לגודל ולעיר '
+          'הזו.\nטווח סביר: ${fmt(r.expectedLow)}–${fmt(r.expectedHigh)}.\n\n'
+          'אולי נפלה טעות? אפשר לתקן, או להמשיך אם המחיר נכון.',
+          style: const TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('חזרה לתיקון'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('המחיר נכון, המשך'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

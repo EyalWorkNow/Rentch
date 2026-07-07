@@ -453,6 +453,15 @@ class GovData {
     return null;
   }
 
+  double? salePerSqm(String city) {
+    if (!_loaded) return null;
+    for (final key in _nameKeys(city)) {
+      final p = _market[key];
+      if (p != null && p.salePerSqm > 0) return p.salePerSqm;
+    }
+    return null;
+  }
+
   // ── new gov-data signals ─────────────────────────────────────────────────────
 
   /// [total, violent, property] recorded offences for a city, or null.

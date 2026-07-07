@@ -28,6 +28,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:dating_app/core/govdata/geo_intelligence.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/finance/price_realism.dart';
 import 'package:dating_app/core/govdata/market_intelligence.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 
@@ -936,6 +937,16 @@ class FeatureEngineer {
     final ppsValue = pps > 0 ? (1.0 - mkt.pricePerSqmPercentile(pps)) : 0.5;
     f['value_score'] = (0.6 * ((residual + 1) / 2) + 0.4 * ppsValue)
         .clamp(0.0, 1.0);
+    // ANTI-BAIT: an absurdly-cheap price (a typo, or lead-bait like "₪1,300 for a
+    // 430m² TLV house") would otherwise look like an incredible deal and TOP the
+    // results. Cap value + the underpricing residual by the price-trust so a fake
+    // can't win on a bogus discount.
+    final priceTrust = PriceRealism.priceTrust(p);
+    f['price_trust'] = priceTrust;
+    if (priceTrust < 1.0) {
+      f['value_score'] = (f['value_score']! * priceTrust).clamp(0.0, 1.0);
+      if (residual > 0) f['hedonic_residual'] = residual * priceTrust;
+    }
 
     // affordability: prefer the gov per-locality norm; fall back to the live
     // candidate-set city median.
