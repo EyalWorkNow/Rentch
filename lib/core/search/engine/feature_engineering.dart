@@ -256,6 +256,44 @@ class IsraelGeoIndex {
   static double? nearestSchoolKm(double lat, double lon) =>
       nearestSchool(lat, lon)?.km;
 
+  // Nightlife venues (OSM bars/pubs/clubs weighted 1.0, cafés 0.4). A LIVELY area
+  // isn't the nearest bar — it's the DENSITY of them around you.
+  static List<List<double>> _nightlife = const <List<double>>[]; // [lat,lon,w]
+  static bool _nightlifeLoaded = false;
+
+  static Future<void> loadNightlife() async {
+    if (_nightlifeLoaded) return;
+    _nightlifeLoaded = true;
+    try {
+      final raw =
+          await rootBundle.loadString('assets/data/govdata/nightlife.json');
+      final list = (jsonDecode(raw) as List);
+      _nightlife = [
+        for (final v in list)
+          if (v is List && v.length >= 3)
+            [
+              (v[0] as num).toDouble(),
+              (v[1] as num).toDouble(),
+              (v[2] as num).toDouble()
+            ],
+      ];
+    } catch (_) {
+      _nightlife = const <List<double>>[];
+    }
+  }
+
+  /// 0..1 nightlife/vibrancy — weighted density of bars/pubs/clubs/cafés within a
+  /// ~1km walk (closer venues count more). High = a lively, going-out area.
+  static double nightlifeDensity(double lat, double lon) {
+    if (_nightlife.isEmpty || !_hasCoords(lat, lon)) return 0.0;
+    double sum = 0;
+    for (final v in _nightlife) {
+      final d = haversineKm(lat, lon, v[0], v[1]);
+      if (d <= 1.0) sum += v[2] * (1.0 - d); // linear walk-decay
+    }
+    return (sum / 9.0).clamp(0.0, 1.0); // ~9 weighted venues in 1km → very lively
+  }
+
   // Most OSM schools are the generic 'בית ספר' — in Israel that's the default
   // ELEMENTARY school (חטיבה/תיכון are named explicitly), so treat generic as
   // elementary when the caller asks for יסודי.
@@ -1067,6 +1105,8 @@ class FeatureEngineer {
         IsraelGeoIndex.schoolTypeProximity(p.lat, p.lon, ['גן', 'יסודי']);
     f['school_teen_prox'] =
         IsraelGeoIndex.schoolTypeProximity(p.lat, p.lon, ['תיכון', 'חטיבה']);
+    // Nightlife/vibrancy — real bar/pub/café density (a "young, lively area").
+    f['nightlife'] = IsraelGeoIndex.nightlifeDensity(p.lat, p.lon);
     f['health_access'] = gov.healthAccessScore(p.city);
     final demo = gov.demographics(p.city);
     f['demo_young'] = demo?['youngShare'] ?? 0.5; // working-age share (20-64)

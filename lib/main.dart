@@ -77,6 +77,7 @@ void main() async {
     await GovData.instance.init();
     await IsraelGeoIndex.loadParks(); // public-park proximity for the ranker
     await IsraelGeoIndex.loadSchools(); // named + typed school proximity
+    await IsraelGeoIndex.loadNightlife(); // bar/pub/café density (vibrant areas)
   } catch (error) {
     debugPrint('GovData init skipped: $error');
   }

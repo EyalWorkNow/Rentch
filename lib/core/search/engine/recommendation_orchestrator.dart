@@ -295,6 +295,13 @@ class Explainer {
     if (uni != null && uni.km <= 1.5) {
       chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
     }
+    // Vibrant / nightlife area (real bar/pub/café density).
+    final nl = pfv.get('nightlife', 0.0);
+    if (nl > 0.6) {
+      chips.add('🍸 אזור תוסס — חיי לילה');
+    } else if (nl > 0.35) {
+      chips.add('🍸 קרוב לברים ובתי קפה');
+    }
     if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
       chips.add('שכונה צעירה');
     } else if (pfv.get('demo_child') > 0.6) {

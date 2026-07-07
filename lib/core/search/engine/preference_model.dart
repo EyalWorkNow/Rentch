@@ -54,6 +54,7 @@ const List<String> kScoringDimensions = [
   'religious_area', // observant community — weighted only on a religious intent
   'school_young', // proximity to גן/יסודי — weighted for young kids
   'school_teen', // proximity to חטיבה/תיכון — weighted for teens
+  'nightlife', // real bar/pub/café density — weighted on a nightlife/vibrant intent
   'yield', // gross rental yield (sale listings) — weighted only on investment intent
   'university', // proximity to a university/college — weighted on student intent
   'young_area', // CBS share of young adults — weighted on young/nightlife intent
@@ -469,6 +470,8 @@ class UserPreferenceModel {
         return pfv.get('school_young_prox', 0.0).clamp(0.0, 1.0);
       case 'school_teen':
         return pfv.get('school_teen_prox', 0.0).clamp(0.0, 1.0);
+      case 'nightlife':
+        return pfv.get('nightlife', 0.0).clamp(0.0, 1.0);
       case 'yield':
         // Sale listings only; rentals stay neutral (weight is 0 there anyway).
         final est = RentalYield.estimate(
@@ -600,6 +603,7 @@ class PreferenceModelBuilder {
     'religious_area': 0.0,
     'school_young': 0.0,
     'school_teen': 0.0,
+    'nightlife': 0.0,
     'yield': 0.0,
     'university': 0.0,
     'young_area': 0.0,
@@ -734,7 +738,10 @@ class PreferenceModelBuilder {
       sharpen('young_area', 0.85, 6.0);
     }
     if (intents.contains(SearchIntent.nightlife)) {
-      sharpen('young_area', 0.92, 11.0);
+      // REAL bar/pub/café density is the strongest signal; young demographics +
+      // centrality reinforce it.
+      sharpen('nightlife', 0.95, 14.0);
+      sharpen('young_area', 0.92, 8.0);
       sharpen('location', 0.7, 3.0); // vibrant areas are central
     }
     if (intents.contains(SearchIntent.quiet)) sharpen('senior_area', 0.95, 10.0);

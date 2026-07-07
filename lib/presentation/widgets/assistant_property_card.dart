@@ -200,12 +200,15 @@ class AssistantPropertyCard extends StatelessWidget {
                       _InfoChip(
                           icon: IconsaxPlusLinear.maximize_3,
                           label: '${p.sizeM2} מ״ר'),
-                      for (final t in scored.tags) ...[
+                      for (final t in scored.tags.where((t) => !_isGeoTag(t))) ...[
                         const SizedBox(width: 8),
                         _InfoChip(label: t),
                       ],
                     ]),
                   ),
+                  // "Why here" — the real named places (X מ׳ from park/school/…), as
+                  // a WRAP of iconsax tags (not a carousel) so each reads clearly.
+                  ..._geoWhy(scored.tags),
                   // Expandable transparency panel — the data-grounded "why this
                   // one" (dimensions + stats + persona + reason).
                   if (scored.scorecard != null)
@@ -238,6 +241,70 @@ class AssistantPropertyCard extends StatelessWidget {
         ),
         child: Icon(icon, size: 17, color: color),
       ),
+    );
+  }
+}
+
+// Geo "why here" tags are emoji-prefixed in the engine; here we map the emoji to
+// an iconsax icon and strip it from the label.
+const Map<String, IconData> _geoIcon = {
+  '🏫': IconsaxPlusLinear.buildings_2,
+  '🌳': IconsaxPlusLinear.tree,
+  '🚉': IconsaxPlusLinear.bus,
+  '🏖️': IconsaxPlusLinear.sun_1,
+  '🎓': IconsaxPlusLinear.teacher,
+  '🍸': IconsaxPlusLinear.coffee,
+};
+
+bool _isGeoTag(String t) => _geoIcon.keys.any(t.startsWith);
+
+/// Render the geo tags (if any) as a wrap under the quick facts.
+List<Widget> _geoWhy(List<String> tags) {
+  final geo = tags.where(_isGeoTag).toList();
+  if (geo.isEmpty) return const [];
+  return [
+    Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [for (final t in geo) _GeoTag(t)],
+      ),
+    ),
+  ];
+}
+
+class _GeoTag extends StatelessWidget {
+  const _GeoTag(this.raw);
+  final String raw;
+
+  @override
+  Widget build(BuildContext context) {
+    var icon = IconsaxPlusLinear.location;
+    var label = raw;
+    for (final e in _geoIcon.entries) {
+      if (raw.startsWith(e.key)) {
+        icon = e.value;
+        label = raw.substring(e.key.length).trim();
+        break;
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 15, color: AppColors.primary),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.navy)),
+      ]),
     );
   }
 }
