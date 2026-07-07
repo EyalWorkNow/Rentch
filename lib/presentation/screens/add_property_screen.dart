@@ -24,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:dating_app/core/search/geo_auto_tags.dart';
+import 'package:dating_app/core/listing_score.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:image_picker/image_picker.dart';
@@ -889,6 +890,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       await context.read<DatingProvider>().addLandlordProperty(property);
 
       if (!mounted) return;
+      // Auto-score the listing (our engine, verified signals) and show it back.
+      final score = ListingScore.basic(property);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 4),
+        backgroundColor: AppColors.navy,
+        content: Text('הדירה עלתה! ניקוד מודעה: $score/100 · '
+            '${ListingScore.label(score)}'),
+      ));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
