@@ -328,9 +328,15 @@ class Explainer {
         chips.add('🍸 קרוב לברים ומסעדות');
       }
     }
-    if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
+    // Demographic character — gated by intent, like the other lifestyle chips:
+    // a "young neighbourhood" tag only for a young/nightlife seeker, a "family
+    // neighbourhood" tag only for a family seeker (never just because the stat
+    // exists). `wantsSchools` above already captures the family intents.
+    if (intents.contains(SearchIntent.nightlife) &&
+        pfv.get('demo_young') > 0.66 &&
+        pfv.get('demo_child') < 0.3) {
       chips.add('שכונה צעירה');
-    } else if (pfv.get('demo_child') > 0.6) {
+    } else if (wantsSchools && pfv.get('demo_child') > 0.6) {
       chips.add('שכונה משפחתית');
     }
 

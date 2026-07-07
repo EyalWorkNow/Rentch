@@ -902,7 +902,9 @@ class FeatureEngineer {
   static double wilsonLowerBound(int positives, int trials, {double z = 1.96}) {
     if (trials <= 0) return 0.0;
     final n = trials.toDouble();
-    final phat = positives / n;
+    // Clamp the rate: malformed data with positives > trials would make
+    // phat·(1−phat) negative and the sqrt NaN.
+    final phat = (positives / n).clamp(0.0, 1.0);
     final z2 = z * z;
     final denom = 1 + z2 / n;
     final centre = phat + z2 / (2 * n);
@@ -993,8 +995,10 @@ class FeatureEngineer {
           MarketIntelligence.affordabilityVsLocal(p.price, p.city, p.sizeM2);
     } else {
       final cityMed = mkt.cityMedianPrice[p.city];
+      // Clamp to [0,1]: the outer (1 − …) reaches 2.0 for a well-below-median
+      // price, which would over-count cheapness vs every other [0,1] feature.
       f['affordability_local'] = (cityMed != null && cityMed > 0 && p.price > 0)
-          ? (1.0 - ((p.price / cityMed) - 1).clamp(-1.0, 1.0))
+          ? (1.0 - ((p.price / cityMed) - 1).clamp(-1.0, 1.0)).clamp(0.0, 1.0)
           : 0.5;
     }
 

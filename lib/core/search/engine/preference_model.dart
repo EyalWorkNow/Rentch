@@ -666,9 +666,16 @@ class PreferenceModelBuilder {
     final stated = <String>{};
 
     // ── resolve targets ───────────────────────────────────────────────────────
+    // Last-resort budget when the market is empty: a rental-scale 8000 would zero
+    // the (highest-weight) budget axis for EVERY sale listing (price ≫ 8000), so
+    // the fallback must match the transaction scale.
+    final emptyMarketDefault =
+        query.transactionType == TransactionTypeFilter.sale ? 2000000 : 8000;
     final maxBudget = (query.maxPrice ??
             profile?.budgetMax ??
-            (market.medianPrice > 0 ? (market.medianPrice * 1.1).round() : 8000))
+            (market.medianPrice > 0
+                ? (market.medianPrice * 1.1).round()
+                : emptyMarketDefault))
         .toDouble();
     final minBudget = query.minPrice;
     final cheap = query.cheapPreference;
