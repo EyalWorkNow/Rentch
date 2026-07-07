@@ -283,58 +283,64 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Stack(
                                         clipBehavior: Clip.none,
                                         children: [
-                                          // אתי stacks a small icon + the "אתי ai"
-                                          // label INSIDE the circle, so every tab
-                                          // stays exactly the same size.
-                                          Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                          AnimatedScale(
-                                            scale: isSelected ? 1.12 : 1.0,
-                                            duration: const Duration(milliseconds: 300),
-                                            curve: Curves.elasticOut,
-                                            // On entry, אתי's circle shows her face
-                                            // for a few seconds, then the icon.
-                                            child: (isEtti && _ettiPeek)
+                                          // אתי's circle: her PHOTO during the 3s
+                                          // entry peek AND whenever her tab is active
+                                          // (permanent on her page); an AI icon
+                                          // otherwise. The photo RISES in with a
+                                          // springy micro-animation.
+                                          AnimatedSwitcher(
+                                            duration:
+                                                const Duration(milliseconds: 420),
+                                            switchInCurve: Curves.easeOutBack,
+                                            switchOutCurve: Curves.easeIn,
+                                            transitionBuilder: (child, anim) =>
+                                                FadeTransition(
+                                              opacity: anim,
+                                              child: SlideTransition(
+                                                position: Tween<Offset>(
+                                                  begin: const Offset(0, 0.55),
+                                                  end: Offset.zero,
+                                                ).animate(anim),
+                                                child: child,
+                                              ),
+                                            ),
+                                            child: (isEtti &&
+                                                    (_ettiPeek || isSelected))
                                                 ? ClipOval(
+                                                    key: const ValueKey(
+                                                        'etti-photo'),
                                                     child: Image.asset(
                                                       'assets/images/eti.jpg',
-                                                      width: circleSize * 0.86,
-                                                      height: circleSize * 0.86,
+                                                      width: circleSize * 0.9,
+                                                      height: circleSize * 0.9,
                                                       fit: BoxFit.cover,
                                                     ),
                                                   )
-                                                : RentlyIcon(
-                                                    isSelected
-                                                        ? item.activeIcon
-                                                        : item.icon,
-                                                    color: Colors.white,
-                                                    size: isEtti
-                                                        ? (isCompact ? 20.0 : 22.0)
-                                                        : (isCompact
-                                                            ? (isNotDiscover
-                                                                ? 26.0
-                                                                : 24.0)
-                                                            : (isNotDiscover
-                                                                ? 31.0
-                                                                : 28.0)),
+                                                : AnimatedScale(
+                                                    key: ValueKey(
+                                                        'ic-$index-$isSelected'),
+                                                    scale:
+                                                        isSelected ? 1.12 : 1.0,
+                                                    duration: const Duration(
+                                                        milliseconds: 300),
+                                                    curve: Curves.elasticOut,
+                                                    child: RentlyIcon(
+                                                      isEtti
+                                                          ? IconsaxPlusLinear
+                                                              .magicpen
+                                                          : (isSelected
+                                                              ? item.activeIcon
+                                                              : item.icon),
+                                                      color: Colors.white,
+                                                      size: isCompact
+                                                          ? (isNotDiscover
+                                                              ? 26.0
+                                                              : 24.0)
+                                                          : (isNotDiscover
+                                                              ? 31.0
+                                                              : 28.0),
+                                                    ),
                                                   ),
-                                          ),
-                                              if (isEtti && !_ettiPeek) ...[
-                                                const SizedBox(height: 1),
-                                                const Text(
-                                                  'אתי ai',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 8,
-                                                    fontWeight: FontWeight.w800,
-                                                    height: 1.0,
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
                                           ),
                                           if (showBadge)
                                             Positioned(

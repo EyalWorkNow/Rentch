@@ -165,7 +165,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   // ── editable active-criteria bar ──────────────────────────────────────────
   Widget _criteriaBar() {
-    if (_query.isEmpty) return const SizedBox.shrink();
+    // A fresh conversation shows NO filters until the user has actually searched —
+    // the persona seed still personalises ranking silently, it just isn't shown as
+    // "הסינונים שלך" before the user has done anything.
+    if (_query.isEmpty || !_searched) return const SizedBox.shrink();
     final items = <Widget>[];
     if (_query.neighborhood != null) {
       items.add(_removableChip('📍 ${_query.neighborhood}',
@@ -231,7 +234,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         GestureDetector(
             onTap: onRemove,
             child:
-                Icon(Icons.close, size: 15, color: AppColors.primaryDark)),
+                Icon(IconsaxPlusLinear.close_circle, size: 15, color: AppColors.primaryDark)),
       ]),
     );
   }
@@ -354,7 +357,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                         fontWeight: FontWeight.w700,
                         fontSize: 13)),
                 const SizedBox(width: 4),
-                Icon(Icons.keyboard_arrow_down,
+                Icon(IconsaxPlusLinear.arrow_down_1,
                     size: 18, color: AppColors.primaryDark),
               ]),
             ),
@@ -1724,7 +1727,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
           actions: [
             IconButton(
               tooltip: 'שיחה חדשה',
-              icon: Icon(Icons.refresh,
+              icon: Icon(IconsaxPlusLinear.refresh_2,
                   color: AppColors.textSecondary, size: 24),
               onPressed: _resetConversation,
             ),
@@ -1858,7 +1861,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       child: Row(children: [
         ElevatedButton.icon(
           onPressed: _busy ? null : _shareLocationNow,
-          icon: const Icon(Icons.my_location, size: 18),
+          icon: const Icon(IconsaxPlusLinear.gps, size: 18),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.textOnPrimary,
@@ -1991,7 +1994,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                         end: Alignment.bottomRight),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.graphic_eq,
+                  child: const Icon(IconsaxPlusLinear.voice_square,
                       color: Colors.white, size: 24),
                 ),
               ),
@@ -2142,7 +2145,7 @@ class _AssistantPropertyCard extends StatelessWidget {
                             ],
                           ),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.verified,
+                            Icon(IconsaxPlusBold.verify,
                                 size: 13, color: AppColors.success),
                             const SizedBox(width: 3),
                             const Text('מאומת',
@@ -2158,14 +2161,14 @@ class _AssistantPropertyCard extends StatelessWidget {
                       left: 10,
                       child: Row(children: [
                         _circleAction(
-                          icon: saved ? Icons.favorite : Icons.favorite_border,
+                          icon: saved ? IconsaxPlusBold.heart : IconsaxPlusLinear.heart,
                           color: saved ? AppColors.coral : AppColors.navy,
                           onTap: () =>
                               context.read<DatingProvider>().toggleSave(p.id),
                         ),
                         const SizedBox(width: 8),
                         _circleAction(
-                          icon: Icons.ios_share,
+                          icon: IconsaxPlusLinear.export_1,
                           color: AppColors.navy,
                           onTap: () => showPropertyShareSheet(context, p),
                         ),

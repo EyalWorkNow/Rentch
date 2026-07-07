@@ -38,23 +38,21 @@ class SpeedModeSlider extends StatelessWidget {
     super.key,
     required this.immediate,
     required this.onChanged,
-    this.dark = false,
     this.width = 208,
   });
 
   /// true = fast/immediate mode; false = personalization mode.
   final bool immediate;
   final ValueChanged<bool> onChanged;
-  final bool dark;
   final double width;
 
   @override
   Widget build(BuildContext context) {
     const h = 34.0;
-    final base = dark
-        ? Colors.white.withValues(alpha: 0.14)
-        : AppColors.primary.withValues(alpha: 0.08);
-    final idle = dark ? Colors.white70 : AppColors.textSecondary;
+    // Self-contained (opaque) so it looks IDENTICAL on the light chat and the
+    // dark voice screen.
+    const base = Color(0xFFECECF3);
+    final idle = AppColors.textSecondary;
     return SizedBox(
       width: width,
       height: h,

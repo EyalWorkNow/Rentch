@@ -4,6 +4,7 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 
 /// Feature #7 — side-by-side comparison of the tenant's saved properties.
@@ -51,7 +52,7 @@ class _CompareScreenState extends State<CompareScreen> {
           actions: [
             IconButton(
               tooltip: 'חיפוש דירה להשוואה',
-              icon: const Icon(Icons.search),
+              icon: const Icon(IconsaxPlusLinear.search_normal_1),
               onPressed: () => _openSearch(provider),
             ),
           ],
@@ -249,30 +250,147 @@ class _CompareTable extends StatelessWidget {
       }, best: _Best.max),
     ];
 
+    final bestIdx = _bestValueIndex(properties);
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.borderLight),
-          ),
-          child: Column(
-            children: [
-              _HeaderRow(properties: properties),
-              for (var i = 0; i < rows.length; i++)
-                _DataRow(
-                  row: rows[i],
-                  properties: properties,
-                  shaded: i.isEven,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (bestIdx >= 0) ...[
+              _ValueVerdict(
+                winner: properties[bestIdx],
+                pros: _pros(properties, bestIdx),
+                cons: _cons(properties, bestIdx),
+                ppmLabel: _perM2Label(properties[bestIdx]),
+              ),
+              const SizedBox(height: 12),
             ],
-          ),
+            Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Column(
+                children: [
+                  _HeaderRow(properties: properties, winnerIndex: bestIdx),
+                  for (var i = 0; i < rows.length; i++)
+                    _DataRow(
+                      row: rows[i],
+                      properties: properties,
+                      shaded: i.isEven,
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  // Value-for-money pick: mostly ₪/m² (the dry value metric), nudged by premium
+  // features + the match score. Returns the winning index, or -1 if < 2 columns.
+  int _bestValueIndex(List<RentalProperty> props) {
+    if (props.length < 2) return -1;
+    final ppms = props.map(_perM2).whereType<double>().toList();
+    final maxPpm = ppms.isEmpty ? 0.0 : ppms.reduce((a, b) => a > b ? a : b);
+    double score(RentalProperty p) {
+      final ppm = _perM2(p);
+      // Cheaper ₪/m² → higher score (1 = best value per m² in the group).
+      final ppmScore = (ppm == null || maxPpm == 0) ? 0.5 : (1 - ppm / maxPpm);
+      final feat = _premiumFeatures
+              .where((f) => p.featureFlags.isEnabled(f))
+              .length /
+          _premiumFeatures.length;
+      final m = (provider.displayMatchScore(p) ?? 0) / 100.0;
+      return ppmScore * 0.6 + feat * 0.25 + m * 0.15;
+    }
+
+    var best = 0;
+    var bestScore = -1.0;
+    for (var i = 0; i < props.length; i++) {
+      final s = score(props[i]);
+      if (s > bestScore) {
+        bestScore = s;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  static const _premiumFeatures = ['elevator', 'parking', 'balcony', 'mamad'];
+  static const _featureHe = {
+    'elevator': 'מעלית',
+    'parking': 'חניה',
+    'balcony': 'מרפסת',
+    'mamad': 'ממ"ד',
+  };
+
+  // What the winner beats the others on (dry data).
+  List<String> _pros(List<RentalProperty> props, int idx) {
+    final w = props[idx];
+    final others = [
+      for (var i = 0; i < props.length; i++)
+        if (i != idx) props[i]
+    ];
+    final out = <String>[];
+    final wPpm = _perM2(w);
+    if (wPpm != null &&
+        others.every((o) {
+          final op = _perM2(o);
+          return op == null || wPpm <= op;
+        })) {
+      out.add('התמורה הכי טובה למחיר — ${_perM2Label(w)} למ"ר');
+    }
+    if (w.price > 0 && others.every((o) => o.price <= 0 || w.price <= o.price)) {
+      out.add('הכי זולה — ${w.priceLabel}');
+    }
+    if (w.sizeM2 > 0 && others.every((o) => w.sizeM2 >= o.sizeM2)) {
+      out.add('הכי מרווחת — ${w.sizeM2} מ"ר');
+    }
+    for (final f in _premiumFeatures) {
+      if (w.featureFlags.isEnabled(f) &&
+          others.any((o) => !o.featureFlags.isEnabled(f))) {
+        out.add('עם ${_featureHe[f]} (חלק מהאחרות בלי)');
+      }
+    }
+    final wm = provider.displayMatchScore(w);
+    if (wm != null &&
+        others.every((o) {
+          final om = provider.displayMatchScore(o);
+          return om == null || wm >= om;
+        })) {
+      out.add('ההתאמה הגבוהה ביותר — $wm%');
+    }
+    return out.take(4).toList();
+  }
+
+  // Where the winner is weaker — so the recommendation stays honest.
+  List<String> _cons(List<RentalProperty> props, int idx) {
+    final w = props[idx];
+    final others = [
+      for (var i = 0; i < props.length; i++)
+        if (i != idx) props[i]
+    ];
+    final out = <String>[];
+    final cheaper = others
+        .where((o) => o.price > 0 && (w.price <= 0 || o.price < w.price))
+        .toList();
+    if (cheaper.isNotEmpty) {
+      out.add('לא הכי זולה — יש זולה יותר ב-${w.priceLabel}');
+    }
+    final bigger = others.where((o) => o.sizeM2 > w.sizeM2).toList();
+    if (bigger.isNotEmpty) out.add('יש מרווחת יותר בהשוואה');
+    for (final f in _premiumFeatures) {
+      if (!w.featureFlags.isEnabled(f) &&
+          others.any((o) => o.featureFlags.isEnabled(f))) {
+        out.add('בלי ${_featureHe[f]} (יש באחרת)');
+      }
+    }
+    return out.take(3).toList();
   }
 
   static double? _perM2(RentalProperty p) =>
@@ -289,6 +407,104 @@ class _CompareTable extends StatelessWidget {
     final total = p.totalFloors.trim();
     return total.isEmpty ? floor : '$floor/$total';
   }
+}
+
+/// The dry value-for-money recommendation: which saved listing gives the most
+/// per shekel, with an honest pros/cons breakdown.
+class _ValueVerdict extends StatelessWidget {
+  const _ValueVerdict({
+    required this.winner,
+    required this.pros,
+    required this.cons,
+    required this.ppmLabel,
+  });
+
+  final RentalProperty winner;
+  final List<String> pros;
+  final List<String> cons;
+  final String ppmLabel;
+
+  String get _where {
+    final w = winner.neighborhood.trim().isNotEmpty
+        ? winner.neighborhood.trim()
+        : winner.city.trim();
+    return w.isNotEmpty ? w : winner.address;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            AppColors.primary,
+            AppColors.primary.withValues(alpha: 0.82),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Text('🏆', style: TextStyle(fontSize: 20)),
+              SizedBox(width: 8),
+              Text('המשתלמת ביותר',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(_where,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800)),
+          Text('תמורה למחיר: $ppmLabel למ"ר · ${winner.priceLabel}',
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
+          const SizedBox(height: 12),
+          for (final p in pros)
+            _line(IconsaxPlusBold.tick_circle, p, Colors.white),
+          if (cons.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            for (final c in cons)
+              _line(IconsaxPlusLinear.minus_cirlce, c,
+                  Colors.white.withValues(alpha: 0.78)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _line(IconData icon, String text, Color color) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2.5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(text,
+                  style:
+                      TextStyle(color: color, fontSize: 12.5, height: 1.25)),
+            ),
+          ],
+        ),
+      );
 }
 
 enum _Best { none, min, max }
@@ -318,8 +534,9 @@ class _CompareRow {
 }
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.properties});
+  const _HeaderRow({required this.properties, this.winnerIndex = -1});
   final List<RentalProperty> properties;
+  final int winnerIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -329,8 +546,11 @@ class _HeaderRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _LabelCell(''),
-          for (final p in properties)
-            Expanded(
+          for (var ci = 0; ci < properties.length; ci++)
+            Builder(builder: (context) {
+              final p = properties[ci];
+              final isWinner = ci == winnerIndex;
+              return Expanded(
               child: InkWell(
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -343,6 +563,21 @@ class _HeaderRow extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (isWinner)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('🏆 מומלץ',
+                              style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white)),
+                        ),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: SizedBox(
@@ -360,17 +595,20 @@ class _HeaderRow extends StatelessWidget {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          color: isWinner
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
+            );
+            }),
         ],
       ),
     );
@@ -438,7 +676,7 @@ class _DataRow extends StatelessWidget {
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
         child: Icon(
-          on ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded,
+          on ? IconsaxPlusBold.tick_circle : IconsaxPlusLinear.minus_cirlce,
           color: on ? AppColors.success : AppColors.textDisabled,
           size: 22,
         ),
@@ -578,7 +816,7 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
                 onChanged: (v) => setState(() => _q = v),
                 decoration: InputDecoration(
                   hintText: 'חיפוש לפי עיר / שכונה / כתובת…',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(IconsaxPlusLinear.search_normal_1),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(

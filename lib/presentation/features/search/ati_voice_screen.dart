@@ -6,6 +6,7 @@ import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:dating_app/presentation/widgets/ati_voice_property_card.dart';
 import 'package:flutter/material.dart';
 
@@ -304,7 +305,6 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                     builder: (_, immediate, __) => SpeedModeSlider(
                       immediate: immediate,
                       onChanged: SpeedMode.set,
-                      dark: true,
                     ),
                   ),
                 ),
@@ -337,7 +337,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down_rounded,
+            icon: const Icon(IconsaxPlusLinear.arrow_down_1,
                 color: Colors.white70, size: 32),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
@@ -357,7 +357,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           const Spacer(),
           IconButton(
             tooltip: 'שיחה חדשה',
-            icon: const Icon(Icons.edit_note_rounded,
+            icon: const Icon(IconsaxPlusLinear.edit_2,
                 color: Colors.white70, size: 28),
             onPressed: _newConversation,
           ),
@@ -540,7 +540,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.home_rounded, color: AppColors.primary, size: 22),
+              Icon(IconsaxPlusBold.home_2, color: AppColors.primary, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Text('מצאתי $_resultCount דירות שמתאימות לך',
@@ -552,7 +552,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
               const Text('הצג',
                   style: TextStyle(
                       color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-              const Icon(Icons.chevron_left_rounded, color: Colors.white70),
+              const Icon(IconsaxPlusLinear.arrow_left_2, color: Colors.white70),
             ],
           ),
         ),
@@ -571,7 +571,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             onPointerUp: (_) => _stopAndSend(),
             onPointerCancel: (_) => _stopAndSend(),
             child: _roundBtn(
-              icon: _recording ? Icons.mic_rounded : Icons.mic_none_rounded,
+              icon: _recording ? IconsaxPlusBold.microphone : IconsaxPlusLinear.microphone,
               bg: _recording
                   ? const Color(0xFF7CE0E6).withValues(alpha: 0.30)
                   : Colors.white.withValues(alpha: 0.12),
@@ -580,13 +580,13 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           ),
           _roundBtn(
             icon: _state == AtiVoiceState.speaking
-                ? Icons.graphic_eq_rounded
-                : Icons.keyboard_rounded,
+                ? IconsaxPlusLinear.voice_square
+                : IconsaxPlusLinear.keyboard,
             bg: Colors.white.withValues(alpha: 0.12),
             onTap: () => Navigator.of(context).maybePop(),
           ),
           _roundBtn(
-            icon: Icons.close_rounded,
+            icon: IconsaxPlusLinear.close_circle,
             bg: const Color(0xFFFF5A67),
             onTap: () => Navigator.of(context).maybePop(),
             big: true,
@@ -669,7 +669,7 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
+              Icon(IconsaxPlusLinear.gps, color: Colors.white, size: 20),
               SizedBox(width: 10),
               Text('שיתוף המיקום שלי',
                   style: TextStyle(
