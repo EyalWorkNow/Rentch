@@ -15,6 +15,7 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/widgets/nav_assistant_orb.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
@@ -289,73 +290,43 @@ class _HomeScreenState extends State<HomeScreen> {
                                           // (permanent on her page); an AI icon
                                           // otherwise. The photo RISES in with a
                                           // springy micro-animation.
-                                          AnimatedSwitcher(
-                                            duration:
-                                                const Duration(milliseconds: 420),
-                                            switchInCurve: Curves.easeOutBack,
-                                            switchOutCurve: Curves.easeIn,
-                                            transitionBuilder: (child, anim) =>
-                                                FadeTransition(
-                                              opacity: anim,
-                                              child: SlideTransition(
-                                                position: Tween<Offset>(
-                                                  begin: const Offset(0, 0.55),
-                                                  end: Offset.zero,
-                                                ).animate(anim),
-                                                child: child,
+                                          _EttiCircleContent(
+                                            showPhoto: isEtti &&
+                                                (_ettiPeek || isSelected),
+                                            size: circleSize,
+                                            photo: ClipOval(
+                                              child: Image.asset(
+                                                'assets/images/eti.jpg',
+                                                width: circleSize * 0.9,
+                                                height: circleSize * 0.9,
+                                                fit: BoxFit.cover,
                                               ),
                                             ),
-                                            child: (isEtti &&
-                                                    (_ettiPeek || isSelected))
-                                                ? ClipOval(
-                                                    key: const ValueKey(
-                                                        'etti-photo'),
-                                                    child: Image.asset(
-                                                      'assets/images/eti.jpg',
-                                                      width: circleSize * 0.9,
-                                                      height: circleSize * 0.9,
-                                                      fit: BoxFit.cover,
+                                            fallback: isEtti
+                                                // The voice-assistant orb — always
+                                                // alive, colours drifting.
+                                                ? NavAssistantOrb(
+                                                    size: circleSize * 0.98)
+                                                : AnimatedScale(
+                                                    scale:
+                                                        isSelected ? 1.12 : 1.0,
+                                                    duration: const Duration(
+                                                        milliseconds: 300),
+                                                    curve: Curves.elasticOut,
+                                                    child: RentlyIcon(
+                                                      isSelected
+                                                          ? item.activeIcon
+                                                          : item.icon,
+                                                      color: Colors.white,
+                                                      size: isCompact
+                                                          ? (isNotDiscover
+                                                              ? 26.0
+                                                              : 24.0)
+                                                          : (isNotDiscover
+                                                              ? 31.0
+                                                              : 28.0),
                                                     ),
-                                                  )
-                                                : isEtti
-                                                    // The voice-assistant orb —
-                                                    // always alive, colours drifting
-                                                    // — sits in her nav circle.
-                                                    ? SizedBox(
-                                                        key: const ValueKey(
-                                                            'etti-orb'),
-                                                        width: circleSize,
-                                                        height: circleSize,
-                                                        child: Center(
-                                                          child: NavAssistantOrb(
-                                                            size: circleSize *
-                                                                0.98,
-                                                          ),
-                                                        ),
-                                                      )
-                                                    : AnimatedScale(
-                                                        key: ValueKey(
-                                                            'ic-$index-$isSelected'),
-                                                        scale: isSelected
-                                                            ? 1.12
-                                                            : 1.0,
-                                                        duration: const Duration(
-                                                            milliseconds: 300),
-                                                        curve: Curves.elasticOut,
-                                                        child: RentlyIcon(
-                                                          isSelected
-                                                              ? item.activeIcon
-                                                              : item.icon,
-                                                          color: Colors.white,
-                                                          size: isCompact
-                                                              ? (isNotDiscover
-                                                                  ? 26.0
-                                                                  : 24.0)
-                                                              : (isNotDiscover
-                                                                  ? 31.0
-                                                                  : 28.0),
-                                                        ),
-                                                      ),
+                                                  ),
                                           ),
                                           if (showBadge)
                                             Positioned(
@@ -481,4 +452,100 @@ class _NavItem {
   /// The "דבר עם אתי" assistant tab — gets a label under the icon + the 2s avatar
   /// peek on entry.
   final bool isAssistant;
+}
+
+/// אתי's nav-circle content, in a FIXED-size box (so the transition never nudges
+/// the rest of the navbar) and isolated in a RepaintBoundary (so the orb's
+/// continuous repaint never re-blurs the whole glass bar → no flicker).
+///
+/// When [showPhoto] flips, her photo SPRINGS up from below (bouncy overshoot) and
+/// the icon/orb sinks + fades — real physics via a SpringSimulation.
+class _EttiCircleContent extends StatefulWidget {
+  const _EttiCircleContent({
+    required this.showPhoto,
+    required this.size,
+    required this.photo,
+    required this.fallback,
+  });
+
+  final bool showPhoto;
+  final double size;
+  final Widget photo;
+  final Widget fallback;
+
+  @override
+  State<_EttiCircleContent> createState() => _EttiCircleContentState();
+}
+
+class _EttiCircleContentState extends State<_EttiCircleContent>
+    with SingleTickerProviderStateMixin {
+  // 0 = fallback (orb/icon) shown, 1 = photo shown. Unbounded so the spring can
+  // overshoot past 1 for a lively pop.
+  late final AnimationController _c = AnimationController.unbounded(
+    vsync: this,
+    value: widget.showPhoto ? 1.0 : 0.0,
+  );
+
+  static const _spring =
+      SpringDescription(mass: 1.0, stiffness: 340, damping: 16);
+
+  @override
+  void didUpdateWidget(covariant _EttiCircleContent old) {
+    super.didUpdateWidget(old);
+    if (old.showPhoto != widget.showPhoto) {
+      final target = widget.showPhoto ? 1.0 : 0.0;
+      _c.animateWith(SpringSimulation(
+          _spring, _c.value, target, (target - _c.value) * 5.5));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) {
+            final t = _c.value;
+            final photoV = t.clamp(0.0, 1.25); // may overshoot → a pop
+            final fallV = (1.0 - t).clamp(0.0, 1.0);
+            return Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                if (fallV > 0.01)
+                  Opacity(
+                    opacity: fallV,
+                    child: Transform.scale(
+                      scale: 0.55 + 0.45 * fallV,
+                      child: widget.fallback,
+                    ),
+                  ),
+                if (photoV > 0.01)
+                  Opacity(
+                    opacity: photoV.clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(
+                          0, (1.0 - photoV.clamp(0.0, 1.0)) * widget.size * 0.5),
+                      child: Transform.scale(
+                        scale: photoV,
+                        child: widget.photo,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
