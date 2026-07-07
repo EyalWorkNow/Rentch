@@ -313,13 +313,19 @@ class Explainer {
           type: 'אוניברסיטה');
       if (uni != null && uni.km <= 1.5) chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
     }
-    // Nightlife — only a nightlife / vibrant-area search.
+    // Nightlife — only a nightlife / vibrant-area search. Thresholds are on the
+    // ABSOLUTE venue density, whose /9 normalisation is calibrated to Tel Aviv's
+    // extreme concentration (=1.0). A genuine local nightlife strip outside TLV
+    // (Herzliya, Ra'anana…) tops out ~0.2, so TLV-tier cutoffs (0.6/0.35) meant
+    // the chip could never fire there — the seeker ASKED for bars/restaurants and
+    // got no matching tag. Since this is already gated on explicit intent, name
+    // any real venue presence nearby.
     if (intents.contains(SearchIntent.nightlife)) {
       final nl = pfv.get('nightlife', 0.0);
-      if (nl > 0.6) {
+      if (nl > 0.5) {
         chips.add('🍸 אזור תוסס — חיי לילה');
-      } else if (nl > 0.35) {
-        chips.add('🍸 קרוב לברים ובתי קפה');
+      } else if (nl > 0.12) {
+        chips.add('🍸 קרוב לברים ומסעדות');
       }
     }
     if (pfv.get('demo_young') > 0.66 && pfv.get('demo_child') < 0.3) {
@@ -689,6 +695,7 @@ class RecommendationEngine {
             confidence: confidence,
             explanation: explanation,
             highlights: highlights,
+            intents: query.intents,
             workLat: workLat,
             workLon: workLon,
           );
@@ -729,6 +736,7 @@ class RecommendationEngine {
     required double confidence,
     required String explanation,
     required List<String> highlights,
+    Set<String> intents = const <String>{},
     double? workLat,
     double? workLon,
   }) {
@@ -749,9 +757,13 @@ class RecommendationEngine {
       final score = model.satisfaction(key, c.pfv).clamp(0.0, 1.0);
       final weightPct =
           weightSum > 0 ? (model.weight(key) / weightSum).clamp(0.0, 1.0) : 0.0;
-      // Keep the card focused: axes that matter to the user OR carry a gov stat.
+      // Keep the card focused on what THIS seeker asked for: an axis shows only
+      // when it matters to them — a stated intent, or a real weight the intent
+      // sharpening gave it. A gov stat existing is NOT enough: a nightlife seeker
+      // was getting "מוסדות חינוך"/"נגישות בריאות" just because those figures
+      // exist, which is the opposite of personalisation.
       final matters = model.statedDimensions.contains(key) || weightPct >= 0.05;
-      if (!matters && !stats.containsKey(key)) continue;
+      if (!matters) continue;
       final stat = stats[key];
       dimensions.add(ScorecardDimension(
         key: key,
@@ -782,9 +794,13 @@ class RecommendationEngine {
     final yieldDim = _yieldDimension(c.property, model, weightSum);
     if (yieldDim != null) dimensions.add(yieldDim);
 
-    // Beach proximity — a real deciding factor in coastal Israel.
-    final coastDim = _coastDimension(c.property, model, weightSum);
-    if (coastDim != null) dimensions.add(coastDim);
+    // Beach proximity — a real deciding factor, but only for a seeker who asked
+    // for the sea. Otherwise "קרבה לים · 4.5 ק״מ" is irrelevant noise (often a
+    // NEGATIVE) on, say, a nightlife search.
+    if (intents.contains(SearchIntent.nearSea)) {
+      final coastDim = _coastDimension(c.property, model, weightSum);
+      if (coastDim != null) dimensions.add(coastDim);
+    }
 
     // Most-relevant axes first (what matters to the user); strongest as tiebreak.
     dimensions.sort((a, b) {
