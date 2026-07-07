@@ -275,8 +275,17 @@ class Explainer {
         intents.contains(SearchIntent.youngChildren) ||
         intents.contains(SearchIntent.teens);
     if (wantsSchools && pfv.get('school_access') > 0.6) {
-      final near = IsraelGeoIndex.nearestSchool(pfv.property.lat, pfv.property.lon);
-      if (near != null && near.km <= 1.2) {
+      // Pick the school TYPE that matches the family's stage — "משפחה" means an
+      // actual SCHOOL, not just a nearby kindergarten. Teens→תיכון, toddler→גן,
+      // otherwise a real (elementary) school.
+      final targetType = intents.contains(SearchIntent.teens)
+          ? 'תיכון'
+          : intents.contains(SearchIntent.youngChildren)
+              ? 'גן'
+              : 'יסודי';
+      final near = IsraelGeoIndex.nearestSchool(p.lat, p.lon, type: targetType) ??
+          IsraelGeoIndex.nearestSchool(p.lat, p.lon);
+      if (near != null && near.km <= 1.5) {
         chips.add('🏫 ${_dist(near.km)} מ${_schoolLabel(near.name, near.type)}');
       } else {
         chips.add('קרוב למוסדות חינוך');
