@@ -7,15 +7,15 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
 
-/// Feature #7 — side-by-side comparison of the tenant's saved properties.
+/// Side-by-side comparison of the tenant's saved (or searched-in) listings.
 ///
-/// Reads (READ-ONLY) [DatingProvider.savedProperties]. If the tenant saved more
-/// than 3 listings, a selector lets them pick up to 3 to compare. An empty/under
-/// state is shown when fewer than 2 are saved (nothing to compare).
+/// Rebuilt: the compare set is a single ordered list of up to 3 columns that is
+/// SEEDED automatically from the first saved listings — so the screen never opens
+/// blank. Chips add/remove columns; the search action pulls in non-saved flats.
 class CompareScreen extends StatefulWidget {
   const CompareScreen({super.key});
 
-  /// Max columns shown side-by-side.
+  /// Max columns shown side-by-side (mobile-portrait ceiling).
   static const int maxColumns = 3;
 
   @override
@@ -23,22 +23,40 @@ class CompareScreen extends StatefulWidget {
 }
 
 class _CompareScreenState extends State<CompareScreen> {
-  /// Property ids the user picked to compare (only used when >3 saved).
-  final Set<String> _selected = <String>{};
+  /// Ordered ids of the listings currently in the comparison (<= maxColumns).
+  final List<String> _columns = <String>[];
 
-  /// Properties the user pulled in via the search — so comparison isn't limited
-  /// to saved listings.
+  /// Listings pulled in via search (not in the saved list).
   final List<RentalProperty> _searchAdded = <RentalProperty>[];
+
+  /// Seed the columns exactly once, from the first saved listings.
+  bool _seeded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // context.watch in build() makes this fire again when saved listings finish
+    // loading, so seeding survives async persistence.
+    if (_seeded) return;
+    final pool = _pool(context.read<DatingProvider>());
+    if (pool.length < 2) return;
+    _columns
+      ..clear()
+      ..addAll(pool.take(CompareScreen.maxColumns).map((p) => p.id));
+    _seeded = true;
+  }
+
+  /// Saved listings + search-added (deduped, saved first).
+  List<RentalProperty> _pool(DatingProvider p) => <RentalProperty>[
+        ...p.savedProperties,
+        ..._searchAdded
+            .where((a) => !p.savedProperties.any((s) => s.id == a.id)),
+      ];
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DatingProvider>();
-    // Compare set = saved + anything added via search (deduped).
-    final saved = <RentalProperty>[
-      ...provider.savedProperties,
-      ..._searchAdded.where((a) =>
-          !provider.savedProperties.any((s) => s.id == a.id)),
-    ];
+    final pool = _pool(provider);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -57,64 +75,34 @@ class _CompareScreenState extends State<CompareScreen> {
             ),
           ],
         ),
-        body: _buildBody(context, provider, saved),
+        body: _body(provider, pool),
       ),
     );
   }
 
-  // Search the catalog and add a property into the comparison.
-  Future<void> _openSearch(DatingProvider provider) async {
-    final picked = await showModalBottomSheet<RentalProperty>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ComparePickerSheet(properties: provider.allProperties),
-    );
-    if (picked == null) return;
-    setState(() {
-      if (!_searchAdded.any((p) => p.id == picked.id)) {
-        _searchAdded.add(picked);
-      }
-      // Auto-select it so it shows even when there are >3 in the set.
-      if (_selected.length < CompareScreen.maxColumns) _selected.add(picked.id);
-    });
-  }
+  Widget _body(DatingProvider provider, List<RentalProperty> pool) {
+    if (pool.length < 2) return _EmptyState(savedCount: pool.length);
 
-  Widget _buildBody(
-    BuildContext context,
-    DatingProvider provider,
-    List<RentalProperty> saved,
-  ) {
-    if (saved.length < 2) {
-      return _EmptyState(savedCount: saved.length);
-    }
-
-    final needsSelection = saved.length > CompareScreen.maxColumns;
-    final List<RentalProperty> columns = needsSelection
-        ? _resolveSelection(saved)
-        : saved;
+    final columns = _resolveColumns(pool);
+    final showChips = pool.length > CompareScreen.maxColumns;
 
     return Column(
       children: [
-        if (needsSelection)
-          _Selector(
-            saved: saved,
-            selected: _selected,
-            onToggle: _toggle,
-          ),
+        if (showChips)
+          _Selector(pool: pool, selected: _columns, onToggle: _toggle),
         if (columns.length < 2)
           const Expanded(
             child: Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'בחרו עד 3 דירות להשוואה',
+                  'בחרו לפחות 2 דירות להשוואה',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
             ),
@@ -125,36 +113,57 @@ class _CompareScreenState extends State<CompareScreen> {
     );
   }
 
-  /// When more than 3 are saved, show the user's picks (capped at 3). If they
-  /// haven't picked enough yet, fall back to the first few so something shows.
-  List<RentalProperty> _resolveSelection(List<RentalProperty> saved) {
-    final picked =
-        saved.where((p) => _selected.contains(p.id)).toList(growable: false);
-    if (picked.length >= 2) return picked.take(CompareScreen.maxColumns).toList();
-    return const [];
+  /// The current columns as live properties, in the user's order, dropping any
+  /// id that has left the pool (e.g. un-saved elsewhere).
+  List<RentalProperty> _resolveColumns(List<RentalProperty> pool) {
+    final byId = {for (final p in pool) p.id: p};
+    return [
+      for (final id in _columns)
+        if (byId[id] != null) byId[id]!
+    ];
   }
 
   void _toggle(String id) {
     setState(() {
-      if (_selected.contains(id)) {
-        _selected.remove(id);
-      } else if (_selected.length < CompareScreen.maxColumns) {
-        _selected.add(id);
+      if (_columns.contains(id)) {
+        _columns.remove(id);
+      } else if (_columns.length < CompareScreen.maxColumns) {
+        _columns.add(id);
       }
+    });
+  }
+
+  Future<void> _openSearch(DatingProvider provider) async {
+    final picked = await showModalBottomSheet<RentalProperty>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ComparePickerSheet(properties: provider.allProperties),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (!_searchAdded.any((p) => p.id == picked.id) &&
+          !provider.savedProperties.any((p) => p.id == picked.id)) {
+        _searchAdded.add(picked);
+      }
+      // Make room + show it: if full, drop the oldest column.
+      _columns.remove(picked.id);
+      if (_columns.length >= CompareScreen.maxColumns) _columns.removeAt(0);
+      _columns.add(picked.id);
     });
   }
 }
 
-/// Horizontal chips to pick up to 3 properties when more than 3 are saved.
+/// Chips to add/remove columns when more than [maxColumns] are in the pool.
 class _Selector extends StatelessWidget {
   const _Selector({
-    required this.saved,
+    required this.pool,
     required this.selected,
     required this.onToggle,
   });
 
-  final List<RentalProperty> saved;
-  final Set<String> selected;
+  final List<RentalProperty> pool;
+  final List<String> selected;
   final ValueChanged<String> onToggle;
 
   @override
@@ -167,7 +176,7 @@ class _Selector extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'בחרו עד 3 דירות להשוואה (${selected.length}/${CompareScreen.maxColumns})',
+            'בחרו עד ${CompareScreen.maxColumns} דירות (${selected.length}/${CompareScreen.maxColumns})',
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -179,7 +188,7 @@ class _Selector extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                for (final p in saved)
+                for (final p in pool)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: FilterChip(
@@ -207,15 +216,15 @@ class _Selector extends StatelessWidget {
   }
 
   String _shortLabel(RentalProperty p) {
-    final where = p.neighborhood.trim().isNotEmpty
-        ? p.neighborhood.trim()
-        : p.city.trim();
+    final where =
+        p.neighborhood.trim().isNotEmpty ? p.neighborhood.trim() : p.city.trim();
     return '$where · ${p.priceLabel}';
   }
 }
 
-/// The actual side-by-side table. Numeric rows highlight the best value per row
-/// (cheapest, biggest, best ₪/m², highest match); amenity rows show ✓/✗.
+/// The side-by-side table. Numeric rows highlight the best value per row;
+/// amenity rows show ✓/✗. A "best value" verdict card sits on top when the data
+/// supports one.
 class _CompareTable extends StatelessWidget {
   const _CompareTable({required this.properties, required this.provider});
 
@@ -225,13 +234,13 @@ class _CompareTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = <_CompareRow>[
-      _CompareRow.number('מחיר', (p) => p.price > 0 ? p.price.toDouble() : null,
-          (p) => p.priceLabel,
+      _CompareRow.number('מחיר',
+          (p) => p.price > 0 ? p.price.toDouble() : null, (p) => p.priceLabel,
           best: _Best.min),
       _CompareRow.number('₪ למ"ר', _perM2, _perM2Label, best: _Best.min),
       _CompareRow.text('חדרים', (p) => p.roomsLabel),
-      _CompareRow.number(
-          'שטח', (p) => p.sizeM2 > 0 ? p.sizeM2.toDouble() : null,
+      _CompareRow.number('שטח',
+          (p) => p.sizeM2 > 0 ? p.sizeM2.toDouble() : null,
           (p) => p.sizeM2 > 0 ? '${p.sizeM2} מ"ר' : '—',
           best: _Best.max),
       _CompareRow.text('קומה', _floorLabel),
@@ -242,12 +251,14 @@ class _CompareTable extends StatelessWidget {
       _CompareRow.text('מצב',
           (p) => p.condition.trim().isEmpty ? '—' : p.condition.trim()),
       _CompareRow.number(
-          'התאמה',
-          (p) => (provider.displayMatchScore(p) ?? -1).toDouble(),
-          (p) {
-        final s = provider.displayMatchScore(p);
-        return s == null ? '—' : '$s%';
-      }, best: _Best.max),
+        'התאמה',
+        (p) => provider.displayMatchScore(p)?.toDouble(),
+        (p) {
+          final s = provider.displayMatchScore(p);
+          return s == null ? '—' : '$s%';
+        },
+        best: _Best.max,
+      ),
     ];
 
     final bestIdx = _bestValueIndex(properties);
@@ -291,35 +302,15 @@ class _CompareTable extends StatelessWidget {
     );
   }
 
-  // Value-for-money pick: mostly ₪/m² (the dry value metric), nudged by premium
-  // features + the match score. Returns the winning index, or -1 if < 2 columns.
-  int _bestValueIndex(List<RentalProperty> props) {
-    if (props.length < 2) return -1;
-    final ppms = props.map(_perM2).whereType<double>().toList();
-    final maxPpm = ppms.isEmpty ? 0.0 : ppms.reduce((a, b) => a > b ? a : b);
-    double score(RentalProperty p) {
-      final ppm = _perM2(p);
-      // Cheaper ₪/m² → higher score (1 = best value per m² in the group).
-      final ppmScore = (ppm == null || maxPpm == 0) ? 0.5 : (1 - ppm / maxPpm);
-      final feat = _premiumFeatures
-              .where((f) => p.featureFlags.isEnabled(f))
-              .length /
-          _premiumFeatures.length;
-      final m = (provider.displayMatchScore(p) ?? 0) / 100.0;
-      return ppmScore * 0.6 + feat * 0.25 + m * 0.15;
-    }
-
-    var best = 0;
-    var bestScore = -1.0;
-    for (var i = 0; i < props.length; i++) {
-      final s = score(props[i]);
-      if (s > bestScore) {
-        bestScore = s;
-        best = i;
-      }
-    }
-    return best;
-  }
+  int _bestValueIndex(List<RentalProperty> props) => bestValueIndex(
+        ppm: props.map(_perM2).toList(),
+        featureFrac: [
+          for (final p in props)
+            _premiumFeatures.where((f) => p.featureFlags.isEnabled(f)).length /
+                _premiumFeatures.length
+        ],
+        match: [for (final p in props) (provider.displayMatchScore(p) ?? 0) / 100.0],
+      );
 
   static const _premiumFeatures = ['elevator', 'parking', 'balcony', 'mamad'];
   static const _featureHe = {
@@ -329,7 +320,6 @@ class _CompareTable extends StatelessWidget {
     'mamad': 'ממ"ד',
   };
 
-  // What the winner beats the others on (dry data).
   List<String> _pros(List<RentalProperty> props, int idx) {
     final w = props[idx];
     final others = [
@@ -368,7 +358,6 @@ class _CompareTable extends StatelessWidget {
     return out.take(4).toList();
   }
 
-  // Where the winner is weaker — so the recommendation stays honest.
   List<String> _cons(List<RentalProperty> props, int idx) {
     final w = props[idx];
     final others = [
@@ -376,14 +365,12 @@ class _CompareTable extends StatelessWidget {
         if (i != idx) props[i]
     ];
     final out = <String>[];
-    final cheaper = others
-        .where((o) => o.price > 0 && (w.price <= 0 || o.price < w.price))
-        .toList();
-    if (cheaper.isNotEmpty) {
-      out.add('לא הכי זולה — יש זולה יותר ב-${w.priceLabel}');
+    if (others.any((o) => o.price > 0 && (w.price <= 0 || o.price < w.price))) {
+      out.add('לא הכי זולה בקבוצה');
     }
-    final bigger = others.where((o) => o.sizeM2 > w.sizeM2).toList();
-    if (bigger.isNotEmpty) out.add('יש מרווחת יותר בהשוואה');
+    if (others.any((o) => o.sizeM2 > w.sizeM2)) {
+      out.add('יש מרווחת יותר בהשוואה');
+    }
     for (final f in _premiumFeatures) {
       if (!w.featureFlags.isEnabled(f) &&
           others.any((o) => o.featureFlags.isEnabled(f))) {
@@ -409,8 +396,8 @@ class _CompareTable extends StatelessWidget {
   }
 }
 
-/// The dry value-for-money recommendation: which saved listing gives the most
-/// per shekel, with an honest pros/cons breakdown.
+/// The value-for-money verdict: which listing gives the most per shekel, with an
+/// honest pros/cons breakdown.
 class _ValueVerdict extends StatelessWidget {
   const _ValueVerdict({
     required this.winner,
@@ -507,11 +494,56 @@ class _ValueVerdict extends StatelessWidget {
       );
 }
 
+/// Value-for-money pick: mostly ₪/m² (min is best), nudged by premium features
+/// and match. Returns -1 (no winner) unless at least 2 columns have a real ₪/m²
+/// — otherwise the "winner" is arbitrary, which is worse than showing none.
+int bestValueIndex({
+  required List<double?> ppm,
+  required List<double> featureFrac,
+  required List<double> match,
+}) {
+  if (ppm.length < 2) return -1;
+  final valid = ppm.whereType<double>().toList();
+  if (valid.length < 2) return -1;
+  final maxPpm = valid.reduce((a, b) => a > b ? a : b);
+  var best = 0;
+  var bestScore = -1.0;
+  for (var i = 0; i < ppm.length; i++) {
+    final p = ppm[i];
+    final ppmScore = (p == null || maxPpm == 0) ? 0.0 : (1 - p / maxPpm);
+    final s = ppmScore * 0.6 + featureFrac[i] * 0.25 + match[i] * 0.15;
+    if (s > bestScore) {
+      bestScore = s;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/// Column indices holding the best value. Uses an epsilon so float ties (₪/m²,
+/// match %) all light up instead of one missing on rounding; returns empty when
+/// every column has the same value (nothing to "win") or none are numeric.
+Set<int> numericWinners(List<double?> vals, {required bool minIsBest}) {
+  double? bestVal;
+  for (final v in vals) {
+    if (v == null) continue;
+    if (bestVal == null || (minIsBest ? v < bestVal : v > bestVal)) bestVal = v;
+  }
+  if (bestVal == null) return const {};
+  if (vals.whereType<double>().toSet().length < 2) return const {};
+  final out = <int>{};
+  for (var i = 0; i < vals.length; i++) {
+    final v = vals[i];
+    if (v != null && (v - bestVal).abs() < 0.5) out.add(i);
+  }
+  return out;
+}
+
 enum _Best { none, min, max }
 
 class _CompareRow {
-  const _CompareRow._(this.label, this.display, this.numeric, this.flag,
-      this.best);
+  const _CompareRow._(
+      this.label, this.display, this.numeric, this.flag, this.best);
   final String label;
   final String Function(RentalProperty) display;
   final double? Function(RentalProperty)? numeric;
@@ -547,77 +579,69 @@ class _HeaderRow extends StatelessWidget {
         children: [
           const _LabelCell(''),
           for (var ci = 0; ci < properties.length; ci++)
-            Builder(builder: (context) {
-              final p = properties[ci];
-              final isWinner = ci == winnerIndex;
-              return Expanded(
-              child: InkWell(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => PropertyDetailScreen(property: p),
-                  ),
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isWinner)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text('🏆 מומלץ',
-                              style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white)),
-                        ),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: SizedBox(
-                          height: 54,
-                          width: double.infinity,
-                          child: SafeMedia(
-                            media: p.primaryMedia,
-                            fallback: Container(color: AppColors.borderLight),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _title(p),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: isWinner
-                              ? AppColors.primary
-                              : AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-            }),
+            Expanded(child: _headerCell(context, properties[ci], ci == winnerIndex)),
         ],
       ),
     );
   }
 
+  Widget _headerCell(BuildContext context, RentalProperty p, bool isWinner) {
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isWinner)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('🏆 מומלץ',
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 54,
+                width: double.infinity,
+                child: SafeMedia(
+                  media: p.primaryMedia,
+                  fallback: Container(color: AppColors.borderLight),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _title(p),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: isWinner ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _title(RentalProperty p) {
-    final where = p.neighborhood.trim().isNotEmpty
-        ? p.neighborhood.trim()
-        : p.city.trim();
+    final where =
+        p.neighborhood.trim().isNotEmpty ? p.neighborhood.trim() : p.city.trim();
     return where.isNotEmpty ? where : p.address;
   }
 }
@@ -635,25 +659,7 @@ class _DataRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Which column(s) hold the best numeric value for this row?
-    final winners = <int>{};
-    if (row.numeric != null && row.best != _Best.none) {
-      final vals = [for (final p in properties) row.numeric!(p)];
-      double? bestVal;
-      for (final v in vals) {
-        if (v == null) continue;
-        if (bestVal == null ||
-            (row.best == _Best.min ? v < bestVal : v > bestVal)) {
-          bestVal = v;
-        }
-      }
-      if (bestVal != null) {
-        for (var i = 0; i < vals.length; i++) {
-          if (vals[i] == bestVal) winners.add(i);
-        }
-      }
-    }
-
+    final winners = _winners();
     return Container(
       color: shaded ? AppColors.background : AppColors.surface,
       child: IntrinsicHeight(
@@ -666,6 +672,14 @@ class _DataRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Set<int> _winners() {
+    if (row.numeric == null || row.best == _Best.none) return const {};
+    return numericWinners(
+      [for (final p in properties) row.numeric!(p)],
+      minIsBest: row.best == _Best.min,
     );
   }
 
@@ -686,13 +700,18 @@ class _DataRow extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
       color: isWinner ? AppColors.primary.withValues(alpha: 0.10) : null,
-      child: Text(
-        row.display(p),
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 17,
-          fontWeight: isWinner ? FontWeight.w900 : FontWeight.w700,
-          color: isWinner ? AppColors.primary : AppColors.textPrimary,
+      // FittedBox: long values (₪12,500) scale down instead of overflowing the
+      // ~90px column on a phone.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          row.display(p),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: isWinner ? FontWeight.w900 : FontWeight.w700,
+            color: isWinner ? AppColors.primary : AppColors.textPrimary,
+          ),
         ),
       ),
     );
@@ -706,7 +725,7 @@ class _LabelCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 88,
+      width: 84,
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       child: Text(
@@ -736,20 +755,14 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.compare_arrows_rounded,
-              size: 64,
-              color: AppColors.textDisabled,
-            ),
+            Icon(Icons.compare_arrows_rounded,
+                size: 64, color: AppColors.textDisabled),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 17,
-                height: 1.4,
-                color: AppColors.textSecondary,
-              ),
+                  fontSize: 17, height: 1.4, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -758,8 +771,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// Searchable list of the catalog → returns the tapped property to add to the
-/// comparison.
+/// Searchable catalog list → returns the tapped property to add to the compare.
 class _ComparePickerSheet extends StatefulWidget {
   const _ComparePickerSheet({required this.properties});
   final List<RentalProperty> properties;
@@ -806,8 +818,7 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
               const Align(
                 alignment: Alignment.centerRight,
                 child: Text('הוספת דירה להשוואה',
-                    style:
-                        TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -829,8 +840,7 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
                 child: list.isEmpty
                     ? const Center(
                         child: Text('אופס! לא נמצאו דירות תואמות',
-                            style:
-                                TextStyle(color: AppColors.textSecondary)))
+                            style: TextStyle(color: AppColors.textSecondary)))
                     : ListView.builder(
                         controller: scroll,
                         itemCount: list.length,
@@ -845,8 +855,8 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
                             title: Text(where,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                                '${p.priceLabel} · ${p.roomsLabel} חד׳'),
+                            subtitle:
+                                Text('${p.priceLabel} · ${p.roomsLabel} חד׳'),
                             onTap: () => Navigator.of(context).pop(p),
                           );
                         },
