@@ -108,12 +108,9 @@ class _ScorecardViewState extends State<ScorecardView> {
 
   // ── expanded body ──────────────────────────────────────────────────────────
   Widget _body(Scorecard c) {
-    final dims = [...c.dimensions]
-      ..sort((a, b) {
-        final w = b.weightPct.compareTo(a.weightPct);
-        return w != 0 ? w : b.contributionPct.compareTo(a.contributionPct);
-      });
-    final top = dims.take(4).toList();
+    // c.dimensions is already ordered stated-first (the axes the user actually
+    // searched by), so show the top of that order — not a generic re-sort.
+    final top = c.dimensions.take(4).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

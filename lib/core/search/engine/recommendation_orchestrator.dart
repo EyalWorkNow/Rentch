@@ -242,6 +242,55 @@ class Explainer {
     final p = pfv.property;
     final chips = <String>[];
 
+    // ── VOICED-INTENT tags FIRST ─────────────────────────────────────────────
+    // Every lifestyle intent the seeker actually voiced gets a visible chip when
+    // this flat satisfies it — so the card leads with what THEY asked for
+    // (safety/quiet/errands/work/health/green/upside), not generic price/transit.
+    // Placed first so the compact "why" (first 2 chips) shows their real asks.
+    if (intents.contains(SearchIntent.safety)) {
+      final sf = pfv.get('safety', 0.5);
+      if (sf > 0.66) {
+        chips.add('🛡️ שכונה בטוחה');
+      } else if (sf > 0.45) {
+        chips.add('🛡️ רמת בטיחות סבירה');
+      }
+    }
+    if (intents.contains(SearchIntent.quiet) && pfv.get('low_noise', 0.5) > 0.66) {
+      chips.add('🤫 שקט — רחוק מצירי תנועה');
+    }
+    if (intents.contains(SearchIntent.convenience) &&
+        pfv.get('retail_access', 0.0) > 0.4) {
+      chips.add('🛒 קרוב לסופר ולקניות');
+    }
+    if (intents.contains(SearchIntent.employment) &&
+        pfv.get('employment_access', 0.0) > 0.4) {
+      chips.add('💼 קרוב לאזור תעסוקה');
+    }
+    if (intents.contains(SearchIntent.health) &&
+        pfv.get('health_access', 0.5) > 0.5) {
+      chips.add('🏥 קרוב לשירותי בריאות');
+    }
+    if (intents.contains(SearchIntent.green)) {
+      final parkKm = IsraelGeoIndex.parkKm(p.lat, p.lon);
+      if (parkKm != null && parkKm <= 0.8) chips.add('🌳 ${_dist(parkKm)} מפארק');
+    }
+    if (intents.contains(SearchIntent.youngPop) && pfv.get('demo_young', 0.5) > 0.55) {
+      chips.add('🎈 אזור צעיר');
+    }
+    if ((intents.contains(SearchIntent.growth) ||
+            intents.contains(SearchIntent.investment)) &&
+        pfv.get('future_value', 0.0) > 0.5) {
+      chips.add('📈 פוטנציאל השבחה — ליד תשתית מתוכננת');
+    }
+    if (intents.contains(SearchIntent.investment) &&
+        p.transactionType == PropertyTransactionType.sale) {
+      final est = RentalYield.estimate(
+          salePrice: p.price, sizeM2: p.sizeM2, city: p.city);
+      if (est != null && est.grossYieldPct > 0) {
+        chips.add('📊 תשואה ~${est.grossYieldPct.toStringAsFixed(1)}%');
+      }
+    }
+
     // value / pricing
     if (pfv.get('hedonic_residual') > 0.2 || pfv.valueScore > 0.72) {
       chips.add('מחיר אטרקטיבי מתחת לשוק');
@@ -637,7 +686,22 @@ class RecommendationEngine {
     final want = limit < 10 ? limit : 10;
     if (selected.length < want) {
       final have = selected.map((c) => c.property.id).toSet();
-      final extra = backfillPool.where((p) => !have.contains(p.id)).toList();
+      // Backfill relaxes soft filters to reach ~10 options — but must stay
+      // RELEVANT to the search: never past the stated budget by >15% (a ₪3300
+      // flat must not pad a "עד 2800" search), and — when the seeker explicitly
+      // asked for the SEA — never a clearly-inland flat (no רמת גן for "על הים").
+      // A slightly-over-budget near-match (≤15%) is kept and carries an explicit
+      // "over budget" concern.
+      final nearSeaStated = query.intents.contains(SearchIntent.nearSea);
+      final extra = backfillPool.where((p) {
+        if (have.contains(p.id)) return false;
+        if (maxP != null && maxP > 0 && p.price > maxP * 1.15) return false;
+        if (nearSeaStated) {
+          final km = IsraelGeoIndex.coastKm(p.lat, p.lon);
+          if (km == null || km > 5.0) return false;
+        }
+        return true;
+      }).toList();
       if (extra.isNotEmpty) {
         final extraRanked = RankingEngine.rank(
           [for (final p in extra) FeatureEngineer.engineer(p, market)],
@@ -803,8 +867,16 @@ class RecommendationEngine {
     final coastDim = _coastDimension(c.property, model, weightSum);
     if (coastDim != null) dimensions.add(coastDim);
 
-    // Most-relevant axes first (what matters to the user); strongest as tiebreak.
+    // Most-relevant axes first: the dimensions the user ACTUALLY stated (their
+    // budget, city, and every intent they voiced — safety/schools/quiet/…) lead,
+    // ahead of always-on generic axes (value/condition/popularity/trust) the user
+    // never asked about. So every apartment card shows what's relevant to THIS
+    // search first, not a generic breakdown. Weight, then strength, break ties.
+    final stated = model.statedDimensions;
     dimensions.sort((a, b) {
+      final aS = stated.contains(a.key) ? 1 : 0;
+      final bS = stated.contains(b.key) ? 1 : 0;
+      if (aS != bS) return bS - aS;
       final w = b.weightPct.compareTo(a.weightPct);
       return w != 0 ? w : b.contributionPct.compareTo(a.contributionPct);
     });

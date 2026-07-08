@@ -659,8 +659,10 @@ class SmartSearch {
             .hasMatch(text)) {
       required.add('petsAllowed');
     }
-    // Explicit "חייב/חובה/מוכרח/הכרחי + <feature>" → that feature is a must.
-    if (RegExp(r'חייב|חובה|מוכרח|הכרחי|בהכרח|רק עם|must have|required')
+    // Explicit "חייב/חובה/מוכרח/הכרחי/חשוב שיהיה + <feature>" → a must-have. The
+    // "חשוב שיהיה / חשוב לי ש / צריך שיהיה" phrasings are strong enough to gate.
+    if (RegExp(r'חייב|חובה|מוכרח|הכרחי|בהכרח|רק עם|חשוב שיהיה|חשוב לי ש|'
+            r'חשוב ש|צריך שיהיה|must have|required')
         .hasMatch(text)) {
       const canon = {
         'feat_elevator': 'elevator',

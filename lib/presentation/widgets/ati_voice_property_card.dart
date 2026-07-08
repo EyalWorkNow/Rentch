@@ -418,9 +418,9 @@ class AtiVoicePropertyCard extends StatelessWidget {
       }
       if (c.highlights.isNotEmpty) return c.highlights.take(2).join(' · ');
       if (c.personaReasons.isNotEmpty) return c.personaReasons.first;
-      final dims = List.of(c.dimensions)
-        ..sort((a, b) => b.contributionPct.compareTo(a.contributionPct));
-      return dims.take(2).map((d) => d.label).join(' · ');
+      // c.dimensions is already ordered stated-first (what the user searched
+      // for), so take them as-is — never re-sort to generic high-score axes.
+      return c.dimensions.take(2).map((d) => d.label).join(' · ');
     }
 
     final r = pick().trim();
