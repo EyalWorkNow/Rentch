@@ -574,13 +574,20 @@ class _HeaderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.primaryLight2,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _LabelCell(''),
-          for (var ci = 0; ci < properties.length; ci++)
-            Expanded(child: _headerCell(context, properties[ci], ci == winnerIndex)),
-        ],
+      // IntrinsicHeight bounds the row height so crossAxisAlignment.stretch is
+      // valid inside the vertical SingleChildScrollView. Without it the Row is
+      // given infinite height and the whole table fails to lay out (blank page).
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _LabelCell(''),
+            for (var ci = 0; ci < properties.length; ci++)
+              Expanded(
+                  child:
+                      _headerCell(context, properties[ci], ci == winnerIndex)),
+          ],
+        ),
       ),
     );
   }
@@ -700,18 +707,18 @@ class _DataRow extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
       color: isWinner ? AppColors.primary.withValues(alpha: 0.10) : null,
-      // FittedBox: long values (₪12,500) scale down instead of overflowing the
-      // ~90px column on a phone.
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          row.display(p),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isWinner ? FontWeight.w900 : FontWeight.w700,
-            color: isWinner ? AppColors.primary : AppColors.textPrimary,
-          ),
+      // NOTE: no FittedBox here — it doesn't support the intrinsic sizing that
+      // the row's IntrinsicHeight needs and throws "RenderBox was not laid out",
+      // leaving the whole table blank. Plain single-line text + ellipsis instead.
+      child: Text(
+        row.display(p),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: isWinner ? FontWeight.w900 : FontWeight.w700,
+          color: isWinner ? AppColors.primary : AppColors.textPrimary,
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/main.dart';
+import 'package:dating_app/presentation/screens/compare_screen.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -239,6 +240,45 @@ void main() {
       }
     },
   );
+
+  testWidgets('CompareScreen renders a table for saved listings (no blank)',
+      (WidgetTester tester) async {
+    debugNetworkImageHttpClientProvider = () => _FakeHttpClient();
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService([
+        _testProperty(id: 'c1', street: 'דיזנגוף', city: 'תל אביב', price: 7200),
+        _testProperty(id: 'c2', street: 'סוקולוב', city: 'רמת השרון', price: 6100),
+        _testProperty(id: 'c3', street: 'ויצמן', city: 'כפר סבא', price: 8300),
+      ]),
+      localStorageService: _MemoryLocalStorageService(),
+    );
+    try {
+      await provider.initialize();
+      await provider.enterGuestMode('tenant');
+      await provider.toggleSave('c1');
+      await provider.toggleSave('c2');
+      await provider.toggleSave('c3');
+      expect(provider.savedProperties.length, 3);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<DatingProvider>.value(
+          value: provider,
+          child: const MaterialApp(home: CompareScreen()),
+        ),
+      );
+      await _pumpFrames(tester);
+
+      // The real bug: the screen came up blank. Assert the comparison table is
+      // actually there, and no layout/render exception was swallowed.
+      expect(tester.takeException(), isNull);
+      expect(find.text('מחיר'), findsOneWidget);
+      expect(find.text('₪ למ"ר'), findsOneWidget);
+      expect(find.text('השוואת דירות'), findsOneWidget);
+    } finally {
+      debugNetworkImageHttpClientProvider = null;
+      provider.dispose();
+    }
+  });
 
   test('rental property media preserves image and video entries', () {
     final property = RentalProperty(
