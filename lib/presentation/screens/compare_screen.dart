@@ -84,12 +84,12 @@ class _CompareScreenState extends State<CompareScreen> {
     if (pool.length < 2) return _EmptyState(savedCount: pool.length);
 
     final columns = _resolveColumns(pool);
-    final showChips = pool.length > CompareScreen.maxColumns;
+    final showPicker = pool.length > CompareScreen.maxColumns;
 
     return Column(
       children: [
-        if (showChips)
-          _Selector(pool: pool, selected: _columns, onToggle: _toggle),
+        if (showPicker)
+          _ColumnDropdown(pool: pool, selected: _columns, onToggle: _toggle),
         if (columns.length < 2)
           const Expanded(
             child: Center(
@@ -154,9 +154,11 @@ class _CompareScreenState extends State<CompareScreen> {
   }
 }
 
-/// Chips to add/remove columns when more than [maxColumns] are in the pool.
-class _Selector extends StatelessWidget {
-  const _Selector({
+/// Dropdown to add/remove columns when more than [maxColumns] are in the pool.
+/// Tap the field → a menu of checkable listings; checking one drops it straight
+/// into the table (capped at [maxColumns]; over the cap the rest are disabled).
+class _ColumnDropdown extends StatelessWidget {
+  const _ColumnDropdown({
     required this.pool,
     required this.selected,
     required this.onToggle,
@@ -168,49 +170,55 @@ class _Selector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final full = selected.length >= CompareScreen.maxColumns;
     return Container(
       width: double.infinity,
       color: AppColors.surface,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'בחרו עד ${CompareScreen.maxColumns} דירות (${selected.length}/${CompareScreen.maxColumns})',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+      child: PopupMenuButton<String>(
+        onSelected: onToggle,
+        // menu stays inside the field width, scrolls when there are many saved.
+        constraints: const BoxConstraints(minWidth: 240, maxHeight: 360),
+        position: PopupMenuPosition.under,
+        itemBuilder: (_) => [
+          for (final p in pool)
+            CheckedPopupMenuItem<String>(
+              value: p.id,
+              checked: selected.contains(p.id),
+              // can't add a 4th; already-checked stay tappable so you can remove.
+              enabled: selected.contains(p.id) || !full,
+              child: Text(_shortLabel(p),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-          ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final p in pool)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: FilterChip(
-                      selected: selected.contains(p.id),
-                      onSelected: (_) => onToggle(p.id),
-                      label: Text(_shortLabel(p)),
-                      labelStyle: TextStyle(
-                        fontSize: 13,
-                        color: selected.contains(p.id)
-                            ? AppColors.textOnPrimary
-                            : AppColors.textPrimary,
-                      ),
-                      selectedColor: AppColors.primary,
-                      backgroundColor: AppColors.background,
-                      checkmarkColor: AppColors.textOnPrimary,
-                      side: BorderSide(color: AppColors.borderLight),
-                    ),
-                  ),
-              ],
-            ),
-          ),
         ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  selected.isEmpty
+                      ? 'בחרו דירות להשוואה'
+                      : 'נבחרו ${selected.length}/${CompareScreen.maxColumns} דירות',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: selected.isEmpty
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textSecondary),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -249,6 +249,7 @@ void main() {
         _testProperty(id: 'c1', street: 'דיזנגוף', city: 'תל אביב', price: 7200),
         _testProperty(id: 'c2', street: 'סוקולוב', city: 'רמת השרון', price: 6100),
         _testProperty(id: 'c3', street: 'ויצמן', city: 'כפר סבא', price: 8300),
+        _testProperty(id: 'c4', street: 'ביאליק', city: 'רמת גן', price: 6900),
       ]),
       localStorageService: _MemoryLocalStorageService(),
     );
@@ -258,7 +259,8 @@ void main() {
       await provider.toggleSave('c1');
       await provider.toggleSave('c2');
       await provider.toggleSave('c3');
-      expect(provider.savedProperties.length, 3);
+      await provider.toggleSave('c4');
+      expect(provider.savedProperties.length, 4);
 
       await tester.pumpWidget(
         ChangeNotifierProvider<DatingProvider>.value(
@@ -274,6 +276,8 @@ void main() {
       expect(find.text('מחיר'), findsOneWidget);
       expect(find.text('₪ למ"ר'), findsOneWidget);
       expect(find.text('השוואת דירות'), findsOneWidget);
+      // >3 saved → the column dropdown is shown (seeded with the first 3).
+      expect(find.text('נבחרו 3/3 דירות'), findsOneWidget);
     } finally {
       debugNetworkImageHttpClientProvider = null;
       provider.dispose();
