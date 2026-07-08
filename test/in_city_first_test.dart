@@ -53,6 +53,24 @@ void main() {
         reason: 'an area search ranks by fit; the strong neighbour should lead');
   });
 
+  test('CBS-suffix city (תל אביב - יפו) still recognises base-name flats', () {
+    // Regression: query.city resolves to the CBS full name "תל אביב - יפו" while
+    // flats store "תל אביב". A strong neighbour must NOT take every slot — an
+    // in-city flat has to survive selection and lead.
+    final c2 = [
+      f('ta-1', 8000, 3, 'תל אביב', 32.072, 34.781),
+      f('ta-2', 7500, 3, 'תל אביב', 32.072, 34.790),
+      f('ta-3', 8200, 3, 'תל אביב', 32.09, 34.77),
+      f('rg-strong', 6500, 3, 'רמת גן', 32.083, 34.814, m2: 110, ft: ['elevator', 'renovated', 'balcony']),
+    ];
+    final recs = RecommendationEngine.recommendAsScored(
+        candidates: c2, query: SmartSearch.parse('דירה שקטה במרכז בתל אביב עד 9000'),
+        profile: null, limit: 2, seed: 7);
+    expect(recs, isNotEmpty);
+    expect(recs.every((s) => s.property.city.contains('תל אביב')), true,
+        reason: 'a "תל אביב" search returned a non-TA flat: ${recs.map((s) => s.property.city)}');
+  });
+
   test('senior_area / young_area are never shown as concerns', () {
     final recs = run('דירה שקטה בתל אביב עד 8000');
     for (final s in recs) {

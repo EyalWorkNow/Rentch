@@ -674,6 +674,20 @@ class RecommendationEngine {
     final ranked = RankingEngine.rank(pfvs, model);
     if (ranked.isEmpty) return const [];
 
+    // IN-CITY FIRST (part 1/2): when the user named a specific city (not "אזור X"),
+    // penalise adjacent-town candidates in the RANKING SCORE — BEFORE selection —
+    // so an in-city flat is never dropped from the top-N by a stronger neighbour.
+    // "דירה בתל אביב" must keep its Tel-Aviv options even when רמת גן scores higher.
+    final areaSearch = query.intents.contains(SearchIntent.cityArea);
+    final namedCity = query.city?.trim() ?? '';
+    final cityGated = !areaSearch && namedCity.isNotEmpty;
+    if (cityGated) {
+      for (final c in ranked) {
+        if (!_cityMatches(c.property, namedCity)) c.score *= 0.7;
+      }
+      ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
     // Part 4 — exploration + diversity
     if (explore) {
       ExplorationPolicy.apply(ranked, model, seed: seed);
@@ -689,16 +703,11 @@ class RecommendationEngine {
     final match = <RankedCandidate, double>{
       for (final c in selected) c: _statedMatch(c, model),
     };
-    // IN-CITY FIRST: when the user named a specific city (not an "אזור X" search),
-    // a flat IN that city always ranks above an adjacent-town one — so "דירה בתל
-    // אביב" never leads with רמת גן while a Tel-Aviv flat exists. We cap each
-    // out-of-city flat's match to JUST below the weakest in-city match, which puts
-    // every in-city flat first AND keeps the displayed fit% monotonic (an 82%
-    // neighbour must not sit above a 73% in-city flat). An area search wants the
-    // neighbours equally, so it keeps pure match.
-    final areaSearch = query.intents.contains(SearchIntent.cityArea);
-    final namedCity = query.city?.trim();
-    if (!areaSearch && namedCity != null && namedCity.isNotEmpty) {
+    // IN-CITY FIRST (part 2/2): also cap each out-of-city flat's DISPLAYED match
+    // to just below the weakest in-city one — so every in-city flat sorts first
+    // AND the fit% stays monotonic (an 82% neighbour must not sit above a 73%
+    // in-city flat). Pairs with the pre-selection score penalty above.
+    if (cityGated) {
       final inCity = [
         for (final c in selected)
           if (_cityMatches(c.property, namedCity)) match[c]!
@@ -1215,11 +1224,13 @@ class RecommendationEngine {
     for (final d in dimensions) {
       if (concerns.length >= 2) break;
       if (d.key == 'budget') continue; // covered above
-      // senior_area / young_area are DEMOGRAPHIC context (a soft proxy for a
-      // quiet-older vs young-lively vibe), not a quality defect — a low score
-      // just means "not that kind of area". Flagging it as a concern contradicts
-      // the physical "🤫 שקט" (low_noise) tag and confuses the card. Skip them.
-      if (d.key == 'senior_area' || d.key == 'young_area') continue;
+      // senior_area / young_area / family are DEMOGRAPHIC context (a soft proxy
+      // for the vibe), not a quality defect — a low score just means "not that
+      // kind of area", which isn't a concern (and "family area weak" is odd on a
+      // couple's card). Skip them; they still influence ranking, just not caveats.
+      if (d.key == 'senior_area' || d.key == 'young_area' || d.key == 'family') {
+        continue;
+      }
       if (d.contributionPct >= 0.35) continue; // genuinely weak only
       final weighty =
           model.statedDimensions.contains(d.key) || d.weightPct >= 0.12;

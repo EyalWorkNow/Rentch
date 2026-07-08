@@ -217,7 +217,7 @@ class SearchIntent {
     // rather than cancelling one — "לא באזור רועש" / "בלי רעש" / "רחוק מכביש").
     // Only the explicit AVOID-noise phrasings add quiet — NOT a bare "רועש",
     // which may be dismissive ("לא משנה אם קצת רועש" = doesn't mind noise).
-    if (RegExp(r'בלי רעש|ללא רעש|לא רוצה רעש|לא באזור רועש|לא בסביבה רועש|'
+    if (RegExp(r'בלי רעש|ללא רעש|לא רוצה רעש|לא רועש|לא באזור רועש|לא בסביבה רועש|'
             r'רחוק מרעש|רחוק מכביש|נטול רעש|no noise|away from.*(road|highway)')
         .hasMatch(text)) {
       out.add(quiet);
