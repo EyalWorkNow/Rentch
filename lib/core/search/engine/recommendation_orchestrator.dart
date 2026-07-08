@@ -204,6 +204,11 @@ class Explainer {
     'view': 'קומה גבוהה / נוף',
     'spaciousness': 'מרווחות',
     'accessibility': 'נגישות',
+    'convenience': 'קרבה לסופר וקניות',
+    'low_noise': 'שקט מרעש',
+    'future_value': 'פוטנציאל השבחה',
+    'employment': 'קרבה לתעסוקה',
+    'low_floor': 'קומה נמוכה',
   };
 
   /// Public Hebrew label for a scoring dimension key (used by the Scorecard
@@ -273,6 +278,9 @@ class Explainer {
     if (intents.contains(SearchIntent.religiousArea) &&
         pfv.get('religious_area', 0.0) > 0.4) {
       chips.add('🕍 קהילה דתית באזור');
+    }
+    if (intents.contains(SearchIntent.lowFloor) && (p.floorNumber ?? 99) <= 2) {
+      chips.add('🏠 קומה נמוכה');
     }
     if (intents.contains(SearchIntent.green)) {
       final parkKm = IsraelGeoIndex.parkKm(p.lat, p.lon);

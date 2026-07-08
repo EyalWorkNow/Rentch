@@ -84,6 +84,7 @@ const List<Trig> triggers = [
   Trig('schools', 'דירה עם בתי ספר טובים בתל אביב עד 9000'),
   Trig('health', 'דירה קרוב לקופת חולים ובית חולים בתל אביב עד 9000'),
   Trig('transit', 'דירה קרוב לתחבורה ציבורית ורכבת בתל אביב עד 9000'),
+  Trig('low_floor', 'דירה בקומה נמוכה בתל אביב עד 9000'),
 ];
 
 double? weightOf(ScoredProperty s, String dim) {
@@ -187,8 +188,8 @@ void main() {
         if (!s.isFinite || s < 0 || s > 1.0001) bad.add('$dim=$s on ${p.id}');
       }
     }
-    // 29 base + convenience + low_noise + future_value + employment = 33.
-    expect(kScoringDimensions.length, 33,
+    // 29 base + convenience + low_noise + future_value + employment + low_floor = 34.
+    expect(kScoringDimensions.length, 34,
         reason: 'dimension count changed: ${kScoringDimensions.length}');
     expect(bad, isEmpty, reason: 'dimension satisfaction issues:\n${bad.take(20).join("\n")}');
   });

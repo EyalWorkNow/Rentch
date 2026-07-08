@@ -67,6 +67,7 @@ const List<String> kScoringDimensions = [
   'low_noise', // distance from a major road/rail (physical quiet) — on a quiet intent
   'future_value', // proximity to planned metro/light-rail + urban renewal — investor upside
   'employment', // job-place density nearby (short-commute proxy) — on a near-work intent
+  'low_floor', // a low floor itself (not just an elevator) — on a "קומה נמוכה" intent
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -512,8 +513,13 @@ class UserPreferenceModel {
         // Higher floor ⇒ better view; ~12th floor saturates to 1.
         return (pfv.get('floor_num', 0.0) / 12.0).clamp(0.0, 1.0);
       case 'spaciousness':
-        // m² per room; ~28 m²/room reads as very roomy.
-        return (pfv.get('size_per_room', 20.0) / 28.0).clamp(0.0, 1.0);
+        // m² per room, on a scale where ~12 reads as cramped and ~30 as very
+        // roomy — so a genuinely small flat scores low (and gets flagged) when
+        // "מרווחת" was asked, while a moderate one stays mid.
+        return ((pfv.get('size_per_room', 20.0) - 12.0) / 18.0).clamp(0.0, 1.0);
+      case 'low_floor':
+        // A LOW floor itself (independent of an elevator) — floor 0→1, ~8th→0.
+        return (1.0 - pfv.get('floor_num', 0.0) / 8.0).clamp(0.0, 1.0);
       case 'accessibility':
         // Step-free access: an elevator makes any floor accessible; otherwise a
         // ground/low floor is fine, a walk-up higher up is near-unusable.
@@ -628,6 +634,7 @@ class PreferenceModelBuilder {
     'low_noise': 0.0, // off until a quiet intent turns it on
     'future_value': 0.0, // off until an investment/growth intent turns it on
     'employment': 0.0, // off until a near-work intent turns it on
+    'low_floor': 0.0, // off until a "קומה נמוכה" intent turns it on
   };
   static const double _priorVariance = 0.09; // σ≈0.3 — fairly uncertain prior
 
@@ -782,6 +789,7 @@ class PreferenceModelBuilder {
     }
     if (intents.contains(SearchIntent.luxury)) sharpen('luxury', 0.9, 9.0);
     if (intents.contains(SearchIntent.view)) sharpen('view', 0.9, 9.0);
+    if (intents.contains(SearchIntent.lowFloor)) sharpen('low_floor', 0.95, 12.0);
     if (intents.contains(SearchIntent.spacious)) {
       sharpen('spaciousness', 0.9, 10.0);
     }
@@ -1046,6 +1054,7 @@ class PreferenceModelBuilder {
       'low_noise': const LinearUtility(),
       'future_value': const LinearUtility(),
       'employment': const LinearUtility(),
+      'low_floor': const LinearUtility(),
     };
 
     final constraints = HardConstraints(

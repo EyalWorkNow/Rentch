@@ -37,6 +37,7 @@ class SearchIntent {
   static const convenience = 'convenience';
   static const growth = 'growth';
   static const employment = 'employment';
+  static const lowFloor = 'low_floor';
 
   /// The seeker wants a religiously-observant community (חרדי / דתי-לאומי) or a
   /// place near a synagogue → prefer known religious localities/neighbourhoods.
@@ -81,6 +82,10 @@ class SearchIntent {
         caseSensitive: false),
     luxury: RegExp(r'יוקר|מפואר|פרימיום|luxur|penthouse|פנטהאוז', caseSensitive: false),
     view: RegExp(r'נוף|קומה גבוה|פנטהאוז|view|penthouse', caseSensitive: false),
+    lowFloor: RegExp(
+        r'קומה נמוכה|קומת קרקע|קומה ראשונה|קומה שנייה|קומה שניה|בלי מדרגות|'
+        r'ללא מדרגות|קרוב לכניסה|low floor|ground floor',
+        caseSensitive: false),
     student: RegExp(r'סטודנט|סטודנטית|קמפוס|מכלל|student|campus', caseSensitive: false),
     nearUniversity:
         RegExp(r'אוניברסיט|קמפוס|מכלל|university|campus', caseSensitive: false),
@@ -216,6 +221,12 @@ class SearchIntent {
             r'רחוק מרעש|רחוק מכביש|נטול רעש|no noise|away from.*(road|highway)')
         .hasMatch(text)) {
       out.add(quiet);
+    }
+    // Avoiding a HIGH floor = wanting a LOW one ("לא קומה גבוהה" / "בלי קומה גבוהה").
+    if (RegExp(r'(?:לא|בלי|ללא)\s*קומה גבוה').hasMatch(text)) {
+      out
+        ..add(lowFloor)
+        ..remove(view); // the negated "קומה גבוהה" must not also add view
     }
     // Young couple → they lean central/lively.
     if (RegExp(r'זוג צעיר|זוג|בני זוג|נשואים טריים|couple|newlywed')
