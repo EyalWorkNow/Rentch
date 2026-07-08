@@ -626,6 +626,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // background AI upgrade runs too (still shows instant results first).
     await _send(transcript, enrich: !_immediateMode);
 
+    // Reality-check (voice): if the ask is a fantasy for that city+budget, אתי
+    // SAYS so — with the realistic price + a nearby-city nudge — instead of
+    // voicing mismatched flats. Only the clearly-impossible case interrupts; a
+    // merely "tight" budget still flows to results below.
+    final reality = BudgetRealityCheck.assess(_query);
+    if (reality.verdict == RealityVerdict.unrealistic) {
+      return VoiceTurn(reply: reality.message);
+    }
+
     // Voice etiquette: don't dump apartments unasked. The FIRST time אתי has enough
     // to search, she ASKS — unless the user already consented or said "תראה לי".
     if (_lastShowedResults &&
