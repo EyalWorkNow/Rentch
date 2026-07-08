@@ -270,6 +270,10 @@ class Explainer {
         pfv.get('health_access', 0.5) > 0.5) {
       chips.add('🏥 קרוב לשירותי בריאות');
     }
+    if (intents.contains(SearchIntent.religiousArea) &&
+        pfv.get('religious_area', 0.0) > 0.4) {
+      chips.add('🕍 קהילה דתית באזור');
+    }
     if (intents.contains(SearchIntent.green)) {
       final parkKm = IsraelGeoIndex.parkKm(p.lat, p.lon);
       if (parkKm != null && parkKm <= 0.8) chips.add('🌳 ${_dist(parkKm)} מפארק');
@@ -677,6 +681,29 @@ class RecommendationEngine {
     final match = <RankedCandidate, double>{
       for (final c in selected) c: _statedMatch(c, model),
     };
+    // IN-CITY FIRST: when the user named a specific city (not an "אזור X" search),
+    // a flat IN that city always ranks above an adjacent-town one — so "דירה בתל
+    // אביב" never leads with רמת גן while a Tel-Aviv flat exists. We cap each
+    // out-of-city flat's match to JUST below the weakest in-city match, which puts
+    // every in-city flat first AND keeps the displayed fit% monotonic (an 82%
+    // neighbour must not sit above a 73% in-city flat). An area search wants the
+    // neighbours equally, so it keeps pure match.
+    final areaSearch = query.intents.contains(SearchIntent.cityArea);
+    final namedCity = query.city?.trim();
+    if (!areaSearch && namedCity != null && namedCity.isNotEmpty) {
+      final inCity = [
+        for (final c in selected)
+          if (_cityMatches(c.property, namedCity)) match[c]!
+      ];
+      if (inCity.isNotEmpty) {
+        final minIn = inCity.reduce(math.min);
+        for (final c in selected) {
+          if (!_cityMatches(c.property, namedCity)) {
+            match[c] = math.min(match[c]!, minIn * 0.98);
+          }
+        }
+      }
+    }
     selected.sort((a, b) => match[b]!.compareTo(match[a]!));
 
     // Backfill: the softer gates can leave only a handful of exact matches, but a
@@ -1180,6 +1207,11 @@ class RecommendationEngine {
     for (final d in dimensions) {
       if (concerns.length >= 2) break;
       if (d.key == 'budget') continue; // covered above
+      // senior_area / young_area are DEMOGRAPHIC context (a soft proxy for a
+      // quiet-older vs young-lively vibe), not a quality defect — a low score
+      // just means "not that kind of area". Flagging it as a concern contradicts
+      // the physical "🤫 שקט" (low_noise) tag and confuses the card. Skip them.
+      if (d.key == 'senior_area' || d.key == 'young_area') continue;
       if (d.contributionPct >= 0.35) continue; // genuinely weak only
       final weighty =
           model.statedDimensions.contains(d.key) || d.weightPct >= 0.12;
