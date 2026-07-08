@@ -127,7 +127,9 @@ class EttiPlan {
     dealBreaker('mamad', 'feat_mamad', 'safety', hardCanonical: 'mamad');
     dealBreaker('parking', 'feat_parking', 'amenities', hardCanonical: 'parking');
     dealBreaker('elevator', 'feat_elevator', 'accessible', hardCanonical: 'elevator');
-    dealBreaker('pets', 'feat_pets', 'accessible', hardCanonical: 'petsAllowed');
+    // pets is a HARD gate (petsAllowed veto) — weight is nearly cosmetic, but it
+    // must NOT be 'accessible' or a pet owner sees a bogus "נגישות פחות חזק" concern.
+    dealBreaker('pets', 'feat_pets', 'amenities', hardCanonical: 'petsAllowed');
     dealBreaker('accessible', 'feat_accessible', 'accessible');
     dealBreaker('furnished', 'feat_furnished', 'amenities', hardCanonical: 'furnished');
 

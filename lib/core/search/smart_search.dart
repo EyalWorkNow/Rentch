@@ -349,6 +349,12 @@ class SmartSearch {
       if (s.contains('מיליון')) {
         return 1000000 + (s.contains('וחצי') ? 500000 : 0);
       }
+      // shorthand: "1.5M" / "2 מ׳" (sale budgets typed tersely)
+      final mShort = RegExp(r'(\d+(?:[.,]\d+)?)\s*(?:M|מ׳|מ״)').firstMatch(s);
+      if (mShort != null) {
+        final base = double.tryParse(mShort.group(1)!.replaceAll(',', '.')) ?? 0;
+        return (base * 1000000).round();
+      }
       final e = RegExp(r'(\d+)\s*(וחצי\s*)?(?:אלף|אלפים)').firstMatch(s);
       if (e != null) {
         return (int.tryParse(e.group(1)!) ?? 0) * 1000 +
@@ -362,7 +368,7 @@ class SmartSearch {
     // digit-less "מיליון"/"מיליון וחצי" (common for sale budgets). The unit must
     // stay in the group so the terminator can't cut at the space before it.
     const amt =
-        r'(\d[\d.,]*\s*(?:אלף|אלפים|מיליון(?:\s*וחצי)?)?|מיליון(?:\s*וחצי)?)';
+        r'(\d[\d.,]*\s*(?:אלף|אלפים|מיליון(?:\s*וחצי)?|M|מ׳|מ״)?|מיליון(?:\s*וחצי)?)';
     final between = RegExp('בין\\s*$amt\\s*ל[-־]?\\s*$amt').firstMatch(text);
     final around =
         RegExp('(?:בערך|סביב|כ[-־]|בסביבות)\\s*$amt').firstMatch(text);

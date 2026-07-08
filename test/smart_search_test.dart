@@ -39,6 +39,12 @@ void main() {
     expect(q.maxPrice, 7000);
   });
 
+  test('million shorthand "M" in a sale range', () {
+    final q = SmartSearch.parse('דירה למכירה בין 1.5M ל-2M בתל אביב');
+    expect(q.minPrice, 1500000);
+    expect(q.maxPrice, 2000000);
+  });
+
   test('budget "בערך" → window', () {
     final q = SmartSearch.parse('משהו בערך 6000 בחיפה');
     expect(q.minPrice, 5100);
