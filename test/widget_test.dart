@@ -270,12 +270,14 @@ void main() {
       );
       await _pumpFrames(tester);
 
-      // The real bug: the screen came up blank. Assert the comparison table is
-      // actually there, and no layout/render exception was swallowed.
+      // The real bug: the screen came up blank. Assert the seeker-facing surface
+      // renders and no layout/render exception was swallowed.
       expect(tester.takeException(), isNull);
-      expect(find.text('מחיר'), findsOneWidget);
-      expect(find.text('₪ למ"ר'), findsOneWidget);
       expect(find.text('השוואת דירות'), findsOneWidget);
+      expect(find.text('השורה התחתונה'), findsOneWidget);
+      expect(find.text('כמה זה יעלה לך באמת'), findsOneWidget); // true-cost
+      expect(find.text('מה מוותרים'), findsOneWidget); // trade-offs
+      expect(find.text('כל הפרטים להשוואה'), findsOneWidget); // collapsed table
       // >3 saved → the column dropdown is shown (seeded with the first 3).
       expect(find.text('נבחרו 3/3 דירות'), findsOneWidget);
     } finally {

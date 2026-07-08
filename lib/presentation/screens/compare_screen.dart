@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/finance/monthly_cost.dart';
 import 'package:dating_app/core/finance/price_realism.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -10,13 +11,20 @@ import 'package:provider/provider.dart';
 
 /// Side-by-side comparison of the tenant's saved (or searched-in) listings.
 ///
-/// Rebuilt: the compare set is a single ordered list of up to 3 columns that is
-/// SEEDED automatically from the first saved listings — so the screen never opens
-/// blank. Chips add/remove columns; the search action pulls in non-saved flats.
+/// Built from the apartment-seeker's point of view, around the things that
+/// actually make choosing hard:
+///   1. the rent is NOT the real cost (arnona + vaad hide ~₪600–1,000/mo),
+///   2. you can't tell if a price is fair without a market anchor,
+///   3. trade-offs are hard to hold in your head ("cheaper but smaller, no
+///      parking, 4th floor no elevator…"),
+///   4. "which do I actually pick?" — decision paralysis.
+/// So the primary surface is decisions, not a spec dump: a bottom-line pick, the
+/// TRUE monthly cost, and plain-language trade-offs. The full spec table is
+/// demoted to a collapsible section for the detail-oriented.
 class CompareScreen extends StatefulWidget {
   const CompareScreen({super.key});
 
-  /// Max columns shown side-by-side (mobile-portrait ceiling).
+  /// Max columns compared at once (mobile-portrait ceiling).
   static const int maxColumns = 3;
 
   @override
@@ -24,20 +32,19 @@ class CompareScreen extends StatefulWidget {
 }
 
 class _CompareScreenState extends State<CompareScreen> {
-  /// Ordered ids of the listings currently in the comparison (<= maxColumns).
+  /// Ordered ids of the listings currently compared (<= maxColumns).
   final List<String> _columns = <String>[];
 
   /// Listings pulled in via search (not in the saved list).
   final List<RentalProperty> _searchAdded = <RentalProperty>[];
 
-  /// Seed the columns exactly once, from the first saved listings.
   bool _seeded = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // context.watch in build() makes this fire again when saved listings finish
-    // loading, so seeding survives async persistence.
+    // context.watch in build() re-fires this when saved listings finish loading,
+    // so seeding survives async persistence.
     if (_seeded) return;
     final pool = _pool(context.read<DatingProvider>());
     if (pool.length < 2) return;
@@ -47,7 +54,6 @@ class _CompareScreenState extends State<CompareScreen> {
     _seeded = true;
   }
 
-  /// Saved listings + search-added (deduped, saved first).
   List<RentalProperty> _pool(DatingProvider p) => <RentalProperty>[
         ...p.savedProperties,
         ..._searchAdded
@@ -109,13 +115,15 @@ class _CompareScreenState extends State<CompareScreen> {
             ),
           )
         else
-          Expanded(child: _CompareTable(properties: columns, provider: provider)),
+          Expanded(
+            child: _CompareBody(
+              analysis: _Analysis(columns, provider),
+            ),
+          ),
       ],
     );
   }
 
-  /// The current columns as live properties, in the user's order, dropping any
-  /// id that has left the pool (e.g. un-saved elsewhere).
   List<RentalProperty> _resolveColumns(List<RentalProperty> pool) {
     final byId = {for (final p in pool) p.id: p};
     return [
@@ -147,7 +155,6 @@ class _CompareScreenState extends State<CompareScreen> {
           !provider.savedProperties.any((p) => p.id == picked.id)) {
         _searchAdded.add(picked);
       }
-      // Make room + show it: if full, drop the oldest column.
       _columns.remove(picked.id);
       if (_columns.length >= CompareScreen.maxColumns) _columns.removeAt(0);
       _columns.add(picked.id);
@@ -155,93 +162,719 @@ class _CompareScreenState extends State<CompareScreen> {
   }
 }
 
-/// Dropdown to add/remove columns when more than [maxColumns] are in the pool.
-/// Tap the field → a menu of checkable listings; checking one drops it straight
-/// into the table (capped at [maxColumns]; over the cap the rest are disabled).
-class _ColumnDropdown extends StatelessWidget {
-  const _ColumnDropdown({
-    required this.pool,
-    required this.selected,
-    required this.onToggle,
-  });
+// ═══════════════════════════════════════════════════════════════════════════
+// Analysis — everything the seeker-facing widgets need, computed once.
+// ═══════════════════════════════════════════════════════════════════════════
 
-  final List<RentalProperty> pool;
-  final List<String> selected;
-  final ValueChanged<String> onToggle;
+class _Analysis {
+  _Analysis(this.props, this.provider)
+      : costs = [for (final p in props) _trueCost(p)],
+        below = [for (final p in props) belowMarket(p)],
+        matches = [for (final p in props) provider.displayMatchScore(p)] {
+    valueIdx = bestValueIndex(below);
+    cheapestTotalIdx = _minIdx([for (final p in props) _totalMonthly(p)]);
+    cheapestRentIdx =
+        _minIdx([for (final p in props) p.price > 0 ? p.price : null]);
+    matchIdx = _maxIdx(matches.map((m) => m?.toDouble()).toList());
+    allRent = props
+        .every((p) => p.transactionType == PropertyTransactionType.rent);
+  }
+
+  final List<RentalProperty> props;
+  final DatingProvider provider;
+  final List<MonthlyCostEstimate?> costs;
+  final List<double?> below; // fraction below local market (null = no anchor)
+  final List<int?> matches;
+
+  late final int valueIdx; // best value vs market (or -1)
+  late final int matchIdx; // best personal match (or -1)
+  late final int cheapestTotalIdx; // cheapest TRUE monthly cost (or -1)
+  late final int cheapestRentIdx; // cheapest headline rent (or -1)
+  late final bool allRent;
+
+  /// The recommended pick: value if we could anchor it, else cheapest true cost.
+  int get pickIdx => valueIdx >= 0 ? valueIdx : cheapestTotalIdx;
+
+  static int _minIdx(List<num?> v) {
+    var idx = -1;
+    num best = double.infinity;
+    for (var i = 0; i < v.length; i++) {
+      final x = v[i];
+      if (x != null && x < best) {
+        best = x;
+        idx = i;
+      }
+    }
+    return idx;
+  }
+
+  static int _maxIdx(List<double?> v) {
+    if (v.whereType<double>().length < 2) return -1;
+    var idx = -1;
+    var best = double.negativeInfinity;
+    for (var i = 0; i < v.length; i++) {
+      final x = v[i];
+      if (x != null && x > best) {
+        best = x;
+        idx = i;
+      }
+    }
+    return idx;
+  }
+}
+
+/// True monthly cost for a rental (rent + arnona + vaad); null for sales/missing.
+MonthlyCostEstimate? _trueCost(RentalProperty p) =>
+    p.transactionType == PropertyTransactionType.rent
+        ? MonthlyCost.estimate(rent: p.price, sizeM2: p.sizeM2, city: p.city)
+        : null;
+
+/// The number to rank cost by: true monthly total for rentals, else the price.
+num? _totalMonthly(RentalProperty p) {
+  final c = _trueCost(p);
+  if (c != null) return c.total;
+  return p.price > 0 ? p.price : null;
+}
+
+/// How far a listing sits below its own local market price, as a fraction
+/// (0.12 = 12% under). Null when there's no market prior or the price is a
+/// sanity outlier (bait) — those can't be a genuine "best value".
+double? belowMarket(RentalProperty p) {
+  final v = PriceRealism.check(p);
+  if (v.flag != PriceFlag.ok) return null;
+  return 1 - v.ratio;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Pure ranking helpers (unit-tested in test/compare_logic_test.dart).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Best value = the listing furthest below its own local market price.
+/// Returns -1 unless ≥2 columns are comparable, so the pick is real rather than
+/// an arbitrary in-group score.
+int bestValueIndex(List<double?> belowMarket) {
+  if (belowMarket.whereType<double>().length < 2) return -1;
+  var best = -1;
+  var bestVal = double.negativeInfinity;
+  for (var i = 0; i < belowMarket.length; i++) {
+    final v = belowMarket[i];
+    if (v != null && v > bestVal) {
+      bestVal = v;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/// Column indices holding the best value for a numeric row. Uses an epsilon so
+/// float ties all light up; empty when every column is equal or none numeric.
+Set<int> numericWinners(List<double?> vals, {required bool minIsBest}) {
+  double? bestVal;
+  for (final v in vals) {
+    if (v == null) continue;
+    if (bestVal == null || (minIsBest ? v < bestVal : v > bestVal)) bestVal = v;
+  }
+  if (bestVal == null) return const {};
+  if (vals.whereType<double>().toSet().length < 2) return const {};
+  final out = <int>{};
+  for (var i = 0; i < vals.length; i++) {
+    final v = vals[i];
+    if (v != null && (v - bestVal).abs() < 0.5) out.add(i);
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Seeker-facing body.
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _CompareBody extends StatelessWidget {
+  const _CompareBody({required this.analysis});
+  final _Analysis analysis;
 
   @override
   Widget build(BuildContext context) {
-    final full = selected.length >= CompareScreen.maxColumns;
-    return Container(
-      width: double.infinity,
-      color: AppColors.surface,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: PopupMenuButton<String>(
-        onSelected: onToggle,
-        // menu stays inside the field width, scrolls when there are many saved.
-        constraints: const BoxConstraints(minWidth: 240, maxHeight: 360),
-        position: PopupMenuPosition.under,
-        itemBuilder: (_) => [
-          for (final p in pool)
-            CheckedPopupMenuItem<String>(
-              value: p.id,
-              checked: selected.contains(p.id),
-              // can't add a 4th; already-checked stay tappable so you can remove.
-              enabled: selected.contains(p.id) || !full,
-              child: Text(_shortLabel(p),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _HeaderStrip(analysis: analysis),
+          const SizedBox(height: 14),
+          _BottomLineCard(analysis: analysis),
+          const SizedBox(height: 14),
+          if (analysis.allRent) ...[
+            _TrueCostCard(analysis: analysis),
+            const SizedBox(height: 14),
+          ],
+          _TradeOffCard(analysis: analysis),
+          const SizedBox(height: 14),
+          _DetailsSection(analysis: analysis),
         ],
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.background,
+      ),
+    );
+  }
+}
+
+// ── header: which flats, with photos ────────────────────────────────────────
+
+class _HeaderStrip extends StatelessWidget {
+  const _HeaderStrip({required this.analysis});
+  final _Analysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final props = analysis.props;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < props.length; i++)
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i == props.length - 1 ? 0 : 8),
+              child: _headerCard(context, props[i], i == analysis.pickIdx),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _headerCard(BuildContext context, RentalProperty p, bool isPick) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderLight),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  selected.isEmpty
-                      ? 'בחרו דירות להשוואה'
-                      : 'נבחרו ${selected.length}/${CompareScreen.maxColumns} דירות',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: selected.isEmpty
-                        ? AppColors.textSecondary
-                        : AppColors.textPrimary,
-                  ),
-                ),
+            child: SizedBox(
+              height: 88,
+              width: double.infinity,
+              child: SafeMedia(
+                media: p.primaryMedia,
+                fallback: Container(color: AppColors.borderLight),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textSecondary),
-            ],
+            ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            _where(p),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: isPick ? AppColors.primary : AppColors.textPrimary,
+            ),
+          ),
+          Text(
+            p.priceLabel,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── the bottom line: which to pick, and why (honest) ────────────────────────
+
+class _BottomLineCard extends StatelessWidget {
+  const _BottomLineCard({required this.analysis});
+  final _Analysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = analysis;
+    if (a.pickIdx < 0) {
+      // Not enough data to recommend — say so, don't fake it.
+      return _plain(
+        'אין מספיק נתונים להמלצה ברורה',
+        'חסרים מחיר/שטח או עוגן שוק לחלק מהדירות. גללו למטה להשוואה המלאה.',
+      );
+    }
+    final pick = a.props[a.pickIdx];
+    final lines = <String>[];
+
+    // 1) value vs market (the "am I overpaying?" answer)
+    lines.add(_valueLine(pick));
+    // 2) the real cost (the "rent isn't the real cost" answer), rentals only
+    final cost = a.costs[a.pickIdx];
+    if (cost != null) {
+      lines.add('עלות אמיתית ~₪${_thousands(cost.total)}/חודש '
+          '(כולל ארנונה וועד)');
+    }
+    // 3) one honest caveat
+    final caveat = _caveat(a, a.pickIdx);
+    if (caveat != null) lines.add('לשים לב: $caveat');
+
+    final matchNote = (a.matchIdx >= 0 && a.matchIdx != a.pickIdx)
+        ? 'אבל הכי מתאימה לך אישית: ${_where(a.props[a.matchIdx])}'
+            ' (${a.matches[a.matchIdx]}%) — אם התקציב פחות קריטי.'
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.82)],
         ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(children: [
+            Text('🏆', style: TextStyle(fontSize: 20)),
+            SizedBox(width: 8),
+            Text('השורה התחתונה',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900)),
+          ]),
+          const SizedBox(height: 6),
+          Text('${_where(pick)} · ${pick.priceLabel}',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          for (final l in lines)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2.5),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(IconsaxPlusBold.tick_circle,
+                    size: 16, color: Colors.white),
+                const SizedBox(width: 6),
+                Expanded(
+                    child: Text(l,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 13, height: 1.3))),
+              ]),
+            ),
+          if (matchNote != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(children: [
+                const Icon(IconsaxPlusBold.heart, size: 15, color: Colors.white),
+                const SizedBox(width: 6),
+                Expanded(
+                    child: Text(matchNote,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12, height: 1.3))),
+              ]),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  String _shortLabel(RentalProperty p) {
-    final where =
-        p.neighborhood.trim().isNotEmpty ? p.neighborhood.trim() : p.city.trim();
-    return '$where · ${p.priceLabel}';
+  String _valueLine(RentalProperty w) {
+    final bm = belowMarket(w);
+    final city = w.city.trim();
+    final where = city.isEmpty ? '' : ' ב$city';
+    if (bm == null) return 'המחיר סביר לגודל ולאזור';
+    final pct = (bm * 100).round();
+    if (pct >= 2) return 'כ-$pct% מתחת למחיר השוק$where — מחיר טוב';
+    if (pct <= -2) return 'סביב מחיר השוק — התמורה הטובה בקבוצה';
+    return 'בדיוק במחיר השוק$where';
+  }
+
+  Widget _plain(String title, String body) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 6),
+          Text(body,
+              style: const TextStyle(
+                  fontSize: 13, height: 1.35, color: AppColors.textSecondary)),
+        ]),
+      );
+
+  /// The single biggest thing the pick gives up to any other option.
+  String? _caveat(_Analysis a, int idx) {
+    final pick = a.props[idx];
+    final others = [
+      for (var i = 0; i < a.props.length; i++)
+        if (i != idx) a.props[i]
+    ];
+    // Bigger flat exists?
+    if (others.any((o) => o.sizeM2 > pick.sizeM2 + 4)) {
+      return 'יש בהשוואה דירה מרווחת יותר';
+    }
+    // A premium feature the pick lacks but another has.
+    for (final f in _premiumFeatures) {
+      if (!pick.featureFlags.isEnabled(f) &&
+          others.any((o) => o.featureFlags.isEnabled(f))) {
+        return 'בלי ${_featureHe[f]} (יש באחת האחרות)';
+      }
+    }
+    // A cheaper true cost exists?
+    final myCost = _totalMonthly(pick);
+    if (myCost != null &&
+        others.any((o) {
+          final c = _totalMonthly(o);
+          return c != null && c < myCost - 100;
+        })) {
+      return 'יש אופציה זולה יותר בעלות החודשית';
+    }
+    return null;
   }
 }
 
-/// The side-by-side table. Numeric rows highlight the best value per row;
-/// amenity rows show ✓/✗. A "best value" verdict card sits on top when the data
-/// supports one.
-class _CompareTable extends StatelessWidget {
-  const _CompareTable({required this.properties, required this.provider});
+// ── the true monthly cost reveal (rentals) ──────────────────────────────────
 
-  final List<RentalProperty> properties;
-  final DatingProvider provider;
+class _TrueCostCard extends StatelessWidget {
+  const _TrueCostCard({required this.analysis});
+  final _Analysis analysis;
 
   @override
   Widget build(BuildContext context) {
+    final a = analysis;
+    final maxTotal = a.costs
+        .whereType<MonthlyCostEstimate>()
+        .fold<int>(0, (m, c) => c.total > m ? c.total : m);
+
+    // The teaching moment: the flat with the lowest RENT isn't always the
+    // cheapest to actually live in once arnona + vaad are counted.
+    final revealsGap = a.cheapestRentIdx >= 0 &&
+        a.cheapestTotalIdx >= 0 &&
+        a.cheapestRentIdx != a.cheapestTotalIdx;
+
+    return _Section(
+      icon: IconsaxPlusBold.wallet_3,
+      title: 'כמה זה יעלה לך באמת',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'שכר הדירה הוא לא העלות האמיתית — ארנונה וועד בית מוסיפים כל חודש.',
+            style: TextStyle(
+                fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < a.props.length; i++)
+            _costRow(a.props[i], a.costs[i], maxTotal,
+                isCheapest: i == a.cheapestTotalIdx),
+          if (revealsGap) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                const Icon(IconsaxPlusBold.info_circle,
+                    size: 16, color: AppColors.warning),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${_where(a.props[a.cheapestRentIdx])} נראית הכי זולה בשכר, '
+                    'אבל ${_where(a.props[a.cheapestTotalIdx])} זולה יותר בעלות '
+                    'החודשית הכוללת.',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _costRow(RentalProperty p, MonthlyCostEstimate? c, int maxTotal,
+      {required bool isCheapest}) {
+    final total = c?.total ?? p.price;
+    final frac = maxTotal > 0 ? (total / maxTotal).clamp(0.08, 1.0) : 1.0;
+    final rentFrac = c != null && c.total > 0 ? c.rent / c.total : 1.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text(
+                _where(p),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (isCheapest)
+              Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('הזולה באמת',
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.success)),
+              ),
+            Text('₪${_thousands(total)}',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: isCheapest
+                        ? AppColors.success
+                        : AppColors.textPrimary)),
+          ]),
+          const SizedBox(height: 5),
+          // Stacked bar: rent portion vs the arnona+vaad add-on.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: FractionallySizedBox(
+              alignment: AlignmentDirectional.centerStart,
+              widthFactor: frac,
+              child: SizedBox(
+                height: 10,
+                child: Row(children: [
+                  Expanded(
+                    flex: (rentFrac * 100).round().clamp(1, 100),
+                    child: Container(color: AppColors.primary),
+                  ),
+                  if (c != null)
+                    Expanded(
+                      flex: ((1 - rentFrac) * 100).round().clamp(1, 100),
+                      child: Container(
+                          color: AppColors.primary.withValues(alpha: 0.35)),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+          if (c != null) ...[
+            const SizedBox(height: 3),
+            Text(
+              'שכ"ד ₪${_thousands(c.rent)} + ארנונה ~₪${_thousands(c.arnona)} '
+              '+ ועד ~₪${_thousands(c.vaad)}',
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── trade-offs: what you give up, in plain Hebrew ───────────────────────────
+
+class _TradeOffCard extends StatelessWidget {
+  const _TradeOffCard({required this.analysis});
+  final _Analysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = analysis;
+    final pickIdx = a.pickIdx >= 0 ? a.pickIdx : 0;
+    final pick = a.props[pickIdx];
+
+    return _Section(
+      icon: IconsaxPlusBold.arrow_swap_horizontal,
+      title: 'מה מוותרים',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'לעומת ${_where(pick)} (ההמלצה) — מה כל אחת מהאחרות נותנת ומה מפסידים:',
+            style: const TextStyle(
+                fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          for (var i = 0; i < a.props.length; i++)
+            if (i != pickIdx) _versusBlock(a, i, pickIdx),
+        ],
+      ),
+    );
+  }
+
+  Widget _versusBlock(_Analysis a, int i, int pickIdx) {
+    final o = a.props[i];
+    final v = _versus(a, i, pickIdx);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(_where(o),
+            style:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        if (v.better.isEmpty && v.worse.isEmpty)
+          const Text('דומה מאוד להמלצה — בלי הבדל מהותי.',
+              style:
+                  TextStyle(fontSize: 12.5, color: AppColors.textSecondary))
+        else ...[
+          for (final b in v.better) _line(true, b),
+          for (final w in v.worse) _line(false, w),
+        ],
+      ]),
+    );
+  }
+
+  Widget _line(bool good, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1.5),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(
+            good ? IconsaxPlusBold.tick_circle : IconsaxPlusLinear.minus_cirlce,
+            size: 15,
+            color: good ? AppColors.success : AppColors.textDisabled,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.3,
+                    color: good ? AppColors.textPrimary : AppColors.textSecondary)),
+          ),
+        ]),
+      );
+
+  /// What option [i] is better/worse at vs the pick — the head-to-head a seeker
+  /// would otherwise have to work out in their head.
+  ({List<String> better, List<String> worse}) _versus(
+      _Analysis a, int i, int pickIdx) {
+    final o = a.props[i];
+    final pick = a.props[pickIdx];
+    final better = <String>[];
+    final worse = <String>[];
+
+    // cost (true monthly when we have it)
+    final co = _totalMonthly(o);
+    final cp = _totalMonthly(pick);
+    if (co != null && cp != null && (co - cp).abs() >= 100) {
+      final d = _thousands((co - cp).abs().round());
+      (co < cp ? better : worse).add(co < cp
+          ? 'זולה ב-₪$d בחודש'
+          : 'יקרה ב-₪$d בחודש');
+    }
+    // space
+    if (o.sizeM2 > 0 && pick.sizeM2 > 0 && (o.sizeM2 - pick.sizeM2).abs() >= 4) {
+      final d = (o.sizeM2 - pick.sizeM2).abs();
+      (o.sizeM2 > pick.sizeM2 ? better : worse)
+          .add(o.sizeM2 > pick.sizeM2 ? 'גדולה ב-$d מ"ר' : 'קטנה ב-$d מ"ר');
+    }
+    // rooms
+    if (o.rooms > 0 && pick.rooms > 0 && (o.rooms - pick.rooms).abs() >= 0.5) {
+      (o.rooms > pick.rooms ? better : worse).add(o.rooms > pick.rooms
+          ? 'יותר חדרים (${o.roomsLabel})'
+          : 'פחות חדרים (${o.roomsLabel})');
+    }
+    // features
+    for (final f in _premiumFeatures) {
+      final oHas = o.featureFlags.isEnabled(f);
+      final pHas = pick.featureFlags.isEnabled(f);
+      if (oHas && !pHas) better.add('עם ${_featureHe[f]}');
+      if (!oHas && pHas) worse.add('בלי ${_featureHe[f]}');
+    }
+    // market value
+    final bo = belowMarket(o);
+    final bp = belowMarket(pick);
+    if (bo != null && bp != null && (bo - bp).abs() >= 0.03) {
+      final pct = ((bo - bp).abs() * 100).round();
+      (bo > bp ? better : worse).add(bo > bp
+          ? 'מחיר טוב יותר יחסית לשוק (ב-$pct%)'
+          : 'מחיר פחות טוב יחסית לשוק (ב-$pct%)');
+    }
+    // personal match
+    final mo = a.matches[i];
+    final mp = a.matches[pickIdx];
+    if (mo != null && mp != null && (mo - mp).abs() >= 5) {
+      (mo > mp ? better : worse)
+          .add(mo > mp ? 'התאמה גבוהה יותר לך ($mo%)' : 'התאמה נמוכה יותר ($mo%)');
+    }
+
+    return (better: better.take(4).toList(), worse: worse.take(4).toList());
+  }
+}
+
+// ── full spec table (collapsed by default) ──────────────────────────────────
+
+class _DetailsSection extends StatelessWidget {
+  const _DetailsSection({required this.analysis});
+  final _Analysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borderLight),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          title: const Text('כל הפרטים להשוואה',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          leading: const Icon(IconsaxPlusLinear.document_text,
+              color: AppColors.textSecondary),
+          childrenPadding: EdgeInsets.zero,
+          children: [_CompareTable(analysis: analysis)],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompareTable extends StatelessWidget {
+  const _CompareTable({required this.analysis});
+  final _Analysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = analysis.provider;
+    final properties = analysis.props;
     final rows = <_CompareRow>[
       _CompareRow.number('מחיר',
           (p) => p.price > 0 ? p.price.toDouble() : null, (p) => p.priceLabel,
@@ -270,283 +903,158 @@ class _CompareTable extends StatelessWidget {
       ),
     ];
 
-    final bestIdx = _bestValueIndex(properties);
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (bestIdx >= 0) ...[
-              _ValueVerdict(
-                winner: properties[bestIdx],
-                pros: _pros(properties, bestIdx),
-                cons: _cons(properties, bestIdx),
-                valueNote: _valueNote(properties[bestIdx]),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Column(
-                children: [
-                  _HeaderRow(properties: properties, winnerIndex: bestIdx),
-                  for (var i = 0; i < rows.length; i++)
-                    _DataRow(
-                      row: rows[i],
-                      properties: properties,
-                      shaded: i.isEven,
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Column(
+      children: [
+        for (var i = 0; i < rows.length; i++)
+          _DataRow(row: rows[i], properties: properties, shaded: i.isEven),
+      ],
     );
-  }
-
-  int _bestValueIndex(List<RentalProperty> props) =>
-      bestValueIndex([for (final p in props) _belowMarket(p)]);
-
-  /// How far this listing sits below its own local market price, as a fraction
-  /// (0.12 = 12% under). Null when there's no market prior or the price is a
-  /// sanity outlier (bait) — those can't be a genuine "best value".
-  static double? _belowMarket(RentalProperty p) {
-    final v = PriceRealism.check(p);
-    if (v.flag != PriceFlag.ok) return null;
-    return 1 - v.ratio;
-  }
-
-  static const _premiumFeatures = ['elevator', 'parking', 'balcony', 'mamad'];
-  static const _featureHe = {
-    'elevator': 'מעלית',
-    'parking': 'חניה',
-    'balcony': 'מרפסת',
-    'mamad': 'ממ"ד',
-  };
-
-  /// The honest headline: how the winner sits vs its own local market price.
-  static String _valueNote(RentalProperty w) {
-    final bm = _belowMarket(w);
-    final city = w.city.trim();
-    final where = city.isEmpty ? '' : ' ב$city';
-    if (bm == null) return 'התמורה הטובה בקבוצה'; // no market prior to anchor to
-    final pct = (bm * 100).round();
-    if (pct >= 2) return 'כ-$pct% מתחת למחיר השוק$where';
-    if (pct <= -2) return 'התמורה הטובה בקבוצה (השאר יקרות יותר יחסית לשוק)';
-    return 'סביב מחיר השוק$where — התמורה הטובה בקבוצה';
-  }
-
-  List<String> _pros(List<RentalProperty> props, int idx) {
-    final w = props[idx];
-    final others = [
-      for (var i = 0; i < props.length; i++)
-        if (i != idx) props[i]
-    ];
-    final out = <String>[];
-    if (w.price > 0 && others.every((o) => o.price <= 0 || w.price <= o.price)) {
-      out.add('הכי זולה — ${w.priceLabel}');
-    }
-    if (w.sizeM2 > 0 && others.every((o) => w.sizeM2 >= o.sizeM2)) {
-      out.add('הכי מרווחת — ${w.sizeM2} מ"ר');
-    }
-    for (final f in _premiumFeatures) {
-      if (w.featureFlags.isEnabled(f) &&
-          others.any((o) => !o.featureFlags.isEnabled(f))) {
-        out.add('עם ${_featureHe[f]} (חלק מהאחרות בלי)');
-      }
-    }
-    final wm = provider.displayMatchScore(w);
-    if (wm != null &&
-        others.every((o) {
-          final om = provider.displayMatchScore(o);
-          return om == null || wm >= om;
-        })) {
-      out.add('ההתאמה הגבוהה ביותר — $wm%');
-    }
-    return out.take(4).toList();
-  }
-
-  List<String> _cons(List<RentalProperty> props, int idx) {
-    final w = props[idx];
-    final others = [
-      for (var i = 0; i < props.length; i++)
-        if (i != idx) props[i]
-    ];
-    final out = <String>[];
-    if (others.any((o) => o.price > 0 && (w.price <= 0 || o.price < w.price))) {
-      out.add('לא הכי זולה בקבוצה');
-    }
-    if (others.any((o) => o.sizeM2 > w.sizeM2)) {
-      out.add('יש מרווחת יותר בהשוואה');
-    }
-    for (final f in _premiumFeatures) {
-      if (!w.featureFlags.isEnabled(f) &&
-          others.any((o) => o.featureFlags.isEnabled(f))) {
-        out.add('בלי ${_featureHe[f]} (יש באחרת)');
-      }
-    }
-    return out.take(3).toList();
-  }
-
-  static double? _perM2(RentalProperty p) =>
-      (p.sizeM2 <= 0 || p.price <= 0) ? null : p.price / p.sizeM2;
-
-  static String _perM2Label(RentalProperty p) {
-    if (p.sizeM2 <= 0 || p.price <= 0) return '—';
-    return '₪${(p.price / p.sizeM2).round()}';
-  }
-
-  static String _floorLabel(RentalProperty p) {
-    final floor = p.floor.trim();
-    if (floor.isEmpty) return '—';
-    final total = p.totalFloors.trim();
-    return total.isEmpty ? floor : '$floor/$total';
   }
 }
 
-/// The value-for-money verdict: which listing gives the most per shekel, with an
-/// honest pros/cons breakdown.
-class _ValueVerdict extends StatelessWidget {
-  const _ValueVerdict({
-    required this.winner,
-    required this.pros,
-    required this.cons,
-    required this.valueNote,
-  });
+// ── shared calc helpers ─────────────────────────────────────────────────────
 
-  final RentalProperty winner;
-  final List<String> pros;
-  final List<String> cons;
-  final String valueNote;
+const _premiumFeatures = ['elevator', 'parking', 'balcony', 'mamad'];
+const _featureHe = {
+  'elevator': 'מעלית',
+  'parking': 'חניה',
+  'balcony': 'מרפסת',
+  'mamad': 'ממ"ד',
+};
 
-  String get _where {
-    final w = winner.neighborhood.trim().isNotEmpty
-        ? winner.neighborhood.trim()
-        : winner.city.trim();
-    return w.isNotEmpty ? w : winner.address;
+double? _perM2(RentalProperty p) =>
+    (p.sizeM2 <= 0 || p.price <= 0) ? null : p.price / p.sizeM2;
+
+String _perM2Label(RentalProperty p) {
+  if (p.sizeM2 <= 0 || p.price <= 0) return '—';
+  return '₪${(p.price / p.sizeM2).round()}';
+}
+
+String _floorLabel(RentalProperty p) {
+  final floor = p.floor.trim();
+  if (floor.isEmpty) return '—';
+  final total = p.totalFloors.trim();
+  return total.isEmpty ? floor : '$floor/$total';
+}
+
+String _where(RentalProperty p) {
+  final w =
+      p.neighborhood.trim().isNotEmpty ? p.neighborhood.trim() : p.city.trim();
+  return w.isNotEmpty ? w : p.address;
+}
+
+String _thousands(int n) {
+  final s = n.abs().toString();
+  final b = StringBuffer(n < 0 ? '-' : '');
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+    b.write(s[i]);
   }
+  return b.toString();
+}
+
+// ── section shell ───────────────────────────────────────────────────────────
+
+class _Section extends StatelessWidget {
+  const _Section({required this.icon, required this.title, required this.child});
+  final IconData icon;
+  final String title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.82),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Text('🏆', style: TextStyle(fontSize: 20)),
-              SizedBox(width: 8),
-              Text('המשתלמת ביותר',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(_where,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text(title,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800)),
-          Text('$valueNote · ${winner.priceLabel}',
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
-          const SizedBox(height: 12),
-          for (final p in pros)
-            _line(IconsaxPlusBold.tick_circle, p, Colors.white),
-          if (cons.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            for (final c in cons)
-              _line(IconsaxPlusLinear.minus_cirlce, c,
-                  Colors.white.withValues(alpha: 0.78)),
-          ],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary)),
+        ]),
+        const SizedBox(height: 12),
+        child,
+      ]),
+    );
+  }
+}
+
+// ── column picker dropdown ──────────────────────────────────────────────────
+
+class _ColumnDropdown extends StatelessWidget {
+  const _ColumnDropdown({
+    required this.pool,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  final List<RentalProperty> pool;
+  final List<String> selected;
+  final ValueChanged<String> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final full = selected.length >= CompareScreen.maxColumns;
+    return Container(
+      width: double.infinity,
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: PopupMenuButton<String>(
+        onSelected: onToggle,
+        constraints: const BoxConstraints(minWidth: 240, maxHeight: 360),
+        position: PopupMenuPosition.under,
+        itemBuilder: (_) => [
+          for (final p in pool)
+            CheckedPopupMenuItem<String>(
+              value: p.id,
+              checked: selected.contains(p.id),
+              enabled: selected.contains(p.id) || !full,
+              child: Text(_shortLabel(p),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
         ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Row(children: [
+            Expanded(
+              child: Text(
+                selected.isEmpty
+                    ? 'בחרו דירות להשוואה'
+                    : 'נבחרו ${selected.length}/${CompareScreen.maxColumns} דירות',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: selected.isEmpty
+                      ? AppColors.textSecondary
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: AppColors.textSecondary),
+          ]),
+        ),
       ),
     );
   }
 
-  Widget _line(IconData icon, String text, Color color) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2.5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(text,
-                  style:
-                      TextStyle(color: color, fontSize: 12.5, height: 1.25)),
-            ),
-          ],
-        ),
-      );
+  String _shortLabel(RentalProperty p) => '${_where(p)} · ${p.priceLabel}';
 }
 
-/// Best value = the listing furthest below its own local market price (per the
-/// CBS ₪/m² prior). [belowMarket] is the fraction below market per column
-/// (0.15 = 15% under; negative = above market), or null when the column isn't
-/// comparable (no market prior, or a price-sanity outlier — a bait listing must
-/// not win on a fake discount). Returns -1 unless ≥2 columns are comparable, so
-/// the recommendation is real rather than an arbitrary in-group score.
-int bestValueIndex(List<double?> belowMarket) {
-  if (belowMarket.whereType<double>().length < 2) return -1;
-  var best = -1;
-  var bestVal = double.negativeInfinity;
-  for (var i = 0; i < belowMarket.length; i++) {
-    final v = belowMarket[i];
-    if (v != null && v > bestVal) {
-      bestVal = v;
-      best = i;
-    }
-  }
-  return best;
-}
-
-/// Column indices holding the best value. Uses an epsilon so float ties (₪/m²,
-/// match %) all light up instead of one missing on rounding; returns empty when
-/// every column has the same value (nothing to "win") or none are numeric.
-Set<int> numericWinners(List<double?> vals, {required bool minIsBest}) {
-  double? bestVal;
-  for (final v in vals) {
-    if (v == null) continue;
-    if (bestVal == null || (minIsBest ? v < bestVal : v > bestVal)) bestVal = v;
-  }
-  if (bestVal == null) return const {};
-  if (vals.whereType<double>().toSet().length < 2) return const {};
-  final out = <int>{};
-  for (var i = 0; i < vals.length; i++) {
-    final v = vals[i];
-    if (v != null && (v - bestVal).abs() < 0.5) out.add(i);
-  }
-  return out;
-}
+// ── details-table primitives ────────────────────────────────────────────────
 
 enum _Best { none, min, max }
 
@@ -572,94 +1080,6 @@ class _CompareRow {
 
   factory _CompareRow.flag(String l, bool Function(RentalProperty) f) =>
       _CompareRow._(l, (p) => f(p) ? 'כן' : 'לא', null, f, _Best.none);
-}
-
-class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.properties, this.winnerIndex = -1});
-  final List<RentalProperty> properties;
-  final int winnerIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.primaryLight2,
-      // IntrinsicHeight bounds the row height so crossAxisAlignment.stretch is
-      // valid inside the vertical SingleChildScrollView. Without it the Row is
-      // given infinite height and the whole table fails to lay out (blank page).
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _LabelCell(''),
-            for (var ci = 0; ci < properties.length; ci++)
-              Expanded(
-                  child:
-                      _headerCell(context, properties[ci], ci == winnerIndex)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _headerCell(BuildContext context, RentalProperty p, bool isWinner) {
-    return InkWell(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isWinner)
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text('🏆 מומלץ',
-                    style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white)),
-              ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                height: 54,
-                width: double.infinity,
-                child: SafeMedia(
-                  media: p.primaryMedia,
-                  fallback: Container(color: AppColors.borderLight),
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _title(p),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: isWinner ? AppColors.primary : AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _title(RentalProperty p) {
-    final where =
-        p.neighborhood.trim().isNotEmpty ? p.neighborhood.trim() : p.city.trim();
-    return where.isNotEmpty ? where : p.address;
-  }
 }
 
 class _DataRow extends StatelessWidget {
@@ -716,9 +1136,6 @@ class _DataRow extends StatelessWidget {
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
       color: isWinner ? AppColors.primary.withValues(alpha: 0.10) : null,
-      // NOTE: no FittedBox here — it doesn't support the intrinsic sizing that
-      // the row's IntrinsicHeight needs and throws "RenderBox was not laid out",
-      // leaving the whole table blank. Plain single-line text + ellipsis instead.
       child: Text(
         row.display(p),
         textAlign: TextAlign.center,
