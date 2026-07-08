@@ -63,6 +63,10 @@ const List<String> kScoringDimensions = [
   'view', // floor height (view) — weighted on view/high-floor intent
   'spaciousness', // m² per room — weighted on "מרווח" / roommate / WFH intent
   'accessibility', // elevator or low floor — weighted on elderly/stroller/wheelchair
+  'convenience', // supermarkets + shopping centres nearby — weighted on errands intent
+  'low_noise', // distance from a major road/rail (physical quiet) — on a quiet intent
+  'future_value', // proximity to planned metro/light-rail + urban renewal — investor upside
+  'employment', // job-place density nearby (short-commute proxy) — on a near-work intent
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -460,6 +464,14 @@ class UserPreferenceModel {
         return pfv.get('demo_child', 0.5).clamp(0.0, 1.0);
       case 'health':
         return pfv.get('health_access', 0.5).clamp(0.0, 1.0);
+      case 'convenience':
+        return pfv.get('retail_access', 0.0).clamp(0.0, 1.0);
+      case 'low_noise':
+        return pfv.get('low_noise', 0.5).clamp(0.0, 1.0);
+      case 'future_value':
+        return pfv.get('future_value', 0.0).clamp(0.0, 1.0);
+      case 'employment':
+        return pfv.get('employment_access', 0.0).clamp(0.0, 1.0);
       case 'coast':
         return pfv.get('coast_access', 0.0).clamp(0.0, 1.0);
       case 'park':
@@ -612,6 +624,10 @@ class PreferenceModelBuilder {
     'view': 0.0,
     'spaciousness': 0.0,
     'accessibility': 0.0,
+    'convenience': 0.0, // off until an errands/shopping intent turns it on
+    'low_noise': 0.0, // off until a quiet intent turns it on
+    'future_value': 0.0, // off until an investment/growth intent turns it on
+    'employment': 0.0, // off until a near-work intent turns it on
   };
   static const double _priorVariance = 0.09; // σ≈0.3 — fairly uncertain prior
 
@@ -682,11 +698,21 @@ class PreferenceModelBuilder {
       for (final a in query.amenities) canonicalFeatureKey(a),
     };
 
-    // deal-breakers from profile (best-effort canonicalization)
-    final dealBreakers = <String>{
-      for (final d in (profile?.dealBreakers ?? const []))
-        canonicalFeatureKey(d),
-    };
+    // A curated profile's dealBreakers are NON-NEGOTIABLE preferences — the model
+    // (see TenantProfile doc) treats a MISSING counterpart as a heavy penalty, so
+    // they are REQUIRED features, not "must be absent". Their free-text Hebrew
+    // labels ('נגישות'/'מעלית'/'ממ"ד') are mapped through the amenity lexicon —
+    // without this the profile silently never touched ranking. importantDetails
+    // feature mentions fold in as softer (non-negotiable-only for dealBreakers).
+    for (final label in (profile?.dealBreakers ?? const [])) {
+      for (final k in SmartSearch.amenityKeysIn(label)) {
+        requested.add(canonicalFeatureKey(k));
+      }
+    }
+
+    // No genuine "must NOT have X" source exists today (the profile field is
+    // must-HAVE), so the must-be-absent set stays empty.
+    const dealBreakers = <String>{};
 
     // ── weights: prior, then sharpen with stated evidence ────────────────────
     final weights = <String, BayesianWeight>{
@@ -732,7 +758,13 @@ class PreferenceModelBuilder {
     // requested lifestyle factor is a top-tier weight (≈value/size), not a nudge.
     final intents = query.intents;
     if (intents.contains(SearchIntent.nearSea)) sharpen('coast', 0.97, 18.0);
-    if (intents.contains(SearchIntent.investment)) sharpen('yield', 0.95, 12.0);
+    if (intents.contains(SearchIntent.investment)) {
+      sharpen('yield', 0.95, 12.0);
+      sharpen('future_value', 0.85, 7.0); // an investor cares about upside/appreciation
+    }
+    if (intents.contains(SearchIntent.growth)) {
+      sharpen('future_value', 0.95, 12.0); // explicitly asked for upside/appreciation
+    }
     if (intents.contains(SearchIntent.nearUniversity)) {
       sharpen('university', 0.95, 12.0);
       sharpen('young_area', 0.85, 6.0);
@@ -744,7 +776,10 @@ class PreferenceModelBuilder {
       sharpen('young_area', 0.92, 8.0);
       sharpen('location', 0.7, 3.0); // vibrant areas are central
     }
-    if (intents.contains(SearchIntent.quiet)) sharpen('senior_area', 0.95, 10.0);
+    if (intents.contains(SearchIntent.quiet)) {
+      sharpen('senior_area', 0.95, 10.0); // demographic (calm, older) proxy
+      sharpen('low_noise', 0.95, 12.0); // physical — far from a major road/rail
+    }
     if (intents.contains(SearchIntent.luxury)) sharpen('luxury', 0.9, 9.0);
     if (intents.contains(SearchIntent.view)) sharpen('view', 0.9, 9.0);
     if (intents.contains(SearchIntent.spacious)) {
@@ -780,6 +815,21 @@ class PreferenceModelBuilder {
     // A religious/observant community is a strong, defining ask — weight it high.
     if (intents.contains(SearchIntent.religiousArea)) {
       sharpen('religious_area', 0.95, 14.0);
+    }
+    // Map-data-backed neighbourhood intents → their GovData dimensions.
+    if (intents.contains(SearchIntent.safety)) sharpen('safety', 0.95, 12.0);
+    if (intents.contains(SearchIntent.transit)) sharpen('transit', 0.95, 12.0);
+    if (intents.contains(SearchIntent.green)) sharpen('park', 0.9, 10.0);
+    if (intents.contains(SearchIntent.health)) sharpen('health', 0.9, 9.0);
+    if (intents.contains(SearchIntent.convenience)) {
+      sharpen('convenience', 0.92, 10.0);
+    }
+    if (intents.contains(SearchIntent.employment)) {
+      sharpen('employment', 0.92, 10.0);
+      sharpen('transit', 0.7, 3.0); // commuters also value getting there
+    }
+    if (intents.contains(SearchIntent.youngPop)) {
+      sharpen('young_area', 0.93, 10.0);
     }
     // Pet owner (requested pet-friendly) → a ground/low floor is easier with a
     // dog, so give accessibility a mild boost on top of the amenity match.
@@ -992,6 +1042,10 @@ class PreferenceModelBuilder {
       'view': const LinearUtility(),
       'spaciousness': const LinearUtility(),
       'accessibility': const LinearUtility(),
+      'convenience': const LinearUtility(),
+      'low_noise': const LinearUtility(),
+      'future_value': const LinearUtility(),
+      'employment': const LinearUtility(),
     };
 
     final constraints = HardConstraints(

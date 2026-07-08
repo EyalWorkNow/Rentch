@@ -468,11 +468,23 @@ class RecommendationEngine {
       final inCity = candidates
           .where((p) => _cityMatches(p, city))
           .toList();
-      if (areaMode && inCity.isNotEmpty) {
-        final cLat =
-            inCity.map((p) => p.lat).reduce((a, b) => a + b) / inCity.length;
-        final cLon =
-            inCity.map((p) => p.lon).reduce((a, b) => a + b) / inCity.length;
+      // Area center for "אזור X": prefer the CBS locality's REAL coordinate — it
+      // exists for every city in Israel (assets/govdata/localities.json), so the
+      // circle works even when X has zero own stock or its listings lack coords.
+      // Falls back to the mean of in-city listings if the locality is unknown.
+      double? aLat, aLon;
+      if (areaMode) {
+        final gov = GovData.instance.localityByName(city);
+        if (gov != null && gov.lat.abs() > 0.1 && gov.lon.abs() > 0.1) {
+          aLat = gov.lat;
+          aLon = gov.lon;
+        } else if (inCity.isNotEmpty) {
+          aLat = inCity.map((p) => p.lat).reduce((a, b) => a + b) / inCity.length;
+          aLon = inCity.map((p) => p.lon).reduce((a, b) => a + b) / inCity.length;
+        }
+      }
+      if (areaMode && aLat != null && aLon != null) {
+        final cLat = aLat, cLon = aLon;
         candidates = candidates
             .where((p) =>
                 _cityMatches(p, city) ||
@@ -513,25 +525,30 @@ class RecommendationEngine {
     // furnished) EXCLUDE listings that lack them — a "must have a mamad" search
     // must never surface a flat without one. Relax only if nothing qualifies.
     if (query.requiredFeatures.isNotEmpty) {
-      final ok = candidates
-          .where((p) =>
-              query.requiredFeatures.every((k) => propertyHasFeature(p, k)))
+      final req = query.requiredFeatures;
+      // First pass: listings satisfying ALL must-haves.
+      var pool = candidates
+          .where((p) => req.every((k) => propertyHasFeature(p, k)))
           .toList();
-      if (ok.isNotEmpty) {
-        candidates = ok;
-      } else {
-        // No listing has ALL must-haves → fall back to the NON-NEGOTIABLE ones
-        // (a dog can't live in a no-pets building; a family in a shelter zone
-        // needs a mamad). Softer must-haves (parking/furnished/elevator) yield.
-        const absolute = {'petsAllowed', 'mamad'};
-        final reqAbs = query.requiredFeatures.where(absolute.contains).toSet();
-        if (reqAbs.isNotEmpty) {
-          final absOk = candidates
-              .where((p) => reqAbs.every((k) => propertyHasFeature(p, k)))
-              .toList();
-          if (absOk.isNotEmpty) candidates = absOk;
-        }
+      if (pool.isEmpty) {
+        // Nothing satisfies ALL. Drop only the UNSATISFIABLE keys — those NO
+        // listing carries (usually an UNRECORDED feature like a pet policy, not
+        // one that's banned) — and gate on the rest. This fixes the old
+        // fall-through where a single impossible key (e.g. an `accessible` flag no
+        // listing has) voided a perfectly-satisfiable one (elevator) and leaked
+        // walk-ups to a wheelchair searcher. If NO key is satisfiable, keep the
+        // full pool rather than hide everything (absence ≠ excluded).
+        final satisfiable = req
+            .where((k) => candidates.any((p) => propertyHasFeature(p, k)))
+            .toSet();
+        pool = satisfiable.isEmpty
+            ? candidates
+            : candidates
+                .where((p) => satisfiable.every((k) => propertyHasFeature(p, k)))
+                .toList();
+        if (pool.isEmpty) pool = candidates;
       }
+      candidates = pool;
     }
 
     // Near-sea gate: excludes the clearly-inland (so "קרוב לים" never returns
@@ -911,7 +928,9 @@ class RecommendationEngine {
   static ScorecardDimension? _coastDimension(
       RentalProperty property, UserPreferenceModel model, double weightSum) {
     final km = IsraelGeoIndex.coastKm(property.lat, property.lon);
-    if (km == null || km > 8) return null;
+    // NaN slips past `km > 8` (NaN comparisons are false) and then km.round()
+    // throws — guard non-finite (a listing with Infinity/NaN coords).
+    if (km == null || !km.isFinite || km > 8) return null;
     final score = IsraelGeoIndex.proximityKernel(km, scaleKm: 3.0);
     final kmLabel = km < 10 ? km.toStringAsFixed(1) : km.round().toString();
     final weightPct = weightSum > 0

@@ -85,6 +85,25 @@ class MarketPrior {
   final double salePerSqm;
 }
 
+/// A CBS statistical area (אזור סטטיסטי, ~3,000 residents) — far finer than a
+/// whole city. Carries its own socioeconomic cluster + age split and a boundary
+/// polygon ([[lat,lon],…]) so a flat is scored by the block it sits in, not the
+/// city average (huge for heterogeneous cities like TA / Jerusalem / Haifa).
+class StatArea {
+  const StatArea({
+    required this.ses,
+    required this.youngShare,
+    required this.childShare,
+    required this.seniorShare,
+    required this.poly,
+  });
+  final int ses; // 1..10 (0 = unknown)
+  final double youngShare;
+  final double childShare;
+  final double seniorShare;
+  final List<List<double>> poly; // [[lat,lon], …]
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // GovData — the singleton reference store
 // ═════════════════════════════════════════════════════════════════════════════
@@ -143,6 +162,34 @@ class GovData {
   // air-quality monitoring stations [lat, lon]
   final List<List<double>> _airLatLon = [];
 
+  // retail/errands density grid: key → [supermarkets, malls] (OSM / data.gov.il)
+  double _retailCell = 0.02;
+  final Map<String, List<int>> _retailGrid = {};
+  int _maxRetailCell = 1;
+
+  // noise proxy: presence of a MAJOR road / rail line per FINE cell (~500m), so a
+  // flat hugging the Ayalon or a train line reads as loud. Presence, not count —
+  // one motorway is enough. key → segment count. (OSM highways + railways.)
+  double _noiseCell = 0.005;
+  final Map<String, int> _noiseGrid = {};
+
+  // statistical areas (CBS): polygons + per-block SES/age, bucketed into a 0.02°
+  // index by bounding box so a point-in-polygon lookup only tests nearby areas.
+  double _statCell = 0.02;
+  final List<StatArea> _statAreas = [];
+  final Map<String, List<int>> _statIndex = {}; // cell → candidate area indices
+
+  // future infrastructure (investor upside): PLANNED metro/light-rail stations
+  // (נת״ע) + urban-renewal projects (פינוי-בינוי / תמ״א). Point lists → proximity.
+  final List<List<double>> _futureStations = []; // [lat, lon]
+  final List<List<double>> _renewalPoints = []; // [lat, lon]
+
+  // employment density grid: key → job-place count (OSM offices + commercial /
+  // industrial). A flat in/near a dense cell = a short commute to many jobs.
+  double _jobCell = 0.02;
+  final Map<String, int> _jobGrid = {};
+  int _maxJobCell = 1;
+
   List<LocalityRecord> get localities => List.unmodifiable(_localities);
 
   // ── init ────────────────────────────────────────────────────────────────────
@@ -162,6 +209,11 @@ class GovData {
       await _loadOptional(() => _loadSchools(read));
       await _loadOptional(() => _loadHealth(read));
       await _loadOptional(() => _loadAirQuality(read));
+      await _loadOptional(() => _loadRetail(read));
+      await _loadOptional(() => _loadNoise(read));
+      await _loadOptional(() => _loadStatAreas(read));
+      await _loadOptional(() => _loadFutureInfra(read));
+      await _loadOptional(() => _loadEmployment(read));
       _deriveCrimeRates();
       _loaded = _localities.isNotEmpty;
       return _loaded;
@@ -512,6 +564,208 @@ class GovData {
         .clamp(0.0, 1.0);
   }
 
+  Future<void> _loadRetail(AssetReader read) async {
+    final obj = jsonDecode(await read('$_assetDir/poi_retail.json'))
+        as Map<String, dynamic>;
+    _retailCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
+    final cells = obj['cells'] as Map<String, dynamic>;
+    for (final e in cells.entries) {
+      final v =
+          (e.value as List<dynamic>).map((x) => (x as num).toInt()).toList();
+      _retailGrid[e.key] = v;
+      final total = v.fold<int>(0, (a, b) => a + b);
+      if (total > _maxRetailCell) _maxRetailCell = total;
+    }
+  }
+
+  /// Errands/retail access in [0,1] around a point — supermarkets + shopping
+  /// centres within a ~6 km² window, log-scaled vs the densest cell. A mall is
+  /// weighted x2 (it covers far more errands than a single grocery). 0 when the
+  /// dataset is missing (the layer degrades to neutral).
+  double retailAccessScore(double lat, double lon) {
+    if (!_loaded || _retailGrid.isEmpty || !_validCoord(lat, lon)) return 0.0;
+    final cx = (lat / _retailCell).round();
+    final cy = (lon / _retailCell).round();
+    var weighted = 0;
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        final cell = _retailGrid['${cx + dx}_${cy + dy}'];
+        if (cell != null) {
+          final markets = cell.isNotEmpty ? cell[0] : 0;
+          final malls = cell.length > 1 ? cell[1] : 0;
+          weighted += markets + malls * 2;
+        }
+      }
+    }
+    if (weighted <= 0) return 0.0;
+    return (math.log(1 + weighted) / math.log(1 + _maxRetailCell * 3))
+        .clamp(0.0, 1.0);
+  }
+
+  Future<void> _loadNoise(AssetReader read) async {
+    final obj = jsonDecode(await read('$_assetDir/noise_roads.json'))
+        as Map<String, dynamic>;
+    _noiseCell = (obj['cell'] as num?)?.toDouble() ?? 0.005;
+    final cells = obj['cells'] as Map<String, dynamic>;
+    for (final e in cells.entries) {
+      _noiseGrid[e.key] = (e.value as num).toInt();
+    }
+  }
+
+  /// Road/rail NOISE proxy in [0,1] (1 = loud, right on a major road/rail; 0 =
+  /// no major road within ~1.5km). Presence-based: the property's own ~500m cell
+  /// counts full, the surrounding ring half. Returns null when the dataset is
+  /// missing (caller treats "unknown" as neutral, not silent-quiet).
+  double? roadNoiseScore(double lat, double lon) {
+    if (!_loaded || _noiseGrid.isEmpty || !_validCoord(lat, lon)) return null;
+    final cx = (lat / _noiseCell).round();
+    final cy = (lon / _noiseCell).round();
+    if ((_noiseGrid['${cx}_$cy'] ?? 0) > 0) return 1.0;
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        if (dx == 0 && dy == 0) continue;
+        if ((_noiseGrid['${cx + dx}_${cy + dy}'] ?? 0) > 0) return 0.5;
+      }
+    }
+    return 0.0;
+  }
+
+  Future<void> _loadStatAreas(AssetReader read) async {
+    final obj = jsonDecode(await read('$_assetDir/stat_areas.json'))
+        as Map<String, dynamic>;
+    _statCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
+    final areas = obj['areas'] as List<dynamic>;
+    for (final a in areas) {
+      final m = a as Map<String, dynamic>;
+      final poly = (m['poly'] as List<dynamic>)
+          .map((p) => (p as List<dynamic>)
+              .map((n) => (n as num).toDouble())
+              .toList())
+          .toList();
+      if (poly.length < 3) continue;
+      final idx = _statAreas.length;
+      _statAreas.add(StatArea(
+        ses: (m['ses'] as num?)?.toInt() ?? 0,
+        youngShare: (m['young'] as num?)?.toDouble() ?? 0.5,
+        childShare: (m['child'] as num?)?.toDouble() ?? 0.5,
+        seniorShare: (m['senior'] as num?)?.toDouble() ?? 0.5,
+        poly: poly,
+      ));
+      // Stamp every 0.02° cell the polygon's bounding box covers → this area.
+      var minLat = poly.first[0], maxLat = poly.first[0];
+      var minLon = poly.first[1], maxLon = poly.first[1];
+      for (final pt in poly) {
+        minLat = math.min(minLat, pt[0]);
+        maxLat = math.max(maxLat, pt[0]);
+        minLon = math.min(minLon, pt[1]);
+        maxLon = math.max(maxLon, pt[1]);
+      }
+      for (var cx = (minLat / _statCell).floor();
+          cx <= (maxLat / _statCell).ceil();
+          cx++) {
+        for (var cy = (minLon / _statCell).floor();
+            cy <= (maxLon / _statCell).ceil();
+            cy++) {
+          (_statIndex['${cx}_$cy'] ??= []).add(idx);
+        }
+      }
+    }
+  }
+
+  /// The CBS statistical area containing [lat],[lon], or null (point in no known
+  /// polygon / dataset absent). Only tests the few areas whose bbox touches the
+  /// point's 0.02° cell, so it's O(1)-ish rather than scanning all ~3,000 areas.
+  StatArea? statAreaAt(double lat, double lon) {
+    if (!_loaded || _statAreas.isEmpty || !_validCoord(lat, lon)) return null;
+    final cx = (lat / _statCell).round();
+    final cy = (lon / _statCell).round();
+    final cand = _statIndex['${cx}_$cy'];
+    if (cand == null) return null;
+    for (final i in cand) {
+      if (_pointInPoly(lat, lon, _statAreas[i].poly)) return _statAreas[i];
+    }
+    return null;
+  }
+
+  Future<void> _loadFutureInfra(AssetReader read) async {
+    final obj = jsonDecode(await read('$_assetDir/future_infra.json'))
+        as Map<String, dynamic>;
+    for (final s in (obj['stations'] as List<dynamic>? ?? const [])) {
+      final p = s as List<dynamic>;
+      _futureStations.add([(p[0] as num).toDouble(), (p[1] as num).toDouble()]);
+    }
+    for (final r in (obj['renewal'] as List<dynamic>? ?? const [])) {
+      final p = r as List<dynamic>;
+      _renewalPoints.add([(p[0] as num).toDouble(), (p[1] as num).toDouble()]);
+    }
+  }
+
+  /// Investor upside in [0,1] — proximity to a PLANNED metro/light-rail station
+  /// (strong value driver) or an urban-renewal project. 0 when nothing planned is
+  /// nearby (or the dataset is absent) — a bonus, so no data = no bonus, never a
+  /// penalty. Weighted only on the investment/growth intent.
+  double futureValueScore(double lat, double lon) {
+    if (!_loaded || !_validCoord(lat, lon)) return 0.0;
+    double nearest(List<List<double>> pts) {
+      var best = double.infinity;
+      for (final p in pts) {
+        final d = _haversineKm(lat, lon, p[0], p[1]);
+        if (d < best) best = d;
+      }
+      return best;
+    }
+
+    // exp falloff: a future station lifts value out to ~1.5km; renewal is tighter.
+    double kernel(double km, double scale) =>
+        km.isFinite ? math.exp(-km / scale) : 0.0;
+    final station = kernel(nearest(_futureStations), 1.5);
+    final renewal = kernel(nearest(_renewalPoints), 0.7);
+    return math.max(station, 0.85 * renewal).clamp(0.0, 1.0);
+  }
+
+  Future<void> _loadEmployment(AssetReader read) async {
+    final obj = jsonDecode(await read('$_assetDir/employment.json'))
+        as Map<String, dynamic>;
+    _jobCell = (obj['cell'] as num?)?.toDouble() ?? 0.02;
+    final cells = obj['cells'] as Map<String, dynamic>;
+    for (final e in cells.entries) {
+      final v = (e.value as num).toInt();
+      _jobGrid[e.key] = v;
+      if (v > _maxJobCell) _maxJobCell = v;
+    }
+  }
+
+  /// Employment access in [0,1] — job-place density (offices + commercial /
+  /// industrial) in a ~6 km² window, log-scaled vs the densest cell. A proxy for
+  /// "short commute to work" when the seeker hasn't named their workplace. 0 when
+  /// the dataset is absent. Weighted on a "near work / employment" intent.
+  double employmentAccessScore(double lat, double lon) {
+    if (!_loaded || _jobGrid.isEmpty || !_validCoord(lat, lon)) return 0.0;
+    final cx = (lat / _jobCell).round();
+    final cy = (lon / _jobCell).round();
+    var total = 0;
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        total += _jobGrid['${cx + dx}_${cy + dy}'] ?? 0;
+      }
+    }
+    if (total <= 0) return 0.0;
+    return (math.log(1 + total) / math.log(1 + _maxJobCell * 3)).clamp(0.0, 1.0);
+  }
+
+  // Ray-casting point-in-polygon on [lat,lon] rings.
+  static bool _pointInPoly(double lat, double lon, List<List<double>> poly) {
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      final yi = poly[i][0], xi = poly[i][1];
+      final yj = poly[j][0], xj = poly[j][1];
+      final intersect = ((yi > lat) != (yj > lat)) &&
+          (lon < (xj - xi) * (lat - yi) / ((yj - yi) == 0 ? 1e-12 : (yj - yi)) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
   /// Health-facility availability for a city in [0,1] (log-scaled count), or 0.
   double healthAccessScore(String city) {
     if (!_loaded) return 0.0;
@@ -618,7 +872,7 @@ class GovData {
 
   // ── geo helpers ──────────────────────────────────────────────────────────────
   static bool _validCoord(double lat, double lon) =>
-      lat.abs() > 0.1 && lon.abs() > 0.1;
+      lat.isFinite && lon.isFinite && lat.abs() > 0.1 && lon.abs() > 0.1;
 
   static double _haversineKm(double la1, double lo1, double la2, double lo2) {
     const r = 6371.0088;
@@ -656,9 +910,18 @@ class GovData {
     _health.clear();
     _healthLoose.clear();
     _airLatLon.clear();
+    _retailGrid.clear();
+    _noiseGrid.clear();
+    _statAreas.clear();
+    _statIndex.clear();
+    _futureStations.clear();
+    _renewalPoints.clear();
+    _jobGrid.clear();
+    _maxJobCell = 1;
     _maxCellDensity = 1;
     _maxSchoolCell = 1;
     _maxHealth = 1;
+    _maxRetailCell = 1;
     version = 0;
   }
 }

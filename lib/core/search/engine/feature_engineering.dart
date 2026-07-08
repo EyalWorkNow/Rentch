@@ -1108,10 +1108,37 @@ class FeatureEngineer {
     // Nightlife/vibrancy — real bar/pub/café density (a "young, lively area").
     f['nightlife'] = IsraelGeoIndex.nightlifeDensity(p.lat, p.lon);
     f['health_access'] = gov.healthAccessScore(p.city);
+    // Errands access — supermarkets + shopping centres nearby (a "walk to the
+    // groceries" convenience). Neutral 0 when the POI dataset isn't bundled.
+    f['retail_access'] = gov.retailAccessScore(p.lat, p.lon);
+    // Quietness (physical): 1 = far from a major road/rail, 0 = right on one.
+    // "unknown" (no noise dataset) stays neutral 0.5 — absence ≠ silence.
+    final noise = gov.roadNoiseScore(p.lat, p.lon);
+    f['low_noise'] = noise == null ? 0.5 : (1.0 - noise);
+    // Investor upside — proximity to a PLANNED metro/light-rail station or an
+    // urban-renewal project. 0 = no known upside nearby (a bonus, never a penalty).
+    f['future_value'] = gov.futureValueScore(p.lat, p.lon);
+    // Employment access — job-place density nearby (a short-commute proxy when the
+    // seeker hasn't named a workplace). 0 when the dataset isn't bundled.
+    f['employment_access'] = gov.employmentAccessScore(p.lat, p.lon);
     final demo = gov.demographics(p.city);
     f['demo_young'] = demo?['youngShare'] ?? 0.5; // working-age share (20-64)
     f['demo_child'] = demo?['childShare'] ?? 0.5; // 0-19 share (family areas)
     f['demo_senior'] = demo?['seniorShare'] ?? 0.5;
+    // MICRO-NEIGHBOURHOOD precision: if the flat falls inside a CBS statistical
+    // area (~3,000 residents), its OWN block's socioeconomic cluster + age split
+    // OVERRIDE the whole-city average — so neighbourhood/young_area/senior_area/
+    // family are scored at street granularity, not "all of Tel Aviv". Degrades to
+    // the city figures when the point isn't in any known polygon.
+    final sa = gov.statAreaAt(p.lat, p.lon);
+    if (sa != null) {
+      if (sa.ses >= 1 && sa.ses <= 10) {
+        f['socioeconomic'] = (sa.ses - 1) / 9.0;
+      }
+      f['demo_young'] = sa.youngShare;
+      f['demo_child'] = sa.childShare;
+      f['demo_senior'] = sa.seniorShare;
+    }
     final airKm = gov.nearestAirStationKm(p.lat, p.lon);
     f['air_station_km'] = airKm ?? 99.0; // coarse environmental-monitoring proxy
 

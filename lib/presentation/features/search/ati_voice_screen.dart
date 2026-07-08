@@ -138,7 +138,11 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
       });
     }
     try {
-      final text = await widget.service.stopRecordingAndTranscribe();
+      // ponytail: overall timeout so the screen can NEVER sit on "רגע, חושבת…"
+      // forever if transcription stalls (audio-session contention on iOS turn 2).
+      final text = await widget.service
+          .stopRecordingAndTranscribe()
+          .timeout(const Duration(seconds: 30), onTimeout: () => '');
       if (!mounted) return;
       if (text.trim().isEmpty) {
         final err = widget.service.lastRecordError;
@@ -190,7 +194,11 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     try {
       await widget.service.speak(result.reply);
     } catch (_) {}
-    if (mounted) setState(() => _state = AtiVoiceState.idle);
+    // ponytail: only fall to idle if we're STILL the speaking turn — a barge-in
+    // may have already moved us to listening/thinking; don't clobber it.
+    if (mounted && _state == AtiVoiceState.speaking) {
+      setState(() => _state = AtiVoiceState.idle);
+    }
   }
 
   // User tapped "share my location" → capture GPS + run the held search. NB: this

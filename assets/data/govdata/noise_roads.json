@@ -1,0 +1,16 @@
+{
+  "cell": 0.005,
+  "note": "SEED bootstrap — FINE 0.005 cells touching a major road/rail (Gush Dan arteries). Replace with the full OSM export by running scripts/govdata/noise.mjs.",
+  "cells": {
+    "6414_6958": 3,
+    "6414_6959": 2,
+    "6415_6958": 2,
+    "6413_6957": 2,
+    "6417_6960": 1,
+    "6410_6955": 2,
+    "6420_6963": 2,
+    "6428_6968": 1,
+    "6416_6949": 2,
+    "6408_6952": 2
+  }
+}

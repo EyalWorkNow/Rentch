@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
@@ -107,7 +108,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -157,7 +158,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
       onTap: () => context.read<DatingProvider>().toggleSave(p.id),
       child: ClipOval(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
           child: Container(
             width: 44,
             height: 44,
@@ -189,7 +190,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(26),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(24), sigmaY: PlatformFx.blurSigma(24)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           decoration: BoxDecoration(
@@ -295,6 +296,16 @@ class AtiVoicePropertyCard extends StatelessWidget {
                   ),
                 ],
               ),
+              // VISIBLE "why" — so the user sees WHY אתי picked this flat right on
+              // the card, not hidden behind a pill they'd have to scroll to. Tap
+              // opens the full explainability scorecard.
+              if (_whyText() != null) ...[
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () => _showWhy(context),
+                  child: _whyRow(_whyText()!),
+                ),
+              ],
               const SizedBox(height: 14),
               // Lower Row: 3 Glass Info Pills
               SingleChildScrollView(
@@ -391,6 +402,72 @@ class AtiVoicePropertyCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // A concise, honest "why" — prefers אתי's warm LLM sentence, then the engine's
+  // highlights / persona reasons, then the two top-weighted dimensions. Null when
+  // there's no scorecard (nothing truthful to say).
+  String? _whyText() {
+    final c = scored.scorecard;
+    if (c == null) return null;
+    String pick() {
+      if (c.llmReason != null && c.llmReason!.trim().isNotEmpty) {
+        return c.llmReason!.trim();
+      }
+      if (c.highlights.isNotEmpty) return c.highlights.take(2).join(' · ');
+      if (c.personaReasons.isNotEmpty) return c.personaReasons.first;
+      final dims = List.of(c.dimensions)
+        ..sort((a, b) => b.contributionPct.compareTo(a.contributionPct));
+      return dims.take(2).map((d) => d.label).join(' · ');
+    }
+
+    final r = pick().trim();
+    return r.isEmpty ? null : r;
+  }
+
+  // The visible reason line: ✨ fit% + short "why", tappable for the full card.
+  Widget _whyRow(String why) {
+    final fit = scored.scorecard?.fitPct;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF7CE0E6).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF7CE0E6).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(IconsaxPlusBold.magic_star,
+              size: 15, color: Color(0xFF9BEAF0)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                if (fit != null)
+                  TextSpan(
+                    text: '$fit% התאמה — ',
+                    style: const TextStyle(
+                        color: Color(0xFF9BEAF0), fontWeight: FontWeight.w800),
+                  ),
+                TextSpan(text: why),
+              ]),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(IconsaxPlusLinear.arrow_left_2,
+              size: 14, color: Colors.white54),
+        ],
       ),
     );
   }

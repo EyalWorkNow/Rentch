@@ -1,0 +1,15 @@
+{
+  "cell": 0.02,
+  "note": "SEED bootstrap — job-place density per 0.02° cell (offices + commercial/industrial). Replace with the full OSM export by running scripts/govdata/employment.mjs.",
+  "cells": {
+    "1604_1739": 200,
+    "1604_1740": 150,
+    "1608_1740": 180,
+    "1605_1742": 120,
+    "1604_1741": 90,
+    "1607_1742": 60,
+    "1616_1743": 70,
+    "1640_1750": 80,
+    "1589_1761": 110
+  }
+}

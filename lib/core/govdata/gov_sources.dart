@@ -47,6 +47,8 @@ class GovSources {
   static const String _education = 'למ״ס / משרד החינוך';
   static const String _health = 'משרד הבריאות / למ״ס';
   static const String _rently = 'נתוני Rently';
+  static const String _osm = 'OpenStreetMap / data.gov.il';
+  static const String _planning = 'נת״ע / רשות התכנון';
 
   /// dimKey → source descriptor. Mirrors the keys ScorecardStats can emit.
   static const Map<String, GovSource> _byDimension = {
@@ -77,6 +79,26 @@ class GovSources {
     'health': GovSource(
       agency: _health,
       dataset: 'שירותי בריאות וקופות חולים',
+    ),
+    'convenience': GovSource(
+      agency: _osm,
+      dataset: 'סופרמרקטים ומרכזי קניות',
+      note: 'ממופה מ-OpenStreetMap / data.gov.il',
+    ),
+    'low_noise': GovSource(
+      agency: _osm,
+      dataset: 'קרבה לצירי תנועה ראשיים ומסילות',
+      note: 'פרוקסי רעש מ-OpenStreetMap (כבישים מהירים + מסילות)',
+    ),
+    'future_value': GovSource(
+      agency: _planning,
+      dataset: 'תחנות מטרו/רק״ל מתוכננות והתחדשות עירונית',
+      note: 'נת״ע + רשות התכנון (פינוי-בינוי / תמ״א)',
+    ),
+    'employment': GovSource(
+      agency: _osm,
+      dataset: 'ריכוזי תעסוקה — משרדים ואזורי מסחר/תעשייה',
+      note: 'צפיפות מקומות עבודה מ-OpenStreetMap (פרוקסי מרחק לעבודה)',
     ),
     // size is the live-market percentile — honest about not being an official
     // statistic.

@@ -11,6 +11,29 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+// Split a reply into speakable chunks on sentence enders, then glue any runt
+// fragment (< 14 chars — "כן.", a lone emoji) onto its neighbour so we never pay
+// a TTS round-trip to synthesise a single word. Used to stream a reply sentence-
+// by-sentence for a near-instant first word.
+final _sentenceEnd = RegExp(r'(?<=[.!?…׃])\s+|\n+');
+List<String> splitForSpeech(String text) {
+  final parts = text
+      .split(_sentenceEnd)
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  if (parts.length <= 1) return parts.isEmpty ? [text] : parts;
+  final out = <String>[];
+  for (final p in parts) {
+    if (out.isNotEmpty && (p.length < 14 || out.last.length < 14)) {
+      out[out.length - 1] = '${out.last} $p';
+    } else {
+      out.add(p);
+    }
+  }
+  return out;
+}
+
 /// One turn in a conversation with Erik.
 class AssistantTurn {
   const AssistantTurn({
@@ -239,7 +262,7 @@ class AssistantService {
     if (!isConfigured) {
       return (fields: currentFields, missing: fallbackMissing, suggestedTitle: '');
     }
-    final client = HttpClient();
+    final client = _http;
     try {
       final request =
           await client.openUrl('POST', _resolve('/assistant/extract')).timeout(_timeout);
@@ -282,9 +305,8 @@ class AssistantService {
       );
     } catch (_) {
       return (fields: currentFields, missing: fallbackMissing, suggestedTitle: '');
-    } finally {
-      client.close(force: true);
     }
+    // NB: no client.close() — _http is a shared keep-alive client (closed in dispose).
   }
 
   Future<AssistantReply> chat(List<AssistantTurn> turns, {String? mode}) async {
@@ -292,7 +314,7 @@ class AssistantService {
       throw const AssistantException('העוזר האישי אינו זמין כרגע.');
     }
     final uri = _resolve('/assistant');
-    final client = HttpClient();
+    final client = _http;
     try {
       final request = await client.openUrl('POST', uri).timeout(_timeout);
       request.headers.contentType = ContentType.json;
@@ -386,9 +408,8 @@ class AssistantService {
       );
     } on TimeoutException {
       throw const AssistantException('העוזר לוקח קצת זמן. נסו שוב.');
-    } finally {
-      client.close(force: true);
     }
+    // NB: no client.close() — _http is a shared keep-alive client (closed in dispose).
   }
 
   // ── Speech to text (Hebrew) ──────────────────────────────────────────────────
@@ -513,7 +534,10 @@ class AssistantService {
     _ampTimer = null;
     String? path;
     try {
-      path = await _recorder.stop();
+      // ponytail: hard timeout — on iOS the `record` plugin's stop() can HANG on
+      // the 2nd turn when flutter_tts (turn 1) still holds the audio session,
+      // which froze the voice screen on "רגע, חושבת…". Fall back to the known path.
+      path = await _recorder.stop().timeout(const Duration(seconds: 6));
     } catch (e) {
       lastRecordError = 'stop:$e';
       path = _recPath;
@@ -555,7 +579,7 @@ class AssistantService {
 
   Future<String> _transcribe(String b64, String mime, String language) async {
     if (!isConfigured) return '';
-    final client = HttpClient();
+    final client = _http;
     try {
       final req = await client
           .openUrl('POST', _resolve('/assistant/transcribe'))
@@ -583,22 +607,43 @@ class AssistantService {
     } catch (e) {
       lastRecordError = 'net:$e';
       return '';
-    } finally {
-      client.close(force: true);
     }
+    // NB: no client.close() — _http is a shared keep-alive client (closed in dispose).
   }
 
   // ── Text to speech — Gemini's natural voice (device TTS as fallback) ─────────
 
+  // Bumped every time playback should abort (new turn / barge-in). A streamed
+  // speak() loop checks it between sentences and bails the moment it changes, so
+  // she stops the instant the user holds the orb — never finishes a stale reply.
+  int _speakGen = 0;
+
   Future<void> speak(String text) async {
     final clean = text.trim();
     if (clean.isEmpty) return;
-    // Erik's warm, natural Gemini voice is the DEFAULT the user hears. Only if
-    // the Gemini TTS genuinely fails (no audio / network) do we fall back to the
-    // device's own (robotic) Hebrew TTS so Erik is never silent.
-    final ok = await _speakWithGemini(clean);
-    if (!ok) await _speakWithDevice(clean);
+    final gen = ++_speakGen;
+    // BREAKTHROUGH: stream the reply sentence-by-sentence instead of synthesising
+    // the whole paragraph before a single word plays. Time-to-first-word drops
+    // from "synth the whole reply" to "synth one short sentence", and the next
+    // sentence is already synthesising while the current one plays (one-ahead
+    // prefetch) so there are no gaps. Erik's warm Gemini voice stays the default;
+    // a per-sentence device-TTS fallback keeps her from ever going silent.
+    final sentences = _splitForSpeech(clean);
+    Future<({Uint8List wav, int rate})?>? next = _fetchGeminiTts(sentences.first);
+    for (var i = 0; i < sentences.length; i++) {
+      final clip = await next;
+      if (gen != _speakGen) return; // barged in while synthesising → stop
+      next = (i + 1 < sentences.length) ? _fetchGeminiTts(sentences[i + 1]) : null;
+      if (clip != null) {
+        await _playWav(clip.wav, clip.rate);
+      } else {
+        await _speakWithDevice(sentences[i]);
+      }
+      if (gen != _speakGen) return; // barged in during playback → stop
+    }
   }
+
+  List<String> _splitForSpeech(String text) => splitForSpeech(text);
 
   /// Plays a pre-recorded prompt clip bundled in assets (instant, zero API cost
   /// and zero TTS latency) — used for Erik's fixed lines. Falls back to the
@@ -620,14 +665,24 @@ class AssistantService {
     }
   }
 
-  /// Fetches Erik's reply as Gemini-synthesised audio (warm, natural voice) and
-  /// plays it. Returns false if unavailable so the caller falls back to the OS
-  /// voice. The Gemini key stays on the backend.
-  Future<bool> _speakWithGemini(String text) async {
-    if (!isConfigured) return false;
-    final client = HttpClient();
+  // ONE keep-alive client shared by EVERY assistant call (STT, chat, TTS,
+  // extract). The backend is in us-east-1 and the user is in Israel, so a fresh
+  // TLS handshake per call costs a full trans-Atlantic round-trip (~0.6–0.9s).
+  // Reusing a warm connection means only the first turn pays the handshake; every
+  // later call rides the open socket. idleTimeout is stretched to 90s so the
+  // connection survives normal think-time between turns instead of re-dialing.
+  HttpClient? _httpClient;
+  HttpClient get _http =>
+      _httpClient ??= (HttpClient()..idleTimeout = const Duration(seconds: 90));
+
+  /// Synthesises one chunk of Erik's reply into Gemini audio (warm, natural
+  /// voice) and returns the playable WAV + sample rate, or null if unavailable
+  /// so the caller can fall back to the OS voice. The Gemini key stays on the
+  /// backend.
+  Future<({Uint8List wav, int rate})?> _fetchGeminiTts(String text) async {
+    if (!isConfigured) return null;
     try {
-      final request = await client
+      final request = await _http
           .openUrl('POST', _resolve('/assistant/tts'))
           .timeout(_timeout);
       request.headers.contentType = ContentType.json;
@@ -642,20 +697,27 @@ class AssistantService {
       request.write(jsonEncode({'text': text, 'voice': ttsVoice}));
       final response = await request.close().timeout(_timeout);
       final raw = await utf8.decoder.bind(response).join().timeout(_timeout);
-      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
       final decoded = jsonDecode(raw);
       final data = decoded is Map && decoded['data'] is Map
           ? Map<String, dynamic>.from(decoded['data'] as Map)
           : Map<String, dynamic>.from(decoded as Map);
       final b64 = data['audio'] as String?;
-      if (b64 == null || b64.isEmpty) return false;
+      if (b64 == null || b64.isEmpty) return null;
       final pcm = base64Decode(b64);
       final rate = (data['sampleRate'] as num?)?.toInt() ?? 24000;
-      final wav = _pcmToWav(pcm, rate);
+      return (wav: _pcmToWav(pcm, rate), rate: rate);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Plays a synthesised WAV clip and resolves only when playback truly finishes
+  /// — the continuous conversation loop relies on this to know when to resume.
+  Future<void> _playWav(Uint8List wav, int rate) async {
+    try {
       await _player.stop();
       // Subscribe BEFORE play so a fast clip can't complete before we listen.
-      // speak() must resolve only when playback truly finishes — the continuous
-      // conversation loop relies on this to know when to resume listening.
       final done = Completer<void>();
       StreamSubscription<void>? sub;
       sub = _player.onPlayerComplete.listen((_) {
@@ -666,18 +728,14 @@ class AssistantService {
       try {
         await _player.setPlaybackRate(1.12);
       } catch (_) {}
-      final approxMs = (pcm.length / (rate * 2) / 1.12 * 1000).round() + 2000;
+      final samples = (wav.length - 44).clamp(0, 1 << 30);
+      final approxMs = (samples / (rate * 2) / 1.12 * 1000).round() + 2000;
       await done.future.timeout(
         Duration(milliseconds: approxMs.clamp(2000, 60000)),
         onTimeout: () {},
       );
       await sub.cancel();
-      return true;
-    } catch (_) {
-      return false;
-    } finally {
-      client.close(force: true);
-    }
+    } catch (_) {/* leave the loop to fall through to the next sentence */}
   }
 
   Future<void> _speakWithDevice(String text) async {
@@ -697,6 +755,7 @@ class AssistantService {
   }
 
   Future<void> stopSpeaking() async {
+    _speakGen++; // abort any in-flight streamed speak() loop (barge-in / new turn)
     try {
       await _player.stop();
     } catch (_) {}
@@ -738,6 +797,7 @@ class AssistantService {
     stopSpeaking();
     stopListening();
     _player.dispose();
+    try { _httpClient?.close(force: true); } catch (_) {}
   }
 
   Uri _resolve(String path) {

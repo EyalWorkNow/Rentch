@@ -278,7 +278,19 @@ class SmartSearch {
     final roomBetween =
         RegExp(r'בין\s*(\d(?:\.\d)?)\s*ל[-־]?\s*(\d(?:\.\d)?)\s*(?:חדר|חד)')
             .firstMatch(text);
-    if (roomRange != null || roomBetween != null) {
+    // "עד N חדרים" is an UPPER bound (max), "מעל/לפחות N חדרים" a LOWER bound —
+    // otherwise a "small apartment, up to 3 rooms" request would set a MINIMUM of
+    // 3 and surface the biggest units first.
+    final uptoRooms = RegExp(
+            r'(?:עד|מקסימום|מקס|לכל היותר)\s*(\d(?:\.\d)?)\s*(?:חדר|חדרים|חד)')
+        .firstMatch(text);
+    final fromRooms =
+        RegExp(r'(?:לפחות|מעל)\s*(\d(?:\.\d)?)\s*(?:חדר|חדרים|חד)').firstMatch(text);
+    if (uptoRooms != null) {
+      maxRooms = double.tryParse(uptoRooms.group(1)!);
+    } else if (fromRooms != null) {
+      minRooms = double.tryParse(fromRooms.group(1)!);
+    } else if (roomRange != null || roomBetween != null) {
       final m = roomRange ?? roomBetween!;
       minRooms = double.tryParse(m.group(1)!);
       maxRooms = double.tryParse(m.group(2)!);
@@ -286,8 +298,10 @@ class SmartSearch {
       final half =
           RegExp(r'(\d|אחד|שני|שתי|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה)\s*וחצי')
               .firstMatch(text);
-      final single =
-          RegExp(r'(\d(?:\.\d)?)\s*(?:חדר|חדרים|חד)').firstMatch(text);
+      final single = RegExp(
+              r'(\d(?:\.\d)?)\s*-?\s*(?:חדר|חדרים|חד|rooms?|bedrooms?)',
+              caseSensitive: false)
+          .firstMatch(text);
       if (half != null) {
         minRooms = (_wordToNum(half.group(1)!) ?? 0) + 0.5;
       } else if (single != null) {
@@ -369,10 +383,18 @@ class SmartSearch {
     } else {
       if (upto != null) maxPrice = amount(upto.group(1)!);
       if (from != null) minPrice = amount(from.group(1)!);
-      // bare number with a price hint
+      // bare number with a price hint. Accept the RENT band (1.5k–60k) OR a clear
+      // SALE-price band (100k–30M): "2 מיליון" / "2500000" typed WITHOUT "עד" must
+      // still register as a budget (and then trip the sale inference below) — the
+      // old ≤60k cap silently dropped them, so an investor got neither a budget nor
+      // a sale search. The 60k–100k gap stays rejected (too ambiguous to guess).
       if (maxPrice == null && minPrice == null) {
         final any = amount(text);
-        if (any != null && any >= 1500 && any <= 60000) maxPrice = any;
+        if (any != null &&
+            ((any >= 1500 && any <= 60000) ||
+                (any >= 100000 && any <= 30000000))) {
+          maxPrice = any;
+        }
       }
     }
     // sanity: drop tiny values that aren't budgets (e.g. room counts)
@@ -416,11 +438,16 @@ class SmartSearch {
     // those phrases before matching a city so "my area" stays city-less → GPS flow.
     // NB: "אזור" is a real town — strip it ONLY with a deictic suffix ("אזור שלי"),
     // never bare (so "דירה באזור" still searches the town Azor).
-    final cityText = text.replaceAll(
-        RegExp(r'ה?א[יִ]?זור\s+(?:שלי|שלנו|הזה|הזאת)|'
-            r'בסביבה(?:\s+(?:שלי|שלנו|הזו))?|קרוב\s*אלי+|קרוב\s*אלינו|'
-            r'אצל[יי]|ליד[יי]|near me|around here|nearby|my area|close to me'),
-        ' ');
+    final cityText = text
+        .replaceAll(
+            RegExp(r'ה?א[יִ]?זור\s+(?:שלי|שלנו|הזה|הזאת)|'
+                r'בסביבה(?:\s+(?:שלי|שלנו|הזו))?|קרוב\s*אלי+|קרוב\s*אלינו|'
+                r'אצל[יי]|ליד[יי]|near me|around here|nearby|my area|close to me'),
+            ' ')
+        // Ktiv-male double-yod ending is the everyday full spelling of the same
+        // town ("נהרייה"=נהריה, "הרצלייה"=הרצליה, "נתנייה"=נתניה, "טברייה"=טבריה).
+        // Collapse it so the city resolves instead of silently dropping to null.
+        .replaceAll('ייה', 'יה');
 
     // City: prefer LLM extraction (Gemini saw the full context);
     // fall back to keyword scan + fuzzy matching only if LLM missed it
@@ -491,6 +518,53 @@ class SmartSearch {
             break;
           }
 
+          // Space-LESS multi-word city: "תלאביב"→"תל אביב", "כפרסבא"→"כפר סבא",
+          // "פתחתקווה"→"פתח תקווה", "בארשבע"→"באר שבע". A very common typo that
+          // otherwise drops the city entirely and returns a WRONG town at high
+          // confidence. Match the token against known multi-word localities with
+          // their space removed (exact, or ≤1 edit for a small slip).
+          if (clean.length >= 4 && clean.length <= 10) {
+            // Try BOTH the prefix-stripped token and the raw one: for "בתלאביב"
+            // the ב is a preposition (→"תלאביב"), but for "בארשבע"/"כפרסבא" the
+            // ב/כ are part of the city name — stripping them would break the match.
+            final raw = words[i].toLowerCase().trim();
+            bool jm(String name, String cand) {
+              if (cand.length < 4) return false;
+              if (!name.contains(' ') && !name.contains('-')) return false;
+              final joined = name.replaceAll('-', '').replaceAll(' ', '');
+              return joined == cand ||
+                  (joined.isNotEmpty &&
+                      (joined.length - cand.length).abs() <= 1 &&
+                      joined[0] == cand[0] &&
+                      LocalityMatcher._levenshtein(joined, cand) <= 1);
+            }
+
+            bool joinMatch(String name) =>
+                jm(name, clean) || (raw != clean && jm(name, raw));
+
+            String? joinHit;
+            // GovData (every CBS city — covers כפר סבא / באר שבע etc.) first.
+            for (final rec in GovData.instance.localities) {
+              if (joinMatch(rec.name)) {
+                joinHit = rec.name;
+                break;
+              }
+            }
+            // Legacy hand-list fallback (when GovData isn't loaded, e.g. tests).
+            if (joinHit == null) {
+              for (final locality in LocalityMatcher.allLocalities) {
+                if (joinMatch(locality)) {
+                  joinHit = locality;
+                  break;
+                }
+              }
+            }
+            if (joinHit != null) {
+              city = joinHit;
+              break;
+            }
+          }
+
           // Only fuzzy-match single word if it's reasonably short (reject "חדרים" type words)
           if (clean.length <= 5) {
             final fuzzyMatches = <(String, int)>[];
@@ -516,6 +590,17 @@ class SmartSearch {
       if (text.contains(n)) {
         neighborhood = n;
         break;
+      }
+    }
+    // A neighbourhood is NOT a city: resolve it to its parent city so the city
+    // gate widens to that city (which has stock) while the neighbourhood stays a
+    // soft preference. Without this, "דירה ברמת אביב" mis-gates as city="רמת אביב"
+    // → zero exact stock → no results. Only override when the city is unset or was
+    // itself mis-parsed as the neighbourhood name.
+    if (neighborhood != null) {
+      final parent = _neighborhoodCity[neighborhood];
+      if (parent != null && (city == null || city == neighborhood)) {
+        city = parent;
       }
     }
 
@@ -1095,6 +1180,26 @@ class SmartSearch {
     'רמת אביב ג', 'גבעת שמואל', 'מרכז העיר',
   ];
 
+  // A neighbourhood belongs to a city — so naming one ("דירה ברמת אביב") can gate
+  // the search to that city instead of hard-filtering to an empty "city=רמת אביב"
+  // set. Only unambiguous neighbourhoods are mapped (ambiguous ones like
+  // נווה שאנן/מרכז העיר, or גבעת שמואל which is its own city, are intentionally omitted).
+  static const Map<String, String> _neighborhoodCity = {
+    // Tel Aviv
+    'פלורנטין': 'תל אביב', 'נווה צדק': 'תל אביב', 'רוטשילד': 'תל אביב',
+    'כרם התימנים': 'תל אביב', 'לב העיר': 'תל אביב', 'הצפון הישן': 'תל אביב',
+    'הצפון החדש': 'תל אביב', 'רמת אביב': 'תל אביב', 'רמת אביב ג': 'תל אביב',
+    'בבלי': 'תל אביב', 'יד אליהו': 'תל אביב', 'רמת החייל': 'תל אביב',
+    'שפירא': 'תל אביב', 'נחלת יצחק': 'תל אביב', 'תל ברוך': 'תל אביב',
+    'אפקה': 'תל אביב', 'מונטיפיורי': 'תל אביב',
+    // Jerusalem
+    'רחביה': 'ירושלים', 'בקעה': 'ירושלים', 'נחלאות': 'ירושלים',
+    'תלפיות': 'ירושלים', 'קטמון': 'ירושלים', 'גילה': 'ירושלים',
+    'פסגת זאב': 'ירושלים', 'רמות': 'ירושלים',
+    // Haifa
+    'הדר': 'חיפה', 'כרמל': 'חיפה', 'ואדי ניסנס': 'חיפה', 'קרית חיים': 'חיפה',
+  };
+
   static String amenityTag(String key) {
     switch (key) {
       case 'feat_renovated':
@@ -1139,6 +1244,19 @@ class SmartSearch {
   }
 
   // ── cohort signals ───────────────────────────────────────────────────────────
+  /// The amenity/feature keys mentioned in [text], using the SAME Hebrew lexicon
+  /// as the full parse. Lets the ranking model turn a profile's free-text labels
+  /// ('נגישות'/'מעלית'/'ממ"ד'/'חניה') into catalogue feature keys so a curated
+  /// profile's must-haves actually influence ranking.
+  static Set<String> amenityKeysIn(String text) {
+    final t = text.toLowerCase();
+    final out = <String>{};
+    _amenityKeywords.forEach((key, words) {
+      if (words.any((w) => t.contains(w.toLowerCase()))) out.add(key);
+    });
+    return out;
+  }
+
   // Extract the persona/cohort signals the BACKEND 14-cohort engine already reads
   // (cohort.mjs `querySignals`: household/religiousStream/isOleh/hasChildren/
   // carFree/wfh/accessibilityNeed/lifeStage/isInvestor/sector/…). Nothing produced
@@ -1149,8 +1267,13 @@ class SmartSearch {
     bool has(List<String> ws) => ws.any((w) => t.contains(w));
     final s = <String, String>{};
 
+    // "בלי / ללא / אין ילדים" negates children — otherwise the ילד* substring
+    // (also inside ילדים) mis-tags a childless couple as a family with kids.
+    final noKids = RegExp(r'(?:בלי|ללא|אין|בלא)\s*ילד').hasMatch(t);
+
     // household (also gates charedi/dati_leumi split, which needs family context)
-    if (has(['משפח', 'ילדים', 'ילד ', 'הילד', 'children', 'kids', 'family'])) {
+    if (has(['משפח', 'family']) ||
+        (!noKids && has(['ילדים', 'ילד ', 'הילד', 'children', 'kids']))) {
       s['household'] = 'family';
     } else if (has(['סטודנט', 'שותפים', 'student', 'roommate'])) {
       s['household'] = 'student';
@@ -1160,8 +1283,10 @@ class SmartSearch {
       s['household'] = 'single';
     }
 
-    // religiosity → stream (charedi vs dati_leumi have OPPOSITE school needs)
-    if (has(['חרדי', 'חרדית', 'חיידר', 'תלמוד תורה', 'בני ברק', 'haredi', 'charedi'])) {
+    // religiosity → stream (charedi vs dati_leumi have OPPOSITE school needs).
+    // NB: a CITY name (בני ברק) is NOT a religiosity signal — "משפחה חילונית בבני
+    // ברק" must not be tagged charedi, and "דתי לאומי בבני ברק" must stay dati_leumi.
+    if (has(['חרדי', 'חרדית', 'חיידר', 'תלמוד תורה', 'haredi', 'charedi'])) {
       s['religiousStream'] = 'charedi';
       s['isReligious'] = 'true';
     } else if (has(['דתי לאומי', 'דתיה לאומית', 'סרוג', 'אולפנה', 'ישיבה תיכונית', 'dati leumi'])) {
@@ -1175,12 +1300,20 @@ class SmartSearch {
     if (has(['ערבי', 'ערבית', 'عرب', 'الناصرة', 'مدرسة'])) s['sector'] = 'arab';
 
     // oleh / language preference
-    if (has(['עולה', 'עולה חדש', 'immigrant', 'oleh', 'new to israel'])) s['isOleh'] = 'true';
-    if (has(['english speaker', 'דובר אנגלית', 'אנגלית'])) s['langPref'] = 'en';
+    if (has(['עולה', 'עולה חדש', 'immigrant', 'oleh', 'olah', 'aliyah',
+        'new to israel'])) {
+      s['isOleh'] = 'true';
+    }
+    if (has(['english speaker', 'english speaking', 'english-speaking',
+        'דובר אנגלית', 'אנגלית'])) {
+      s['langPref'] = 'en';
+    }
     if (has(['דובר צרפתית', 'french speaker', 'צרפתית'])) s['langPref'] = 'fr';
 
-    // children / life-stage timing
-    if (has(['ילד', 'ילדים', 'kids', 'children'])) s['hasChildren'] = 'true';
+    // children / life-stage timing ("בלי ילדים" already negated via noKids)
+    if (!noKids && has(['ילד', 'ילדים', 'kids', 'children'])) {
+      s['hasChildren'] = 'true';
+    }
     if (has(['בהריון', 'הריון', 'pregnant', 'expecting', 'תינוק בדרך'])) s['expecting'] = 'true';
     if (has(['תינוק', 'רך נולד', 'baby', 'newborn'])) {
       s['hasChildren'] = 'true';
@@ -1196,18 +1329,27 @@ class SmartSearch {
     }
 
     // accessibility → senior/accessible cohort
-    if (has(['נגיש', 'נגישות', 'כיסא גלגלים', 'כסא גלגלים', 'נכה', 'wheelchair', 'accessible', 'disabled'])) {
+    if (has(['נגיש', 'נגישות', 'כיסא גלגלים', 'כסא גלגלים', 'נכה', 'wheelchair',
+        'accessible', 'disabled', 'קושי בהליכה', 'מתקשה ללכת', 'הליכון', 'צולע'])) {
       s['accessibilityNeed'] = 'true';
     }
 
-    // life stage
+    // life stage. "מבוגר/ת" is a very common elderly self-description.
     if (has(['סטודנט', 'סטודנטית', 'student'])) s['lifeStage'] = 'student';
-    if (has(['גמלאי', 'פנסיונר', 'פנסיונרית', 'קשיש', 'בגיל השלישי', 'retired', 'senior', 'pensioner'])) {
+    if (has(['גמלאי', 'פנסיונר', 'פנסיונרית', 'קשיש', 'מבוגר', 'מבוגרת',
+        'בגיל השלישי', 'גיל הפרישה', 'retired', 'senior', 'pensioner', 'elderly'])) {
       s['lifeStage'] = 'senior';
     }
-    // explicit age ("בן 72" / "age 72")
-    final age = RegExp(r'(?:בן|בת|גיל|age)\s*(\d{2,3})').firstMatch(t);
-    if (age != null) s['age'] = age.group(1)!;
+    // explicit age ("בן 72" / "age 72"). Guard against a BUILDING's age
+    // ("בניין בן 40 שנה") — that's the property, not the user.
+    final ageM = RegExp(r'(?:בן|בת|גיל|age)\s*(\d{2,3})').firstMatch(t);
+    if (ageM != null) {
+      final before =
+          t.substring((ageM.start - 8).clamp(0, t.length), ageM.start);
+      if (!RegExp(r'בניין|בית|מבנה|דירה|נכס').hasMatch(before)) {
+        s['age'] = ageM.group(1)!;
+      }
+    }
 
     // intent
     if (has(['משקיע', 'השקעה', 'תשואה', 'investor', 'investment', 'yield', 'לקנייה', 'לקנות', 'רכישה'])) {

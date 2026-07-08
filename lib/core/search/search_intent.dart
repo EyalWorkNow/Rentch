@@ -26,6 +26,18 @@ class SearchIntent {
   static const goodSchools = 'good_schools';
   static const qualityArea = 'quality_area';
 
+  // Map-data-backed neighbourhood intents (each sharpens a GovData dimension:
+  // safety→police crime, transit→transit grid+rail, green→park, health→health
+  // facilities, youngPop→CBS young-adult share).
+  static const safety = 'safety';
+  static const transit = 'transit';
+  static const green = 'green';
+  static const health = 'health';
+  static const youngPop = 'young_pop';
+  static const convenience = 'convenience';
+  static const growth = 'growth';
+  static const employment = 'employment';
+
   /// The seeker wants a religiously-observant community (חרדי / דתי-לאומי) or a
   /// place near a synagogue → prefer known religious localities/neighbourhoods.
   static const religiousArea = 'religious_area';
@@ -48,13 +60,19 @@ class SearchIntent {
     // (as in "כיסא גלגלים"/wheelchair) false-matches and sea-gates the search.
     nearSea: RegExp(r'הים|(?<=\s)לים|חוף|ליד המים|beach|seaside|seafront', caseSensitive: false),
     nightlife: RegExp(
-        r'נייטלייף|חיי לילה|בילוי|\bבר\b|ברים|פאב|פאבים|מועדון|מסעד|בית קפה|בתי קפה|'
-        r'תוסס|אזור צעיר|שכונה צעיר|מקום צעיר|אזור צעיר|צעיר ותוסס|'
-        r'nightlife|bars|pubs|clubs|hipster|trendy',
+        r'נייטלייף|חיי לילה|בילוי|לבלות|מקום לבלות|\bבר\b|ברים|פאב|פאבים|מועדון|'
+        r'מסעד|בית קפה|בתי קפה|תוסס|תוססת|בוהמיינ|בוהמי|היפסטר|אמנותי|סצנה|'
+        r'אזור צעיר|שכונה צעיר|מקום צעיר|צעיר ותוסס|'
+        r'nightlife|bars|pubs|clubs|hipster|trendy|bohemian',
         caseSensitive: false),
-    quiet: RegExp(r'שקט|שקטה|רגוע|מבוגר|גמלא|פנסי|קשיש|retire|quiet|calm',
+    quiet: RegExp(
+        r'שקט|שקטה|רגוע|רגועה|שלוו|שליו|פסטורל|מבוגר|גמלא|פנסי|קשיש|'
+        r'בלי רעש|ללא רעש|רחוק מרעש|נטול רעש|רחוק מכביש|רחוק מהרעש|'
+        r'retire|quiet|calm|peaceful|tranquil',
         caseSensitive: false),
-    central: RegExp(r'מרכזי|מרכזית|מרכז העיר|לב העיר|במרכז|סנטר|central|downtown',
+    central: RegExp(
+        r'מרכזי|מרכזית|מרכז העיר|לב העיר|במרכז|סנטר|אזור עסקים|מרכז עסקים|'
+        r'מגדלי משרדים|central|downtown|business district',
         caseSensitive: false),
     spacious: RegExp(r'מרווח|מרווחת|מרווחים|מרווחות|חדרים גדולים|גדולה מאוד|spacious',
         caseSensitive: false),
@@ -74,11 +92,54 @@ class SearchIntent {
     goodSchools: RegExp(r'בתי ספר|בית ספר|בית הספר|חינוך|מוסדות חינוך|schools?',
         caseSensitive: false),
     qualityArea: RegExp(
-        r'שכונה טובה|אזור טוב|אזור איכותי|אזור יוקרתי|שכונה יוקרתית|שכונה שקטה|good area|nice area',
+        r'שכונה טובה|אזור טוב|אזור איכותי|אזור יוקרתי|שכונה יוקרתית|שכונה שקטה|'
+        r'מטופח|מטופחת|אזור מבוקש|שכונה מבוקש|מבוקשת|נחשב|נחשבת|שכונה בעלייה|'
+        r'בעלייה|אזור מתפתח|מתפתח|מתפתחת|מתחדש|מתחדשת|שכונה נקייה|אזור נקי|'
+        r'good area|nice area|prime|up.and.coming|sought.after',
+        caseSensitive: false),
+    safety: RegExp(
+        r'בטוח|בטוחה|בטיחות|לא מסוכן|לא מסוכנת|בלי פשיעה|ללא פשיעה|פשיעה נמוכה|'
+        r'ללא אלימות|בלי אלימות|safe|low.crime|secure',
+        caseSensitive: false),
+    transit: RegExp(
+        r'תחבורה ציבורית|קרוב לתחבורה|נגיש לתחבורה|קרוב לרכבת|ליד רכבת|תחנת רכבת|'
+        r'רכבת קלה|קו אדום|קו סגול|מטרו|קרוב לאוטובוס|ליד אוטובוס|תחנת אוטובוס|'
+        r'קרוב לתחנה|public transport|near.*train|metro|light.rail|\bbus\b|transit|'
+        r'near transit|well.connected',
+        caseSensitive: false),
+    employment: RegExp(
+        r'קרוב לעבודה|ליד העבודה|קרוב למקום העבודה|אזור תעסוקה|אזור תעשייה|'
+        r'הייטק|היי[- ]?טק|פארק הייטק|קרוב למשרדים|ליד משרדים|מרכז עסקים|'
+        r'אזור עסקים|קרוב לאזור התעשייה|near work|close to work|tech park|'
+        r'business district|job hub|employment',
+        caseSensitive: false),
+    green: RegExp(
+        r'אזור ירוק|הרבה ירוק|הרבה גינות|גינות|גינה ציבורית|פארק|קרוב לפארק|'
+        r'גן ציבורי|גנים ציבוריים|שטח פתוח|אזור פתוח|טבע|ריאות ירוקות|אוויר נקי|'
+        r'green|park|garden',
+        caseSensitive: false),
+    health: RegExp(
+        r'בית חולים|קופת חולים|מרפאה|קרוב לרפואה|שירותי בריאות|קרוב לבריאות|'
+        r'clinic|hospital|medical',
+        caseSensitive: false),
+    youngPop: RegExp(
+        r'אזור צעיר|סביבה צעירה|שכונה צעיר|מקום צעיר|אוכלוס\S* צעיר|'
+        r'אזור של צעירים|קהל צעיר|הרבה צעירים|young (area|crowd|people|vibe)',
+        caseSensitive: false),
+    convenience: RegExp(
+        r'ליד סופר|קרוב לסופר|סופרמרקט|ליד מכולת|מרכז קניות|מרכזי קניות|קניון|'
+        r'קרוב לקניות|ליד מרכז מסחרי|מרכז מסחרי|קרוב לחנויות|ליד חנויות|'
+        r'supermarket|grocer|shopping|\bmall\b|errands',
+        caseSensitive: false),
+    growth: RegExp(
+        r'פוטנציאל|פוטנציאל השבחה|השבחה|פינוי בינוי|פינוי[- ]?בינוי|תמ[״"]?א|'
+        r'התחדשות עירונית|אזור מתפתח|בעלייה|לפני עלייה|קרוב למטרו|מטרו עתידי|'
+        r'קו מטרו|רכבת קלה עתידית|רק[״"]?ל עתיד|ערך עתידי|appreciation|upside|'
+        r'up.and.coming|future (metro|value)|urban renewal',
         caseSensitive: false),
     religiousArea: RegExp(
         r'דתי|דתיה|דתיים|חרדי|חרדית|חרדים|שומר שבת|שומרי שבת|בית כנסת|בתי כנסת|'
-        r'קהילה דתית|אזור דתי|שכונה דתית|כשר|מקווה|עירוב|ישיבה|אולפנה|תלמוד תורה|'
+        r'קהילה דתית|אזור דתי|שכונה דתית|מסורתי|מסורתית|כשר|מקווה|עירוב|ישיבה|אולפנה|תלמוד תורה|'
         r'religious|synagogue|kosher|haredi|observant',
         caseSensitive: false),
   };
@@ -136,10 +197,23 @@ class SearchIntent {
         out.add(teens);
       }
     }
-    // Retiree / elderly → step-free access + a quiet area.
-    if (RegExp(r'מבוגר|גמלא|פנסי|קשיש|בגיל השלישי|retire|senior|elderly')
-        .hasMatch(text)) {
+    // Retiree / elderly → step-free access + a quiet area. Includes a stated
+    // numeric age of 65+ ("אני בן 74") — the person, not a building (a building's
+    // age reads as "בניין בן N שנה", which this doesn't match).
+    final elderlyAge = RegExp(r'(?:בן|בת|גיל)\s*(6[5-9]|[7-9]\d|1\d\d)\b')
+        .hasMatch(text) &&
+        !RegExp(r'בניין|בית|מבנה|נכס').hasMatch(text);
+    if (elderlyAge ||
+        RegExp(r'מבוגר|גמלא|פנסי|קשיש|בגיל השלישי|retire|senior|elderly')
+            .hasMatch(text)) {
       out..add(accessible)..add(quiet);
+    }
+    // Wanting the ABSENCE of noise = wanting QUIET (a negation that ADDS an intent
+    // rather than cancelling one — "לא באזור רועש" / "בלי רעש" / "רחוק מכביש").
+    if (RegExp(r'בלי רעש|ללא רעש|רועש|רועשת|לא רוצה רעש|רחוק מרעש|רחוק מכביש|'
+            r'נטול רעש|no noise|away from.*(road|highway)')
+        .hasMatch(text)) {
+      out.add(quiet);
     }
     // Young couple → they lean central/lively.
     if (RegExp(r'זוג צעיר|זוג|בני זוג|נשואים טריים|couple|newlywed')

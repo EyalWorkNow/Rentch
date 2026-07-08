@@ -70,6 +70,9 @@ const S3_BUCKET = process.env.S3_BUCKET;
 // Python OpenCV stitcher Lambda (container image) — invoked async to build a
 // horizontal 360° panorama from the frames the user swept on the phone.
 const PANO_STITCH_FN = process.env.PANO_STITCH_FN || '';
+// Node Lambda that turns a Gaussian-splat .ply/.spz upload into a compact .ksplat
+// the in-app viewer streams fast (defaults to the deployed function name).
+const SPLAT_CONVERT_FN = process.env.SPLAT_CONVERT_FN || 'rentch-splat-convert';
 const lambda = new LambdaClient({ region: REGION });
 const TABLE_PREFIX = process.env.TABLE_PREFIX || 'rently-';
 const LUMA_API_KEY = process.env.LUMA_API_KEY || '';
@@ -1909,6 +1912,32 @@ async function create3dViewer(event) {
   }));
 
   const viewerUrl = `https://${S3_BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+
+  // Kick off async .ply/.spz → .ksplat conversion so the viewer streams a compact,
+  // fast splat instead of a 200-400 MB raw .ply. We do NOT return a predicted URL
+  // (it would 404 during the ~30s conversion) — the converter writes the real
+  // ksplatUrl back onto the property (model3d.ksplatUrl) in DynamoDB when done, so
+  // a seeker fetching the listing later gets the fast splat; owner preview mean-
+  // while falls back to plyUrl. Fully fail-soft.
+  const splatSourceUrl = manifest.plyUrl || manifest.spzUrl;
+  const srcKey = splatSourceUrl ? keyFromS3Url(splatSourceUrl) : null;
+  if (srcKey && SPLAT_CONVERT_FN) {
+    try {
+      await lambda.send(new InvokeCommand({
+        FunctionName: SPLAT_CONVERT_FN,
+        InvocationType: 'Event', // async — never block the /3d/viewers response
+        Payload: Buffer.from(JSON.stringify({
+          bucket: S3_BUCKET,
+          key: srcKey,
+          propertyId,
+          tableName: TABLES.properties.name,
+        })),
+      }));
+    } catch (e) {
+      console.warn('splat-convert invoke failed:', e.message);
+    }
+  }
+
   return json(200, {
     data: {
       scanId: `scan_${propertyId}_${Date.now()}`,
@@ -1923,6 +1952,7 @@ async function create3dViewer(event) {
         usdzUrl: manifest.usdzUrl,
         spzUrl: manifest.spzUrl,
         plyUrl: manifest.plyUrl,
+        ksplatUrl: '', // populated async by rentch-splat-convert (read from DDB later)
         textureFolder: manifest.textureFolder,
         assets,
       },
@@ -5095,8 +5125,12 @@ function buildTenantSearchSystemPrompt() {
     'Rently תומכת גם בשכירות וגם במכירה, אז לעולם אל תגידי שאנחנו "רק שכירות". אם מישהו מחפש לקנות או להשקיע — עזרי לו: בררי בעדינות אם זו שכירות או קנייה, תקציב, אזור, ולמשקיע גם מה חשוב לו בתשואה.',
     'סגנון: שפה טבעית, חמה ומשוחררת, כמו חבר/ה שמבינ/ה עניין. משפטים קצרים (שורה־שתיים), בלי רובוטיות, בלי ז׳רגון, בלי כוכביות או markdown. מותר אימוג׳י אחד פה ושם, בטעם.',
     'המטרה: להבין מה האדם באמת מחפש ולגרום לו להרגיש שמקשיבים לו. תני לו לספר על עצמו במילים שלו — אזור, תקציב, כמה חדרים, אורח חיים, חיות מחמד, קרבה לעבודה או לתחבורה, ומה חשוב לו.',
+    // איסוף שיטתי אך שיחתי: לאורך השיחה (לא בבת אחת!) דאגי לכסות בעדינות את שבעת הדברים
+    // שמאפשרים לי לבנות התאמה מדויקת מול נתוני האמת. אל תשאלי כמו טופס — שאלה אחת חמה
+    // בכל פעם, ותמיד קודם שקפי מה כבר הבנת.
+    'לאורך השיחה חשוב שתאספי בעדינות שבעה דברים כדי שאוכל לחשב התאמה אמיתית: (1) גיל/שלב חיים, (2) איפה הוא גר היום, (3) באיזה אזור/עיר הוא מחפש, (4) מה הכי חשוב לו (deal-breakers — למשל ממ"ד, מעלית, שקט), (5) דברים שהוא אוהב וישמחו אותו (ים, פארקים, בתי קפה, קהילה), (6) תקציב, (7) מה עוד חשוב שהדירה תכלול. אל תשאלי הכול בבת אחת — כסי אותם טבעי לאורך השיחה, שאלה אחת קצרה בכל פעם, והתחילי מהחסר הקריטי ביותר לפרסונה שלו.',
     'את חכמה ומנוסה — יודעת לזהות מיהו האדם שמולך ולהסיק את הצרכים הסמויים שלו, גם כשלא אמר הכול: משפחות (ממ"ד, שקט, קרבה לגנים/בתי ספר), סטודנטים (זול, שותפים, קרוב לאוניברסיטה ולתחבורה), עולים חדשים ודוברי אנגלית (הקלי, עני גם באנגלית פשוטה אם צריך, הכווני לאזורים ידידותיים), דתיים/חרדים (קרבה לבית כנסת ולמוסדות המתאימים לזרם שלהם), מבוגרים ובעלי צרכי נגישות (מעלית, קומה נמוכה, נגישות, קרבה לשירותי בריאות), זוגות ורווקים (שקט מול תוסס), עובדים מהבית (חדר עבודה, שקט, אינטרנט), בעלי חיות מחמד, ומשקיעים (תשואה, אזורים מבוקשים). התאימי את השאלה והטון לפרסונה.',
-    'אל תרוצי ישר להציע — קודם שקפי בחום מה הבנת, ושאלי שאלה אחת קצרה ועדינה וחכמה (הכי חשובה לפרסונה הזו) כדי להכיר אותו יותר (שאלה אחת בכל פעם). כשכבר יש מספיק מידע (אזור או תקציב או חדרים, או בקשה ברורה) — אמרי בחום שאת בודקת מה הכי מתאים, כי האפליקציה תציג לו את הדירות. אל תמציאי דירות, כתובות או מחירים ספציפיים בעצמך.',
+    'אל תרוצי ישר להציע — קודם שקפי בחום מה הבנת, ושאלי שאלה אחת קצרה ועדינה וחכמה (הכי חשובה לפרסונה הזו) כדי להכיר אותו יותר (שאלה אחת בכל פעם). כשכיסית את עיקרי הדברים (לפחות אזור + תקציב, ועוד כמה מהשבעה) — אמרי בחום שאת בודקת מה הכי מתאים, כי האפליקציה תדרג ותציג לו את הדירות לפי מה שחשוב לו. אל תמציאי דירות, כתובות או מחירים ספציפיים בעצמך.',
     'מיקום: אם האדם מדבר על "האזור שלי" / "פה" / "כאן" / "קרוב אליי" — האפליקציה מזהה אוטומטית את המיקום שלו דרך ה-GPS, אז אל תשאלי אותו באיזו עיר; פשוט אמרי בחום שאת מאתרת אותו ומחפשת באזור שלו.',
     'תמיד כווני להביא לו דירות אמיתיות ולא להיתקע: אם חסר רק פרט קריטי אחד (בדרך כלל אזור או תקציב) בקשי אותו בעדינות, אחרת אמרי שאת מחפשת ומראה לו התאמות. אם משהו מצומצם מדי, הציעי להרחיב אזור/תקציב במקום לומר "אין".',
     'הקלט עלול להיות מסורבל או לא ברור — פרשי בהיגיון, וכשמשהו לא ברור שאלי בעדינות.',
@@ -5125,8 +5159,8 @@ async function createRealtimeSession(event) {
   const instructions = [
     'את "אתי", סוכנת נדל״ן ישראלית — חמה, אנושית, נעימה מאוד ומקצועית מאוד.',
     'דברי עברית טבעית וזורמת, במשפטים קצרים כמו בשיחת טלפון אמיתית.',
-    'המטרה: תוך 3–4 שאלות ממוקדות להבין מה השוכר צריך — עיר/אזור, תקציב, מספר חדרים, ואורח חיים (משפחה/סטודנט/זוג, דתי/חילוני/מסורתי, חיות מחמד, חניה, מעלית).',
-    'שאלה אחת בכל פעם — הקשיבי, חדדי, ואל תציפי בשאלות.',
+    'המטרה: להבין מה השוכר צריך כדי שהאפליקציה תדרג לו דירות מול נתוני אמת. לאורך השיחה כסי בעדינות: גיל/שלב חיים, איפה הוא גר היום, איזה אזור/עיר הוא מחפש, מה הכי חשוב לו (must-have), מה הוא אוהב (ים/פארקים/בתי קפה/קהילה), תקציב, ומספר חדרים ואורח חיים (משפחה/סטודנט/זוג, דתי/חילוני, חיות מחמד, חניה, מעלית).',
+    'שאלה אחת בכל פעם — הקשיבי, חדדי, ואל תציפי בשאלות. אל תשאלי כמו טופס; כסי את הדברים טבעי, מהחסר הקריטי ביותר קודם.',
     'ברגע שיש מספיק פרטים קראי לפונקציה search_listings כדי להציג דירות אמיתיות, ואז הציגי אותן בקצרה בקול.',
     'אם המשתמש אומר "פה"/"כאן" בלי לציין עיר — בקשי אישור לאתר את המיקום שלו.',
     'היי אמינה: אל תמציאי דירות — הציגי רק מה שחוזר מ-search_listings.',
@@ -5211,15 +5245,35 @@ async function handleAssistantLiveToken(event) {
     return json(503, { message: 'Live assistant not configured.' });
   }
 
-  let properties = [];
-  let profile = null;
-  try {
-    [properties, profile] = await Promise.all([
-      loadOwnerProperties(uid),
-      loadUserProfile(uid),
-    ]);
-  } catch { /* context is best-effort */ }
-  const systemText = buildErikSystemPrompt(profile, properties);
+  let mode = '';
+  try { mode = (JSON.parse(event.body || '{}').mode || '').toString(); } catch { /* no body */ }
+
+  let systemText;
+  let tools;
+  if (mode === 'tenant_search') {
+    // אתי — SPOKEN apartment search. The CLIENT runs the real search on-device
+    // (its full ranking engine) when she calls search_listings and streams cards
+    // inline, so the token only DECLARES the tool; no owner context is loaded.
+    systemText = buildTenantSearchSystemPrompt()
+      + '\n' + TENANT_GROUNDING
+      + '\nזוהי שיחה קולית חיה: דברי קצר, חם וטבעי כמו בטלפון. בלי markdown, בלי '
+      + '[[CHOICES]], בלי להקריא רשימות ארוכות של דירות. שאלי שאלה אחת בכל פעם. '
+      + 'ברגע שיש עיר, או תקציב, או מספר חדרים — קראי מיד ל-search_listings, ואז '
+      + 'אמרי בחום שמצאת כמה התאמות שמופיעות עכשיו על המסך.';
+    tools = [{ functionDeclarations: [SEARCH_LISTINGS_TOOL] }];
+  } else {
+    // Erik (owner/publish) — unchanged behaviour.
+    let properties = [];
+    let profile = null;
+    try {
+      [properties, profile] = await Promise.all([
+        loadOwnerProperties(uid),
+        loadUserProfile(uid),
+      ]);
+    } catch { /* context is best-effort */ }
+    systemText = buildErikSystemPrompt(profile, properties);
+    tools = [ASSISTANT_TOOL];
+  }
 
   const now = Date.now();
   const expireTime = new Date(now + 30 * 60 * 1000).toISOString();
@@ -5233,7 +5287,7 @@ async function handleAssistantLiveToken(event) {
       model: GEMINI_LIVE_MODEL,
       generationConfig: { responseModalities: ['AUDIO'] },
       systemInstruction: { parts: [{ text: systemText }] },
-      tools: [ASSISTANT_TOOL],
+      tools,
       inputAudioTranscription: {},
       outputAudioTranscription: {},
     },

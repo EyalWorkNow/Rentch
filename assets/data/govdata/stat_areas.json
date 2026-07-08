@@ -1,0 +1,20 @@
+{
+  "cell": 0.02,
+  "note": "SEED bootstrap — CBS statistical areas (אזור סטטיסטי) with per-block SES + age split and a boundary polygon [[lat,lon],…]. Replace with the full CBS export by running scripts/govdata/stat_areas.mjs. ses 1..10; young/child/senior are population shares.",
+  "areas": [
+    {
+      "ses": 2,
+      "young": 0.30,
+      "child": 0.42,
+      "senior": 0.28,
+      "poly": [[32.040, 34.740], [32.040, 34.760], [32.060, 34.760], [32.060, 34.740]]
+    },
+    {
+      "ses": 9,
+      "young": 0.34,
+      "child": 0.30,
+      "senior": 0.16,
+      "poly": [[32.080, 34.780], [32.080, 34.800], [32.100, 34.800], [32.100, 34.780]]
+    }
+  ]
+}

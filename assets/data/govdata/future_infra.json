@@ -1,0 +1,15 @@
+{
+  "note": "SEED bootstrap — PLANNED metro/light-rail stations (נת״ע) + urban-renewal points (פינוי-בינוי / תמ״א). [lat,lon]. Replace with the full export by running scripts/govdata/future_infra.mjs.",
+  "stations": [
+    [32.090, 34.800],
+    [32.083, 34.810],
+    [32.075, 34.790],
+    [32.100, 34.830],
+    [32.066, 34.780]
+  ],
+  "renewal": [
+    [32.060, 34.770],
+    [32.100, 34.835],
+    [32.088, 34.808]
+  ]
+}
