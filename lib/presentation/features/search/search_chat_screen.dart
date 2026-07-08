@@ -4,6 +4,7 @@ import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/core/search/budget_reality.dart';
 import 'package:dating_app/core/search/lifestyle_knowledge.dart';
 import 'package:dating_app/data/models/persona_profile.dart';
 import 'package:geolocator/geolocator.dart';
@@ -17,7 +18,9 @@ import 'package:dating_app/data/repositories/property_search_repository.dart';
 import 'package:dating_app/core/search/etti_plan.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/presentation/features/search/ati_voice_screen.dart';
+import 'package:dating_app/presentation/features/search/ati_live_voice_screen.dart';
 import 'package:dating_app/presentation/widgets/why_details.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -428,6 +431,27 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   Future<void> _openVoice() async {
     FocusScope.of(context).unfocus();
     _resetConversation(); // every voice conversation is brand new
+    // LIVE speech-to-speech (Gemini Live) when enabled — bypasses the trans-Atlantic
+    // STT→LLM→TTS chain. Falls back to the turn-based screen if it can't connect.
+    if (AppConfig.atiLiveVoice) {
+      await Navigator.of(context).push(MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => AtiLiveVoiceScreen(
+          onConnectFailed: _openTurnBasedVoice,
+          onSearch: (args) async {
+            final r = await _handleRealtimeSearch(args);
+            return (count: r.results.length, summary: r.summary);
+          },
+        ),
+      ));
+      _scrollToEnd();
+      return;
+    }
+    await _openTurnBasedVoice();
+    _scrollToEnd();
+  }
+
+  Future<void> _openTurnBasedVoice() async {
     await Navigator.of(context).push(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => AtiVoiceScreen(
@@ -439,13 +463,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         resultCount: 0,
       ),
     ));
-    _scrollToEnd();
   }
 
   // Runs a `search_listings` tool-call from the live voice agent: builds the query
   // from its args, runs the same cohort search as typed input, drops the cards
   // into the chat, and returns a short spoken summary + the results for אתי.
-  // ignore: unused_element  (ready for the realtime in-screen upgrade)
   Future<({List<ScoredProperty> results, String summary})> _handleRealtimeSearch(
       Map<String, dynamic> args) async {
     final provider = context.read<DatingProvider>();
@@ -993,6 +1015,18 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       // empty/contradictory bubble.
       if (replyMsg != null) _messages.add(replyMsg);
       if (shouldSearch) {
+        // Reality-check heads-up: when the ask is a fantasy for that city+budget,
+        // אתי says so honestly (with a raise-budget / nearby-city nudge) BEFORE the
+        // results — instead of a wall of low-fit mismatches.
+        final reality = BudgetRealityCheck.assess(_query);
+        if (reality.needsGuidance) {
+          final chips = <String>[
+            if (reality.expected != null) 'עד ${reality.expected} ₪',
+            if (reality.nearbyCity != null) 'אזור ${reality.nearbyCity}',
+          ];
+          _messages.add(_ChatMsg(
+              role: 'assistant', text: reality.message, chips: chips));
+        }
         if (results.isEmpty) {
           // Honest — nothing matched, not even within 10km with the same filters.
           // Offer concrete ways to relax (tapping a chip re-runs the search).
