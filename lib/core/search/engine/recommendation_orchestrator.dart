@@ -372,7 +372,13 @@ class Explainer {
       final uni = IsraelGeoIndex.nearestSchool(
           pfv.property.lat, pfv.property.lon,
           type: 'אוניברסיטה');
-      if (uni != null && uni.km <= 1.5) chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
+      if (uni != null && uni.km <= 1.5) {
+        chips.add('🎓 ${_dist(uni.km)} מ${uni.name}');
+      } else if (pfv.get('university_access', 0.0) > 0.5) {
+        // Campus proximity without a named institution in the index — still tell
+        // the student the intent was honoured.
+        chips.add('🎓 קרוב לקמפוס');
+      }
     }
     // Nightlife — only a nightlife / vibrant-area search.
     if (intents.contains(SearchIntent.nightlife)) {
