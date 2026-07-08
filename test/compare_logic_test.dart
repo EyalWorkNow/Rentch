@@ -3,29 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('bestValueIndex', () {
-    test('picks the cheapest ₪/m² when features/match tie', () {
-      final i = bestValueIndex(
-        ppm: [100, 50, 80],
-        featureFrac: [0, 0, 0],
-        match: [0, 0, 0],
-      );
-      expect(i, 1); // 50 ₪/m² is the best value
+    test('picks the listing furthest below its local market price', () {
+      // 0.05 = 5% under, 0.20 = 20% under, -0.10 = 10% over market.
+      expect(bestValueIndex([0.05, 0.20, -0.10]), 1);
     });
 
-    test('no winner unless ≥2 columns have a real ₪/m²', () {
-      expect(
-        bestValueIndex(ppm: [null, 50], featureFrac: [0, 0], match: [0, 0]),
-        -1, // only one column has data → arbitrary, so decline
-      );
+    test('a listing above market still wins if the others are worse', () {
+      expect(bestValueIndex([-0.30, -0.10, null]), 1); // -10% beats -30%
     });
 
-    test('features + match can outweigh a slightly worse ₪/m²', () {
-      final i = bestValueIndex(
-        ppm: [100, 98], // col1 barely cheaper (ppmScore ~0.02 vs 0)
-        featureFrac: [1.0, 0.0], // col0 has all premium features
-        match: [1.0, 0.0],
-      );
-      expect(i, 0);
+    test('no winner unless ≥2 columns are comparable', () {
+      expect(bestValueIndex([null, 0.20]), -1); // only one anchored → decline
+      expect(bestValueIndex([null, null]), -1);
     });
   });
 

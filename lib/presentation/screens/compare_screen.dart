@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/finance/price_realism.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
@@ -281,7 +282,7 @@ class _CompareTable extends StatelessWidget {
                 winner: properties[bestIdx],
                 pros: _pros(properties, bestIdx),
                 cons: _cons(properties, bestIdx),
-                ppmLabel: _perM2Label(properties[bestIdx]),
+                valueNote: _valueNote(properties[bestIdx]),
               ),
               const SizedBox(height: 12),
             ],
@@ -310,15 +311,17 @@ class _CompareTable extends StatelessWidget {
     );
   }
 
-  int _bestValueIndex(List<RentalProperty> props) => bestValueIndex(
-        ppm: props.map(_perM2).toList(),
-        featureFrac: [
-          for (final p in props)
-            _premiumFeatures.where((f) => p.featureFlags.isEnabled(f)).length /
-                _premiumFeatures.length
-        ],
-        match: [for (final p in props) (provider.displayMatchScore(p) ?? 0) / 100.0],
-      );
+  int _bestValueIndex(List<RentalProperty> props) =>
+      bestValueIndex([for (final p in props) _belowMarket(p)]);
+
+  /// How far this listing sits below its own local market price, as a fraction
+  /// (0.12 = 12% under). Null when there's no market prior or the price is a
+  /// sanity outlier (bait) — those can't be a genuine "best value".
+  static double? _belowMarket(RentalProperty p) {
+    final v = PriceRealism.check(p);
+    if (v.flag != PriceFlag.ok) return null;
+    return 1 - v.ratio;
+  }
 
   static const _premiumFeatures = ['elevator', 'parking', 'balcony', 'mamad'];
   static const _featureHe = {
@@ -328,6 +331,18 @@ class _CompareTable extends StatelessWidget {
     'mamad': 'ממ"ד',
   };
 
+  /// The honest headline: how the winner sits vs its own local market price.
+  static String _valueNote(RentalProperty w) {
+    final bm = _belowMarket(w);
+    final city = w.city.trim();
+    final where = city.isEmpty ? '' : ' ב$city';
+    if (bm == null) return 'התמורה הטובה בקבוצה'; // no market prior to anchor to
+    final pct = (bm * 100).round();
+    if (pct >= 2) return 'כ-$pct% מתחת למחיר השוק$where';
+    if (pct <= -2) return 'התמורה הטובה בקבוצה (השאר יקרות יותר יחסית לשוק)';
+    return 'סביב מחיר השוק$where — התמורה הטובה בקבוצה';
+  }
+
   List<String> _pros(List<RentalProperty> props, int idx) {
     final w = props[idx];
     final others = [
@@ -335,14 +350,6 @@ class _CompareTable extends StatelessWidget {
         if (i != idx) props[i]
     ];
     final out = <String>[];
-    final wPpm = _perM2(w);
-    if (wPpm != null &&
-        others.every((o) {
-          final op = _perM2(o);
-          return op == null || wPpm <= op;
-        })) {
-      out.add('התמורה הכי טובה למחיר — ${_perM2Label(w)} למ"ר');
-    }
     if (w.price > 0 && others.every((o) => o.price <= 0 || w.price <= o.price)) {
       out.add('הכי זולה — ${w.priceLabel}');
     }
@@ -411,13 +418,13 @@ class _ValueVerdict extends StatelessWidget {
     required this.winner,
     required this.pros,
     required this.cons,
-    required this.ppmLabel,
+    required this.valueNote,
   });
 
   final RentalProperty winner;
   final List<String> pros;
   final List<String> cons;
-  final String ppmLabel;
+  final String valueNote;
 
   String get _where {
     final w = winner.neighborhood.trim().isNotEmpty
@@ -468,7 +475,7 @@ class _ValueVerdict extends StatelessWidget {
                   color: Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w800)),
-          Text('תמורה למחיר: $ppmLabel למ"ר · ${winner.priceLabel}',
+          Text('$valueNote · ${winner.priceLabel}',
               style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
           const SizedBox(height: 12),
@@ -502,26 +509,20 @@ class _ValueVerdict extends StatelessWidget {
       );
 }
 
-/// Value-for-money pick: mostly ₪/m² (min is best), nudged by premium features
-/// and match. Returns -1 (no winner) unless at least 2 columns have a real ₪/m²
-/// — otherwise the "winner" is arbitrary, which is worse than showing none.
-int bestValueIndex({
-  required List<double?> ppm,
-  required List<double> featureFrac,
-  required List<double> match,
-}) {
-  if (ppm.length < 2) return -1;
-  final valid = ppm.whereType<double>().toList();
-  if (valid.length < 2) return -1;
-  final maxPpm = valid.reduce((a, b) => a > b ? a : b);
-  var best = 0;
-  var bestScore = -1.0;
-  for (var i = 0; i < ppm.length; i++) {
-    final p = ppm[i];
-    final ppmScore = (p == null || maxPpm == 0) ? 0.0 : (1 - p / maxPpm);
-    final s = ppmScore * 0.6 + featureFrac[i] * 0.25 + match[i] * 0.15;
-    if (s > bestScore) {
-      bestScore = s;
+/// Best value = the listing furthest below its own local market price (per the
+/// CBS ₪/m² prior). [belowMarket] is the fraction below market per column
+/// (0.15 = 15% under; negative = above market), or null when the column isn't
+/// comparable (no market prior, or a price-sanity outlier — a bait listing must
+/// not win on a fake discount). Returns -1 unless ≥2 columns are comparable, so
+/// the recommendation is real rather than an arbitrary in-group score.
+int bestValueIndex(List<double?> belowMarket) {
+  if (belowMarket.whereType<double>().length < 2) return -1;
+  var best = -1;
+  var bestVal = double.negativeInfinity;
+  for (var i = 0; i < belowMarket.length; i++) {
+    final v = belowMarket[i];
+    if (v != null && v > bestVal) {
+      bestVal = v;
       best = i;
     }
   }
