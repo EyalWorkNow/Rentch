@@ -31,6 +31,15 @@ class AppConfig {
     defaultValue: true,
   );
 
+  /// אתי's LIVE speech-to-speech voice over Gemini Live (real-time, sub-second,
+  /// bypasses the us-east-1 turn-based STT→LLM→TTS chain). OFF by default — the
+  /// turn-based flow stays the default until this is validated on a real device;
+  /// enable with --dart-define=ATI_LIVE_VOICE=true.
+  static const bool atiLiveVoice = bool.fromEnvironment(
+    'ATI_LIVE_VOICE',
+    defaultValue: false,
+  );
+
   // ── AWS API Gateway ──────────────────────────────────────────────────────────
   // Live deployed backend (us-east-1). Override per-build with
   //   --dart-define=AWS_API_URL=https://<id>.execute-api.<region>.amazonaws.com/prod
@@ -39,6 +48,15 @@ class AppConfig {
   static const String awsApiGatewayUrl = String.fromEnvironment(
     'AWS_API_URL',
     defaultValue: 'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod',
+  );
+
+  // PUBLIC (no-auth) base for shareable links: the router's Lambda Function URL
+  // serves ONLY the /p/:id share page (which opens the app or falls back to the
+  // store). The main API GW URL is behind the authorizer (401), so it can't be
+  // used for links people open without the app.
+  static const String publicShareBaseUrl = String.fromEnvironment(
+    'PUBLIC_SHARE_URL',
+    defaultValue: 'https://gzt3oo5plp5s4twk25o2xpuvgm0sigpy.lambda-url.us-east-1.on.aws',
   );
 
   // Live WebSocket endpoint for real-time chat (us-east-1). Firebase token is

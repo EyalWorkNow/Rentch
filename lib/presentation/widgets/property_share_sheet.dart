@@ -31,7 +31,7 @@ Future<void> showPropertyShareSheet(
 String _shareMessage(RentalProperty property) {
   // The Rently share link renders a rich banner (photo + price) in WhatsApp via
   // the backend OpenGraph page (GET /p/:id).
-  final shareLink = '${AppConfig.awsApiGatewayUrl}/p/${property.id}';
+  final shareLink = '${AppConfig.publicShareBaseUrl}/p/${property.id}';
   final details = <String>[
     'מצאתי נכס מעניין ב-Rently',
     property.address,
