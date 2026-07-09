@@ -10,6 +10,7 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/ask_rently_sheet.dart';
 import 'package:dating_app/presentation/widgets/price_badge.dart';
+import 'package:dating_app/presentation/widgets/nearby_places_card.dart';
 import 'package:dating_app/presentation/widgets/neighborhood_score_card.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/tenant_rights_sheet.dart';
@@ -397,6 +398,12 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
     // gap when something real precedes the next item.
     children.add(priceBadge);
     children.add(neighborhood);
+    // Named nearby schools / kindergartens / parks (≤2 km). Self-hides if none.
+    children.add(NearbyPlacesCard(
+      lat: widget.property.lat,
+      lon: widget.property.lon,
+      city: widget.property.city,
+    ));
     children.add(_AskRentlyEntry(
       property: widget.property,
       title: widget.title,
@@ -1143,6 +1150,22 @@ class _ParitySections extends StatelessWidget {
       ));
     }
 
+    // The scan is already viewable (via .ply) but the fast .ksplat is still being
+    // converted server-side — show a live timer so the owner sees it's happening.
+    // Disappears once the .ksplat is ready (fresh fetch) or the 3-min window ends.
+    final optimizingSince =
+        context.watch<DatingProvider>().scanOptimizingSince(property.id);
+    final ksplatReady = property.model3d?.ksplatUrl.trim().isNotEmpty ?? false;
+    if (optimizingSince != null && !ksplatReady) {
+      mediaCards.add(_Scan3dProcessingCard(
+        surface: _cardSurface,
+        onSurface: _onSurface,
+        muted: _muted,
+        since: optimizingSince,
+        optimizing: true,
+      ));
+    }
+
     if (mediaCards.isEmpty) {
       // No 360 and no 3D scan: keep the existing single entry (video /
       // processing / "request a scan" states) so the CTA is never dead.
@@ -1310,10 +1333,14 @@ String? _scan3dGlbUrl(RentalProperty property) {
   return glb.isEmpty ? null : glb;
 }
 
-/// Returns a Gaussian-splat url (`.ply`) for [property]'s 3D scan, or null.
+/// Returns a Gaussian-splat url for [property]'s 3D scan, or null. Prefers the
+/// compact, fast-loading `.ksplat` (produced async by rentch-splat-convert) and
+/// falls back to the raw `.ply` while conversion is still catching up.
 String? _scan3dSplatUrl(RentalProperty property) {
   final m = property.model3d;
   if (m == null) return null;
+  final ksplat = m.ksplatUrl.trim();
+  if (ksplat.isNotEmpty) return ksplat;
   final ply = m.plyUrl.trim();
   return ply.isEmpty ? null : ply;
 }
@@ -1402,23 +1429,70 @@ class _MediaTourCard extends StatelessWidget {
 /// "מעבד… נודיע כשמוכן" notice for a 3D scan still reconstructing in the
 /// background. Sets expectations (a few minutes, can leave) and reassures the
 /// owner the scan wasn't lost — it surfaces here as a viewer once ready.
-class _Scan3dProcessingCard extends StatelessWidget {
+class _Scan3dProcessingCard extends StatefulWidget {
   const _Scan3dProcessingCard({
     required this.surface,
     required this.onSurface,
     required this.muted,
+    this.since,
+    this.optimizing = false,
   });
 
   final Color surface;
   final Color onSurface;
   final Color muted;
 
+  /// When the current processing started — drives the live count-up timer. Null
+  /// falls back to a spinner-only card (the older cloud-reconstruction path).
+  final DateTime? since;
+
+  /// True = a fast-splat optimize of an already-viewable scan (different copy);
+  /// false = a full 3D reconstruction that isn't viewable yet.
+  final bool optimizing;
+
+  @override
+  State<_Scan3dProcessingCard> createState() => _Scan3dProcessingCardState();
+}
+
+class _Scan3dProcessingCardState extends State<_Scan3dProcessingCard> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.since != null) {
+      // Tick once a second so the mm:ss timer stays live.
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _elapsed() {
+    final s = DateTime.now().difference(widget.since!).inSeconds.clamp(0, 5999);
+    final m = s ~/ 60;
+    final sec = s % 60;
+    return '${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final title = widget.optimizing
+        ? 'מייעל את הסריקה לטעינה מהירה…'
+        : 'מעבד סריקת תלת-מימד…';
+    final subtitle = widget.optimizing
+        ? 'הסריקה כבר ניתנת לצפייה; מכינים גרסה חדה וקלה שנטענת מהר.'
+        : 'בונים את המודל — כמה דקות. אפשר לעזוב, נודיע כשמוכן.';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: surface,
+        color: widget.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
       ),
@@ -1445,26 +1519,45 @@ class _Scan3dProcessingCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'מעבד סריקת תלת-מימד…',
+                  title,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
-                    color: onSurface,
+                    color: widget.onSurface,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'בונים את המודל — כמה דקות. אפשר לעזוב, נודיע כשמוכן.',
+                  subtitle,
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: muted,
+                    color: widget.muted,
                     height: 1.35,
                   ),
                 ),
               ],
             ),
           ),
+          if (widget.since != null) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                _elapsed(),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

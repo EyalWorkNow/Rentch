@@ -134,11 +134,31 @@ class _GeoPlace {
 }
 
 class _School {
-  const _School(this.name, this.type, this.lat, this.lon);
+  const _School(this.name, this.type, this.lat, this.lon, [this.sector = '']);
   final String name;
-  final String type; // גן / יסודי / חטיבה / תיכון / מכללה / אוניברסיטה / בית ספר
+  final String type; // גן / יסודי / חטיבת ביניים / תיכון / מכללה / אוניברסיטה
+  final String sector; // ממלכתי / ממלכתי דתי / חרדי / '' (schools only)
   final double lat;
   final double lon;
+}
+
+/// A named nearby place (school / kindergarten / park) with its distance from the
+/// apartment — for the "nearby places" lists on the property detail screen.
+class NearbyPlace {
+  const NearbyPlace({
+    required this.name,
+    required this.km,
+    required this.lat,
+    required this.lon,
+    this.stage = '',
+    this.sector = '',
+  });
+  final String name;
+  final double km;
+  final double lat;
+  final double lon;
+  final String stage; // גן / יסודי / חטיבת ביניים / תיכון (schools) or ''
+  final String sector; // ממלכתי / ממלכתי דתי / חרדי (schools) or ''
 }
 
 class IsraelGeoIndex {
@@ -225,7 +245,8 @@ class IsraelGeoIndex {
         for (final s in list)
           if (s is Map)
             _School((s['n'] ?? '').toString(), (s['t'] ?? '').toString(),
-                (s['lat'] as num).toDouble(), (s['lon'] as num).toDouble()),
+                (s['lat'] as num).toDouble(), (s['lon'] as num).toDouble(),
+                (s['s'] ?? '').toString()),
       ];
     } catch (_) {
       _schools = const <_School>[];
@@ -255,6 +276,57 @@ class IsraelGeoIndex {
   /// Distance (km) to the nearest school of any type, or null.
   static double? nearestSchoolKm(double lat, double lon) =>
       nearestSchool(lat, lon)?.km;
+
+  // ── nearby LISTS (all places within a radius, sorted nearest-first) ─────────
+  // The property detail screen shows real lists (name + type + distance), not
+  // just the single nearest. Default radius 2 km; capped so the UI stays tidy.
+  static const Set<String> _schoolStages = {
+    'יסודי', 'חטיבת ביניים', 'תיכון', 'בית ספר', 'על יסודי', 'חטיבה',
+  };
+
+  static List<NearbyPlace> _schoolsWhere(
+      double lat, double lon, double km, int cap, bool Function(_School) keep) {
+    if (_schools.isEmpty || !_hasCoords(lat, lon)) return const [];
+    final out = <NearbyPlace>[];
+    final seen = <String>{};
+    for (final s in _schools) {
+      if (!keep(s)) continue;
+      final d = haversineKm(lat, lon, s.lat, s.lon);
+      if (d > km) continue;
+      if (!seen.add('${s.name}_${s.lat}_${s.lon}')) continue; // exact dup only
+      out.add(NearbyPlace(
+          name: s.name, km: d, lat: s.lat, lon: s.lon,
+          stage: s.type, sector: s.sector));
+    }
+    out.sort((a, b) => a.km.compareTo(b.km));
+    return out.length > cap ? out.sublist(0, cap) : out;
+  }
+
+  /// Kindergartens (גן) within [km] km, sorted nearest-first.
+  static List<NearbyPlace> kindergartensWithin(double lat, double lon,
+          {double km = 2, int cap = 12}) =>
+      _schoolsWhere(lat, lon, km, cap, (s) => s.type == 'גן');
+
+  /// Schools (יסודי / חטיבת ביניים / תיכון …) within [km] km, sorted nearest-first.
+  static List<NearbyPlace> schoolsWithin(double lat, double lon,
+          {double km = 2, int cap = 12}) =>
+      _schoolsWhere(lat, lon, km, cap, (s) => _schoolStages.contains(s.type));
+
+  /// Public parks/gardens within [km] km, sorted nearest-first.
+  static List<NearbyPlace> parksWithin(double lat, double lon,
+      {double km = 2, int cap = 12}) {
+    if (_parks.isEmpty || !_hasCoords(lat, lon)) return const [];
+    final out = <NearbyPlace>[];
+    final seen = <String>{};
+    for (final p in _parks) {
+      final d = haversineKm(lat, lon, p.lat, p.lon);
+      if (d > km) continue;
+      if (p.name.isEmpty || !seen.add('${p.name}_${p.lat}_${p.lon}')) continue;
+      out.add(NearbyPlace(name: p.name, km: d, lat: p.lat, lon: p.lon));
+    }
+    out.sort((a, b) => a.km.compareTo(b.km));
+    return out.length > cap ? out.sublist(0, cap) : out;
+  }
 
   // Nightlife venues (OSM bars/pubs/clubs weighted 1.0, cafés 0.4). A LIVELY area
   // isn't the nearest bar — it's the DENSITY of them around you.
