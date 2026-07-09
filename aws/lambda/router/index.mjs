@@ -2865,25 +2865,45 @@ async function runAiGenerate(jobId) {
   try {
     const inputKeys = Array.isArray(meta.inputKeys) ? meta.inputKeys : [];
     if (inputKeys.length === 0) throw new Error('no input images');
-    const form = new FormData();
-    form.append('model', 'gpt-image-2');
-    form.append('size', '1536x1024');
-    form.append('quality', 'high'); // best gpt-image-2 fidelity
-    form.append('prompt', AI_PANO_PROMPT);
+    // Download the input image(s) once.
+    const imgs = [];
     for (const key of inputKeys) {
       const obj = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
-      const bytes = await streamToBuffer(obj.Body);
-      form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
+      imgs.push(await streamToBuffer(obj.Body));
     }
-    const r = await fetch('https://api.openai.com/v1/images/edits', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-      body: form,
-    });
-    const j = await r.json();
-    const b64 = j?.data?.[0]?.b64_json;
-    if (!b64) throw new Error('gpt-image-2 returned no image: ' + JSON.stringify(j).slice(0, 200));
-    const out = Buffer.from(b64, 'base64');
+    // Try quality:high first; if OpenAI returns a 5xx / non-JSON gateway blip
+    // (the slow high-quality call can hit an 'upstream connect error'), retry
+    // once at default quality (faster + more reliable) so the job still succeeds.
+    let out = null, lastErr = 'unknown';
+    for (const quality of ['high', '']) {
+      try {
+        const form = new FormData();
+        form.append('model', 'gpt-image-2');
+        form.append('size', '1536x1024');
+        if (quality) form.append('quality', quality);
+        form.append('prompt', AI_PANO_PROMPT);
+        for (const bytes of imgs) {
+          form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
+        }
+        const r = await fetch('https://api.openai.com/v1/images/edits', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+          body: form,
+        });
+        const text = await r.text();
+        if (!r.ok) { lastErr = `HTTP ${r.status}: ${text.slice(0, 140)}`; continue; }
+        let j;
+        try { j = JSON.parse(text); }
+        catch { lastErr = 'non-JSON: ' + text.slice(0, 140); continue; }
+        const b64 = j?.data?.[0]?.b64_json;
+        if (!b64) { lastErr = 'no image: ' + text.slice(0, 140); continue; }
+        out = Buffer.from(b64, 'base64');
+        break;
+      } catch (e) {
+        lastErr = String(e && e.message ? e.message : e);
+      }
+    }
+    if (!out) throw new Error('gpt-image-2 failed: ' + lastErr);
     await s3.send(new PutObjectCommand({
       Bucket: S3_BUCKET, Key: meta.resultKey, Body: out,
       ContentType: 'image/png', CacheControl: 'public, max-age=31536000',
