@@ -87,6 +87,11 @@ dependencies:
   # w_likes, w_updated. The native widgets (built by other agents, iOS App Group
   # group.com.eyalatiyawork.rentch) render these keys.
   home_widget: ^0.7.0
+  # Deep links: open a shared apartment straight in the app (rently://property/:id
+  # + universal/app links later). share_plus = native OS share sheet (opens
+  # WhatsApp directly instead of the wa.me web page).
+  app_links: ^6.3.2
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:

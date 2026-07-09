@@ -24,6 +24,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:dating_app/core/services/deep_link_service.dart';
+
+/// Global navigator key so deep links can push the apartment page from outside
+/// the widget tree.
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+// Held so its link-stream subscription stays alive for the app's lifetime.
+DeepLinkService? _deepLinks;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +96,10 @@ void main() async {
     ),
   );
   runApp(const RentlyApp());
+
+  // Deep links: rently://property/<id> → open the apartment in-app. Fail-soft.
+  _deepLinks = DeepLinkService(appNavigatorKey);
+  unawaited(_deepLinks!.init());
 }
 
 class RentlyApp extends StatelessWidget {
@@ -119,6 +130,7 @@ class RentlyApp extends StatelessWidget {
           final palette = BrandPalette.forRole(themeRole);
           return MaterialApp(
             title: 'Rently',
+            navigatorKey: appNavigatorKey,
             debugShowCheckedModeBanner: false,
             theme: _buildTheme(palette),
             builder: (context, child) {

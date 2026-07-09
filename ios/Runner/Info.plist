@@ -32,6 +32,20 @@
 				<string>com.googleusercontent.apps.116035400248-8vr9h6b5nq73k8fihunjbes1kuufkr8p</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.eyalatiyawork.rentch.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>rently</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>

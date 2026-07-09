@@ -911,10 +911,30 @@ async function propertyOgPage(id, ua = '') {
   // unguessable 8-char ids (≈2.8e12 space → no enumeration), the endpoint leaks
   // nothing beyond the single card the sharer chose to send.
   if (ua && !_OG_CRAWLERS.test(ua)) {
+    // A real person opened the link → try to open the APP at this apartment
+    // (rently://property/:id). If the app isn't installed the scheme does nothing,
+    // so after a short delay we fall back to the App Store. A manual button too,
+    // for browsers that block the auto-launch.
+    const jid = JSON.stringify(String(id));
+    const store = JSON.stringify(APP_STORE_URL);
+    const page = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>פתיחת הדירה ב-Rently…</title>
+<style>body{font-family:-apple-system,system-ui,Arial,sans-serif;margin:0;background:#0f1220;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
+.b{max-width:420px;padding:24px}a.btn{display:inline-block;background:#14D3DC;color:#04222b;font-weight:800;text-decoration:none;padding:14px 30px;border-radius:999px;margin-top:14px}</style>
+</head><body><div class="b"><h1>פותחים את הדירה באפליקציה…</h1>
+<p style="color:#c9cfe0">אם לא נפתח אוטומטית:</p>
+<a class="btn" href="rently://property/${_esc(id)}" onclick="return go(event)">פתח ב-Rently</a>
+<script>
+var ID=${jid},STORE=${store};
+function go(e){if(e)e.preventDefault();var t=Date.now();window.location='rently://property/'+ID;
+setTimeout(function(){if(Date.now()-t<1500)window.location=STORE;},1200);return false;}
+go();
+</script></div></body></html>`;
     return {
-      statusCode: 302,
-      headers: { Location: APP_STORE_URL, 'Cache-Control': 'no-store' },
-      body: '',
+      statusCode: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+      body: page,
     };
   }
 

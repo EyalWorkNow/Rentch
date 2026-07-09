@@ -46,10 +46,17 @@ String _shareMessage(RentalProperty property) {
 Future<void> _shareViaUri(
   BuildContext context,
   Uri uri,
-  String errorMessage,
-) async {
+  String errorMessage, {
+  Uri? fallback,
+}) async {
   if (await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+    return;
+  }
+  // Primary scheme unavailable (e.g. WhatsApp app not installed) → try the web
+  // fallback before giving up.
+  if (fallback != null && await canLaunchUrl(fallback)) {
+    await launchUrl(fallback, mode: LaunchMode.externalApplication);
     return;
   }
   if (!context.mounted) return;
@@ -152,12 +159,18 @@ class _PropertyShareSheet extends StatelessWidget {
                             subtitle: 'שליחה ישירה',
                             onTap: () async {
                               Navigator.of(context).pop();
+                              // whatsapp:// opens the WhatsApp APP directly (no
+                              // wa.me web-page bounce); falls back to wa.me only
+                              // if the app isn't installed.
+                              final wa = Uri.parse(
+                                  'whatsapp://send?text=${Uri.encodeComponent(message)}');
+                              final web = Uri.parse(
+                                  'https://wa.me/?text=${Uri.encodeComponent(message)}');
                               await _shareViaUri(
                                 context,
-                                Uri.parse(
-                                  'https://wa.me/?text=${Uri.encodeComponent(message)}',
-                                ),
+                                wa,
                                 'לא ניתן לפתוח את WhatsApp כרגע',
+                                fallback: web,
                               );
                             },
                           ),
