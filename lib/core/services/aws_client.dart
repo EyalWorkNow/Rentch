@@ -263,6 +263,30 @@ class AwsApiClient {
   Future<void> startPanoramaStitch(String jobId) =>
       post('/panorama/$jobId/stitch', const {});
 
+  /// AI generate: allocate 1–2 image slots; gpt-image-2 will merge the uploaded
+  /// panorama(s) into one equirectangular 360. Reuses [uploadToPresignedUrl] +
+  /// [startAiPanoramaGenerate] + [getPanorama].
+  Future<({String jobId, List<String> uploadUrls})?> createAiPanoramaJob({
+    required String propertyId,
+    required int imageCount,
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/panorama', {
+      'propertyId': propertyId,
+      'captureMode': 'ai',
+      'imageCount': imageCount,
+    });
+    final data = res['data'] as Map<String, dynamic>?;
+    final jobId = data?['jobId'] as String?;
+    final urls = (data?['uploadUrls'] as List?)?.cast<String>();
+    if (jobId == null || urls == null || urls.length < imageCount) return null;
+    return (jobId: jobId, uploadUrls: urls);
+  }
+
+  /// Kick off the (async) gpt-image-2 generation once the image(s) are uploaded.
+  Future<void> startAiPanoramaGenerate(String jobId) =>
+      post('/panorama/$jobId/ai-generate', const {});
+
   /// Poll job status. status ∈ pending|processing|ready|failed.
   Future<({String status, String imageUrl, double haov, double vaov, String error})?>
       getPanorama(String jobId) async {

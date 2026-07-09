@@ -124,6 +124,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         await _composeFromPanoramas();
       case _CaptureChoice.gallery:
         await _importFromGallery();
+      case _CaptureChoice.ai:
+        await _generateWithAi();
     }
   }
 
@@ -227,6 +229,112 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         contentType: 'image/jpeg',
         haov: fov.haov,
         vaov: fov.vaov);
+  }
+
+  // AI 360: the landlord picks 1–2 room photos/panoramas; the server runs
+  // gpt-image-2 to merge them into ONE seamless equirectangular 360. Takes ~1 min
+  // (async on the server), so we show a clear progress dialog and poll. The node
+  // is labelled with ✨ so it reads honestly as AI-generated.
+  Future<void> _generateWithAi() async {
+    final picks = await _picker.pickMultiImage(imageQuality: 92);
+    if (picks.isEmpty || !mounted) return;
+    final imgs = picks.take(2).toList(); // gpt-image-2 path takes 1–2 images
+    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    if (label == null || !mounted) return;
+
+    final msg = ValueNotifier<String>('מכינים…');
+    _showAiProgress(msg);
+    var dialogOpen = true;
+    void close() {
+      if (dialogOpen && mounted) {
+        dialogOpen = false;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
+    try {
+      final job = await AwsApiClient.instance.createAiPanoramaJob(
+        propertyId: 'draft_${DateTime.now().millisecondsSinceEpoch}',
+        imageCount: imgs.length,
+      );
+      if (job == null) {
+        close();
+        _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
+        return;
+      }
+      msg.value = 'מעלים תמונות…';
+      for (var i = 0; i < imgs.length; i++) {
+        final ok = await AwsApiClient.instance
+            .uploadToPresignedUrl(job.uploadUrls[i], imgs[i].path);
+        if (!ok) {
+          close();
+          _toast('ההעלאה נכשלה. בדקו את החיבור ונסו שוב.');
+          return;
+        }
+      }
+      msg.value = 'ה-AI יוצר את ה-360°… (עד דקה)';
+      await AwsApiClient.instance.startAiPanoramaGenerate(job.jobId);
+
+      // Poll up to ~2.5 min (gpt-image-2 takes ~50s + upload/queue).
+      for (var i = 0; i < 75; i++) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+        final st = await AwsApiClient.instance.getPanorama(job.jobId);
+        if (st == null) continue;
+        if (st.status == 'ready' && st.imageUrl.isNotEmpty) {
+          close();
+          await _addNode(
+              url: st.imageUrl, label: '$label ✨', haov: st.haov, vaov: st.vaov);
+          return;
+        }
+        if (st.status == 'failed') {
+          close();
+          _toast('היצירה נכשלה. נסו תמונה אחרת, ברורה ורחבה.');
+          return;
+        }
+      }
+      close();
+      _toast('העיבוד לוקח יותר מדי זמן. נסו שוב מאוחר יותר.');
+    } catch (e) {
+      close();
+      _toast('משהו השתבש. בדקו את החיבור ונסו שוב.');
+    }
+  }
+
+  void _showAiProgress(ValueNotifier<String> msg) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('✨', style: TextStyle(fontSize: 40)),
+              const SizedBox(height: 12),
+              const Text('יוצרים 360° עם AI',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+              const SizedBox(height: 16),
+              CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
+              ValueListenableBuilder<String>(
+                valueListenable: msg,
+                builder: (_, m, __) => Text(m,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 15, height: 1.4)),
+              ),
+              const SizedBox(height: 6),
+              const Text('אל תסגרו את המסך',
+                  style: TextStyle(color: AppColors.textDisabled, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // Ask whether to add real floor+ceiling, then run the guided pole capture.
@@ -755,7 +863,7 @@ class _NodeTile extends StatelessWidget {
 /// [photo] = guided 10-photo 360° capture (PRIMARY default), [sweep] = the
 /// frame-by-frame guided sweep (advanced), [arranged] = compose from native
 /// panos, [gallery] = import a native pano.
-enum _CaptureChoice { photo, sweep, arranged, gallery }
+enum _CaptureChoice { photo, sweep, arranged, gallery, ai }
 
 /// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
 /// older, non-technical user: the in-app guided sweep now lands one full 360°
@@ -869,6 +977,25 @@ class _PanoramaGuideScreen extends StatelessWidget {
                   label: const Text('העלה פנורמה מהגלריה',
                       style:
                           TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                ),
+              ),
+            ),
+            // AI path: turn 1–2 ordinary room photos into a 360 with gpt-image-2.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary, width: 1.4),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(_CaptureChoice.ai),
+                  icon: const Text('✨', style: TextStyle(fontSize: 18)),
+                  label: const Text('צור 360° עם AI (מ-1–2 תמונות)',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 ),
               ),
             ),
