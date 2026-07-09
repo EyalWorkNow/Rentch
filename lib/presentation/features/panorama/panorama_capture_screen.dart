@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:dating_app/core/constants/app_colors.dart';
@@ -40,23 +41,33 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
 
   // Sequentially link points: each gets a forward arrow to the next and a back
   // arrow to the previous. (Hotspots are placed ahead/behind by default.)
+  // Walk-between-rooms tour (Street-View style): every point links to every other
+  // point, and each arrow points toward that room's REAL position on the floor
+  // map (bearing from this point to the target), so navigation follows the layout
+  // you placed — not a fixed forward/back chain.
   PropertyPanoramaTour _buildTour() {
     final linked = <PanoramaNode>[];
     for (var i = 0; i < _nodes.length; i++) {
+      final from = _nodes[i];
       final hotspots = <PanoramaHotspot>[];
-      if (i + 1 < _nodes.length) {
+      for (var j = 0; j < _nodes.length; j++) {
+        if (j == i) continue;
+        final to = _nodes[j];
+        // Map coords: x = left→right, y = top→bottom. Treat "up" (−y) as forward;
+        // bearing 0°=forward, clockwise. Approximate (the pano's absolute north
+        // isn't calibrated to the map) but gives consistent directional arrows.
+        final dx = (to.x ?? 0.5) - (from.x ?? 0.5);
+        final dy = (to.y ?? 0.5) - (from.y ?? 0.5);
+        final bearing = (dx == 0 && dy == 0)
+            ? 0.0
+            : (math.atan2(dx, -dy) * 180 / math.pi + 360) % 360;
         hotspots.add(PanoramaHotspot(
-            targetNodeId: _nodes[i + 1].id,
-            longitude: 0,
-            label: _nodes[i + 1].label));
+          targetNodeId: to.id,
+          longitude: bearing,
+          label: to.label,
+        ));
       }
-      if (i - 1 >= 0) {
-        hotspots.add(PanoramaHotspot(
-            targetNodeId: _nodes[i - 1].id,
-            longitude: 180,
-            label: 'חזרה'));
-      }
-      linked.add(_nodes[i].copyWith(hotspots: hotspots));
+      linked.add(from.copyWith(hotspots: hotspots));
     }
     return PropertyPanoramaTour(nodes: linked);
   }
@@ -272,11 +283,11 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
           return;
         }
       }
-      msg.value = 'ה-AI יוצר את ה-360°… (עד דקה)';
+      msg.value = 'ה-AI יוצר את ה-360° באיכות גבוהה… (1–3 דקות)';
       await AwsApiClient.instance.startAiPanoramaGenerate(job.jobId);
 
-      // Poll up to ~2.5 min (gpt-image-2 takes ~50s + upload/queue).
-      for (var i = 0; i < 75; i++) {
+      // Poll up to ~5 min (gpt-image-2 quality:high takes ~2.5min + upload/queue).
+      for (var i = 0; i < 150; i++) {
         await Future<void>.delayed(const Duration(seconds: 2));
         if (!mounted) return;
         final st = await AwsApiClient.instance.getPanorama(job.jobId);

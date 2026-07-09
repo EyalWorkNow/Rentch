@@ -2808,6 +2808,29 @@ function validatePoses(raw, frameCount) {
   return out;
 }
 
+// Hardened super-prompt for gpt-image-2: a viewer-ready, seamless, faithful 360.
+const AI_PANO_PROMPT = [
+  'You are given one or more photos of a SINGLE real room.',
+  'Produce ONE photorealistic 360°×180° EQUIRECTANGULAR panorama of THIS room,',
+  'made to be viewed in a spherical/VR 360 viewer where the user rotates a full',
+  'circle and looks up and down.',
+  '',
+  'HARD REQUIREMENTS (all mandatory):',
+  '1) TRUE equirectangular (2:1) projection: the horizon is a straight horizontal',
+  '   line across the vertical middle; the CEILING fills the top edge and the FLOOR',
+  '   fills the bottom edge; walls curve naturally toward the top/bottom poles.',
+  '2) SEAMLESS horizontal wrap: the far LEFT and far RIGHT edges must match EXACTLY,',
+  '   pixel-continuous, so there is NO visible seam when the view wraps 360°.',
+  '3) FULL coverage — absolutely no black bars, empty/blank areas, missing ceiling',
+  '   or floor, and no duplicated or repeated furniture around the circle.',
+  '4) FAITHFUL to the photos: keep the SAME room — the real furniture, wall colors,',
+  '   flooring, windows, doors, fixtures and overall layout. Do NOT invent a',
+  '   different room, do NOT add extra rooms or fantasy elements.',
+  '5) Very HIGH quality: sharp focus, clean straight vertical lines near the center,',
+  '   realistic real-estate interior lighting, natural white balance.',
+  'Do NOT include any text, watermark, logo, people, or a circular fisheye frame.',
+].join('\n');
+
 // POST /panorama/:id/ai-generate → kick off the gpt-image-2 generation. Because
 // it takes ~50s (over the API-Gateway limit) we self-invoke this function as an
 // async Event (see the `op:'aiGenerate'` hook at the top of the handler) and the
@@ -2845,12 +2868,8 @@ async function runAiGenerate(jobId) {
     const form = new FormData();
     form.append('model', 'gpt-image-2');
     form.append('size', '1536x1024');
-    form.append('prompt',
-      'Merge the provided photo(s) of this room into ONE seamless equirectangular ' +
-      '360° panorama (2:1 spherical projection): ceiling at the top, floor at the ' +
-      'bottom, walls wrapping continuously so the left and right edges match exactly. ' +
-      'Keep the room\'s real furniture, colours, windows and layout faithful to the ' +
-      'photos. Photorealistic, natural lighting, no text or watermarks.');
+    form.append('quality', 'high'); // best gpt-image-2 fidelity
+    form.append('prompt', AI_PANO_PROMPT);
     for (const key of inputKeys) {
       const obj = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
       const bytes = await streamToBuffer(obj.Body);
