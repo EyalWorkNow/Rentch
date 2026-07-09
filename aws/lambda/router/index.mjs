@@ -1027,7 +1027,10 @@ export const handler = async (event) => {
     // GET /p/:id → HTML with og:image/title/description. No auth (the WhatsApp
     // crawler is anonymous).
     if (segments[0] === 'p' && segments[1] && method === 'GET') {
-      return await propertyOgPage(decodeURIComponent(segments[1]));
+      // Pass the UA so a real person gets the app-open interstitial (crawlers get
+      // the OG card). API-GW header keys can be any case.
+      const ua = event.headers?.['user-agent'] || event.headers?.['User-Agent'] || '';
+      return await propertyOgPage(decodeURIComponent(segments[1]), ua);
     }
 
     // ── Storage routes ──────────────────────────────────────────────────────

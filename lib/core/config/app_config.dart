@@ -50,13 +50,13 @@ class AppConfig {
     defaultValue: 'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod',
   );
 
-  // PUBLIC (no-auth) base for shareable links: the router's Lambda Function URL
-  // serves ONLY the /p/:id share page (which opens the app or falls back to the
-  // store). The main API GW URL is behind the authorizer (401), so it can't be
-  // used for links people open without the app.
+  // PUBLIC (no-auth) base for shareable links. The API-GW /p/{id} route is public
+  // (its own resource, no authorizer) and serves the share page — which opens the
+  // app at the apartment (rently://) or falls back to the store. (Public Lambda
+  // Function URLs are blocked by an org guardrail, so we use the API-GW path.)
   static const String publicShareBaseUrl = String.fromEnvironment(
     'PUBLIC_SHARE_URL',
-    defaultValue: 'https://gzt3oo5plp5s4twk25o2xpuvgm0sigpy.lambda-url.us-east-1.on.aws',
+    defaultValue: 'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod',
   );
 
   // Live WebSocket endpoint for real-time chat (us-east-1). Firebase token is
