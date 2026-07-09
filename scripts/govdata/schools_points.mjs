@@ -115,10 +115,11 @@ function sectorOf(pikuach) {
 // grade the school teaches up to, so a 7–12 six-year school reads as תיכון
 // (not חטיבת ביניים) — the level that actually matters to a parent.
 function stageOf(fromG, toG, sugMosad) {
+  // A kindergarten ONLY when the institution type says so — do NOT infer גן from
+  // a 0..0 grade range, or colleges / admin centres (no K-12 grades) leak in.
   if (clean(sugMosad).includes('גן')) return 'גן';
   const f = Number(fromG), t = Number(toG);
-  if (f === 0 && (t === 0 || !isFinite(t))) return 'גן';
-  if (!isFinite(t) || t <= 0) return '';
+  if (!isFinite(t) || t <= 0) return ''; // no real school grades → drop (college/…)
   if (t <= 6) return 'יסודי';               // ends by grade 6
   if (isFinite(f) && f >= 7) {              // starts middle/high
     return t >= 10 ? 'תיכון' : 'חטיבת ביניים'; // 7-9 middle, 7-12/9-12 high

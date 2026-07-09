@@ -10,6 +10,7 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/ask_rently_sheet.dart';
 import 'package:dating_app/presentation/widgets/price_badge.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/presentation/widgets/nearby_places_card.dart';
 import 'package:dating_app/presentation/widgets/neighborhood_score_card.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
@@ -398,11 +399,17 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
     // gap when something real precedes the next item.
     children.add(priceBadge);
     children.add(neighborhood);
-    // Named nearby schools / kindergartens / parks (≤2 km). Self-hides if none.
+    // Nearby places (schools / kindergartens / clinics / supermarkets / parks),
+    // PERSONALISED to the seeker's persona (their profile bio + important details)
+    // → only relevant sections show. Self-hides when nothing is relevant.
+    final tp = context.read<DatingProvider>().tenantProfile;
+    final personaText =
+        '${tp?.bio ?? ''} ${(tp?.importantDetails ?? const <String>[]).join(' ')}';
     children.add(NearbyPlacesCard(
       lat: widget.property.lat,
       lon: widget.property.lon,
       city: widget.property.city,
+      profile: NearbyProfile.fromText(personaText),
     ));
     children.add(_AskRentlyEntry(
       property: widget.property,

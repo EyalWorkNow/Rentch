@@ -142,6 +142,14 @@ class _School {
   final double lon;
 }
 
+class _Clinic {
+  const _Clinic(this.name, this.hmo, this.lat, this.lon);
+  final String name;
+  final String hmo; // כללית / מכבי / לאומית / מאוחדת / '' (general clinic)
+  final double lat;
+  final double lon;
+}
+
 /// A named nearby place (school / kindergarten / park) with its distance from the
 /// apartment — for the "nearby places" lists on the property detail screen.
 class NearbyPlace {
@@ -150,6 +158,7 @@ class NearbyPlace {
     required this.km,
     required this.lat,
     required this.lon,
+    this.kind = '',
     this.stage = '',
     this.sector = '',
   });
@@ -157,8 +166,9 @@ class NearbyPlace {
   final double km;
   final double lat;
   final double lon;
-  final String stage; // גן / יסודי / חטיבת ביניים / תיכון (schools) or ''
-  final String sector; // ממלכתי / ממלכתי דתי / חרדי (schools) or ''
+  final String kind; // school | kindergarten | clinic | supermarket | park
+  final String stage; // schools: גן/יסודי/חטיבת ביניים/תיכון · clinics: קופת חולים/מרפאה
+  final String sector; // schools: ממלכתי/דתי/חרדי · clinics: HMO (כללית/מכבי/…)
 }
 
 class IsraelGeoIndex {
@@ -296,6 +306,7 @@ class IsraelGeoIndex {
       if (!seen.add('${s.name}_${s.lat}_${s.lon}')) continue; // exact dup only
       out.add(NearbyPlace(
           name: s.name, km: d, lat: s.lat, lon: s.lon,
+          kind: s.type == 'גן' ? 'kindergarten' : 'school',
           stage: s.type, sector: s.sector));
     }
     out.sort((a, b) => a.km.compareTo(b.km));
@@ -322,7 +333,86 @@ class IsraelGeoIndex {
       final d = haversineKm(lat, lon, p.lat, p.lon);
       if (d > km) continue;
       if (p.name.isEmpty || !seen.add('${p.name}_${p.lat}_${p.lon}')) continue;
-      out.add(NearbyPlace(name: p.name, km: d, lat: p.lat, lon: p.lon));
+      out.add(NearbyPlace(name: p.name, km: d, lat: p.lat, lon: p.lon, kind: 'park'));
+    }
+    out.sort((a, b) => a.km.compareTo(b.km));
+    return out.length > cap ? out.sublist(0, cap) : out;
+  }
+
+  // ── health clinics / קופות חולים (tagged with HMO) ──────────────────────────
+  static List<_Clinic> _clinics = const <_Clinic>[];
+  static bool _clinicsLoaded = false;
+
+  static Future<void> loadClinics() async {
+    if (_clinicsLoaded) return;
+    _clinicsLoaded = true;
+    try {
+      final raw =
+          await rootBundle.loadString('assets/data/govdata/clinics.json');
+      _clinics = [
+        for (final c in (jsonDecode(raw) as List))
+          if (c is Map)
+            _Clinic((c['n'] ?? '').toString(), (c['h'] ?? '').toString(),
+                (c['lat'] as num).toDouble(), (c['lon'] as num).toDouble()),
+      ];
+    } catch (_) {
+      _clinics = const <_Clinic>[];
+    }
+  }
+
+  /// Health clinics within [km] km (default 5 — clinics matter a bit farther),
+  /// optionally restricted to one [hmo] (כללית / מכבי / לאומית / מאוחדת).
+  static List<NearbyPlace> clinicsWithin(double lat, double lon,
+      {double km = 5, String? hmo, int cap = 12}) {
+    if (_clinics.isEmpty || !_hasCoords(lat, lon)) return const [];
+    final out = <NearbyPlace>[];
+    final seen = <String>{};
+    for (final c in _clinics) {
+      if (hmo != null && hmo.isNotEmpty && c.hmo != hmo) continue;
+      final d = haversineKm(lat, lon, c.lat, c.lon);
+      if (d > km) continue;
+      if (!seen.add('${c.name}_${c.lat}_${c.lon}')) continue;
+      out.add(NearbyPlace(
+          name: c.name, km: d, lat: c.lat, lon: c.lon, kind: 'clinic',
+          stage: c.hmo.isEmpty ? 'מרפאה' : 'קופת חולים', sector: c.hmo));
+    }
+    out.sort((a, b) => a.km.compareTo(b.km));
+    return out.length > cap ? out.sublist(0, cap) : out;
+  }
+
+  // ── supermarkets ────────────────────────────────────────────────────────────
+  static List<_GeoPlace> _supermarkets = const <_GeoPlace>[];
+  static bool _supermarketsLoaded = false;
+
+  static Future<void> loadSupermarkets() async {
+    if (_supermarketsLoaded) return;
+    _supermarketsLoaded = true;
+    try {
+      final raw =
+          await rootBundle.loadString('assets/data/govdata/supermarkets.json');
+      _supermarkets = [
+        for (final s in (jsonDecode(raw) as List))
+          if (s is Map)
+            _GeoPlace((s['n'] ?? '').toString(), (s['lat'] as num).toDouble(),
+                (s['lon'] as num).toDouble()),
+      ];
+    } catch (_) {
+      _supermarkets = const <_GeoPlace>[];
+    }
+  }
+
+  /// Supermarkets within [km] km, sorted nearest-first.
+  static List<NearbyPlace> supermarketsWithin(double lat, double lon,
+      {double km = 2, int cap = 12}) {
+    if (_supermarkets.isEmpty || !_hasCoords(lat, lon)) return const [];
+    final out = <NearbyPlace>[];
+    final seen = <String>{};
+    for (final s in _supermarkets) {
+      final d = haversineKm(lat, lon, s.lat, s.lon);
+      if (d > km) continue;
+      if (s.name.isEmpty || !seen.add('${s.name}_${s.lat}_${s.lon}')) continue;
+      out.add(NearbyPlace(
+          name: s.name, km: d, lat: s.lat, lon: s.lon, kind: 'supermarket'));
     }
     out.sort((a, b) => a.km.compareTo(b.km));
     return out.length > cap ? out.sublist(0, cap) : out;
