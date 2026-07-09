@@ -361,6 +361,26 @@ class Explainer {
         chips.add('🌳 ${_dist(parkKm)} מ${_parkLabel(name)}');
       }
     }
+    // Health — nearest clinic (named with its HMO), for a health-focused seeker.
+    if (intents.contains(SearchIntent.health)) {
+      final cl = IsraelGeoIndex.clinicsWithin(p.lat, p.lon, km: 5, cap: 1);
+      if (cl.isNotEmpty) {
+        final c0 = cl.first;
+        chips.add(
+            '🏥 ${_dist(c0.km)} מ${c0.sector.isEmpty ? 'מרפאה' : 'קופ״ח ${c0.sector}'}');
+      }
+    }
+    // Kindergarten — for a young-children search (a real גן nearby).
+    if (intents.contains(SearchIntent.youngChildren)) {
+      final kg = IsraelGeoIndex.kindergartensWithin(p.lat, p.lon, km: 2, cap: 1);
+      if (kg.isNotEmpty) chips.add('🧸 ${_dist(kg.first.km)} מגן ילדים');
+    }
+    // Errands — nearest supermarket, for a convenience/groceries-focused seeker.
+    if (intents.contains(SearchIntent.convenience)) {
+      final su = IsraelGeoIndex.supermarketsWithin(p.lat, p.lon, km: 2, cap: 1);
+      if (su.isNotEmpty) chips.add('🛒 ${_dist(su.first.km)} מ${su.first.name}');
+    }
+
     // Sea — only a beach-seeker.
     if (intents.contains(SearchIntent.nearSea)) {
       final seaKm = IsraelGeoIndex.coastKm(pfv.property.lat, pfv.property.lon);

@@ -48,8 +48,9 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       IsraelGeoIndex.loadSupermarkets(),
     ]);
     if (!mounted) return;
+    // Show ALL nearby kinds with data (full reference), persona-relevant first.
     final out = <(NearbySection, List<NearbyPlace>)>[];
-    for (final s in relevantNearbySections(widget.profile)) {
+    for (final s in orderedNearbySections(widget.profile)) {
       final places = _dataFor(s);
       if (places.isNotEmpty) out.add((s, places));
     }

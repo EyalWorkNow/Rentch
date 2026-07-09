@@ -117,6 +117,17 @@ void main() {
     }
   });
 
+  test('orderedNearbySections shows ALL 5 kinds (detail screen), relevant first', () {
+    // Even a no-signal profile → all kinds present (full reference on detail).
+    final all = orderedNearbySections(NearbyProfile.fromText('3 חדרים'));
+    expect(all.map((s) => s.kind).toSet(), NearbyKind.values.toSet());
+    // A family+health persona → its relevant kinds lead the list.
+    final fam = orderedNearbySections(
+        NearbyProfile.fromText('משפחה עם ילדים, קרוב לכללית'));
+    expect(fam.first.priority, greaterThan(0)); // a relevant kind is first
+    expect(fam.map((s) => s.kind).toSet(), NearbyKind.values.toSet());
+  });
+
   test('R7 plural "גני ילדים" and "גן חובה" → kindergartens (youngChild)', () {
     expect(NearbyProfile.fromText('קרוב לגני ילדים').youngChild, isTrue);
     expect(NearbyProfile.fromText('ילד בגן חובה').youngChild, isTrue);

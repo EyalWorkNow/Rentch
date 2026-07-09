@@ -158,3 +158,27 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   sections.sort((a, b) => b.priority.compareTo(a.priority));
   return sections;
 }
+
+/// ALL nearby section kinds, with the persona-relevant ones first (by priority)
+/// and the rest appended in a sensible default order. Used on the property
+/// detail screen, which is a full reference — every nearby school/kindergarten/
+/// clinic/supermarket/park should be browsable — while the chat "why this one"
+/// summary uses [relevantNearbySections] (only what matters to the seeker).
+List<NearbySection> orderedNearbySections(NearbyProfile p) {
+  final relevant = relevantNearbySections(p);
+  final have = relevant.map((s) => s.kind).toSet();
+  const fallbackOrder = [
+    NearbyKind.schools,
+    NearbyKind.kindergartens,
+    NearbyKind.clinics,
+    NearbyKind.supermarkets,
+    NearbyKind.parks,
+  ];
+  return [
+    ...relevant,
+    for (final k in fallbackOrder)
+      if (!have.contains(k))
+        // clinics with no persona HMO → show all funds (hmo: '').
+        NearbySection(k, hmo: '', priority: 0),
+  ];
+}

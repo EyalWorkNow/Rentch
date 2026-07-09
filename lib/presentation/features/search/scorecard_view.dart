@@ -452,6 +452,9 @@ const Map<String, IconData> _geoIcon = {
   '🏖️': IconsaxPlusLinear.sun_1,
   '🎓': IconsaxPlusLinear.teacher,
   '🍸': IconsaxPlusLinear.coffee,
+  '🏥': IconsaxPlusLinear.hospital,
+  '🛒': IconsaxPlusLinear.shopping_cart,
+  '🧸': IconsaxPlusLinear.teacher,
 };
 
 /// True if [t] is a named geo proximity tag (park/school/station/sea/uni/nightlife).
