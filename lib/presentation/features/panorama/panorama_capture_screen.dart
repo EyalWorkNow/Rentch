@@ -798,16 +798,17 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'מצלמים את הסיור כאן באפליקציה',
+                      'מצלמים פנורמה 360° ומעלים אותה כאן',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontWeight: FontWeight.w900,
-                          fontSize: 24,
+                          fontSize: 23,
                           color: AppColors.navy),
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'עמדו במרכז החדר וצלמו 10 תמונות מסביבכם — האפליקציה תחבר אותן לסיור 360°.',
+                      'הדרך הכי איכותית: אפליקציית Google Street View (חינם) — '
+                      'צילום כדור 360° מלא. אחר כך פשוט מעלים את התמונה לכאן.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 16,
@@ -817,32 +818,44 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     const SizedBox(height: 22),
                     const _GuideStep(
                       number: '1',
-                      icon: IconsaxPlusBold.user,
-                      title: 'עמדו במרכז החדר',
-                      body: 'מחזיקים את הטלפון לאורך (ישר), לפניכם וקבוע.',
+                      icon: IconsaxPlusBold.mobile,
+                      title: 'התקינו Google Street View',
+                      body:
+                          'מה-App Store או Google Play — בחינם. (אפשר גם מצב "פנורמה" '
+                          'במצלמת הטלפון, אבל Street View נותן 360° מלא ואיכותי יותר.)',
                     ),
                     const _GuideStep(
                       number: '2',
                       icon: IconsaxPlusBold.camera,
-                      title: 'צלמו 10 תמונות מסביב',
+                      title: 'צלמו את החדר ב-360°',
                       body:
-                          'בכל פעם מסתובבים מעט (~36°) וצולמים — האפליקציה מראה לכם בדיוק כמה לסובב.',
+                          'בתוך Street View: "צור" ← מצלמה. עומדים במרכז החדר ומכוונים '
+                          'את הטלפון אל הנקודות עד שהכדור מתמלא.',
                     ),
                     const _GuideStep(
                       number: '3',
+                      icon: IconsaxPlusBold.gallery,
+                      title: 'שומרים לגלריה',
+                      body:
+                          'שומרים/מייצאים את הפנורמה אל התמונות בטלפון.',
+                    ),
+                    const _GuideStep(
+                      number: '4',
                       icon: IconsaxPlusBold.tick_circle,
-                      title: 'זהו — הסיור מוכן',
-                      body: 'האפליקציה מחברת את התמונות לסיור 360°. אין שום עבודה נוספת.',
+                      title: 'מעלים כאן',
+                      body:
+                          'לוחצים על הכפתור למטה ובוחרים את הפנורמה מהגלריה. זהו — הסיור מוכן.',
                       isLast: true,
                     ),
                   ],
                 ),
               ),
             ),
-            // PRIMARY (default): the guided 10-photo 360° capture. Sharp stills,
-            // step-by-step — the simplest reliable flow for an older user.
+            // The ONLY action: import a ready 360° panorama from the gallery.
+            // (The in-app capture flows are dormant — the phone/Street-View
+            // native capture is sharper and parallax-free.)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -851,72 +864,11 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 17),
                   ),
                   onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.photo),
-                  icon: const Icon(IconsaxPlusBold.camera, size: 22),
-                  label: const Text('צלם עכשיו — 10 תמונות',
+                      Navigator.of(context).pop(_CaptureChoice.gallery),
+                  icon: const Icon(IconsaxPlusBold.gallery, size: 22),
+                  label: const Text('העלה פנורמה מהגלריה',
                       style:
                           TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                ),
-              ),
-            ),
-            // SECONDARY: the frame-by-frame guided sweep, for users who want it.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: BorderSide(color: AppColors.primary, width: 1.4),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.sweep),
-                  icon: const Icon(IconsaxPlusBold.camera, size: 20),
-                  label: const Text('צילום מתקדם — תמונה אחר תמונה',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                ),
-              ),
-            ),
-            // HIGH-QUALITY: compose a full 360° from several native phone panos.
-            // Native panos are sharp and parallax-free, so arranging 2+ of them
-            // is the most reliable path — given clear, prominent billing.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: BorderSide(color: AppColors.primary, width: 1.4),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.arranged),
-                  icon: const Icon(IconsaxPlusBold.gallery_add, size: 20),
-                  label: const Text('הרכבת 360° מכמה פנורמות (איכותי)',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                ),
-              ),
-            ),
-            // FALLBACK: import a single panorama already shot in the native camera.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onPressed: () =>
-                      Navigator.of(context).pop(_CaptureChoice.gallery),
-                  icon: const Icon(IconsaxPlusLinear.gallery, size: 20),
-                  label: const Text('כבר צילמתי — ייבא תמונה',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 ),
               ),
             ),

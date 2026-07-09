@@ -149,9 +149,8 @@ void main() {
   testWidgets('capture screen builds with guidance and add buttons',
       (tester) async {
     await tester.pumpWidget(_wrap(const PanoramaCaptureScreen()));
-    // the capture/import actions + empty state (plain Text widgets)
-    expect(find.text('צלם פנורמה 360°'), findsOneWidget);
-    expect(find.text('ייבא 360°'), findsOneWidget);
+    // Single "add point" action (opens the guide) + empty state + app-bar title.
+    expect(find.text('הוסף פנורמה'), findsOneWidget);
     expect(find.textContaining('עוד לא הוספת'), findsOneWidget);
     expect(find.text('צילום סיור 360°'), findsOneWidget); // app-bar title
   });
