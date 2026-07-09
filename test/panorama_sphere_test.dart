@@ -20,8 +20,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(tester.takeException(), isNull);
-    // 22 targets: 8 horizon + 6 up + 6 down + zenith + nadir.
-    expect(find.text('צולמו 0 מתוך 22'), findsOneWidget);
+    // 16 targets: 6 horizon + 4 up + 4 down + zenith + nadir.
+    expect(find.text('צולמו 0 מתוך 16'), findsOneWidget);
     // Demo backdrop (no camera) is shown.
     expect(find.textContaining('מצב הדגמה'), findsOneWidget);
   });

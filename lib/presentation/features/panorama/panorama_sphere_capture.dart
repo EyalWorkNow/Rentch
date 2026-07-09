@@ -35,13 +35,21 @@ class PanoramaSphereCaptureScreen extends StatefulWidget {
 // HDR exposure bracket per target (identical to the photo path): -1.3 protects
 // bright windows, +1.3 lifts dim corners, middle is the neutral base.
 const _bracketEvs = <double>[-1.3, 0.0, 1.3];
-const _ultraWideHfovDeg = 90.0;
-const _normalHfovDeg = 65.0;
+// iPhone 0.5× ultra-wide is really ~100–106° horizontal (NOT 90°). The old 90°
+// made the dots slide at the wrong rate vs the world ("everything moves"). This
+// is the FOV-calibration knob — nudge if dots lead/lag the scene on a device.
+const _ultraWideHfovDeg = 102.0;
+const _normalHfovDeg = 66.0;
 // Aim is "locked on" a dot within this great-circle angle; then a short dwell
-// (holding still on it) fires the capture.
-const _lockDeg = 11.0;
+// (holding still on it) fires the capture. A touch more forgiving now that there
+// are fewer, wider-spaced targets.
+const _lockDeg = 13.0;
 const _dwellMs = 450;
-const _maxSpinForCapture = 28.0; // deg/s — must be fairly still to fire
+const _maxSpinForCapture = 26.0; // deg/s — must be fairly still to fire
+// Low-pass factor for the displayed/aiming pose. Lower = smoother but laggier.
+// This is the main cure for the "gyro רועד" jitter: raw sensor noise is filtered
+// so the dots glide instead of shaking.
+const _poseSmoothing = 0.16;
 
 class _Target {
   _Target(this.yaw, this.pitch);
@@ -76,6 +84,13 @@ class _PanoramaSphereCaptureScreenState
   double _spinRate = 0;
   int _lastGyroUs = 0;
   double _gx = 0, _gy = -1, _gz = 0;
+
+  // Smoothed pose ACTUALLY used for aiming + drawing. Raw sensor values are
+  // low-passed into these so the dots glide instead of shaking (the "gyro רועד"
+  // complaint). Capture also reads these so jitter can't false-trigger a shot.
+  double _dispHeading = 0;
+  double _dispPitch = 0;
+  bool _poseInit = false;
 
   // The target sphere + captured frames (kept parallel like the photo screen).
   final List<_Target> _targets = [];
@@ -123,11 +138,14 @@ class _PanoramaSphereCaptureScreenState
       }
     }
 
-    ring(0, 8, 0); // horizon — every 45°
-    ring(38, 6, 30); // up — staggered
-    ring(-38, 6, 30); // down — staggered
-    _targets.add(_Target(0, 78)); // zenith (near straight up)
-    _targets.add(_Target(0, -78)); // nadir (near straight down)
+    // Fewer, wider-spaced targets: the ~102° ultra-wide covers a lot per shot,
+    // so 6 around the horizon still overlap generously. Fewer positions → less
+    // turning → less accumulated drift, and a calmer, faster capture.
+    ring(0, 6, 0); // horizon — every 60°
+    ring(40, 4, 45); // up — staggered
+    ring(-40, 4, 45); // down — staggered
+    _targets.add(_Target(0, 80)); // zenith (near straight up)
+    _targets.add(_Target(0, -80)); // nadir (near straight down)
   }
 
   Future<void> _init() async {
@@ -214,10 +232,16 @@ class _PanoramaSphereCaptureScreenState
   void _onAccel(AccelerometerEvent e) {
     final m = math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
     if (m < 1e-3) return;
-    _gx = e.x / m;
-    _gy = e.y / m;
-    _gz = e.z / m;
-    _pitchDeg = math.asin(_gz.clamp(-1.0, 1.0)) * 180 / math.pi;
+    // Low-pass the gravity vector itself (accelerometer is noisy) → steadier
+    // pitch AND a steadier world-up for the yaw projection.
+    const a = 0.2;
+    _gx += (e.x / m - _gx) * a;
+    _gy += (e.y / m - _gy) * a;
+    _gz += (e.z / m - _gz) * a;
+    final gm = math.sqrt(_gx * _gx + _gy * _gy + _gz * _gz);
+    if (gm > 1e-3) {
+      _pitchDeg = math.asin((_gz / gm).clamp(-1.0, 1.0)) * 180 / math.pi;
+    }
   }
 
   void _onGyro(GyroscopeEvent e) {
@@ -244,10 +268,10 @@ class _PanoramaSphereCaptureScreenState
     return (_hfovDeg * factor).clamp(_hfovDeg, 180.0);
   }
 
-  // Great-circle angle (deg) between the current aim and a target.
+  // Great-circle angle (deg) between the current (smoothed) aim and a target.
   double _angTo(_Target t) {
-    final p1 = _pitchDeg * math.pi / 180, p2 = t.pitch * math.pi / 180;
-    final dyaw = _wrap180(t.yaw - _headingDeg) * math.pi / 180;
+    final p1 = _dispPitch * math.pi / 180, p2 = t.pitch * math.pi / 180;
+    final dyaw = _wrap180(t.yaw - _dispHeading) * math.pi / 180;
     final c =
         (math.sin(p1) * math.sin(p2) + math.cos(p1) * math.cos(p2) * math.cos(dyaw))
             .clamp(-1.0, 1.0);
@@ -257,6 +281,19 @@ class _PanoramaSphereCaptureScreenState
   // Per-frame: manage lock-on dwell and fire the auto-capture.
   void _onTick(Duration _) {
     _frame.value++; // repaint the overlay
+    // Low-pass the raw pose into the displayed/aiming pose every frame → the
+    // dots glide instead of jittering with sensor noise.
+    if (!_poseInit) {
+      _dispHeading = _headingDeg;
+      _dispPitch = _pitchDeg;
+      _poseInit = true;
+    } else {
+      _dispHeading =
+          (_dispHeading + _wrap180(_headingDeg - _dispHeading) * _poseSmoothing +
+                  360) %
+              360;
+      _dispPitch += (_pitchDeg - _dispPitch) * _poseSmoothing;
+    }
     if (_building || _capturing) return;
 
     // Nearest uncaptured target within the lock cone.
@@ -292,9 +329,9 @@ class _PanoramaSphereCaptureScreenState
     _capturing = true;
     final t = _targets[idx];
     final group = _groups;
-    // Freeze the pose for the whole bracket at the actual measured aim.
-    final yaw = _headingDeg;
-    final pitch = _pitchDeg;
+    // Freeze the pose for the whole bracket at the smoothed (stable) aim.
+    final yaw = _dispHeading;
+    final pitch = _dispPitch;
     final cam = _cam;
     try {
       if (_hasCamera && cam != null) {
@@ -490,8 +527,8 @@ class _PanoramaSphereCaptureScreenState
                     builder: (_, __, ___) => CustomPaint(
                       painter: _SphereTargetsPainter(
                         targets: _targets,
-                        headingDeg: _headingDeg,
-                        pitchDeg: _pitchDeg,
+                        headingDeg: _dispHeading,
+                        pitchDeg: _dispPitch,
                         hfovDeg: _hfovDeg,
                         vfovDeg: _vfovDeg,
                         lockedIdx: _lockedIdx,
@@ -588,8 +625,8 @@ class _PanoramaSphereCaptureScreenState
           size: const Size(132, 132),
           painter: _CoverageBallPainter(
             targets: _targets,
-            headingDeg: _headingDeg,
-            pitchDeg: _pitchDeg,
+            headingDeg: _dispHeading,
+            pitchDeg: _dispPitch,
           ),
         ),
       ],
@@ -617,8 +654,8 @@ class _PanoramaSphereCaptureScreenState
     } else if (best < _lockDeg) {
       text = 'החזיקו רגע... ננעל ומצלם 📸';
     } else if (next != null) {
-      final dyaw = _wrap180(next.yaw - _headingDeg);
-      final dpitch = next.pitch - _pitchDeg;
+      final dyaw = _wrap180(next.yaw - _dispHeading);
+      final dpitch = next.pitch - _dispPitch;
       final dir = dpitch > 20
           ? 'הרימו את הטלפון למעלה ☝️'
           : dpitch < -20
