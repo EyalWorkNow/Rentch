@@ -8,7 +8,7 @@ import 'package:dating_app/presentation/features/panorama/panorama_align_screen.
 import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_pole_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
-import 'package:dating_app/presentation/features/panorama/panorama_photo_capture.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_sphere_capture.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_sweep_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -154,7 +154,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // result (same _addNode call). This replaces the broken video→360 flow.
   Future<void> _captureWithPhotos() async {
     final result = await Navigator.of(context).push<PanoramaSweepResult>(
-      MaterialPageRoute(builder: (_) => const PanoramaPhotoCaptureScreen()),
+      MaterialPageRoute(builder: (_) => const PanoramaSphereCaptureScreen()),
     );
     if (result == null || !mounted) return;
 
