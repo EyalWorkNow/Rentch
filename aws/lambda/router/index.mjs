@@ -975,6 +975,13 @@ ${i ? `<img class="hero" src="${i}" alt="">` : ''}
 
 export const handler = async (event) => {
   try {
+    // Internal async worker: the AI-360 generation (gpt-image-2) takes ~50s —
+    // over the API-Gateway limit — so POST /panorama/:id/ai-generate self-invokes
+    // this function as an async Event that does the slow work + writes the result.
+    if (event && event.op === 'aiGenerate' && event.jobId) {
+      return await runAiGenerate(event.jobId);
+    }
+
     // Lambda Function URL (public, no authorizer) → ONLY the public OpenGraph
     // share page is served here; every other route still requires the
     // authenticated API Gateway. This keeps the Function URL from exposing any
@@ -1034,6 +1041,10 @@ export const handler = async (event) => {
       // POST /panorama/:id/stitch → async-invoke the stitcher
       if (method === 'POST' && jobId && segments[2] === 'stitch') {
         return await stitchPanorama(jobId, event);
+      }
+      // POST /panorama/:id/ai-generate → async gpt-image-2 → generated 360
+      if (method === 'POST' && jobId && segments[2] === 'ai-generate') {
+        return await aiGeneratePanorama(jobId, event);
       }
       // GET /panorama/:id → poll status → imageUrl + haov/vaov
       if (method === 'GET' && jobId) return await getPanorama(jobId);
@@ -2594,6 +2605,30 @@ async function createPanorama(event) {
     return json(200, { data: { jobId, uploadUrls } });
   }
 
+  // ── AI generate mode (gpt-image-2) ────────────────────────────────────────
+  // The user uploads 1–2 real photos/panoramas of the room; gpt-image-2 turns
+  // them into ONE seamless equirectangular 360. Presign a PUT per input image.
+  if (body.captureMode === 'ai') {
+    const n = Math.max(1, Math.min(2, Number(body.imageCount) || 1));
+    const inputKeys = [];
+    const uploadUrls = [];
+    for (let i = 0; i < n; i++) {
+      const key = `panoramas/jobs/${jobId}/ai${i}.jpg`;
+      inputKeys.push(key);
+      uploadUrls.push(await getSignedUrl(
+        s3,
+        new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: 'image/jpeg' }),
+        { expiresIn: 21600 },
+      ));
+    }
+    const resultKey = `panoramas/results/${jobId}.png`;
+    await putPanoMeta(jobId, {
+      jobId, propertyId, inputKeys, resultKey, captureMode: 'ai',
+      status: 'pending', createdAt: ts,
+    });
+    return json(200, { data: { jobId, uploadUrls } });
+  }
+
   // ── Photo capture mode (unchanged) ────────────────────────────────────────
   // Allocate exactly as many frame slots as the client will upload (cv2 needs ≥2).
   // Must NOT clamp up — extra unfilled slots become missing keys the stitcher 404s on.
@@ -2748,6 +2783,81 @@ function validatePoses(raw, frameCount) {
     out.push({ yaw, pitch, hfov, vfov });
   }
   return out;
+}
+
+// POST /panorama/:id/ai-generate → kick off the gpt-image-2 generation. Because
+// it takes ~50s (over the API-Gateway limit) we self-invoke this function as an
+// async Event (see the `op:'aiGenerate'` hook at the top of the handler) and the
+// client polls GET /panorama/:id as usual.
+async function aiGeneratePanorama(jobId, event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  const meta = await getPanoMeta(jobId);
+  if (!meta) return json(404, { message: 'Panorama job not found' });
+  if (meta.status === 'ready' || meta.status === 'failed') {
+    return json(200, { data: panoData(meta) });
+  }
+  if (!OPENAI_API_KEY) {
+    const failed = { ...meta, status: 'failed', error: 'AI generation not configured.' };
+    await putPanoMeta(jobId, failed);
+    return json(200, { data: panoData(failed) });
+  }
+  await putPanoMeta(jobId, { ...meta, status: 'processing', processedAt: Date.now() });
+  await lambda.send(new InvokeCommand({
+    FunctionName: process.env.AWS_LAMBDA_FUNCTION_NAME,
+    InvocationType: 'Event',
+    Payload: Buffer.from(JSON.stringify({ op: 'aiGenerate', jobId })),
+  }));
+  return json(200, { data: { jobId, status: 'processing' } });
+}
+
+// The async worker (self-invoked). Downloads the 1–2 input images, asks
+// gpt-image-2 to merge them into one seamless equirectangular 360, uploads the
+// PNG, and marks the job ready. Fail-soft: any error → status 'failed' + message.
+async function runAiGenerate(jobId) {
+  const meta = await getPanoMeta(jobId);
+  if (!meta) return json(404, { message: 'not found' });
+  try {
+    const inputKeys = Array.isArray(meta.inputKeys) ? meta.inputKeys : [];
+    if (inputKeys.length === 0) throw new Error('no input images');
+    const form = new FormData();
+    form.append('model', 'gpt-image-2');
+    form.append('size', '1536x1024');
+    form.append('prompt',
+      'Merge the provided photo(s) of this room into ONE seamless equirectangular ' +
+      '360° panorama (2:1 spherical projection): ceiling at the top, floor at the ' +
+      'bottom, walls wrapping continuously so the left and right edges match exactly. ' +
+      'Keep the room\'s real furniture, colours, windows and layout faithful to the ' +
+      'photos. Photorealistic, natural lighting, no text or watermarks.');
+    for (const key of inputKeys) {
+      const obj = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+      const bytes = await streamToBuffer(obj.Body);
+      form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
+    }
+    const r = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: form,
+    });
+    const j = await r.json();
+    const b64 = j?.data?.[0]?.b64_json;
+    if (!b64) throw new Error('gpt-image-2 returned no image: ' + JSON.stringify(j).slice(0, 200));
+    const out = Buffer.from(b64, 'base64');
+    await s3.send(new PutObjectCommand({
+      Bucket: S3_BUCKET, Key: meta.resultKey, Body: out,
+      ContentType: 'image/png', CacheControl: 'public, max-age=31536000',
+    }));
+    const imageUrl =
+      `https://${S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${meta.resultKey}`;
+    await putPanoMeta(jobId, {
+      ...meta, status: 'ready', imageUrl, haov: 360, vaov: 180,
+      aiGenerated: true, finishedAt: Date.now(),
+    });
+  } catch (e) {
+    await putPanoMeta(jobId, {
+      ...meta, status: 'failed', error: String(e && e.message ? e.message : e).slice(0, 300),
+    });
+  }
+  return json(200, { ok: true });
 }
 
 async function getPanorama(jobId) {
