@@ -139,6 +139,10 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
     final config = jsonEncode({
       'splatUrl': widget.splatUrl,
       'waypoints': _effectiveWaypoints.map((w) => w.toJson()).toList(),
+      // Android's System-WebView WebGL is far slower/variable than iOS WKWebView,
+      // so render at a lower pixel ratio there (fewer fragments = smoother walk);
+      // iOS keeps the sharper cap.
+      'dprCap': Platform.isAndroid ? 1.2 : 1.5,
     });
     final injected = html.replaceFirst(
       '</head>',

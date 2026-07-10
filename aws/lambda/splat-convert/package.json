@@ -1,0 +1,10 @@
+{
+  "name": "rentch-splat-convert",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Converts Gaussian-splat .ply/.spz uploads to compact .ksplat for the in-app viewer.",
+  "dependencies": {
+    "@mkkellogg/gaussian-splats-3d": "0.4.7",
+    "three": "0.160.1"
+  }
+}

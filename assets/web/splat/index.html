@@ -105,7 +105,9 @@ function fail(msg) {
 //   • the GaussianSplats3D sort runs on a worker; we keep splats ≲1M via the
 //     `splatAlphaRemovalThreshold` (drops near-transparent splats) and rely on
 //     the library's progressive load. True LOD/SOGS budgeting is a later tier.
-const DPR_CAP = 1.5;
+// The native side lowers this on Android (weaker/variable System-WebView WebGL)
+// so we render fewer fragments there; iOS/WKWebView keeps the sharper 1.5.
+const DPR_CAP = (cfg.dprCap && cfg.dprCap > 0) ? cfg.dprCap : 1.5;
 const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
 
 // Detect the splat format from the URL. NOTE: GaussianSplats3D 0.4.x loads

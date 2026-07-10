@@ -35,6 +35,11 @@ class PanoramaPhotoCaptureScreen extends StatefulWidget {
 // gives a generous ~54° overlap between neighbours — plenty for a clean stitch.
 const _shotCount = 10;
 const _stepDeg = 360.0 / _shotCount; // 36°
+// HDR exposure bracket (EV offsets) captured at each position. -1.3 protects
+// bright windows, +1.3 lifts dim corners; the middle is the neutral base. A
+// device that ignores offset-while-locked just yields near-identical frames →
+// the server fusion is a harmless no-op (no regression).
+const _bracketEvs = <double>[-1.3, 0.0, 1.3];
 // Default ultra-wide / normal horizontal FOV (the camera plugin doesn't expose
 // the real lens FOV). 0.5× ultra-wide is ~90°; 1× back camera ~65°. vfov is
 // derived from the captured portrait aspect (tall frame → vfov > hfov).
@@ -72,6 +77,11 @@ class _PanoramaPhotoCaptureScreenState
   final List<String> _shotPaths = [];
   final List<double> _shotYaws = [];
   final List<double> _shotPitches = [];
+  // HDR: which capture POSITION each frame belongs to. Frames sharing a group are
+  // an exposure bracket of the same view; the server Mertens-fuses them into one
+  // well-exposed frame (bright windows AND dim interior hold) before projecting.
+  final List<int> _shotGroups = [];
+  int _positions = 0; // capture positions completed (each = a bracket of frames)
   final _yawNotifier = ValueNotifier<double>(0);
 
   @override
@@ -140,12 +150,9 @@ class _PanoramaPhotoCaptureScreenState
         'exposure-auto', () => ctrl.setExposureMode(ExposureMode.auto));
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
-    await tryLock('exposure-offset', () async {
-      final minEv = await ctrl.getMinExposureOffset();
-      final maxEv = await ctrl.getMaxExposureOffset();
-      final target = (-1.25).clamp(minEv, maxEv);
-      await ctrl.setExposureOffset(target);
-    });
+    // Meter + lock at a NEUTRAL base (offset 0) so the whole sphere shares one
+    // exposure — the HDR bracket then biases ± around this fixed base per shot.
+    await tryLock('exposure-offset', () => ctrl.setExposureOffset(0.0));
     await tryLock(
         'exposure-lock', () => ctrl.setExposureMode(ExposureMode.locked));
   }
@@ -220,26 +227,42 @@ class _PanoramaPhotoCaptureScreenState
   // target heading for shot i is i*36°; we measure progress off the accumulated
   // gravity-projected yaw so it's robust to a little tilt.
   double get _degToNextShot {
-    final target = _shotPaths.length * _stepDeg;
+    final target = _positions * _stepDeg;
     return target - _yawDeg;
   }
 
   Future<void> _takeShot() async {
     final cam = _cam;
     if (cam == null || _capturing || _building) return;
-    if (_shotPaths.length >= _shotCount) return;
+    if (_positions >= _shotCount) return;
     setState(() => _capturing = true);
+    final group = _positions;
+    // Freeze the heading/tilt for the whole bracket (the user holds still), so all
+    // exposures of this position share one pose.
+    final yaw = _yawDeg % 360;
+    final pitch = _pitchDeg;
     try {
-      final XFile shot = await cam.takePicture();
-      _shotPaths.add(shot.path);
-      // Record the ACTUAL heading + tilt at capture (not the ideal i*36°) so the
-      // server projects each photo where it really points.
-      _shotYaws.add(_yawDeg % 360);
-      _shotPitches.add(_pitchDeg);
+      for (final ev in _bracketEvs) {
+        try {
+          await cam.setExposureOffset(ev);
+          // Let the sensor settle to the new bias before the shot.
+          await Future<void>.delayed(const Duration(milliseconds: 220));
+        } catch (_) {/* offset unsupported → identical frame, fusion no-ops */}
+        final XFile shot = await cam.takePicture();
+        _shotPaths.add(shot.path);
+        _shotYaws.add(yaw);
+        _shotPitches.add(pitch);
+        _shotGroups.add(group);
+      }
+      // Restore the neutral base for the live preview / next position.
+      try {
+        await cam.setExposureOffset(0.0);
+      } catch (_) {}
+      _positions++;
       HapticFeedback.mediumImpact();
       if (!mounted) return;
       setState(() => _capturing = false);
-      if (_shotPaths.length >= _shotCount) {
+      if (_positions >= _shotCount) {
         await _build();
       }
     } catch (e) {
@@ -252,11 +275,17 @@ class _PanoramaPhotoCaptureScreenState
   }
 
   void _undoLast() {
-    if (_shotPaths.isEmpty || _building || _capturing) return;
+    if (_positions == 0 || _building || _capturing) return;
+    // Remove the entire last bracket (all exposures of the last position).
+    final lastGroup = _positions - 1;
     setState(() {
-      _shotPaths.removeLast();
-      _shotYaws.removeLast();
-      _shotPitches.removeLast();
+      while (_shotGroups.isNotEmpty && _shotGroups.last == lastGroup) {
+        _shotPaths.removeLast();
+        _shotYaws.removeLast();
+        _shotPitches.removeLast();
+        _shotGroups.removeLast();
+      }
+      _positions--;
     });
   }
 
@@ -281,6 +310,8 @@ class _PanoramaPhotoCaptureScreenState
           'pitch': _shotPitches[i],
           'hfov': hfov,
           'vfov': vfov,
+          // Frames sharing a group are an exposure bracket → server fuses them.
+          'group': _shotGroups[i].toDouble(),
         },
     ];
 
@@ -359,6 +390,8 @@ class _PanoramaPhotoCaptureScreenState
       _shotPaths.clear();
       _shotYaws.clear();
       _shotPitches.clear();
+      _shotGroups.clear();
+      _positions = 0;
       _yawDeg = 0;
       _yawNotifier.value = 0;
       _lastGyroUs = 0;
@@ -471,7 +504,7 @@ class _PanoramaPhotoCaptureScreenState
   }
 
   Widget _guide() {
-    final taken = _shotPaths.length;
+    final taken = _positions;
     final done = taken >= _shotCount;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -499,9 +532,9 @@ class _PanoramaPhotoCaptureScreenState
     String text;
     final tooFast = _spinRate > 30;
     final remaining = _degToNextShot;
-    if (_shotPaths.isEmpty) {
+    if (_positions == 0) {
       text = 'עמדו במרכז, החזיקו ישר וצלמו את התמונה הראשונה.';
-    } else if (_shotPaths.length >= _shotCount) {
+    } else if (_positions >= _shotCount) {
       text = 'מצוין! בונים את הסיור...';
     } else if (tooFast) {
       text = 'החזיקו את הטלפון יציב 🤳 ואז צלמו';

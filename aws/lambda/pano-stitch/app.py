@@ -346,6 +346,48 @@ def _valid_poses(poses, n_frames):
     return True
 
 
+def _fuse_brackets(images, poses):
+    """HDR: group frames by pose['group'] (an exposure bracket of one view) and
+    Mertens-fuse each group into a single well-exposed frame — so bright windows
+    AND dim interior both hold, the #1 tell of amateur vs pro interior 360.
+
+    Returns (fused_images, fused_poses), one entry per group, preserving order.
+    No-op (returns inputs) when poses carry no 'group'. Fully fail-soft: a group of
+    one passes through; a fusion error falls back to that group's middle frame."""
+    if not poses or not any(isinstance(p, dict) and "group" in p for p in poses):
+        return images, poses
+    from collections import OrderedDict
+    groups = OrderedDict()
+    for img, pose in zip(images, poses):
+        groups.setdefault(pose.get("group"), []).append((img, pose))
+    merger = None
+    out_imgs, out_poses = [], []
+    for members in groups.values():
+        imgs = [m[0] for m in members]
+        pose = members[len(members) // 2][1]  # brackets share yaw/pitch/hfov/vfov
+        if len(imgs) < 2:
+            out_imgs.append(imgs[0])
+            out_poses.append(pose)
+            continue
+        # Mertens needs same-size uint8 BGR frames; a size mismatch (rare) → skip.
+        if any(im.shape != imgs[0].shape for im in imgs):
+            out_imgs.append(imgs[len(imgs) // 2])
+            out_poses.append(pose)
+            continue
+        try:
+            if merger is None:
+                merger = cv2.createMergeMertens()
+            fused = merger.process(imgs)  # float32 in ~[0,1]
+            fused = np.clip(fused * 255.0, 0, 255).astype(np.uint8)
+            out_imgs.append(fused)
+            out_poses.append(pose)
+        except Exception as e:  # noqa: BLE001
+            print(f"exposure fusion failed for a group: {e}")
+            out_imgs.append(imgs[len(imgs) // 2])
+            out_poses.append(pose)
+    return out_imgs, out_poses
+
+
 def _handle_pole_fill(event):
     """op=poleFill: download the strip (+ optional floor/ceiling photos), composite
     real floor/ceiling caps via pole_fill.fill_poles, upload the completed
@@ -897,6 +939,9 @@ def handler(event, _context):
             images.append(img)
             if use_poses:
                 kept_poses.append(poses_in[i])
+        # HDR: fuse each position's exposure bracket into one frame before projecting.
+        if use_poses and len(kept_poses) == len(images):
+            images, kept_poses = _fuse_brackets(images, kept_poses)
         if len(images) < 2:
             raise RuntimeError(f"only {len(images)} usable frames (need ≥2)")
 

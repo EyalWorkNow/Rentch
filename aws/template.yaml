@@ -443,7 +443,11 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: rentch-api
-      EndpointConfiguration: { Types: [REGIONAL] }
+      # EDGE = CloudFront-fronted: TLS terminates at a POP near the client (Israel)
+      # and rides AWS's backbone to us-east-1, cutting the trans-Atlantic handshake/
+      # transit RTT on every call. Activate on the live stack with the surgical patch
+      # (see notes) or a CFN deploy; revert to [REGIONAL] to roll back.
+      EndpointConfiguration: { Types: [EDGE] }
 
   Authorizer:
     Type: AWS::ApiGateway::Authorizer
