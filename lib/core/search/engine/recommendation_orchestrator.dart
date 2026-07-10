@@ -1385,6 +1385,44 @@ class RecommendationEngine {
     return concerns;
   }
 
+  /// PURE per-property relevance in [0,1] — the ranker's blended, calibrated score
+  /// (MAUT + GBM + learner, Platt-calibrated, × soft-constraint) WITHOUT the
+  /// orchestrator's city/budget gates, diversity rerank, backfill or 10-slate
+  /// logic. For callers that do their OWN filtering and just need one stable,
+  /// comparable relevance per listing (e.g. the swipe deck). [marketSource] fits
+  /// the value/hedonic baseline — pass the FULL catalogue for a stable,
+  /// non-batch-relative baseline; defaults to [candidates].
+  static Map<String, double> relevance({
+    required List<RentalProperty> candidates,
+    required SearchQuery query,
+    TenantProfile? profile,
+    List<RentalProperty>? marketSource,
+  }) {
+    if (candidates.isEmpty) return const {};
+    // Baseline over the transaction-consistent slice of the market source (never
+    // judge a rental's value against sale prices), mirroring recommend().
+    final isSale = candidates
+        .every((p) => p.transactionType == PropertyTransactionType.sale);
+    final src = marketSource ?? candidates;
+    final seg = [
+      for (final p in src)
+        if ((p.transactionType == PropertyTransactionType.sale) == isSale) p,
+    ];
+    final market =
+        MarketContext.analyze(seg.length >= 8 ? seg : candidates);
+    final model = PreferenceModelBuilder.build(
+        query: query, profile: profile, market: market);
+    final ranked = RankingEngine.rank(
+      [for (final p in candidates) FeatureEngineer.engineer(p, market)],
+      model,
+    );
+    // Return the honest fit% (_statedMatch), NOT the raw blended score: it reads
+    // as "how well this satisfies what you asked for" on a percentage-like band,
+    // which is what a caller wants to display AND what keeps a caller's own ±
+    // deltas (calibrated against that band) meaningful.
+    return {for (final c in ranked) c.property.id: _statedMatch(c, model)};
+  }
+
   /// Adapter: run the pipeline and return results as the legacy [ScoredProperty]
   /// list the existing SmartSearch UI already renders — so the new engine drops
   /// in without UI changes.

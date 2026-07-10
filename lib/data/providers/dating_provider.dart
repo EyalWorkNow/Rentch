@@ -11,8 +11,6 @@ import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/matching/match_engine.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
-import 'package:dating_app/core/govdata/gov_data.dart';
-import 'package:dating_app/core/govdata/geo_intelligence.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/core/services/kiri_3d_service.dart';
@@ -179,6 +177,10 @@ class DatingProvider extends ChangeNotifier {
   // that ordered the card, attached to the swipe outcome so each swipe is a
   // (prediction, label) calibration row.
   Map<String, int> _deckMatchScore = const {};
+  // Per-property RecommendationEngine relevance [0,1] for the current deck — the
+  // UNIFIED structural core of the deck score (same ranker as the search surface).
+  // Populated in _sortProperties; a cache miss falls back to an on-demand score.
+  Map<String, double> _engineRelevance = const {};
   List<String>? _availableFeaturesCache;
   List<String>? _availablePropertyTypesCache;
   List<String>? _availableConditionsCache;
@@ -228,20 +230,12 @@ class DatingProvider extends ChangeNotifier {
     transactionType: TransactionTypeFilter.any,
   );
 
-  static const double _budgetWeight = 22;
+  // Retained structural weights: market-value drives a best-match tiebreak and
+  // listing-confidence is a post-band business-readiness bonus. The rest of the
+  // old hand-tuned structural scorer is gone — search-fit is now the unified
+  // RecommendationEngine relevance (see _matchScoreForContext).
   static const double _marketValueWeight = 12;
-  static const double _locationWeight = 14;
-  static const double _roomsWeight = 8;
-  static const double _sizeWeight = 5;
-  static const double _floorWeight = 1;
-  static const double _timingWeight = 8;
-  static const double _preferredFeatureWeight = 10;
-  static const double _preferredPropertyTypeWeight = 4;
-  static const double _preferredConditionWeight = 3;
-  static const double _preferredListingSourceWeight = 2;
-  static const double _requiredFeatureWeight = 4;
   static const double _listingConfidenceWeight = 12;
-  static const double _businessReadinessWeight = 4;
 
   // ── Persona weighting (the tenant's "חשוב" / "קריטי" choices) ──────────────
   // These act on the property DIRECTLY (via its own features), so the displayed
@@ -261,7 +255,6 @@ class DatingProvider extends ChangeNotifier {
   // curve is measured against, but only up to this cap, so a user who keeps
   // liking ~15%-over listings stops being punished for being just over their
   // stated cap — without making any price look on-budget.
-  static const double _maxLearnedBudgetWiden = 1.20; // never widen past +20%
   // Per matching feature, tagAffinity in [-1, 1] scales to at most this many
   // points (so a strongly-liked feature adds ≤ +_learnedTagWeight and a
   // strongly-disliked one subtracts the same).
@@ -339,6 +332,10 @@ class DatingProvider extends ChangeNotifier {
     _filterRevision++;
     _filterLayoutRevision++;
     _filteredPropertiesCache = null;
+    // The unified engine relevance is filter-dependent — drop it so a match score
+    // read after a filter change recomputes fresh instead of returning a stale
+    // deck value (otherwise widening the budget wouldn't move the score).
+    _engineRelevance = const {};
   }
 
   void _removeFromFilteredCache(String propertyId) {
@@ -1164,6 +1161,16 @@ class DatingProvider extends ChangeNotifier {
       featureWeights: _featureWeights,
       marketIndex: _marketIndex,
     );
+    // Compute the unified engine relevance for the WHOLE deck once, so each
+    // property's match score reads from the cache instead of re-ranking per call.
+    _engineRelevance = filters.sortBy == SearchSortOption.bestMatch
+        ? RecommendationEngine.relevance(
+            candidates: properties,
+            query: _queryFromFilters(_effectiveScoringFilters(filters)),
+            profile: _tenantProfile,
+            marketSource: _allProperties,
+          )
+        : const <String, double>{};
     final scoreCache = filters.sortBy == SearchSortOption.bestMatch
         ? <String, int>{
             for (final property in properties)
@@ -1895,6 +1902,10 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> updateTenantProfile(TenantProfile updatedProfile) async {
     _tenantProfile = updatedProfile;
+    // Engine relevance folds in the profile (budget/rooms/persona), so a profile
+    // change must drop the cached deck scores — else a match score read next would
+    // reflect the OLD profile.
+    _engineRelevance = const {};
     await _persist();
     // Sync to discovery table so this user appears in other users' feeds.
     unawaited(_userRepository.upsertProfile(
@@ -3673,6 +3684,42 @@ class DatingProvider extends ChangeNotifier {
     );
   }
 
+  /// Build the engine's [SearchQuery] from the current filter state so the deck
+  /// is ranked by the SAME RecommendationEngine relevance as the search surface.
+  /// Only real, user-set constraints are mapped (an unset budget/rooms stays null
+  /// so the engine uses its priors, not a synthetic ceiling).
+  SearchQuery _queryFromFilters(SearchFilters f) {
+    final type = f.transactionType;
+    final hasMaxBudget =
+        f.maxBudget > 0 && f.maxBudget < _defaultMaxBudgetFor(type);
+    return SearchQuery(
+      city: f.city.trim().isEmpty ? null : f.city.trim(),
+      minPrice: f.minBudget > 0 ? f.minBudget : null,
+      maxPrice: hasMaxBudget ? f.maxBudget : null,
+      minRooms: f.minRooms > 0 ? f.minRooms : null,
+      maxRooms: f.maxRooms > 0 && f.maxRooms < _unsetMaxRooms ? f.maxRooms : null,
+      amenities: {...f.requiredFeatures, ...f.preferredFeatures},
+      requiredFeatures: f.requiredFeatures,
+      transactionType: type,
+      propertyType: f.propertyTypes.isNotEmpty ? f.propertyTypes.first : null,
+    );
+  }
+
+  /// The unified engine relevance for [p] under [filters]: the cached deck value
+  /// when available (the common path — a sort just computed the whole deck), else
+  /// an on-demand single-property score against the full-catalogue baseline.
+  double _engineRelevanceFor(RentalProperty p, SearchFilters filters) {
+    final cached = _engineRelevance[p.id];
+    if (cached != null) return cached;
+    final rel = RecommendationEngine.relevance(
+      candidates: [p],
+      query: _queryFromFilters(filters),
+      profile: _tenantProfile,
+      marketSource: _allProperties,
+    );
+    return rel[p.id] ?? 0.5;
+  }
+
   int _matchScoreForContext(RentalProperty p, _MatchContext context) {
     // Fold the tenant profile's stated budget / rooms into the scoring filters
     // when the user hasn't set those filters explicitly. Without this, a tenant
@@ -3753,70 +3800,29 @@ class DatingProvider extends ChangeNotifier {
       }
     }
 
-    final structural = _budgetFitScore(p, filters) +
-        _marketValueScore(p, context) +
-        _locationScore(p, context) +
-        _spaceFitScore(p, filters) +
-        _moveInScore(p, filters, context.now) +
-        _featureFitScore(p, context) +
-        _listingConfidenceScore(p) +
-        _businessReadinessScore(p, context);
-
-    // The raw structural weights sum to ~108 at a perfect fit, so they alone
-    // clamp to 100 for almost any decent listing — which made the displayed
-    // "% התאמה" saturate and swallowed every persona/tag boost (the boost was
-    // applied above the ceiling and never showed). We compress the structural
-    // total into a sub-100 band so that:
-    //   • a perfect structural fit lands at [_structuralCeiling] (≈88), leaving
-    //     real headroom for IMPORTANT/shared-tag boosts to be visible, and
-    //   • the displayed number genuinely moves with how well the property fits
-    //     the user's budget / rooms / location / size / features.
-    // Persona deltas (tag compatibility, IMPORTANT boosts, CRITICAL penalties)
-    // are added AFTER compression so they shift the visible score rather than
-    // being absorbed by the clamp.
-    final compressed = _compressStructural(structural);
+    // UNIFIED STRUCTURAL CORE: the deck's budget/value/location/size/amenities/
+    // trust fit is now the SAME RecommendationEngine relevance that ranks the
+    // search surface — one scoring brain, so the deck inherits the engine's
+    // catalogue-wide value baseline, block-level gov geo (stat-areas/centrality/
+    // safety) and de-collinearity instead of the old hand-tuned sub-scores. It's
+    // mapped into the same [0, _structuralCeiling] band, leaving headroom for the
+    // deck-unique business layer added AFTER: two-sided tenant↔landlord tag
+    // compatibility and the on-device learned deltas. (The gov-geo nudge that used
+    // to live here is gone — the engine already accounts for it.)
+    final relevance = _engineRelevanceFor(p, filters); // 0..1 honest search-fit
+    final compressed = relevance * _structuralCeiling;
     final score = compressed +
         tagCompatibilityScore +
         _learnedScoreDelta(p) +
-        _neighborhoodQualityDelta(p);
+        // Business-readiness (verification / media richness / completeness) is a
+        // real listing-quality signal ORTHOGONAL to search-fit — kept as a small
+        // post-band bonus so a verified, well-documented listing still edges out a
+        // bare one at the same fit.
+        _listingConfidenceScore(p);
 
     return _clampDouble(score, 0, 100).round();
   }
 
-  /// Maximum ± the gov-data neighbourhood nudge can move a deck score.
-  static const double _neighborhoodQualityWeight = 6.0;
-
-  /// Gov-data neighbourhood-quality nudge, folded in AFTER structural compression
-  /// (like [_learnedScoreDelta]) so the swipe deck is finally ordered by the SAME
-  /// geographic intelligence the RecommendationEngine uses: BLOCK-level SES (CBS
-  /// statistical areas — Shapira ≠ central TLV), centrality and safety. The deck's
-  /// own [_locationScore] is a binary in-city check, blind to all of this. Bounded
-  /// to ±[_neighborhoodQualityWeight] so it differentiates without overriding
-  /// budget/rooms/features/tags. Returns 0 when gov data isn't loaded (e.g. a unit
-  /// test that didn't init GovData) → no behavioural change on that path.
-  double _neighborhoodQualityDelta(RentalProperty p) {
-    final gov = GovData.instance;
-    if (!gov.loaded) return 0.0;
-    final hasCoord = p.lat.abs() > 0.1 && p.lon.abs() > 0.1;
-
-    // BLOCK-level SES via point-in-polygon, else the city cluster, else neutral.
-    double ses;
-    final sa = hasCoord ? gov.statAreaAt(p.lat, p.lon) : null;
-    if (sa != null && sa.ses >= 1 && sa.ses <= 10) {
-      ses = (sa.ses - 1) / 9.0;
-    } else {
-      final city = gov.socioeconomic(p.city);
-      ses = (city >= 1 && city <= 10) ? (city - 1) / 9.0 : 0.5;
-    }
-    final centrality =
-        hasCoord ? GeoIntelligence.centrality(p.lat, p.lon, p.city) : 0.5;
-    final safety = gov.safetyScore(p.city) ?? 0.5;
-
-    // Composite neighbourhood desirability in [0,1]; map 0.5→0, 1→+W, 0→−W.
-    final quality =
-        (0.5 * ses + 0.3 * centrality + 0.2 * safety).clamp(0.0, 1.0);
-    return (quality - 0.5) * 2.0 * _neighborhoodQualityWeight;
-  }
 
   /// The bounded personalisation layer: small ± nudges folded out of the user's
   /// own revealed behaviour ([_userSignals]). Added AFTER structural compression
@@ -3883,34 +3889,9 @@ class DatingProvider extends ChangeNotifier {
     return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
 
-  // The theoretical maximum of the structural weights, used to normalise the
-  // raw sum before mapping it into the visible [0, _structuralCeiling] band.
-  static const double _maxStructuralScore = _budgetWeight +
-      _marketValueWeight +
-      _locationWeight +
-      _roomsWeight +
-      _sizeWeight +
-      _floorWeight +
-      _timingWeight +
-      _requiredFeatureWeight +
-      _preferredFeatureWeight +
-      _preferredPropertyTypeWeight +
-      _preferredConditionWeight +
-      _preferredListingSourceWeight +
-      _listingConfidenceWeight +
-      _businessReadinessWeight;
-
   // A perfect structural fit maps to this score, reserving the remaining
   // headroom up to 100 for honest persona/tag boosts.
   static const double _structuralCeiling = 88;
-
-  /// Maps the raw structural sum (0.._maxStructuralScore) into 0.._structuralCeiling
-  /// so the base never saturates at 100 on its own and persona boosts stay
-  /// visible. Monotonic: a better structural fit always yields a higher result.
-  double _compressStructural(double structural) {
-    final ratio = _clampDouble(structural / _maxStructuralScore, 0, 1);
-    return ratio * _structuralCeiling;
-  }
 
   /// Scores the property against the tenant's own persona choices when there is
   /// no landlord profile to cross-reference (the common case). IMPORTANT details
@@ -3987,43 +3968,6 @@ class DatingProvider extends ChangeNotifier {
     }
   }
 
-  double _budgetFitScore(RentalProperty property, SearchFilters filters) {
-    if (!_hasKnownPrice(property)) {
-      return filters.includeUnknownPriceListings ? _budgetWeight * 0.2 : 0;
-    }
-
-    final hasMin =
-        filters.minBudget > _defaultMinBudgetFor(filters.transactionType);
-    final hasMax =
-        filters.maxBudget < _defaultMaxBudgetFor(filters.transactionType);
-    if (!hasMin && !hasMax) return _budgetWeight;
-
-    // Revealed budget tolerance: a user who demonstrably keeps liking listings
-    // over their stated cap shouldn't be harshly penalised for being just over.
-    // We widen ONLY the ceiling the overage is measured against (clamped to
-    // +20%), so listings the user has shown they'll consider stop reading as a
-    // poor budget fit. This never makes an over-budget listing look on-budget —
-    // a strongly over-budget listing still decays — it just softens the cliff at
-    // the stated cap up to the revealed tolerance.
-    final tolerance =
-        _userSignals.revealedBudgetTolerance.clamp(1.0, _maxLearnedBudgetWiden);
-    final effectiveMax = filters.maxBudget * tolerance;
-
-    final price = property.price.toDouble();
-    if ((!hasMin || price >= filters.minBudget) &&
-        (!hasMax || price <= effectiveMax)) {
-      return _budgetWeight;
-    }
-
-    if (hasMin && price < filters.minBudget) {
-      final gap = (filters.minBudget - price) / filters.minBudget;
-      return _budgetWeight * _expDecay(gap / 0.3, 1.2);
-    }
-
-    final overage = (price - effectiveMax) / effectiveMax;
-    return _budgetWeight * _expDecay(overage / 0.18, 1.45);
-  }
-
   double _marketValueScore(RentalProperty property, _MatchContext context) {
     final pricePerM2 = property.pricePerSquareMeter;
     final stats = context.marketIndex.resolve(property);
@@ -4043,186 +3987,6 @@ class DatingProvider extends ChangeNotifier {
     final overMarket = (pricePerM2 - median) / median;
     final scale = math.max(stats.relativeMad * 1.4, 0.18);
     return _marketValueWeight * _expDecay(overMarket / scale, 1.35);
-  }
-
-  double _locationScore(RentalProperty property, _MatchContext context) {
-    final filters = context.filters;
-    final selectedCity = filters.city.trim();
-    if (selectedCity.isNotEmpty) {
-      return property.city.trim() == selectedCity ? _locationWeight : 0;
-    }
-
-    if (filters.hasCustomArea) {
-      return context.area.contains(property.point) ? _locationWeight : 0;
-    }
-    if (filters.areaId == 'all_israel') return _locationWeight;
-    return context.area.contains(property.point) ? _locationWeight : 0;
-  }
-
-  double _spaceFitScore(RentalProperty property, SearchFilters filters) {
-    return _roomsFitScore(property, filters) +
-        _sizeFitScore(property, filters) +
-        _floorFitScore(property, filters);
-  }
-
-  double _roomsFitScore(RentalProperty property, SearchFilters filters) {
-    final hasMin = filters.minRooms > 0;
-    final hasMax = filters.maxRooms < _unsetMaxRooms;
-    if (!hasMin && !hasMax) return _roomsWeight;
-
-    if ((!hasMin || property.rooms >= filters.minRooms) &&
-        (!hasMax || property.rooms <= filters.maxRooms)) {
-      return _roomsWeight;
-    }
-
-    final shortage = filters.minRooms - property.rooms;
-    if (hasMin && shortage > 0) {
-      if (shortage <= 0.5) {
-        return _roomsWeight * (1 - shortage * 0.9);
-      }
-      return _roomsWeight * _expDecay(shortage / 0.5, 1.25) * 0.35;
-    }
-
-    final excess = property.rooms - filters.maxRooms;
-    if (hasMax && excess <= 0.5) {
-      return _roomsWeight * (1 - excess * 0.4);
-    }
-    return _roomsWeight * _expDecay(excess / 0.75, 1.2) * 0.55;
-  }
-
-  double _sizeFitScore(RentalProperty property, SearchFilters filters) {
-    final hasMin = filters.minSizeM2 > 0;
-    final hasMax = filters.maxSizeM2 < _unsetMaxSizeM2;
-    if (!hasMin && !hasMax) return _sizeWeight;
-    if (property.sizeM2 <= 0) return _sizeWeight * 0.45;
-
-    final size = property.sizeM2.toDouble();
-    final minSize = filters.minSizeM2.toDouble();
-    final maxSize = filters.maxSizeM2.toDouble();
-
-    if ((!hasMin || size >= minSize) && (!hasMax || size <= maxSize)) {
-      return _sizeWeight;
-    }
-
-    if (hasMin && size < minSize) {
-      final deficit = (minSize - size) / minSize;
-      return _sizeWeight * _expDecay(deficit / 0.24, 1.3);
-    }
-
-    final oversize = (size - maxSize) / maxSize;
-    return _sizeWeight * _expDecay(oversize / 0.75, 1.15);
-  }
-
-  double _floorFitScore(RentalProperty property, SearchFilters filters) {
-    if (filters.minFloor <= 0) return _floorWeight;
-
-    final floorNumber = property.floorNumber;
-    if (floorNumber == null) return _floorWeight * 0.45;
-    if (floorNumber >= filters.minFloor) return _floorWeight;
-    if (floorNumber == filters.minFloor - 1) return _floorWeight * 0.45;
-    return 0;
-  }
-
-  double _featureFitScore(RentalProperty property, _MatchContext context) {
-    final filters = context.filters;
-    final requiredScore = _requiredFeatureWeight;
-    final featureScore = filters.preferredFeatures.isEmpty
-        ? _preferredFeatureWeight
-        : _weightedSetPreferenceScore(
-            actualValues: property.features.toSet(),
-            preferredValues: filters.preferredFeatures,
-            totalWeight: _preferredFeatureWeight,
-            weightLookup: (feature) => context.featureWeights[feature] ?? 1,
-          );
-
-    return requiredScore +
-        featureScore +
-        _setPreferenceScore(
-          actualValue: property.propertyType,
-          preferredValues: filters.preferredPropertyTypes,
-          totalWeight: _preferredPropertyTypeWeight,
-        ) +
-        _setPreferenceScore(
-          actualValue: property.condition,
-          preferredValues: filters.preferredConditions,
-          totalWeight: _preferredConditionWeight,
-        ) +
-        _setPreferenceScore(
-          actualValue: _listingSourceFor(property),
-          preferredValues: filters.preferredListingSources,
-          totalWeight: _preferredListingSourceWeight,
-        );
-  }
-
-  /// Concave reward: f(x) = 1 − (1−x)^1.5
-  /// Partial tag matches are still rewarded, but full match is best.
-  double _concaveReward(double ratio) {
-    final clamped = _clampDouble(ratio, 0, 1);
-    return 1.0 - math.pow(1.0 - clamped, 1.5).toDouble();
-  }
-
-  double _setPreferenceScore<T>({
-    required T actualValue,
-    required Set<T> preferredValues,
-    required double totalWeight,
-  }) {
-    if (preferredValues.isEmpty) return totalWeight;
-    return preferredValues.contains(actualValue) ? totalWeight : 0;
-  }
-
-  double _weightedSetPreferenceScore({
-    required Set<String> actualValues,
-    required Set<String> preferredValues,
-    required double totalWeight,
-    required double Function(String value) weightLookup,
-  }) {
-    if (preferredValues.isEmpty) return totalWeight;
-
-    var matchedWeight = 0.0;
-    var availableWeight = 0.0;
-    for (final value in preferredValues) {
-      final weight = weightLookup(value);
-      availableWeight += weight;
-      if (actualValues.contains(value)) {
-        matchedWeight += weight;
-      }
-    }
-
-    if (availableWeight <= 0) return totalWeight;
-    return totalWeight * _concaveReward(matchedWeight / availableWeight);
-  }
-
-  double _moveInScore(
-    RentalProperty property,
-    SearchFilters filters,
-    DateTime now,
-  ) {
-    final prioritizedOptions = filters.requiredMoveInFilters.isNotEmpty
-        ? filters.requiredMoveInFilters
-        : filters.preferredMoveInFilters;
-    if (prioritizedOptions.isEmpty) return _timingWeight;
-
-    final entryDate = property.entryDateValue;
-    if (entryDate == null) return _timingWeight * 0.35;
-
-    double bestScore = 0;
-    for (final option in prioritizedOptions) {
-      final deadline = _moveInDeadlineFor(option, now);
-      if (deadline == null) {
-        bestScore = math.max(bestScore, _timingWeight);
-        continue;
-      }
-      if (!entryDate.isAfter(deadline)) {
-        bestScore = math.max(bestScore, _timingWeight);
-        continue;
-      }
-
-      final lateDays = math.max(entryDate.difference(deadline).inDays, 1);
-      final graceDays = math.max(_moveInGraceDaysFor(option), 1);
-      final candidate = _timingWeight * _expDecay(lateDays / graceDays, 1.25);
-      bestScore = math.max(bestScore, candidate);
-    }
-    return bestScore;
   }
 
   ListingSourceFilter _listingSourceFor(RentalProperty property) {
@@ -4315,44 +4079,6 @@ class DatingProvider extends ChangeNotifier {
 
     score += property.agencyListing ? 0.7 : 1;
     return _clampDouble(score, 0, _listingConfidenceWeight);
-  }
-
-  double _businessReadinessScore(
-    RentalProperty property,
-    _MatchContext context,
-  ) {
-    var score = 0.0;
-
-    if (context.filters.transactionType == TransactionTypeFilter.any) {
-      score += 0.7;
-    } else {
-      score += 1;
-    }
-
-    if (_hasKnownPrice(property) && property.sizeM2 > 0) score += 1;
-    if (!property.agencyListing) score += 0.8;
-
-    final entryDate = property.entryDateValue;
-    if (entryDate == null) {
-      if (property.entryDate.trim().isNotEmpty) score += 0.4;
-    } else {
-      final daysUntilEntry = entryDate.difference(context.now).inDays;
-      if (daysUntilEntry <= 90) {
-        score += 1;
-      } else if (daysUntilEntry <= 180) {
-        score += 0.6;
-      } else {
-        score += 0.3;
-      }
-    }
-
-    if (property.media.length >= 2 &&
-        property.ownerName.trim().isNotEmpty &&
-        property.street.trim().isNotEmpty) {
-      score += 0.2;
-    }
-
-    return _clampDouble(score, 0, _businessReadinessWeight);
   }
 
   bool _hasUsableCoordinates(RentalProperty property) {
