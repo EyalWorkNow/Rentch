@@ -89,6 +89,14 @@ enum UserEventType {
   funnelStage, // {stage, abandoned}
   priceSensitivity, // {maxOverBudgetRatioLiked}
   personaProfileUpdated, // {version, facts:{key:{value,confidence,source,evidence}}}
+
+  // ── Calibration telemetry ─────────────────────────────────────────────────
+  // The ranker is hand-tuned; to ever fit its thresholds/priors/calibration to
+  // reality we need (prediction → outcome) pairs. `rankedImpression` records the
+  // engine's OWN prediction for each shown listing; the swipe/contact outcome is
+  // then joinable by (sessionId, propertyId), and `swipeOutcome` also carries the
+  // predicted fit inline so a single swipe row is a complete training example.
+  rankedImpression, // {fitPct, rank, dims:{dim:contribution}}
 }
 
 /// Direction of a swipe decision, as recorded by [EventService.logSwipeOutcome].
@@ -166,6 +174,7 @@ class EventService {
     required SwipeDirection direction,
     required double priceToBudgetRatio,
     int? dwellMs,
+    double? predictedFit,
   }) =>
       log(
         UserEventType.swipeOutcome,
@@ -174,8 +183,44 @@ class EventService {
           'direction': direction.name,
           'priceToBudgetRatio': priceToBudgetRatio,
           if (dwellMs != null) 'dwellMs': math.max(0, dwellMs),
+          // The score the ranker gave this listing when it was shown → paired
+          // with the label (direction) this row calibrates prediction vs reality.
+          if (predictedFit != null) 'predictedFit': predictedFit,
         },
       );
+
+  /// The ranker's OWN prediction for a shown listing — [fitPct] (0..100) at its
+  /// [rank], plus the top contributing dimensions (kept small). Emitted per result
+  /// so that, joined to the later swipe/contact outcome on (sessionId, propertyId),
+  /// the hand-tuned scores can finally be calibrated against real behaviour.
+  void logRankedImpression({
+    required String propertyId,
+    required int fitPct,
+    required int rank,
+    Map<String, double>? dims,
+  }) =>
+      log(
+        UserEventType.rankedImpression,
+        propertyId: propertyId,
+        metadata: {
+          'fitPct': fitPct.clamp(0, 100),
+          'rank': math.max(0, rank),
+          if (dims != null && dims.isNotEmpty) 'dims': topDims(dims, 5),
+        },
+      );
+
+  /// The [n] highest-contribution dimensions, rounded — keeps the impression
+  /// payload well under the 2 KB metadata cap while retaining the score's drivers.
+  static Map<String, double> topDims(Map<String, double> dims, int n) {
+    // Drop non-finite contributions: a NaN/Inf would make jsonEncode throw and
+    // silently void the whole metadata row (see _encodeMetadata).
+    final entries = dims.entries.where((e) => e.value.isFinite).toList()
+      ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
+    return {
+      for (final e in entries.take(n))
+        e.key: (e.value * 1000).roundToDouble() / 1000,
+    };
+  }
 
   /// (3) How far (0..1) into the detail view the user scrolled.
   void logDetailScrollDepth({

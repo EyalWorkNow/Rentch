@@ -173,6 +173,10 @@ class DatingProvider extends ChangeNotifier {
   List<RentalProperty>? _allPropertiesCache;
   Map<String, RentalProperty>? _propertyByIdCache;
   List<RentalProperty>? _filteredPropertiesCache;
+  // The deck's best-match score per property from the last sort — the PREDICTION
+  // that ordered the card, attached to the swipe outcome so each swipe is a
+  // (prediction, label) calibration row.
+  Map<String, int> _deckMatchScore = const {};
   List<String>? _availableFeaturesCache;
   List<String>? _availablePropertyTypesCache;
   List<String>? _availableConditionsCache;
@@ -493,6 +497,17 @@ class DatingProvider extends ChangeNotifier {
       workLat: _tenantProfile?.workLat,
       workLon: _tenantProfile?.workLon,
     );
+    // Calibration: log the engine's OWN prediction for every result it surfaces,
+    // so a later swipe/contact outcome (joined by propertyId+sessionId) tells us
+    // how well the hand-tuned fit% actually predicts behaviour. Fire-and-forget.
+    for (var i = 0; i < recs.length; i++) {
+      AppEvents.instance.service.logRankedImpression(
+        propertyId: recs[i].property.id,
+        fitPct: recs[i].fitPct,
+        rank: i,
+        dims: recs[i].dimensionBreakdown,
+      );
+    }
     return [
       for (final r in recs)
         ScoredProperty(
@@ -1153,6 +1168,9 @@ class DatingProvider extends ChangeNotifier {
               property.id: _matchScoreForContext(property, matchContext),
           }
         : const <String, int>{};
+    // Remember the scores that ordered this deck so a swipe can log its own
+    // prediction (calibration). Only meaningful for best-match sort.
+    if (scoreCache.isNotEmpty) _deckMatchScore = scoreCache;
 
     properties.sort((a, b) {
       switch (filters.sortBy) {
@@ -2776,6 +2794,7 @@ class DatingProvider extends ChangeNotifier {
       direction: direction,
       priceToBudgetRatio: ratio,
       dwellMs: dwellMs,
+      predictedFit: _deckMatchScore[property.id]?.toDouble(),
     );
     _foldUserSignal('swipeOutcome', {
       'direction': direction.name,
