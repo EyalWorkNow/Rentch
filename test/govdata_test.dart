@@ -157,7 +157,10 @@ void main() {
             lon: 34.78 + i * 0.003,
             price: 6200 + i * 120),
     ];
-    final q = SmartSearch.parse('דירת 3 חדרים בתל אביב');
+    // NO city in the query — otherwise the city gate correctly drops the
+    // wrong-city Beer Sheva flat entirely (it wouldn't appear at all), which
+    // defeats the point. With both eligible, gov quality alone must decide.
+    final q = SmartSearch.parse('דירת 3 חדרים');
     final recs = RecommendationEngine.recommend(
       candidates: candidates,
       query: q,
@@ -167,7 +170,8 @@ void main() {
     final tlvRank = recs.indexWhere((r) => r.property.id == 'tlv');
     final bashRank = recs.indexWhere((r) => r.property.id == 'bash');
     expect(tlvRank >= 0, true);
-    // Tel Aviv (asked-for city, higher SES/centrality) ranks above Beer Sheva
+    expect(bashRank >= 0, true); // both present → a pure gov-quality comparison
+    // Tel Aviv (higher SES + centrality) ranks above Beer Sheva on gov data alone.
     expect(tlvRank < bashRank, true);
   });
 }

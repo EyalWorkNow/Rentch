@@ -151,10 +151,14 @@ class SearchQuery {
     Set<String>? intents,
     Map<String, double>? weights,
     Set<String>? requiredFeatures,
+    List<String>? excludeAreas,
+    this.areaDir,
+    this.areaDirExclude = false,
   })  : amenities = amenities ?? <String>{},
         intents = intents ?? <String>{},
         weights = weights ?? const <String, double>{},
-        requiredFeatures = requiredFeatures ?? const <String>{};
+        requiredFeatures = requiredFeatures ?? const <String>{},
+        excludeAreas = excludeAreas ?? const <String>[];
 
   final String? city;
   final String? neighborhood;
@@ -194,6 +198,18 @@ class SearchQuery {
   /// not merely down-weighted. Set by Etti's hard_constraints. Distinct from the
   /// soft [amenities] "nice-to-have" set.
   final Set<String> requiredFeatures;
+
+  /// Places (cities/neighborhoods) the user asked to AVOID ("לא רמת גן", "חוץ
+  /// מפלורנטין"). Soft: listings there are strongly down-ranked, not hard-dropped.
+  final List<String> excludeAreas;
+
+  /// A sub-city DIRECTION the seeker cares about — one of
+  /// 'דרום'/'צפון'/'מרכז'/'מזרח'/'מערב' — resolved against the city centroid +
+  /// known neighbourhood clusters. Null when no direction was stated.
+  final String? areaDir;
+
+  /// When true, [areaDir] is what to AVOID ("לא בדרום העיר"), not what to prefer.
+  final bool areaDirExclude;
 
   bool get isEmpty =>
       city == null &&
@@ -610,6 +626,17 @@ class SmartSearch {
       }
     }
 
+    // ── location NEGATION + sub-city DIRECTION ───────────────────────────────
+    // "לא רמת גן" must NOT set city=רמת גן (it's an exclusion). "דרום תל אביב" /
+    // "לא בצפון העיר" carry a direction. This corrects the positive city/hood and
+    // fills excludeAreas / areaDir / areaDirExclude.
+    final locMods = _parseLocationModifiers(text, city, neighborhood);
+    city = locMods.$1;
+    neighborhood = locMods.$2;
+    final excludeAreas = locMods.$3;
+    final areaDir = locMods.$4;
+    final areaDirExclude = locMods.$5;
+
     // ── amenities (keywords + llm flags) ─────────────────────────────────────
     final amenities = <String>{};
     _amenityKeywords.forEach((key, words) {
@@ -689,6 +716,9 @@ class SmartSearch {
     return SearchQuery(
       city: city,
       neighborhood: neighborhood,
+      excludeAreas: excludeAreas,
+      areaDir: areaDir,
+      areaDirExclude: areaDirExclude,
       minPrice: minPrice,
       maxPrice: maxPrice,
       minRooms: minRooms,
@@ -726,6 +756,88 @@ class SmartSearch {
       return true;
     }
     return false;
+  }
+
+  // Location negation + sub-city direction. Returns a corrected
+  // (city, neighborhood, excludeAreas, areaDir, areaDirExclude): a place mentioned
+  // under a negation ("לא רמת גן") is moved OUT of the positive target and INTO
+  // excludeAreas, and a direction ("דרום העיר" / "לא בצפון") is captured.
+  static const _directions = {
+    'דרום': 'דרום', 'צפון': 'צפון', 'מזרח': 'מזרח', 'מערב': 'מערב',
+    'מרכז': 'מרכז', 'לב': 'מרכז',
+  };
+  // Everyday Israeli negation cues that mean "avoid this place".
+  static final _locNeg = RegExp(
+      r'לא|בלי|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט|not|without|avoid|except',
+      caseSensitive: false);
+
+  static (String?, String?, List<String>, String?, bool) _parseLocationModifiers(
+      String text, String? city, String? neighborhood) {
+    final excl = <String>[];
+
+    // A place is negated if a negation cue sits within ~14 chars before it.
+    bool negatedBefore(int idx) {
+      if (idx < 0) return false;
+      final from = idx - 14 < 0 ? 0 : idx - 14;
+      return _locNeg.hasMatch(text.substring(from, idx));
+    }
+
+    String firstWord(String place) => place
+        .split(RegExp(r'[\s\-־]'))
+        .firstWhere((s) => s.isNotEmpty, orElse: () => place);
+
+    if (city != null && negatedBefore(text.indexOf(firstWord(city)))) {
+      excl.add(city);
+      city = null;
+    }
+    if (neighborhood != null && negatedBefore(text.indexOf(neighborhood))) {
+      excl.add(neighborhood);
+      neighborhood = null;
+    }
+
+    // Independently scan "<negation> <place>" — catches a negated place that the
+    // positive city/hood scan skipped (it stops at the first match), e.g.
+    // "בתל אביב אבל לא רמת גן" (city already resolved to תל אביב).
+    final negPhrase = RegExp(
+        r'(?:לא|בלי|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט)\s+'
+        r'(?:ב|ל|ליד\s+|באזור\s+|רוצ\w+\s+ב?|מעוניינ?\w*\s+ב?)?'
+        r'([א-ת]{2,}(?:[\s\-]+[א-ת]{2,})?)',
+        caseSensitive: false);
+    for (final m in negPhrase.allMatches(text)) {
+      final phrase = m.group(1)!.trim();
+      if (_directions.containsKey(phrase.split(RegExp(r'\s+')).first)) continue;
+      final loc = GovData.instance.findLocalityInText(phrase);
+      if (loc != null) {
+        if (!excl.contains(loc.name)) excl.add(loc.name);
+        continue;
+      }
+      final hand = LocalityMatcher.allLocalities
+          .firstWhere((l) => phrase.contains(l), orElse: () => '');
+      if (hand.isNotEmpty) {
+        if (!excl.contains(hand)) excl.add(hand);
+        continue;
+      }
+      for (final n in _neighborhoods) {
+        if (phrase.contains(n) && !excl.contains(n)) {
+          excl.add(n);
+          break;
+        }
+      }
+    }
+
+    // Direction: (ב/ל/מ)?<dir> followed by "העיר" or the city's first word.
+    String? areaDir;
+    var areaDirExclude = false;
+    final cityFirst = city == null ? '' : RegExp.escape(firstWord(city));
+    final anchor = cityFirst.isEmpty ? r'ה?עיר' : '(?:ה?עיר|$cityFirst)';
+    final dm = RegExp(r'[בהמל]?(דרום|צפון|מזרח|מערב|מרכז|לב)\s+' + anchor)
+        .firstMatch(text);
+    if (dm != null) {
+      areaDir = _directions[dm.group(1)];
+      areaDirExclude = negatedBefore(dm.start);
+    }
+
+    return (city, neighborhood, excl, areaDir, areaDirExclude);
   }
 
   static TransactionTypeFilter? _parseTransactionFilter(dynamic v) {

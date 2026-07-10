@@ -272,6 +272,7 @@ class PropertyModel3d {
     this.usdzUrl = '',
     this.spzUrl = '',
     this.plyUrl = '',
+    this.ksplatUrl = '',
     this.textureFolder = '',
     this.assets = const [],
     this.modelQualityScore,
@@ -285,6 +286,9 @@ class PropertyModel3d {
   final String usdzUrl;
   final String spzUrl;
   final String plyUrl;
+  // Compact, fast-loading Gaussian splat produced by rentch-splat-convert from the
+  // uploaded .ply/.spz — the client prefers this over the huge raw .ply.
+  final String ksplatUrl;
   final String textureFolder;
   final List<PropertyModelAsset> assets;
   final int? modelQualityScore;
@@ -298,6 +302,7 @@ class PropertyModel3d {
       usdzUrl.trim().isNotEmpty ||
       spzUrl.trim().isNotEmpty ||
       plyUrl.trim().isNotEmpty ||
+      ksplatUrl.trim().isNotEmpty ||
       textureFolder.trim().isNotEmpty ||
       assets.isNotEmpty;
 
@@ -309,6 +314,7 @@ class PropertyModel3d {
     String? usdzUrl,
     String? spzUrl,
     String? plyUrl,
+    String? ksplatUrl,
     String? textureFolder,
     List<PropertyModelAsset>? assets,
     int? modelQualityScore,
@@ -322,6 +328,7 @@ class PropertyModel3d {
       usdzUrl: usdzUrl ?? this.usdzUrl,
       spzUrl: spzUrl ?? this.spzUrl,
       plyUrl: plyUrl ?? this.plyUrl,
+      ksplatUrl: ksplatUrl ?? this.ksplatUrl,
       textureFolder: textureFolder ?? this.textureFolder,
       assets: assets ?? this.assets,
       modelQualityScore: modelQualityScore ?? this.modelQualityScore,
@@ -339,6 +346,7 @@ class PropertyModel3d {
       usdzUrl: json['usdzUrl']?.toString() ?? '',
       spzUrl: json['spzUrl']?.toString() ?? '',
       plyUrl: json['plyUrl']?.toString() ?? '',
+      ksplatUrl: json['ksplatUrl']?.toString() ?? '',
       textureFolder: json['textureFolder']?.toString() ?? '',
       assets: rawAssets
           .whereType<Map>()
@@ -368,6 +376,7 @@ class PropertyModel3d {
       'usdzUrl': usdzUrl,
       'spzUrl': spzUrl,
       'plyUrl': plyUrl,
+      'ksplatUrl': ksplatUrl,
       'textureFolder': textureFolder,
       'assets': assets.map((item) => item.toJson()).toList(),
       'modelQualityScore': modelQualityScore,

@@ -659,12 +659,13 @@ class RecommendationEngine {
     // never backfilled with an inland flat, nor a "must-have mamad" with one lacking it.
     final backfillPool = List.of(candidates);
 
-    // Budget gate: when the user states a max budget, don't surface listings far
-    // over it (>15%) while in-budget options exist. Relax to the cheapest cluster
-    // when NOTHING fits (the "over budget" concern makes the compromise explicit).
+    // Budget gate: a stated max budget is a HARD ceiling — "עד 5000" must never
+    // surface a ₪5500 flat while anything ≤ ₪5000 exists. Only when NOTHING fits
+    // do we relax to the cheapest available cluster (each carries an explicit
+    // "over budget" concern so the compromise is visible, not silent).
     final maxP = query.maxPrice;
     if (maxP != null && maxP > 0) {
-      final within = candidates.where((p) => p.price <= maxP * 1.15).toList();
+      final within = candidates.where((p) => p.price <= maxP).toList();
       if (within.isNotEmpty) {
         candidates = within;
       } else {
@@ -714,6 +715,22 @@ class RecommendationEngine {
       ranked.sort((a, b) => b.score.compareTo(a.score));
     }
 
+    // Sub-city DIRECTION ("דרום תל אביב") + EXCLUDED areas ("לא רמת גן") — a SOFT
+    // preference: matching listings are boosted / excluded ones sink, but nothing
+    // is hard-dropped (never dead-ends). Purely coordinate + neighbourhood-name.
+    if (query.areaDir != null || query.excludeAreas.isNotEmpty) {
+      final regionCity = namedCity.isNotEmpty ? namedCity : (query.city ?? '');
+      var touched = false;
+      for (final c in ranked) {
+        final mult = _locationRegionMultiplier(c.property, query, regionCity);
+        if (mult != 1.0) {
+          c.score *= mult;
+          touched = true;
+        }
+      }
+      if (touched) ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
     // Part 4 — exploration + diversity
     if (explore) {
       ExplorationPolicy.apply(ranked, model, seed: seed);
@@ -756,16 +773,14 @@ class RecommendationEngine {
     final want = limit < 10 ? limit : 10;
     if (selected.length < want) {
       final have = selected.map((c) => c.property.id).toSet();
-      // Backfill relaxes soft filters to reach ~10 options — but must stay
-      // RELEVANT to the search: never past the stated budget by >15% (a ₪3300
-      // flat must not pad a "עד 2800" search), and — when the seeker explicitly
-      // asked for the SEA — never a clearly-inland flat (no רמת גן for "על הים").
-      // A slightly-over-budget near-match (≤15%) is kept and carries an explicit
-      // "over budget" concern.
+      // Backfill relaxes SOFT filters (features / rooms / sea) to reach ~10 options
+      // — but NEVER the budget: a stated max is a hard ceiling, so a ₪5500 flat must
+      // not pad a "עד 5000" search. (When nothing at all fit the budget, the primary
+      // gate already switched to the cheapest cluster with an "over budget" concern.)
       final nearSeaStated = query.intents.contains(SearchIntent.nearSea);
       final extra = backfillPool.where((p) {
         if (have.contains(p.id)) return false;
-        if (maxP != null && maxP > 0 && p.price > maxP * 1.15) return false;
+        if (maxP != null && maxP > 0 && p.price > maxP) return false;
         if (nearSeaStated) {
           final km = IsraelGeoIndex.coastKm(p.lat, p.lon);
           if (km == null || km > 5.0) return false;
@@ -801,11 +816,13 @@ class RecommendationEngine {
     }
 
     // Adjacent-town results are a BONUS, not the search: keep one only if it's a
-    // genuinely strong fit (>70%), so a weak out-of-city listing never dilutes the
-    // named-city results. (Backfilled fills are already capped ≤0.55 → dropped here.)
+    // genuinely strong fit, so a weak out-of-city listing never dilutes the
+    // named-city results. Threshold is on the HONEST (un-inflated) scale — 0.63
+    // here equals the old inflated 0.70, preserving the same real selectivity.
+    // (Backfilled fills are already capped ≤0.55 → dropped here.)
     if (nearbyKm.isNotEmpty) {
       selected.removeWhere((c) =>
-          nearbyKm.containsKey(c.property.id) && (match[c] ?? 0) <= 0.70);
+          nearbyKm.containsKey(c.property.id) && (match[c] ?? 0) <= 0.63);
     }
 
     // model confidence: how much intent we captured + behavioral confidence
@@ -999,6 +1016,7 @@ class RecommendationEngine {
       weightPct: 0.0,
       contributionPct: score,
       stat: est.plainHebrewLabel,
+      source: GovSources.labelFor(kCommuteDimensionKey),
       positive: score >= _kStrongScore,
     );
   }
@@ -1026,6 +1044,7 @@ class RecommendationEngine {
       weightPct: 0.0,
       contributionPct: score,
       stat: est.plainHebrewLabel,
+      source: GovSources.labelFor(kTotalCostDimensionKey),
       positive: score >= _kStrongScore,
     );
   }
@@ -1057,6 +1076,7 @@ class RecommendationEngine {
       weightPct: weightPct,
       contributionPct: score,
       stat: est.plainHebrewLabel,
+      source: GovSources.labelFor(kYieldDimensionKey),
       positive: score >= _kStrongScore,
     );
   }
@@ -1084,6 +1104,7 @@ class RecommendationEngine {
       weightPct: weightPct,
       contributionPct: score,
       stat: 'כ-$kmLabel ק״מ מהחוף',
+      source: GovSources.labelFor(kCoastDimensionKey),
       positive: score >= _kStrongScore,
     );
   }
@@ -1172,6 +1193,75 @@ class RecommendationEngine {
     return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
 
+  // Sub-city direction → known neighbourhood clusters (name-based). Tel Aviv is
+  // the dense case; other cities fall back to the coordinate half-plane below.
+  static const _dirClusters = <String, Map<String, List<String>>>{
+    'תל אביב': {
+      'דרום': ['פלורנטין', 'שפירא', 'נווה שאנן', 'קרית שלום', 'יד אליהו',
+        'התקווה', 'נווה צדק', 'כרם התימנים', 'מונטיפיורי', 'ביצרון'],
+      'צפון': ['רמת אביב', 'הצפון הישן', 'הצפון החדש', 'בבלי', 'אפקה',
+        'תל ברוך', 'רמת החייל', 'נווה אביבים', 'כוכב הצפון'],
+      'מרכז': ['לב העיר', 'רוטשילד', 'הכרם', 'מרכז העיר', 'גן העיר'],
+      'מזרח': ['רמת החייל', 'יד אליהו', 'ביצרון', 'נחלת יצחק', 'רמת ישראל'],
+      'מערב': ['נווה צדק', 'כרם התימנים', 'גן הכובשים'],
+    },
+  };
+
+  /// Is [p] in the [dir] region of [city]? true=in · false=out · null=can't tell.
+  static bool? _inDirection(RentalProperty p, String city, String dir) {
+    final clusters = _dirClusters[_normCity(city)] ?? _dirClusters[city.trim()];
+    if (clusters != null && p.neighborhood.trim().isNotEmpty) {
+      final names = clusters[dir];
+      if (names != null && names.any((n) => p.neighborhood.contains(n))) {
+        return true;
+      }
+    }
+    final gov = GovData.instance.localityByName(city);
+    if (gov != null && gov.lat.abs() > 0.1 && p.lat.abs() > 0.1) {
+      switch (dir) {
+        case 'דרום':
+          return p.lat < gov.lat - 0.004; // ~400m buffer around the centroid
+        case 'צפון':
+          return p.lat > gov.lat + 0.004;
+        case 'מזרח':
+          return p.lon > gov.lon + 0.004;
+        case 'מערב':
+          return p.lon < gov.lon - 0.004;
+        case 'מרכז':
+          return _km(p.lat, p.lon, gov.lat, gov.lon) <= 2.5;
+      }
+    }
+    return null;
+  }
+
+  /// Soft location multiplier for direction + excluded areas (never 0).
+  static double _locationRegionMultiplier(
+      RentalProperty p, SearchQuery q, String city) {
+    double m = 1.0;
+    if (q.excludeAreas.isNotEmpty) {
+      final hay = _normCity('${p.city} ${p.neighborhood}');
+      for (final area in q.excludeAreas) {
+        final a = _normCity(area);
+        if (a.isNotEmpty && hay.contains(a)) {
+          m *= 0.35; // an explicitly-avoided place sinks hard (but never vanishes)
+          break;
+        }
+      }
+    }
+    final dir = q.areaDir;
+    if (dir != null && city.isNotEmpty) {
+      final inR = _inDirection(p, city, dir);
+      if (inR != null) {
+        if (q.areaDirExclude) {
+          if (inR) m *= 0.35; // "לא בדרום" → sink flats in that direction
+        } else if (!inR) {
+          m *= 0.55; // "דרום" → prefer that direction, downweight the rest
+        }
+      }
+    }
+    return m;
+  }
+
   /// Display "match %": how well the listing satisfies WHAT THE USER ASKED FOR
   /// (the stated dimensions), lightly blended with overall quality. The raw
   /// ranking score (c.score) includes trust/popularity/freshness the user never
@@ -1187,15 +1277,13 @@ class RecommendationEngine {
       acc += w * model.satisfaction(dim, c.pfv);
     }
     if (wsum <= 0) return c.score;
-    // Mostly the stated-criteria fit, with a little overall quality so it isn't
-    // a single axis. Both are 0..1.
-    // Mostly the stated-criteria fit (weigh it more; the ranking blend carries
-    // trust/popularity the user didn't ask about, which shouldn't drag the %).
-    final m = (0.85 * (acc / wsum) + 0.15 * c.score).clamp(0.0, 1.0);
-    // Display calibration: a genuinely good match (~0.7) should READ as strong
-    // (~0.85). Expand the upper half only — weak matches (≤0.5) are untouched, and
-    // the transform is monotonic so the display order is preserved.
-    return (m <= 0.5 ? m : (0.5 + (m - 0.5) * 1.5)).clamp(0.0, 1.0);
+    // HONEST fit: the weighted satisfaction of the user's STATED criteria (mostly),
+    // plus a small overall-quality term so it isn't a single axis and ties break by
+    // quality. Both are 0..1. NO cosmetic inflation — the % means exactly what it
+    // says: "this listing satisfies ~X% of what you asked for". A listing that
+    // fully meets the criteria and also scores well still reaches ~90%+ ("perfect");
+    // a partial match now reads at its true level instead of being padded upward.
+    return (0.85 * (acc / wsum) + 0.15 * c.score).clamp(0.0, 1.0);
   }
 
   static List<String> _concerns(

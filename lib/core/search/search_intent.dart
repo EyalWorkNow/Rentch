@@ -22,6 +22,11 @@ class SearchIntent {
   static const nearUniversity = 'near_university';
   static const investment = 'investment';
   static const roommates = 'roommates';
+  /// Household shape — a young person living ALONE, or a couple. These sharpen
+  /// lifestyle ranking dimensions (centrality, young/lively area, transit) so the
+  /// persona actually reorders results, not just the nearby-places card.
+  static const single = 'single';
+  static const couple = 'couple';
   static const wfh = 'wfh';
   static const goodSchools = 'good_schools';
   static const qualityArea = 'quality_area';
@@ -91,6 +96,18 @@ class SearchIntent {
         RegExp(r'אוניברסיט|קמפוס|מכלל|university|campus', caseSensitive: false),
     investment: RegExp(r'השקע|תשוא|invest|yield|rental income', caseSensitive: false),
     roommates: RegExp(r'שותפ|שותפות|roommate|flatmate', caseSensitive: false),
+    // Detect the "living ALONE" INTENT via explicit phrasings, NOT a bare "לבד"
+    // (which false-matches "לא לבד" / "פחד להיות לבד" — the _negator only covers
+    // בלי/ללא/לא-ליד, not a bare לא). Stricter than NearbyProfile on purpose: this
+    // one moves the ranking, so a false positive has a real cost.
+    single: RegExp(
+        r'רווק|רווקה|לגור לבד|גר לבד|גרה לבד|גר לבדי|מחפש לבד|לבד בדירה|'
+        r'\bsolo\b|\bsingle\b|living alone|on my own|by myself|young professional',
+        caseSensitive: false),
+    couple: RegExp(
+        r'זוג|זוגי|בן ?זוג|בת ?זוג|בני ?זוג|בזוגיות|נשואים טריים|'
+        r'couple|partner|spouse|two of us|newlywed',
+        caseSensitive: false),
     wfh: RegExp(
         r'עבודה מהבית|עובד מהבית|עובדת מהבית|חדר עבודה|מהבית|רימוט|remote|wfh|work from home',
         caseSensitive: false),

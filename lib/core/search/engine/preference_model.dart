@@ -793,9 +793,42 @@ class PreferenceModelBuilder {
     if (intents.contains(SearchIntent.spacious)) {
       sharpen('spaciousness', 0.9, 10.0);
     }
+    // A persona's LIVELY-lifestyle boosts (nightlife / young-area) are wrong when
+    // the SAME query asks for calm — an elderly religious couple ("זוג דתי מבוגר
+    // ... שקט") is still a couple, but must NOT be pushed toward bars. Gate the
+    // lively signals on the absence of a quiet/religious/senior cue.
+    final wantsCalm = intents.contains(SearchIntent.quiet) ||
+        intents.contains(SearchIntent.religiousArea);
     if (intents.contains(SearchIntent.roommates)) {
       sharpen('size', 0.85, 4.0);
       sharpen('spaciousness', 0.85, 6.0);
+      sharpen('transit', 0.72, 4.0); // often car-free
+      if (!wantsCalm) {
+        sharpen('young_area', 0.80, 5.0); // shared flats skew young
+        sharpen('nightlife', 0.72, 4.0); // + social / going-out
+      }
+    }
+    // A young single living alone → central, well-connected, and (unless they
+    // asked for calm) lively/young. Uses the real bar/café-density ('nightlife'),
+    // CBS young-adult share and transit-grid dims, so the persona genuinely
+    // reorders results — not just the nearby-places card.
+    if (intents.contains(SearchIntent.single)) {
+      sharpen('location', 0.82, 6.0);
+      sharpen('transit', 0.75, 5.0);
+      if (!wantsCalm) {
+        sharpen('young_area', 0.85, 7.0);
+        sharpen('nightlife', 0.78, 6.0); // bars / cafés / restaurants nearby
+      }
+    }
+    // A couple → central-ish, a quality area, and dining/cafés. But these are
+    // SOFT inferences and must never fight an explicit ask: a religious/quiet
+    // couple's neighbourhood is driven by 'religious_area'/'quiet', so when the
+    // query signals calm we leave the couple signal inert rather than push
+    // generic centrality/SES/nightlife that would bury a מאה-שערים flat.
+    if (intents.contains(SearchIntent.couple) && !wantsCalm) {
+      sharpen('location', 0.70, 4.0);
+      sharpen('neighborhood', 0.62, 3.0);
+      sharpen('nightlife', 0.62, 3.0);
     }
     if (intents.contains(SearchIntent.wfh)) {
       sharpen('spaciousness', 0.85, 7.0);
@@ -1041,6 +1074,16 @@ class PreferenceModelBuilder {
       'schools': const LinearUtility(),
       'family': const LinearUtility(),
       'health': const LinearUtility(),
+      // These 5 gov/geo dims were MISSING here and silently fell back to a
+      // ConstantUtility(0.5) in satisfaction() — i.e. their real feature values
+      // were IGNORED in ranking. So a religious neighbourhood, a nearby park, an
+      // age-matched school, and bar/café density never actually moved the score
+      // (only their chips did). They are [0,1] scores where higher is better.
+      'park': const LinearUtility(),
+      'religious_area': const LinearUtility(),
+      'school_young': const LinearUtility(),
+      'school_teen': const LinearUtility(),
+      'nightlife': const LinearUtility(),
       'coast': const LinearUtility(), // coast_access is already a [0,1] proximity
       'yield': const LinearUtility(), // yield score already normalised to [0,1]
       'university': const LinearUtility(),

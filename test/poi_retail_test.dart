@@ -44,7 +44,9 @@ void main() {
     // Tel Aviv centre sits in a seeded dense cell.
     expect(GovData.instance.retailAccessScore(32.072, 34.781) > 0, true);
     // A remote desert coord has no POI cell → neutral 0 (degrades, no crash).
-    expect(GovData.instance.retailAccessScore(30.61, 34.80), 0.0);
+    // Mitzpe-Ramon (30.61,34.80) now has real shops under the NATIONAL data, so
+    // use the truly-empty deep Arava instead.
+    expect(GovData.instance.retailAccessScore(30.35, 35.10), 0.0);
   });
 
   test('convenience dimension is ENGAGED in ranking for an errands query', () {

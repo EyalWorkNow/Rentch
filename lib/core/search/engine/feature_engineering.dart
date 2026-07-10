@@ -150,6 +150,17 @@ class _Clinic {
   final double lon;
 }
 
+/// A generic bundled point (pharmacy / playground / gym / dining / nightlife).
+/// [type] carries an optional Hebrew subtype (מסעדה / בית קפה / בר / פאב); name
+/// may be empty for layers that are mostly unnamed in OSM (playgrounds).
+class _Poi {
+  const _Poi(this.name, this.lat, this.lon, [this.type = '']);
+  final String name;
+  final double lat;
+  final double lon;
+  final String type;
+}
+
 /// A named nearby place (school / kindergarten / park) with its distance from the
 /// apartment — for the "nearby places" lists on the property detail screen.
 class NearbyPlace {
@@ -166,8 +177,8 @@ class NearbyPlace {
   final double km;
   final double lat;
   final double lon;
-  final String kind; // school | kindergarten | clinic | supermarket | park
-  final String stage; // schools: גן/יסודי/חטיבת ביניים/תיכון · clinics: קופת חולים/מרפאה
+  final String kind; // school|kindergarten|clinic|supermarket|park|pharmacy|playground|gym|dining|nightlife
+  final String stage; // schools: גן/יסודי/… · clinics: קופת חולים/מרפאה · dining/nightlife: מסעדה/בר/…
   final String sector; // schools: ממלכתי/דתי/חרדי · clinics: HMO (כללית/מכבי/…)
 }
 
@@ -418,6 +429,189 @@ class IsraelGeoIndex {
     return out.length > cap ? out.sublist(0, cap) : out;
   }
 
+  /// 0..1 errands access from the REAL supermarket point layer — count within
+  /// [km] km, log-compressed ([cap] within-radius ⇒ 1.0). Replaces the 16-cell
+  /// Tel-Aviv retail SEED grid with 4.5k national points. 0 when none nearby or
+  /// the layer isn't loaded.
+  // ponytail: O(candidates × supermarkets) linear scan; add a grid index if a
+  // single search ever ranks thousands of candidates.
+  static double supermarketAccess(double lat, double lon,
+      {double km = 1.5, int cap = 8}) {
+    if (_supermarkets.isEmpty || !_hasCoords(lat, lon)) return 0.0;
+    var n = 0;
+    for (final s in _supermarkets) {
+      if (haversineKm(lat, lon, s.lat, s.lon) <= km) n++;
+    }
+    return n == 0 ? 0.0 : (math.log(1 + n) / math.log(1 + cap)).clamp(0.0, 1.0);
+  }
+
+  /// 0..1 health access from the REAL clinic point layer (HMO + general) — count
+  /// within [km] km (clinics matter a bit farther than groceries), log-compressed.
+  /// Replaces the 160-city health table with 599 national HMO-tagged points.
+  static double clinicAccess(double lat, double lon,
+      {double km = 3, int cap = 6}) {
+    if (_clinics.isEmpty || !_hasCoords(lat, lon)) return 0.0;
+    var n = 0;
+    for (final c in _clinics) {
+      if (haversineKm(lat, lon, c.lat, c.lon) <= km) n++;
+    }
+    return n == 0 ? 0.0 : (math.log(1 + n) / math.log(1 + cap)).clamp(0.0, 1.0);
+  }
+
+  // ── lifestyle POI layers (pharmacies/playgrounds/gyms/dining/nightlife) ─────
+  // One generic mechanism instead of five copy-pasted loaders. Each layer is a
+  // bundled `[{n?,lat,lon,t?}]` JSON; `_poiLayers[key]` is null until loaded.
+  static final Map<String, List<_Poi>> _poiLayers = {};
+
+  static Future<void> _loadPoi(String key, String file) async {
+    if (_poiLayers.containsKey(key)) return;
+    _poiLayers[key] = const <_Poi>[]; // mark loading (idempotent)
+    try {
+      final raw = await rootBundle.loadString('assets/data/govdata/$file');
+      _poiLayers[key] = [
+        for (final e in (jsonDecode(raw) as List))
+          if (e is Map)
+            _Poi((e['n'] ?? '').toString(), (e['lat'] as num).toDouble(),
+                (e['lon'] as num).toDouble(), (e['t'] ?? '').toString()),
+      ];
+    } catch (_) {
+      _poiLayers[key] = const <_Poi>[];
+    }
+  }
+
+  /// Load every lifestyle layer used by the personalised nearby card.
+  static Future<void> loadLifestylePois() => Future.wait([
+        _loadPoi('pharmacies', 'pharmacies.json'),
+        _loadPoi('playgrounds', 'playgrounds.json'),
+        _loadPoi('gyms', 'gyms.json'),
+        _loadPoi('dining', 'dining.json'),
+        _loadPoi('nightlife', 'nightlife_venues.json'),
+        _loadPoi('synagogues', 'synagogues.json'),
+        _loadPoi('culture', 'culture.json'),
+        _loadPoi('hospitals', 'hospitals.json'),
+        _loadPoi('transit_stops', 'transit_stops.json'),
+        _loadPoi('worship', 'worship.json'),
+        _loadPoi('pools', 'pools.json'),
+        _loadPoi('dog_parks', 'dog_parks.json'),
+        _loadPoi('vets', 'vets.json'),
+        _loadPoi('bike_share', 'bike_share.json'),
+        _loadPoi('coworking', 'coworking.json'),
+        _loadPoi('parking', 'parking.json'),
+      ]);
+
+  /// Generic within-radius query over a loaded [_poiLayers] key. [kind] tags the
+  /// result; [genericName] labels unnamed points (playgrounds).
+  static List<NearbyPlace> _poiWithin(String key, double lat, double lon,
+      {required double km,
+      required String kind,
+      int cap = 12,
+      String genericName = ''}) {
+    final list = _poiLayers[key];
+    if (list == null || list.isEmpty || !_hasCoords(lat, lon)) return const [];
+    final out = <NearbyPlace>[];
+    final seen = <String>{};
+    for (final p in list) {
+      final d = haversineKm(lat, lon, p.lat, p.lon);
+      if (d > km) continue;
+      final name = p.name.isEmpty ? genericName : p.name;
+      if (name.isEmpty || !seen.add('$name|${p.lat}|${p.lon}')) continue;
+      out.add(NearbyPlace(
+          name: name, km: d, lat: p.lat, lon: p.lon, kind: kind, stage: p.type));
+    }
+    out.sort((a, b) => a.km.compareTo(b.km));
+    return out.length > cap ? out.sublist(0, cap) : out;
+  }
+
+  static List<NearbyPlace> pharmaciesWithin(double lat, double lon,
+          {double km = 2, int cap = 12}) =>
+      _poiWithin('pharmacies', lat, lon, km: km, kind: 'pharmacy', cap: cap);
+
+  static List<NearbyPlace> playgroundsWithin(double lat, double lon,
+          {double km = 1.5, int cap = 12}) =>
+      _poiWithin('playgrounds', lat, lon,
+          km: km, kind: 'playground', cap: cap, genericName: 'גן שעשועים');
+
+  static List<NearbyPlace> gymsWithin(double lat, double lon,
+          {double km = 3, int cap = 12}) =>
+      _poiWithin('gyms', lat, lon, km: km, kind: 'gym', cap: cap);
+
+  static List<NearbyPlace> diningWithin(double lat, double lon,
+          {double km = 1.5, int cap = 12}) =>
+      _poiWithin('dining', lat, lon, km: km, kind: 'dining', cap: cap);
+
+  static List<NearbyPlace> nightlifeVenuesWithin(double lat, double lon,
+          {double km = 2, int cap = 12}) =>
+      _poiWithin('nightlife', lat, lon, km: km, kind: 'nightlife', cap: cap);
+
+  static List<NearbyPlace> synagoguesWithin(double lat, double lon,
+          {double km = 1.5, int cap = 12}) =>
+      _poiWithin('synagogues', lat, lon,
+          km: km, kind: 'synagogue', cap: cap, genericName: 'בית כנסת');
+
+  /// Loads ONLY the synagogue layer (lightweight, ~576 pts) for the religious_area
+  /// scoring signal — call at startup so the ranker has it without pulling every
+  /// lifestyle layer. Idempotent (shares the _poiLayers cache with the card).
+  static Future<void> loadSynagogues() => _loadPoi('synagogues', 'synagogues.json');
+
+  /// 0..1 religiosity proxy from REAL synagogue DENSITY — count within [km] km,
+  /// log-compressed ([cap] within radius ⇒ 1.0). A dense cluster of synagogues is
+  /// a strong, NATIONAL signal of an observant community, unlike the hardcoded
+  /// neighbourhood list (which only knows a handful of areas). 0 when unloaded.
+  static double synagogueDensity(double lat, double lon,
+      {double km = 1.0, int cap = 10}) {
+    final list = _poiLayers['synagogues'];
+    if (list == null || list.isEmpty || !_hasCoords(lat, lon)) return 0.0;
+    var n = 0;
+    for (final s in list) {
+      if (haversineKm(lat, lon, s.lat, s.lon) <= km) n++;
+    }
+    return n == 0 ? 0.0 : (math.log(1 + n) / math.log(1 + cap)).clamp(0.0, 1.0);
+  }
+
+  static List<NearbyPlace> cultureWithin(double lat, double lon,
+          {double km = 3, int cap = 12}) =>
+      _poiWithin('culture', lat, lon, km: km, kind: 'culture', cap: cap);
+
+  static List<NearbyPlace> hospitalsWithin(double lat, double lon,
+          {double km = 5, int cap = 12}) =>
+      _poiWithin('hospitals', lat, lon, km: km, kind: 'hospital', cap: cap);
+
+  static List<NearbyPlace> transitStopsWithin(double lat, double lon,
+          {double km = 1.5, int cap = 12}) =>
+      _poiWithin('transit_stops', lat, lon,
+          km: km, kind: 'transit', cap: cap, genericName: 'תחנת רכבת');
+
+  static List<NearbyPlace> worshipWithin(double lat, double lon,
+          {double km = 2, int cap = 12}) =>
+      _poiWithin('worship', lat, lon,
+          km: km, kind: 'worship', cap: cap, genericName: 'בית תפילה');
+
+  static List<NearbyPlace> poolsWithin(double lat, double lon,
+          {double km = 3, int cap = 12}) =>
+      _poiWithin('pools', lat, lon, km: km, kind: 'pool', cap: cap);
+
+  static List<NearbyPlace> dogParksWithin(double lat, double lon,
+          {double km = 2, int cap = 12}) =>
+      _poiWithin('dog_parks', lat, lon,
+          km: km, kind: 'dogpark', cap: cap, genericName: 'גינת כלבים');
+
+  static List<NearbyPlace> vetsWithin(double lat, double lon,
+          {double km = 3, int cap = 12}) =>
+      _poiWithin('vets', lat, lon, km: km, kind: 'vet', cap: cap);
+
+  static List<NearbyPlace> bikeShareWithin(double lat, double lon,
+          {double km = 1.5, int cap = 12}) =>
+      _poiWithin('bike_share', lat, lon,
+          km: km, kind: 'bike', cap: cap, genericName: 'תחנת אופניים');
+
+  static List<NearbyPlace> coworkingWithin(double lat, double lon,
+          {double km = 3, int cap = 12}) =>
+      _poiWithin('coworking', lat, lon, km: km, kind: 'coworking', cap: cap);
+
+  static List<NearbyPlace> parkingWithin(double lat, double lon,
+          {double km = 1.5, int cap = 12}) =>
+      _poiWithin('parking', lat, lon, km: km, kind: 'parking', cap: cap);
+
   // Nightlife venues (OSM bars/pubs/clubs weighted 1.0, cafés 0.4). A LIVELY area
   // isn't the nearest bar — it's the DENSITY of them around you.
   static List<List<double>> _nightlife = const <List<double>>[]; // [lat,lon,w]
@@ -496,15 +690,18 @@ class IsraelGeoIndex {
   };
 
   /// 0..1 — how religiously-observant the property's community is (verified list).
+  /// A confirmed religious NEIGHBOURHOOD is the most specific signal and takes
+  /// precedence — otherwise a מאה-שערים flat was dragged down to Jerusalem's
+  /// city-average (0.6), identical to a secular Jerusalem flat, so the dimension
+  /// couldn't tell them apart. City-level is the fallback when the neighbourhood
+  /// is unknown, but a known religious neighbourhood always wins.
   static double religiousAreaScore(String city, String neighborhood) {
     final c = city.trim();
-    final direct = _religiousLocalities[c];
-    if (direct != null) return direct;
     final n = neighborhood.trim();
     for (final rn in _religiousNeighbourhoods) {
       if (n.contains(rn) || c.contains(rn)) return 0.95;
     }
-    return 0.0;
+    return _religiousLocalities[c] ?? 0.0;
   }
 
   /// The nearest park's NAME (for the "קרוב ל<park>" reason), or null.
@@ -1100,8 +1297,14 @@ class FeatureEngineer {
     f['park_access'] = IsraelGeoIndex.proximityKernel(
         IsraelGeoIndex.parkKm(p.lat, p.lon),
         scaleKm: 0.7);
-    f['religious_area'] =
-        IsraelGeoIndex.religiousAreaScore(p.city, p.neighborhood);
+    // Religiosity of the community: the curated locality/neighbourhood list (known
+    // religious areas) OR real synagogue density around the flat — whichever is
+    // stronger. The density term extends the signal NATIONALLY to observant
+    // pockets the hardcoded list doesn't name, while known areas keep their score.
+    f['religious_area'] = math.max(
+      IsraelGeoIndex.religiousAreaScore(p.city, p.neighborhood),
+      IsraelGeoIndex.synagogueDensity(p.lat, p.lon),
+    );
 
     // ── price / value econometrics ───────────────────────────────────────────
     f['price'] = p.price.toDouble();
@@ -1269,10 +1472,16 @@ class FeatureEngineer {
         IsraelGeoIndex.schoolTypeProximity(p.lat, p.lon, ['תיכון', 'חטיבה']);
     // Nightlife/vibrancy — real bar/pub/café density (a "young, lively area").
     f['nightlife'] = IsraelGeoIndex.nightlifeDensity(p.lat, p.lon);
-    f['health_access'] = gov.healthAccessScore(p.city);
-    // Errands access — supermarkets + shopping centres nearby (a "walk to the
-    // groceries" convenience). Neutral 0 when the POI dataset isn't bundled.
-    f['retail_access'] = gov.retailAccessScore(p.lat, p.lon);
+    // Health access — REAL national clinic points (point-level, HMO-tagged) as the
+    // primary signal, falling back to the city-level gov table where no clinic is
+    // mapped nearby. max() keeps whichever is the stronger evidence.
+    f['health_access'] = math.max(
+        IsraelGeoIndex.clinicAccess(p.lat, p.lon), gov.healthAccessScore(p.city));
+    // Errands access — REAL national supermarket points (4.5k) as the primary
+    // signal, OR-ed with the gov retail grid (which also counts malls where it has
+    // coverage). Replaces the Tel-Aviv-only 16-cell retail seed.
+    f['retail_access'] = math.max(IsraelGeoIndex.supermarketAccess(p.lat, p.lon),
+        gov.retailAccessScore(p.lat, p.lon));
     // Quietness (physical): 1 = far from a major road/rail, 0 = right on one.
     // "unknown" (no noise dataset) stays neutral 0.5 — absence ≠ silence.
     final noise = gov.roadNoiseScore(p.lat, p.lon);

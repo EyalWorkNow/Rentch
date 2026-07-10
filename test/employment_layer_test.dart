@@ -45,7 +45,9 @@ void main() {
 
   test('employmentAccessScore >0 in a job cluster, 0 in a residential area', () {
     expect(GovData.instance.employmentAccessScore(32.072, 34.790) > 0, true);
-    expect(GovData.instance.employmentAccessScore(32.02, 34.74), 0.0);
+    // Empty area = deep Arava desert (no settlement) — the OLD Bat-Yam coord now
+    // legitimately has jobs under the NATIONAL data (the seed only covered TLV).
+    expect(GovData.instance.employmentAccessScore(30.35, 35.10), 0.0);
     expect(GovData.instance.employmentAccessScore(double.infinity, 34.0), 0.0);
   });
 

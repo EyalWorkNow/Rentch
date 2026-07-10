@@ -113,13 +113,15 @@ class GeoIntelligence {
     final prior = _cityPrior(city);
 
     if (_gov.loaded) {
-      final ses = _gov.socioeconomic(city);
-      final sesScore = (ses >= 1 && ses <= 10) ? (ses - 1) / 9.0 : null;
+      // Centrality is PURELY spatial prominence — transit density + a city prior.
+      // Socioeconomic status is deliberately NOT mixed in here: SES is scored on
+      // its own `neighborhood` dimension, so folding it into centrality (which
+      // feeds `location`) would double-count the same fact. Keeping the two
+      // orthogonal — "how central/accessible" vs "how affluent" — is the point.
       final density = _validCoord(lat, lon)
           ? _gov.transitDensityScore(lat, lon)
           : null;
 
-      // weighted blend of whatever signals we actually have
       double num = 0, den = 0;
       void add(double? v, double w) {
         if (v != null) {
@@ -128,9 +130,8 @@ class GeoIntelligence {
         }
       }
 
-      add(sesScore, 0.45);
-      add(density, 0.35);
-      add(prior, 0.30); // prior always present (floor)
+      add(density, 0.6);
+      add(prior, 0.4); // prior always present (floor)
 
       final blended = den > 0 ? num / den : prior;
       // never let it fall below half the city prior (stability)

@@ -44,8 +44,10 @@ void main() {
   });
 
   test('futureValueScore is high on a planned station, ~0 far away', () {
-    expect(GovData.instance.futureValueScore(32.090, 34.800) > 0.8, true);
-    expect(GovData.instance.futureValueScore(32.02, 34.73) < 0.1, true);
+    // On an actual sampled under-construction line point in central TLV.
+    expect(GovData.instance.futureValueScore(32.0619, 34.7872) > 0.8, true);
+    // Deep Arava desert — 67km from any planned line → ~0.
+    expect(GovData.instance.futureValueScore(30.35, 35.10) < 0.1, true);
     expect(GovData.instance.futureValueScore(double.infinity, 34.0), 0.0);
   });
 

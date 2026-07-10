@@ -2286,6 +2286,31 @@ class DatingProvider extends ChangeNotifier {
   bool isScanProcessing(String propertyId) =>
       _scanProcessingPropertyIds.contains(propertyId);
 
+  // In-memory: when a Gaussian-splat scan was just imported, the server is
+  // converting the heavy .ply into a fast .ksplat (~30-60s). Drives the
+  // "מעבד… (timer)" notice on the listing. Auto-expires after 3 min so it never
+  // sticks even if we miss the completion signal.
+  final Map<String, DateTime> _scanOptimizingSince = {};
+
+  /// Mark that [propertyId]'s scan is optimizing (server .ksplat conversion).
+  void markScanOptimizing(String propertyId) {
+    if (propertyId.trim().isEmpty) return;
+    _scanOptimizingSince[propertyId] = DateTime.now();
+    notifyListeners();
+  }
+
+  /// When optimization started for [propertyId], or null if it isn't optimizing
+  /// (or the ~3-min window elapsed). Prunes stale entries.
+  DateTime? scanOptimizingSince(String propertyId) {
+    final t = _scanOptimizingSince[propertyId];
+    if (t == null) return null;
+    if (DateTime.now().difference(t).inMinutes >= 3) {
+      _scanOptimizingSince.remove(propertyId);
+      return null;
+    }
+    return t;
+  }
+
   /// Reloads the cached set of property ids with an in-flight scan and notifies
   /// listeners if it changed. Cheap and safe to call from any owner screen.
   Future<void> refreshScanProcessingCache() async {

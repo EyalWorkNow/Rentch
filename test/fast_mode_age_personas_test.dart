@@ -55,7 +55,7 @@ final _cat = <RentalProperty>[
   p('rish_no', city: 'ראשון לציון', lat: 31.9600, lon: 34.8000, price: 5500, rooms: 4, feats: ['ac']),
   // Jerusalem — religious retiree, quiet. One in a religious neighbourhood.
   p('jer_quiet', city: 'ירושלים', lat: 31.7780, lon: 35.2100, price: 5000, rooms: 3, feats: ['ac', 'elevator']),
-  p('jer_relig', city: 'ירושלים', neighborhood: 'מאה שערים', lat: 31.7870, lon: 35.2230, price: 4900, rooms: 3, feats: ['ac', 'elevator']),
+  p('jer_relig', city: 'ירושלים', neighborhood: 'מאה שערים', lat: 31.7890, lon: 35.2200, price: 4900, rooms: 3, feats: ['ac', 'elevator']),
   // Periphery sale — investor.
   p('afula_sale', city: 'עפולה', lat: 32.6100, lon: 35.2900, price: 900000, rooms: 3, tx: PropertyTransactionType.sale),
 ];

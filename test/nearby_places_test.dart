@@ -13,6 +13,9 @@ void main() {
   setUpAll(() async {
     await IsraelGeoIndex.loadSchools();
     await IsraelGeoIndex.loadParks();
+    await IsraelGeoIndex.loadSupermarkets();
+    await IsraelGeoIndex.loadClinics();
+    await IsraelGeoIndex.loadLifestylePois();
   });
 
   test('schoolsWithin: non-empty, <=2km, sorted, not kindergartens', () {
@@ -55,5 +58,71 @@ void main() {
   test('invalid coords → empty lists', () {
     expect(IsraelGeoIndex.schoolsWithin(0, 0), isEmpty);
     expect(IsraelGeoIndex.parksWithin(0, 0), isEmpty);
+  });
+
+  // ── scoring access (the #2 rewiring: real points feed retail/health_access) ──
+  test('supermarketAccess: strong in dense TA, 0 at invalid coords', () {
+    final a = IsraelGeoIndex.supermarketAccess(lat, lon);
+    expect(a, greaterThan(0.5)); // central TA has many supermarkets within 1.5km
+    expect(a, lessThanOrEqualTo(1.0));
+    expect(IsraelGeoIndex.supermarketAccess(0, 0), 0.0);
+  });
+
+  test('clinicAccess: positive in dense TA, 0 at invalid coords', () {
+    final a = IsraelGeoIndex.clinicAccess(lat, lon);
+    expect(a, greaterThan(0.0));
+    expect(a, lessThanOrEqualTo(1.0));
+    expect(IsraelGeoIndex.clinicAccess(0, 0), 0.0);
+  });
+
+  test('synagogueDensity: strong in religious מאה שערים, 0 in the desert', () {
+    // מאה שערים (Jerusalem) is dense with synagogues → a real religiosity signal
+    // the hardcoded list can now be backed/extended by.
+    expect(IsraelGeoIndex.synagogueDensity(31.789, 35.220), greaterThan(0.3));
+    expect(IsraelGeoIndex.synagogueDensity(30.35, 35.10), 0.0); // Arava desert
+    expect(IsraelGeoIndex.synagogueDensity(0, 0), 0.0);
+  });
+
+  test('hospitals + transit stops load and return places in central TA', () {
+    expect(IsraelGeoIndex.hospitalsWithin(lat, lon, km: 6), isNotEmpty);
+    final t = IsraelGeoIndex.transitStopsWithin(lat, lon, km: 3);
+    expect(t, isNotEmpty);
+    expect(t.any((s) => s.stage.isNotEmpty), isTrue); // typed רכבת/רק״ל/מטרו
+    // worship layer loads (mosques/churches sparse in central TA — just no crash).
+    expect(IsraelGeoIndex.worshipWithin(lat, lon, km: 5).length,
+        greaterThanOrEqualTo(0));
+  });
+
+  test('pools / bike-share / parking / coworking / vets load in central TA', () {
+    expect(IsraelGeoIndex.poolsWithin(lat, lon, km: 4), isNotEmpty);
+    expect(IsraelGeoIndex.bikeShareWithin(lat, lon, km: 3), isNotEmpty);
+    expect(IsraelGeoIndex.parkingWithin(lat, lon, km: 3), isNotEmpty);
+    // sparser layers just load without crashing (may be empty at this point)
+    expect(IsraelGeoIndex.coworkingWithin(lat, lon, km: 5).length,
+        greaterThanOrEqualTo(0));
+    expect(IsraelGeoIndex.vetsWithin(lat, lon, km: 5).length,
+        greaterThanOrEqualTo(0));
+    expect(IsraelGeoIndex.dogParksWithin(lat, lon, km: 5).length,
+        greaterThanOrEqualTo(0));
+  });
+
+  test('synagogues + culture load and return nearby places in central TA', () {
+    final syn = IsraelGeoIndex.synagoguesWithin(lat, lon, km: 2);
+    expect(syn, isNotEmpty);
+    for (final s in syn) {
+      expect(s.km, lessThanOrEqualTo(2.0));
+      expect(s.name, isNotEmpty); // generic "בית כנסת" when unnamed
+    }
+    final cul = IsraelGeoIndex.cultureWithin(lat, lon, km: 3);
+    expect(cul, isNotEmpty);
+    expect(cul.any((c) => c.stage.isNotEmpty), isTrue); // typed (מוזיאון/תיאטרון/…)
+  });
+
+  test('supermarketAccess in the Negev desert is far lower than central TA', () {
+    // A sparse rural point should score well below dense Tel Aviv — proves it is
+    // reading real point density, not a flat constant.
+    final ta = IsraelGeoIndex.supermarketAccess(lat, lon);
+    final desert = IsraelGeoIndex.supermarketAccess(30.6, 34.8); // near Mitzpe Ramon
+    expect(desert, lessThan(ta));
   });
 }

@@ -1,6 +1,7 @@
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/engine/preference_model.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
+import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,6 +99,85 @@ void main() {
     for (var i = 1; i < recs.length; i++) {
       expect(recs[i - 1].fitScore >= recs[i].fitScore, true);
     }
+  });
+
+  test('stated max budget is a HARD cap — "עד 5000" never shows a ₪5500 flat', () {
+    final candidates = [
+      ...backgroundMarket(), // all ≥ ₪5500
+      prop(id: 'in_a', price: 4800, rooms: 3, city: 'תל אביב'),
+      prop(id: 'in_b', price: 4500, rooms: 3, city: 'תל אביב'),
+      prop(id: 'in_c', price: 5000, rooms: 3, city: 'תל אביב'), // exactly at the cap
+    ];
+    final q = SmartSearch.parse('דירת 3 חדרים בתל אביב עד 5000');
+    final recs = RecommendationEngine.recommend(
+      candidates: candidates,
+      query: q,
+      limit: 10,
+      explore: false,
+    );
+    expect(recs, isNotEmpty);
+    for (final r in recs) {
+      expect(r.property.price, lessThanOrEqualTo(5000),
+          reason: '${r.property.id} @ ₪${r.property.price} exceeds the ₪5000 cap');
+    }
+  });
+
+  test('display fit% is honest — a near-match is NOT inflated toward 100%', () {
+    // In-budget and right city/rooms, but MISSING both requested amenities → a
+    // strong-but-partial match. The OLD cosmetic upper-half expansion
+    // (0.5+(m-0.5)*1.5) pushed such a listing to ~100% ("perfect"); honest display
+    // must read it as strong-but-not-perfect.
+    final candidates = [
+      ...backgroundMarket(),
+      prop(id: 'target', price: 6800, rooms: 3, city: 'תל אביב', features: const []),
+    ];
+    final q = SmartSearch.parse('דירת 3 חדרים בתל אביב עד 7000 עם מעלית וחניה');
+    final recs = RecommendationEngine.recommend(
+      candidates: candidates,
+      query: q,
+      limit: 10,
+      explore: false,
+    );
+    final target = recs.firstWhere((r) => r.property.id == 'target');
+    expect(target.fitPct, lessThan(95)); // would have been ~100 under inflation
+    expect(target.fitPct, greaterThan(50)); // still clearly a good match
+  });
+
+  test('persona intents reach RANKING weights (not just the nearby card)', () {
+    final market = MarketContext.analyze(backgroundMarket());
+    UserPreferenceModel model(String q) =>
+        PreferenceModelBuilder.build(query: SmartSearch.parse(q), market: market);
+    final neutral = model('דירה בתל אביב');
+    final single = model('רווק צעיר מחפש דירה בתל אביב');
+    final couple = model('זוג מחפש דירה בתל אביב');
+    final room = model('שלושה שותפים מחפשים דירה בתל אביב');
+
+    // The distinctive dims start at a 0.0 prior, so any elevation is the persona
+    // actually reaching the ranker (location is excluded — the named city already
+    // saturates it, so it isn't a clean discriminator).
+    expect(single.weight('nightlife'),
+        greaterThan(neutral.weight('nightlife')));
+    expect(single.weight('young_area'),
+        greaterThan(neutral.weight('young_area')));
+    expect(couple.weight('nightlife'),
+        greaterThan(neutral.weight('nightlife')));
+    expect(room.weight('spaciousness'),
+        greaterThan(neutral.weight('spaciousness')));
+    expect(room.weight('young_area'), greaterThan(neutral.weight('young_area')));
+  });
+
+  test('persona detection: single/couple/roommates, with negation guard', () {
+    expect(SearchIntent.fromText('רווק שמחפש דירה'),
+        contains(SearchIntent.single));
+    expect(SearchIntent.fromText('זוג צעיר'), contains(SearchIntent.couple));
+    expect(SearchIntent.fromText('שלושה שותפים'),
+        contains(SearchIntent.roommates));
+    // no false single on a neutral query…
+    expect(SearchIntent.fromText('דירת 3 חדרים במרכז'),
+        isNot(contains(SearchIntent.single)));
+    // …and "לא לבד" (not alone) must be suppressed by the negator.
+    expect(
+        SearchIntent.fromText('לא לבד'), isNot(contains(SearchIntent.single)));
   });
 
   test('in-budget property outranks an identical over-budget one', () {

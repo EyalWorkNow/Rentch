@@ -56,6 +56,27 @@ class GovSources {
       agency: _cbs,
       dataset: 'מדד מחירי שכר דירה למ״ר',
     ),
+    // The "true monthly cost" stat (rent + arnona + vaad). Arnona is a municipal
+    // per-m² residential rate; the figure is a coarse, clearly-approximate estimate.
+    'total_cost': GovSource(
+      agency: 'הרשויות המקומיות',
+      dataset: 'תעריפי ארנונה למגורים (₪/מ״ר לשנה)',
+      note: 'הערכה גסה, כולל אומדן ועד בית; לא כולל חשמל/גז',
+    ),
+    // Informational scorecard axes (weight 0 — explain, never re-rank).
+    'coast': GovSource(
+      agency: _osm,
+      dataset: 'קו החוף של הים התיכון',
+    ),
+    'commute': GovSource(
+      agency: _rently,
+      dataset: 'הערכת זמן נסיעה לפי מרחק',
+      note: 'אומדן גס, לא כולל עומסי תנועה',
+    ),
+    'yield': GovSource(
+      agency: _rently,
+      dataset: 'הערכת תשואה משכר דירה מול מחיר מבוקש',
+    ),
     'safety': GovSource(
       agency: _police,
       dataset: 'עבירות פליליות שנרשמו (לנפש)',

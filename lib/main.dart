@@ -85,6 +85,9 @@ void main() async {
     await IsraelGeoIndex.loadParks(); // public-park proximity for the ranker
     await IsraelGeoIndex.loadSchools(); // named + typed school proximity
     await IsraelGeoIndex.loadNightlife(); // bar/pub/café density (vibrant areas)
+    await IsraelGeoIndex.loadSupermarkets(); // real supermarket density (retail_access)
+    await IsraelGeoIndex.loadClinics(); // real clinic density (health_access)
+    await IsraelGeoIndex.loadSynagogues(); // synagogue density (religious_area)
   } catch (error) {
     debugPrint('GovData init skipped: $error');
   }

@@ -63,10 +63,10 @@ SearchQuery + TenantProfile + List<RentalProperty>
 ┌─────────────────────────────────────────────────────────┐
 │ PART 3 — Ranking Engine  (ranking_engine.dart)           │
 │  • MautScorer: Σ w·u(x) משוקלל + attribution             │
-│  • TopsisScorer: קרבה לאידאל/אנטי-אידאל                  │
-│  • CosineScorer: דמיון בוקטור מנורמל                      │
+│    (האות המותאם-אישית היחיד; ירש את משקל TOPSIS+Cosine)   │
 │  • GradientBoostedScorer: ensemble של decision stumps    │
-│  • CalibratedEnsemble: שילוב + Platt sigmoid calibration  │
+│  • Online learner: אות התנהגותי                           │
+│  • CalibratedEnsemble: שילוב 3 אותות אורתוגונליים + Platt │
 │   → List<RankedCandidate>                                 │
 └─────────────────────────────────────────────────────────┘
         │
