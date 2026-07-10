@@ -516,6 +516,26 @@ class RecommendationEngine {
   }) {
     if (candidates.isEmpty) return const [];
 
+    // PERSISTENT market baseline: fit the price / percentile / hedonic statistics
+    // over the FULL, UNFILTERED catalogue — segmented by transaction type (rent ≈
+    // ₪5k, sale ≈ ₪2M; mixing them would wreck the price distribution). Feature
+    // engineering below reads THIS, not per-query stats, so a listing's
+    // value_score / price_percentile / hedonic-residual are stable: they no longer
+    // drift with whoever happens to co-occur in a filtered result set. Same
+    // catalogue in ⇒ same baseline out, every query. (A tiny catalogue — <8 of a
+    // type, e.g. a unit test — has no meaningful distribution, so it falls back to
+    // per-query analyze() below.)
+    final rentAll = <RentalProperty>[];
+    final saleAll = <RentalProperty>[];
+    for (final p in candidates) {
+      (p.transactionType == PropertyTransactionType.sale ? saleAll : rentAll)
+          .add(p);
+    }
+    final rentBaseline =
+        rentAll.length >= 8 ? MarketContext.analyze(rentAll) : null;
+    final saleBaseline =
+        saleAll.length >= 8 ? MarketContext.analyze(saleAll) : null;
+
     // Hard rent/sale gate: an investor's "דירה להשקעה" must never surface
     // rentals (and vice-versa). Enforced here so EVERY caller — incl. the chat's
     // provider.recommendForTenant path — is gated, not just SmartSearch.rank.
@@ -683,8 +703,15 @@ class RecommendationEngine {
       if (enough.isNotEmpty) candidates = enough;
     }
 
-    // Part 1 — market analysis + feature engineering
-    final market = MarketContext.analyze(candidates);
+    // Part 1 — market analysis + feature engineering. Use the PERSISTENT,
+    // catalogue-wide baseline (segmented rent/sale) so value/percentile/hedonic
+    // don't drift with this query's filtered set; fall back to per-query stats only
+    // when the catalogue was too small to fit a baseline (tests / tiny markets).
+    final isSale = candidates.isNotEmpty &&
+        candidates.every(
+            (p) => p.transactionType == PropertyTransactionType.sale);
+    final market = (isSale ? saleBaseline : rentBaseline) ??
+        MarketContext.analyze(candidates);
     final pfvs = [
       for (final p in candidates) FeatureEngineer.engineer(p, market),
     ];
@@ -766,6 +793,18 @@ class RecommendationEngine {
     }
     selected.sort((a, b) => match[b]!.compareTo(match[a]!));
 
+    // Adjacent-town results are a BONUS, not the search: keep one only if it's a
+    // genuinely strong fit, so a weak out-of-city listing never dilutes the
+    // named-city results. Threshold is on the HONEST (un-inflated) scale — 0.63
+    // here equals the old inflated 0.70, preserving the same real selectivity.
+    // Run this BEFORE the backfill so pruning a weak neighbour frees a slot that
+    // the backfill then re-fills from legitimate in-scope stock — the list stays
+    // topped up to `want` rather than silently shrinking below it.
+    if (nearbyKm.isNotEmpty) {
+      selected.removeWhere((c) =>
+          nearbyKm.containsKey(c.property.id) && (match[c] ?? 0) <= 0.63);
+    }
+
     // Backfill: the softer gates can leave only a handful of exact matches, but a
     // user wants ~10 options. Top up from the in-city pool (relaxing budget /
     // features / rooms / sea, NOT city or rent/sale) with the closest near-matches,
@@ -780,6 +819,8 @@ class RecommendationEngine {
       final nearSeaStated = query.intents.contains(SearchIntent.nearSea);
       final extra = backfillPool.where((p) {
         if (have.contains(p.id)) return false;
+        // The weak adjacent-town bonus flats were just pruned — don't re-add them.
+        if (nearbyKm.containsKey(p.id)) return false;
         if (maxP != null && maxP > 0 && p.price > maxP) return false;
         if (nearSeaStated) {
           final km = IsraelGeoIndex.coastKm(p.lat, p.lon);
@@ -813,16 +854,6 @@ class RecommendationEngine {
         fill.sort((a, b) => match[b]!.compareTo(match[a]!));
         selected.addAll(fill); // after the sorted exact matches → strict-first
       }
-    }
-
-    // Adjacent-town results are a BONUS, not the search: keep one only if it's a
-    // genuinely strong fit, so a weak out-of-city listing never dilutes the
-    // named-city results. Threshold is on the HONEST (un-inflated) scale — 0.63
-    // here equals the old inflated 0.70, preserving the same real selectivity.
-    // (Backfilled fills are already capped ≤0.55 → dropped here.)
-    if (nearbyKm.isNotEmpty) {
-      selected.removeWhere((c) =>
-          nearbyKm.containsKey(c.property.id) && (match[c] ?? 0) <= 0.63);
     }
 
     // model confidence: how much intent we captured + behavioral confidence

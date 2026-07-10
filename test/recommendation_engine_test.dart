@@ -395,4 +395,141 @@ void main() {
       reason: 'pet-friendly persona reason expected',
     );
   });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CRUSH TESTS — persistent market baseline (#1)
+  // The value/percentile/hedonic features must be fit over the WHOLE catalogue,
+  // not the per-query filtered set, so a listing's assessment doesn't drift with
+  // whoever happens to co-occur in a result page.
+  // ════════════════════════════════════════════════════════════════════════════
+
+  test('BASELINE bug is real — per-query market swings a listing\'s value', () {
+    // Same target flat, judged against two DIFFERENT competitor pools. The old
+    // per-batch behaviour (analyze the filtered set) gives it wildly different
+    // value_scores; that instability is exactly what the persistent baseline kills.
+    final target = prop(id: 't', price: 8000, sizeM2: 80); // ₪100/m²
+    final cheap = [
+      for (var i = 0; i < 10; i++)
+        prop(id: 'c$i', price: 4000, sizeM2: 80) // ₪50/m² — target looks pricey
+    ];
+    final pricey = [
+      for (var i = 0; i < 10; i++)
+        prop(id: 'p$i', price: 16000, sizeM2: 80) // ₪200/m² — target looks cheap
+    ];
+    final vsCheap =
+        FeatureEngineer.engineer(target, MarketContext.analyze([target, ...cheap]))
+            .valueScore;
+    final vsPricey =
+        FeatureEngineer.engineer(target, MarketContext.analyze([target, ...pricey]))
+            .valueScore;
+    expect((vsCheap - vsPricey).abs(), greaterThan(0.2),
+        reason: 'per-batch value assessment is unstable — the bug we fix');
+  });
+
+  test('BASELINE fix — a listing\'s fit is stable across differently-filtered '
+      'queries over the SAME catalogue', () {
+    // One catalogue; two queries that survive to DIFFERENT competitor pools via a
+    // required amenity (never budget, so the value dimension\'s weight is identical
+    // in both). The target carries BOTH amenities. With the persistent baseline the
+    // target\'s value is fit over the whole catalogue either way ⇒ its fit% barely
+    // moves. Under the old per-query market it would swing.
+    final target =
+        prop(id: 'tgt', price: 8000, sizeM2: 80, features: ['elevator', 'parking']);
+    final catalogue = [
+      target,
+      // cheap pool — has PARKING only (surfaces on the "חניה" query)
+      for (var i = 0; i < 9; i++)
+        prop(id: 'ch$i', price: 4200, sizeM2: 80, features: ['parking']),
+      // pricey pool — has ELEVATOR only (surfaces on the "מעלית" query)
+      for (var i = 0; i < 9; i++)
+        prop(id: 'pr$i', price: 15500, sizeM2: 80, features: ['elevator']),
+    ];
+    List<Recommendation> run(String q) => RecommendationEngine.recommend(
+          candidates: catalogue,
+          query: SmartSearch.parse(q),
+          limit: 10,
+          explore: false,
+        );
+    final withPricey =
+        run('דירה בתל אביב עם מעלית'); // target + elevator (pricey) pool
+    final withCheap =
+        run('דירה בתל אביב עם חניה'); // target + parking (cheap) pool
+    final a = withPricey.firstWhere((r) => r.property.id == 'tgt').fitPct;
+    final b = withCheap.firstWhere((r) => r.property.id == 'tgt').fitPct;
+    expect((a - b).abs(), lessThanOrEqualTo(3),
+        reason: 'baseline should keep the target\'s fit stable ($a vs $b)');
+  });
+
+  test('BASELINE segments rent vs sale — a rental\'s value is NOT judged against '
+      'million-shekel sale prices', () {
+    final rental = prop(id: 'r', price: 6000, sizeM2: 70);
+    final rentals = [
+      rental,
+      for (var i = 0; i < 10; i++) prop(id: 'r$i', price: 5000 + i * 300, sizeM2: 70),
+    ];
+    final sales = [
+      for (var i = 0; i < 10; i++)
+        RentalProperty(
+          id: 's$i',
+          price: 2000000 + i * 100000,
+          rooms: 3,
+          sizeM2: 70,
+          floor: '2',
+          totalFloors: '5',
+          city: 'תל אביב',
+          neighborhood: '',
+          street: 'הרצל',
+          streetNumber: 10,
+          lat: 32.07,
+          lon: 34.78,
+          propertyType: 'דירה',
+          entryDate: '',
+          condition: 'טוב',
+          ownerName: 'בעלים',
+          agencyListing: false,
+          features: const [],
+          media: const [
+            PropertyMedia(url: 'http://x/a.jpg', type: PropertyMediaType.image),
+          ],
+          transactionType: PropertyTransactionType.sale,
+        ),
+    ];
+    final q = SmartSearch.parse('דירה בתל אביב');
+    final rentOnly = RecommendationEngine.recommend(
+        candidates: rentals, query: q, limit: 10, explore: false);
+    final mixed = RecommendationEngine.recommend(
+        candidates: [...rentals, ...sales], query: q, limit: 10, explore: false);
+    final a = rentOnly.firstWhere((r) => r.property.id == 'r').fitPct;
+    final b = mixed.firstWhere((r) => r.property.id == 'r').fitPct;
+    expect((a - b).abs(), lessThanOrEqualTo(2),
+        reason: 'sale prices must not pollute the rental baseline ($a vs $b)');
+    // and no sale ever leaks into a rent search
+    expect(mixed.every((r) => r.property.transactionType != PropertyTransactionType.sale),
+        true);
+  });
+
+  test('SLATE — a city with ample stock returns a full 10 options, best-first', () {
+    final candidates = [
+      for (var i = 0; i < 25; i++)
+        prop(
+          id: 'ta$i',
+          price: 5000 + i * 150,
+          rooms: 2 + (i % 4).toDouble(),
+          city: 'תל אביב',
+          lat: 32.06 + i * 0.001,
+          lon: 34.77 + i * 0.001,
+        ),
+    ];
+    final recs = RecommendationEngine.recommend(
+      candidates: candidates,
+      query: SmartSearch.parse('דירה בתל אביב'),
+      limit: 10,
+      explore: false,
+    );
+    expect(recs.length, 10);
+    for (var i = 1; i < recs.length; i++) {
+      expect(recs[i - 1].fitPct, greaterThanOrEqualTo(recs[i].fitPct),
+          reason: 'options must be ordered most→least relevant');
+    }
+  });
 }
