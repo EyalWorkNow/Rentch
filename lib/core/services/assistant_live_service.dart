@@ -32,7 +32,11 @@ enum LiveStatus { idle, connecting, listening, speaking, error, closed }
 ///           "interrupted":true,"turnComplete":true}}
 ///   tool   {"toolCall":{"functionCalls":[{"id","name":"create_property","args":{…}}]}}
 class AssistantLiveService {
-  AssistantLiveService();
+  /// [mode] = 'tenant_search' turns this into אתי's live apartment-search voice
+  /// (search_listings tool, run on-device); anything else is Erik (create_property).
+  AssistantLiveService({this.mode = ''});
+
+  final String mode;
 
   static const _wsBase =
       'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage'
@@ -56,6 +60,9 @@ class AssistantLiveService {
   void Function()? onTurnComplete;
   void Function()? onInterrupted;
   void Function(Map<String, dynamic> args)? onCreateProperty;
+  // אתי (tenant): the model asks to search; the screen runs the REAL on-device
+  // search, shows cards, and returns a short spoken summary אתי voices back.
+  Future<String> Function(Map<String, dynamic> args)? onSearchListings;
   void Function(String message)? onError;
 
   bool get isConnected => _connected;
@@ -69,7 +76,7 @@ class AssistantLiveService {
     _setStatus(LiveStatus.connecting);
     try {
       if (!await _recorder.hasPermission()) {
-        _fail('צריך הרשאת מיקרופון כדי לדבר עם אריק.');
+        _fail('צריך הרשאת מיקרופון כדי לדבר.');
         return;
       }
       final token = await _fetchToken();
@@ -139,7 +146,7 @@ class AssistantLiveService {
           req.headers.add(HttpHeaders.authorizationHeader, 'Bearer $t');
         }
       } catch (_) {}
-      req.write(jsonEncode(<String, dynamic>{}));
+      req.write(jsonEncode(mode.isEmpty ? <String, dynamic>{} : {'mode': mode}));
       final resp = await req.close().timeout(const Duration(seconds: 15));
       final raw = await utf8.decoder.bind(resp).join();
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -213,10 +220,31 @@ class AssistantLiveService {
     final toolCall = msg['toolCall'];
     if (toolCall is Map && toolCall['functionCalls'] is List) {
       for (final c in toolCall['functionCalls'] as List) {
-        if (c is Map && c['name'] == 'create_property') {
-          final args = c['args'] is Map
-              ? Map<String, dynamic>.from(c['args'] as Map)
-              : <String, dynamic>{};
+        if (c is! Map) continue;
+        final args = c['args'] is Map
+            ? Map<String, dynamic>.from(c['args'] as Map)
+            : <String, dynamic>{};
+        // אתי (tenant): run the REAL on-device search, then hand the model a short
+        // summary so she voices "מצאתי כמה התאמות" while the cards are on screen.
+        if (c['name'] == 'search_listings' && onSearchListings != null) {
+          String summary = 'לא נמצאו התאמות כרגע.';
+          try {
+            summary = await onSearchListings!(args);
+          } catch (_) {}
+          _send({
+            'toolResponse': {
+              'functionResponses': [
+                {
+                  if (c['id'] != null) 'id': c['id'],
+                  'name': 'search_listings',
+                  'response': {'result': summary},
+                }
+              ]
+            }
+          });
+          continue;
+        }
+        if (c['name'] == 'create_property') {
           onCreateProperty?.call(args);
           // Tell the model the listing was actually published so Erik confirms
           // it correctly by voice ("פרסמתי את הדירה") instead of asking for more.
