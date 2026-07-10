@@ -11,6 +11,8 @@ import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/matching/match_engine.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
+import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/govdata/geo_intelligence.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/core/services/kiri_3d_service.dart';
@@ -3773,9 +3775,47 @@ class DatingProvider extends ChangeNotifier {
     // are added AFTER compression so they shift the visible score rather than
     // being absorbed by the clamp.
     final compressed = _compressStructural(structural);
-    final score = compressed + tagCompatibilityScore + _learnedScoreDelta(p);
+    final score = compressed +
+        tagCompatibilityScore +
+        _learnedScoreDelta(p) +
+        _neighborhoodQualityDelta(p);
 
     return _clampDouble(score, 0, 100).round();
+  }
+
+  /// Maximum ± the gov-data neighbourhood nudge can move a deck score.
+  static const double _neighborhoodQualityWeight = 6.0;
+
+  /// Gov-data neighbourhood-quality nudge, folded in AFTER structural compression
+  /// (like [_learnedScoreDelta]) so the swipe deck is finally ordered by the SAME
+  /// geographic intelligence the RecommendationEngine uses: BLOCK-level SES (CBS
+  /// statistical areas — Shapira ≠ central TLV), centrality and safety. The deck's
+  /// own [_locationScore] is a binary in-city check, blind to all of this. Bounded
+  /// to ±[_neighborhoodQualityWeight] so it differentiates without overriding
+  /// budget/rooms/features/tags. Returns 0 when gov data isn't loaded (e.g. a unit
+  /// test that didn't init GovData) → no behavioural change on that path.
+  double _neighborhoodQualityDelta(RentalProperty p) {
+    final gov = GovData.instance;
+    if (!gov.loaded) return 0.0;
+    final hasCoord = p.lat.abs() > 0.1 && p.lon.abs() > 0.1;
+
+    // BLOCK-level SES via point-in-polygon, else the city cluster, else neutral.
+    double ses;
+    final sa = hasCoord ? gov.statAreaAt(p.lat, p.lon) : null;
+    if (sa != null && sa.ses >= 1 && sa.ses <= 10) {
+      ses = (sa.ses - 1) / 9.0;
+    } else {
+      final city = gov.socioeconomic(p.city);
+      ses = (city >= 1 && city <= 10) ? (city - 1) / 9.0 : 0.5;
+    }
+    final centrality =
+        hasCoord ? GeoIntelligence.centrality(p.lat, p.lon, p.city) : 0.5;
+    final safety = gov.safetyScore(p.city) ?? 0.5;
+
+    // Composite neighbourhood desirability in [0,1]; map 0.5→0, 1→+W, 0→−W.
+    final quality =
+        (0.5 * ses + 0.3 * centrality + 0.2 * safety).clamp(0.0, 1.0);
+    return (quality - 0.5) * 2.0 * _neighborhoodQualityWeight;
   }
 
   /// The bounded personalisation layer: small ± nudges folded out of the user's

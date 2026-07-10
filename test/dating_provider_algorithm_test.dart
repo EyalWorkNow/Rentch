@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -9,6 +12,65 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
 void main() {
+  test('UNIFY — swipe deck is now stat-area aware: high-SES block outranks a '
+      'low-SES block in the SAME city', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await GovData.instance.init(reader: (p) => File(p).readAsString());
+    try {
+      // Two identical Tel Aviv flats, differing ONLY by block: central TLV (CBS
+      // SES ~9) vs Shapira (SES ~2). The deck's legacy _locationScore is a binary
+      // in-city check blind to this; the gov-data neighbourhood nudge fixes it.
+      final central = _property(id: 'central', lat: 32.0700, lon: 34.7750);
+      final shapira = _property(id: 'shapira', lat: 32.0545, lon: 34.7790);
+      final provider = DatingProvider(
+        rentalDataService: _FakeRentalDataService([
+          central,
+          shapira,
+          _property(id: 'm1', price: 5900),
+          _property(id: 'm2', price: 6100),
+        ]),
+        localStorageService: _MemoryLocalStorageService(),
+      );
+      await provider.initialize();
+      await provider.updateFilters(const SearchFilters(
+        query: '',
+        minBudget: 600,
+        maxBudget: 8000,
+        minRooms: 0,
+        maxRooms: 10,
+        areaId: 'all_israel',
+        requiredFeatures: {'parking'},
+        preferredFeatures: <String>{},
+        minSizeM2: 0,
+        maxSizeM2: 200,
+        propertyTypes: <String>{},
+        preferredPropertyTypes: <String>{},
+        conditions: <String>{},
+        preferredConditions: <String>{},
+        listingSource: ListingSourceFilter.any,
+        minFloor: 0,
+        moveInFilter: MoveInFilter.any,
+        sortBy: SearchSortOption.bestMatch,
+        includeUnknownPriceListings: false,
+        customAreaPolygon: <LatLng>[],
+        city: 'Tel Aviv',
+        transactionType: TransactionTypeFilter.rent,
+      ));
+      expect(provider.matchScore(central),
+          greaterThan(provider.matchScore(shapira)),
+          reason: 'block-level CBS SES must reach the swipe deck score');
+      // CRUSH: pathological coords with gov data loaded must stay bounded (the
+      // neighbourhood delta must never crash or push the score out of range).
+      final bad = provider.matchScore(
+          _property(id: 'bad', lat: double.nan, lon: double.infinity));
+      expect(bad, inInclusiveRange(0, 100));
+      provider.dispose();
+    } finally {
+      // Restore the no-gov state so the other (gov-less) deck tests are unaffected.
+      GovData.instance.resetForTest();
+    }
+  });
+
   test('best match ranks soft near-misses by value, fit, and confidence',
       () async {
     final excellent = _property(
