@@ -140,6 +140,37 @@ void main() {
     expect(GovData.instance.crimeCounts('תל אביב - יפו'), isNotNull);
   });
 
+  test('CBS statistical areas loaded nationally (real polygons, not the seed)', () {
+    // The seed had 2 fake squares; the real CBS layer has thousands of blocks.
+    var hits = 0;
+    for (final ll in const [
+      [32.0869, 34.7749], // central Tel Aviv
+      [31.7683, 35.2137], // Jerusalem
+      [32.7940, 34.9896], // Haifa
+      [31.2530, 34.7915], // Be'er Sheva
+      [32.0853, 34.8110], // Ramat Gan
+    ]) {
+      final sa = GovData.instance.statAreaAt(ll[0], ll[1]);
+      if (sa != null) {
+        hits++;
+        expect(sa.ses, inInclusiveRange(1, 10), reason: 'block SES 1..10');
+        final sum = sa.youngShare + sa.childShare + sa.seniorShare;
+        expect((sum - 1.0).abs() < 0.02, true, reason: 'age shares ≈ 1');
+      }
+    }
+    expect(hits, greaterThanOrEqualTo(4),
+        reason: 'most major-city points must fall inside a real CBS block');
+  });
+
+  test('block-level SES OVERRIDES the city average (the accuracy lever)', () {
+    // Two Tel Aviv points in different blocks should be able to differ in SES —
+    // impossible under the old city-wide single number. At minimum, a central
+    // point resolves to a real block whose SES is set from the polygon, not 0.
+    final sa = GovData.instance.statAreaAt(32.0869, 34.7749);
+    expect(sa, isNotNull);
+    expect(sa!.ses, greaterThan(0));
+  });
+
   test('engine end-to-end uses gov data (neighbourhood quality flows through)',
       () {
     // Two otherwise-identical listings; only the locality (and thus its real

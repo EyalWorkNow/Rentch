@@ -8,18 +8,15 @@
 // neighbourhood/young_area/senior_area/family features for any flat inside a
 // known area.
 //
-// Two CBS inputs, joined on the statistical-area id (YISHUV_STAT11 / stat_area):
-//   1) BOUNDARIES  — the אזורים סטטיסטיים polygons (GeoJSON on data.gov.il / CBS
-//      GIS). Geometry is often in ITM (EPSG:2039) and must be projected to WGS84
-//      lon/lat; if the layer already serves EPSG:4326, use it directly.
-//   2) SES INDEX   — "המדד החברתי-כלכלי לפי אזור סטטיסטי" (cluster 1..10) + the
-//      age-group population shares per area.
+// SOURCE — the official CBS GIS layer "מדד חברתי כלכלי לפי אזור סטטיסטי 2021"
+// (org ISRAEL_CBS_GIS). It already joins, per statistical-area polygon:
+//   • eshkol_mad          — socioeconomic cluster 1..10 (the SES index)
+//   • Pop_Total + age_0_4…age_85_up — the full age histogram
+// served as GeoJSON in WGS84 (f=geojson), so NO shapefile / 7z / ITM reprojection.
+// One layer, one fetch → boundaries + SES + age together.
 //
 // Output → assets/data/govdata/stat_areas.json
 //   { "cell":0.02, "areas":[ { ses, young, child, senior, poly:[[lat,lon],…] } ] }
-//
-// NOTE: confirm the two resource ids below against data.gov.il before running —
-// CBS republishes them periodically. Left as constants so this is a one-line fix.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -28,29 +25,28 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = join(__dirname, '../../assets/data/govdata/stat_areas.json');
-const CKAN = 'https://data.gov.il/api/3/action/datastore_search';
 
-// TODO(confirm): resource ids for the two CBS datasets.
-const BOUNDARIES_RESOURCE = 'REPLACE_WITH_STAT_AREA_BOUNDARIES_RESOURCE_ID';
-const SES_RESOURCE = 'REPLACE_WITH_STAT_AREA_SES_RESOURCE_ID';
+const LAYER =
+  'https://services2.arcgis.com/xMRYm7cNgdR5RN6F/arcgis/rest/services/SOEC_Stat11_2021/FeatureServer/27';
+const AGE = [
+  'age_0_4', 'age_5_9', 'age_10_14', 'age_15_19', 'age_20_24', 'age_25_29',
+  'age_30_34', 'age_35_39', 'age_40_44', 'age_45_49', 'age_50_54', 'age_55_59',
+  'age_60_64', 'age_65_69', 'age_70_74', 'age_75_79', 'age_80_84', 'age_85_up',
+];
+const OUT_FIELDS = ['eshkol_mad', 'Pop_Total', ...AGE].join(',');
+const PAGE = 2000; // = the layer's maxRecordCount
 
-async function fetchAll(resourceId, label) {
-  const out = [];
-  for (let offset = 0; ; offset += 10000) {
-    const url = `${CKAN}?resource_id=${resourceId}&limit=10000&offset=${offset}&records_format=objects`;
-    const res = await fetch(url, { headers: { accept: 'application/json' } });
-    if (!res.ok) throw new Error(`CKAN ${res.status} for ${label}`);
-    const recs = (await res.json()).result?.records ?? [];
-    out.push(...recs);
-    process.stdout.write(`\r  ${label}: ${out.length} rows`);
-    if (recs.length < 10000) break;
-  }
-  process.stdout.write('\n');
-  return out;
-}
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
-// A GeoJSON ring in [lon,lat] order → our [[lat,lon],…]. Handles Polygon and the
-// outer ring of a MultiPolygon.
+// Outer ring of a Polygon / first ring of a MultiPolygon → [[lat,lon],…], rounded
+// to 5 dp and radial-distance–simplified: drop any vertex within ~20 m of the last
+// KEPT one (first + last always kept). An apartment coordinate is never precise to
+// <20 m, so this doesn't change which area a point falls in — but it roughly
+// halves the asset. 0.00018° ≈ 20 m at Israel's latitude.
+const MIN_STEP = 0.00018;
 function ringToLatLon(geometry) {
   if (!geometry) return null;
   const ring =
@@ -59,47 +55,67 @@ function ringToLatLon(geometry) {
       : geometry.type === 'MultiPolygon'
         ? geometry.coordinates?.[0]?.[0]
         : null;
-  if (!Array.isArray(ring) || ring.length < 3) return null;
-  return ring.map(([lon, lat]) => [lat, lon]);
+  if (!Array.isArray(ring) || ring.length < 4) return null;
+  const out = [];
+  let klat = null, klon = null;
+  for (let i = 0; i < ring.length; i++) {
+    const lat = Math.round(ring[i][1] * 1e5) / 1e5;
+    const lon = Math.round(ring[i][0] * 1e5) / 1e5;
+    const last = i === ring.length - 1;
+    if (klat != null && !last &&
+        Math.abs(lat - klat) < MIN_STEP && Math.abs(lon - klon) < MIN_STEP) {
+      continue;
+    }
+    out.push([lat, lon]);
+    klat = lat;
+    klon = lon;
+  }
+  return out.length >= 3 ? out : null;
 }
 
-const num = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
+async function fetchPage(offset) {
+  const url =
+    `${LAYER}/query?where=Pop_Total%3E0&outFields=${OUT_FIELDS}` +
+    `&resultOffset=${offset}&resultRecordCount=${PAGE}` +
+    `&geometryPrecision=5&f=geojson`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'rently-etl/1.0' } });
+  if (!res.ok) throw new Error(`ArcGIS ${res.status} @offset ${offset}`);
+  const j = await res.json();
+  if (j.error) throw new Error(`ArcGIS: ${JSON.stringify(j.error)}`);
+  return j.features ?? [];
+}
 
 async function main() {
-  const boundaries = await fetchAll(BOUNDARIES_RESOURCE, 'boundaries');
-  const sesRows = await fetchAll(SES_RESOURCE, 'ses');
-
-  // index SES by statistical-area id
-  const sesById = new Map();
-  for (const r of sesRows) {
-    const id = String(r.stat_area ?? r.YISHUV_STAT11 ?? r.id ?? '').trim();
-    if (id) sesById.set(id, r);
-  }
-
   const areas = [];
-  for (const b of boundaries) {
-    const id = String(b.stat_area ?? b.YISHUV_STAT11 ?? b.id ?? '').trim();
-    const geom =
-      typeof b.geometry === 'string' ? JSON.parse(b.geometry) : b.geometry;
-    const poly = ringToLatLon(geom);
-    const ses = sesById.get(id);
-    if (!poly || !ses) continue;
-    areas.push({
-      ses: num(ses.cluster ?? ses.index_cluster) ?? 0,
-      young: num(ses.share_20_64 ?? ses.young) ?? 0.5,
-      child: num(ses.share_0_19 ?? ses.child) ?? 0.5,
-      senior: num(ses.share_65p ?? ses.senior) ?? 0.5,
-      poly,
-    });
+  for (let offset = 0; ; offset += PAGE) {
+    const feats = await fetchPage(offset);
+    for (const f of feats) {
+      const poly = ringToLatLon(f.geometry);
+      const p = f.properties ?? {};
+      const pop = num(p.Pop_Total);
+      if (!poly || pop <= 0) continue;
+      const sum = (a, b) => a.slice(b[0], b[1]).reduce((s, k) => s + num(p[k]), 0);
+      const child = sum(AGE, [0, 4]); // 0-19
+      const workingAge = sum(AGE, [4, 13]); // 20-64
+      const senior = sum(AGE, [13, 18]); // 65+
+      areas.push({
+        ses: num(p.eshkol_mad), // cluster 1..10 (0 = unknown → loader ignores)
+        young: Math.round((workingAge / pop) * 1000) / 1000,
+        child: Math.round((child / pop) * 1000) / 1000,
+        senior: Math.round((senior / pop) * 1000) / 1000,
+        poly,
+      });
+    }
+    process.stdout.write(`\r  fetched ${areas.length} areas`);
+    if (feats.length < PAGE) break;
   }
+  process.stdout.write('\n');
 
   const out = { cell: 0.02, areas };
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(out));
-  console.log(`✓ wrote ${OUT}\n  ${areas.length} statistical areas`);
+  const mb = (JSON.stringify(out).length / 1e6).toFixed(1);
+  console.log(`✓ wrote ${OUT}\n  ${areas.length} statistical areas · ${mb} MB`);
 }
 
 main().catch((e) => {

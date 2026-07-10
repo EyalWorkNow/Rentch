@@ -34,17 +34,24 @@ void main() {
   });
 
   test('point-in-polygon resolves the block (and null outside)', () {
-    expect(GovData.instance.statAreaAt(32.05, 34.75)?.ses, 2);   // low-SES block
-    expect(GovData.instance.statAreaAt(32.09, 34.79)?.ses, 9);   // high-SES block
-    expect(GovData.instance.statAreaAt(32.07, 34.77), isNull);   // no polygon here
+    // Real CBS blocks: Shapira (south TLV) is low-SES; central TLV is high-SES —
+    // the same city, two very different micro-areas. Ranges (not exact clusters)
+    // so a CBS re-publish doesn't break the test.
+    final shapira = GovData.instance.statAreaAt(32.0545, 34.7790);
+    final central = GovData.instance.statAreaAt(32.0700, 34.7750);
+    expect(shapira, isNotNull);
+    expect(central, isNotNull);
+    expect(shapira!.ses, lessThanOrEqualTo(4), reason: 'Shapira is a low-SES block');
+    expect(central!.ses, greaterThanOrEqualTo(8), reason: 'central TLV is high-SES');
+    expect(GovData.instance.statAreaAt(32.05, 34.68), isNull);   // sea, no polygon
     expect(GovData.instance.statAreaAt(double.infinity, 34.0), isNull);
   });
 
   test('"שכונה טובה" ranks the high-SES block above the low-SES block (same city)',
       () {
     final cat = [
-      flat('poor-block', 32.05, 34.75), // inside the ses=2 polygon
-      flat('rich-block', 32.09, 34.79), // inside the ses=9 polygon
+      flat('poor-block', 32.0545, 34.7790), // Shapira — low-SES block
+      flat('rich-block', 32.0700, 34.7750), // central TLV — high-SES block
     ];
     final recs = RecommendationEngine.recommendAsScored(
       candidates: cat,
@@ -57,5 +64,33 @@ void main() {
     final nb = recs.first.scorecard!.dimensions.where((d) => d.key == 'neighborhood');
     expect(nb.isNotEmpty && nb.first.weightPct > 0, true,
         reason: 'neighborhood dimension not engaged');
+  });
+
+  test('CRUSH — point-in-polygon over the real layer never throws / emits garbage',
+      () {
+    // pathological coords must return null, never crash
+    for (final ll in const [
+      [double.nan, 34.0], [32.0, double.infinity], [0.0, 0.0],
+      [-90.0, 200.0], [999.0, -999.0],
+    ]) {
+      expect(GovData.instance.statAreaAt(ll[0], ll[1]), isNull);
+    }
+    // sweep a grid over the country: any resolved area has SES 0..10 and age
+    // shares that are finite and sum to ~1 (0 shares only for an empty block).
+    var resolved = 0;
+    for (var lat = 29.5; lat <= 33.3; lat += 0.05) {
+      for (var lon = 34.3; lon <= 35.9; lon += 0.05) {
+        final sa = GovData.instance.statAreaAt(lat, lon);
+        if (sa == null) continue;
+        resolved++;
+        expect(sa.ses, inInclusiveRange(0, 10));
+        final s = sa.youngShare + sa.childShare + sa.seniorShare;
+        expect(s.isFinite, true);
+        expect(s == 0 || (s - 1.0).abs() < 0.02, true,
+            reason: 'shares must be ~1 (or 0 for an empty block), got $s');
+      }
+    }
+    expect(resolved, greaterThan(100),
+        reason: 'a national grid must land inside many real blocks');
   });
 }

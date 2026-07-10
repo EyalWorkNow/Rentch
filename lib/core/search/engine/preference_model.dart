@@ -856,6 +856,14 @@ class PreferenceModelBuilder {
     // A religious/observant community is a strong, defining ask — weight it high.
     if (intents.contains(SearchIntent.religiousArea)) {
       sharpen('religious_area', 0.95, 14.0);
+      // A religious neighbourhood (e.g. מאה שערים) is typically LOW-SES and
+      // family-heavy (many children, few seniors). Now that real block-level CBS
+      // data flows in, the affluence proxy (neighborhood/SES) and the older-crowd
+      // proxy (senior_area, which `quiet` sharpens) would fight the very area the
+      // observant seeker asked for — burying it. Neutralise both so the explicit
+      // religious choice wins; physical quiet (low_noise) still carries the "שקט".
+      weights['neighborhood'] = BayesianWeight(0.1, 0.02);
+      weights['senior_area'] = BayesianWeight(0.0, 0.02);
     }
     // Map-data-backed neighbourhood intents → their GovData dimensions.
     if (intents.contains(SearchIntent.safety)) sharpen('safety', 0.95, 12.0);
