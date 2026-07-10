@@ -60,6 +60,13 @@ class _ProfileCardState extends State<ProfileCard> {
   void _precacheNeighbors() {
     final media = p.media;
     if (media.isEmpty) return;
+    // Decode neighbours at the card's DISPLAY width (matches SafeImage's own
+    // cacheWidth so it's a cache HIT, not a second full-res decode). Full-res
+    // here meant 3 × ~48 MB bitmaps per swipe — the worst Android memory spike.
+    final w = (MediaQuery.sizeOf(context).width *
+            MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(64, 2048);
     final cur = _safeImageIndex(_currentImage);
     for (final idx in [cur, cur - 1, cur + 1]) {
       if (idx < 0 || idx >= media.length) continue;
@@ -68,7 +75,8 @@ class _ProfileCardState extends State<ProfileCard> {
       final url = InputSanitizer.sanitizeImageUrl(m.url);
       if (url == null || url.isEmpty) continue;
       if (url.startsWith('/') || url.startsWith('file://')) continue;
-      precacheImage(NetworkImage(url), context, onError: (_, __) {});
+      precacheImage(ResizeImage(NetworkImage(url), width: w), context,
+          onError: (_, __) {});
     }
   }
 

@@ -542,12 +542,77 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     });
   }
 
+  // A short pre-import guide so the user captures & exports a HIGH-QUALITY,
+  // photoreal artifact (Gaussian-splat PLY). Returns true to proceed to picking.
+  Future<bool?> _showScanGuide() {
+    Widget step(String n, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.primary,
+                child: Text(n,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text, style: const TextStyle(height: 1.35))),
+            ],
+          ),
+        );
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('סריקת תלת-מימד כמו הדירה האמיתית'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('כדי לקבל סריקה פוטוריאליסטית עם טקסטורות אמיתיות:'),
+              const SizedBox(height: 14),
+              step('1',
+                  'הורידו את האפליקציה החינמית Scaniverse וסרקו את הדירה — הליכה איטית, תאורה טובה, חפיפה בין הזוויות.'),
+              step('2',
+                  'ב-Scaniverse: Export → Gaussian Splat → פורמט PLY (זה מה שנותן את המראה האמיתי).'),
+              step('3', 'חזרו לכאן ובחרו את קובץ ה-PLY שיוצא.'),
+              const SizedBox(height: 4),
+              const Text(
+                'טיפ: GLB/OBJ נותנים משטח פשוט ללא מראה אמיתי; PLY נותן איכות מלאה.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('ביטול')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('בחר קובץ')),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _importScaniverseAssets() async {
     if (_wantsVerifiedListing) {
       _showMediaError(
           'בדירה מאומתת סריקות והעלאות ננעלות עד ביטול מצב האימות.');
       return;
     }
+    // Guide the user to the RIGHT artifact FIRST. A Gaussian-splat PLY looks like
+    // the real apartment (photoreal, textured); a mesh GLB/OBJ — or the compressed
+    // .spz the viewer can't open — won't. Without this step users export the wrong
+    // thing and the scan looks bad, which reads as "the feature doesn't work".
+    final proceed = await _showScanGuide();
+    if (proceed != true || !mounted) return;
     try {
       setState(() => _isScanSubmitting = true);
       final imported = await _scaniverseImportService.importExportedModel(
@@ -560,6 +625,20 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         _model3dDraft = imported.model3d;
         _isScanSubmitting = false;
       });
+      // A .ply/.spz is now converting server-side to a fast .ksplat → show the
+      // live "מייעל…" timer on the listing until it's ready (or the window ends).
+      if (imported.model3d.plyUrl.trim().isNotEmpty ||
+          imported.model3d.spzUrl.trim().isNotEmpty) {
+        context.read<DatingProvider>().markScanOptimizing(_draftPropertyId);
+      }
+      // Steer toward the photoreal path if they picked a non-splat export: the
+      // viewer only shows the real-house quality from a Gaussian-splat PLY.
+      if (imported.model3d.plyUrl.trim().isEmpty) {
+        _showMediaError(
+          'הקובץ יובא. לאיכות פוטוריאליסטית מלאה (כמו הדירה האמיתית) '
+          'ייצאו מ-Scaniverse בפורמט Gaussian Splat · PLY.',
+        );
+      }
     } on ScaniverseAssetImportException catch (error) {
       if (!mounted) return;
       setState(() => _isScanSubmitting = false);

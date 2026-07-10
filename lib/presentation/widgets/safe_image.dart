@@ -55,6 +55,28 @@ class _SafeImageState extends State<SafeImage> {
 
   @override
   Widget build(BuildContext context) {
+    // Decode to the DISPLAY size, not the source's full resolution. A 4000px CDN
+    // photo in a ~400px card otherwise decodes a ~48 MB ARGB bitmap; iOS's large
+    // image cache tolerates it, but Android's tight per-app heap evicts + re-
+    // decodes (photos flash/reload while scrolling) or OOM-kills. cacheWidth cuts
+    // that ~10-100× while preserving quality (it's the on-screen pixel width).
+    return LayoutBuilder(
+      builder: (context, constraints) => _build(context, _decodeWidth(context, constraints)),
+    );
+  }
+
+  // On-screen pixel width to decode at: box width × devicePixelRatio, clamped so
+  // an unbounded box (Infinity, e.g. inside a Row/Column) or a full-screen gallery
+  // never over-decodes. Null → full-res (only if we truly can't size it).
+  int? _decodeWidth(BuildContext context, BoxConstraints c) {
+    final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+    final w = c.maxWidth.isFinite && c.maxWidth > 0
+        ? c.maxWidth
+        : (MediaQuery.maybeSizeOf(context)?.width ?? 1080);
+    return (w * dpr).round().clamp(64, 2048);
+  }
+
+  Widget _build(BuildContext context, int? cacheW) {
     final source = widget.source;
     final fallback = widget.fallback;
     final fit = widget.fit;
@@ -72,6 +94,7 @@ class _SafeImageState extends State<SafeImage> {
         File(path),
         fit: fit,
         alignment: alignment,
+        cacheWidth: cacheW,
         gaplessPlayback: true,
         frameBuilder: _animatedFrameBuilder,
         errorBuilder: (_, __, ___) => fallback,
@@ -87,6 +110,7 @@ class _SafeImageState extends State<SafeImage> {
       cleaned,
       fit: fit,
       alignment: alignment,
+      cacheWidth: cacheW,
       headers: _imageRequestHeaders(cleaned),
       // Hold the previously-decoded frame until the new one is ready (no blank
       // flash when tapping between the card's photos). Pairs with the neighbor

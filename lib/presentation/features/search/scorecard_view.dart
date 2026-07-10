@@ -17,14 +17,31 @@
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart';
+import 'package:dating_app/presentation/widgets/nearby_places_card.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 class ScorecardView extends StatefulWidget {
-  const ScorecardView({super.key, required this.card, this.initiallyExpanded = false});
+  const ScorecardView({
+    super.key,
+    required this.card,
+    this.initiallyExpanded = false,
+    this.lat,
+    this.lon,
+    this.city,
+    this.nearbyProfile,
+  });
 
   final Scorecard card;
   final bool initiallyExpanded;
+
+  // When lat/lon + a [nearbyProfile] are supplied (the chat "why this" preview),
+  // a RELEVANT-ONLY nearby-places dropdown is appended at the very bottom.
+  final double? lat;
+  final double? lon;
+  final String? city;
+  final NearbyProfile? nearbyProfile;
 
   @override
   State<ScorecardView> createState() => _ScorecardViewState();
@@ -177,6 +194,24 @@ class _ScorecardViewState extends State<ScorecardView> {
         if (_sourcedDimensions(c).isNotEmpty) ...[
           const SizedBox(height: 12),
           _sourcesSection(c),
+        ],
+        // At the VERY BOTTOM — a nearby-places dropdown with ONLY the sections
+        // relevant to this seeker's search (a family sees schools/gans/clinics/…,
+        // a young-area seeker sees supermarkets/dining/parks). Hidden when there's
+        // no coords/profile or nothing relevant.
+        if (widget.nearbyProfile != null &&
+            widget.lat != null &&
+            widget.lon != null) ...[
+          const SizedBox(height: 4),
+          NearbyPlacesCard(
+            lat: widget.lat!,
+            lon: widget.lon!,
+            city: widget.city ?? '',
+            profile: widget.nearbyProfile!,
+            relevantOnly: true,
+            carousel: true, // preview → tag carousel, top 3 + "צפה בכולם"
+            maxChips: 3,
+          ),
         ],
       ],
     );

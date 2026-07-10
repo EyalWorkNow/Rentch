@@ -1,27 +1,32 @@
 // "שאל את Rently" — a friendly, RTL chat sheet that lets a tenant ask free-text
 // Hebrew questions about ONE specific listing ("מותר חיות?", "איזה קומה?",
-// "תחבורה ציבורית קרובה?") and get a grounded Hebrew answer from the backend.
+// "תחבורה ציבורית קרובה?").
 //
-// It calls the generic AWS client:
-//   AwsApiClient.instance.post('/listing/ask', {'listingId': ..., 'question': ...})
-// and reads the answer defensively from a few common shapes
-// ({answer} / {data:{answer}} / {text} / {message}). Everything is fail-soft:
-// a network error or empty body shows a calm Hebrew "couldn't answer" line
-// instead of throwing, so the sheet can never break the detail screen.
+// It answers INSTANTLY from the listing's own data (floor / rooms / price /
+// parking / pets / entry date / nearby transit…) via [answerFromListing] — no
+// network needed — and only falls back to the backend for the rest. Anything it
+// truly can't answer surfaces a SINGLE CTA to send the question straight to the
+// landlord (provider.requestToMessage). Everything is fail-soft: it can never
+// break the detail screen.
 //
 // Designed for older, less tech-savvy users: large tap targets, big readable
 // text, suggested-question chips, and plain language.
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:provider/provider.dart';
 
-/// Opens the "Ask Rently" Q&A sheet for the listing identified by [listingId].
-/// [listingTitle] is shown in the header for context (optional, plain string).
+/// Opens the "Ask Rently" Q&A sheet for one [property]. Most questions are
+/// answered instantly from the listing's own data; anything it can't answer
+/// offers a single CTA to message the landlord directly.
 Future<void> showAskRentlySheet(
   BuildContext context, {
-  required String listingId,
+  required RentalProperty property,
   String listingTitle = '',
 }) {
   return showModalBottomSheet<void>(
@@ -29,7 +34,7 @@ Future<void> showAskRentlySheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => _AskRentlyBody(
-      listingId: listingId,
+      property: property,
       listingTitle: listingTitle,
     ),
   );
@@ -44,8 +49,8 @@ class _AskMessage {
 }
 
 class _AskRentlyBody extends StatefulWidget {
-  const _AskRentlyBody({required this.listingId, required this.listingTitle});
-  final String listingId;
+  const _AskRentlyBody({required this.property, required this.listingTitle});
+  final RentalProperty property;
   final String listingTitle;
 
   @override
@@ -57,6 +62,9 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
   final _scrollController = ScrollController();
   final _messages = <_AskMessage>[];
   bool _sending = false;
+  bool _needsLandlord = false; // a question went unanswered → offer the CTA
+  String _lastQuestion = '';
+  bool _messaged = false; // guard: send the landlord request once
 
   static const _suggestions = <String>[
     'מותר להחזיק חיות מחמד?',
@@ -92,19 +100,26 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
     setState(() {
       _messages.add(_AskMessage(text: question, fromUser: true));
       _sending = true;
+      _lastQuestion = question;
+      _needsLandlord = false;
       _controller.clear();
     });
     _scrollToEnd();
 
-    String? answer;
-    try {
-      final res = await AwsApiClient.instance.post('/listing/ask', {
-        'listingId': widget.listingId,
-        'question': question,
-      });
-      answer = _extractAnswer(res);
-    } catch (_) {
-      answer = null; // fail-soft: handled below
+    // 1) Answer instantly from the listing's own data whenever we can.
+    String? answer = answerFromListing(question, widget.property);
+
+    // 2) Only fall back to the backend for what the data can't cover.
+    if (answer == null) {
+      try {
+        final res = await AwsApiClient.instance.post('/listing/ask', {
+          'listingId': widget.property.id,
+          'question': question,
+        });
+        answer = _extractAnswer(res);
+      } catch (_) {
+        answer = null; // fail-soft: handled below
+      }
     }
 
     if (!mounted) return;
@@ -113,19 +128,35 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
       if (answer != null && answer.trim().isNotEmpty) {
         _messages.add(_AskMessage(text: answer.trim(), fromUser: false));
       } else {
+        // 3) Couldn't answer → offer the single CTA to ask the landlord.
         _messages.add(_AskMessage(
-          text: 'לא הצלחנו לענות על זה כרגע. אפשר לנסות שוב, '
-              'או לשאול את בעל הנכס ישירות.',
+          text: 'אין לי את המידע הזה על הדירה. אפשר לשלוח את השאלה '
+              'ישירות לבעל הנכס:',
           fromUser: false,
           failed: true,
         ));
+        _needsLandlord = true;
       }
     });
     _scrollToEnd();
   }
 
-  /// Reads the grounded answer from the common response shapes the backend
-  /// might use, without assuming any one of them is present.
+  Future<void> _sendToLandlord() async {
+    if (_messaged) return;
+    _messaged = true;
+    final provider = context.read<DatingProvider>();
+    final note = _lastQuestion.isNotEmpty ? _lastQuestion : 'שאלה על הדירה';
+    await provider.requestToMessage(widget.property, note: note);
+    if (!mounted) return;
+    Navigator.of(context).maybePop();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      duration: Duration(milliseconds: 2800),
+      content: Text('השאלה נשלחה לבעל הנכס — תופיע אצלו תחת '
+          '"מבקשים לשלוח הודעה"'),
+    ));
+  }
+
+  /// Reads the grounded answer from the common backend response shapes.
   static String? _extractAnswer(Map<String, dynamic> res) {
     for (final key in ['answer', 'text', 'message', 'reply']) {
       final v = res[key];
@@ -164,10 +195,32 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
                   child: _messages.isEmpty ? _emptyState() : _conversation(),
                 ),
                 if (_sending) _typingIndicator(),
+                if (_needsLandlord) _landlordCta(),
                 _inputBar(),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // Single CTA — appears only when a question couldn't be answered from the data.
+  Widget _landlordCta() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: SizedBox(
+        height: 52,
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          onPressed: _sendToLandlord,
+          icon: const Icon(Icons.send_rounded, size: 20),
+          label: const Text('שלח את השאלה לבעל הדירה',
+              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
         ),
       ),
     );
@@ -364,6 +417,83 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
   }
 }
 
+/// Grounded, INSTANT answers to common tenant questions from the listing's own
+/// fields + the geo index. Returns null only when the data genuinely can't
+/// answer — that's when the sheet offers the "message the landlord" CTA.
+/// Top-level & pure so it's unit-testable.
+String? answerFromListing(String q, RentalProperty p) {
+  final t = q.toLowerCase();
+  bool ask(String pat) => RegExp(pat, caseSensitive: false).hasMatch(t);
+  final feats = p.features.join(' ').toLowerCase();
+  bool has(String pat) => RegExp(pat, caseSensitive: false).hasMatch(feats);
+  String rooms() => p.rooms == p.rooms.roundToDouble()
+      ? p.rooms.toInt().toString()
+      : p.rooms.toString();
+
+  if (ask(r'קומה|באיזו ?קומה|floor')) {
+    if (p.floor.trim().isEmpty) return null;
+    final of = p.totalFloors.trim().isNotEmpty ? ' מתוך ${p.totalFloors}' : '';
+    return 'הדירה בקומה ${p.floor}$of.';
+  }
+  if (ask(r'כמה ?חדר|חדרים|rooms?')) return 'בדירה ${rooms()} חדרים.';
+  if (ask(r'גודל|שטח|כמה ?מטר|מ.?ר\b|size|sqm|square')) {
+    return p.sizeM2 > 0 ? 'שטח הדירה כ-${p.sizeM2} מ״ר.' : null;
+  }
+  if (ask(r'מחיר|כמה ?עולה|כמה ?זה|שכר ?דירה|שכ.?ד|price|rent|cost')) {
+    return 'שכר הדירה ${p.price} ₪ לחודש.';
+  }
+  if (ask(r'חני[יה]|חנה|parking')) {
+    return has(r'חני|parking')
+        ? 'כן, יש חניה לדירה.'
+        : 'לא צוינה חניה בפרטי הדירה — כדאי לוודא מול בעל הנכס.';
+  }
+  if (ask(r'חי[הות]|כלב|חתול|מחמד|pet|dog|cat')) {
+    return has(r'חיות|pets?|petsallowed|כלב')
+        ? 'כן, מותר להחזיק חיות מחמד.'
+        : 'לא צוין שמותר להחזיק חיות — עדיף לשאול את בעל הנכס ישירות.';
+  }
+  if (ask(r'מעלית|elevator|lift')) {
+    return has(r'מעלית|elevator|lift')
+        ? 'כן, יש מעלית בבניין.'
+        : 'לא צוינה מעלית בפרטי הדירה.';
+  }
+  if (ask(r'מרפסת|balcony')) {
+    return has(r'מרפסת|balcony') ? 'כן, יש מרפסת.' : 'לא צוינה מרפסת בפרטי הדירה.';
+  }
+  if (ask(r'ממ.?ד|מקלט|shelter|safe ?room')) {
+    return has(r'ממ.?ד|mamad|shelter') ? 'כן, יש ממ״ד.' : 'לא צוין ממ״ד בפרטי הדירה.';
+  }
+  if (ask(r'מיזוג|מזגן|air ?con|\bac\b')) {
+    return has(r'מיזוג|מזגן|\bac\b|air')
+        ? 'כן, יש מיזוג אוויר.'
+        : 'לא צוין מיזוג בפרטי הדירה.';
+  }
+  if (ask(r'מרוהט|ריהוט|furnish')) {
+    return has(r'מרוהט|ריהוט|furnish')
+        ? 'כן, הדירה מרוהטת.'
+        : 'לא צוין ריהוט בפרטי הדירה.';
+  }
+  if (ask(r'כניסה|מתי ?אפשר|פנוי|מתי ?נכנס|entry|available|move ?in')) {
+    return p.entryDate.trim().isNotEmpty
+        ? 'תאריך הכניסה: ${p.entryDate}.'
+        : 'לא צוין תאריך כניסה — כדאי לתאם עם בעל הנכס.';
+  }
+  if (ask(r'תחבורה|רכבת|אוטובוס|תחנה|רק.?ל|מטרו|transit|train|bus|metro')) {
+    final st = IsraelGeoIndex.transitStopsWithin(p.lat, p.lon, km: 2);
+    if (st.isEmpty) return 'לא נמצאה תחנת רכבת/רק״ל במרחק הליכה (עד 2 ק״מ).';
+    final d = st.first.km;
+    final dist = d < 1 ? '${(d * 1000).round()} מ׳' : '${d.toStringAsFixed(1)} ק״מ';
+    return 'התחנה הקרובה: ${st.first.name} — כ-$dist מהדירה.';
+  }
+  if (ask(r'שכונה|איפה|כתובת|מיקום|באיזה ?אזור|neighborhood|where|address|location')) {
+    final loc = [p.street, p.neighborhood, p.city]
+        .where((x) => x.trim().isNotEmpty)
+        .join(', ');
+    return loc.isNotEmpty ? 'הדירה נמצאת ב$loc.' : null;
+  }
+  return null;
+}
+
 class _SuggestionChip extends StatelessWidget {
   const _SuggestionChip({required this.label, required this.onTap});
   final String label;
@@ -378,8 +508,7 @@ class _SuggestionChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(999),
-          border:
-              Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
         ),
         child: Text(
           label,

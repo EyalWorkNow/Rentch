@@ -410,6 +410,8 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
       lon: widget.property.lon,
       city: widget.property.city,
       profile: NearbyProfile.fromText(personaText),
+      carousel: true, // detail page → tag carousel, top 5 + "צפה בכולם"
+      maxChips: 5,
     ));
     children.add(_AskRentlyEntry(
       property: widget.property,
@@ -444,7 +446,7 @@ class _AskRentlyEntry extends StatelessWidget {
       child: GestureDetector(
         onTap: () => showAskRentlySheet(
           context,
-          listingId: property.id,
+          property: property,
           listingTitle: title,
         ),
         child: Container(

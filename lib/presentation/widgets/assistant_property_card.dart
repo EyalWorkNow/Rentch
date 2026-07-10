@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';
@@ -210,9 +211,15 @@ class AssistantPropertyCard extends StatelessWidget {
                   // a WRAP of iconsax tags (not a carousel) so each reads clearly.
                   ..._geoWhy(scored.tags),
                   // Expandable transparency panel — the data-grounded "why this
-                  // one" (dimensions + stats + persona + reason).
+                  // one", with a relevant-only nearby-places dropdown at the bottom.
                   if (scored.scorecard != null)
-                    ScorecardView(card: scored.scorecard!),
+                    ScorecardView(
+                      card: scored.scorecard!,
+                      lat: p.lat,
+                      lon: p.lon,
+                      city: p.city,
+                      nearbyProfile: _nearbyProfile(context),
+                    ),
                 ],
               ),
             ),
@@ -220,6 +227,15 @@ class AssistantPropertyCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Nearby-relevance profile from the captured persona (no live query here) —
+  // decides which nearby-places sections show in this card's "למה זו" preview.
+  NearbyProfile _nearbyProfile(BuildContext context) {
+    final tp = context.read<DatingProvider>().tenantProfile;
+    final text = '${tp?.bio ?? ''} '
+        '${(tp?.importantDetails ?? const <String>[]).join(' ')}';
+    return NearbyProfile.fromText(text);
   }
 
   Widget _circleAction({

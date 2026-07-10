@@ -3,6 +3,7 @@ import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/presentation/widgets/speed_mode_slider.dart';
 import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/search/budget_reality.dart';
 import 'package:dating_app/core/search/lifestyle_knowledge.dart';
@@ -329,6 +330,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
               // separate "למה בחרתי לך את זו?" panel duplicated it and was removed.
               _AssistantPropertyCard(
                 scored: m.scored[i],
+                nearbyProfile: _seekerNearbyProfile(),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) =>
                         PropertyDetailScreen(property: m.scored[i].property))),
@@ -1383,6 +1385,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   SearchQuery _merge(SearchQuery a, SearchQuery b) => SearchQuery(
         city: b.city ?? a.city,
         neighborhood: b.neighborhood ?? a.neighborhood,
+        excludeAreas: {...a.excludeAreas, ...b.excludeAreas}.toList(),
+        areaDir: b.areaDir ?? a.areaDir,
+        areaDirExclude: b.areaDir != null ? b.areaDirExclude : a.areaDirExclude,
         minPrice: b.minPrice ?? a.minPrice,
         maxPrice: b.maxPrice ?? a.maxPrice,
         minRooms: b.minRooms ?? a.minRooms,
@@ -1630,6 +1635,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     ];
     scored.sort((a, b) => b.$2.compareTo(a.$2));
     return [for (final e in scored) e.$1];
+  }
+
+  // The seeker's nearby-relevance profile — from their live query text plus any
+  // captured persona (bio + important details). Drives which nearby-places
+  // sections show in each result's "למה זו" preview (only what's relevant).
+  NearbyProfile _seekerNearbyProfile() {
+    final tp = context.read<DatingProvider>().tenantProfile;
+    final text = '${_query.rawText} ${tp?.bio ?? ''} '
+        '${(tp?.importantDetails ?? const <String>[]).join(' ')}';
+    return NearbyProfile.fromText(text);
   }
 
   double _religiosityBoost(Religiosity rel, RentalProperty p) {
@@ -2164,9 +2179,11 @@ class _AnimatedChipState extends State<_AnimatedChip>
 }
 
 class _AssistantPropertyCard extends StatelessWidget {
-  const _AssistantPropertyCard({required this.scored, required this.onTap});
+  const _AssistantPropertyCard(
+      {required this.scored, required this.onTap, this.nearbyProfile});
   final ScoredProperty scored;
   final VoidCallback onTap;
+  final NearbyProfile? nearbyProfile; // seeker relevance for the nearby dropdown
 
   @override
   Widget build(BuildContext context) {
@@ -2355,9 +2372,16 @@ class _AssistantPropertyCard extends StatelessWidget {
                     ]),
                   ),
                   // Expandable transparency panel — the data-grounded "why this
-                  // one" breakdown (dimensions + stats + persona + LLM reason).
+                  // one" breakdown, with a RELEVANT-ONLY nearby-places dropdown at
+                  // the very bottom (only what this seeker's search implies).
                   if (scored.scorecard != null)
-                    ScorecardView(card: scored.scorecard!),
+                    ScorecardView(
+                      card: scored.scorecard!,
+                      lat: scored.property.lat,
+                      lon: scored.property.lon,
+                      city: scored.property.city,
+                      nearbyProfile: nearbyProfile,
+                    ),
                 ],
               ),
             ),
