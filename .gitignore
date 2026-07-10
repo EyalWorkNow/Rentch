@@ -69,3 +69,7 @@ aws/lambda/router/node_modules/
 aws/lambda/router/fcm-service-account.json
 aws/lambda/router/router.zip
 *.zip
+
+# local worktrees / agent state
+.claude/
+aws/lambda/*/node_modules/

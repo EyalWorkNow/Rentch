@@ -1,4 +1,6 @@
 PODS:
+  - app_links (6.4.1):
+    - Flutter
   - AppAuth (2.0.0):
     - AppAuth/Core (= 2.0.0)
     - AppAuth/ExternalUserAgent (= 2.0.0)
@@ -152,6 +154,8 @@ PODS:
     - Flutter
   - sensors_plus (0.0.1):
     - Flutter
+  - share_plus (0.0.1):
+    - Flutter
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -173,6 +177,7 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
+  - app_links (from `.symlinks/plugins/app_links/ios`)
   - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/darwin`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - dchs_motion_sensors (from `.symlinks/plugins/dchs_motion_sensors/ios`)
@@ -194,6 +199,7 @@ DEPENDENCIES:
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - record_darwin (from `.symlinks/plugins/record_darwin/ios`)
   - sensors_plus (from `.symlinks/plugins/sensors_plus/ios`)
+  - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sign_in_with_apple (from `.symlinks/plugins/sign_in_with_apple/ios`)
   - speech_to_text (from `.symlinks/plugins/speech_to_text/darwin`)
@@ -227,6 +233,8 @@ SPEC REPOS:
     - RecaptchaInterop
 
 EXTERNAL SOURCES:
+  app_links:
+    :path: ".symlinks/plugins/app_links/ios"
   audioplayers_darwin:
     :path: ".symlinks/plugins/audioplayers_darwin/darwin"
   camera_avfoundation:
@@ -269,6 +277,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/record_darwin/ios"
   sensors_plus:
     :path: ".symlinks/plugins/sensors_plus/ios"
+  share_plus:
+    :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   sign_in_with_apple:
@@ -285,6 +295,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/webview_flutter_wkwebview/darwin"
 
 SPEC CHECKSUMS:
+  app_links: 3dbc685f76b1693c66a6d9dd1e9ab6f73d97dc0a
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
@@ -327,6 +338,7 @@ SPEC CHECKSUMS:
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
   record_darwin: fb1f375f1d9603714f55b8708a903bbb91ffdb0a
   sensors_plus: 6a11ed0c2e1d0bd0b20b4029d3bad27d96e0c65b
+  share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418
   speech_to_text: 3b313d98516d3d0406cea424782ec25470c59d19
