@@ -32,19 +32,27 @@ const SELECTORS = [
   'way["railway"~"^(rail|light_rail|subway)$"]',
 ];
 
-async function overpass(selector, label) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function overpass(selector, label, { tries = 5 } = {}) {
   const q = `[out:json][timeout:300];(${selector}(${BBOX}););out geom;`;
-  process.stdout.write(`  ${label}: querying Overpass…`);
-  const res = await fetch(OVERPASS, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(q),
-  });
-  if (!res.ok) throw new Error(`Overpass ${res.status} for ${label}`);
-  const json = await res.json();
-  const els = json.elements ?? [];
-  process.stdout.write(`\r  ${label}: ${els.length} ways        \n`);
-  return els;
+  for (let i = 1; i <= tries; i++) {
+    process.stdout.write(`  ${label}: querying Overpass… (try ${i})`);
+    const res = await fetch(OVERPASS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'RentlyETL/1.0 (apartment-matching; contact hh3466@gmail.com)' },
+      body: 'data=' + encodeURIComponent(q),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const els = json.elements ?? [];
+      process.stdout.write(`\r  ${label}: ${els.length} ways            \n`);
+      return els;
+    }
+    process.stdout.write(`\r  ${label}: Overpass ${res.status}, retrying…   \n`);
+    if (i < tries) await sleep(20000 * i); // 429/504 backoff
+  }
+  throw new Error(`Overpass failed for ${label} after ${tries} tries`);
 }
 
 const key = (lat, lon) =>

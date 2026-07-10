@@ -35,15 +35,28 @@ const key = (lat, lon) =>
   `${Math.round(lat / GRID_DEG)}_${Math.round(lon / GRID_DEG)}`;
 
 async function main() {
-  const q = `[out:json][timeout:300];(${SELECTOR}(${BBOX}););out center;`;
-  process.stdout.write('  querying Overpass…');
-  const res = await fetch(OVERPASS, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(q),
-  });
-  if (!res.ok) throw new Error(`Overpass ${res.status}`);
-  const els = (await res.json()).elements ?? [];
+  // Bind the BBOX to EVERY statement — otherwise nwr["office"] runs globally
+  // (times out / returns nothing) and only the last statement is bounded.
+  const stmts = SELECTOR.split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => `${s}(${BBOX});`)
+      .join('');
+  const q = `[out:json][timeout:300];(${stmts});out center;`;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let els;
+  for (let i = 1; i <= 5; i++) {
+    process.stdout.write(`  querying Overpass… (try ${i})`);
+    const res = await fetch(OVERPASS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'RentlyETL/1.0 (apartment-matching; contact hh3466@gmail.com)' },
+      body: 'data=' + encodeURIComponent(q),
+    });
+    if (res.ok) { els = (await res.json()).elements ?? []; break; }
+    process.stdout.write(`\r  Overpass ${res.status}, retrying…   \n`);
+    if (i === 5) throw new Error(`Overpass ${res.status} after 5 tries`);
+    await sleep(20000 * i);
+  }
   process.stdout.write(`\r  ${els.length} job places            \n`);
 
   const cells = {};

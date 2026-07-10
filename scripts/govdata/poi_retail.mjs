@@ -32,19 +32,35 @@ const MARKET_Q = 'nwr["shop"~"^(supermarket|convenience|greengrocer)$"]';
 const MALL_Q =
   'nwr["shop"~"^(mall|department_store)$"];nwr["amenity"="marketplace"]';
 
-async function overpass(selector, label) {
-  const q = `[out:json][timeout:180];(${selector}(${BBOX}););out center;`;
-  process.stdout.write(`  ${label}: querying Overpass…`);
-  const res = await fetch(OVERPASS, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(q),
-  });
-  if (!res.ok) throw new Error(`Overpass ${res.status} for ${label}`);
-  const json = await res.json();
-  const els = json.elements ?? [];
-  process.stdout.write(`\r  ${label}: ${els.length} POIs        \n`);
-  return els;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function overpass(selector, label, { tries = 5 } = {}) {
+  // Bind the BBOX to EVERY statement — a multi-statement selector (e.g. malls +
+  // marketplaces) would otherwise leave all but the last running globally.
+  const stmts = selector
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => `${s}(${BBOX});`)
+      .join('');
+  const q = `[out:json][timeout:180];(${stmts});out center;`;
+  for (let i = 1; i <= tries; i++) {
+    process.stdout.write(`  ${label}: querying Overpass… (try ${i})`);
+    const res = await fetch(OVERPASS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'RentlyETL/1.0 (apartment-matching; contact hh3466@gmail.com)' },
+      body: 'data=' + encodeURIComponent(q),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const els = json.elements ?? [];
+      process.stdout.write(`\r  ${label}: ${els.length} POIs            \n`);
+      return els;
+    }
+    process.stdout.write(`\r  ${label}: Overpass ${res.status}, retrying…   \n`);
+    if (i < tries) await sleep(20000 * i);
+  }
+  throw new Error(`Overpass ${label} failed after ${tries} tries`);
 }
 
 // element → [lat, lon] (nodes carry lat/lon; ways/relations carry .center).
