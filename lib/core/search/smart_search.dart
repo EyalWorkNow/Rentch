@@ -597,11 +597,13 @@ class SmartSearch {
             }
           }
 
-          // Only fuzzy-match a single word of 4-5 chars. THREE-char words are too
-          // dangerous to fuzzy (edit-distance-1 turns everyday words into short
-          // cities: "ערך"→"ערד", "שדה"→"שדות") — a 3-char city needs the EXACT
-          // match handled above, not fuzzy.
-          if (clean.length >= 4 && clean.length <= 5) {
+          // Fuzzy-match a single word of 4+ chars. THREE-char words are too
+          // dangerous (edit-distance-1 turns everyday words into short cities:
+          // "ערך"→"ערד") — a 3-char city needs the EXACT match above. But longer
+          // words SHOULD fuzzy (common typos: "ירשלים"→"ירושלים", "חיפא"→"חיפה"),
+          // so no low upper cap — the dist≤1 + first-char + ±1-length gates keep it
+          // safe.
+          if (clean.length >= 4 && clean.length <= 9) {
             final fuzzyMatches = <(String, int)>[];
             for (final locality in LocalityMatcher.allLocalities) {
               if (clean[0] != locality[0]) continue;
