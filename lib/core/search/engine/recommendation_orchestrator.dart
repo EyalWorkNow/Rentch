@@ -828,6 +828,31 @@ class RecommendationEngine {
       ranked.sort((a, b) => b.score.compareTo(a.score));
     }
 
+    // NO-BUDGET OUTLIER GUARD: when the user gave no price ceiling AND isn't after
+    // luxury/investment, an absurd top-of-market flat (a ₪20k penthouse in a ₪5k
+    // market) must not become the default #1 just because it satisfies the stated
+    // dims (accessible / quiet …). Softly sink only the extreme top price-percentile
+    // so a sensible flat wins (#30 senior-pension → ₪20k penthouse).
+    final noBudgetOutlierGuard = maxP == null &&
+        market.medianPrice > 0 &&
+        !query.intents.contains(SearchIntent.luxury) &&
+        !query.intents.contains(SearchIntent.investment);
+    // Sink only a GENUINE outlier — priced above 2× the market median (a ₪20k flat
+    // in a ₪5k market), scaling to a 0.55 cut at ~3.3× median. A merely above-median
+    // flat (a ₪6k central flat vs ₪2.6k periphery) is left untouched, so this can't
+    // fight the region/central preference.
+    double _outlierPenalty(RankedCandidate c) {
+      final ratio = c.property.price / market.medianPrice;
+      if (ratio <= 2.0) return 1.0;
+      return 1.0 - (0.55 * ((ratio - 2.0) / 1.3)).clamp(0.0, 0.55);
+    }
+    if (noBudgetOutlierGuard) {
+      for (final c in ranked) {
+        c.score *= _outlierPenalty(c);
+      }
+      ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
     // Part 4 — exploration + diversity
     if (explore) {
       ExplorationPolicy.apply(ranked, model, seed: seed);
@@ -843,25 +868,6 @@ class RecommendationEngine {
     final match = <RankedCandidate, double>{
       for (final c in selected) c: _statedMatch(c, model),
     };
-    // IN-CITY FIRST (part 2/2): also cap each out-of-city flat's DISPLAYED match
-    // to just below the weakest in-city one — so every in-city flat sorts first
-    // AND the fit% stays monotonic (an 82% neighbour must not sit above a 73%
-    // in-city flat). Pairs with the pre-selection score penalty above.
-    if (cityGated) {
-      final inCity = [
-        for (final c in selected)
-          if (_cityMatches(c.property, namedCity)) match[c]!
-      ];
-      if (inCity.isNotEmpty) {
-        final minIn = inCity.reduce(math.min);
-        for (final c in selected) {
-          if (!_cityMatches(c.property, namedCity)) {
-            match[c] = math.min(match[c]!, minIn * 0.98);
-          }
-        }
-      }
-    }
-
     // The DISPLAY order + fit% is driven by _statedMatch, so the same soft
     // preferences that re-ranked c.score (which only drives SELECTION) must ALSO
     // shape match[c] — else a named-neighbourhood / commute / cheapest search
@@ -904,6 +910,31 @@ class RecommendationEngine {
       for (final c in selected) {
         final pctile = c.pfv.get('price_percentile', 0.5).clamp(0.0, 1.0);
         match[c] = (match[c]! * (1.0 + 0.18 * (1.0 - pctile))).clamp(0.0, 1.0);
+      }
+    }
+    // Mirror the no-budget outlier guard on the DISPLAY scale (see selection above).
+    if (noBudgetOutlierGuard) {
+      for (final c in selected) {
+        match[c] = (match[c]! * _outlierPenalty(c)).clamp(0.0, 1.0);
+      }
+    }
+    // IN-CITY FIRST: cap each out-of-city flat's DISPLAYED match to just below the
+    // weakest in-city one — so every in-city flat sorts first AND the fit% stays
+    // monotonic. This runs LAST (after the cheap/commute boosts) so a cheaper
+    // adjacent-town flat can never re-inflate past a named-city one in the display
+    // order (#5 רמת גן → בני ברק). Pairs with the pre-selection score penalty.
+    if (cityGated) {
+      final inCity = [
+        for (final c in selected)
+          if (_cityMatches(c.property, namedCity)) match[c]!
+      ];
+      if (inCity.isNotEmpty) {
+        final minIn = inCity.reduce(math.min);
+        for (final c in selected) {
+          if (!_cityMatches(c.property, namedCity)) {
+            match[c] = math.min(match[c]!, minIn * 0.98);
+          }
+        }
       }
     }
     selected.sort((a, b) => match[b]!.compareTo(match[a]!));

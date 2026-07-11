@@ -787,7 +787,17 @@ class PreferenceModelBuilder {
       sharpen('senior_area', 0.95, 10.0); // demographic (calm, older) proxy
       sharpen('low_noise', 0.95, 12.0); // physical — far from a major road/rail
     }
-    if (intents.contains(SearchIntent.luxury)) sharpen('luxury', 0.9, 9.0);
+    if (intents.contains(SearchIntent.luxury)) {
+      // "יוקרה" is the DOMINANT ask — weight it hard so a plain cheap flat can't
+      // tie a pool/gym penthouse on fit%. Space + a high floor (view) are part of
+      // the premium picture, so nudge those too.
+      sharpen('luxury', 0.95, 15.0);
+      sharpen('spaciousness', 0.75, 5.0);
+      sharpen('view', 0.7, 4.0);
+      // A luxury seeker isn't optimizing ₪/m² — don't let the value dimension
+      // dock the expensive-but-premium penthouse they actually asked for.
+      weights['value'] = BayesianWeight(0.08, 0.02);
+    }
     if (intents.contains(SearchIntent.view)) sharpen('view', 0.9, 9.0);
     if (intents.contains(SearchIntent.lowFloor)) sharpen('low_floor', 0.95, 12.0);
     if (intents.contains(SearchIntent.spacious)) {

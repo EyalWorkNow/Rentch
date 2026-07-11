@@ -800,8 +800,12 @@ class SmartSearch {
     'מרכז': 'מרכז', 'לב': 'מרכז',
   };
   // Everyday Israeli negation cues that mean "avoid this place".
+  // "לא" must be the standalone word (not the prefix of "לאוניברסיטה" / "לאט" /
+  // "לאור" …) — Hebrew has no \b, so guard with letter lookaround. This bug nulled
+  // the city of "קרוב לאוניברסיטה בתל אביב" (the "לא" in "לאוניברסיטה").
   static final _locNeg = RegExp(
-      r'לא|בלי|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט|not|without|avoid|except',
+      r'(?<![א-ת])לא(?![א-ת])|בלי\b|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט|'
+      r'\bnot\b|without|avoid|except',
       caseSensitive: false);
 
   static (String?, String?, List<String>, String?, bool) _parseLocationModifiers(

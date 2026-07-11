@@ -1,5 +1,7 @@
 // Regression guards for the parser/ranking fixes surfaced by the 50-persona
 // aggressive break-test (messy natural language).
+import 'dart:io';
+
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/search_intent.dart';
@@ -7,11 +9,11 @@ import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-RentalProperty p({required String id, int price = 6000, double rooms = 3, String city = 'תל אביב', double lat = 32.07, double lon = 34.78}) =>
-    RentalProperty(id: id, price: price, rooms: rooms, sizeM2: 70, floor: '3',
+RentalProperty p({required String id, int price = 6000, double rooms = 3, String city = 'תל אביב', double lat = 32.07, double lon = 34.78, int sizeM2 = 70, List<String> features = const []}) =>
+    RentalProperty(id: id, price: price, rooms: rooms, sizeM2: sizeM2, floor: '3',
         totalFloors: '8', city: city, neighborhood: '', street: 'x', streetNumber: 1,
         lat: lat, lon: lon, propertyType: 'דירה', entryDate: '', condition: 'טוב',
-        ownerName: 'x', agencyListing: false, features: const [],
+        ownerName: 'x', agencyListing: false, features: features,
         media: const [PropertyMedia(url: 'u', type: PropertyMediaType.image)]);
 
 void main() {
@@ -49,6 +51,66 @@ void main() {
         TransactionTypeFilter.rent);
     // longer-city typo now resolves.
     expect(SmartSearch.parse('דירה בירשלים').city, 'ירושלים');
+  });
+
+  group('60-persona criticals — root fixes', () {
+    setUpAll(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      await GovData.instance.init(reader: (path) => File(path).readAsString());
+    });
+    tearDownAll(() => GovData.instance.resetForTest());
+
+    test('"לאוניברסיטה" (to-the-university) does NOT null the city via its "לא"', () {
+      // The location-negation regex used to match the "לא" inside "לאוניברסיטה".
+      expect(SmartSearch.parse('סטודנט קרוב לאוניברסיטה בתל אביב').city,
+          contains('תל אביב'));
+      // a REAL negation still strips the city.
+      final neg = SmartSearch.parse('דירה לא בתל אביב');
+      expect(neg.city, isNot('תל אביב'));
+    });
+
+    test('cheap preference never floats an adjacent town above the named city', () {
+      final cat = [
+        p(id: 'rg', city: 'רמת גן', lat: 32.085, lon: 34.811, price: 6300),
+        p(id: 'bb', city: 'בני ברק', lat: 32.083, lon: 34.833, price: 4800),
+        p(id: 'tlv', city: 'תל אביב', lat: 32.07, lon: 34.78, price: 3900),
+      ];
+      final recs = RecommendationEngine.recommend(
+          candidates: cat,
+          query: SmartSearch.parse('משתלם ברמת גן'),
+          limit: 3, explore: false);
+      expect(recs.first.property.city, 'רמת גן',
+          reason: 'the named city must win the display even when cheaper towns are adjacent');
+    });
+
+    test('luxury intent surfaces the premium flat (value not penalizing)', () {
+      final cat = [
+        p(id: 'plain', city: 'תל אביב', lat: 32.07, lon: 34.775, price: 8500),
+        p(id: 'cheap', city: 'תל אביב', lat: 32.085, lon: 34.781, price: 3900, rooms: 1),
+        p(id: 'penthouse', city: 'תל אביב', lat: 32.065, lon: 34.771, price: 21000, rooms: 5, sizeM2: 180, features: const ['elevator', 'pool', 'gym', 'mamad']),
+      ];
+      final recs = RecommendationEngine.recommend(
+          candidates: cat,
+          query: SmartSearch.parse('דירת יוקרה בתל אביב'),
+          limit: 3, explore: false);
+      expect(recs.first.property.id, 'penthouse',
+          reason: 'a luxury search must lead with the premium flat, not be sunk by value');
+    });
+
+    test('no-budget non-luxury search does not default to a price outlier', () {
+      final cat = [
+        p(id: 'access', city: 'תל אביב', lat: 32.08, lon: 34.78, price: 7000),
+        p(id: 'mid', city: 'תל אביב', lat: 32.07, lon: 34.775, price: 8500),
+        p(id: 'cheap', city: 'תל אביב', lat: 32.056, lon: 34.769, price: 5200, rooms: 2),
+        p(id: 'outlier', city: 'תל אביב', lat: 32.065, lon: 34.771, price: 21000, rooms: 5),
+      ];
+      final recs = RecommendationEngine.recommend(
+          candidates: cat,
+          query: SmartSearch.parse('מבוגר בפנסיה מחפש דירה נגישה ושקטה בתל אביב'),
+          limit: 3, explore: false);
+      expect(recs.first.property.id, isNot('outlier'),
+          reason: 'a ₪21k outlier must not be the default #1 when no budget was stated');
+    });
   });
 
   group('central region', () {
