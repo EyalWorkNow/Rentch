@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/insights/area_intelligence.dart';
 import 'package:dating_app/core/insights/target_personas.dart';
+import 'package:dating_app/presentation/features/broker/area_ranking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -79,6 +80,32 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
               _intro(),
+              const SizedBox(height: 10),
+              // Cross-link to the city-wide ranking (Phase 2).
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AreaRankingScreen())),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(children: [
+                    Icon(IconsaxPlusLinear.ranking_1, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('דרג את כל האזורים בעיר לפי קהל יעד',
+                          style: TextStyle(
+                              fontSize: 13.5, fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary)),
+                    ),
+                    Icon(IconsaxPlusLinear.arrow_left_2,
+                        color: AppColors.primary, size: 18),
+                  ]),
+                ),
+              ),
               const SizedBox(height: 12),
               _addressRow(),
               if (_error != null) ...[

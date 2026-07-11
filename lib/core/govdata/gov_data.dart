@@ -96,12 +96,28 @@ class StatArea {
     required this.childShare,
     required this.seniorShare,
     required this.poly,
+    this.city = '',
+    this.id = 0,
   });
   final int ses; // 1..10 (0 = unknown)
   final double youngShare;
   final double childShare;
   final double seniorShare;
   final List<List<double>> poly; // [[lat,lon], …]
+  final String city; // settlement name (for city ranking)
+  final int id; // YISHUV*10000 + stat-area
+
+  /// Approximate centroid (mean of the ring vertices) — [lat, lon]. Enough for
+  /// profiling the area and placing it on a map.
+  List<double> get centroid {
+    if (poly.isEmpty) return const [0, 0];
+    var la = 0.0, lo = 0.0;
+    for (final p in poly) {
+      la += p[0];
+      lo += p[1];
+    }
+    return [la / poly.length, lo / poly.length];
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -649,6 +665,8 @@ class GovData {
         youngShare: (m['young'] as num?)?.toDouble() ?? 0.5,
         childShare: (m['child'] as num?)?.toDouble() ?? 0.5,
         seniorShare: (m['senior'] as num?)?.toDouble() ?? 0.5,
+        city: (m['city'] as String?)?.trim() ?? '',
+        id: (m['id'] as num?)?.toInt() ?? 0,
         poly: poly,
       ));
       // Stamp every 0.02° cell the polygon's bounding box covers → this area.
@@ -685,6 +703,32 @@ class GovData {
       if (_pointInPoly(lat, lon, _statAreas[i].poly)) return _statAreas[i];
     }
     return null;
+  }
+
+  /// All statistical areas in [city] (normalized name match — handles the
+  /// "תל אביב -יפו" / "תל אביב יפו" / "תל אביב" spellings). Empty when unloaded or
+  /// the city has no areas. Used by Area Intelligence to rank a city's blocks.
+  List<StatArea> statAreasInCity(String city) {
+    if (!_loaded || _statAreas.isEmpty) return const [];
+    final q = _normStatCity(city);
+    if (q.isEmpty) return const [];
+    return [
+      for (final a in _statAreas)
+        if (_statCityMatches(a.city, q)) a
+    ];
+  }
+
+  static String _normStatCity(String s) => s
+      .trim()
+      .replaceAll(RegExp(r'[\-־]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(RegExp(r'\sיפו$'), '')
+      .trim();
+
+  static bool _statCityMatches(String areaCity, String normQuery) {
+    final a = _normStatCity(areaCity);
+    if (a.isEmpty) return false;
+    return a == normQuery || a.contains(normQuery) || normQuery.contains(a);
   }
 
   Future<void> _loadFutureInfra(AssetReader read) async {

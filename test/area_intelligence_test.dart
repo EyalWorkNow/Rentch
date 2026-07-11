@@ -50,6 +50,41 @@ void main() {
     }
   });
 
+  test('statAreasInCity resolves a big city (normalized name)', () {
+    final tlv = GovData.instance.statAreasInCity('תל אביב');
+    expect(tlv.length, greaterThan(50), reason: 'TLV has many statistical blocks');
+    expect(tlv.every((a) => a.centroid[0] > 31 && a.centroid[0] < 33), true);
+  });
+
+  test('rankCityAreas — sorted best-first + persona discriminates', () {
+    final forFamilies =
+        AreaIntelligence.rankCityAreas('תל אביב', TargetPersona.byKey('families')!);
+    final forTech =
+        AreaIntelligence.rankCityAreas('תל אביב', TargetPersona.byKey('tech')!);
+    expect(forFamilies.length, greaterThan(50));
+    // sorted desc by fit
+    for (var i = 1; i < forFamilies.length; i++) {
+      expect(forFamilies[i - 1].fit.pct, greaterThanOrEqualTo(forFamilies[i].fit.pct));
+    }
+    // the #1 family block and the #1 tech block should not be identical (the
+    // personas value different layers), proving the ranking discriminates.
+    final famTop = forFamilies.first.area.id;
+    final techTop = forTech.first.area.id;
+    expect(famTop != techTop || forFamilies.first.fit.pct != forTech.first.fit.pct,
+        true);
+    // limit is honoured
+    expect(
+        AreaIntelligence.rankCityAreas('תל אביב', TargetPersona.byKey('tech')!,
+                limit: 10)
+            .length,
+        10);
+  });
+
+  test('rankCityAreas — unknown city → empty, no throw', () {
+    expect(AreaIntelligence.rankCityAreas('עיר-שלא-קיימת', TargetPersona.all.first),
+        isEmpty);
+  });
+
   test('CRUSH — bad coords do not crash the profiler', () {
     for (final ll in const [[0.0, 0.0], [double.nan, 34.0]]) {
       final p = AreaIntelligence.profileAt(ll[0], ll[1]);

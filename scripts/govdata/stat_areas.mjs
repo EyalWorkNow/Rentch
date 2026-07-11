@@ -33,7 +33,8 @@ const AGE = [
   'age_30_34', 'age_35_39', 'age_40_44', 'age_45_49', 'age_50_54', 'age_55_59',
   'age_60_64', 'age_65_69', 'age_70_74', 'age_75_79', 'age_80_84', 'age_85_up',
 ];
-const OUT_FIELDS = ['eshkol_mad', 'Pop_Total', ...AGE].join(',');
+const OUT_FIELDS =
+    ['eshkol_mad', 'Pop_Total', 'Shem_Yishuv', 'YISHUV_STA', ...AGE].join(',');
 const PAGE = 2000; // = the layer's maxRecordCount
 
 const num = (v) => {
@@ -103,6 +104,8 @@ async function main() {
         young: Math.round((workingAge / pop) * 1000) / 1000,
         child: Math.round((child / pop) * 1000) / 1000,
         senior: Math.round((senior / pop) * 1000) / 1000,
+        city: (p.Shem_Yishuv ?? '').trim(), // settlement name — for city ranking
+        id: num(p.YISHUV_STA), // YISHUV*10000 + stat-area
         poly,
       });
     }

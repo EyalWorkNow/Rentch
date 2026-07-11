@@ -56,6 +56,16 @@ class PersonaFit {
   final List<AreaReason> reasons; // top contributing layers
 }
 
+/// One statistical area ranked for a persona (list + map row).
+class RankedArea {
+  const RankedArea(this.area, this.profile, this.fit);
+  final StatArea area;
+  final AreaProfile profile;
+  final PersonaFit fit;
+  List<double> get centroid => area.centroid; // [lat, lon]
+  List<List<double>> get poly => area.poly;
+}
+
 class AreaIntelligence {
   const AreaIntelligence._();
 
@@ -168,4 +178,34 @@ class AreaIntelligence {
     out.sort((a, b) => b.pct.compareTo(a.pct));
     return out;
   }
+
+  static final Map<String, List<RankedArea>> _cityCache = {};
+
+  /// Rank every statistical block in [city] for [persona], best-first. Profiles
+  /// each block's centroid and scores persona-fit — the "where should I buy for
+  /// this crowd" view. Cached per (city, persona); returns [] when gov data isn't
+  /// loaded or the city has no known blocks.
+  static List<RankedArea> rankCityAreas(String city, TargetPersona persona,
+      {int? limit}) {
+    final key = '${_normKey(city)}|${persona.key}';
+    var ranked = _cityCache[key];
+    if (ranked == null) {
+      final areas = GovData.instance.statAreasInCity(city);
+      final out = <RankedArea>[];
+      for (final a in areas) {
+        final c = a.centroid;
+        if (c[0].abs() < 0.1 || c[1].abs() < 0.1) continue;
+        final profile = profileAt(c[0], c[1], city: a.city);
+        out.add(RankedArea(a, profile, fit(profile.pfv, persona)));
+      }
+      out.sort((x, y) => y.fit.pct.compareTo(x.fit.pct));
+      ranked = _cityCache[key] = out;
+    }
+    return limit != null && ranked.length > limit
+        ? ranked.sublist(0, limit)
+        : ranked;
+  }
+
+  static String _normKey(String s) =>
+      s.trim().replaceAll(RegExp(r'[\-־\s]+'), ' ');
 }

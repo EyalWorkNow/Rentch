@@ -47,3 +47,38 @@ value-add-investor. Each = a SearchQuery (intents/text) → weight profile.
 
 ## Open (defaulted for MVP)
 - Yield → proxy. Map → Phase 2 list-first. Entry → both. Personas → the 7 above.
+
+---
+
+# Phase 2 — City area ranking (architecture)
+
+Goal: pick a target persona + a city → rank ALL that city's statistical areas
+best→worst for the persona, as a ranked list AND a colour-coded map.
+
+**Data (prerequisite):** `stat_areas.json` today has no city/id per area, so a
+city can't be resolved. Fix in the ETL:
+- `stat_areas.mjs`: add `city` (`Shem_Yishuv`) + `id` (`YISHUV_STA`) per area.
+  Re-run → new asset (~+50 KB). Centroid computed in Dart from the polygon.
+- `StatArea` model + `_loadStatAreas`: parse `city` + `id`; add a `centroid` getter
+  (mean of ring vertices — enough for profiling + map placement).
+- `GovData.statAreasInCity(city)`: normalized-name filter → the city's areas.
+
+**Engine:** `AreaIntelligence.rankCityAreas(city, persona, {limit})`:
+- for each `StatArea` in the city → `profileAt(centroid)` → `fit(persona)` →
+  `RankedArea(area, profile, fit)`; sort desc by fit%. Cache per (city, persona).
+- O(areas) FeatureEngineer runs; a big city (~500 areas) is a ~1 s one-shot — run
+  off the UI frame + show a spinner; cache the result.
+
+**UI:** extend `area_intel_screen.dart` with a second MODE ("דרג אזורים בעיר"):
+- city field (autocomplete off `GovData.localities`) + persona picker → "דרג".
+- **List:** ranked rows (rank #, best-effort neighbourhood label via
+  reverse-geocode of the top-N centroids, fit %, top reason, mini-bar). Tap → the
+  Phase-1 layer card for that area's centroid.
+- **Map (the wow):** `flutter_map` centred on the city, top-N areas drawn as
+  colour-graded polygons (green=high fit → amber=low), tap a polygon → its card.
+
+**Tests:** `statAreasInCity` returns a non-trivial set for a big city; centroid
+inside the polygon bbox; `rankCityAreas` sorted + persona-discriminating; crush
+(unknown city → empty, no throw).
+
+Phase 3 (real CBS AppValue yield) still deferred.
