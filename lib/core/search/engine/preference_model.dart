@@ -1202,6 +1202,24 @@ class PreferenceModelBuilder {
       sharpen('family', 0.55, 2.0); // young/family-mix area, mild
     }
 
+    // A CHILDLESS single / couple / roommate is NOT looking for child (or elderly)
+    // infrastructure — being a couple doesn't mean they want schools & gardens.
+    // The schools/family/health dims otherwise sit at the same 0.30 baseline as a
+    // family's and quietly push them toward family neighbourhoods over their REAL
+    // needs (central/lively/transit/nightlife). Down-weight those dims here (a
+    // direct override, NOT marked "stated") so the seeker's own lifestyle leads.
+    // A calm/quiet couple still keeps health (they may value it) via wantsCalm.
+    final childless = !familyPersona &&
+        (intents.contains(SearchIntent.single) ||
+            intents.contains(SearchIntent.couple) ||
+            intents.contains(SearchIntent.roommates));
+    if (childless) {
+      // Only the child-specific dims — health stays (a childless couple, and
+      // especially a retired one, may still value clinics nearby).
+      weights['schools'] = BayesianWeight(0.08, 0.02);
+      weights['family'] = BayesianWeight(0.10, 0.02);
+    }
+
     // ── LLM-DRIVEN WEIGHTS (the assistant is the brain) ───────────────────────
     // When the assistant supplied importances, they REPLACE all heuristic weights:
     // the language model understood the human and decided what matters and how

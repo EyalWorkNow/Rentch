@@ -72,6 +72,20 @@ void main() {
     up('אחרי הצבא, עבודה ראשונה', 'value');
   });
 
+  test('childless couple/single are NOT pushed toward schools & family dims', () {
+    final couple = model('זוג צעיר בתל אביב');
+    final single = model('רווק בתל אביב');
+    final family = model('משפחה עם ילדים בתל אביב');
+    // being a couple/single ≠ wanting schools: their schools weight is far below
+    // a family's AND below their own location weight.
+    expect(couple.weight('schools'), lessThan(0.15));
+    expect(single.weight('schools'), lessThan(0.15));
+    expect(family.weight('schools'), greaterThan(0.5));
+    expect(couple.weight('schools'), lessThan(couple.weight('location')));
+    // a couple who signals kids DOES get schools back.
+    expect(model('זוג שמתכנן ילדים').weight('schools'), greaterThan(0.4));
+  });
+
   test('explicit ask still dominates a soft inference', () {
     // A single seeker who ALSO explicitly wants quiet must not be pushed to a
     // young/nightlife area — wantsCalm gates the lively nudges.
