@@ -742,20 +742,28 @@ class RecommendationEngine {
       ranked.sort((a, b) => b.score.compareTo(a.score));
     }
 
-    // "מרכז" WITHOUT A CITY = the central REGION (Gush Dan), not just "central
+    // A REGION word without a city ("מרכז" / "השרון") = a broad AREA, not "central
     // within any city". Otherwise a central-Beer-Sheva flat outranks Tel Aviv for
-    // someone who said "משהו במרכז". So when the central intent fires with NO named
-    // city, softly down-weight listings outside the central region (never a hard
-    // drop). Only when no city — a named city keeps its own centre meaning.
-    if (namedCity.isEmpty && query.intents.contains(SearchIntent.central)) {
-      var touched = false;
-      for (final c in ranked) {
-        if (!_isCentralRegion(c.property.city)) {
-          c.score *= 0.6;
-          touched = true;
-        }
+    // "משהו במרכז". So when no city is named, softly down-weight listings outside
+    // the referenced region (never a hard drop). Only when no city — a named city
+    // keeps its own centre meaning.
+    if (namedCity.isEmpty) {
+      Set<String>? region;
+      if (RegExp(r'השרון|בשרון|שרון\b').hasMatch(query.rawText)) {
+        region = _sharonRegion;
+      } else if (query.intents.contains(SearchIntent.central)) {
+        region = _centralRegion;
       }
-      if (touched) ranked.sort((a, b) => b.score.compareTo(a.score));
+      if (region != null) {
+        var touched = false;
+        for (final c in ranked) {
+          if (!_inRegion(c.property.city, region)) {
+            c.score *= 0.6;
+            touched = true;
+          }
+        }
+        if (touched) ranked.sort((a, b) => b.score.compareTo(a.score));
+      }
     }
 
     // NAMED NEIGHBOURHOOD ("דירה בפלורנטין") — an IDENTITY, like the city. Naming a
@@ -864,6 +872,21 @@ class RecommendationEngine {
       if (anyIn) {
         for (final c in selected) {
           if (!_hoodMatches(c.property, namedHood)) match[c] = match[c]! * 0.6;
+        }
+      }
+    }
+    // Region ("מרכז"/"השרון") without a city — down-weight the DISPLAY of out-of-
+    // region listings too, so a cheap peripheral flat doesn't top a region search.
+    if (namedCity.isEmpty) {
+      Set<String>? region;
+      if (RegExp(r'השרון|בשרון|שרון\b').hasMatch(query.rawText)) {
+        region = _sharonRegion;
+      } else if (query.intents.contains(SearchIntent.central)) {
+        region = _centralRegion;
+      }
+      if (region != null && selected.any((c) => _inRegion(c.property.city, region!))) {
+        for (final c in selected) {
+          if (!_inRegion(c.property.city, region)) match[c] = match[c]! * 0.55;
         }
       }
     }
@@ -1312,9 +1335,15 @@ class RecommendationEngine {
     'רחובות', 'לוד', 'רמלה', 'אזור', 'גני תקווה',
   };
 
-  static bool _isCentralRegion(String city) {
+  // The Sharon region — what "השרון" means when no specific city is named.
+  static const Set<String> _sharonRegion = {
+    'הרצליה', 'רמת השרון', 'הוד השרון', 'רעננה', 'כפר סבא', 'כפר יונה',
+    'נתניה', 'אבן יהודה', 'צור יגאל', 'קדימה צורן', 'תל מונד', 'רמת גן',
+  };
+
+  static bool _inRegion(String city, Set<String> region) {
     final c = _normCity(city);
-    for (final r in _centralRegion) {
+    for (final r in region) {
       if (c == r || c.contains(r) || r.contains(c)) return true;
     }
     return false;

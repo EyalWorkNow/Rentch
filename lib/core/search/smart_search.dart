@@ -323,9 +323,10 @@ class SmartSearch {
       } else if (single != null) {
         minRooms = double.tryParse(single.group(1)!);
       } else {
-        // Spelled-out room counts ("שלושה חדרים") — common in formal/older speech.
+        // Spelled-out room counts ("שלושה חדרים", "תלת חדר") — common in formal/
+        // older speech.
         final spelled = RegExp(
-                r'(אחד|שני|שתי|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה|שש|שישה)\s*(?:חדר|חדרים)')
+                r'(אחד|שני|שתי|שלוש|שלושה|תלת|ארבע|ארבעה|חמש|חמישה|שש|שישה|שבע|שבעה)\s*(?:חדר|חדרים)')
             .firstMatch(text);
         if (spelled != null) {
           minRooms = _wordToNum(spelled.group(1)!)?.toDouble();
@@ -376,6 +377,15 @@ class SmartSearch {
         return (int.tryParse(e.group(1)!) ?? 0) * 1000 +
             (e.group(2) != null ? 500 : 0);
       }
+      // SPELLED thousands: "ששת אלפים" (6000), "חמשת אלפים" (5000), "אלף" (1000).
+      final spelledK = RegExp(
+              r'(שני|שתי|שלושת|תלת|ארבעת|חמשת|ששת|שבעת|שמונת|תשעת|עשרת)\s*אלפ')
+          .firstMatch(s);
+      if (spelledK != null) {
+        final n = _wordToNum(spelledK.group(1)!);
+        if (n != null) return (n * 1000).round();
+      }
+      if (RegExp(r'(?<![א-ת])אלף(?![א-ת])').hasMatch(s)) return 1000;
       final n = RegExp(r'\d[\d,]{2,}').firstMatch(s.replaceAll(',', ''));
       return n != null ? int.tryParse(n.group(0)!) : null;
     }
@@ -451,8 +461,12 @@ class SmartSearch {
     // You cannot BUY an apartment in Israel for < ₪100k — that number is a monthly
     // RENT. And a monthly rent is never ₪500k+ — that's a purchase price. So we
     // don't need to ask "rent or buy?" when the budget already makes it obvious.
+    // Explicit MONTHLY phrasing ("בחודש"/"לחודש"/"שכ״ד") pins it to rent no matter
+    // the number — "₪500,000 בחודש" is an (absurd) rent, not a purchase price.
+    final monthly = RegExp(r'בחודש|לחודש|חודשי|שכ["׳’]?ד|שכר דירה')
+        .hasMatch(text);
     if (transactionType == TransactionTypeFilter.any && maxPrice != null) {
-      if (maxPrice < 100000) {
+      if (monthly || maxPrice < 100000) {
         transactionType = TransactionTypeFilter.rent;
       } else if (maxPrice >= 500000) {
         transactionType = TransactionTypeFilter.sale;
@@ -1323,7 +1337,7 @@ class SmartSearch {
   static const List<String> _neighborhoods = [
     'פלורנטין', 'נווה צדק', 'רוטשילד', 'כרם התימנים', 'לב העיר', 'הצפון הישן',
     'הצפון החדש', 'רמת אביב', 'בבלי', 'יד אליהו', 'רמת החייל', 'שפירא',
-    'נחלת יצחק', 'תל ברוך', 'אפקה', 'מונטיפיורי', 'הקריה', 'נווה שאנן',
+    'נחלת יצחק', 'תל ברוך', 'אפקה', 'מונטיפיורי', 'יפו', 'הקריה', 'נווה שאנן',
     'רחביה', 'בקעה', 'נחלאות', 'תלפיות', 'קטמון', 'גילה', 'פסגת זאב',
     'הדר', 'כרמל', 'נווה שאנן', 'ואדי ניסנס', 'רמות', 'קרית חיים',
     'רמת אביב ג', 'גבעת שמואל', 'מרכז העיר',
@@ -1340,7 +1354,7 @@ class SmartSearch {
     'הצפון החדש': 'תל אביב', 'רמת אביב': 'תל אביב', 'רמת אביב ג': 'תל אביב',
     'בבלי': 'תל אביב', 'יד אליהו': 'תל אביב', 'רמת החייל': 'תל אביב',
     'שפירא': 'תל אביב', 'נחלת יצחק': 'תל אביב', 'תל ברוך': 'תל אביב',
-    'אפקה': 'תל אביב', 'מונטיפיורי': 'תל אביב',
+    'אפקה': 'תל אביב', 'מונטיפיורי': 'תל אביב', 'יפו': 'תל אביב',
     // Jerusalem
     'רחביה': 'ירושלים', 'בקעה': 'ירושלים', 'נחלאות': 'ירושלים',
     'תלפיות': 'ירושלים', 'קטמון': 'ירושלים', 'גילה': 'ירושלים',
@@ -1542,10 +1556,17 @@ class SmartSearch {
 
   static double? _wordToNum(String w) {
     const map = {
-      'אחד': 1, 'אחת': 1, 'שני': 2, 'שתי': 2, 'שניים': 2, 'שתיים': 2,
-      'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4, 'חמש': 5, 'חמישה': 5,
+      'אחד': 1, 'אחת': 1, 'שני': 2, 'שתי': 2, 'שניים': 2, 'שתיים': 2, 'שתי ': 2,
+      'שלוש': 3, 'שלושה': 3, 'תלת': 3, 'שלושת': 3,
+      'ארבע': 4, 'ארבעה': 4, 'ארבעת': 4,
+      'חמש': 5, 'חמישה': 5, 'חמשת': 5,
+      'שש': 6, 'שישה': 6, 'ששת': 6,
+      'שבע': 7, 'שבעה': 7, 'שבעת': 7,
+      'שמונה': 8, 'שמונת': 8,
+      'תשע': 9, 'תשעה': 9, 'תשעת': 9,
+      'עשר': 10, 'עשרה': 10, 'עשרת': 10,
     };
-    return map[w]?.toDouble() ?? double.tryParse(w);
+    return map[w.trim()]?.toDouble() ?? double.tryParse(w);
   }
 
   static bool _truthy(dynamic v) =>

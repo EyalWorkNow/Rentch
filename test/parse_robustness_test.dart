@@ -35,6 +35,22 @@ void main() {
         reason: 'roommates need bedrooms; must not fall to the student 1-2 cap');
   });
 
+  test('minor round-2 fixes: יפו / spelled numbers / monthly / typos', () {
+    // Jaffa resolves to Tel Aviv.
+    expect(SmartSearch.parse('דירה ביפו 3 חדרים').city, 'תל אביב');
+    // spelled rooms + spelled thousands.
+    final q = SmartSearch.parse('תלת חדר בתל אביב עד ששת אלפים');
+    expect(q.minRooms, 3);
+    expect(q.maxPrice, 6000);
+    expect(SmartSearch.parse('שבעה חדרים').minRooms, 7);
+    expect(SmartSearch.parse('דירה חמשת אלפים בתל אביב').maxPrice, 5000);
+    // "בחודש" forces rent even for an absurd number.
+    expect(SmartSearch.parse('דירה בתל אביב עד 500000 בחודש').transactionType,
+        TransactionTypeFilter.rent);
+    // longer-city typo now resolves.
+    expect(SmartSearch.parse('דירה בירשלים').city, 'ירושלים');
+  });
+
   group('central region', () {
     setUpAll(() async {
       // gov data not required for this ranking behaviour; keep it lightweight.
