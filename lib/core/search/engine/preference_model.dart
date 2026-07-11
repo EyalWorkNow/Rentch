@@ -793,6 +793,12 @@ class PreferenceModelBuilder {
     if (intents.contains(SearchIntent.spacious)) {
       sharpen('spaciousness', 0.9, 10.0);
     }
+    // A downsizer wants SMALL — so size matters, but the ideal is FEW rooms (the
+    // size utility below caps the sweet-spot at ≤3 rooms for a compact search, so
+    // a big 4-5 room flat decays instead of winning).
+    if (intents.contains(SearchIntent.compact)) {
+      sharpen('size', 0.85, 7.0);
+    }
     // A persona's LIVELY-lifestyle boosts (nightlife / young-area) are wrong when
     // the SAME query asks for calm — an elderly religious couple ("זוג דתי מבוגר
     // ... שקט") is still a couple, but must NOT be pushed toward bars. Gate the
@@ -800,12 +806,14 @@ class PreferenceModelBuilder {
     final wantsCalm = intents.contains(SearchIntent.quiet) ||
         intents.contains(SearchIntent.religiousArea);
     if (intents.contains(SearchIntent.roommates)) {
-      sharpen('size', 0.85, 4.0);
+      // Bedrooms are near-mandatory: 3 roommates can't share a studio, so room
+      // count must DOMINATE — a lively 1-room must never outrank a big flat here.
+      sharpen('size', 0.95, 14.0);
       sharpen('spaciousness', 0.85, 6.0);
       sharpen('transit', 0.72, 4.0); // often car-free
       if (!wantsCalm) {
-        sharpen('young_area', 0.80, 5.0); // shared flats skew young
-        sharpen('nightlife', 0.72, 4.0); // + social / going-out
+        sharpen('young_area', 0.72, 2.5); // shared flats skew young (secondary)
+        sharpen('nightlife', 0.66, 2.0); // + social / going-out (secondary)
       }
     }
     // A young single living alone → central, well-connected, and (unless they
@@ -1069,7 +1077,18 @@ class PreferenceModelBuilder {
       'budget': BudgetUtility(maxBudget, elasticity,
           minBudget: (minBudget ?? 0).toDouble()),
       'value': const LinearUtility(),
-      'size': RangeUtility(roomsLo, roomsHi, slackBelow: 1.0, slackAbove: 2.0),
+      // Compact (downsizer): ideal 2-3 rooms, a 4+ flat decays — so "קטנה" no
+      // longer surfaces the biggest flat. Roommates want the OPPOSITE: more rooms
+      // is better, so a 5-room flat isn't penalised for exceeding the market
+      // "typical" range. Otherwise the usual range around the stated desire.
+      'size': intents.contains(SearchIntent.compact)
+          ? RangeUtility(math.min(roomsLo, 2.0), 3.0,
+              slackBelow: 1.0, slackAbove: 1.0)
+          // Roommates want BEDROOMS: more rooms is strictly better (a 5-room beats
+          // a 4-room), so an ascending sigmoid — not a flat range that ties them.
+          : (intents.contains(SearchIntent.roommates) && desiredRoomsLo == null)
+              ? const SigmoidThresholdUtility(3.5, 1.2)
+              : RangeUtility(roomsLo, roomsHi, slackBelow: 1.0, slackAbove: 2.0),
       'amenities': const LinearUtility(), // input already a satisfaction
       'transit': query.nearTrain
           ? const SigmoidThresholdUtility(0.3, 7.0)

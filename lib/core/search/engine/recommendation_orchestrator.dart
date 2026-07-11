@@ -742,6 +742,24 @@ class RecommendationEngine {
       ranked.sort((a, b) => b.score.compareTo(a.score));
     }
 
+    // NAMED NEIGHBOURHOOD ("דירה בפלורנטין") — an IDENTITY, like the city. Naming a
+    // neighbourhood sharpens weights but doesn't, on its own, pull the flats
+    // actually IN that neighbourhood to the top (centrality is coord-based and
+    // similar for adjacent areas). So down-weight out-of-neighbourhood listings the
+    // same way we do out-of-city ones — a "פלורנטין" search must surface Florentin
+    // first. Soft (×0.6), never a hard drop.
+    final namedHood = query.neighborhood?.trim() ?? '';
+    if (namedHood.isNotEmpty) {
+      final anyInHood =
+          ranked.any((c) => _hoodMatches(c.property, namedHood));
+      if (anyInHood) {
+        for (final c in ranked) {
+          if (!_hoodMatches(c.property, namedHood)) c.score *= 0.6;
+        }
+        ranked.sort((a, b) => b.score.compareTo(a.score));
+      }
+    }
+
     // Sub-city DIRECTION ("דרום תל אביב") + EXCLUDED areas ("לא רמת גן") — a SOFT
     // preference: matching listings are boosted / excluded ones sink, but nothing
     // is hard-dropped (never dead-ends). Purely coordinate + neighbourhood-name.
@@ -756,6 +774,34 @@ class RecommendationEngine {
         }
       }
       if (touched) ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
+    // COMMUTE re-rank: when the tenant supplied a work location, proximity to it is
+    // a genuine, stated priority ("קרוב לעבודה") — so it must actually REORDER, not
+    // just annotate the card (the commute scorecard axis carries weight 0). A
+    // Gaussian-ish proximity boost (up to +30% for a flat at the workplace, ~0 by
+    // 25 km) nudges nearer flats up without overriding budget/rooms/features.
+    if (workLat != null && workLon != null &&
+        workLat.abs() > 0.1 && workLon.abs() > 0.1) {
+      for (final c in ranked) {
+        final km = _km(c.property.lat, c.property.lon, workLat, workLon);
+        if (!km.isFinite) continue;
+        final prox = math.exp(-km / 8.0); // 1 at 0 km, ~0.29 at 10 km
+        c.score *= 1.0 + 0.30 * prox;
+      }
+      ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
+    // CHEAPEST re-rank: an explicit "הכי זול" is a request for the lowest PRICE,
+    // not the best price-per-m² value (which the `value` dimension already scores).
+    // Nudge by absolute cheapness (lowest price-percentile) so the actually-cheapest
+    // in-scope flat surfaces, without letting it override a hard budget/rooms fit.
+    if (query.cheapPreference) {
+      for (final c in ranked) {
+        final pctile = c.pfv.get('price_percentile', 0.5); // 0 = cheapest
+        c.score *= 1.0 + 0.18 * (1.0 - pctile.clamp(0.0, 1.0));
+      }
+      ranked.sort((a, b) => b.score.compareTo(a.score));
     }
 
     // Part 4 — exploration + diversity
@@ -789,6 +835,36 @@ class RecommendationEngine {
             match[c] = math.min(match[c]!, minIn * 0.98);
           }
         }
+      }
+    }
+
+    // The DISPLAY order + fit% is driven by _statedMatch, so the same soft
+    // preferences that re-ranked c.score (which only drives SELECTION) must ALSO
+    // shape match[c] — else a named-neighbourhood / commute / cheapest search
+    // selects the right flat but still orders it by generic stated-match. Apply
+    // them here so the visible order and % reflect what the user actually asked.
+    if (namedHood.isNotEmpty) {
+      final anyIn = selected.any((c) => _hoodMatches(c.property, namedHood));
+      if (anyIn) {
+        for (final c in selected) {
+          if (!_hoodMatches(c.property, namedHood)) match[c] = match[c]! * 0.6;
+        }
+      }
+    }
+    if (workLat != null && workLon != null &&
+        workLat.abs() > 0.1 && workLon.abs() > 0.1) {
+      for (final c in selected) {
+        final km = _km(c.property.lat, c.property.lon, workLat, workLon);
+        if (km.isFinite) {
+          match[c] =
+              (match[c]! * (1.0 + 0.30 * math.exp(-km / 8.0))).clamp(0.0, 1.0);
+        }
+      }
+    }
+    if (query.cheapPreference) {
+      for (final c in selected) {
+        final pctile = c.pfv.get('price_percentile', 0.5).clamp(0.0, 1.0);
+        match[c] = (match[c]! * (1.0 + 0.18 * (1.0 - pctile))).clamp(0.0, 1.0);
       }
     }
     selected.sort((a, b) => match[b]!.compareTo(match[a]!));
@@ -1209,6 +1285,15 @@ class RecommendationEngine {
     if (pc == q || pc.contains(q) || q.contains(pc)) return true;
     final nb = _normCity(p.neighborhood);
     return nb.isNotEmpty && (nb == q || nb.contains(q));
+  }
+
+  // Does a listing sit in the NAMED neighbourhood? Matches the recorded
+  // neighbourhood (either-way containment, hyphen/space-normalised).
+  static bool _hoodMatches(RentalProperty p, String hood) {
+    final q = _normCity(hood);
+    if (q.isEmpty) return false;
+    final nb = _normCity(p.neighborhood);
+    return nb.isNotEmpty && (nb == q || nb.contains(q) || q.contains(nb));
   }
 
   static double _km(double la1, double lo1, double la2, double lo2) {

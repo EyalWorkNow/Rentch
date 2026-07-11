@@ -15,6 +15,7 @@ class SearchIntent {
   static const quiet = 'quiet';
   static const central = 'central';
   static const spacious = 'spacious';
+  static const compact = 'compact'; // wants a SMALL flat (downsizer / low-maintenance)
   static const accessible = 'accessible';
   static const luxury = 'luxury';
   static const view = 'view';
@@ -81,6 +82,11 @@ class SearchIntent {
         r'מגדלי משרדים|central|downtown|business district',
         caseSensitive: false),
     spacious: RegExp(r'מרווח|מרווחת|מרווחים|מרווחות|חדרים גדולים|גדולה מאוד|spacious',
+        caseSensitive: false),
+    // Small on purpose — a downsizer / low-maintenance seeker. Guarded phrases so
+    // a bare "קטן" (or "לא קטנה") doesn't false-fire.
+    compact: RegExp(
+        r'דירה קטנה|קטנטנה|קומפקט|להקטין|מקטינ|קן ריק|downsiz|empty.?nest|compact',
         caseSensitive: false),
     accessible: RegExp(
         r'נגיש|נגישות|כיסא גלגלים|כסא גלגלים|מוגבלות|נכה|עגלה|wheelchair|accessible|step.?free',

@@ -1454,7 +1454,22 @@ class FeatureEngineer {
 
     // ── livability (real gov data: crime, schools, demographics, health, air) ──
     final gov = GovData.instance;
-    f['safety'] = gov.safetyScore(p.city) ?? 0.5; // 1 = safest (per-capita crime)
+    // Safety = 1 − percentile(per-capita reported crime). That per-capita rate
+    // uses a RESIDENTIAL denominator, but offences accrue from a much larger
+    // daytime/commuter/tourist population — so a dense, affluent CENTRE reads far
+    // more "dangerous" than residents experience (Tel Aviv ≈ 0.01). Correct the
+    // bias HERE (not just in the GBM penalty) so BOTH the score AND the scorecard
+    // caveat use the corrected value: pull an inflated-low safety toward neutral in
+    // proportion to hubness (centrality ∨ SES). A genuinely distressed area — low
+    // centrality AND low SES — gets ~no relief, so its low safety stays honest.
+    final rawSafety = gov.safetyScore(p.city) ?? 0.5;
+    if (rawSafety < 0.5) {
+      final hubness = math.max(f['centrality'] ?? 0.5, f['socioeconomic'] ?? 0.5);
+      final relief = ((hubness - 0.5).clamp(0.0, 0.5) / 0.5) * 0.8; // 0..0.8
+      f['safety'] = (rawSafety + (0.5 - rawSafety) * relief).clamp(0.0, 1.0);
+    } else {
+      f['safety'] = rawSafety;
+    }
     // Schools: BLEND the area density (many schools around) with the exact
     // distance to the nearest named school (a school within a short walk counts
     // even if the wider density is moderate).
