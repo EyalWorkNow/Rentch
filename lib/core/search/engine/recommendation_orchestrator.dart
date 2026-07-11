@@ -742,6 +742,22 @@ class RecommendationEngine {
       ranked.sort((a, b) => b.score.compareTo(a.score));
     }
 
+    // "מרכז" WITHOUT A CITY = the central REGION (Gush Dan), not just "central
+    // within any city". Otherwise a central-Beer-Sheva flat outranks Tel Aviv for
+    // someone who said "משהו במרכז". So when the central intent fires with NO named
+    // city, softly down-weight listings outside the central region (never a hard
+    // drop). Only when no city — a named city keeps its own centre meaning.
+    if (namedCity.isEmpty && query.intents.contains(SearchIntent.central)) {
+      var touched = false;
+      for (final c in ranked) {
+        if (!_isCentralRegion(c.property.city)) {
+          c.score *= 0.6;
+          touched = true;
+        }
+      }
+      if (touched) ranked.sort((a, b) => b.score.compareTo(a.score));
+    }
+
     // NAMED NEIGHBOURHOOD ("דירה בפלורנטין") — an IDENTITY, like the city. Naming a
     // neighbourhood sharpens weights but doesn't, on its own, pull the flats
     // actually IN that neighbourhood to the top (centrality is coord-based and
@@ -1287,6 +1303,23 @@ class RecommendationEngine {
     return nb.isNotEmpty && (nb == q || nb.contains(q));
   }
 
+  // The central region (גוש דן + inner ring) — what "מרכז" means when no specific
+  // city is named. A soft preference, never a hard gate.
+  static const Set<String> _centralRegion = {
+    'תל אביב', 'תל אביב יפו', 'רמת גן', 'גבעתיים', 'בני ברק', 'הרצליה',
+    'רמת השרון', 'גבעת שמואל', 'קרית אונו', 'פתח תקווה', 'ראשון לציון', 'חולון',
+    'בת ים', 'אור יהודה', 'יהוד', 'כפר סבא', 'רעננה', 'הוד השרון', 'נס ציונה',
+    'רחובות', 'לוד', 'רמלה', 'אזור', 'גני תקווה',
+  };
+
+  static bool _isCentralRegion(String city) {
+    final c = _normCity(city);
+    for (final r in _centralRegion) {
+      if (c == r || c.contains(r) || r.contains(c)) return true;
+    }
+    return false;
+  }
+
   // Does a listing sit in the NAMED neighbourhood? Matches the recorded
   // neighbourhood (either-way containment, hyphen/space-normalised).
   static bool _hoodMatches(RentalProperty p, String hood) {
@@ -1454,17 +1487,23 @@ class RecommendationEngine {
     for (final d in dimensions) {
       if (concerns.length >= 2) break;
       if (d.key == 'budget') continue; // covered above
-      // senior_area / young_area / family are DEMOGRAPHIC context (a soft proxy
-      // for the vibe), not a quality defect — a low score just means "not that
-      // kind of area", which isn't a concern (and "family area weak" is odd on a
-      // couple's card). Skip them; they still influence ranking, just not caveats.
-      if (d.key == 'senior_area' || d.key == 'young_area' || d.key == 'family') {
-        continue;
-      }
+      // Skip axes that are NOT quality defects: demographic context (a low score
+      // just means "not that kind of area"), and ASPIRATIONAL/inferred axes whose
+      // low value is often the OPPOSITE of what the seeker wants — e.g. flagging
+      // "view weak" to someone who asked for a LOW floor, or "nightlife weak" to a
+      // family. These bleed in via soft inference weights and read as nonsense.
+      // Demographic context + ASPIRATIONAL axes whose low value isn't a defect and
+      // is often the OPPOSITE of the ask (e.g. "view weak" to a low-floor seeker,
+      // whose garden request inferred a view weight). Genuinely-stated axes like
+      // nightlife/park/coast still caveat honestly (they resolve in production).
+      const notADefect = {
+        'senior_area', 'young_area', 'family', 'view', 'luxury', 'low_floor',
+      };
+      if (notADefect.contains(d.key)) continue;
       if (d.contributionPct >= 0.35) continue; // genuinely weak only
-      final weighty =
-          model.statedDimensions.contains(d.key) || d.weightPct >= 0.12;
-      if (!weighty) continue;
+      // Only caveat what the user ACTUALLY asked about (stated) — an inferred
+      // weight must never generate a scary caveat the user never raised.
+      if (!model.statedDimensions.contains(d.key)) continue;
       concerns.add('${d.label} פחות חזק כאן');
     }
     return concerns;

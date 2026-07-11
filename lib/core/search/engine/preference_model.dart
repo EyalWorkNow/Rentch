@@ -1272,10 +1272,12 @@ class PreferenceModelBuilder {
       'size': intents.contains(SearchIntent.compact)
           ? RangeUtility(math.min(roomsLo, 2.0), 3.0,
               slackBelow: 1.0, slackAbove: 1.0)
-          // Roommates want BEDROOMS: more rooms is strictly better (a 5-room beats
-          // a 4-room), so an ascending sigmoid — not a flat range that ties them.
+          // Roommates want BEDROOMS: more rooms is strictly better, and a too-small
+          // flat is nearly unusable (3 roommates can't share a studio). A steep
+          // sigmoid centred at 3 → 1-room≈0.02, 3-room≈0.5, 4-5 rooms high, so a
+          // cheap central studio can no longer top a big flat here.
           : (intents.contains(SearchIntent.roommates) && desiredRoomsLo == null)
-              ? const SigmoidThresholdUtility(3.5, 1.2)
+              ? const SigmoidThresholdUtility(3.0, 2.0)
               : RangeUtility(roomsLo, roomsHi, slackBelow: 1.0, slackAbove: 2.0),
       'amenities': const LinearUtility(), // input already a satisfaction
       'transit': query.nearTrain

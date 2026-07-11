@@ -424,7 +424,13 @@ class SmartSearch {
     if (maxPrice != null && maxPrice < 1500) maxPrice = null;
     maxPrice ??= _toInt(llm['price']);
 
-    final cheap = RegExp(r'זול|משתלם|במחיר טוב|כמה שפחות').hasMatch(text);
+    // Cheapness signal — incl. VAGUE budget phrasing with no number ("תקציב קטן/
+    // מוגבל/נמוך"), which otherwise gave zero price signal and let an expensive
+    // flat win for a clearly budget-limited seeker.
+    final cheap = RegExp(
+            r'זול|משתלם|במחיר טוב|כמה שפחות|תקציב (קטן|מוגבל|נמוך|צנוע)|'
+            r'מוגבל בתקציב|כסף מוגבל|לא הרבה כסף|תקציב מוגבל|חסכוני')
+        .hasMatch(text);
 
     // ── rent vs. sale intent ─────────────────────────────────────────────────
     // Sale phrasing wins ("למכירה"/"לקנות"/"לרכוש"). Otherwise an explicit rent
@@ -533,6 +539,10 @@ class SmartSearch {
           // Single word fallback (only if it's 4+ chars or doesn't look like "חדרים")
           final clean = stripPrefix(words[i]).toLowerCase().trim();
           if (clean.isEmpty || clean.length < 3) continue;
+          // Common Hebrew words that fuzzy-match a short city and must NEVER be
+          // read as one — e.g. "בערך" (≈) → "ערך" → fuzzy "ערד" (Arad), which
+          // silently gated a whole search to an empty city. Blacklist them.
+          if (_notACityWord.contains(clean)) continue;
 
           // Exact match
           if (LocalityMatcher.allLocalities.contains(clean)) {
@@ -587,8 +597,11 @@ class SmartSearch {
             }
           }
 
-          // Only fuzzy-match single word if it's reasonably short (reject "חדרים" type words)
-          if (clean.length <= 5) {
+          // Only fuzzy-match a single word of 4-5 chars. THREE-char words are too
+          // dangerous to fuzzy (edit-distance-1 turns everyday words into short
+          // cities: "ערך"→"ערד", "שדה"→"שדות") — a 3-char city needs the EXACT
+          // match handled above, not fuzzy.
+          if (clean.length >= 4 && clean.length <= 5) {
             final fuzzyMatches = <(String, int)>[];
             for (final locality in LocalityMatcher.allLocalities) {
               if (clean[0] != locality[0]) continue;
@@ -662,7 +675,11 @@ class SmartSearch {
       final emptyNest = RegExp(r'הילדים עזבו|הילדים גדלו|אחרי שהילדים|'
               r'קן ריק|נשארנו לבד|הבית התרוקן|דירה קטנה יותר')
           .hasMatch(text);
-      if (RegExp(r'סטודנט').hasMatch(text)) {
+      if (RegExp(r'שותפ').hasMatch(text)) {
+        // Roommates need a bedroom EACH — a 3+ floor, which must win over the
+        // student 1-2 cap below ("סטודנטים שותפים" → NOT a studio).
+        minRooms = 3;
+      } else if (RegExp(r'סטודנט').hasMatch(text)) {
         minRooms = 1;
         maxRooms = 2;
       } else if (emptyNest) {
@@ -1288,6 +1305,16 @@ class SmartSearch {
     'דופלקס': ['דופלקס', 'duplex'],
     'גג': ['דירת גג', 'גג'],
     'דירה': ['דירה', 'apartment'],
+  };
+
+  // Everyday Hebrew words that fuzzy-match a short city and must never be read as
+  // one (post prefix-strip). "בערך"→"ערך", "ערך"~"ערד"; "שקט"~"סכת"; etc.
+  static const Set<String> _notACityWord = {
+    'ערך', 'בערך', 'ערכי', 'חדר', 'חדרים', 'דירה', 'דירת', 'בית', 'משהו',
+    'שקט', 'שקטה', 'גדול', 'גדולה', 'קטן', 'קטנה', 'זול', 'זולה', 'יקר', 'יקרה',
+    'נחמד', 'יפה', 'יפו', 'טוב', 'טובה', 'חדש', 'חדשה', 'ישן', 'מרכז', 'מרכזי',
+    'קרוב', 'רחוק', 'צריך', 'רוצה', 'מחפש', 'מחפשת', 'לגור', 'עבודה', 'רכבת',
+    'ילדים', 'ילד', 'משפחה', 'זוג', 'רווק', 'סטודנט', 'כלב', 'חתול', 'שנה',
   };
 
   // Well-known neighborhoods — narrows results within a city when mentioned.
