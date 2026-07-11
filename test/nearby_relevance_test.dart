@@ -31,6 +31,17 @@ void main() {
     }
   });
 
+  test('elderly couple → HEALTH leads, not restaurants', () {
+    final list = secs('זוג מבוגר מחפש דירה שקטה');
+    final kinds = list.map((s) => s.kind).toList();
+    expect(kinds.first, NearbyKind.clinics,
+        reason: 'a senior couple must see clinics/health first, not dining');
+    if (kinds.contains(NearbyKind.dining)) {
+      expect(kinds.indexOf(NearbyKind.dining),
+          greaterThan(kinds.indexOf(NearbyKind.clinics)));
+    }
+  });
+
   test('UC1 family + toddler → kindergartens + playgrounds + clinics + parks', () {
     final k = kinds('משפחה עם פעוט, מחפשים קרוב לגן ילדים');
     expect(k, contains(NearbyKind.kindergartens));
