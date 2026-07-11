@@ -14,6 +14,25 @@ class AreaReason {
   final double strength; // 0..1
 }
 
+/// Investment lens for an area — honest about what's current vs stale.
+class InvestmentLens {
+  const InvestmentLens({
+    required this.rentability,
+    required this.appreciation,
+    required this.investmentScore,
+    this.relativePriceTier,
+    this.valuePerSqm2013,
+    this.roughYieldPct,
+  });
+
+  final double rentability; // 0..1 — how easy to rent out (CURRENT gov signals)
+  final double appreciation; // 0..1 — planned-infra upside (CURRENT)
+  final int investmentScore; // 0..100 combined heuristic
+  final double? relativePriceTier; // 0..1 CBS 2013 rank (relative, not absolute)
+  final int? valuePerSqm2013; // ₪/m² (2013 — stale absolute)
+  final double? roughYieldPct; // labelled rough estimate (rent ÷ inflated 2013 value)
+}
+
 /// The full gov-data profile of a point, ready for the card UI.
 class AreaProfile {
   const AreaProfile({
@@ -37,6 +56,7 @@ class AreaProfile {
     required this.coastKm,
     required this.parkAccess,
     required this.pfv,
+    required this.investment,
   });
 
   final double lat, lon;
@@ -47,6 +67,7 @@ class AreaProfile {
   final double schools, youngShare, childShare, seniorShare;
   final double nightlife, employment, futureValue, health, parkAccess;
   final PropertyFeatureVector pfv;
+  final InvestmentLens investment;
 }
 
 class PersonaFit {
@@ -121,6 +142,37 @@ class AreaIntelligence {
         ? GovData.instance.statAreaAt(lat, lon)
         : null;
     double g(String k, [double d = 0.0]) => pfv.get(k, d);
+    final gov = GovData.instance;
+    // ── investment lens ────────────────────────────────────────────────────
+    // Rentability = how easy to let (CURRENT gov signals). Appreciation = planned
+    // infra. Price = CBS 2013 relative rank only. A rough yield uses current city
+    // rent ÷ the 2013 value inflated by the national 2013→now index (~2.1×) — a
+    // labelled ESTIMATE, never presented as precise.
+    final rentability = (0.35 * g('transit_access') +
+            0.30 * g('centrality', 0.5) +
+            0.20 * g('employment_access') +
+            0.15 * g('demo_young', 0.5))
+        .clamp(0.0, 1.0);
+    final appreciation = g('future_value');
+    final priceTier = sa != null ? gov.areaValuePercentile(sa.id) : null;
+    final value2013 = sa != null ? gov.areaValuePerSqm(sa.id) : null;
+    final rentSqm = city.isNotEmpty ? gov.rentPerSqm(city) : null;
+    final roughYield = (value2013 != null && rentSqm != null && rentSqm > 0)
+        ? (rentSqm * 12) / (value2013 * 2.1) * 100
+        : null;
+    // Combined score: rentability + upside reward, cheaper areas score higher
+    // (better yield headroom). Falls back gracefully when price is unknown.
+    final invScore = priceTier != null
+        ? (50 * rentability + 30 * appreciation + 20 * (1 - priceTier))
+        : (65 * rentability + 35 * appreciation);
+    final investment = InvestmentLens(
+      rentability: rentability,
+      appreciation: appreciation,
+      investmentScore: invScore.round().clamp(0, 100),
+      relativePriceTier: priceTier,
+      valuePerSqm2013: value2013,
+      roughYieldPct: roughYield,
+    );
     final railKm = g('rail_km', 99);
     final coastKm = g('coast_access', -1) > 0
         ? null // engineered as a kernel; expose the km separately if needed
@@ -144,6 +196,7 @@ class AreaIntelligence {
       coastKm: coastKm,
       parkAccess: g('park_access'),
       pfv: pfv,
+      investment: investment,
     );
   }
 

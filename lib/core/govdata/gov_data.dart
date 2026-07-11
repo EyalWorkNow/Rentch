@@ -228,6 +228,7 @@ class GovData {
       await _loadOptional(() => _loadRetail(read));
       await _loadOptional(() => _loadNoise(read));
       await _loadOptional(() => _loadStatAreas(read));
+      await _loadOptional(() => _loadAreaValue(read));
       await _loadOptional(() => _loadFutureInfra(read));
       await _loadOptional(() => _loadEmployment(read));
       _deriveCrimeRates();
@@ -731,6 +732,42 @@ class GovData {
     return a == normQuery || a.contains(normQuery) || normQuery.contains(a);
   }
 
+  // ── CBS estimated apartment value per statistical area (₪/m², 2013) ──────────
+  final Map<int, int> _areaValue = {}; // YISHUV_STA → ₪/m²
+  List<int> _areaValueSorted = const []; // ascending, for percentiles
+
+  Future<void> _loadAreaValue(AssetReader read) async {
+    final obj = jsonDecode(await read('$_assetDir/stat_area_value.json'))
+        as Map<String, dynamic>;
+    obj.forEach((k, v) {
+      final id = int.tryParse(k);
+      final val = (v as num?)?.toInt();
+      if (id != null && val != null && val > 0) _areaValue[id] = val;
+    });
+    _areaValueSorted = _areaValue.values.toList()..sort();
+  }
+
+  /// Estimated ₪/m² for the block [id] (2013 CBS), or null when unknown.
+  int? areaValuePerSqm(int id) => _areaValue[id];
+
+  /// Relative price positioning of block [id]: fraction of valued blocks whose
+  /// ₪/m² is ≤ this one (0 = cheapest nationally … 1 = priciest). Null if unknown.
+  /// The 2013 vintage is stale in ABSOLUTE terms but relative rank is fairly stable.
+  double? areaValuePercentile(int id) {
+    final v = _areaValue[id];
+    if (v == null || _areaValueSorted.isEmpty) return null;
+    var lo = 0, hi = _areaValueSorted.length;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (_areaValueSorted[mid] <= v) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo / _areaValueSorted.length;
+  }
+
   Future<void> _loadFutureInfra(AssetReader read) async {
     final obj = jsonDecode(await read('$_assetDir/future_infra.json'))
         as Map<String, dynamic>;
@@ -958,6 +995,8 @@ class GovData {
     _noiseGrid.clear();
     _statAreas.clear();
     _statIndex.clear();
+    _areaValue.clear();
+    _areaValueSorted = const [];
     _futureStations.clear();
     _renewalPoints.clear();
     _jobGrid.clear();

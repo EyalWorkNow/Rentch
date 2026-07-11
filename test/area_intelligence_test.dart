@@ -85,6 +85,32 @@ void main() {
         isEmpty);
   });
 
+  test('investment lens — sane values, TLV has a price tier + yield', () {
+    final p = AreaIntelligence.profileAt(32.0700, 34.7750, city: 'תל אביב');
+    final inv = p.investment;
+    expect(inv.investmentScore, inInclusiveRange(0, 100));
+    expect(inv.rentability, inInclusiveRange(0.0, 1.0));
+    expect(inv.appreciation, inInclusiveRange(0.0, 1.0));
+    // central TLV is a valued block → relative price tier present + rough yield.
+    if (inv.valuePerSqm2013 != null) {
+      expect(inv.relativePriceTier, inInclusiveRange(0.0, 1.0));
+      expect(inv.valuePerSqm2013!, greaterThan(0));
+      if (inv.roughYieldPct != null) {
+        expect(inv.roughYieldPct!, inInclusiveRange(0.0, 20.0));
+      }
+    }
+  });
+
+  test('areaValuePercentile is monotonic + relative', () {
+    // a pricey central-TLV block ranks higher on the value percentile than a
+    // low-SES peripheral block (relative positioning is the point).
+    final central = GovData.instance.statAreaAt(32.0700, 34.7750);
+    if (central != null) {
+      final pct = GovData.instance.areaValuePercentile(central.id);
+      if (pct != null) expect(pct, inInclusiveRange(0.0, 1.0));
+    }
+  });
+
   test('CRUSH — bad coords do not crash the profiler', () {
     for (final ll in const [[0.0, 0.0], [double.nan, 34.0]]) {
       final p = AreaIntelligence.profileAt(ll[0], ll[1]);

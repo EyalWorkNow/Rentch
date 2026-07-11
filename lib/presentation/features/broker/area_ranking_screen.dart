@@ -348,6 +348,12 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
             _miniStat('חינוך', '${(p.schools * 100).round()}%'),
             _miniStat('ילדים / עובדים / 65+',
                 '${(p.childShare * 100).round()}% · ${(p.youngShare * 100).round()}% · ${(p.seniorShare * 100).round()}%'),
+            const Divider(height: 20),
+            _miniStat('💰 ציון השקעה', '${p.investment.investmentScore}/100'),
+            _miniStat('ביקוש שכירות', '${(p.investment.rentability * 100).round()}%'),
+            if (p.investment.roughYieldPct != null)
+              _miniStat('הערכת תשואה (גסה)',
+                  '~${p.investment.roughYieldPct!.toStringAsFixed(1)}%'),
           ]),
         ),
       ),

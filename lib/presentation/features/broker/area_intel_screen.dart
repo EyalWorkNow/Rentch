@@ -119,6 +119,10 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                 const SizedBox(height: 12),
                 _selectedFitCard(),
                 const SizedBox(height: 18),
+                _sectionTitle('עדשת השקעה'),
+                const SizedBox(height: 10),
+                _investmentCard(_profile!.investment),
+                const SizedBox(height: 18),
                 _sectionTitle('כל שכבות הנתונים במקום'),
                 const SizedBox(height: 10),
                 _layersCard(_profile!),
@@ -290,6 +294,67 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
               ),
           ]),
         ],
+      ]),
+    );
+  }
+
+  Widget _investmentCard(InvestmentLens inv) {
+    final scoreColor = inv.investmentScore >= 70
+        ? AppColors.success
+        : (inv.investmentScore >= 50 ? AppColors.primary : AppColors.warning);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(IconsaxPlusLinear.chart_21, color: scoreColor, size: 20),
+          const SizedBox(width: 8),
+          const Text('ציון השקעה',
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary)),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+                color: scoreColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999)),
+            child: Text('${inv.investmentScore}/100',
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w900, color: scoreColor)),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        _bar('ביקוש שכירות (קלות השכרה)', inv.rentability),
+        _bar('פוטנציאל השבחה (תשתית מתוכננת)', inv.appreciation),
+        if (inv.relativePriceTier != null)
+          _bar('רמת מחירים באזור (יחסי)', inv.relativePriceTier!),
+        if (inv.roughYieldPct != null) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+                child: Text('הערכת תשואה ברוטו',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary))),
+            Text('~${inv.roughYieldPct!.toStringAsFixed(1)}%',
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w900,
+                    color: AppColors.primary)),
+          ]),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          inv.valuePerSqm2013 != null
+              ? 'רמת המחירים מבוססת על שווי הלמ״ס 2013 (₪${inv.valuePerSqm2013}/מ״ר) — מדד יחסי; התשואה הערכה גסה בלבד.'
+              : 'ביקוש והשבחה מנתונים עדכניים. אין נתוני שווי לאזור זה.',
+          style: TextStyle(
+              fontSize: 11, height: 1.35, color: AppColors.textSecondary),
+        ),
       ]),
     );
   }
