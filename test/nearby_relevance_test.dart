@@ -12,6 +12,25 @@ void main() {
   List<NearbySection> secs(String q) =>
       relevantNearbySections(NearbyProfile.fromText(q));
 
+  test('couple WITH a child → education leads, NOT restaurants (the reported bug)',
+      () {
+    final list = secs('דירה לזוג בהרצליה עם ילד ותקציב');
+    final kindList = list.map((s) => s.kind).toList();
+    int rank(NearbyKind k) => kindList.indexOf(k);
+    // Education/kids sections must be present and lead the list.
+    expect(kindList.first,
+        anyOf(NearbyKind.schools, NearbyKind.kindergartens, NearbyKind.playgrounds),
+        reason: 'a family-couple must see education first, not dining');
+    // If dining appears at all, it sits BELOW schools & kindergartens.
+    if (kindList.contains(NearbyKind.dining)) {
+      expect(rank(NearbyKind.dining), greaterThan(rank(NearbyKind.schools)));
+      if (kindList.contains(NearbyKind.kindergartens)) {
+        expect(rank(NearbyKind.dining),
+            greaterThan(rank(NearbyKind.kindergartens)));
+      }
+    }
+  });
+
   test('UC1 family + toddler → kindergartens + playgrounds + clinics + parks', () {
     final k = kinds('משפחה עם פעוט, מחפשים קרוב לגן ילדים');
     expect(k, contains(NearbyKind.kindergartens));

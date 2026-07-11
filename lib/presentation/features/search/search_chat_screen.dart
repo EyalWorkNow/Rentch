@@ -175,32 +175,40 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     if (_query.isEmpty || !_searched) return const SizedBox.shrink();
     final items = <Widget>[];
     if (_query.neighborhood != null) {
-      items.add(_removableChip('📍 ${_query.neighborhood}',
+      items.add(_removableChip(IconsaxPlusLinear.location, _query.neighborhood!,
           () => _drop(neighborhood: true)));
     }
     if (_query.city != null) {
-      items.add(_removableChip('📍 ${_query.city}', () => _drop(city: true)));
+      items.add(_removableChip(
+          IconsaxPlusLinear.location, _query.city!, () => _drop(city: true)));
     }
     if (_query.propertyType != null) {
-      items.add(_removableChip('🏠 ${_query.propertyType}',
+      items.add(_removableChip(IconsaxPlusLinear.house, _query.propertyType!,
           () => _drop(propertyType: true)));
     }
     if (_query.minRooms != null || _query.maxRooms != null) {
-      items.add(
-          _removableChip('🛏️ ${_roomsChipLabel()} חד׳', () => _drop(rooms: true)));
+      items.add(_removableChip(IconsaxPlusLinear.category,
+          '${_roomsChipLabel()} חד׳', () => _drop(rooms: true)));
     }
     if (_query.minPrice != null || _query.maxPrice != null) {
-      items.add(
-          _removableChip('💰 ${_priceChipLabel()}', () => _drop(price: true)));
+      items.add(_removableChip(
+          IconsaxPlusLinear.wallet_money, _priceChipLabel(), () => _drop(price: true)));
     }
     if (_query.nearTrain) {
-      items.add(_removableChip('🚉 ליד הרכבת', () => _drop(train: true)));
+      items.add(_removableChip(
+          IconsaxPlusLinear.bus, 'ליד הרכבת', () => _drop(train: true)));
     }
     if (_query.cheapPreference) {
-      items.add(_removableChip('🏷️ הכי משתלם', () => _drop(cheap: true)));
+      items.add(_removableChip(
+          IconsaxPlusLinear.tag, 'הכי משתלם', () => _drop(cheap: true)));
     }
     for (final a in _query.amenities) {
-      items.add(_removableChip(SmartSearch.amenityTag(a), () => _drop(amenity: a)));
+      // Strip the emoji prefix the tag carries — the chip now uses an iconsax icon.
+      final label = SmartSearch.amenityTag(a)
+          .replaceFirst(RegExp(r'^[^֐-׿a-zA-Z]+'), '')
+          .trim();
+      items.add(_removableChip(
+          IconsaxPlusLinear.tick_circle, label, () => _drop(amenity: a)));
     }
     return Container(
       width: double.infinity,
@@ -222,13 +230,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     );
   }
 
-  Widget _removableChip(String label, VoidCallback onRemove) {
+  Widget _removableChip(IconData icon, String label, VoidCallback onRemove) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+      padding: const EdgeInsets.fromLTRB(9, 6, 6, 6),
       decoration: BoxDecoration(
           color: AppColors.primaryLight2,
           borderRadius: BorderRadius.circular(99)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: AppColors.primaryDark),
+        const SizedBox(width: 4),
         Text(label,
             style: TextStyle(
                 color: AppColors.primaryDark,

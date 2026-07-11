@@ -202,11 +202,70 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
               if (viewAll != null) ...[const SizedBox(width: 8), viewAll],
             ]),
           ),
-        const SizedBox(height: 4),
-        // Selected tag's list.
+        const SizedBox(height: 8),
+        // Selected tag's places as a 3-column grid of square cards
+        // (name · what it is · distance), each in one square component.
         if (_sections.isNotEmpty)
-          Column(children: [for (final pl in _sections[sel].$2) _placeRow(pl)]),
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1, // square
+            children: [
+              for (final pl in _sections[sel].$2.take(9)) _placeCard(pl),
+            ],
+          ),
       ],
+    );
+  }
+
+  /// One square place card for the preview grid: name · type · distance.
+  Widget _placeCard(NearbyPlace p) {
+    final sub = _sub(p);
+    return InkWell(
+      onTap: () => _confirmOpenGoogle(p.name),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(p.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary)),
+            ),
+            if (sub.isNotEmpty)
+              Text(sub,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 10.5, color: AppColors.textSecondary)),
+            const SizedBox(height: 3),
+            Row(children: [
+              Icon(Icons.place_rounded, size: 12, color: AppColors.primary),
+              const SizedBox(width: 2),
+              Text(_distLabel(p.km),
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary)),
+            ]),
+          ],
+        ),
+      ),
     );
   }
 

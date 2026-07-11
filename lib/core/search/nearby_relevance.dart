@@ -308,20 +308,23 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   final youngL = p.youngLifestyle; // single/roommates/student/young-area
 
   // ── children & education ──────────────────────────────────────────────────
+  // A household WITH KIDS is family-first: education/kids sections must lead,
+  // ABOVE any couple/lifestyle dining — a couple who mentioned a child is looking
+  // for schools & kindergartens, not restaurants (the bug this fixes).
   if (p.youngChild) {
     add(NearbyKind.kindergartens, 95);
   } else if (p.family && !p.schoolChild && !p.teen && !p.wantsSchools) {
-    add(NearbyKind.kindergartens, 60);
+    add(NearbyKind.kindergartens, 75);
   }
   if (p.schoolChild || p.teen || p.wantsSchools) {
     add(NearbyKind.schools, (p.teen || p.schoolChild) ? 95 : 85);
   } else if (p.family && !p.youngChild) {
-    add(NearbyKind.schools, 65);
+    add(NearbyKind.schools, 78);
   }
   if (p.youngChild) {
     add(NearbyKind.playgrounds, 92);
   } else if (p.family) {
-    add(NearbyKind.playgrounds, 54);
+    add(NearbyKind.playgrounds, 70);
   }
 
   // ── health (clinics / pharmacies / hospitals) ─────────────────────────────
@@ -362,7 +365,10 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   // ── going out & lifestyle (dining / gyms / nightlife / culture) ───────────
   if (p.dining) {
     add(NearbyKind.dining, 86);
-  } else if (p.lifestyle) {
+  } else if (p.lifestyle && !p.family) {
+    // Lifestyle dining leads only when there are NO kids — a couple/single/roommate
+    // household. A family that ALSO reads as a couple gets a minor dining chip
+    // BELOW its education/kids sections (handled just below), never above them.
     add(NearbyKind.dining, p.couple ? 84 : (p.student ? 74 : 80));
   } else if (p.young) {
     add(NearbyKind.dining, 76);
@@ -370,10 +376,12 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
     add(NearbyKind.dining, 66);
   } else if (p.wfh) {
     add(NearbyKind.dining, 60); // WFH → cafés to work from
+  } else if (p.family && p.couple) {
+    add(NearbyKind.dining, 48); // family-couple: a small extra, well below schools
   }
   if (p.active) {
     add(NearbyKind.gyms, 82);
-  } else if (youngL || p.couple) {
+  } else if ((youngL || p.couple) && !p.family) {
     add(NearbyKind.gyms, 64);
   } else if (p.luxury || p.wfh) {
     add(NearbyKind.gyms, 58);
