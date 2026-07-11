@@ -992,6 +992,176 @@ class PreferenceModelBuilder {
       sharpen('neighborhood', 0.72, s * 0.6);
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // F. LIFE-SITUATION & LIFESTYLE TELLS — same GOAL, many PHRASINGS (41-67).
+    //
+    // What an expert infers from HOW someone describes their life, robust to
+    // wording (formal Hebrew + slang + English). Each is a soft push toward the
+    // implied need. Lifestyle pushes (young/nightlife) are gated on `lively`
+    // (= !wantsCalm) so a quiet/religious ask is never overridden.
+    // ════════════════════════════════════════════════════════════════════════
+    bool m(String re) => RegExp(re, caseSensitive: false).hasMatch(infTxt);
+    final lively = !wantsCalm;
+
+    // (41) Single / lives alone → young, connected, central (the canonical case).
+    if (m(r'רווק|רווקה|גר\w* לבד|גרה לבד|לבד\b|בחור צעיר|בחורה צעיר|single|on my own|by myself|just me')) {
+      sharpen('young_area', 0.80, s * (lively ? 1.0 : 0.4));
+      sharpen('transit', 0.80, s);
+      sharpen('location', 0.78, s * 0.8);
+      if (lively) sharpen('nightlife', 0.72, s * 0.6);
+    }
+    // (42) New couple moving in together → central quality area + a bit of space.
+    if (m(r'עוברים לגור|לגור (ביחד|יחד)|זוג טרי|מתחילים לגור|moving in together')) {
+      sharpen('location', 0.74, s * 0.7);
+      sharpen('neighborhood', 0.70, s * 0.6);
+      sharpen('spaciousness', 0.68, s * 0.5);
+    }
+    // (43) Newlyweds → quality area, room to grow.
+    if (m(r'נשוי\w* טרי|התחתנ|חתונה|newlywed|just married')) {
+      sharpen('neighborhood', 0.72, s * 0.6);
+      sharpen('spaciousness', 0.70, s * 0.5);
+      sharpen('schools', 0.62, s * 0.35);
+    }
+    // (44) Expecting a baby → family area, safe, stroller-friendly, a bit bigger.
+    if (m(r'בהריון|הריון|מצפים ל?תינוק|בדרך תינוק|expecting|pregnant|baby on the way')) {
+      sharpen('safety', 0.80, s * 0.8);
+      sharpen('schools', 0.70, s * 0.6);
+      sharpen('accessibility', 0.70, s * 0.6); // stroller → elevator / low floor
+      sharpen('spaciousness', 0.66, s * 0.4);
+      sharpen('health', 0.66, s * 0.4);
+    }
+    // (45) Divorced / fresh start → value, move-in-ready, connected.
+    if (m(r'גרוש|גרושה|פרידה|נפרדתי|אחרי גירושין|divorced|separated|breakup')) {
+      sharpen('value', 0.74, s * 0.7);
+      sharpen('condition', 0.70, s * 0.5);
+      sharpen('transit', 0.68, s * 0.4);
+    }
+    // (46) Relocating for a new job → near work + easy commute + move-in-ready.
+    if (m(r'עבר\w* בשביל עבוד|מעבר לעבוד|התחלתי עבוד|עבודה חדשה|relocat|new job|starting a job')) {
+      sharpen('employment', 0.76, s * 0.7);
+      sharpen('transit', 0.74, s * 0.6);
+      sharpen('condition', 0.66, s * 0.4);
+    }
+    // (47) High-tech / young professional → central, lively, connected.
+    if (m(r'הייטק|היי.טק|מתכנת|סטארטאפ|יזם|young professional|high.?tech|\btech\b|startup')) {
+      sharpen('location', 0.76, s * 0.7);
+      sharpen('transit', 0.70, s * 0.5);
+      if (lively) {
+        sharpen('young_area', 0.74, s * 0.6);
+        sharpen('nightlife', 0.66, s * 0.4);
+      }
+    }
+    // (48) Retiree / pensioner → accessible, quiet, health nearby, low floor.
+    if (m(r'פנסיונר|גמלא|פרישה|בגיל השליש|קשיש|retire|pensioner')) {
+      sharpen('accessibility', 0.82, s * 0.9);
+      sharpen('health', 0.76, s * 0.7);
+      sharpen('low_noise', 0.72, s * 0.6);
+      sharpen('low_floor', 0.70, s * 0.5);
+      sharpen('senior_area', 0.70, s * 0.5);
+    }
+    // (49) Health / mobility need → accessible + health, low floor.
+    if (m(r'בעי\w* רפואי|מוגבלות|ניידות|נכה\b|כיסא גלגלים|health condition|mobility|wheelchair|disab')) {
+      sharpen('accessibility', 0.88, s);
+      sharpen('health', 0.78, s * 0.7);
+      sharpen('low_floor', 0.72, s * 0.6);
+    }
+    // (50) Beach lover → coast + coastal centrality.
+    if (m(r'אוהב\w* ים|קרוב לים|גלישה|לגלוש|חוף\b|beach|surf|by the sea|seaside')) {
+      sharpen('coast', 0.82, s * 0.9);
+      sharpen('location', 0.66, s * 0.4);
+    }
+    // (51) Nature / outdoors → parks + quiet.
+    if (m(r'טבע|ירוק\b|טיול|hiking|nature|outdoors|greenery')) {
+      sharpen('park', 0.76, s * 0.7);
+      sharpen('low_noise', 0.66, s * 0.4);
+    }
+    // (52) Car-free → transit + walkable convenience.
+    if (m(r'בלי רכב|אין לי (רכב|אוטו)|לא נוהג|ללא רכב|car.?free|no car|don.?t drive')) {
+      sharpen('transit', 0.84, s);
+      sharpen('location', 0.70, s * 0.5);
+      sharpen('convenience', 0.70, s * 0.5);
+    }
+    // (53) Foodie / café culture → café & dining density, central.
+    if (m(r'קולינר|מסעד|בתי קפה|שף\b|אוכל טוב|foodie|caf[eé]|restaurant|dining')) {
+      if (lively) sharpen('nightlife', 0.72, s * 0.6); // bar/café-density dim
+      sharpen('location', 0.66, s * 0.4);
+    }
+    // (54) Fitness / active → parks (running) + young area (gyms cluster).
+    if (m(r'ספורט|כושר|ריצה|לרוץ|אופניים|gym|fitness|running|workout')) {
+      sharpen('park', 0.68, s * 0.5);
+      if (lively) sharpen('young_area', 0.64, s * 0.35);
+    }
+    // (55) Frequent traveler → connected + central.
+    if (m(r'טס הרבה|נוסע לחו.?ל|שדה תעופה|נתב.?ג|travel a lot|frequent flyer|airport')) {
+      sharpen('transit', 0.72, s * 0.5);
+      sharpen('location', 0.66, s * 0.4);
+    }
+    // (56) After the army / first job → value + transit + young.
+    if (m(r'אחרי הצבא|אחרי צבא|עבודה ראשונה|שחרור מהצבא|after army|first job|fresh out of')) {
+      sharpen('value', 0.76, s * 0.7);
+      sharpen('transit', 0.72, s * 0.5);
+      if (lively) sharpen('young_area', 0.70, s * 0.5);
+    }
+    // (57) Growing family / need more room → space + schools + quality area.
+    if (m(r'משפחה גדל|צריכ\w* יותר מקום|נהיה צפוף|growing family|need more (room|space)|outgrown')) {
+      sharpen('spaciousness', 0.76, s * 0.7);
+      sharpen('schools', 0.70, s * 0.5);
+      sharpen('neighborhood', 0.68, s * 0.4);
+    }
+    // (58) Commuter to a job hub → transit + employment + upside.
+    if (m(r'נוסע ל?(תל אביב|מרכז|עבודה)|עובד ב?מרכז|commut')) {
+      sharpen('transit', 0.76, s * 0.6);
+      sharpen('employment', 0.68, s * 0.4);
+      sharpen('future_value', 0.62, s * 0.3);
+    }
+    // (59) Quiet / calm phrasing → physical quiet + calmer demographic.
+    if (m(r'שקט|רגוע|שלווה|בלי רעש|peace|quiet|calm|serene')) {
+      sharpen('low_noise', 0.80, s * 0.8);
+      sharpen('senior_area', 0.62, s * 0.3);
+    }
+    // (60) Luxury lifestyle phrasing → premium + view + prime area.
+    if (m(r'יוקר|מפואר|פרימיום|וילה|פנטהאו|luxur|premium|upscale|high.?end')) {
+      sharpen('luxury', 0.80, s * 0.7);
+      sharpen('view', 0.70, s * 0.5);
+      sharpen('neighborhood', 0.70, s * 0.5);
+    }
+    // (61) Budget-conscious phrasing → value + transit + convenience.
+    if (m(r'חסכ|תקציב מוגבל|לא יקר|במחיר טוב|משתלם|זול|budget|affordab|cheap|save money')) {
+      sharpen('value', 0.80, s * 0.8);
+      sharpen('transit', 0.66, s * 0.4);
+      sharpen('convenience', 0.62, s * 0.3);
+    }
+    // (62) Student phrasings (broad) → campus + value + young + transit.
+    if (m(r'סטודנט|לומד\w* תואר|אקדמ|מכללה|קמפוס|student|university|college|campus')) {
+      sharpen('university', 0.74, s * 0.6);
+      sharpen('value', 0.70, s * 0.5);
+      sharpen('transit', 0.68, s * 0.4);
+      if (lively) sharpen('young_area', 0.68, s * 0.4);
+    }
+    // (63) Religious / observant phrasing (mild — heavy handling is intent-driven).
+    if (m(r'דתי\b|שומר\w* שבת|כשר\b|בית כנסת|מסורתי|observant|kosher|religious')) {
+      sharpen('religious_area', 0.72, s * 0.5);
+    }
+    // (64) Works from home (broad) → space for an office + quiet.
+    if (m(r'מהבית|פרילנס|עצמאי|חדר עבודה|home office|freelanc|self.?employed')) {
+      sharpen('spaciousness', 0.72, s * 0.5);
+      sharpen('low_noise', 0.66, s * 0.4);
+    }
+    // (65) View / high floor phrasing → view.
+    if (m(r'נוף\b|קומה גבוה|high floor|\bview\b|skyline')) {
+      sharpen('view', 0.78, s * 0.6);
+    }
+    // (66) Garden / outdoor-space lover → green + nicer area.
+    if (m(r'גינה|מרפסת גדולה|צמח|שמש|garden|big balcony|plants')) {
+      sharpen('park', 0.60, s * 0.3);
+      sharpen('neighborhood', 0.60, s * 0.3);
+    }
+    // (67) Errands / convenience-first → supermarkets & shops nearby + walkable.
+    if (m(r'קרוב לסופר|קניות|מכולת|נוחות|errands|groceries|convenien')) {
+      sharpen('convenience', 0.78, s * 0.7);
+      sharpen('location', 0.62, s * 0.3);
+    }
+
     if (profile != null && profile.importantDetails.isNotEmpty) {
       // a tenant who curated details cares about condition & trust
       sharpen('condition', 0.7, 2.0);
