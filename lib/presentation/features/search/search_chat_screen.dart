@@ -101,6 +101,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   bool _consentAsked = false;
   Map<String, dynamic>? _pendingPersona;
 
+  // ── Personalization interview (מותאם אישית) ────────────────────────────────
+  // In personalization mode אתי runs a short guided interview (4-6 adaptive
+  // questions, each with a "why") BEFORE searching, so she genuinely understands
+  // the person. Fast mode skips this and searches instantly. Tracks which
+  // questions were already asked so we never repeat one and stop after ~6.
+  final Set<String> _interviewAsked = {};
+  bool _interviewIntroShown = false;
+
   static const _starterChips = [
     '3 חדרים בתל אביב עד 7000, עם מרפסת',
     'ליד הרכבת, משופצת, לזוג עם כלב',
@@ -152,6 +160,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _query = SearchQuery();
       _userTurns = 0;
       _searched = false;
+      _interviewAsked.clear();
+      _interviewIntroShown = false;
       // Voice session flags — so a new conversation truly starts clean.
       _voiceAwaitingConsent = false;
       _voiceConsented = false;
@@ -636,7 +646,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
     // Voice honours the speed mode: fast → on-device only; personalization → the
     // background AI upgrade runs too (still shows instant results first).
-    await _send(transcript, enrich: !_immediateMode);
+    await _send(transcript, enrich: !_immediateMode, isVoice: true);
 
     // Reality-check (voice): if the ask is a fantasy for that city+budget, אתי
     // SAYS so — with the realistic price + a nearby-city nudge — instead of
@@ -932,7 +942,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
   }
 
-  Future<void> _send(String raw, {bool enrich = true}) async {
+  Future<void> _send(String raw, {bool enrich = true, bool isVoice = false}) async {
     final text = raw.trim();
     if (text.isEmpty || _busy) return;
 
@@ -981,11 +991,48 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       return;
     }
 
-    final shouldSearch = !_query.isEmpty &&
-        (_searched ||
-            _wantsResultsNow(text) ||
-            _userTurns >= 2 ||
-            _queryIsRich());
+    // MODE: fast → search instantly (current behaviour). Personalization → run a
+    // short guided INTERVIEW (4-6 adaptive questions, each with a "why") BEFORE
+    // searching, so אתי genuinely understands the person and explains her choices.
+    // The user can cut it short any time ("תראי לי כבר").
+    bool shouldSearch;
+    if (_immediateMode || isVoice) {
+      // Fast mode (or the hands-free voice flow) searches without the interview.
+      shouldSearch = !_query.isEmpty &&
+          (_searched ||
+              _wantsResultsNow(text) ||
+              _userTurns >= 2 ||
+              _queryIsRich());
+    } else {
+      final nextQ = _searched ? null : _nextInterviewQuestion();
+      final asked = _interviewAsked.length;
+      final wantsNow = _wantsResultsNow(text) && asked >= 2;
+      final interviewDone =
+          _searched || asked >= 6 || (asked >= 4 && nextQ == null);
+      if (!_query.isEmpty && (interviewDone || wantsNow)) {
+        shouldSearch = true;
+      } else if (nextQ != null) {
+        // Ask the next question (with its "why") instead of searching yet.
+        final intro = _interviewIntroShown
+            ? ''
+            : 'כדי למצוא לך משהו שבאמת מתאים, אשאל אותך כמה שאלות קצרות 🙂\n\n';
+        _interviewIntroShown = true;
+        _interviewAsked.add(nextQ.key);
+        if (!mounted) return;
+        setState(() {
+          _messages.add(_ChatMsg(
+            role: 'assistant',
+            text: '$intro${nextQ.q}\n\n💡 ${nextQ.why}',
+            chips: nextQ.chips,
+          ));
+          _busy = false;
+        });
+        _scrollToEnd();
+        return;
+      } else {
+        shouldSearch = !_query.isEmpty;
+      }
+    }
 
     // ⚡ IMMEDIATE — rank ON-DEVICE right now (no network, no LLM) so results +
     // a reply appear in well under a second. The community-fit cohort ranking +
@@ -1335,6 +1382,84 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       return 'חשוב לכם קרבה לבית כנסת ולמוסדות שמתאימים לכם?';
     }
     return 'מה עוד חשוב לך — אווירת שכונה, קומה, או משהו ספציפי בדירה?';
+  }
+
+  // ── Personalization interview ──────────────────────────────────────────────
+  /// The next question אתי should ask in the guided interview, or null when the
+  /// interview is complete (all relevant questions asked). Adaptive: she skips
+  /// what she already knows and asks the persona-relevant ones — i.e. she DECIDES
+  /// what matters for THIS person — and every question carries a "why". Ordered
+  /// most-decisive first (area/budget/household → the #1 priority → persona-
+  /// specific → hard must-haves → timeline → commute), capped at 6 in [_send].
+  ({String key, String q, String why, List<String> chips})? _nextInterviewQuestion() {
+    final s = SmartSearch.cohortSignals(_conversationText);
+    final household = _persona['household'] ?? s['household'];
+    final text = _conversationText;
+    bool has(String k) => _interviewAsked.contains(k);
+    final out = <({String key, String q, String why, List<String> chips})>[];
+    void add(String key, String q, String why, List<String> chips) {
+      if (!has(key)) out.add((key: key, q: q, why: why, chips: chips));
+    }
+
+    // Essentials — only while still unknown.
+    if (_query.city == null && (_query.neighborhood == null)) {
+      add('area', 'באיזה אזור או עיר לחפש?',
+          'המיקום קובע כמעט הכל — שכונה, נגישות ומרחק מהעבודה.',
+          ['תל אביב', 'ירושלים', 'חיפה', 'מרכז/השרון', 'באר שבע']);
+    }
+    if (_query.maxPrice == null) {
+      add('budget', 'מה התקציב החודשי המקסימלי?',
+          'ככה אני מציגה רק דירות שבאמת אפשריות לך — בלי לבזבז לך זמן.',
+          ['עד 4,000', '4,000-6,000', '6,000-9,000', 'מעל 9,000']);
+    }
+    if (household == null) {
+      add('household', 'מי גר בדירה?',
+          'זה קובע כמה חדרים צריך ואילו שירותים בשכונה חשובים לך.',
+          ['לבד', 'זוג', 'משפחה עם ילדים', 'שותפים']);
+    }
+    // The single most important factor — always asked once.
+    add('priority', 'אם היית צריך לבחור דבר אחד הכי חשוב — מה זה?',
+        'זה מה שידחוף הכי חזק את ההצעות הרלוונטיות למעלה.',
+        ['מיקום מרכזי', 'שקט ואיכות חיים', 'תמורה למחיר', 'דירה מרווחת', 'קרוב לעבודה']);
+
+    // Persona-specific — she asks only what fits THIS person.
+    final family = household == 'family' ||
+        _persona['baby'] == 'true' ||
+        RegExp(r'משפח|ילד|תינוק').hasMatch(text);
+    if (family) {
+      add('schools', 'כמה חשובה קרבה לגנים ובתי ספר טובים?',
+          'למשפחה זה משנה את סדר ההצעות — אני מדרגת לפי מוסדות חינוך באזור.',
+          ['קריטי', 'חשוב', 'פחות חשוב']);
+    }
+    final senior = s['lifeStage'] == 'senior' ||
+        s['accessibilityNeed'] == 'true' ||
+        RegExp(r'מבוגר|נגיש|כיסא גלגלים|מעלית חובה').hasMatch(text);
+    if (senior) {
+      add('accessibility', 'צריך נגישות מלאה — מעלית או קומה נמוכה?',
+          'נגישות היא סינון קשיח אצלי — לא אציג דירה שלא באמת מתאימה.',
+          ['חובה מעלית', 'קומה נמוכה', 'לא קריטי']);
+    }
+    if (RegExp(r'כלב|חתול|חיית מחמד|בעל חיים').hasMatch(text)) {
+      add('pet', 'יש חיית מחמד שצריך להתחשב בה?',
+          'דירה שמאשרת חיות + קומה נמוכה זה הבדל גדול לבעל כלב.',
+          ['כן, כלב', 'כן, חתול', 'אין']);
+    }
+    // Hard must-haves (a real filter, not a preference).
+    add('musthave', 'יש משהו שהוא חובה מוחלטת בדירה?',
+        'זה סינון קשיח — לא רק העדפה. דירה בלי זה פשוט לא תעלה.',
+        ['ממ״ד', 'מעלית', 'חניה', 'מרפסת', 'אין חובות']);
+    // Timeline.
+    add('timeline', 'מתי צריכים להיכנס לדירה?',
+        'דחיפות משנה מה כדאי להראות — כניסה מיידית מול גמישות.',
+        ['מיידי', 'חודש-חודשיים', 'גמיש']);
+    // Commute (skip for a senior — usually retired).
+    if (!senior) {
+      add('commute', 'יש מקום עבודה קבוע שחשוב להיות קרוב אליו?',
+          'אם כן, אני יכולה לדרג את ההצעות לפי זמן הנסיעה בפועל.',
+          ['כן, יש', 'עובד/ת מהבית', 'לא רלוונטי']);
+    }
+
+    return out.isEmpty ? null : out.first;
   }
 
   int _warmIdx = 0;
