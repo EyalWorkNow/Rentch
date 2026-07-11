@@ -1,0 +1,171 @@
+// Area Intelligence (supply side): profile a LOCATION with every gov-data layer
+// and score how well it serves a target tenant/buyer persona — the inverse of the
+// tenant search engine, reusing the SAME FeatureEngineer + preference model.
+import 'package:dating_app/core/govdata/gov_data.dart';
+import 'package:dating_app/core/insights/target_personas.dart';
+import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/core/search/engine/preference_model.dart';
+import 'package:dating_app/data/models/rental_models.dart';
+
+/// One scored reason ("why this area fits") — a layer + how strong it is.
+class AreaReason {
+  const AreaReason(this.label, this.strength);
+  final String label; // Hebrew
+  final double strength; // 0..1
+}
+
+/// The full gov-data profile of a point, ready for the card UI.
+class AreaProfile {
+  const AreaProfile({
+    required this.lat,
+    required this.lon,
+    required this.city,
+    required this.sesCluster,
+    required this.socioeconomic,
+    required this.safety,
+    required this.centrality,
+    required this.transit,
+    required this.railKm,
+    required this.schools,
+    required this.youngShare,
+    required this.childShare,
+    required this.seniorShare,
+    required this.nightlife,
+    required this.employment,
+    required this.futureValue,
+    required this.health,
+    required this.coastKm,
+    required this.parkAccess,
+    required this.pfv,
+  });
+
+  final double lat, lon;
+  final String city;
+  final int sesCluster; // 1..10 (0 = unknown block)
+  final double socioeconomic, safety, centrality, transit; // 0..1
+  final double? railKm, coastKm;
+  final double schools, youngShare, childShare, seniorShare;
+  final double nightlife, employment, futureValue, health, parkAccess;
+  final PropertyFeatureVector pfv;
+}
+
+class PersonaFit {
+  const PersonaFit(this.persona, this.pct, this.reasons);
+  final TargetPersona persona;
+  final int pct; // 0..100
+  final List<AreaReason> reasons; // top contributing layers
+}
+
+class AreaIntelligence {
+  const AreaIntelligence._();
+
+  // The dimensions that describe a PLACE (not a specific flat). Area fit is scored
+  // over these only — budget/rooms/amenities/condition are property-level.
+  static const List<String> _placeDims = [
+    'location', 'neighborhood', 'safety', 'transit', 'schools', 'family',
+    'health', 'coast', 'park', 'religious_area', 'nightlife', 'young_area',
+    'senior_area', 'employment', 'convenience', 'low_noise', 'future_value',
+    'university',
+  ];
+
+  static const Map<String, String> _label = {
+    'location': 'מרכזיות', 'neighborhood': 'איכות אזור (סוציו-אקונומי)',
+    'safety': 'בטיחות', 'transit': 'תחבורה ציבורית', 'schools': 'מוסדות חינוך',
+    'family': 'אופי משפחתי', 'health': 'שירותי בריאות', 'coast': 'קרבה לים',
+    'park': 'פארקים וירוק', 'religious_area': 'קהילה דתית',
+    'nightlife': 'חיי לילה ובילוי', 'young_area': 'אוכלוסייה צעירה',
+    'senior_area': 'אזור שקט/מבוגר', 'employment': 'קרבה לתעסוקה',
+    'convenience': 'סופר וקניות', 'low_noise': 'שקט מרעש',
+    'future_value': 'פוטנציאל השבחה', 'university': 'קרבה לאוניברסיטה',
+  };
+
+  // A tiny fixed market so FeatureEngineer can run — the PLACE layers come from
+  // GovData/GeoIntelligence, not the market, so its contents don't affect them.
+  static MarketContext? _market;
+  static MarketContext _dummyMarket() => _market ??= MarketContext.analyze([
+        for (var i = 0; i < 10; i++)
+          RentalProperty(
+              id: 'seed$i', price: 5000 + i * 300, rooms: 3, sizeM2: 70,
+              floor: '2', totalFloors: '6', city: 'תל אביב', neighborhood: '',
+              street: 'x', streetNumber: 1, lat: 32.07, lon: 34.78,
+              propertyType: 'דירה', entryDate: '', condition: 'טוב',
+              ownerName: 'x', agencyListing: false, features: const [],
+              media: const [
+                PropertyMedia(url: 'u', type: PropertyMediaType.image)
+              ]),
+      ]);
+
+  static RentalProperty _syntheticAt(double lat, double lon, String city) =>
+      RentalProperty(
+          id: 'area', price: 6000, rooms: 3, sizeM2: 70, floor: '2',
+          totalFloors: '6', city: city, neighborhood: '', street: '',
+          streetNumber: 0, lat: lat, lon: lon, propertyType: 'דירה',
+          entryDate: '', condition: 'טוב', ownerName: '', agencyListing: false,
+          features: const [],
+          media: const [PropertyMedia(url: 'u', type: PropertyMediaType.image)]);
+
+  /// Full gov-data profile of a point.
+  static AreaProfile profileAt(double lat, double lon, {String city = ''}) {
+    final pfv = FeatureEngineer.engineer(_syntheticAt(lat, lon, city), _dummyMarket());
+    final sa = GovData.instance.loaded
+        ? GovData.instance.statAreaAt(lat, lon)
+        : null;
+    double g(String k, [double d = 0.0]) => pfv.get(k, d);
+    final railKm = g('rail_km', 99);
+    final coastKm = g('coast_access', -1) > 0
+        ? null // engineered as a kernel; expose the km separately if needed
+        : null;
+    return AreaProfile(
+      lat: lat, lon: lon, city: city,
+      sesCluster: sa?.ses ?? 0,
+      socioeconomic: g('socioeconomic', 0.5),
+      safety: g('safety', 0.5),
+      centrality: g('centrality', 0.5),
+      transit: g('transit_access'),
+      railKm: railKm < 90 ? railKm : null,
+      schools: g('school_access'),
+      youngShare: g('demo_young', 0.5),
+      childShare: g('demo_child', 0.5),
+      seniorShare: g('demo_senior', 0.5),
+      nightlife: g('nightlife'),
+      employment: g('employment_access'),
+      futureValue: g('future_value'),
+      health: g('health_access'),
+      coastKm: coastKm,
+      parkAccess: g('park_access'),
+      pfv: pfv,
+    );
+  }
+
+  /// How well [pfv] (a place) serves [persona]: a 0..100 fit + the top reasons.
+  static PersonaFit fit(PropertyFeatureVector pfv, TargetPersona persona) {
+    final model = PreferenceModelBuilder.build(
+        query: persona.query, market: _dummyMarket());
+    double wsum = 0, acc = 0;
+    final contrib = <String, double>{};
+    for (final dim in _placeDims) {
+      final w = model.weight(dim);
+      if (w <= 0.001) continue;
+      final sat = model.satisfaction(dim, pfv);
+      wsum += w;
+      acc += w * sat;
+      contrib[dim] = w * sat;
+    }
+    final pct = wsum > 0 ? (acc / wsum * 100).round() : 50;
+    final reasons = (contrib.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value)))
+        .take(3)
+        .where((e) => model.satisfaction(e.key, pfv) >= 0.5)
+        .map((e) => AreaReason(
+            _label[e.key] ?? e.key, model.satisfaction(e.key, pfv)))
+        .toList();
+    return PersonaFit(persona, pct.clamp(0, 100), reasons);
+  }
+
+  /// All personas ranked by how well this point serves them (best first).
+  static List<PersonaFit> suitablePersonas(PropertyFeatureVector pfv) {
+    final out = [for (final p in TargetPersona.all) fit(pfv, p)];
+    out.sort((a, b) => b.pct.compareTo(a.pct));
+    return out;
+  }
+}

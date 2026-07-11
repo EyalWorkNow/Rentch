@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/presentation/features/broker/area_intel_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_brochure_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_clients_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_cma_screen.dart';
@@ -59,6 +60,13 @@ class BrokerToolsScreen extends StatelessWidget {
         title: 'ניתוח שוק (CMA)',
         subtitle: 'מחיר מומלץ לפי נכסים דומים באזור',
         builder: (_) => const BrokerCmaScreen(),
+      ),
+      _BrokerTool(
+        icon: IconsaxPlusLinear.map_1,
+        color: AppColors.primary,
+        title: 'אינטליגנציית אזור',
+        subtitle: 'כתובת → כל נתוני האזור + למי הוא הכי מתאים להשקעה',
+        builder: (_) => const AreaIntelScreen(),
       ),
       _BrokerTool(
         icon: IconsaxPlusLinear.shield_tick,

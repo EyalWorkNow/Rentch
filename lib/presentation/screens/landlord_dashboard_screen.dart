@@ -11,6 +11,7 @@ import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/presentation/screens/rent_tracking_screen.dart';
 import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
 import 'package:dating_app/presentation/features/landlord/reminders_screen.dart';
+import 'package:dating_app/presentation/features/broker/area_intel_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_tools_screen.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
@@ -1678,6 +1679,18 @@ class _LandlordToolsSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+        // Area Intelligence — where to invest + who a location suits. Shown to
+        // every landlord (brokers also reach it from "כלי הסוכן").
+        _ToolTile(
+          icon: IconsaxPlusLinear.map_1,
+          color: AppColors.success,
+          title: 'אינטליגנציית אזור',
+          subtitle: 'כתובת → כל נתוני האזור ולמי הוא הכי מתאים להשקעה',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AreaIntelScreen()),
+          ),
+        ),
+        const SizedBox(height: 12),
         // Income-tax helper — landlords only; removed from the broker (סוכן) account.
         if (!context.watch<DatingProvider>().isBroker) ...[
           _ToolTile(
