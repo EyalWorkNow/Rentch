@@ -277,14 +277,18 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         vaov: fov.vaov);
   }
 
-  // AI 360: the landlord picks 1–2 room photos/panoramas; the server runs
-  // gpt-image-2 to merge them into ONE seamless equirectangular 360. Takes ~1 min
-  // (async on the server), so we show a clear progress dialog and poll. The node
+  // AI 360: the landlord picks up to 6 room photos; the server runs gpt-image-2
+  // to merge them into ONE seamless equirectangular 360. MORE photos (each wall)
+  // = far less the model has to invent, so accuracy rises with coverage. Takes
+  // ~1–3 min (async on the server); we show a progress dialog and poll. The node
   // is labelled with ✨ so it reads honestly as AI-generated.
   Future<void> _generateWithAi() async {
     final picks = await _picker.pickMultiImage(imageQuality: 92);
     if (picks.isEmpty || !mounted) return;
-    final imgs = picks.take(2).toList(); // gpt-image-2 path takes 1–2 images
+    final imgs = picks.take(6).toList(); // gpt-image-2 path takes up to 6 images
+    if (mounted && picks.length < 3) {
+      _toast('טיפ: צלמו כל קיר בחדר (3–6 תמונות) — ככה ה-AI ממציא פחות ומדייק יותר.');
+    }
     final label = await _askLabel('נקודה ${_nodes.length + 1}');
     if (label == null || !mounted) return;
 

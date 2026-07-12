@@ -2629,10 +2629,11 @@ async function createPanorama(event) {
   }
 
   // ── AI generate mode (gpt-image-2) ────────────────────────────────────────
-  // The user uploads 1–2 real photos/panoramas of the room; gpt-image-2 turns
-  // them into ONE seamless equirectangular 360. Presign a PUT per input image.
+  // The user uploads up to 6 real photos of the room (more angles = less the
+  // model has to invent); gpt-image-2 merges them into ONE seamless
+  // equirectangular 360. Presign a PUT per input image.
   if (body.captureMode === 'ai') {
-    const n = Math.max(1, Math.min(2, Number(body.imageCount) || 1));
+    const n = Math.max(1, Math.min(6, Number(body.imageCount) || 1));
     const inputKeys = [];
     const uploadUrls = [];
     for (let i = 0; i < n; i++) {
@@ -2809,24 +2810,36 @@ function validatePoses(raw, frameCount) {
 }
 
 // Hardened super-prompt for gpt-image-2: a viewer-ready, seamless, faithful 360.
+// Priority #1 is FAITHFULNESS — the model must reproduce only what the photos
+// show and never invent furniture/rooms, because that is the landlord's main
+// complaint. Feeding MORE photos (up to 6) shrinks the unseen area it has to fill.
 const AI_PANO_PROMPT = [
-  'You are given one or more photos of a SINGLE real room.',
-  'Produce ONE photorealistic 360°×180° EQUIRECTANGULAR panorama of THIS room,',
-  'made to be viewed in a spherical/VR 360 viewer where the user rotates a full',
-  'circle and looks up and down.',
+  'You are given SEVERAL photos of ONE single real room, shot from the same spot',
+  'facing different directions. Merge them into ONE photorealistic 360°×180°',
+  'EQUIRECTANGULAR panorama of THIS EXACT room, for a spherical/VR 360 viewer',
+  'where the user rotates a full circle and looks up and down.',
   '',
-  'HARD REQUIREMENTS (all mandatory):',
-  '1) TRUE equirectangular (2:1) projection: the horizon is a straight horizontal',
-  '   line across the vertical middle; the CEILING fills the top edge and the FLOOR',
-  '   fills the bottom edge; walls curve naturally toward the top/bottom poles.',
-  '2) SEAMLESS horizontal wrap: the far LEFT and far RIGHT edges must match EXACTLY,',
+  'FAITHFULNESS — THIS IS THE MOST IMPORTANT RULE:',
+  '• Reproduce ONLY what is actually visible in the photos. Keep the EXACT same',
+  '  furniture, wall colors, flooring, windows, doors, fixtures, materials and',
+  '  layout — same positions, same proportions.',
+  '• Do NOT invent, add, remove, move, or restyle ANY object. No new furniture,',
+  '  windows, doors, artwork, plants, lamps, rugs, or decorations that are not in',
+  '  the photos. No extra rooms, hallways, or fantasy elements.',
+  '• For gaps the photos do NOT cover, do NOT guess objects. Simply CONTINUE the',
+  '  adjacent real wall / floor / ceiling with the same plain color and texture —',
+  '  an empty neutral surface is CORRECT; inventing furniture there is WRONG.',
+  '• If unsure whether something exists, leave it OUT. Under-fill, never fabricate.',
+  '',
+  'GEOMETRY & QUALITY (all mandatory):',
+  '1) TRUE equirectangular projection: the horizon is a straight horizontal line',
+  '   across the vertical middle; the CEILING fills the top edge and the FLOOR the',
+  '   bottom edge; walls curve naturally toward the top/bottom poles.',
+  '2) SEAMLESS horizontal wrap: the far LEFT and far RIGHT edges match EXACTLY,',
   '   pixel-continuous, so there is NO visible seam when the view wraps 360°.',
-  '3) FULL coverage — absolutely no black bars, empty/blank areas, missing ceiling',
-  '   or floor, and no duplicated or repeated furniture around the circle.',
-  '4) FAITHFUL to the photos: keep the SAME room — the real furniture, wall colors,',
-  '   flooring, windows, doors, fixtures and overall layout. Do NOT invent a',
-  '   different room, do NOT add extra rooms or fantasy elements.',
-  '5) Very HIGH quality: sharp focus, clean straight vertical lines near the center,',
+  '3) FULL coverage — no black bars, no blank areas, no missing ceiling/floor, and',
+  '   NO duplicated or mirror-repeated furniture around the circle.',
+  '4) Very HIGH quality: sharp focus, clean straight vertical lines near the center,',
   '   realistic real-estate interior lighting, natural white balance.',
   'Do NOT include any text, watermark, logo, people, or a circular fisheye frame.',
 ].join('\n');
@@ -2856,7 +2869,7 @@ async function aiGeneratePanorama(jobId, event) {
   return json(200, { data: { jobId, status: 'processing' } });
 }
 
-// The async worker (self-invoked). Downloads the 1–2 input images, asks
+// The async worker (self-invoked). Downloads the input images (up to 6), asks
 // gpt-image-2 to merge them into one seamless equirectangular 360, uploads the
 // PNG, and marks the job ready. Fail-soft: any error → status 'failed' + message.
 async function runAiGenerate(jobId) {
