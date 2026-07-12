@@ -712,6 +712,30 @@ class RecommendationEngine {
             (p) => p.transactionType == PropertyTransactionType.sale);
     final market = (isSale ? saleBaseline : rentBaseline) ??
         MarketContext.analyze(candidates);
+
+    // PERF CAP: per-candidate feature engineering + ranking is O(n) on the UI
+    // isolate — ~1s over a 10k catalogue, a visible freeze that grows as the
+    // background loader accumulates pages. City/budget-gated queries already shrink
+    // far below this cap; only a BROAD (no-city) feed stays huge, and there any
+    // representative subset ranks fine — the user swipes a few dozen. Keep the most
+    // relevant slice by a CHEAP price heuristic (no gov lookups): within-budget /
+    // cheapest / mainstream-priced, matching what the ranker would favour anyway.
+    // ponytail: 1200 cap (~200ms); raise if broad-feed recall ever matters more.
+    const kMaxRankCandidates = 1200;
+    if (candidates.length > kMaxRankCandidates) {
+      final maxP = query.maxPrice;
+      final med = market.medianPrice > 0 ? market.medianPrice : 5000.0;
+      int cost(RentalProperty p) {
+        if (maxP != null && maxP > 0) {
+          // in-budget first (priciest-within-budget ≈ best), over-budget last.
+          return p.price <= maxP ? (maxP - p.price) : (p.price - maxP) + 100000000;
+        }
+        if (query.cheapPreference) return p.price;
+        return (p.price - med).abs().round();
+      }
+      candidates = ([...candidates]..sort((a, b) => cost(a).compareTo(cost(b))))
+          .sublist(0, kMaxRankCandidates);
+    }
     final pfvs = [
       for (final p in candidates) FeatureEngineer.engineer(p, market),
     ];
