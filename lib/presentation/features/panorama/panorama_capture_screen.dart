@@ -53,14 +53,21 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       for (var j = 0; j < _nodes.length; j++) {
         if (j == i) continue;
         final to = _nodes[j];
-        // Map coords: x = left→right, y = top→bottom. Treat "up" (−y) as forward;
-        // bearing 0°=forward, clockwise. Approximate (the pano's absolute north
-        // isn't calibrated to the map) but gives consistent directional arrows.
-        final dx = (to.x ?? 0.5) - (from.x ?? 0.5);
-        final dy = (to.y ?? 0.5) - (from.y ?? 0.5);
-        final bearing = (dx == 0 && dy == 0)
-            ? 0.0
-            : (math.atan2(dx, -dy) * 180 / math.pi + 360) % 360;
+        double bearing;
+        if (from.hasPosition || to.hasPosition) {
+          // Map coords: x = left→right, y = top→bottom. Treat "up" (−y) as
+          // forward; bearing 0°=forward, clockwise. Approximate (the pano's north
+          // isn't calibrated to the map) but gives consistent directional arrows.
+          final dx = (to.x ?? 0.5) - (from.x ?? 0.5);
+          final dy = (to.y ?? 0.5) - (from.y ?? 0.5);
+          bearing = (dx == 0 && dy == 0)
+              ? 0.0
+              : (math.atan2(dx, -dy) * 180 / math.pi + 360) % 360;
+        } else {
+          // No floor placement (e.g. a bulk gallery import): spread the arrows
+          // evenly around the ring so they don't all stack on one spot.
+          bearing = (j * 360.0 / _nodes.length) % 360;
+        }
         hotspots.add(PanoramaHotspot(
           targetNodeId: to.id,
           longitude: bearing,
@@ -83,8 +90,10 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     required String contentType,
     double haov = 360,
     double vaov = 180,
+    String? autoLabel,
   }) async {
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    // Bulk imports pass an autoLabel so the landlord isn't prompted per image.
+    final label = autoLabel ?? await _askLabel('נקודה ${_nodes.length + 1}');
     if (label == null || !mounted) return;
 
     setState(() => _busy = true);
@@ -204,16 +213,42 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
   }
 
-  // SECONDARY fallback: import a panorama the landlord already shot themselves.
+  // Import one or SEVERAL ready panoramas from the gallery. Picking MULTIPLE adds
+  // each as its own tour point — they auto-link into a walkable tour (this is the
+  // "upload several panoramas and connect them" flow). A single pick keeps the
+  // careful path (manual FOV calibration + optional pole-fill).
   Future<void> _importFromGallery() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
+    final picks = await _picker.pickMultiImage(
       maxWidth: _maxPanoWidth,
       imageQuality: 90,
     );
-    if (picked == null || !mounted) return;
+    if (picks.isEmpty || !mounted) return;
 
-    final aspect = await _imageAspect(picked.path) ?? 4.0;
+    if (picks.length == 1) {
+      await _importSinglePano(picks.first.path);
+      return;
+    }
+
+    // BULK: each image becomes a point. Estimate the vertical FOV from the aspect
+    // ratio (a 2:1 export = a full sphere) so the landlord isn't asked to
+    // calibrate every one — they just pick and go; points auto-link in _buildTour.
+    for (final pick in picks) {
+      if (!mounted) return;
+      final aspect = await _imageAspect(pick.path) ?? 2.0;
+      final vaov = (360.0 / aspect).clamp(60.0, 180.0);
+      await _uploadAndAdd(
+        path: pick.path,
+        contentType: 'image/jpeg',
+        haov: 360,
+        vaov: vaov,
+        autoLabel: 'נקודה ${_nodes.length + 1}',
+      );
+    }
+  }
+
+  // SECONDARY fallback: import a single panorama the landlord already shot.
+  Future<void> _importSinglePano(String pickedPath) async {
+    final aspect = await _imageAspect(pickedPath) ?? 4.0;
     if (!mounted) return;
     // Phone EXIF rarely states the true vertical FOV, so estimate it from the
     // strip's aspect ratio and let the landlord nudge it until the horizon sits
@@ -227,7 +262,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (!mounted) return;
     if (poles != null && poles.hasAny) {
       final ok = await _uploadCompositedPano(
-          stripPath: picked.path,
+          stripPath: pickedPath,
           poles: poles,
           vaov: fov.vaov,
           fallbackHaov: fov.haov);
@@ -236,7 +271,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     }
 
     await _uploadAndAdd(
-        path: picked.path,
+        path: pickedPath,
         contentType: 'image/jpeg',
         haov: fov.haov,
         vaov: fov.vaov);
@@ -970,11 +1005,10 @@ class _PanoramaGuideScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // The ONLY action: import a ready 360° panorama from the gallery.
-            // (The in-app capture flows are dormant — the phone/Street-View
-            // native capture is sharper and parallax-free.)
+            // PRIMARY: upload one or SEVERAL ready panoramas — several become a
+            // connected walkable tour (the "upload several and link them" flow).
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 14),
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -985,11 +1019,55 @@ class _PanoramaGuideScreen extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pop(_CaptureChoice.gallery),
                   icon: const Icon(IconsaxPlusBold.gallery, size: 22),
-                  label: const Text('העלה פנורמה מהגלריה',
+                  label: const Text('העלה פנורמות מהגלריה',
                       style:
                           TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
                 ),
               ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('אפשר לבחור כמה פנורמות — הן יתחברו לסיור אחד',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+            // SECONDARY paths — capture in-app, or stitch several partial phone
+            // panoramas into one full 360°.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary, width: 1.3),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                    ),
+                    onPressed: () =>
+                        Navigator.of(context).pop(_CaptureChoice.sweep),
+                    icon: const Icon(IconsaxPlusBold.camera, size: 19),
+                    label: const Text('צלם באפליקציה',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 14.5)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary, width: 1.3),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                    ),
+                    onPressed: () =>
+                        Navigator.of(context).pop(_CaptureChoice.arranged),
+                    icon: const Icon(IconsaxPlusBold.mirror, size: 19),
+                    label: const Text('חבר לתמונה אחת',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 14.5)),
+                  ),
+                ),
+              ]),
             ),
             // AI path: turn 1–2 ordinary room photos into a 360 with gpt-image-2.
             Padding(
@@ -1004,7 +1082,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                   ),
                   onPressed: () => Navigator.of(context).pop(_CaptureChoice.ai),
                   icon: const Text('✨', style: TextStyle(fontSize: 18)),
-                  label: const Text('צור 360° עם AI (מ-1–2 תמונות)',
+                  label: const Text('צור 360° עם AI (מכמה תמונות)',
                       style:
                           TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 ),
