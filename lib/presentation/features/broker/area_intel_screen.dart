@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/insights/area_intelligence.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/core/services/govmap_geocoder.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/broker/area_ranking_screen.dart';
@@ -44,7 +45,31 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   List<_NearbyCategory> _nearby = const [];
   String _selectedPersona = 'young_couples';
 
-  /// Autocomplete suggestions from OUR data: every CBS locality (reliable
+  String _acToken = '';
+
+  /// Address autocomplete. PRIMARY = GovMap (official Israeli mapping) — every
+  /// town, street and house number with precise coordinates, so the profile is
+  /// built at the EXACT spot. Debounced so only the last keystroke hits the
+  /// network. Falls back to offline locality/listing suggestions if GovMap is
+  /// unreachable or returns nothing.
+  Future<Iterable<_PlaceSuggestion>> _acOptions(String raw) async {
+    final q = raw.trim();
+    if (q.length < 2) return const [];
+    final token = q;
+    _acToken = token;
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    if (_acToken != token || !mounted) return const [];
+    final gov = await GovMapGeocoder.instance.search(q);
+    if (_acToken != token) return const []; // superseded while awaiting
+    if (gov.isNotEmpty) {
+      return gov
+          .map((p) => _PlaceSuggestion(p.label, p.lat, p.lon, p.city))
+          .toList();
+    }
+    return _suggest(q);
+  }
+
+  /// Offline fallback suggestions from OUR data: every CBS locality (reliable
   /// centroid coords) + real listings from the loaded catalogue (street-level).
   List<_PlaceSuggestion> _suggest(String raw) {
     final q = raw.trim();
@@ -98,21 +123,34 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         lon = picked.lon;
         city = picked.city;
       } else {
-        // Manual submit without picking: prefer a CBS locality named in the text
-        // (real coords), fall back to the OS geocoder only as a last resort.
-        final loc = GovData.instance.findLocalityInText(q);
-        if (loc != null) {
-          lat = loc.lat;
-          lon = loc.lon;
-          city = loc.name;
+        // Manual submit without picking a suggestion: resolve via GovMap first
+        // (precise), then a CBS locality named in the text, then the OS geocoder.
+        final gov = await GovMapGeocoder.instance.search(q);
+        if (gov.isNotEmpty) {
+          lat = gov.first.lat;
+          lon = gov.first.lon;
+          city = gov.first.city;
         } else {
-          final geo = await locationFromAddress(q);
-          if (geo.isEmpty) throw 'no-geo';
-          lat = geo.first.latitude;
-          lon = geo.first.longitude;
-          city = GovData.instance.statAreaAt(lat, lon)?.city ?? '';
+          final loc = GovData.instance.findLocalityInText(q);
+          if (loc != null) {
+            lat = loc.lat;
+            lon = loc.lon;
+            city = loc.name;
+          } else {
+            final geo = await locationFromAddress(q);
+            if (geo.isEmpty) throw 'no-geo';
+            lat = geo.first.latitude;
+            lon = geo.first.longitude;
+            city = GovData.instance.statAreaAt(lat, lon)?.city ?? '';
+          }
         }
       }
+      // Normalize the resolved city to GovData's canonical spelling (GovMap
+      // returns "תל אביב-יפו"), so the city-keyed lookups (safety / rent / yield)
+      // hit instead of falling back to defaults. Block-level SES + demographics
+      // still come from the exact-point stat-area polygon regardless.
+      final canon = GovData.instance.findLocalityInText(city)?.name;
+      if (canon != null && canon.isNotEmpty) city = canon;
       // The lifestyle POI layers (dining / gyms / pharmacies / culture / transit /
       // playgrounds) are lazy-loaded — the tenant card loads them, but this screen
       // may open first. All loaders are idempotent, so this is a one-time cost.
@@ -285,7 +323,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
 
   Widget _addressRow() => Autocomplete<_PlaceSuggestion>(
         displayStringForOption: (o) => o.label,
-        optionsBuilder: (v) => _suggest(v.text),
+        optionsBuilder: (v) => _acOptions(v.text),
         onSelected: (o) => _analyze(o, o.label),
         optionsViewBuilder: (context, onSelected, options) => Align(
           alignment: Alignment.topRight,
