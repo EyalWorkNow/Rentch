@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// One autocomplete suggestion — resolved to REAL coordinates up front (CBS
 /// locality centroid or an actual listing), so the profile never depends on the
@@ -246,6 +247,18 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
 
   static String _dist(double km) =>
       km < 1 ? '${(km * 1000).round()} מ׳' : '${km.toStringAsFixed(1)} ק״מ';
+
+  // Tapping a place searches it on Google (name + city; unnamed → its category
+  // + city), opening the browser/Google app.
+  Future<void> _searchGoogle(NearbyPlace p, String catLabel) async {
+    final city = _profile?.city ?? '';
+    final q = (p.name.isEmpty ? '$catLabel $city' : '${p.name} $city').trim();
+    final uri = Uri.parse(
+        'https://www.google.com/search?q=${Uri.encodeQueryComponent(q)}');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {/* no browser available — ignore */}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -737,19 +750,28 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         const SizedBox(height: 6),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final p in shown)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.12))),
-              child: Text(
-                '${p.name.isEmpty ? c.label : p.name} · ${_dist(p.km)}',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryDark),
+            GestureDetector(
+              onTap: () => _searchGoogle(p, c.label),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.12))),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(
+                    '${p.name.isEmpty ? c.label : p.name} · ${_dist(p.km)}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryDark),
+                  ),
+                  const SizedBox(width: 5),
+                  Icon(IconsaxPlusLinear.search_normal_1,
+                      size: 12, color: AppColors.primary),
+                ]),
               ),
             ),
           if (hidden > 0)
