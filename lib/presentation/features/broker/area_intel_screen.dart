@@ -1,10 +1,31 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/insights/area_intelligence.dart';
-import 'package:dating_app/core/insights/target_personas.dart';
+import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/broker/area_ranking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:provider/provider.dart';
+
+/// One autocomplete suggestion — resolved to REAL coordinates up front (CBS
+/// locality centroid or an actual listing), so the profile never depends on the
+/// flaky OS geocoder.
+class _PlaceSuggestion {
+  const _PlaceSuggestion(this.label, this.lat, this.lon, this.city);
+  final String label;
+  final double lat, lon;
+  final String city;
+}
+
+/// One category of concrete nearby places to render ("what's actually here").
+class _NearbyCategory {
+  const _NearbyCategory(this.emoji, this.label, this.places);
+  final String emoji, label;
+  final List<NearbyPlace> places;
+}
 
 /// "אינטליגנציית אזור" — enter an address, get every gov-data layer at that spot
 /// and see which target tenant/buyer persona it serves best (and why). The
@@ -16,46 +37,144 @@ class AreaIntelScreen extends StatefulWidget {
 }
 
 class _AreaIntelScreenState extends State<AreaIntelScreen> {
-  final _addr = TextEditingController();
   bool _loading = false;
   String? _error;
   AreaProfile? _profile;
   List<PersonaFit> _fits = const [];
+  List<_NearbyCategory> _nearby = const [];
   String _selectedPersona = 'young_couples';
 
-  Future<void> _analyze() async {
-    final q = _addr.text.trim();
-    if (q.isEmpty || _loading) return;
+  /// Autocomplete suggestions from OUR data: every CBS locality (reliable
+  /// centroid coords) + real listings from the loaded catalogue (street-level).
+  List<_PlaceSuggestion> _suggest(String raw) {
+    final q = raw.trim();
+    if (q.length < 2) return const [];
+    final out = <_PlaceSuggestion>[];
+    final seen = <String>{};
+    for (final l in GovData.instance.localities) {
+      if (l.lat.abs() < 0.1) continue;
+      if (l.name.contains(q) && seen.add(l.name)) {
+        out.add(_PlaceSuggestion(l.name, l.lat, l.lon, l.name));
+      }
+      if (out.length >= 6) break;
+    }
+    List<RentalProperty> props;
+    try {
+      props = context.read<DatingProvider>().allProperties;
+    } catch (_) {
+      props = const [];
+    }
+    for (final p in props) {
+      if (p.lat.abs() < 0.1) continue;
+      if (p.street.contains(q) ||
+          p.city.contains(q) ||
+          p.neighborhood.contains(q)) {
+        final label = p.street.isEmpty
+            ? p.city
+            : '${p.street} ${p.streetNumber}, ${p.city}';
+        if (seen.add(label)) {
+          out.add(_PlaceSuggestion(label, p.lat, p.lon, p.city));
+        }
+      }
+      if (out.length >= 12) break;
+    }
+    return out.take(10).toList();
+  }
+
+  Future<void> _analyze(_PlaceSuggestion? picked, String typed) async {
+    if (_loading) return;
+    final q = (picked?.label ?? typed).trim();
+    if (q.isEmpty) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final locs = await locationFromAddress(q);
-      if (locs.isEmpty) throw 'no-geo';
-      final loc = locs.first;
-      final profile = AreaIntelligence.profileAt(loc.latitude, loc.longitude);
+      double lat, lon;
+      String city;
+      if (picked != null) {
+        lat = picked.lat;
+        lon = picked.lon;
+        city = picked.city;
+      } else {
+        // Manual submit without picking: prefer a CBS locality named in the text
+        // (real coords), fall back to the OS geocoder only as a last resort.
+        final loc = GovData.instance.findLocalityInText(q);
+        if (loc != null) {
+          lat = loc.lat;
+          lon = loc.lon;
+          city = loc.name;
+        } else {
+          final geo = await locationFromAddress(q);
+          if (geo.isEmpty) throw 'no-geo';
+          lat = geo.first.latitude;
+          lon = geo.first.longitude;
+          city = GovData.instance.statAreaAt(lat, lon)?.city ?? '';
+        }
+      }
+      // The lifestyle POI layers (dining / gyms / pharmacies / culture / transit /
+      // playgrounds) are lazy-loaded — the tenant card loads them, but this screen
+      // may open first. All loaders are idempotent, so this is a one-time cost.
+      await Future.wait([
+        IsraelGeoIndex.loadLifestylePois(),
+        IsraelGeoIndex.loadParks(),
+        IsraelGeoIndex.loadSchools(),
+        IsraelGeoIndex.loadSupermarkets(),
+        IsraelGeoIndex.loadClinics(),
+      ]);
+      final profile = AreaIntelligence.profileAt(lat, lon, city: city);
       final fits = AreaIntelligence.suitablePersonas(profile.pfv);
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _fits = fits;
+        _nearby = _collectNearby(lat, lon);
         _selectedPersona = fits.first.persona.key;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'לא הצלחתי לאתר את הכתובת. נסה לכתוב עיר + רחוב.');
+      setState(() => _error = 'לא הצלחתי לאתר את הכתובת. נסה לבחור מההשלמה או לכתוב עיר + רחוב.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  @override
-  void dispose() {
-    _addr.dispose();
-    super.dispose();
+  /// Query every concrete POI layer at the point and keep the categories that
+  /// actually have places nearby — the real "what's around here", not just bars.
+  List<_NearbyCategory> _collectNearby(double lat, double lon) {
+    List<NearbyPlace> top(List<NearbyPlace> l) => l.take(4).toList();
+    final cats = <_NearbyCategory>[
+      _NearbyCategory('🚉', 'תחבורה ציבורית',
+          top(IsraelGeoIndex.transitStopsWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('🏫', 'בתי ספר',
+          top(IsraelGeoIndex.schoolsWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('🧸', 'גני ילדים',
+          top(IsraelGeoIndex.kindergartensWithin(lat, lon, km: 1.2))),
+      _NearbyCategory('🌳', 'פארקים וגינות',
+          top(IsraelGeoIndex.parksWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('☕', 'בתי קפה ומסעדות',
+          top(IsraelGeoIndex.diningWithin(lat, lon, km: 1.2))),
+      _NearbyCategory('🛒', 'סופרמרקטים',
+          top(IsraelGeoIndex.supermarketsWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('🏥', 'שירותי בריאות',
+          top(IsraelGeoIndex.clinicsWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('💊', 'בתי מרקחת',
+          top(IsraelGeoIndex.pharmaciesWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('🏋️', 'חדרי כושר',
+          top(IsraelGeoIndex.gymsWithin(lat, lon, km: 1.5))),
+      _NearbyCategory('🕍', 'בתי כנסת',
+          top(IsraelGeoIndex.synagoguesWithin(lat, lon, km: 1.2))),
+      _NearbyCategory('🎭', 'תרבות ופנאי',
+          top(IsraelGeoIndex.cultureWithin(lat, lon, km: 2))),
+      _NearbyCategory('🛝', 'גני משחקים',
+          top(IsraelGeoIndex.playgroundsWithin(lat, lon, km: 1.2))),
+    ];
+    return [for (final c in cats) if (c.places.isNotEmpty) c];
   }
+
+  static String _dist(double km) =>
+      km < 1 ? '${(km * 1000).round()} מ׳' : '${km.toStringAsFixed(1)} ק״מ';
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +245,12 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                 _sectionTitle('כל שכבות הנתונים במקום'),
                 const SizedBox(height: 10),
                 _layersCard(_profile!),
+                if (_nearby.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  _sectionTitle('מה יש בסביבה'),
+                  const SizedBox(height: 10),
+                  _nearbyCard(),
+                ],
               ],
             ],
           ),
@@ -158,47 +283,81 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         ]),
       );
 
-  Widget _addressRow() => Row(children: [
-        Expanded(
-          child: TextField(
-            controller: _addr,
-            textInputAction: TextInputAction.search,
-            onSubmitted: (_) => _analyze(),
-            decoration: InputDecoration(
-              hintText: 'כתובת: עיר + רחוב (למשל: תל אביב, דיזנגוף 100)',
-              filled: true,
-              fillColor: Colors.white,
-              prefixIcon: Icon(IconsaxPlusLinear.location, color: AppColors.primary),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.borderLight)),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.borderLight)),
+  Widget _addressRow() => Autocomplete<_PlaceSuggestion>(
+        displayStringForOption: (o) => o.label,
+        optionsBuilder: (v) => _suggest(v.text),
+        onSelected: (o) => _analyze(o, o.label),
+        optionsViewBuilder: (context, onSelected, options) => Align(
+          alignment: Alignment.topRight,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 260, maxWidth: 340),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: [
+                  for (final o in options)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(IconsaxPlusLinear.location,
+                          size: 18, color: AppColors.primary),
+                      title: Text(o.label,
+                          style: const TextStyle(
+                              fontSize: 13.5, fontWeight: FontWeight.w700)),
+                      onTap: () => onSelected(o),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        SizedBox(
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _loading ? null : _analyze,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+        fieldViewBuilder: (context, controller, focus, onSubmit) =>
+            Row(children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focus,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (t) => _analyze(null, t),
+              decoration: InputDecoration(
+                hintText: 'כתובת: עיר + רחוב (למשל: תל אביב, דיזנגוף 100)',
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon:
+                    Icon(IconsaxPlusLinear.location, color: AppColors.primary),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppColors.borderLight)),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppColors.borderLight)),
+              ),
             ),
-            child: _loading
-                ? const SizedBox(
-                    width: 20, height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : const Text('נתח',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
           ),
-        ),
-      ]);
+          const SizedBox(width: 10),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _loading ? null : () => _analyze(null, controller.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('נתח',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+            ),
+          ),
+        ]),
+      );
 
   Widget _personaPicker() => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -459,6 +618,47 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 10.5, color: AppColors.textSecondary)),
+        ]),
+      );
+
+  Widget _nearbyCard() => Container(
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(children: [
+          for (final c in _nearby) _nearbyCategory(c),
+        ]),
+      );
+
+  Widget _nearbyCategory(_NearbyCategory c) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${c.emoji}  ${c.label}',
+              style: const TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final p in c.places)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.12))),
+                child: Text(
+                  '${p.name.isEmpty ? c.label : p.name} · ${_dist(p.km)}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryDark),
+                ),
+              ),
+          ]),
         ]),
       );
 
