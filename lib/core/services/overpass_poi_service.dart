@@ -40,7 +40,9 @@ class OverpassPoiService {
         'nwr(around:$r,$lat,$lon)[tourism~"^(museum|gallery)\$"];'
         'nwr(around:$r,$lat,$lon)[railway~"^(station|tram_stop)\$"];'
         'nwr(around:$r,$lat,$lon)[public_transport=station];'
-        ');out center tags 1500;';
+        // High cap so even the densest city centre (≈1.3k POIs within 2 km at
+        // Dizengoff) is never truncated — "don't miss even one".
+        ');out center tags 3000;';
 
     for (final ep in _endpoints) {
       try {
