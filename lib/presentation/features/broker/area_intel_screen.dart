@@ -3,6 +3,7 @@ import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/insights/area_intelligence.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/services/govmap_geocoder.dart';
+import 'package:dating_app/core/services/overpass_poi_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/broker/area_ranking_screen.dart';
@@ -23,8 +24,8 @@ class _PlaceSuggestion {
 
 /// One category of concrete nearby places to render ("what's actually here").
 class _NearbyCategory {
-  const _NearbyCategory(this.emoji, this.label, this.places);
-  final String emoji, label;
+  const _NearbyCategory(this.key, this.emoji, this.label, this.places);
+  final String key, emoji, label;
   final List<NearbyPlace> places;
 }
 
@@ -43,6 +44,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   AreaProfile? _profile;
   List<PersonaFit> _fits = const [];
   List<_NearbyCategory> _nearby = const [];
+  final Set<String> _expandedCats = {};
   String _selectedPersona = 'young_couples';
 
   String _acToken = '';
@@ -163,11 +165,13 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
       ]);
       final profile = AreaIntelligence.profileAt(lat, lon, city: city);
       final fits = AreaIntelligence.suitablePersonas(profile.pfv);
+      final nearby = await _collectNearby(lat, lon);
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _fits = fits;
-        _nearby = _collectNearby(lat, lon);
+        _nearby = nearby;
+        _expandedCats.clear();
         _selectedPersona = fits.first.persona.key;
       });
     } catch (_) {
@@ -178,37 +182,66 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
     }
   }
 
-  /// Query every concrete POI layer at the point and keep the categories that
-  /// actually have places nearby — the real "what's around here", not just bars.
-  List<_NearbyCategory> _collectNearby(double lat, double lon) {
-    List<NearbyPlace> top(List<NearbyPlace> l) => l.take(4).toList();
-    final cats = <_NearbyCategory>[
-      _NearbyCategory('🚉', 'תחבורה ציבורית',
-          top(IsraelGeoIndex.transitStopsWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('🏫', 'בתי ספר',
-          top(IsraelGeoIndex.schoolsWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('🧸', 'גני ילדים',
-          top(IsraelGeoIndex.kindergartensWithin(lat, lon, km: 1.2))),
-      _NearbyCategory('🌳', 'פארקים וגינות',
-          top(IsraelGeoIndex.parksWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('☕', 'בתי קפה ומסעדות',
-          top(IsraelGeoIndex.diningWithin(lat, lon, km: 1.2))),
-      _NearbyCategory('🛒', 'סופרמרקטים',
-          top(IsraelGeoIndex.supermarketsWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('🏥', 'שירותי בריאות',
-          top(IsraelGeoIndex.clinicsWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('💊', 'בתי מרקחת',
-          top(IsraelGeoIndex.pharmaciesWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('🏋️', 'חדרי כושר',
-          top(IsraelGeoIndex.gymsWithin(lat, lon, km: 1.5))),
-      _NearbyCategory('🕍', 'בתי כנסת',
-          top(IsraelGeoIndex.synagoguesWithin(lat, lon, km: 1.2))),
-      _NearbyCategory('🎭', 'תרבות ופנאי',
-          top(IsraelGeoIndex.cultureWithin(lat, lon, km: 2))),
-      _NearbyCategory('🛝', 'גני משחקים',
-          top(IsraelGeoIndex.playgroundsWithin(lat, lon, km: 1.2))),
+  /// EVERYTHING within [_radiusKm] of the point, by category. Merges the LIVE
+  /// OpenStreetMap/Overpass POIs (comprehensive — the bundled files miss many
+  /// cafés/gyms/parks) with our bundled gov layers, deduped, so nothing in the
+  /// radius is left out. Async because Overpass is a live query.
+  static const double _radiusKm = 2.0;
+
+  Future<List<_NearbyCategory>> _collectNearby(double lat, double lon) async {
+    final ov = await OverpassPoiService.instance
+        .nearby(lat, lon, radiusM: (_radiusKm * 1000).round());
+
+    List<NearbyPlace> merge(String key, List<NearbyPlace> bundled) {
+      final all = <NearbyPlace>[...bundled, ...(ov[key] ?? const [])];
+      final seen = <String>{};
+      final dedup = <NearbyPlace>[];
+      for (final p in all) {
+        if (p.km > _radiusKm) continue;
+        final id = p.name.isEmpty
+            ? '${p.lat.toStringAsFixed(4)},${p.lon.toStringAsFixed(4)}'
+            : p.name.replaceAll(RegExp(r'\s+'), '');
+        if (seen.add('$key|$id')) dedup.add(p);
+      }
+      dedup.sort((a, b) => a.km.compareTo(b.km));
+      return dedup;
+    }
+
+    final defs = <List<Object>>[
+      ['transit', '🚉', 'תחבורה ציבורית',
+          IsraelGeoIndex.transitStopsWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['schools', '🏫', 'בתי ספר',
+          IsraelGeoIndex.schoolsWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['kindergartens', '🧸', 'גני ילדים',
+          IsraelGeoIndex.kindergartensWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['parks', '🌳', 'פארקים וגינות',
+          IsraelGeoIndex.parksWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['dining', '☕', 'בתי קפה ומסעדות',
+          IsraelGeoIndex.diningWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['supermarkets', '🛒', 'סופרמרקטים וקניות',
+          IsraelGeoIndex.supermarketsWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['health', '🏥', 'שירותי בריאות',
+          IsraelGeoIndex.clinicsWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['pharmacies', '💊', 'בתי מרקחת',
+          IsraelGeoIndex.pharmaciesWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['gyms', '🏋️', 'חדרי כושר וספורט',
+          IsraelGeoIndex.gymsWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['worship', '🕍', 'בתי כנסת ותפילה',
+          IsraelGeoIndex.synagoguesWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['culture', '🎭', 'תרבות ופנאי',
+          IsraelGeoIndex.cultureWithin(lat, lon, km: _radiusKm, cap: 120)],
+      ['playgrounds', '🛝', 'גני משחקים',
+          IsraelGeoIndex.playgroundsWithin(lat, lon, km: _radiusKm, cap: 120)],
     ];
-    return [for (final c in cats) if (c.places.isNotEmpty) c];
+    final cats = <_NearbyCategory>[];
+    for (final d in defs) {
+      final places = merge(d[0] as String, d[3] as List<NearbyPlace>);
+      if (places.isNotEmpty) {
+        cats.add(_NearbyCategory(
+            d[0] as String, d[1] as String, d[2] as String, places));
+      }
+    }
+    return cats;
   }
 
   static String _dist(double km) =>
@@ -567,7 +600,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
       child: Column(children: [
         if (p.sesCluster > 0)
           _clusterRow('אשכול סוציו-אקונומי (בלוק)', p.sesCluster),
-        _bar('בטיחות', p.safety),
+        _bar('בטיחות (ברמת העיר)', p.safety),
         _bar('מרכזיות', p.centrality),
         _bar('תחבורה ציבורית', p.transit),
         _bar('מוסדות חינוך', p.schools),
@@ -671,34 +704,90 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         ]),
       );
 
-  Widget _nearbyCategory(_NearbyCategory c) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${c.emoji}  ${c.label}',
-              style: const TextStyle(
-                  fontSize: 13.5, fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary)),
-          const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final p in c.places)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.12))),
-                child: Text(
-                  '${p.name.isEmpty ? c.label : p.name} · ${_dist(p.km)}',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryDark),
-                ),
-              ),
-          ]),
+  static const int _collapsedCount = 12;
+
+  Widget _nearbyCategory(_NearbyCategory c) {
+    final expanded = _expandedCats.contains(c.key);
+    final shown =
+        expanded ? c.places : c.places.take(_collapsedCount).toList();
+    final hidden = c.places.length - shown.length;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: Text('${c.emoji}  ${c.label}',
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary)),
+          ),
+          // The count makes completeness visible — "everything within 2 km".
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(999)),
+            child: Text('${c.places.length}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryDark)),
+          ),
         ]),
-      );
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final p in shown)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.12))),
+              child: Text(
+                '${p.name.isEmpty ? c.label : p.name} · ${_dist(p.km)}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryDark),
+              ),
+            ),
+          if (hidden > 0)
+            GestureDetector(
+              onTap: () => setState(() => _expandedCats.add(c.key)),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text('+ $hidden נוספים · הצג הכל',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+              ),
+            ),
+          if (expanded && c.places.length > _collapsedCount)
+            GestureDetector(
+              onTap: () => setState(() => _expandedCats.remove(c.key)),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.borderLight)),
+                child: Text('הצג פחות',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary)),
+              ),
+            ),
+        ]),
+      ]),
+    );
+  }
 
   Widget _sectionTitle(String t) => Text(t,
       style: const TextStyle(
