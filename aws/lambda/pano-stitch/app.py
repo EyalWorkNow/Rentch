@@ -478,6 +478,27 @@ def _openai_edit(face_bgr, hole_mask, region):
         return None
 
 
+def _handle_resize2to1(event):
+    """op=resize2to1: download an image and re-upload it stretched to a true 2:1
+    equirectangular (width = 2×height), so a 3:2 gpt-image-2 output loads correctly
+    in a 360 viewer. In place (same key). Best-effort."""
+    bucket = event["bucket"]
+    key = event["key"]
+    s3 = _s3()
+    try:
+        img = _download(s3, bucket, key)
+        h = img.shape[0]
+        out = cv2.resize(img, (h * 2, h), interpolation=cv2.INTER_CUBIC)
+        ok, buf = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        if not ok:
+            raise RuntimeError("encode failed")
+        s3.put_object(Bucket=bucket, Key=key, Body=buf.tobytes(),
+                      ContentType="image/jpeg", CacheControl="public, max-age=31536000")
+        return {"status": "ok", "size": [h * 2, h]}
+    except Exception as e:  # noqa: BLE001
+        return {"status": "failed", "error": str(e)}
+
+
 def _handle_enhance(event):
     """op=enhance: download an existing equirect, generatively fill the missing
     ceiling/floor + close the 360 wrap, upload the result. Self-invoked async by
@@ -1027,6 +1048,9 @@ def handler(event, _context):
     # EXISTING equirect. Async (self-invoked by the router, like the AI-360 job).
     if event.get("op") == "enhance":
         return _handle_enhance(event)
+    # Stretch an image to a 2:1 equirectangular in place (gpt-image-2 outputs 3:2).
+    if event.get("op") == "resize2to1":
+        return _handle_resize2to1(event)
     # Arranged capture: N user-placed native panoramas composited by KNOWN
     # position (startDeg/widthDeg/row) — deterministic, no feature matching.
     if event.get("captureMode") == "arranged":

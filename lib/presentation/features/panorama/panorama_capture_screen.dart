@@ -287,7 +287,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (picks.isEmpty || !mounted) return;
     final imgs = picks.take(6).toList(); // gpt-image-2 path takes up to 6 images
     if (mounted && picks.length < 3) {
-      _toast('טיפ: צלמו כל קיר בחדר (3–6 תמונות) — ככה ה-AI ממציא פחות ומדייק יותר.');
+      _toast('טיפ: בחרו 2–3 פנורמות של אותו החדר (או תמונות של כל קיר) — ה-AI מרכיב מהן 360° מדויק.');
     }
     final label = await _askLabel('נקודה ${_nodes.length + 1}');
     if (label == null || !mounted) return;
@@ -1174,7 +1174,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                   ),
                   onPressed: () => Navigator.of(context).pop(_CaptureChoice.ai),
                   icon: const Text('✨', style: TextStyle(fontSize: 18)),
-                  label: const Text('צור 360° עם AI (מכמה תמונות)',
+                  label: const Text('צור 360° מפנורמות/תמונות (AI)',
                       style:
                           TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 ),

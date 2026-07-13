@@ -2850,10 +2850,10 @@ function validatePoses(raw, frameCount) {
 // show and never invent furniture/rooms, because that is the landlord's main
 // complaint. Feeding MORE photos (up to 6) shrinks the unseen area it has to fill.
 const AI_PANO_PROMPT = [
-  'You are given SEVERAL photos of ONE single real room, shot from the same spot',
-  'facing different directions. Merge them into ONE photorealistic 360°×180°',
-  'EQUIRECTANGULAR panorama of THIS EXACT room, for a spherical/VR 360 viewer',
-  'where the user rotates a full circle and looks up and down.',
+  'You are given one or more images — photos or WIDE PANORAMAS — of the SAME real',
+  'room/apartment. Combine them into ONE photorealistic 360°×180° EQUIRECTANGULAR',
+  'panorama of THIS EXACT space, ready to load into a spherical/VR 360 viewer where',
+  'the user rotates a full circle and looks up and down.',
   '',
   'FAITHFULNESS — THIS IS THE MOST IMPORTANT RULE:',
   '• Reproduce ONLY what is actually visible in the photos. Keep the EXACT same',
@@ -2957,6 +2957,21 @@ async function runAiGenerate(jobId) {
       Bucket: S3_BUCKET, Key: meta.resultKey, Body: out,
       ContentType: 'image/png', CacheControl: 'public, max-age=31536000',
     }));
+    // gpt-image-2 outputs 3:2, but a 360 viewer expects a 2:1 equirectangular.
+    // The model already maps content equirectangularly, so pano-stitch just
+    // stretches it to 2:1 in place (OpenCV). Best-effort — the 3:2 still loads if
+    // the stitcher is unavailable.
+    if (PANO_STITCH_FN) {
+      try {
+        await lambda.send(new InvokeCommand({
+          FunctionName: PANO_STITCH_FN,
+          InvocationType: 'RequestResponse',
+          Payload: Buffer.from(JSON.stringify({
+            op: 'resize2to1', bucket: S3_BUCKET, key: meta.resultKey,
+          })),
+        }));
+      } catch (e) { console.error('resize2to1 skipped:', e); }
+    }
     const imageUrl =
       `https://${S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${meta.resultKey}`;
     await putPanoMeta(jobId, {
