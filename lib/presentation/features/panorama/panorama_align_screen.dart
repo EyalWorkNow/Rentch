@@ -56,6 +56,12 @@ class _PanoBand {
 
   _PanoRow row = _PanoRow.horizontal;
 
+  /// Fraction of the SOURCE image trimmed off each side (0..0.9), so overlapping
+  /// or bad edges are removed and adjacent panos meet cleanly. Applied server-side
+  /// before placement.
+  double cropLeft = 0.0;
+  double cropRight = 0.0;
+
   double get endDeg => startDeg + widthDeg; // may exceed 360 (wraps visually)
 }
 
@@ -102,6 +108,26 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
 
   void _setRow(int i, _PanoRow row) {
     setState(() => _bands[i].row = row);
+  }
+
+  // Open the crop editor for a pano — trim its left/right edges so overlapping or
+  // bad edges are removed and it meets the neighbouring pano cleanly.
+  Future<void> _openCrop(int i) async {
+    if (i < 0 || i >= _bands.length) return;
+    final b = _bands[i];
+    final res = await showModalBottomSheet<(double, double)>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          _CropEditor(path: b.path, cropLeft: b.cropLeft, cropRight: b.cropRight),
+    );
+    if (res != null && mounted) {
+      setState(() {
+        _bands[i].cropLeft = res.$1;
+        _bands[i].cropRight = res.$2;
+      });
+    }
   }
 
   void _reorder(int oldIndex, int newIndex) {
@@ -160,6 +186,10 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
               'startDeg': double.parse(b.startDeg.toStringAsFixed(1)),
               'widthDeg': double.parse(b.widthDeg.toStringAsFixed(1)),
               'row': b.row.wire,
+              if (b.cropLeft > 0.001)
+                'cropLeft': double.parse(b.cropLeft.toStringAsFixed(3)),
+              if (b.cropRight > 0.001)
+                'cropRight': double.parse(b.cropRight.toStringAsFixed(3)),
             })
         .toList();
 
@@ -290,6 +320,7 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
                                 band: _bands[i],
                                 onRow: (r) => _setRow(i, r),
                                 onRemove: () => _removeBand(i),
+                                onCrop: () => _openCrop(i),
                               ),
                             ),
                           ],
@@ -647,12 +678,14 @@ class _BandTile extends StatelessWidget {
     required this.band,
     required this.onRow,
     required this.onRemove,
+    required this.onCrop,
   });
 
   final int index;
   final _PanoBand band;
   final void Function(_PanoRow) onRow;
   final VoidCallback onRemove;
+  final VoidCallback onCrop;
 
   @override
   Widget build(BuildContext context) {
@@ -695,8 +728,23 @@ class _BandTile extends StatelessWidget {
                         '${band.startDeg.round()}° → ${(band.startDeg + band.widthDeg).round() % 360}° · רוחב ${band.widthDeg.round()}°',
                         style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 12)),
+                    if (band.cropLeft > 0.001 || band.cropRight > 0.001) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                          '✂ נחתך ${(band.cropLeft * 100).round()}% משמאל · ${(band.cropRight * 100).round()}% מימין',
+                          style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700)),
+                    ],
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(IconsaxPlusLinear.crop,
+                    color: AppColors.primary, size: 22),
+                onPressed: onCrop,
+                tooltip: 'חתוך התאמה',
               ),
               IconButton(
                 icon: const Icon(IconsaxPlusLinear.trash,
@@ -838,4 +886,140 @@ class _StitchOverlay extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Crop editor ────────────────────────────────────────────────────────────────
+// Trim the left/right edges of a source pano so overlap or a bad edge is removed
+// and it meets the neighbouring pano cleanly. Returns (cropLeft, cropRight).
+class _CropEditor extends StatefulWidget {
+  const _CropEditor(
+      {required this.path, required this.cropLeft, required this.cropRight});
+  final String path;
+  final double cropLeft, cropRight;
+
+  @override
+  State<_CropEditor> createState() => _CropEditorState();
+}
+
+class _CropEditorState extends State<_CropEditor> {
+  late double _l = widget.cropLeft.clamp(0.0, 0.8).toDouble(); // left crop frac
+  late double _r =
+      (1 - widget.cropRight).clamp(0.2, 1.0).toDouble(); // right edge (kept=[_l,_r])
+  static const double _minKeep = 0.15;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 14),
+          const Text('חתכו את הקצוות כדי שיתאים לפנורמה הסמוכה',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.navy)),
+          const SizedBox(height: 4),
+          const Text('גררו את הידיות פנימה כדי להסיר חפיפה או קצה לא טוב.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          const SizedBox(height: 16),
+          LayoutBuilder(builder: (context, c) {
+            final w = c.maxWidth;
+            const h = 200.0;
+            const hw = 30.0;
+            return SizedBox(
+              width: w,
+              height: h,
+              child: Stack(children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                      width: w,
+                      height: h,
+                      child: Image.file(File(widget.path), fit: BoxFit.cover)),
+                ),
+                Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: _l * w,
+                    child: Container(color: Colors.black.withValues(alpha: 0.6))),
+                Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: (1 - _r) * w,
+                    child: Container(color: Colors.black.withValues(alpha: 0.6))),
+                _handle(_l * w - hw / 2, hw, (dx) => setState(() {
+                      _l = (_l + dx / w).clamp(0.0, _r - _minKeep).toDouble();
+                    })),
+                _handle(_r * w - hw / 2, hw, (dx) => setState(() {
+                      _r = (_r + dx / w).clamp(_l + _minKeep, 1.0).toDouble();
+                    })),
+              ]),
+            );
+          }),
+          const SizedBox(height: 16),
+          Row(children: [
+            TextButton.icon(
+              onPressed: () => setState(() {
+                _l = 0;
+                _r = 1;
+              }),
+              icon: Icon(IconsaxPlusLinear.refresh_2,
+                  size: 18, color: AppColors.textSecondary),
+              label: const Text('איפוס',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            const Spacer(),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12)),
+              onPressed: () => Navigator.of(context).pop((_l, 1 - _r)),
+              child: const Text('החל חיתוך',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _handle(double left, double width, void Function(double dx) onDrag) =>
+      Positioned(
+        left: left,
+        top: 0,
+        bottom: 0,
+        width: width,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
+          child: Center(
+            child: Container(
+              width: 6,
+              height: double.infinity,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(3),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black38, blurRadius: 4)
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }

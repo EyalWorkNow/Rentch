@@ -927,6 +927,17 @@ def _handle_arranged_stitch(event):
             except Exception:  # noqa: BLE001 — dropped upload; skip this pano
                 continue
 
+            # Horizontal crop: trim overlapping/bad edges off the SOURCE image so
+            # adjacent panos meet cleanly (fractions from the align UI).
+            cl = max(0.0, min(0.9, float(p.get("cropLeft", 0.0))))
+            cr = max(0.0, min(0.9, float(p.get("cropRight", 0.0))))
+            if cl > 0.0 or cr > 0.0:
+                iw = img.shape[1]
+                x0 = int(cl * iw)
+                x1 = int((1.0 - cr) * iw)
+                if x1 - x0 >= 8:
+                    img = img[:, x0:x1]
+
             start = float(p.get("startDeg", 0.0)) % 360.0
             width = max(0.0, min(360.0, float(p.get("widthDeg", 0.0))))
             if width <= 0:
