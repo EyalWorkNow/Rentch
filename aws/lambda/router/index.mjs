@@ -1069,6 +1069,10 @@ export const handler = async (event) => {
       if (method === 'POST' && jobId && segments[2] === 'ai-generate') {
         return await aiGeneratePanorama(jobId, event);
       }
+      // POST /panorama/:id/enhance → async pole-fill + 360-wrap on an existing pano
+      if (method === 'POST' && jobId && segments[2] === 'enhance') {
+        return await enhancePanorama(jobId, event);
+      }
       // GET /panorama/:id → poll status → imageUrl + haov/vaov
       if (method === 'GET' && jobId) return await getPanorama(jobId);
       return json(404, { message: 'Unknown panorama route' });
@@ -2653,6 +2657,26 @@ async function createPanorama(event) {
     return json(200, { data: { jobId, uploadUrls } });
   }
 
+  // ── Enhance mode (AI pole-fill + 360 wrap on an EXISTING pano) ─────────────
+  // The client uploads the pano to improve to the single presigned URL, then
+  // POSTs /panorama/:id/enhance. gpt-image-2 fills the missing ceiling/floor and
+  // closes the 360 wrap on the undistorted cube faces (pano-stitch enhance op).
+  if (body.captureMode === 'enhance') {
+    const srcKey = `panoramas/jobs/${jobId}/src.jpg`;
+    const uploadUrl = await getSignedUrl(
+      s3,
+      new PutObjectCommand({ Bucket: S3_BUCKET, Key: srcKey, ContentType: 'image/jpeg' }),
+      { expiresIn: 21600 },
+    );
+    const resultKey = `panoramas/results/${jobId}.jpg`;
+    await putPanoMeta(jobId, {
+      jobId, propertyId, srcKey, resultKey, captureMode: 'enhance',
+      wrap: body.wrap !== false, poles: body.poles !== false,
+      status: 'pending', createdAt: ts,
+    });
+    return json(200, { data: { jobId, uploadUrls: [uploadUrl] } });
+  }
+
   // ── Photo capture mode (unchanged) ────────────────────────────────────────
   // Allocate exactly as many frame slots as the client will upload (cv2 needs ≥2).
   // Must NOT clamp up — extra unfilled slots become missing keys the stitcher 404s on.
@@ -2933,6 +2957,37 @@ async function runAiGenerate(jobId) {
     });
   }
   return json(200, { ok: true });
+}
+
+// POST /panorama/:id/enhance → async pole-fill + 360-wrap on the uploaded pano.
+// Runs in PANO_STITCH_FN (OpenCV + the enhance pipeline); client polls GET.
+async function enhancePanorama(jobId, event) {
+  if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  const meta = await getPanoMeta(jobId);
+  if (!meta) return json(404, { message: 'Panorama job not found' });
+  if (meta.status === 'ready' || meta.status === 'failed') {
+    return json(200, { data: panoData(meta) });
+  }
+  if (!PANO_STITCH_FN) {
+    const failed = { ...meta, status: 'failed', error: 'Enhancer not configured (no PANO_STITCH_FN).' };
+    await putPanoMeta(jobId, failed);
+    return json(200, { data: panoData(failed) });
+  }
+  await putPanoMeta(jobId, { ...meta, status: 'processing', processedAt: Date.now() });
+  await lambda.send(new InvokeCommand({
+    FunctionName: PANO_STITCH_FN,
+    InvocationType: 'Event',
+    Payload: Buffer.from(JSON.stringify({
+      op: 'enhance',
+      bucket: S3_BUCKET,
+      metaKey: `panoramas/meta/${jobId}.json`,
+      srcKey: meta.srcKey,
+      resultKey: meta.resultKey,
+      wrap: meta.wrap !== false,
+      poles: meta.poles !== false,
+    })),
+  }));
+  return json(200, { data: { jobId, status: 'processing' } });
 }
 
 async function getPanorama(jobId) {

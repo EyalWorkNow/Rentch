@@ -416,6 +416,114 @@ def _handle_pole_fill(event):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# AI enhance: generative ceiling/floor fill + 360 wrap completion
+# ─────────────────────────────────────────────────────────────────────────────
+# Strict guardrail prompts. The MASK physically limits the model to the empty
+# region (walls/existing pixels are untouched); these words keep the FILL itself
+# a plain continuation rather than an invented object.
+_ENHANCE_PROMPTS = {
+    "D": ("This is the FLOOR of a room seen straight down (down face of a 360 panorama). "
+          "Fill ONLY the transparent area by seamlessly CONTINUING the surrounding real floor: "
+          "same material, color, plank/tile pattern and direction, and lighting. Reproduce ONLY "
+          "plain continuous flooring. Do NOT add or invent any object, furniture, rug, carpet, "
+          "cable, drain, pattern or fixture that is not already there."),
+    "U": ("This is the CEILING of a room seen straight up (up face of a 360 panorama). Fill ONLY "
+          "the transparent area by seamlessly CONTINUING the surrounding real ceiling: same color, "
+          "texture and lighting. Reproduce ONLY a plain continuous ceiling. Do NOT add or invent "
+          "any lamp, light, vent, beam, molding or object that is not already there."),
+    "W": ("This is a 360 degree indoor room panorama with a MISSING vertical wedge (the transparent "
+          "band). Fill ONLY the transparent band by seamlessly CONTINUING the SAME room across the "
+          "gap: walls, floor line, ceiling line and horizon must connect continuously from the left "
+          "side to the right side with matching colors, materials, brightness and perspective. The "
+          "left and right edges of your fill must match the existing pixels EXACTLY so there is no "
+          "seam. Reproduce ONLY a plausible continuation of THIS room. Do NOT invent or add new "
+          "furniture, doors, windows, outlets, switches, people or objects."),
+}
+
+
+def _openai_edit(face_bgr, hole_mask, region):
+    """edit_fn for enhance.py: gpt-image-2 masked inpaint. Returns None on any
+    failure so the pipeline degrades gracefully (leaves that region as-is)."""
+    import base64
+    import requests
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        print("enhance: OPENAI_API_KEY not set")
+        return None
+    h, w = face_bgr.shape[:2]
+    m = np.zeros((h, w, 4), np.uint8)
+    m[..., :3] = 255
+    m[..., 3] = np.where(hole_mask > 0, 0, 255).astype(np.uint8)  # hole -> transparent
+
+    def pb(x):
+        return cv2.imencode(".png", x)[1].tobytes()
+
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/images/edits",
+            headers={"Authorization": f"Bearer {key}"},
+            files={"image": ("f.png", pb(face_bgr), "image/png"),
+                   "mask": ("m.png", pb(m), "image/png")},
+            data={"model": "gpt-image-2", "prompt": _ENHANCE_PROMPTS[region],
+                  "size": f"{w}x{h}", "n": "1"},
+            timeout=180)
+        if not r.ok:
+            print(f"enhance edit {region} HTTP {r.status_code}: {r.text[:200]}")
+            return None
+        b64 = r.json()["data"][0]["b64_json"]
+        arr = cv2.imdecode(np.frombuffer(base64.b64decode(b64), np.uint8), cv2.IMREAD_COLOR)
+        return cv2.resize(arr, (w, h)) if arr.shape[:2] != (h, w) else arr
+    except Exception as e:  # noqa: BLE001
+        print(f"enhance edit {region} error: {e}")
+        return None
+
+
+def _handle_enhance(event):
+    """op=enhance: download an existing equirect, generatively fill the missing
+    ceiling/floor + close the 360 wrap, upload the result. Self-invoked async by
+    the router; writes status to metaKey so the client can poll."""
+    import enhance as E
+    bucket = event["bucket"]
+    region = os.environ.get("AWS_REGION", "eu-central-1")
+    meta_key = event.get("metaKey")
+    s3 = _s3()
+
+    def _base_meta():
+        # Preserve jobId/propertyId/etc so the client's poll (panoData) stays valid.
+        if not meta_key:
+            return {}
+        try:
+            return json.loads(s3.get_object(Bucket=bucket, Key=meta_key)["Body"].read())
+        except Exception:  # noqa: BLE001
+            return {}
+
+    try:
+        equi = _download(s3, bucket, event["srcKey"])
+        if equi.shape[1] > 4096:  # cap working resolution
+            equi = cv2.resize(equi, (4096, 2048), interpolation=cv2.INTER_AREA)
+        out = E.enhance(equi, _openai_edit,
+                        do_wrap=bool(event.get("wrap", True)),
+                        do_poles=bool(event.get("poles", True)))
+        ok, buf = cv2.imencode(".jpg", out, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        if not ok:
+            raise RuntimeError("encode failed")
+        result_key = event["resultKey"]
+        s3.put_object(Bucket=bucket, Key=result_key, Body=buf.tobytes(),
+                      ContentType="image/jpeg", CacheControl="public, max-age=31536000")
+        url = f"https://{bucket}.s3.{region}.amazonaws.com/{result_key}"
+        if meta_key:
+            _put_meta(s3, bucket, meta_key,
+                      {**_base_meta(), "status": "ready", "imageUrl": url,
+                       "haov": 360, "vaov": 180, "enhanced": True})
+        return {"status": "ready", "imageUrl": url}
+    except Exception as e:  # noqa: BLE001
+        if meta_key:
+            _put_meta(s3, bucket, meta_key,
+                      {**_base_meta(), "status": "failed", "error": str(e)[:300]})
+        return {"status": "failed", "error": str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Video frame source
 # ─────────────────────────────────────────────────────────────────────────────
 #
@@ -904,6 +1012,10 @@ def handler(event, _context):
     # Synchronous pole-fill op (router RequestResponse); default = async stitch job.
     if event.get("op") == "poleFill":
         return _handle_pole_fill(event)
+    # AI enhance: generative ceiling/floor fill + 360 wrap completion on an
+    # EXISTING equirect. Async (self-invoked by the router, like the AI-360 job).
+    if event.get("op") == "enhance":
+        return _handle_enhance(event)
     # Arranged capture: N user-placed native panoramas composited by KNOWN
     # position (startDeg/widthDeg/row) — deterministic, no feature matching.
     if event.get("captureMode") == "arranged":
