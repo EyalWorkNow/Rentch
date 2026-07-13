@@ -559,6 +559,64 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     setState(() => _nodes[i] = _nodes[i].copyWith(label: name));
   }
 
+  // Complete a captured/imported panorama into a FULL 360: the server fills the
+  // missing ceiling & floor and closes the 360 wrap (cube-face inpaint, strict
+  // "continue the surface, invent nothing"), then we swap in the enhanced image.
+  Future<void> _enhanceNode(int i) async {
+    if (_busy || i < 0 || i >= _nodes.length) return;
+    final node = _nodes[i];
+    if (node.isLocal) {
+      _toast('צריך חיבור לאינטרנט — הפנורמה עדיין לא הועלתה.');
+      return;
+    }
+    final msg = ValueNotifier<String>('מתחילים…');
+    _showAiProgress(msg);
+    var open = true;
+    void close() {
+      if (open && mounted) {
+        open = false;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
+    try {
+      final jobId = await AwsApiClient.instance.createEnhancePanoramaJob(
+        propertyId: 'draft_${DateTime.now().millisecondsSinceEpoch}',
+        srcUrl: node.imageUrl,
+      );
+      if (jobId == null) {
+        close();
+        _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
+        return;
+      }
+      msg.value = 'ה-AI משלים תקרה, רצפה וסוגר 360°… (1–2 דקות)';
+      await AwsApiClient.instance.startEnhancePanorama(jobId);
+      for (var t = 0; t < 150; t++) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final s = await AwsApiClient.instance.getPanorama(jobId);
+        if (s == null) continue;
+        if (s.status == 'ready' && s.imageUrl.isNotEmpty) {
+          close();
+          if (!mounted) return;
+          setState(() => _nodes[i] =
+              node.copyWith(imageUrl: s.imageUrl, haov: 360, vaov: 180));
+          _toast('הפנורמה הושלמה ל-360° מלא ✨');
+          return;
+        }
+        if (s.status == 'failed') {
+          close();
+          _toast('ההשלמה נכשלה. נסו שוב.');
+          return;
+        }
+      }
+      close();
+      _toast('ההשלמה לוקחת יותר מדי זמן. נסו שוב מאוחר יותר.');
+    } catch (e) {
+      close();
+      _toast('שגיאה בהשלמה. נסו שוב.');
+    }
+  }
+
   // Quick look at a single point (no links) so the landlord can verify the 360.
   void _previewNode(PanoramaNode node) {
     PanoramaPsvTourView.open(
@@ -721,6 +779,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                       onDelete: () => setState(() => _nodes.removeAt(i)),
                       onRename: () => _renameNode(i),
                       onPreview: () => _previewNode(_nodes[i]),
+                      onEnhance: () => _enhanceNode(i),
                     ),
                   ),
           ),
@@ -799,11 +858,12 @@ class _Instructions extends StatelessWidget {
                     color: AppColors.navy, fontSize: 15, height: 1.5),
                 children: [
                   TextSpan(
-                      text: 'בכל חדר מוסיפים נקודה אחת.\n',
+                      text: 'בכל חדר מוסיפים נקודה אחת — והן מתחברות לסיור אחד.\n',
                       style: TextStyle(fontWeight: FontWeight.w900)),
                   TextSpan(
                       text:
-                          'הקישו «הוסף פנורמה» למטה — נסביר לכם בדיוק מה לעשות, צעד אחר צעד.'),
+                          'הקישו «הוסף פנורמה» למטה. פנורמה חלקית? הקישו ✨ ליד הנקודה '
+                          'וה-AI ישלים אותה ל-360° מלא (תקרה, רצפה וסגירה).'),
                 ],
               ),
             ),
@@ -822,12 +882,18 @@ class _NodeTile extends StatelessWidget {
     required this.onDelete,
     required this.onRename,
     required this.onPreview,
+    required this.onEnhance,
   });
   final int index;
   final PanoramaNode node;
   final VoidCallback onDelete;
   final VoidCallback onRename;
   final VoidCallback onPreview;
+  final VoidCallback onEnhance;
+
+  // A full sphere = 360×180. Anything narrower is a partial pano that can be
+  // completed (poles + wrap) into a full 360.
+  bool get _isFull => node.haov >= 359 && node.vaov >= 179;
 
   @override
   Widget build(BuildContext context) {
@@ -872,22 +938,44 @@ class _NodeTile extends StatelessWidget {
         ),
         title: Text(node.label.isNotEmpty ? node.label : 'נקודה ${index + 1}',
             style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text('נקודה ${index + 1} · גרור לסידור',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        subtitle: Row(children: [
+          Icon(_isFull ? IconsaxPlusBold.tick_circle : IconsaxPlusBold.magic_star,
+              size: 13,
+              color: _isFull ? AppColors.success : AppColors.primary),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(_isFull ? '360° מלא · גרור לסידור' : 'חלקי · אפשר להשלים ל-360°',
+                style: TextStyle(
+                    color: _isFull ? AppColors.textSecondary : AppColors.primaryDark,
+                    fontSize: 12,
+                    fontWeight: _isFull ? FontWeight.w500 : FontWeight.w700)),
+          ),
+        ]),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Complete a partial pano to a full 360 (poles + wrap) — the headline
+            // "connect into a full 360" action.
+            if (!_isFull)
+              IconButton(
+                icon: const Text('✨', style: TextStyle(fontSize: 17)),
+                onPressed: onEnhance,
+                tooltip: 'השלם ל-360° מלא',
+                visualDensity: VisualDensity.compact,
+              ),
             IconButton(
               icon: Icon(IconsaxPlusLinear.edit_2,
                   color: AppColors.primary, size: 20),
               onPressed: onRename,
               tooltip: 'שנה שם',
+              visualDensity: VisualDensity.compact,
             ),
             IconButton(
               icon: const Icon(IconsaxPlusLinear.trash,
                   color: AppColors.coral, size: 20),
               onPressed: onDelete,
               tooltip: 'מחק',
+              visualDensity: VisualDensity.compact,
             ),
             ReorderableDragStartListener(
               index: index,

@@ -2662,19 +2662,31 @@ async function createPanorama(event) {
   // POSTs /panorama/:id/enhance. gpt-image-2 fills the missing ceiling/floor and
   // closes the 360 wrap on the undistorted cube faces (pano-stitch enhance op).
   if (body.captureMode === 'enhance') {
-    const srcKey = `panoramas/jobs/${jobId}/src.jpg`;
-    const uploadUrl = await getSignedUrl(
-      s3,
-      new PutObjectCommand({ Bucket: S3_BUCKET, Key: srcKey, ContentType: 'image/jpeg' }),
-      { expiresIn: 21600 },
-    );
     const resultKey = `panoramas/results/${jobId}.jpg`;
+    // An existing pano (already in our bucket) is used in place — no re-upload.
+    // Otherwise presign one upload for the source pano.
+    let srcKey = null;
+    let uploadUrls = [];
+    if (body.srcUrl) {
+      try {
+        const p = new URL(body.srcUrl).pathname.replace(/^\/+/, '');
+        if (p) srcKey = decodeURIComponent(p);
+      } catch { /* fall through to upload */ }
+    }
+    if (!srcKey) {
+      srcKey = `panoramas/jobs/${jobId}/src.jpg`;
+      uploadUrls = [await getSignedUrl(
+        s3,
+        new PutObjectCommand({ Bucket: S3_BUCKET, Key: srcKey, ContentType: 'image/jpeg' }),
+        { expiresIn: 21600 },
+      )];
+    }
     await putPanoMeta(jobId, {
       jobId, propertyId, srcKey, resultKey, captureMode: 'enhance',
       wrap: body.wrap !== false, poles: body.poles !== false,
       status: 'pending', createdAt: ts,
     });
-    return json(200, { data: { jobId, uploadUrls: [uploadUrl] } });
+    return json(200, { data: { jobId, uploadUrls } });
   }
 
   // ── Photo capture mode (unchanged) ────────────────────────────────────────

@@ -287,6 +287,30 @@ class AwsApiClient {
   Future<void> startAiPanoramaGenerate(String jobId) =>
       post('/panorama/$jobId/ai-generate', const {});
 
+  /// Enhance an EXISTING panorama (already in our bucket) into a complete 360:
+  /// generative ceiling/floor fill + 360-wrap completion. Returns the job id;
+  /// then call [startEnhancePanorama] + poll [getPanorama].
+  Future<String?> createEnhancePanoramaJob({
+    required String propertyId,
+    required String srcUrl,
+    bool wrap = true,
+    bool poles = true,
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/panorama', {
+      'propertyId': propertyId,
+      'captureMode': 'enhance',
+      'srcUrl': srcUrl,
+      'wrap': wrap,
+      'poles': poles,
+    });
+    return (res['data'] as Map<String, dynamic>?)?['jobId'] as String?;
+  }
+
+  /// Kick off the (async) pole-fill + 360-wrap enhancement.
+  Future<void> startEnhancePanorama(String jobId) =>
+      post('/panorama/$jobId/enhance', const {});
+
   /// Poll job status. status ∈ pending|processing|ready|failed.
   Future<({String status, String imageUrl, double haov, double vaov, String error})?>
       getPanorama(String jobId) async {
