@@ -250,6 +250,15 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   Future<void> _importSinglePano(String pickedPath) async {
     final aspect = await _imageAspect(pickedPath) ?? 4.0;
     if (!mounted) return;
+    // A ~2:1 image is ALREADY a full 360°×180° equirectangular sphere (exported
+    // from Street View, an AI-360 tool, etc.). Add it as a full sphere as-is —
+    // do NOT run the phone-strip FOV estimator, which would mislabel a real 360
+    // as a narrow ~120°×60° pano (default vaov 60 × aspect 2).
+    if (aspect >= 1.8 && aspect <= 2.25) {
+      await _uploadAndAdd(
+          path: pickedPath, contentType: 'image/jpeg', haov: 360, vaov: 180);
+      return;
+    }
     // Phone EXIF rarely states the true vertical FOV, so estimate it from the
     // strip's aspect ratio and let the landlord nudge it until the horizon sits
     // level (the calibration knob a fixed model can't infer).
