@@ -1212,7 +1212,26 @@ class DatingProvider extends ChangeNotifier {
     });
   }
 
+  List<RentalProperty>? _ownerLeadsCache;
+  int _ownerLeadsSig = -1;
+
   List<RentalProperty> get ownerLeads {
+    // Memoize: this getter is read inside Consumer builders, so without a cache it
+    // re-ran a full .where()+leadFitScore()+sort() over the whole catalogue on EVERY
+    // rebuild (incl. every pagination notify and every swipe). Recompute only when a
+    // lead-affecting input actually changed (cheap size/revision signature).
+    final sig = Object.hash(
+      _catalogRevision,
+      _likedPropertyIds.length,
+      _ownerAcceptedPropertyIds.length,
+      _ownerRejectedPropertyIds.length,
+      _matches.length,
+      _incomingLikesByProperty.length,
+      identityHashCode(_tenantProfile),
+    );
+    final cached = _ownerLeadsCache;
+    if (cached != null && sig == _ownerLeadsSig) return cached;
+
     final leads = _allProperties.where((property) {
       final hasIncoming =
           _incomingLikesByProperty[property.id]?.isNotEmpty ?? false;
@@ -1231,7 +1250,10 @@ class DatingProvider extends ChangeNotifier {
     // Stable: ties fall back to id so ordering is deterministic and the lead
     // membership the rest of the app relies on is unchanged — only reordered.
     final tenant = _tenantProfile;
-    if (tenant == null || leads.length < 2) return leads;
+    if (tenant == null || leads.length < 2) {
+      _ownerLeadsSig = sig;
+      return _ownerLeadsCache = leads;
+    }
 
     final scores = <String, double>{
       for (final property in leads) property.id: leadFitScore(property),
@@ -1241,7 +1263,8 @@ class DatingProvider extends ChangeNotifier {
       if (delta != 0) return delta;
       return a.id.compareTo(b.id);
     });
-    return leads;
+    _ownerLeadsSig = sig;
+    return _ownerLeadsCache = leads;
   }
 
   // ── Candidate (lead) ranking ────────────────────────────────────────────
@@ -1561,7 +1584,9 @@ class DatingProvider extends ChangeNotifier {
   /// Waits between pages so network bursts don't compete with UI rendering.
   /// Capped at 20 pages (~10 000 properties) to prevent runaway loading.
   Future<void> _fetchAllRemainingPages() async {
-    const maxExtraPages = 20;
+    // ~1500 properties is plenty for the lasso/overview; loading up to 10k pushed
+    // memory + rebuild cost hard on device. Halved.
+    const maxExtraPages = 10;
     int pagesLoaded = 0;
     while (_hasMoreProperties && pagesLoaded < maxExtraPages) {
       if (_isLoadingMoreProperties) return;
@@ -1585,7 +1610,11 @@ class DatingProvider extends ChangeNotifier {
               '+${page.items.length} (total: ${_baseProperties.length}, hasMore: $_hasMoreProperties)',
             );
           }
-          notifyListeners();
+          // Throttle: notifying (and thus re-ranking the whole catalogue on the UI
+          // isolate) on EVERY page caused a ~20× rebuild storm during startup — the
+          // main freeze. Notify only every few pages; a final notify runs after the
+          // loop so the last batch always lands.
+          if (pagesLoaded % 4 == 0) notifyListeners();
         } else {
           _hasMoreProperties = false;
           _propertiesCursor = null;
@@ -1600,6 +1629,7 @@ class DatingProvider extends ChangeNotifier {
         await Future<void>.delayed(const Duration(milliseconds: 800));
       }
     }
+    notifyListeners(); // final refresh with the full preloaded set
   }
 
   bool get hasMoreProperties => _hasMoreProperties;
