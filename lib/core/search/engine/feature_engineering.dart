@@ -204,6 +204,69 @@ class IsraelGeoIndex {
   static bool _hasCoords(double lat, double lon) =>
       lat.abs() > 0.01 && lon.abs() > 0.01;
 
+  // Spatial grid over a point list — turns an O(n) radius scan (n up to ~15k for
+  // schools) into O(nearby cells). Built once per layer at load. This is THE fix
+  // for the app-wide jank: the nearby cards + the ranking's FeatureEngineer both
+  // hammered these lookups on the UI thread.
+  static const double _gridCell = 0.02; // ~2.2 km of latitude per cell
+  static int _gridKey(double lat, double lon) {
+    final cx = (lat / _gridCell).floor() + 100000;
+    final cy = (lon / _gridCell).floor() + 100000;
+    return cx * 1000000 + cy;
+  }
+
+  static Map<int, List<int>> _buildGrid(
+      int n, double Function(int) latOf, double Function(int) lonOf) {
+    final cells = <int, List<int>>{};
+    for (var i = 0; i < n; i++) {
+      (cells[_gridKey(latOf(i), lonOf(i))] ??= <int>[]).add(i);
+    }
+    return cells;
+  }
+
+  // Visit candidate indices whose grid cell overlaps the [km] radius box.
+  static void _gridNear(Map<int, List<int>> cells, double lat, double lon,
+      double km, void Function(int) visit) {
+    final r = (km / 111.0 / _gridCell).ceil() + 1;
+    final cx = (lat / _gridCell).floor();
+    final cy = (lon / _gridCell).floor();
+    for (var dx = -r; dx <= r; dx++) {
+      for (var dy = -r; dy <= r; dy++) {
+        final l = cells[(cx + dx + 100000) * 1000000 + (cy + dy + 100000)];
+        if (l != null) {
+          for (final i in l) {
+            visit(i);
+          }
+        }
+      }
+    }
+  }
+
+  // Count points within [km] using the grid (falls back to a full scan). latOf/
+  // lonOf read the parallel point coords by index. For the per-candidate density
+  // scores that the ranker calls thousands of times.
+  static int _countWithin(Map<int, List<int>> grid, int n, double lat, double lon,
+      double km, double Function(int) latOf, double Function(int) lonOf) {
+    var count = 0;
+    if (grid.isNotEmpty) {
+      _gridNear(grid, lat, lon, km, (i) {
+        if (haversineKm(lat, lon, latOf(i), lonOf(i)) <= km) count++;
+      });
+    } else {
+      for (var i = 0; i < n; i++) {
+        if (haversineKm(lat, lon, latOf(i), lonOf(i)) <= km) count++;
+      }
+    }
+    return count;
+  }
+
+  static int _poiCountWithin(String key, double lat, double lon, double km) {
+    final list = _poiLayers[key];
+    if (list == null || list.isEmpty) return 0;
+    return _countWithin(_poiGrids[key] ?? const {}, list.length, lat, lon, km,
+        (i) => list[i].lat, (i) => list[i].lon);
+  }
+
   /// Nearest Israel Railways station (km), or null if coords are missing.
   static double? nearestStationKm(double lat, double lon) =>
       _nearest(lat, lon, _stations);
@@ -225,6 +288,7 @@ class IsraelGeoIndex {
   // once at startup so park_access scoring + the "קרוב לפארק" auto-tag can use
   // real, verified coordinates.
   static List<_GeoPlace> _parks = const <_GeoPlace>[];
+  static Map<int, List<int>> _parksGrid = const {};
   static bool _parksLoaded = false;
 
   static Future<void> loadParks() async {
@@ -240,6 +304,8 @@ class IsraelGeoIndex {
             _GeoPlace((p['n'] ?? '').toString(),
                 (p['lat'] as num).toDouble(), (p['lon'] as num).toDouble()),
       ];
+      _parksGrid =
+          _buildGrid(_parks.length, (i) => _parks[i].lat, (i) => _parks[i].lon);
     } catch (_) {
       _parks = const <_GeoPlace>[];
     }
@@ -247,12 +313,13 @@ class IsraelGeoIndex {
 
   /// Distance (km) to the nearest public park/garden, or null if unknown/unloaded.
   static double? parkKm(double lat, double lon) =>
-      _parks.isEmpty ? null : _nearest(lat, lon, _parks);
+      _parks.isEmpty ? null : _nearest(lat, lon, _parks, _parksGrid);
 
   // Named education institutions with a TYPE (גן / יסודי / חטיבה / תיכון / מכללה /
   // אוניברסיטה), bundled from OSM. Enables "250m from יסודי X" instead of a coarse
   // density score, plus filtering by school type.
   static List<_School> _schools = const <_School>[];
+  static Map<int, List<int>> _schoolsGrid = const {};
   static bool _schoolsLoaded = false;
 
   static Future<void> loadSchools() async {
@@ -269,6 +336,8 @@ class IsraelGeoIndex {
                 (s['lat'] as num).toDouble(), (s['lon'] as num).toDouble(),
                 (s['s'] ?? '').toString()),
       ];
+      _schoolsGrid = _buildGrid(
+          _schools.length, (i) => _schools[i].lat, (i) => _schools[i].lon);
     } catch (_) {
       _schools = const <_School>[];
     }
@@ -282,16 +351,27 @@ class IsraelGeoIndex {
     if (_schools.isEmpty || !_hasCoords(lat, lon)) return null;
     _School? best;
     double? bestD;
-    for (final s in _schools) {
-      if (type != null && !_typeMatches(s.type, type)) continue;
+    void consider(_School s) {
+      if (type != null && !_typeMatches(s.type, type)) return;
       final d = haversineKm(lat, lon, s.lat, s.lon);
-      if (bestD == null || d < bestD) {
+      if (bestD == null || d < bestD!) {
         bestD = d;
         best = s;
       }
     }
+
+    // Grid-scan a generous radius first (nearest school is almost always <15 km);
+    // fall back to a full scan only if that box is empty.
+    if (_schoolsGrid.isNotEmpty) {
+      _gridNear(_schoolsGrid, lat, lon, 15, (i) => consider(_schools[i]));
+    }
+    if (best == null) {
+      for (final s in _schools) {
+        consider(s);
+      }
+    }
     if (best == null) return null;
-    return (name: best.name, type: best.type, km: bestD!);
+    return (name: best!.name, type: best!.type, km: bestD!);
   }
 
   /// Distance (km) to the nearest school of any type, or null.
@@ -310,15 +390,23 @@ class IsraelGeoIndex {
     if (_schools.isEmpty || !_hasCoords(lat, lon)) return const [];
     final out = <NearbyPlace>[];
     final seen = <String>{};
-    for (final s in _schools) {
-      if (!keep(s)) continue;
+    void consider(_School s) {
+      if (!keep(s)) return;
       final d = haversineKm(lat, lon, s.lat, s.lon);
-      if (d > km) continue;
-      if (!seen.add('${s.name}_${s.lat}_${s.lon}')) continue; // exact dup only
+      if (d > km) return;
+      if (!seen.add('${s.name}_${s.lat}_${s.lon}')) return; // exact dup only
       out.add(NearbyPlace(
           name: s.name, km: d, lat: s.lat, lon: s.lon,
           kind: s.type == 'גן' ? 'kindergarten' : 'school',
           stage: s.type, sector: s.sector));
+    }
+
+    if (_schoolsGrid.isNotEmpty) {
+      _gridNear(_schoolsGrid, lat, lon, km, (i) => consider(_schools[i]));
+    } else {
+      for (final s in _schools) {
+        consider(s);
+      }
     }
     out.sort((a, b) => a.km.compareTo(b.km));
     return out.length > cap ? out.sublist(0, cap) : out;
@@ -340,11 +428,19 @@ class IsraelGeoIndex {
     if (_parks.isEmpty || !_hasCoords(lat, lon)) return const [];
     final out = <NearbyPlace>[];
     final seen = <String>{};
-    for (final p in _parks) {
+    void consider(_GeoPlace p) {
       final d = haversineKm(lat, lon, p.lat, p.lon);
-      if (d > km) continue;
-      if (p.name.isEmpty || !seen.add('${p.name}_${p.lat}_${p.lon}')) continue;
+      if (d > km) return;
+      if (p.name.isEmpty || !seen.add('${p.name}_${p.lat}_${p.lon}')) return;
       out.add(NearbyPlace(name: p.name, km: d, lat: p.lat, lon: p.lon, kind: 'park'));
+    }
+
+    if (_parksGrid.isNotEmpty) {
+      _gridNear(_parksGrid, lat, lon, km, (i) => consider(_parks[i]));
+    } else {
+      for (final p in _parks) {
+        consider(p);
+      }
     }
     out.sort((a, b) => a.km.compareTo(b.km));
     return out.length > cap ? out.sublist(0, cap) : out;
@@ -352,6 +448,7 @@ class IsraelGeoIndex {
 
   // ── health clinics / קופות חולים (tagged with HMO) ──────────────────────────
   static List<_Clinic> _clinics = const <_Clinic>[];
+  static Map<int, List<int>> _clinicsGrid = const {};
   static bool _clinicsLoaded = false;
 
   static Future<void> loadClinics() async {
@@ -366,6 +463,8 @@ class IsraelGeoIndex {
             _Clinic((c['n'] ?? '').toString(), (c['h'] ?? '').toString(),
                 (c['lat'] as num).toDouble(), (c['lon'] as num).toDouble()),
       ];
+      _clinicsGrid = _buildGrid(
+          _clinics.length, (i) => _clinics[i].lat, (i) => _clinics[i].lon);
     } catch (_) {
       _clinics = const <_Clinic>[];
     }
@@ -378,14 +477,22 @@ class IsraelGeoIndex {
     if (_clinics.isEmpty || !_hasCoords(lat, lon)) return const [];
     final out = <NearbyPlace>[];
     final seen = <String>{};
-    for (final c in _clinics) {
-      if (hmo != null && hmo.isNotEmpty && c.hmo != hmo) continue;
+    void consider(_Clinic c) {
+      if (hmo != null && hmo.isNotEmpty && c.hmo != hmo) return;
       final d = haversineKm(lat, lon, c.lat, c.lon);
-      if (d > km) continue;
-      if (!seen.add('${c.name}_${c.lat}_${c.lon}')) continue;
+      if (d > km) return;
+      if (!seen.add('${c.name}_${c.lat}_${c.lon}')) return;
       out.add(NearbyPlace(
           name: c.name, km: d, lat: c.lat, lon: c.lon, kind: 'clinic',
           stage: c.hmo.isEmpty ? 'מרפאה' : 'קופת חולים', sector: c.hmo));
+    }
+
+    if (_clinicsGrid.isNotEmpty) {
+      _gridNear(_clinicsGrid, lat, lon, km, (i) => consider(_clinics[i]));
+    } else {
+      for (final c in _clinics) {
+        consider(c);
+      }
     }
     out.sort((a, b) => a.km.compareTo(b.km));
     return out.length > cap ? out.sublist(0, cap) : out;
@@ -393,6 +500,7 @@ class IsraelGeoIndex {
 
   // ── supermarkets ────────────────────────────────────────────────────────────
   static List<_GeoPlace> _supermarkets = const <_GeoPlace>[];
+  static Map<int, List<int>> _supermarketsGrid = const {};
   static bool _supermarketsLoaded = false;
 
   static Future<void> loadSupermarkets() async {
@@ -407,6 +515,8 @@ class IsraelGeoIndex {
             _GeoPlace((s['n'] ?? '').toString(), (s['lat'] as num).toDouble(),
                 (s['lon'] as num).toDouble()),
       ];
+      _supermarketsGrid = _buildGrid(_supermarkets.length,
+          (i) => _supermarkets[i].lat, (i) => _supermarkets[i].lon);
     } catch (_) {
       _supermarkets = const <_GeoPlace>[];
     }
@@ -418,12 +528,20 @@ class IsraelGeoIndex {
     if (_supermarkets.isEmpty || !_hasCoords(lat, lon)) return const [];
     final out = <NearbyPlace>[];
     final seen = <String>{};
-    for (final s in _supermarkets) {
+    void consider(_GeoPlace s) {
       final d = haversineKm(lat, lon, s.lat, s.lon);
-      if (d > km) continue;
-      if (s.name.isEmpty || !seen.add('${s.name}_${s.lat}_${s.lon}')) continue;
+      if (d > km) return;
+      if (s.name.isEmpty || !seen.add('${s.name}_${s.lat}_${s.lon}')) return;
       out.add(NearbyPlace(
           name: s.name, km: d, lat: s.lat, lon: s.lon, kind: 'supermarket'));
+    }
+
+    if (_supermarketsGrid.isNotEmpty) {
+      _gridNear(_supermarketsGrid, lat, lon, km, (i) => consider(_supermarkets[i]));
+    } else {
+      for (final s in _supermarkets) {
+        consider(s);
+      }
     }
     out.sort((a, b) => a.km.compareTo(b.km));
     return out.length > cap ? out.sublist(0, cap) : out;
@@ -438,10 +556,8 @@ class IsraelGeoIndex {
   static double supermarketAccess(double lat, double lon,
       {double km = 1.5, int cap = 8}) {
     if (_supermarkets.isEmpty || !_hasCoords(lat, lon)) return 0.0;
-    var n = 0;
-    for (final s in _supermarkets) {
-      if (haversineKm(lat, lon, s.lat, s.lon) <= km) n++;
-    }
+    final n = _countWithin(_supermarketsGrid, _supermarkets.length, lat, lon, km,
+        (i) => _supermarkets[i].lat, (i) => _supermarkets[i].lon);
     return n == 0 ? 0.0 : (math.log(1 + n) / math.log(1 + cap)).clamp(0.0, 1.0);
   }
 
@@ -451,10 +567,8 @@ class IsraelGeoIndex {
   static double clinicAccess(double lat, double lon,
       {double km = 3, int cap = 6}) {
     if (_clinics.isEmpty || !_hasCoords(lat, lon)) return 0.0;
-    var n = 0;
-    for (final c in _clinics) {
-      if (haversineKm(lat, lon, c.lat, c.lon) <= km) n++;
-    }
+    final n = _countWithin(_clinicsGrid, _clinics.length, lat, lon, km,
+        (i) => _clinics[i].lat, (i) => _clinics[i].lon);
     return n == 0 ? 0.0 : (math.log(1 + n) / math.log(1 + cap)).clamp(0.0, 1.0);
   }
 
@@ -462,18 +576,22 @@ class IsraelGeoIndex {
   // One generic mechanism instead of five copy-pasted loaders. Each layer is a
   // bundled `[{n?,lat,lon,t?}]` JSON; `_poiLayers[key]` is null until loaded.
   static final Map<String, List<_Poi>> _poiLayers = {};
+  static final Map<String, Map<int, List<int>>> _poiGrids = {};
 
   static Future<void> _loadPoi(String key, String file) async {
     if (_poiLayers.containsKey(key)) return;
     _poiLayers[key] = const <_Poi>[]; // mark loading (idempotent)
     try {
       final raw = await rootBundle.loadString('assets/data/govdata/$file');
-      _poiLayers[key] = [
+      final list = [
         for (final e in (jsonDecode(raw) as List))
           if (e is Map)
             _Poi((e['n'] ?? '').toString(), (e['lat'] as num).toDouble(),
                 (e['lon'] as num).toDouble(), (e['t'] ?? '').toString()),
       ];
+      _poiLayers[key] = list;
+      _poiGrids[key] =
+          _buildGrid(list.length, (i) => list[i].lat, (i) => list[i].lon);
     } catch (_) {
       _poiLayers[key] = const <_Poi>[];
     }
@@ -510,13 +628,22 @@ class IsraelGeoIndex {
     if (list == null || list.isEmpty || !_hasCoords(lat, lon)) return const [];
     final out = <NearbyPlace>[];
     final seen = <String>{};
-    for (final p in list) {
+    void consider(_Poi p) {
       final d = haversineKm(lat, lon, p.lat, p.lon);
-      if (d > km) continue;
+      if (d > km) return;
       final name = p.name.isEmpty ? genericName : p.name;
-      if (name.isEmpty || !seen.add('$name|${p.lat}|${p.lon}')) continue;
+      if (name.isEmpty || !seen.add('$name|${p.lat}|${p.lon}')) return;
       out.add(NearbyPlace(
           name: name, km: d, lat: p.lat, lon: p.lon, kind: kind, stage: p.type));
+    }
+
+    final grid = _poiGrids[key];
+    if (grid != null) {
+      _gridNear(grid, lat, lon, km, (i) => consider(list[i]));
+    } else {
+      for (final p in list) {
+        consider(p);
+      }
     }
     out.sort((a, b) => a.km.compareTo(b.km));
     return out.length > cap ? out.sublist(0, cap) : out;
@@ -559,12 +686,8 @@ class IsraelGeoIndex {
   /// neighbourhood list (which only knows a handful of areas). 0 when unloaded.
   static double synagogueDensity(double lat, double lon,
       {double km = 1.0, int cap = 10}) {
-    final list = _poiLayers['synagogues'];
-    if (list == null || list.isEmpty || !_hasCoords(lat, lon)) return 0.0;
-    var n = 0;
-    for (final s in list) {
-      if (haversineKm(lat, lon, s.lat, s.lon) <= km) n++;
-    }
+    if (!_hasCoords(lat, lon)) return 0.0;
+    final n = _poiCountWithin('synagogues', lat, lon, km);
     return n == 0 ? 0.0 : (math.log(1 + n) / math.log(1 + cap)).clamp(0.0, 1.0);
   }
 
@@ -615,6 +738,7 @@ class IsraelGeoIndex {
   // Nightlife venues (OSM bars/pubs/clubs weighted 1.0, cafés 0.4). A LIVELY area
   // isn't the nearest bar — it's the DENSITY of them around you.
   static List<List<double>> _nightlife = const <List<double>>[]; // [lat,lon,w]
+  static Map<int, List<int>> _nightlifeGrid = const {};
   static bool _nightlifeLoaded = false;
 
   static Future<void> loadNightlife() async {
@@ -633,6 +757,8 @@ class IsraelGeoIndex {
               (v[2] as num).toDouble()
             ],
       ];
+      _nightlifeGrid = _buildGrid(
+          _nightlife.length, (i) => _nightlife[i][0], (i) => _nightlife[i][1]);
     } catch (_) {
       _nightlife = const <List<double>>[];
     }
@@ -643,9 +769,18 @@ class IsraelGeoIndex {
   static double nightlifeDensity(double lat, double lon) {
     if (_nightlife.isEmpty || !_hasCoords(lat, lon)) return 0.0;
     double sum = 0;
-    for (final v in _nightlife) {
+    void consider(int i) {
+      final v = _nightlife[i];
       final d = haversineKm(lat, lon, v[0], v[1]);
       if (d <= 1.0) sum += v[2] * (1.0 - d); // linear walk-decay
+    }
+
+    if (_nightlifeGrid.isNotEmpty) {
+      _gridNear(_nightlifeGrid, lat, lon, 1.0, consider);
+    } else {
+      for (var i = 0; i < _nightlife.length; i++) {
+        consider(i);
+      }
     }
     return (sum / 9.0).clamp(0.0, 1.0); // ~9 weighted venues in 1km → very lively
   }
@@ -719,12 +854,22 @@ class IsraelGeoIndex {
     return best?.name;
   }
 
-  static double? _nearest(double lat, double lon, List<_GeoPlace> places) {
+  static double? _nearest(double lat, double lon, List<_GeoPlace> places,
+      [Map<int, List<int>>? grid]) {
     if (!_hasCoords(lat, lon)) return null;
     double? best;
-    for (final p in places) {
+    void consider(_GeoPlace p) {
       final d = haversineKm(lat, lon, p.lat, p.lon);
-      if (best == null || d < best) best = d;
+      if (best == null || d < best!) best = d;
+    }
+
+    // Nearest is almost always <20 km; grid-scan that box, full-scan only if empty.
+    if (grid != null && grid.isNotEmpty) {
+      _gridNear(grid, lat, lon, 20, (i) => consider(places[i]));
+      if (best != null) return best;
+    }
+    for (final p in places) {
+      consider(p);
     }
     return best;
   }
