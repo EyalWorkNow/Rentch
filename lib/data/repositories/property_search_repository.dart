@@ -15,6 +15,7 @@ class PropertySearchCriteria {
     this.minPrice,
     this.maxPrice,
     this.minRooms,
+    this.maxRooms,
     this.amenityKeys = const {},
     this.vibe,
     this.queryText,
@@ -25,6 +26,7 @@ class PropertySearchCriteria {
   final int? minPrice;
   final int? maxPrice;
   final double? minRooms;
+  final double? maxRooms;
   // PropertyFeatureSet keys, e.g. {'feat_parking','feat_balcony'}.
   final Set<String> amenityKeys;
   // Soft preference (chip or NL): 'שקט'/'תוסס'/'משפחתי'/'סטודנטיאלי'.
@@ -222,6 +224,7 @@ class PropertySearchRepository {
       if (c.minPrice != null && p.price < c.minPrice!) return false;
       if (c.maxPrice != null && p.price > c.maxPrice!) return false;
       if (c.minRooms != null && p.rooms < c.minRooms!) return false;
+      if (c.maxRooms != null && p.rooms > c.maxRooms!) return false;
       for (final key in c.amenityKeys) {
         if (!p.featureFlags.isEnabled(key)) return false;
       }
@@ -550,6 +553,7 @@ class PropertySearchRepository {
           'minPrice': c.minPrice,
           'maxPrice': c.maxPrice,
           'minRooms': c.minRooms,
+          'maxRooms': c.maxRooms,
           'amenities': c.amenityKeys.toList(),
           'vibe': c.vibe,
         },

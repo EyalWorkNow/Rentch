@@ -537,12 +537,20 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         if (d != null) llmWeights[k.toString()] = d.clamp(0.0, 1.0);
       });
     }
+    // A single stated room count from the voice tool ("3 חדרים") arrives as
+    // minRooms only; without an upper bound the ranking keeps 4/5/6-room units.
+    // Mirror the typed-search band: a lone min with no max → tight [n, n+0.5].
+    var vMinRooms = (args['minRooms'] as num?)?.toDouble();
+    final vRooms = (args['rooms'] as num?)?.toDouble();
+    vMinRooms ??= vRooms;
+    var vMaxRooms = (args['maxRooms'] as num?)?.toDouble();
+    if (vMaxRooms == null && vMinRooms != null) vMaxRooms = vMinRooms + 0.5;
     _query = _merge(
       _query,
       SearchQuery(
         city: args['city'] as String?,
-        minRooms: (args['minRooms'] as num?)?.toDouble(),
-        maxRooms: (args['maxRooms'] as num?)?.toDouble(),
+        minRooms: vMinRooms,
+        maxRooms: vMaxRooms,
         maxPrice: (args['maxPrice'] as num?)?.toInt(),
         amenities: amenities,
         transactionType: txType,
@@ -1696,6 +1704,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       minPrice: q.minPrice,
       maxPrice: q.maxPrice,
       minRooms: q.minRooms,
+      maxRooms: q.maxRooms,
       amenityKeys: q.amenities,
       vibe: signals['vibe'],
       queryText: _conversationText,

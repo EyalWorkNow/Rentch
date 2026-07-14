@@ -359,7 +359,7 @@ class SmartSearch {
           RegExp(r'(\d|אחד|שני|שתי|שלוש|שלושה|ארבע|ארבעה|חמש|חמישה)\s*וחצי')
               .firstMatch(text);
       final single = RegExp(
-              r'(\d(?:\.\d)?)\s*-?\s*(?:חדר|חדרים|חד|rooms?|bedrooms?)',
+              r'(\d(?:\.\d)?)\s*[-+]?\s*(?:חדר|חדרים|חד|rooms?|bedrooms?)',
               caseSensitive: false)
           .firstMatch(text);
       if (half != null) {
@@ -376,12 +376,31 @@ class SmartSearch {
           minRooms = _wordToNum(spelled.group(1)!)?.toDouble();
         }
       }
+      // "חדר וחצי" / "דירת חדר וחצי" = 1.5 rooms (no leading number → the digit/
+      // word regexes above miss it).
+      if (minRooms == null && RegExp(r'חדר\s*וחצי').hasMatch(text)) {
+        minRooms = 1.5;
+      }
       // "3+" → open-ended max (just a min).
       if (single != null && RegExp(r'\d\s*\+').hasMatch(text)) {
         maxRooms = null;
       }
     }
     minRooms ??= _toDouble(llm['rooms']);
+
+    // A bare single room count ("3 חדרים", "שלושה חדרים", llm rooms=3) means ~3,
+    // NOT "3 or more": without an upper bound the filter surfaces 4/5/6-room units
+    // and feels like it ignored the request. Give it a tight band [n, n+0.5] so it
+    // matches 3 and 3.5 but excludes 4. Ranges / "עד" / "לפחות" / "3+" keep their
+    // deliberate open bound.
+    final bareSingle = uptoRooms == null &&
+        fromRooms == null &&
+        roomRange == null &&
+        roomBetween == null;
+    final openEnded = RegExp(r'\d\s*\+').hasMatch(text);
+    if (bareSingle && !openEnded && minRooms != null && maxRooms == null) {
+      maxRooms = minRooms + 0.5;
+    }
 
     // ── property type ───────────────────────────────────────────────────────
     String? propertyType;
@@ -391,9 +410,9 @@ class SmartSearch {
         break;
       }
     }
-    // studio / sub-unit imply a small place
+    // studio / sub-unit imply a small place: cap the top but keep NO floor, so a
+    // 0.5/1-room micro-unit still matches ("from 0.5 and studio up to the max").
     if (propertyType == 'סטודיו' || propertyType == 'יחידת דיור') {
-      minRooms ??= 1;
       maxRooms ??= 2;
     }
 

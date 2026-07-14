@@ -13,6 +13,42 @@ void main() {
     expect(q.isEmpty, false);
   });
 
+  test('a bare single room count becomes a tight band [n, n+0.5]', () {
+    // "3 חדרים" must not surface 4/5/6-room units — it means ~3.
+    final q = SmartSearch.parse('דירת 3 חדרים בתל אביב');
+    expect(q.minRooms, 3);
+    expect(q.maxRooms, 3.5);
+    // spelled-out too
+    final s = SmartSearch.parse('דירה שלושה חדרים');
+    expect(s.minRooms, 3);
+    expect(s.maxRooms, 3.5);
+    // "3+" stays open-ended (a minimum, no cap)
+    final open = SmartSearch.parse('דירת 3+ חדרים');
+    expect(open.minRooms, 3);
+    expect(open.maxRooms, isNull);
+    // "לפחות 3" keeps its deliberate open upper bound
+    final atLeast = SmartSearch.parse('לפחות 3 חדרים');
+    expect(atLeast.minRooms, 3);
+    expect(atLeast.maxRooms, isNull);
+    // an explicit range is untouched
+    final range = SmartSearch.parse('דירת 3-4 חדרים');
+    expect(range.minRooms, 3);
+    expect(range.maxRooms, 4);
+  });
+
+  test('"חדר וחצי" → 1.5 rooms with a tight band', () {
+    final q = SmartSearch.parse('דירת חדר וחצי בתל אביב');
+    expect(q.minRooms, 1.5);
+    expect(q.maxRooms, 2.0);
+  });
+
+  test('studio caps at 2 but keeps no floor (0.5/1 units match)', () {
+    final q = SmartSearch.parse('סטודיו בפלורנטין עד 5000');
+    expect(q.propertyType, 'סטודיו');
+    expect(q.minRooms, isNull); // no floor → a 0.5/1-room micro-unit still matches
+    expect(q.maxRooms, 2);
+  });
+
   test('parses city and budget', () {
     final q = SmartSearch.parse('אני צריך דירת 4 חדרים בתל אביב עד 7500 שקל');
     expect(q.city, 'תל אביב');
