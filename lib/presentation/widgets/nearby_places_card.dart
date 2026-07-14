@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
+import 'package:dating_app/core/search/scenario_layers.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -80,9 +81,11 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     if (!mounted) return;
     // Chat preview → only what's relevant to the seeker (until they ask for more);
     // detail screen → ALL kinds with data (full reference), persona-relevant first.
-    final sections = (widget.relevantOnly && !_expandedAll)
-        ? relevantNearbySections(widget.profile)
-        : orderedNearbySections(widget.profile);
+    // Spec-primary (curated 504-scenario mapping) with heuristic fallback.
+    final sections = personalizedNearbySections(
+      widget.profile,
+      coreOnly: widget.relevantOnly && !_expandedAll,
+    );
     final out = <(NearbySection, List<NearbyPlace>)>[];
     var scanned = 0;
     for (final s in sections) {
