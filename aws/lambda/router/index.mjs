@@ -1654,15 +1654,38 @@ function num(v) {
 
 // View + like counts per listing (the popularity signal source). Uses the
 // propertyId-index COUNT query on the analytics tables. Bounded, fail-soft.
+//
+// Each id was costing 2 COUNT queries, so a 40-listing search fired ~80 DDB
+// round-trips and the slowest gated the whole GET /properties response (~3-4s).
+// Popularity is approximate and slow-moving, so cache it in the warm Lambda for
+// POP_TTL_MS: repeat/overlapping searches (the common case) then hit memory and
+// skip the queries entirely. ponytail: module Map + TTL, bounded at 5000 ids —
+// swap for a denormalised count on the property row if the catalogue explodes.
+const _popCache = new Map(); // id → { views, likes, exp }
+const POP_TTL_MS = 90 * 1000;
+
 async function loadPopularityCounts(ids) {
   const out = {};
-  await Promise.all(ids.map(async (id) => {
+  const now = Date.now();
+  const misses = [];
+  for (const id of ids) {
+    const c = _popCache.get(id);
+    if (c && c.exp > now) out[id] = { views: c.views, likes: c.likes };
+    else misses.push(id);
+  }
+  await Promise.all(misses.map(async (id) => {
     const [views, likes] = await Promise.all([
       countByPropertyId(TABLES.property_views, id),
       countByPropertyId(TABLES.property_likes, id),
     ]);
     out[id] = { views, likes };
+    _popCache.set(id, { views, likes, exp: now + POP_TTL_MS });
   }));
+  if (_popCache.size > 5000) {
+    for (const k of [..._popCache.keys()].slice(0, _popCache.size - 5000)) {
+      _popCache.delete(k);
+    }
+  }
   return out;
 }
 
@@ -4307,6 +4330,13 @@ async function runSearchListings(args = {}) {
     }
     return true;
   }).slice(0, limit);
+
+  console.log('search_listings', JSON.stringify({
+    in: { rooms: args.rooms ?? null, minRooms: args.minRooms ?? null, maxRooms: args.maxRooms ?? null, city: wantCity || null },
+    band: { minRooms: minRooms ?? null, maxRooms: maxRooms ?? null },
+    scanned: rows.length, matched: matched.length,
+    roomsOut: matched.map((p) => Number(p.rooms)),
+  }));
 
   return matched.map((p) => ({
     id: String(p.id || ''),
