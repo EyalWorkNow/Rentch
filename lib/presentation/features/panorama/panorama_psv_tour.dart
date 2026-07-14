@@ -92,16 +92,47 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
             (await rootBundle.load(entry.value.path)).buffer.asUint8List();
       }
 
-      // 2. panorama images (network → download, local → read) into memory
+      // 2. panorama images into memory. Each node's ACTIVE render is served at
+      //    /img/{nodeId} (the tour default). Nodes with >1 VIEWER-visible render
+      //    also serve their other versions at /img/{nodeId}::v{i} so the tenant
+      //    can flip between them in-viewer.
       final images = <String, Uint8List>{};
+      final availableNodes = <String>{};
+      // nodeId → [{src, source, haov, vaov, def}] (only when >1 visible version).
+      final versionsByNode = <String, List<Map<String, dynamic>>>{};
       for (final n in widget.tour.nodes) {
-        final bytes = await _loadImage(n);
-        if (bytes != null) images[n.id] = bytes;
+        final visible = n.viewerVersions;
+        final vlist = <Map<String, dynamic>>[];
+        for (var vi = 0; vi < visible.length; vi++) {
+          final v = visible[vi];
+          final isDefault = v.imageUrl == n.imageUrl; // the active/published one
+          final key = isDefault ? n.id : '${n.id}::v$vi';
+          final bytes = await _loadBytes(v.imageUrl);
+          if (bytes == null) continue;
+          images[key] = bytes;
+          vlist.add({
+            'src': '/img/${Uri.encodeComponent(key)}',
+            'source': v.source.isNotEmpty ? v.source : 'גרסה ${vi + 1}',
+            'haov': v.haov,
+            'vaov': v.vaov,
+            'def': isDefault,
+          });
+        }
+        // The tour default (/img/{nodeId}) must exist; if the active render
+        // failed to load, fall back to the first visible one that did.
+        if (!images.containsKey(n.id) && vlist.isNotEmpty) {
+          final firstKey = Uri.decodeComponent(
+              (vlist.first['src'] as String).substring(5));
+          images[n.id] = images[firstKey]!;
+          vlist.first['def'] = true;
+        }
+        if (images.containsKey(n.id)) availableNodes.add(n.id);
+        if (vlist.length > 1) versionsByNode[n.id] = vlist;
       }
       if (images.isEmpty) throw StateError('no panorama images');
 
       // 3. the tour HTML
-      final html = _buildHtml(widget.tour, images.keys.toSet());
+      final html = _buildHtml(widget.tour, availableNodes, versionsByNode);
 
       // 4. local HTTP server (loopback, random port)
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -168,15 +199,15 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
     }
   }
 
-  Future<Uint8List?> _loadImage(PanoramaNode n) async {
+  Future<Uint8List?> _loadBytes(String url) async {
     try {
-      if (n.isLocal) {
-        final p =
-            n.imageUrl.startsWith('file://') ? n.imageUrl.substring(7) : n.imageUrl;
+      final isLocal = url.startsWith('/') || url.startsWith('file://');
+      if (isLocal) {
+        final p = url.startsWith('file://') ? url.substring(7) : url;
         return await File(p).readAsBytes();
       }
       final res =
-          await http.get(Uri.parse(n.imageUrl)).timeout(const Duration(seconds: 40));
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 40));
       if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
     } catch (_) {}
     return null;
@@ -190,13 +221,18 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
     req.response.close();
   }
 
-  String _buildHtml(PropertyPanoramaTour tour, Set<String> available) {
+  String _buildHtml(
+    PropertyPanoramaTour tour,
+    Set<String> available,
+    Map<String, List<Map<String, dynamic>>> versionsByNode,
+  ) {
     final config = psvTourConfig(
       tour,
       imageUrlFor: (id) => '/img/${Uri.encodeComponent(id)}',
       available: available,
     );
     final json = jsonEncode(config);
+    final versionsJson = jsonEncode(versionsByNode);
 
     // nodes with a map position → mini-map data (id, x, y, label, link targets)
     final mapNodes = [
@@ -239,6 +275,14 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
   .mm-dot{cursor:pointer}
   @keyframes mmpulse{0%{r:5;opacity:.9}70%{r:12;opacity:0}100%{opacity:0}}
   #err{color:#fff;padding:24px;font:14px sans-serif}
+  /* version switcher (tenants flip between the landlord's shown 360 renders) */
+  #vbar{position:absolute;left:0;right:0;bottom:20px;z-index:6;display:none;
+    justify-content:center;gap:6px;pointer-events:none}
+  #vbar .vchip{pointer-events:auto;cursor:pointer;color:#fff;
+    background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.25);
+    padding:7px 14px;border-radius:999px;font:700 12.5px sans-serif;
+    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  #vbar .vchip.on{background:#fff;color:#000;border-color:#fff}
 </style>
 <script type="importmap">
 {
@@ -255,12 +299,14 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
 <div id="pano"></div>
 <div id="mm-name"></div>
 <div id="minimap"><svg id="mm-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div>
+<div id="vbar"></div>
 <script type="module">
   import { Viewer } from '@photo-sphere-viewer/core';
   import { VirtualTourPlugin } from '@photo-sphere-viewer/virtual-tour-plugin';
   import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
 
   var TOUR = $json;
+  var VERSIONS = $versionsJson; // nodeId → [{src,source,haov,vaov,def}]
   var ARROW = '#00A6A6';
 
   // ── partial-pano panoData ─────────────────────────────────────────────────
@@ -391,6 +437,46 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
     }
     vt.addEventListener('node-changed', function(e){ setActive(e.node.id); });
     setActive(TOUR.startNodeId);
+  })();
+
+  // ── version switcher ──────────────────────────────────────────────────────
+  // For a node with >1 landlord-visible render, show pills; tapping swaps the
+  // current panorama in place (staying on the node) via viewer.setPanorama.
+  (function(){
+    var bar = document.getElementById('vbar');
+    if (!viewer || !bar) return;
+    var current = null; // list for the node we're on
+    function paint(){
+      Array.prototype.forEach.call(bar.children, function(c, i){
+        c.className = 'vchip' + (current && current[i].active ? ' on' : '');
+      });
+    }
+    function pick(v){
+      try {
+        viewer.setPanorama(v.src, { panoData: panoDataFor(v), transition: false });
+      } catch (e) {}
+      current.forEach(function(x){ x.active = (x === v); });
+      paint();
+    }
+    function render(nodeId){
+      var list = VERSIONS[nodeId];
+      current = list || null;
+      bar.innerHTML = '';
+      if (!list || list.length < 2) { bar.style.display = 'none'; return; }
+      // entering a node shows its default (published) render.
+      list.forEach(function(x){ x.active = !!x.def; });
+      list.forEach(function(v){
+        var b = document.createElement('div');
+        b.className = 'vchip';
+        b.textContent = v.source;
+        b.addEventListener('click', function(){ pick(v); });
+        bar.appendChild(b);
+      });
+      bar.style.display = 'flex';
+      paint();
+    }
+    if (vt) vt.addEventListener('node-changed', function(e){ render(e.node.id); });
+    render(TOUR.startNodeId);
   })();
 </script>
 </body>

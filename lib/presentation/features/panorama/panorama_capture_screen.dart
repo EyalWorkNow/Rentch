@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/core/services/pending_pano_store.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_align_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
@@ -32,11 +34,16 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   final List<PanoramaNode> _nodes = [];
   bool _busy = false;
   String? _floorPlanPath; // optional floor-plan image, reused across points
+  // Node ids currently auto-completing to full 360 in the background (silent —
+  // shows a small spinner on the tile, never a blocking modal).
+  final Set<String> _enhancing = {};
 
   @override
   void initState() {
     super.initState();
     if (widget.initial != null) _nodes.addAll(widget.initial!.nodes);
+    // Reconnect any enhance jobs left running when the screen was last closed.
+    unawaited(_resumePendingEnhances());
   }
 
   // Sequentially link points: each gets a forward arrow to the next and a back
@@ -571,58 +578,117 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // Complete a captured/imported panorama into a FULL 360: the server fills the
   // missing ceiling & floor and closes the 360 wrap (cube-face inpaint, strict
   // "continue the surface, invent nothing"), then we swap in the enhanced image.
+  // Manual ✨ trigger from a node tile: complete this pano to a full 360. Shows
+  // a modal (the landlord asked for it), but the job is ALSO persisted so it
+  // survives leaving the screen — same resilient path as the auto pass.
   Future<void> _enhanceNode(int i) async {
-    if (_busy || i < 0 || i >= _nodes.length) return;
+    if (i < 0 || i >= _nodes.length) return;
     final node = _nodes[i];
     if (node.isLocal) {
       _toast('צריך חיבור לאינטרנט — הפנורמה עדיין לא הועלתה.');
       return;
     }
-    final msg = ValueNotifier<String>('מתחילים…');
-    _showAiProgress(msg);
-    var open = true;
-    void close() {
-      if (open && mounted) {
-        open = false;
+    await _startEnhance(node.id, showModal: true);
+  }
+
+  // Unified enhance entry (auto, manual, resume all funnel here). Persists the
+  // job to [PendingPanoStore] the instant it's submitted, so closing/reopening
+  // the capture screen resumes it instead of orphaning it. [showModal] drives
+  // the blocking "מתחילים…" dialog for the manual path; the auto path is silent.
+  Future<void> _startEnhance(String nodeId, {bool showModal = false}) async {
+    if (_enhancing.contains(nodeId)) return;
+    final node = _nodeById(nodeId);
+    if (node == null || node.isLocal) return;
+
+    ValueNotifier<String>? msg;
+    var modalOpen = false;
+    void closeModal() {
+      if (modalOpen && mounted) {
+        modalOpen = false;
         Navigator.of(context, rootNavigator: true).pop();
       }
     }
 
+    if (showModal) {
+      msg = ValueNotifier<String>('מתחילים…');
+      _showAiProgress(msg);
+      modalOpen = true;
+    }
+    setState(() => _enhancing.add(nodeId));
     try {
       final jobId = await AwsApiClient.instance.createEnhancePanoramaJob(
         propertyId: 'draft_${DateTime.now().millisecondsSinceEpoch}',
         srcUrl: node.imageUrl,
       );
       if (jobId == null) {
-        close();
-        _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
+        if (showModal) _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
         return;
       }
-      msg.value = 'ה-AI משלים תקרה, רצפה וסוגר 360°… (1–2 דקות)';
+      // Persist BEFORE starting so a crash between start and the first poll is
+      // still recoverable on the next capture-screen open.
+      await PendingPanoStore.instance
+          .add(PendingPano(jobId: jobId, nodeId: nodeId, submittedAt: DateTime.now()));
+      msg?.value = 'ה-AI משלים תקרה, רצפה וסוגר 360°… (1–2 דקות)';
       await AwsApiClient.instance.startEnhancePanorama(jobId);
-      for (var t = 0; t < 150; t++) {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        final s = await AwsApiClient.instance.getPanorama(jobId);
-        if (s == null) continue;
-        if (s.status == 'ready' && s.imageUrl.isNotEmpty) {
-          close();
-          if (!mounted) return;
-          setState(() => _nodes[i] =
-              node.copyWith(imageUrl: s.imageUrl, haov: 360, vaov: 180));
-          _toast('הפנורמה הושלמה ל-360° מלא ✨');
-          return;
-        }
-        if (s.status == 'failed') {
-          close();
-          _toast('ההשלמה נכשלה. נסו שוב.');
-          return;
-        }
+      await _pollEnhanceJob(jobId, nodeId, showedModal: showModal);
+    } catch (_) {
+      if (showModal) _toast('שגיאה בהשלמה. נסו שוב.');
+    } finally {
+      closeModal();
+      if (mounted) setState(() => _enhancing.remove(nodeId));
+    }
+  }
+
+  // Polls one enhance job to a terminal state and, on success, adds the
+  // completed 360 as a 'משופר ✨' version of [nodeId] (non-destructive — the
+  // original stays as 'מקור'). Leaving the screen ends the loop WITHOUT dropping
+  // the persisted record, so a later resume can finish the job.
+  Future<void> _pollEnhanceJob(String jobId, String nodeId,
+      {bool showedModal = false}) async {
+    for (var t = 0; t < 150; t++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return; // record kept → resumed on re-entry
+      final s = await AwsApiClient.instance.getPanorama(jobId);
+      if (s == null) continue;
+      if (s.status == 'ready' && s.imageUrl.isNotEmpty) {
+        await PendingPanoStore.instance.remove(jobId);
+        final i = _nodes.indexWhere((n) => n.id == nodeId);
+        if (i < 0) return; // node deleted while enhancing
+        setState(() => _nodes[i] = _nodes[i].addVersion(
+              PanoVersion(
+                  imageUrl: s.imageUrl, haov: 360, vaov: 180, source: 'משופר ✨'),
+            ));
+        final name = _nodes[i].label.isNotEmpty ? _nodes[i].label : 'הנקודה';
+        _toast('נוספה גרסה משופרת ל־$name ✨ — אפשר להשוות ולבחור');
+        return;
       }
-      close();
-      _toast('ההשלמה לוקחת יותר מדי זמן. נסו שוב מאוחר יותר.');
-    } catch (e) {
-      close();
-      _toast('שגיאה בהשלמה. נסו שוב.');
+      if (s.status == 'failed') {
+        await PendingPanoStore.instance.remove(jobId);
+        if (showedModal) _toast('ההשלמה נכשלה. נסו שוב.');
+        return;
+      }
+    }
+    // Timed out this session — keep the record (within _maxAge) so a later
+    // resume can still pick up a slow job.
+  }
+
+  // On capture-screen entry, resume any persisted enhance jobs whose node is in
+  // this tour (e.g. the user left mid-enhance and came back). Jobs for nodes not
+  // present are left alone — they age out of the store.
+  Future<void> _resumePendingEnhances() async {
+    final pending = await PendingPanoStore.instance.all();
+    if (!mounted) return;
+    for (final p in pending) {
+      if (_enhancing.contains(p.nodeId)) continue;
+      if (_nodes.indexWhere((n) => n.id == p.nodeId) < 0) continue;
+      setState(() => _enhancing.add(p.nodeId));
+      unawaited(() async {
+        try {
+          await _pollEnhanceJob(p.jobId, p.nodeId);
+        } finally {
+          if (mounted) setState(() => _enhancing.remove(p.nodeId));
+        }
+      }());
     }
   }
 
@@ -656,6 +722,17 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         vaov: vaov,
       ));
     });
+    // AUTO: a partial pano (not a full sphere) is auto-completed to a full 360
+    // in the background — the enhanced result lands as a 'משופר ✨' version the
+    // landlord can compare against 'מקור'. Full spheres (sweep/AI) skip this.
+    final isFull = haov >= 359 && vaov >= 179;
+    final isNetwork = !(url.startsWith('/') || url.startsWith('file://'));
+    if (!isFull && isNetwork) unawaited(_startEnhance(id));
+  }
+
+  PanoramaNode? _nodeById(String id) {
+    final i = _nodes.indexWhere((n) => n.id == id);
+    return i < 0 ? null : _nodes[i];
   }
 
   // Spread auto-placed points along a diagonal so an un-mapped tour still has a
@@ -703,6 +780,21 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   }
 
 
+
+  // Landlord curates which renders tenants can flip to in the 360 viewer.
+  // Long-press a version chip to hide/show it; the last visible one can't hide.
+  void _toggleVersionHidden(int i, int v) {
+    if (i < 0 || i >= _nodes.length) return;
+    final updated = _nodes[i].toggleVersionHidden(v);
+    if (identical(updated, _nodes[i])) {
+      _toast('חייבת להישאר לפחות גרסה אחת גלויה לדיירים');
+      return;
+    }
+    setState(() => _nodes[i] = updated);
+    _toast(updated.allVersions[v].hidden
+        ? 'הגרסה תוסתר מהדיירים 👁️'
+        : 'הגרסה תוצג לדיירים 👁️');
+  }
 
   Future<String?> _askLabel(String fallback) async {
     final ctrl = TextEditingController(text: fallback);
@@ -789,6 +881,10 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                       onRename: () => _renameNode(i),
                       onPreview: () => _previewNode(_nodes[i]),
                       onEnhance: () => _enhanceNode(i),
+                      onSelectVersion: (v) => setState(
+                          () => _nodes[i] = _nodes[i].selectVersion(v)),
+                      onToggleVersionHidden: (v) => _toggleVersionHidden(i, v),
+                      enhancing: _enhancing.contains(_nodes[i].id),
                     ),
                   ),
           ),
@@ -892,6 +988,9 @@ class _NodeTile extends StatelessWidget {
     required this.onRename,
     required this.onPreview,
     required this.onEnhance,
+    required this.onSelectVersion,
+    required this.onToggleVersionHidden,
+    this.enhancing = false,
   });
   final int index;
   final PanoramaNode node;
@@ -899,6 +998,11 @@ class _NodeTile extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onPreview;
   final VoidCallback onEnhance;
+  final ValueChanged<int> onSelectVersion;
+  final ValueChanged<int> onToggleVersionHidden;
+
+  /// True while a background auto-enhance is running for this node.
+  final bool enhancing;
 
   // A full sphere = 360×180. Anything narrower is a partial pano that can be
   // completed (poles + wrap) into a full 360.
@@ -913,7 +1017,62 @@ class _NodeTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2ECF1)),
       ),
-      child: ListTile(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _tile(context),
+          // Version picker — appears once the node has more than one 360 render
+          // (e.g. מקור + משופר). Lets the landlord compare and pick, so enhance
+          // is reversible.
+          if (node.hasMultipleVersions) _versionBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _versionBar() {
+    final versions = node.allVersions;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Row(
+        children: [
+          Icon(IconsaxPlusLinear.layer, size: 15, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var v = 0; v < versions.length; v++)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: _VersionChip(
+                        label: versions[v].source.isNotEmpty
+                            ? versions[v].source
+                            : 'גרסה ${v + 1}',
+                        selected: v == node.activeVersion,
+                        hidden: versions[v].hidden,
+                        onTap: () => onSelectVersion(v),
+                        onLongPress: () => onToggleVersionHidden(v),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Hint: what long-press does (curate what tenants see).
+          const Text('החזק להסתרה מדיירים',
+              style: TextStyle(
+                  color: AppColors.textDisabled,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile(BuildContext context) {
+    return ListTile(
         // Tap the thumbnail → quick 360 preview (a small "play" badge hints it).
         leading: GestureDetector(
           onTap: onPreview,
@@ -948,24 +1107,48 @@ class _NodeTile extends StatelessWidget {
         title: Text(node.label.isNotEmpty ? node.label : 'נקודה ${index + 1}',
             style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Row(children: [
-          Icon(_isFull ? IconsaxPlusBold.tick_circle : IconsaxPlusBold.magic_star,
+          Icon(
+              enhancing
+                  ? IconsaxPlusBold.magic_star
+                  : (_isFull
+                      ? IconsaxPlusBold.tick_circle
+                      : IconsaxPlusBold.magic_star),
               size: 13,
-              color: _isFull ? AppColors.success : AppColors.primary),
+              color: _isFull && !enhancing
+                  ? AppColors.success
+                  : AppColors.primary),
           const SizedBox(width: 4),
           Expanded(
-            child: Text(_isFull ? '360° מלא · גרור לסידור' : 'חלקי · אפשר להשלים ל-360°',
+            child: Text(
+                enhancing
+                    ? 'משלים ל-360° מלא…'
+                    : (_isFull ? '360° מלא · גרור לסידור' : 'חלקי · אפשר להשלים ל-360°'),
                 style: TextStyle(
-                    color: _isFull ? AppColors.textSecondary : AppColors.primaryDark,
+                    color: _isFull && !enhancing
+                        ? AppColors.textSecondary
+                        : AppColors.primaryDark,
                     fontSize: 12,
-                    fontWeight: _isFull ? FontWeight.w500 : FontWeight.w700)),
+                    fontWeight:
+                        _isFull && !enhancing ? FontWeight.w500 : FontWeight.w700)),
           ),
         ]),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Complete a partial pano to a full 360 (poles + wrap) — the headline
-            // "connect into a full 360" action.
-            if (!_isFull)
+            // While auto-completing, show a spinner in place of the ✨ action.
+            if (enhancing)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.primary),
+                ),
+              )
+            // Complete a partial pano to a full 360 (poles + wrap) — manual
+            // trigger / retry if the auto pass didn't run or failed.
+            else if (!_isFull)
               IconButton(
                 icon: const Text('✨', style: TextStyle(fontSize: 17)),
                 onPressed: onEnhance,
@@ -996,14 +1179,73 @@ class _NodeTile extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _thumbFallback() => Container(
         color: AppColors.primaryLight2,
         child: Icon(IconsaxPlusLinear.gallery, color: AppColors.primary),
       );
+}
+
+/// A pill in the node's version picker (מקור / משופר ✨ …).
+class _VersionChip extends StatelessWidget {
+  const _VersionChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.onLongPress,
+    this.hidden = false,
+  });
+
+  final String label;
+  final bool selected;
+
+  /// Landlord-hidden from the tenant viewer (dimmed, eye-off icon).
+  final bool hidden;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: hidden ? 0.55 : 1,
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.primaryLight2,
+            borderRadius: BorderRadius.circular(999),
+            border: hidden
+                ? Border.all(color: AppColors.textDisabled, width: 1)
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hidden) ...[
+                Icon(IconsaxPlusLinear.eye_slash,
+                    size: 12,
+                    color: selected ? Colors.white : AppColors.primaryDark),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.primaryDark,
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Which capture path the landlord chose on the guide screen.

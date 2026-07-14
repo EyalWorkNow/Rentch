@@ -175,4 +175,103 @@ void main() {
     tester.takeException();
     expect(find.textContaining('· מטבח'), findsOneWidget);
   });
+
+  group('PanoramaNode versions', () {
+    const original = PanoramaNode(
+      id: 'a',
+      imageUrl: 'https://example.com/raw.jpg',
+      label: 'סלון',
+      haov: 200,
+      vaov: 90, // a partial pano
+    );
+
+    test('legacy node synthesizes a single מקור version', () {
+      expect(original.hasMultipleVersions, isFalse);
+      expect(original.allVersions, hasLength(1));
+      expect(original.allVersions.single.source, 'מקור');
+      expect(original.allVersions.single.imageUrl, original.imageUrl);
+    });
+
+    test('addVersion is non-destructive and activates the new render', () {
+      final enhanced = original.addVersion(const PanoVersion(
+        imageUrl: 'https://example.com/enhanced.jpg',
+        haov: 360,
+        vaov: 180,
+        source: 'משופר ✨',
+      ));
+
+      // Two versions now; the original is preserved as version 0.
+      expect(enhanced.allVersions, hasLength(2));
+      expect(enhanced.allVersions[0].imageUrl, 'https://example.com/raw.jpg');
+      // Active fields mirror the new (enhanced) version so viewers update.
+      expect(enhanced.activeVersion, 1);
+      expect(enhanced.imageUrl, 'https://example.com/enhanced.jpg');
+      expect(enhanced.haov, 360);
+      expect(enhanced.vaov, 180);
+
+      // Flip back to the original — image + FOV revert, nothing is lost.
+      final reverted = enhanced.selectVersion(0);
+      expect(reverted.imageUrl, 'https://example.com/raw.jpg');
+      expect(reverted.haov, 200);
+      expect(reverted.vaov, 90);
+      expect(reverted.allVersions, hasLength(2)); // enhanced still available
+    });
+
+    test('versions survive a JSON round-trip; single-version stays lean', () {
+      final enhanced = original.addVersion(const PanoVersion(
+        imageUrl: 'https://example.com/enhanced.jpg',
+        source: 'משופר ✨',
+      ));
+      final decoded = PanoramaNode.fromJson(enhanced.toJson());
+      expect(decoded.allVersions, hasLength(2));
+      expect(decoded.activeVersion, 1);
+      expect(decoded.allVersions[1].source, 'משופר ✨');
+
+      // A single-render node must NOT bloat the JSON with a versions array.
+      expect(original.toJson().containsKey('versions'), isFalse);
+    });
+
+    test('viewer visibility: landlord hides a version from tenants', () {
+      final node = original.addVersion(const PanoVersion(
+        imageUrl: 'https://example.com/enhanced.jpg',
+        source: 'משופר ✨',
+      ));
+      // Both visible by default → tenant switcher offers both.
+      expect(node.viewerVersions, hasLength(2));
+
+      // Hide the enhanced one → tenants only see 'מקור'.
+      final hiddenEnhanced = node.toggleVersionHidden(1);
+      expect(hiddenEnhanced.allVersions[1].hidden, isTrue);
+      expect(hiddenEnhanced.viewerVersions, hasLength(1));
+      expect(hiddenEnhanced.viewerVersions.single.source, 'מקור');
+
+      // Hidden flag survives a JSON round-trip.
+      final decoded = PanoramaNode.fromJson(hiddenEnhanced.toJson());
+      expect(decoded.viewerVersions, hasLength(1));
+    });
+
+    test('cannot hide the last visible version', () {
+      final node = original.addVersion(const PanoVersion(
+        imageUrl: 'https://example.com/enhanced.jpg',
+        source: 'משופר ✨',
+      ));
+      final oneHidden = node.toggleVersionHidden(1); // hide enhanced → 1 left
+      // Attempting to hide the sole remaining visible version is refused.
+      final refused = oneHidden.toggleVersionHidden(0);
+      expect(identical(refused, oneHidden), isTrue);
+      expect(refused.viewerVersions, isNotEmpty);
+    });
+
+    test('hiding the active version moves active to a visible one', () {
+      // active = enhanced (index 1). Hide it → active should fall back to 0.
+      final node = original.addVersion(const PanoVersion(
+        imageUrl: 'https://example.com/enhanced.jpg',
+        source: 'משופר ✨',
+      ));
+      expect(node.activeVersion, 1);
+      final hid = node.toggleVersionHidden(1);
+      expect(hid.activeVersion, 0);
+      expect(hid.imageUrl, 'https://example.com/raw.jpg'); // published default reverted
+    });
+  });
 }
