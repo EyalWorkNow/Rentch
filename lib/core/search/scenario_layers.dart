@@ -198,6 +198,56 @@ class ScenarioLayers {
     return _map[deriveKey(p, religiosity: religiosity, purpose: purpose)]
         ?.weights;
   }
+
+  // ── spec → ranking dimension (scoring) ────────────────────────────────────
+
+  /// Spec layer → a canonical scoring dimension (kScoringDimensions). Only
+  /// layers that have a ranking dimension are here; pure display POIs
+  /// (culture/dining/gyms/pools/vets/parking/bike_share/playgrounds) have none.
+  static const Map<String, String> _layerToDim = {
+    'transit_stops': 'transit',
+    'rail_stations': 'transit',
+    'nightlife': 'nightlife',
+    'nightlife_venues': 'nightlife',
+    'schools': 'schools',
+    'schools_grid': 'schools',
+    'parks': 'park',
+    'dog_parks': 'park',
+    'synagogues': 'religious_area',
+    'worship': 'religious_area',
+    'market_seed': 'value',
+    'stat_area_value': 'value',
+    'employment': 'employment',
+    'coworking': 'employment',
+    'crime': 'safety',
+    'noise_roads': 'low_noise',
+    'future_infra': 'future_value',
+    'supermarkets': 'convenience',
+    'poi_retail': 'convenience',
+    'clinics': 'health',
+    'health': 'health',
+    'pharmacies': 'health',
+    'hospitals': 'health',
+  };
+
+  /// Per-dimension prior-boost targets (0..1) for [p], derived from the
+  /// scenario's layer weights (spec range ~0.5..5 → target mean 0.5..1.0),
+  /// keeping the strongest layer per dimension. Fed to the ranker as a GENTLE
+  /// low-precision prior so learned/stated evidence still dominates. Null when
+  /// unavailable.
+  Map<String, double>? dimensionBoostsFor(NearbyProfile p,
+      {String? religiosity, String? purpose}) {
+    final w = weightsFor(p, religiosity: religiosity, purpose: purpose);
+    if (w == null) return null;
+    final out = <String, double>{};
+    w.forEach((layer, weight) {
+      final dim = _layerToDim[layer];
+      if (dim == null) return;
+      final target = (0.5 + weight * 0.09).clamp(0.0, 1.0);
+      if (target > (out[dim] ?? 0.0)) out[dim] = target;
+    });
+    return out.isEmpty ? null : out;
+  }
 }
 
 /// Spec-primary nearby sections with heuristic fallback — the entry point call

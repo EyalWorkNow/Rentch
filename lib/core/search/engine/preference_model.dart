@@ -27,6 +27,8 @@ import 'package:dating_app/core/finance/monthly_cost.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart';
+import 'package:dating_app/core/search/scenario_layers.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -1349,6 +1351,22 @@ class PreferenceModelBuilder {
       'employment': const LinearUtility(),
       'low_floor': const LinearUtility(),
     };
+
+    // ── curated persona→layer spec: a GENTLE prior nudge ─────────────────────
+    // The 504-scenario spec (ScenarioLayers) says which layers a persona cares
+    // about; fold its layer weights into the matching dimension priors at LOW
+    // precision (0.8 vs a ~11 prior precision ⇒ a ~0.05 nudge) so stated and
+    // learned evidence still dominate. Best-effort: an unloaded asset or an
+    // unmatched persona is a no-op. NOT marked `stated` — these are priors, not
+    // user-stated facts, so they don't claim attribution in explanations.
+    try {
+      final np = NearbyProfile.fromText(query.rawText);
+      final purpose =
+          query.transactionType == TransactionTypeFilter.sale ? 'buy' : 'rent';
+      ScenarioLayers.instance
+          .dimensionBoostsFor(np, purpose: purpose)
+          ?.forEach((dim, target) => weights[dim]?.observe(target, 0.8));
+    } catch (_) {}
 
     final constraints = HardConstraints(
       city: query.city,

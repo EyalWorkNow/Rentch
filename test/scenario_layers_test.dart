@@ -79,6 +79,24 @@ void main() {
     }
   });
 
+  test('dimensionBoostsFor maps spec layers → gentle dimension targets', () {
+    // single + secular + dog: core [transit_stops(5), nightlife(4), … dog_parks]
+    final b = ScenarioLayers.instance.dimensionBoostsFor(
+        const NearbyProfile(single: true, secular: true, dog: true));
+    expect(b, isNotNull);
+    // transit_stops weight 5 → 0.5 + 5*0.09 = 0.95 target on 'transit'
+    expect(b!['transit'], closeTo(0.95, 1e-9));
+    // nightlife weight 4 → 0.86
+    expect(b['nightlife'], closeTo(0.86, 1e-9));
+    // dog_parks → 'park' dimension present, targets clamp to ≤1.0
+    expect(b['park'], isNotNull);
+    for (final t in b.values) {
+      expect(t, inInclusiveRange(0.0, 1.0));
+    }
+    // pure-display layers (culture/dining) never leak into scoring dims.
+    expect(b.containsKey('culture'), isFalse);
+  });
+
   test('coreOnly returns only the highlighted core band', () {
     final all = personalizedNearbySections(
         const NearbyProfile(single: true, secular: true, dog: true));
