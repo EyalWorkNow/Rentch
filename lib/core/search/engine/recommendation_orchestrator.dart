@@ -497,6 +497,16 @@ class Explainer {
 // RecommendationEngine — the public entry point
 // ═════════════════════════════════════════════════════════════════════════════
 
+// Process-wide cache of the catalogue-constant market baseline (see recommend()).
+// A single slot is enough: queries within a session share one catalogue, so the
+// key stays stable and hits every time until the catalogue changes.
+class _BaselineCache {
+  _BaselineCache._();
+  static int? key;
+  static MarketContext? rent;
+  static MarketContext? sale;
+}
+
 class RecommendationEngine {
   const RecommendationEngine._();
 
@@ -513,6 +523,7 @@ class RecommendationEngine {
     OnlineLogisticLearner? learner,
     double? workLat,
     double? workLon,
+    Map<String, Map<String, double>>? learnerFeatureSink,
   }) {
     if (candidates.isEmpty) return const [];
 
@@ -525,16 +536,35 @@ class RecommendationEngine {
     // catalogue in ⇒ same baseline out, every query. (A tiny catalogue — <8 of a
     // type, e.g. a unit test — has no meaningful distribution, so it falls back to
     // per-query analyze() below.)
-    final rentAll = <RentalProperty>[];
-    final saleAll = <RentalProperty>[];
-    for (final p in candidates) {
-      (p.transactionType == PropertyTransactionType.sale ? saleAll : rentAll)
-          .add(p);
+    // PERF: the baseline is catalogue-constant ("same catalogue in ⇒ same baseline
+    // out"), so analyzing ~1,500 listings' percentiles on EVERY query/swipe is
+    // wasted main-thread work. Cache it, keyed by the candidate list's identity +
+    // length + endpoints — a robust, O(1) key that misses (recomputes) whenever the
+    // catalogue is replaced, appended to, or a different subset is passed.
+    final baselineKey = Object.hash(
+      identityHashCode(candidates),
+      candidates.length,
+      candidates.isEmpty ? 0 : candidates.first.id,
+      candidates.isEmpty ? 0 : candidates.last.id,
+    );
+    final MarketContext? rentBaseline;
+    final MarketContext? saleBaseline;
+    if (_BaselineCache.key == baselineKey) {
+      rentBaseline = _BaselineCache.rent;
+      saleBaseline = _BaselineCache.sale;
+    } else {
+      final rentAll = <RentalProperty>[];
+      final saleAll = <RentalProperty>[];
+      for (final p in candidates) {
+        (p.transactionType == PropertyTransactionType.sale ? saleAll : rentAll)
+            .add(p);
+      }
+      rentBaseline = rentAll.length >= 8 ? MarketContext.analyze(rentAll) : null;
+      saleBaseline = saleAll.length >= 8 ? MarketContext.analyze(saleAll) : null;
+      _BaselineCache.key = baselineKey;
+      _BaselineCache.rent = rentBaseline;
+      _BaselineCache.sale = saleBaseline;
     }
-    final rentBaseline =
-        rentAll.length >= 8 ? MarketContext.analyze(rentAll) : null;
-    final saleBaseline =
-        saleAll.length >= 8 ? MarketContext.analyze(saleAll) : null;
 
     // Hard rent/sale gate: an investor's "דירה להשקעה" must never surface
     // rentals (and vice-versa). Enforced here so EVERY caller — incl. the chat's
@@ -773,7 +803,7 @@ class RecommendationEngine {
     // keeps its own centre meaning.
     if (namedCity.isEmpty) {
       Set<String>? region;
-      if (RegExp(r'השרון|בשרון|שרון\b').hasMatch(query.rawText)) {
+      if (RegExp(r'השרון|בשרון|שרון(?![\wא-ת])').hasMatch(query.rawText)) {
         region = _sharonRegion;
       } else if (query.intents.contains(SearchIntent.central)) {
         region = _centralRegion;
@@ -909,7 +939,7 @@ class RecommendationEngine {
     // region listings too, so a cheap peripheral flat doesn't top a region search.
     if (namedCity.isEmpty) {
       Set<String>? region;
-      if (RegExp(r'השרון|בשרון|שרון\b').hasMatch(query.rawText)) {
+      if (RegExp(r'השרון|בשרון|שרון(?![\wא-ת])').hasMatch(query.rawText)) {
         region = _sharonRegion;
       } else if (query.intents.contains(SearchIntent.central)) {
         region = _centralRegion;
@@ -1036,6 +1066,10 @@ class RecommendationEngine {
     return [
       for (final c in selected)
         () {
+          // Stash the learner feature vector for this SHOWN listing so a later
+          // swipe can feed the online learner in O(1) — no recompute (see
+          // DatingProvider._pfvCache / registerSwipeFeedback).
+          learnerFeatureSink?[c.property.id] = model.learnerFeatures(c.pfv);
           final fitPct = (match[c]! * 100).round();
           final explanation = Explainer.explain(c, model);
           // Flag WHY an out-of-city listing surfaced: it hugs the searched city's

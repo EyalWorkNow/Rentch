@@ -2632,12 +2632,34 @@ class _FeatureWrap extends StatelessWidget {
   }
 }
 
-class _MapSection extends StatelessWidget {
+class _MapSection extends StatefulWidget {
   const _MapSection({required this.property});
   final RentalProperty property;
 
   @override
+  State<_MapSection> createState() => _MapSectionState();
+}
+
+class _MapSectionState extends State<_MapSection> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Defer the FlutterMap (widget init + OpenStreetMap tile fetch) off the
+    // page-open critical path — building it eagerly on every listing open was a
+    // main cause of the "delay entering an apartment page". The map is below the
+    // fold, so it fills in a moment after the page has slid in.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) setState(() => _ready = true);
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final property = widget.property;
     return GestureDetector(
       onTap: () => _openInMaps(property.lat, property.lon),
       child: ClipRRect(
@@ -2647,7 +2669,8 @@ class _MapSection extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              FlutterMap(
+              if (_ready)
+                FlutterMap(
                 options: MapOptions(
                   initialCenter: LatLng(property.lat, property.lon),
                   initialZoom: 15,
@@ -2685,7 +2708,15 @@ class _MapSection extends StatelessWidget {
                     ],
                   ),
                 ],
-              ),
+                )
+              else
+                ColoredBox(
+                  color: const Color(0xFFE9EEF2),
+                  child: Center(
+                    child: RentlyIcon(IconsaxPlusLinear.map_1,
+                        color: AppColors.primary, size: 30),
+                  ),
+                ),
               // "Open in maps" hint pill
               Positioned(
                 bottom: 12,

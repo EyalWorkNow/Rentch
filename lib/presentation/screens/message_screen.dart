@@ -17,6 +17,7 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
 import 'package:dating_app/presentation/screens/contract_form_screen.dart';
 import 'package:dating_app/presentation/screens/contract_sign_flow_screen.dart';
+import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
 import 'package:dating_app/presentation/widgets/pulse_widget.dart';
@@ -572,72 +573,82 @@ class _MessageScreenState extends State<MessageScreen> {
             shadowColor: chatTheme.borderColor,
             iconTheme: IconThemeData(color: chatTheme.primaryText),
             titleSpacing: 0,
-            title: Row(children: [
-              // Property thumbnail
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: chatTheme.borderColor),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: SafeImage(
-                    source: imageUrl,
-                    fallback: Container(
-                      color: chatTheme.iconSurface,
-                      child: RentlyIcon(IconsaxPlusLinear.building,
-                          color: chatTheme.accent, size: 18),
-                    ),
+            title: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PropertyDetailScreen(property: property),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(property.address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: chatTheme.primaryText,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${property.priceLabel} · ${property.city}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: chatTheme.secondaryText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-              // Connection dot
-              if (isRemote)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: PulseWidget(
-                    scaleUpTo: 1.35,
-                    duration: const Duration(milliseconds: 1500),
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            isConnected ? AppColors.success : AppColors.warning,
+                );
+              },
+              child: Row(children: [
+                // Property thumbnail
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: chatTheme.borderColor),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SafeImage(
+                      source: imageUrl,
+                      fallback: Container(
+                        color: chatTheme.iconSurface,
+                        child: RentlyIcon(IconsaxPlusLinear.building,
+                            color: chatTheme.accent, size: 18),
                       ),
                     ),
                   ),
                 ),
-            ]),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(property.address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: chatTheme.primaryText,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${property.priceLabel} · ${property.city}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: chatTheme.secondaryText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                // Connection dot
+                if (isRemote)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: PulseWidget(
+                      scaleUpTo: 1.35,
+                      duration: const Duration(milliseconds: 1500),
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color:
+                              isConnected ? AppColors.success : AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
             // Actions menu icon + block popup
             actions: [
               IconButton(

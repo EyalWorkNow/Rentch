@@ -593,6 +593,7 @@ class ProfileScreen extends StatelessWidget {
                                 ? 'הוסף תקציב'
                                 : _fmt(profile.budgetMax),
                             isEmpty: isDemoProfile,
+                            onTap: () => _showBudgetSheet(context, provider, profile),
                           ),
                           const _SettingsDivider(),
                           _PreferenceTile(
@@ -600,8 +601,9 @@ class ProfileScreen extends StatelessWidget {
                             label: 'מספר חדרים',
                             value: isDemoProfile
                                 ? 'הוסף מספר חדרים'
-                                : '${profile.desiredRooms} חדרים',
+                                : '${profile.desiredRooms % 1 == 0 ? profile.desiredRooms.toInt() : profile.desiredRooms} חדרים',
                             isEmpty: isDemoProfile,
+                            onTap: () => _showRoomsSheet(context, provider, profile),
                           ),
                           const _SettingsDivider(),
                           _PreferenceTile(
@@ -612,6 +614,7 @@ class ProfileScreen extends StatelessWidget {
                                 : profile.moveInWindow,
                             isEmpty:
                                 isDemoProfile || profile.moveInWindow.isEmpty,
+                            onTap: () => _showMoveInSheet(context, provider, profile),
                           ),
                         ],
                       ),
@@ -3429,11 +3432,13 @@ class _PreferenceTile extends StatelessWidget {
     required this.label,
     required this.value,
     this.isEmpty = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   /// When true the value is a "הוסף ..." prompt (no real data yet) — rendered in
   /// a muted style so it reads as a call to action rather than a real value.
@@ -3441,56 +3446,54 @@ class _PreferenceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: RentlyIcon(
-              icon,
-              size: 20,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: isEmpty
-                  ? AppColors.primary.withValues(alpha: 0.08)
-                  : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: isEmpty ? AppColors.primary : const Color(0xFF475569),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: RentlyIcon(
+                icon,
+                size: 20,
+                color: AppColors.primary,
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          const RentlyIcon(
-            IconsaxPlusLinear.arrow_left,
-            size: 16,
-            color: Color(0xFF94A3B8),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isEmpty
+                    ? AppColors.primary.withValues(alpha: 0.08)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: isEmpty ? AppColors.primary : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3572,6 +3575,278 @@ class _ActionRow extends StatelessWidget {
                   : const Color(0xFF94A3B8),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Direct Input Helper Sheets ──────────────────────────────────────────────
+
+void _showBudgetSheet(BuildContext context, DatingProvider provider, TenantProfile profile) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      final controller = TextEditingController(
+        text: profile.budgetMax > 0 ? profile.budgetMax.toString() : '',
+      );
+      return _DirectInputSheet(
+        title: 'תקציב מקסימלי',
+        subtitle: 'הגדר תקציב נוח עבורך לחיפוש דירה',
+        inputWidget: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          decoration: InputDecoration(
+            prefixText: '₪ ',
+            prefixStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            hintText: 'לדוגמה: 5,000',
+            hintStyle: TextStyle(fontSize: 20, color: Colors.grey.shade400),
+            border: InputBorder.none,
+          ),
+        ),
+        onSave: () {
+          final val = int.tryParse(controller.text.replaceAll(',', '')) ?? 0;
+          if (val > 0) {
+            provider.updateTenantProfile(profile.copyWith(budgetMax: val));
+          }
+          Navigator.pop(context);
+        },
+      );
+    },
+  );
+}
+
+void _showRoomsSheet(BuildContext context, DatingProvider provider, TenantProfile profile) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      double selectedRooms = profile.desiredRooms > 0 ? profile.desiredRooms : 2.0;
+      final roomOptions = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0];
+
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return _DirectInputSheet(
+            title: 'מספר חדרים רצוי',
+            subtitle: 'בחר את מספר החדרים המבוקש בדירה',
+            inputWidget: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.2,
+              ),
+              itemCount: roomOptions.length,
+              itemBuilder: (context, index) {
+                final opt = roomOptions[index];
+                final isSelected = opt == selectedRooms;
+                final displayVal = opt == opt.toInt() ? opt.toInt().toString() : opt.toString();
+                return InkWell(
+                  onTap: () {
+                    setModalState(() {
+                      selectedRooms = opt;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      displayVal,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            onSave: () {
+              provider.updateTenantProfile(profile.copyWith(desiredRooms: selectedRooms));
+              Navigator.pop(context);
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
+void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfile profile) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      String selectedWindow = profile.moveInWindow.isNotEmpty ? profile.moveInWindow : 'גמיש';
+      final presets = ['מיידי', 'בחודש הקרוב', 'בעוד חודשיים', 'גמיש'];
+
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return _DirectInputSheet(
+            title: 'מועד כניסה רצוי',
+            subtitle: 'בחר מתי תרצה להיכנס לדירה החדשה',
+            inputWidget: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: presets.map((preset) {
+                final isSelected = preset == selectedWindow;
+                return InkWell(
+                  onTap: () {
+                    setModalState(() {
+                      selectedWindow = preset;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : Colors.transparent,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          preset,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            onSave: () {
+              provider.updateTenantProfile(profile.copyWith(moveInWindow: selectedWindow));
+              Navigator.pop(context);
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
+class _DirectInputSheet extends StatelessWidget {
+  const _DirectInputSheet({
+    required this.title,
+    required this.subtitle,
+    required this.inputWidget,
+    required this.onSave,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget inputWidget;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Grabber
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Input Container
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: inputWidget,
+              ),
+              const SizedBox(height: 24),
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: onSave,
+                  child: const Text(
+                    'שמירה',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -11,6 +11,8 @@ import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/core/matching/match_engine.dart';
 import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
+import 'package:dating_app/core/search/engine/preference_model.dart'
+    show OnlineLogisticLearner;
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/core/services/kiri_3d_service.dart';
@@ -19,8 +21,10 @@ import 'package:dating_app/core/services/pending_scan_store.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
+import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:dating_app/data/models/user_signals.dart';
 import 'package:dating_app/data/models/persona_profile.dart';
 import 'package:dating_app/core/services/aws_client.dart';
@@ -128,6 +132,15 @@ class DatingProvider extends ChangeNotifier {
   List<SearchArea> _searchAreas = const [];
   List<AppReview> _tenantReviews = const [];
   Map<String, List<AppReview>> _propertyReviews = <String, List<AppReview>>{};
+  // ── FTRL online personalization (closed loop) ──────────────────────────────
+  // A per-user FTRL learner that learns P(like|features) from real swipes and
+  // is blended into ranking (confidence-gated, so it's inert until it has data).
+  // Persisted with the rest of the local state so it accumulates across sessions.
+  OnlineLogisticLearner _learner = OnlineLogisticLearner();
+  // propertyId → the learner feature vector of a SHOWN listing, stashed at render
+  // by the ranker (learnerFeatureSink) so a swipe can feed the learner in O(1).
+  final Map<String, Map<String, double>> _pfvCache = {};
+
   Set<String> _likedPropertyIds = <String>{};
   Set<String> _passedPropertyIds = <String>{};
   Set<String> _ownerAcceptedPropertyIds = <String>{};
@@ -495,7 +508,15 @@ class DatingProvider extends ChangeNotifier {
       limit: limit,
       workLat: _tenantProfile?.workLat,
       workLon: _tenantProfile?.workLon,
+      learner: _learner, // read side: blended in (confidence-gated)
+      learnerFeatureSink: _pfvCache, // stash shown listings' feature vectors
     );
+    // Keep the stash bounded (feature vectors of recently-shown listings only).
+    if (_pfvCache.length > 800) {
+      for (final k in _pfvCache.keys.take(_pfvCache.length - 800).toList()) {
+        _pfvCache.remove(k);
+      }
+    }
     // Calibration: log the engine's OWN prediction for every result it surfaces,
     // so a later swipe/contact outcome (joined by propertyId+sessionId) tells us
     // how well the hand-tuned fit% actually predicts behaviour. Fire-and-forget.
@@ -2289,6 +2310,58 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// APPENDS a finished scan as a ROOM to the property's 3D model, instead of
+  /// replacing the whole model3d. This is what makes background multi-room
+  /// completion work: two rooms finished off-screen both land in model3d.rooms
+  /// rather than the second overwriting the first. Deduped by asset url so a
+  /// re-run of the finalizer can't double-add. Also mirrors the first viewable
+  /// room into the legacy single-scan urls for back-compat readers.
+  Future<void> appendScanRoom({
+    required String propertyId,
+    required ScannedRoom room,
+  }) async {
+    if (!room.hasViewableAsset) return;
+    var changed = false;
+    final updated = _customProperties.map((property) {
+      if (property.id != propertyId) return property;
+      if (!_belongsToCurrentLandlord(property)) return property;
+      final current = property.model3d ?? const PropertyModel3d();
+      final dup = current.rooms.any((r) =>
+          (room.splatUrl != null && r.splatUrl == room.splatUrl) ||
+          (room.meshGlbUrl != null && r.meshGlbUrl == room.meshGlbUrl));
+      if (dup) return property;
+      final rooms = [...current.rooms, room];
+      final firstViewable =
+          rooms.firstWhere((r) => r.hasViewableAsset, orElse: () => room);
+      changed = true;
+      return property.copyWith(
+        model3d: current.copyWith(
+          rooms: rooms,
+          glbUrl: firstViewable.meshGlbUrl ?? current.glbUrl,
+          plyUrl: firstViewable.splatUrl ?? current.plyUrl,
+          scanDate: DateTime.now().toUtc(),
+        ),
+      );
+    }).toList();
+    if (!changed) return;
+    _customProperties = updated;
+    _invalidateCatalogCache();
+    await _persist();
+    final property = propertyById(propertyId);
+    if (property != null) {
+      unawaited(_propertyRepository
+          .saveProperty(property, ownerUserId: _currentOwnerUserId)
+          .then((result) {
+        if (!result.isOk && kDebugMode) {
+          debugPrint('appendScanRoom: remote rejected — ${result.userMessage}');
+        }
+      }));
+      AppEvents.instance
+          .log(UserEventType.tourUploaded, propertyId: propertyId);
+    }
+    notifyListeners();
+  }
+
   /// Re-checks every locally-persisted in-flight 3D scan against the backend
   /// (which polls KIRI; on KIRI status==2 it fetches+extracts the model zip,
   /// re-hosts the assets, and marks the job ready). When a job is ready we attach
@@ -2304,6 +2377,17 @@ class DatingProvider extends ChangeNotifier {
     }
     if (pending.isEmpty) return;
     for (final scan in pending) {
+      // Give-up guard: a KIRI job finishes well within an hour. A record older
+      // than this is either stuck server-side or its backend meta is gone (a 404
+      // the client can't distinguish from 'processing'). Drop it so it stops
+      // polling forever instead of lingering until the 12h store purge.
+      final submitted = scan.submittedAt;
+      if (submitted != null &&
+          DateTime.now().toUtc().difference(submitted.toUtc()) >
+              const Duration(minutes: 90)) {
+        await PendingScanStore.instance.remove(scan.jobId);
+        continue;
+      }
       // Only act on the current landlord's own listings.
       final property = _customPropertyById(scan.propertyId);
       if (property == null || !_belongsToCurrentLandlord(property)) continue;
@@ -2316,12 +2400,22 @@ class DatingProvider extends ChangeNotifier {
         } catch (_) {/* best-effort; getStatus below still reports state */}
         final job = await Kiri3dService.instance.result(scan.jobId);
         if (job.isReady && job.hasAssets) {
-          final model = PropertyModel3d(
-            glbUrl: job.meshGlbUrl ?? '',
-            plyUrl: job.splatUrl ?? '',
-            scanDate: DateTime.now().toUtc(),
+          // APPEND as a room (multi-room safe) — no name was known at submit
+          // time (naming happens after the scan), so default to the next number.
+          final existing =
+              _customPropertyById(scan.propertyId)?.model3d?.rooms.length ?? 0;
+          final name = scan.roomName.isNotEmpty
+              ? scan.roomName
+              : 'חדר ${existing + 1}';
+          await appendScanRoom(
+            propertyId: scan.propertyId,
+            room: ScannedRoom(
+              name: name,
+              meshGlbUrl: job.meshGlbUrl,
+              splatUrl: job.splatUrl,
+              source: 'cloud',
+            ),
           );
-          await attachPropertyModel3d(propertyId: scan.propertyId, model3d: model);
           await PendingScanStore.instance.remove(scan.jobId);
         } else if (job.isFailed) {
           // Reconstruction failed on KIRI — stop polling it.
@@ -2831,6 +2925,12 @@ class DatingProvider extends ChangeNotifier {
     final now = DateTime.now();
     final ratio = _priceToBudgetRatio(property);
     final liked = direction != SwipeDirection.skip;
+
+    // ── Close the FTRL loop: feed this real swipe into the online learner using
+    // the feature vector stashed when the listing was ranked (O(1), no recompute).
+    // The learner is persisted with the rest of the state (see _persist / restore).
+    final feats = _pfvCache[property.id];
+    if (feats != null) _learner.update(feats, liked ? 1.0 : 0.0);
 
     AppEvents.instance.service.logSwipeOutcome(
       propertyId: property.id,
@@ -4291,6 +4391,34 @@ class DatingProvider extends ChangeNotifier {
             type: PropertyMediaType.image,
           ),
         ],
+        // Demo 360° tour: one point with TWO real renders (from the sample
+        // panoramas) so guests can try the in-viewer version switcher.
+        panoramaTour: const PropertyPanoramaTour(nodes: [
+          PanoramaNode(
+            id: 'demo-node-1',
+            imageUrl: 'asset://assets/demo/office_360_v1.jpg',
+            label: 'הסלון',
+            activeVersion: 0,
+            versions: [
+              PanoVersion(
+                imageUrl: 'asset://assets/demo/office_360_v1.jpg',
+                source: 'מקור',
+              ),
+              PanoVersion(
+                imageUrl: 'asset://assets/demo/office_360_v2.jpg',
+                source: 'מסודר ✨',
+              ),
+              PanoVersion(
+                imageUrl: 'asset://assets/demo/office_360_v3.jpg',
+                source: 'ערב 🌇',
+              ),
+              PanoVersion(
+                imageUrl: 'asset://assets/demo/office_360_v4.jpg',
+                source: 'לילה 🌙',
+              ),
+            ],
+          ),
+        ]),
       ),
       RentalProperty(
         id: 'demo-prop-2',
@@ -4331,6 +4459,29 @@ class DatingProvider extends ChangeNotifier {
             type: PropertyMediaType.image,
           ),
         ],
+        // Demo 3D scan: multiple rooms so guests can try the room-picker in the
+        // 3D viewer. Uses public sample GLB meshes (loaded over the network by
+        // model-viewer) as stand-ins for real KIRI room reconstructions.
+        model3d: const PropertyModel3d(rooms: [
+          ScannedRoom(
+            name: 'סלון',
+            meshGlbUrl:
+                'https://modelviewer.dev/shared-assets/models/SheenChair.glb',
+            source: 'cloud',
+          ),
+          ScannedRoom(
+            name: 'מטבח',
+            meshGlbUrl:
+                'https://modelviewer.dev/shared-assets/models/RobotExpressive.glb',
+            source: 'cloud',
+          ),
+          ScannedRoom(
+            name: 'חדר שינה',
+            meshGlbUrl:
+                'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
+            source: 'cloud',
+          ),
+        ]),
       ),
       RentalProperty(
         id: 'demo-prop-3',
@@ -4540,6 +4691,11 @@ class DatingProvider extends ChangeNotifier {
     _filters = SearchFilters.fromJson(
       Map<String, dynamic>.from(storedState['filters'] as Map? ?? const {}),
     );
+    final learnerJson = storedState['learner'];
+    if (learnerJson is Map) {
+      _learner = OnlineLogisticLearner.fromJson(
+          Map<String, dynamic>.from(learnerJson));
+    }
     _likedPropertyIds = Set<String>.from(
       storedState['likedPropertyIds'] as List<dynamic>? ?? const [],
     );
@@ -4800,6 +4956,7 @@ class DatingProvider extends ChangeNotifier {
     final snapshot = {
       'schema': 'rental_match_v2',
       'tenantProfile': _tenantProfile?.toJson(),
+      'learner': _learner.toJson(), // per-user FTRL model (z/n/updates)
       'filters': _filters.toJson(),
       'likedPropertyIds': _likedPropertyIds.toList(),
       'passedPropertyIds': _passedPropertyIds.toList(),

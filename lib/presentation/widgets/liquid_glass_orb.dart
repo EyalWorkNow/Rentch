@@ -121,15 +121,20 @@ class _LiquidGlassOrbState extends State<LiquidGlassOrb>
                 child: SizedBox(
                   width: widget.size,
                   height: widget.size,
-                  child: _glass != null
-                      ? CustomPaint(
-                          painter: _LiquidGlassPainter(
-                              shader: _glass!,
-                              time: t,
-                              level: lvl,
-                              speaking: widget.speaking ? 1.0 : 0.0),
-                        )
-                      : CustomPaint(painter: _FallbackOrbPainter(t: t)),
+                  // RepaintBoundary: the orb repaints EVERY frame (shader time /
+                // amplitude). Without this its dirty layer forces the whole voice
+                // screen (glass blur, transcript, buttons) to re-composite each
+                // frame; the boundary keeps the repaint to the orb's own layer.
+                child: RepaintBoundary(
+                    child: _glass != null
+                        ? CustomPaint(
+                            painter: _LiquidGlassPainter(
+                                shader: _glass!,
+                                time: t,
+                                level: lvl,
+                                speaking: widget.speaking ? 1.0 : 0.0),
+                          )
+                        : CustomPaint(painter: _FallbackOrbPainter(t: t))),
                 ),
               ),
             ],

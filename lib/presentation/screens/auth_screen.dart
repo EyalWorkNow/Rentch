@@ -3374,7 +3374,7 @@ class _LandlordCtaButton extends StatelessWidget {
                 Icon(IconsaxPlusLinear.home, color: Colors.white, size: 17),
                 SizedBox(width: 6),
                 Text(
-                  'אני בעל דירה',
+                  'כניסה כבעל דירה',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 13.5,
@@ -3459,13 +3459,6 @@ class _WelcomePortal extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Top CTA — landlords / agents declare their account type here.
-                // Tenants (apartment searchers) are the default and skip this.
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _LandlordCtaButton(onTap: onLandlordCta),
-                ),
-                const SizedBox(height: 4),
                 // Top logo / branding
                 Align(
                   alignment: Alignment.center,
@@ -3488,6 +3481,12 @@ class _WelcomePortal extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(height: 14),
+                // Centered Landlord login button below the logo
+                Align(
+                  alignment: Alignment.center,
+                  child: _LandlordCtaButton(onTap: onLandlordCta),
                 ),
                 const Spacer(),
 

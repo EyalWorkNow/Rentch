@@ -89,22 +89,27 @@ class _ErikPresenceState extends State<ErikPresence>
           // Snap up fast on sound, ease down slowly — reactive yet smooth.
           final k = target > _level ? 0.5 : 0.12;
           _level += (target - _level) * k;
-          return AnimatedBuilder(
-            animation: Listenable.merge([_morph, _spin]),
-            builder: (context, _) {
-              return CustomPaint(
-                size: Size(field, field),
-                painter: _PresencePainter(
-                  t: _morph.value,
-                  spin: _spin.value,
-                  level: _level,
-                  state: widget.state,
-                  accent: widget.accent,
-                  accentGlow: widget.accentGlow,
-                  showRing: widget.showRing,
-                ),
-              );
-            },
+          // RepaintBoundary: two controllers (_morph + _spin) repaint this orb on
+          // every frame — isolate it so its dirty layer doesn't re-composite the
+          // whole assistant screen behind it each tick.
+          return RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_morph, _spin]),
+              builder: (context, _) {
+                return CustomPaint(
+                  size: Size(field, field),
+                  painter: _PresencePainter(
+                    t: _morph.value,
+                    spin: _spin.value,
+                    level: _level,
+                    state: widget.state,
+                    accent: widget.accent,
+                    accentGlow: widget.accentGlow,
+                    showRing: widget.showRing,
+                  ),
+                );
+              },
+            ),
           );
         },
       ),

@@ -87,7 +87,7 @@ class _OrbPainter extends CustomPainter {
       final drift = s * 0.19;
       final bc = Offset(
         center.dx + drift * math.cos(tau * t + phase) * 0.9,
-        center.dy + drift * math.sin(tau * t * 0.8 + phase * 1.3),
+        center.dy + drift * math.sin(tau * t * 2.0 + phase * 1.3),
       );
 
       // Pulse: grow/shrink gently.
@@ -95,7 +95,7 @@ class _OrbPainter extends CustomPainter {
       final radius = s * (0.36 + 0.13 * pulse);
 
       // Hue drifts slowly around its base so colours keep shifting.
-      final hue = (_baseHues[i] + t * 70) % 360;
+      final hue = (_baseHues[i] + t * 360) % 360;
       final color = HSVColor.fromAHSV(1, hue, 0.85, 1.0).toColor();
 
       canvas.drawCircle(

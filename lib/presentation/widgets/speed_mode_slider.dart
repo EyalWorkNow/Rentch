@@ -43,12 +43,14 @@ class SpeedModeSlider extends StatelessWidget {
     required this.immediate,
     required this.onChanged,
     this.width = 300,
+    this.darkGlass = false,
   });
 
   /// true = fast/immediate mode; false = personalization mode.
   final bool immediate;
   final ValueChanged<bool> onChanged;
   final double width;
+  final bool darkGlass;
 
   @override
   Widget build(BuildContext context) {
@@ -65,31 +67,45 @@ class SpeedModeSlider extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withValues(alpha: 0.96),
-              const Color(0xFFEAF9FB).withValues(alpha: 0.94),
-              const Color(0xFFF8FBFD).withValues(alpha: 0.98),
-            ],
-          ),
+          gradient: darkGlass
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.12),
+                    Colors.white.withValues(alpha: 0.04),
+                    Colors.white.withValues(alpha: 0.08),
+                  ],
+                )
+              : LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.96),
+                    const Color(0xFFEAF9FB).withValues(alpha: 0.94),
+                    const Color(0xFFF8FBFD).withValues(alpha: 0.98),
+                  ],
+                ),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.78),
-            width: 1.4,
+            color: darkGlass
+                ? Colors.white.withValues(alpha: 0.16)
+                : Colors.white.withValues(alpha: 0.78),
+            width: darkGlass ? 1.2 : 1.4,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.navy.withValues(alpha: 0.10),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.14),
-              blurRadius: 18,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          boxShadow: darkGlass
+              ? []
+              : [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.10),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
@@ -119,6 +135,7 @@ class SpeedModeSlider extends StatelessWidget {
                             label: 'מותאם אישית',
                             selected: !immediate,
                             onTap: () => onChanged(false),
+                            darkGlass: darkGlass,
                           ),
                         ),
                         Expanded(
@@ -127,6 +144,7 @@ class SpeedModeSlider extends StatelessWidget {
                             label: 'מהיר',
                             selected: immediate,
                             onTap: () => onChanged(true),
+                            darkGlass: darkGlass,
                           ),
                         ),
                       ],
@@ -146,8 +164,11 @@ class SpeedModeSlider extends StatelessWidget {
     required String label,
     required bool selected,
     required VoidCallback onTap,
+    required bool darkGlass,
   }) {
-    final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
+    final inactiveColor = darkGlass
+        ? Colors.white.withValues(alpha: 0.45)
+        : AppColors.textSecondary.withValues(alpha: 0.84);
     final selectedShadow = [
       Shadow(
         color: AppColors.navy.withValues(alpha: 0.22),

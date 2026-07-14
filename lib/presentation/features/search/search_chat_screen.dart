@@ -5,6 +5,7 @@ import 'package:dating_app/core/search/engine/scorecard.dart';
 import 'package:dating_app/core/search/engine/search_narrative.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/smart_search.dart';
+import 'package:dating_app/core/search/what_if_engine.dart';
 import 'package:dating_app/core/search/budget_reality.dart';
 import 'package:dating_app/core/search/lifestyle_knowledge.dart';
 import 'package:dating_app/data/models/persona_profile.dart';
@@ -55,6 +56,7 @@ class _ChatMsg {
     this.text = '',
     this.scored = const [],
     this.chips = const [],
+    this.whatIfs = const [],
     this.isConsent = false,
     this.locationRequest = false,
   });
@@ -62,6 +64,8 @@ class _ChatMsg {
   String text; // mutable: the "how I chose" bubble is upgraded once the LLM returns
   List<ScoredProperty> scored; // mutable: scorecards get llmReason merged in async
   final List<String> chips;
+  // "What-if" relaxations of the seeker's own constraints (thin-result recovery).
+  List<WhatIfSuggestion> whatIfs;
   final bool isConsent;
   final bool locationRequest; // אתי asking to share GPS → renders a location button
   bool expanded = false; // "show more" toggle for result lists
@@ -746,7 +750,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // True whenever the user refers to their own location ("פה" / "באזור שלי" /
   // "קרוב אליי" / "my area"…) — the cue to capture GPS instead of asking.
   static final _locationRelative = RegExp(
-      r'\bפה\b|\bכאן\b|באזור הזה|באיזור הזה|בסביבה הזו|בסביבה שלי|ליד(?:י| שלי| הבית)?|'
+      r'(?<![\wא-ת])פה(?![\wא-ת])|(?<![\wא-ת])כאן(?![\wא-ת])|באזור הזה|באיזור הזה|בסביבה הזו|בסביבה שלי|ליד(?:י| שלי| הבית)?|'
       r'אזור שלי|איזור שלי|באזור שלי|באיזור שלי|האזור שלי|קרוב אלי|קרוב אליי|אצלי|'
       r'ה?מיקום שלי|במיקום שלי|איפה שאני|היכן שאני|ליד המיקום|ליד איפה ש|כאן לידי|'
       r'near me|around here|\bhere\b|my area|in my area|close to me|nearby|my location');
@@ -868,7 +872,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         const Duration(seconds: 4),
       );
       final plan = EttiPlan.fromJson(resp);
-      if (!plan.isEmpty) _query = plan.toQuery(fallback: _query);
+      // The server enrich ADDS soft signals (persona weights/intents/features)
+      // and fills gaps — but the deterministic on-device parse stays AUTHORITATIVE
+      // for the explicit hard constraints the user actually typed. Re-overlaying
+      // _query keeps its city/budget/rooms from being overwritten by a fuzzy Gemini
+      // re-extraction of a single turn (which was silently degrading correct asks).
+      if (!plan.isEmpty) _query = _merge(plan.toQuery(fallback: _query), _query);
     } catch (_) {
       // graceful — the on-device SmartSearch query already stands
     }
@@ -916,10 +925,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     } catch (_) {}
     List<ScoredProperty> cohort;
     try {
-      cohort = _rankByLifestyle(_applyLifestyleFilter(
+      // Same anti-hallucination gate (_verifyResults) the INSTANT path applies —
+      // otherwise the server-ranked swap-in could reintroduce geo-far / over-budget
+      // flats that the instant results had already filtered out, so results would
+      // visibly get WORSE a second after appearing.
+      cohort = _verifyResults(_rankByLifestyle(_applyLifestyleFilter(
               await _cohortRanked(provider, limit: 40)))
           .take(10)
-          .toList();
+          .toList());
     } catch (_) {
       cohort = const [];
     }
@@ -942,7 +955,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     }
   }
 
-  Future<void> _send(String raw, {bool enrich = true, bool isVoice = false}) async {
+  Future<void> _send(String raw,
+      {bool enrich = true, bool isVoice = false, SearchQuery? forceQuery}) async {
     final text = raw.trim();
     if (text.isEmpty || _busy) return;
 
@@ -961,9 +975,27 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // location request instead of a warm reply (see below).
     final maybeLoc = _locationRelative.hasMatch(text);
 
+    // A "what-if" tap applies a pre-built mutated query directly — no parse/merge,
+    // so the exact relaxation the user chose is what we search.
+    if (forceQuery != null) {
+      _query = forceQuery;
+    } else {
     // Deterministic base: SmartSearch parses explicit fields instantly on-device
     // (city / budget / rooms / features) — the fallback Etti folds over.
-    _query = _merge(_query, SmartSearch.parse(text));
+    final parsed = SmartSearch.parse(text);
+    // CITY SWITCH mid-conversation: when this turn names a DIFFERENT city, drop the
+    // previous location context entirely — old city / neighborhood / excluded-areas
+    // / direction AND the accumulated rawText that named the old city — otherwise it
+    // lingers (rawText, exclusions, sticky hood) and we keep showing the old city.
+    // Non-location preferences (budget / rooms / amenities / intents) are kept.
+    if (parsed.city != null &&
+        _query.city != null &&
+        _cityKey(parsed.city!) != _cityKey(_query.city!)) {
+      _query = _merge(_prefsOnly(_query), parsed);
+    } else {
+      _query = _merge(_query, parsed);
+    }
+    }
 
     // Fold lifestyle signals from the whole conversation into the query (e.g.
     // "דתי לאומי" / "תינוק" → an elevator matters). See _applyLifestyle.
@@ -1169,6 +1201,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     // fetches the richer LLM explanations inside _upgradeSearch on the final set.
 
     if (shouldSearch && results.isNotEmpty) _maybeCapturePersona(results.length);
+
+    // 💡 WHAT-IF: on a THIN result set (incl. empty), offer QUANTIFIED relaxations
+    // of the seeker's OWN constraints — "אם תעלה ל-X ₪ → עוד N דירות". Deferred to
+    // after the cards paint so it never delays the results, and only shown when a
+    // relaxation actually frees ≥3 more listings (WhatIfEngine's own gate).
+    if (shouldSearch && results.length <= 4) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _offerWhatIfs());
+    }
 
     // 🎯 BACKGROUND personalisation — the instant results are already on screen;
     // now quietly upgrade them with the LLM enrich + community-fit cohort ranking
@@ -1540,6 +1580,62 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         requiredFeatures: {...a.requiredFeatures, ...b.requiredFeatures},
       );
 
+  // Canonical city name for equality — strips the "- יפו" / parenthetical suffix
+  // so "תל אביב" and "תל אביב - יפו" are the SAME city (never a false switch).
+  String _cityKey(String c) =>
+      c.split('-').first.split('(').first.trim();
+
+  // The non-location PREFERENCES of a query (budget / rooms / features / intents /
+  // weights) with the place + accumulated rawText dropped. Used on a city switch so
+  // the seeker's real criteria carry over to the new city, but nothing that named
+  // or scoped the OLD city lingers.
+  SearchQuery _prefsOnly(SearchQuery q) => SearchQuery(
+        minPrice: q.minPrice,
+        maxPrice: q.maxPrice,
+        minRooms: q.minRooms,
+        maxRooms: q.maxRooms,
+        propertyType: q.propertyType,
+        amenities: {...q.amenities},
+        nearTrain: q.nearTrain,
+        cheapPreference: q.cheapPreference,
+        transactionType: q.transactionType,
+        intents: {...q.intents},
+        weights: {...q.weights},
+        requiredFeatures: {...q.requiredFeatures},
+        // city / neighborhood / excludeAreas / areaDir / rawText intentionally dropped
+      );
+
+  // Compute + render "what-if" relaxations of the current (thin) query. Counts
+  // STRICT matches (ALL hard constraints met) via the real ranker, so the "עוד N
+  // דירות" reflects exactly what the seeker would actually get — not soft-ranked
+  // near-misses. Runs post-frame, so it never delays the results themselves.
+  void _offerWhatIfs() {
+    if (!mounted || _busy) return;
+    final provider = context.read<DatingProvider>();
+    // `.exact` == the engine's strictMatch (ALL hard constraints met).
+    int strict(SearchQuery q) => provider
+        .recommendForTenant(provider.allProperties, q, limit: 120)
+        .where((r) => r.exact)
+        .length;
+    final base = strict(_query);
+    final ifs = WhatIfEngine.suggest(
+        query: _query, countMatches: strict, baselineCount: base);
+    if (ifs.isEmpty || !mounted) return;
+    setState(() => _messages.add(_ChatMsg(
+          role: 'assistant',
+          text: 'רוצה עוד אפשרויות מתאימות? נסה לשנות אחד מאלה 👇',
+          whatIfs: ifs,
+        )));
+    _scrollToEnd();
+  }
+
+  // Applying a what-if: the pre-built mutated query is searched directly (no
+  // re-parse), and the label doubles as the user's turn so the chat reads naturally.
+  void _onWhatIfTap(WhatIfSuggestion s) {
+    if (_busy) return;
+    _send(s.label, forceQuery: s.mutated);
+  }
+
   // ── Lifestyle inference ────────────────────────────────────────────────────
   // Reads plain-language lifestyle cues from the message and remembers them in
   // _persona: the tenant's religiosity (secular / traditional / religious /
@@ -1776,10 +1872,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // captured persona (bio + important details). Drives which nearby-places
   // sections show in each result's "למה זו" preview (only what's relevant).
   NearbyProfile _seekerNearbyProfile() {
+    // The SEARCH QUERY is authoritative for what the seeker wants RIGHT NOW:
+    // "דירה באזור צעיר" must surface nightlife/dining/parks — NOT schools/gani/
+    // synagogues leaked from a stale saved profile. Only when the query carries no
+    // persona signal at all do we fall back to enriching with the stored profile.
+    final fromQuery = NearbyProfile.fromText(_query.rawText);
+    if (fromQuery.anySignal) return fromQuery;
     final tp = context.read<DatingProvider>().tenantProfile;
-    final text = '${_query.rawText} ${tp?.bio ?? ''} '
-        '${(tp?.importantDetails ?? const <String>[]).join(' ')}';
-    return NearbyProfile.fromText(text);
+    return NearbyProfile.fromText('${_query.rawText} ${tp?.bio ?? ''} '
+        '${(tp?.importantDetails ?? const <String>[]).join(' ')}');
   }
 
   double _religiosityBoost(Religiosity rel, RentalProperty p) {
@@ -2073,9 +2174,57 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                       height: 1.45)),
             ),
           if (m.scored.isNotEmpty) _resultList(m),
+          if (m.whatIfs.isNotEmpty) _whatIfRow(m.whatIfs),
           if (m.chips.isNotEmpty) _chipsRow(m.chips),
           if (m.isConsent) _consentButtons(),
           if (m.locationRequest) _locationButtons(),
+        ],
+      ),
+    );
+  }
+
+  // Distinct, richer style than plain chips: each is an ACTIONABLE relaxation with
+  // its quantified payoff ("עד 9,600 ₪ · עוד 12 דירות").
+  Widget _whatIfRow(List<WhatIfSuggestion> ifs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (int i = 0; i < ifs.length; i++)
+            _AnimatedChip(
+              delayMs: i * 70,
+              child: GestureDetector(
+                onTap: _busy ? null : () => _onWhatIfTap(ifs[i]),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight2,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.45)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.auto_awesome,
+                        size: 16, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text(ifs[i].label,
+                        style: TextStyle(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14)),
+                    const SizedBox(width: 6),
+                    Text('· ${ifs[i].gainText}',
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5)),
+                  ]),
+                ),
+              ),
+            ),
         ],
       ),
     );

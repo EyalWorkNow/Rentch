@@ -436,7 +436,7 @@ String? answerFromListing(String q, RentalProperty p) {
     return 'הדירה בקומה ${p.floor}$of.';
   }
   if (ask(r'כמה ?חדר|חדרים|rooms?')) return 'בדירה ${rooms()} חדרים.';
-  if (ask(r'גודל|שטח|כמה ?מטר|מ.?ר\b|size|sqm|square')) {
+  if (ask(r'גודל|שטח|כמה ?מטר|מ.?ר(?![\wא-ת])|size|sqm|square')) {
     return p.sizeM2 > 0 ? 'שטח הדירה כ-${p.sizeM2} מ״ר.' : null;
   }
   if (ask(r'מחיר|כמה ?עולה|כמה ?זה|שכר ?דירה|שכ.?ד|price|rent|cost')) {

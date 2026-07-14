@@ -361,7 +361,10 @@ class ErikTextComposer extends StatelessWidget {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        // sigma reduced 22→14: this glass sits over the CONTINUOUSLY animating
+        // orb, so the blur re-samples the layer below every frame — a lower sigma
+        // is a materially cheaper per-frame convolution with no visible loss.
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           decoration: BoxDecoration(

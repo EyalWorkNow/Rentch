@@ -380,6 +380,29 @@ class OnlineLogisticLearner {
 
   Map<String, double> snapshotWeights(Iterable<String> keys) =>
       {for (final k in keys) k: _weight(k)};
+
+  /// Serialize the LEARNED state (z, n, updates) for cross-session persistence.
+  /// Hyper-params (alpha/beta/l1/l2) are fixed config and are NOT stored.
+  Map<String, dynamic> toJson() => {'z': _z, 'n': _n, 'u': updates};
+
+  /// Restore a learner from [toJson]. Unknown/absent fields degrade to an empty
+  /// (cold) learner, so a corrupt or version-changed blob can never throw.
+  factory OnlineLogisticLearner.fromJson(Map<String, dynamic> j) {
+    final l = OnlineLogisticLearner();
+    void load(Map<String, double> into, dynamic raw) {
+      if (raw is Map) {
+        raw.forEach((k, v) {
+          final d = v is num ? v.toDouble() : double.tryParse('$v');
+          if (d != null && d.isFinite) into['$k'] = d;
+        });
+      }
+    }
+    load(l._z, j['z']);
+    load(l._n, j['n']);
+    final u = j['u'];
+    l.updates = u is int ? u : (u is num ? u.toInt() : 0);
+    return l;
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1014,7 +1037,7 @@ class PreferenceModelBuilder {
     final lively = !wantsCalm;
 
     // (41) Single / lives alone → young, connected, central (the canonical case).
-    if (m(r'רווק|רווקה|גר\w* לבד|גרה לבד|לבד\b|בחור צעיר|בחורה צעיר|single|on my own|by myself|just me')) {
+    if (m(r'רווק|רווקה|גר\w* לבד|גרה לבד|לבד(?![\wא-ת])|בחור צעיר|בחורה צעיר|single|on my own|by myself|just me')) {
       sharpen('young_area', 0.80, s * (lively ? 1.0 : 0.4));
       sharpen('transit', 0.80, s);
       sharpen('location', 0.78, s * 0.8);
@@ -1070,18 +1093,18 @@ class PreferenceModelBuilder {
       sharpen('senior_area', 0.70, s * 0.5);
     }
     // (49) Health / mobility need → accessible + health, low floor.
-    if (m(r'בעי\w* רפואי|מוגבלות|ניידות|נכה\b|כיסא גלגלים|health condition|mobility|wheelchair|disab')) {
+    if (m(r'בעי\w* רפואי|מוגבלות|ניידות|נכה(?![\wא-ת])|כיסא גלגלים|health condition|mobility|wheelchair|disab')) {
       sharpen('accessibility', 0.88, s);
       sharpen('health', 0.78, s * 0.7);
       sharpen('low_floor', 0.72, s * 0.6);
     }
     // (50) Beach lover → coast + coastal centrality.
-    if (m(r'אוהב\w* ים|קרוב לים|גלישה|לגלוש|חוף\b|beach|surf|by the sea|seaside')) {
+    if (m(r'אוהב\w* ים|קרוב לים|גלישה|לגלוש|חוף(?![\wא-ת])|beach|surf|by the sea|seaside')) {
       sharpen('coast', 0.82, s * 0.9);
       sharpen('location', 0.66, s * 0.4);
     }
     // (51) Nature / outdoors → parks + quiet.
-    if (m(r'טבע|ירוק\b|טיול|hiking|nature|outdoors|greenery')) {
+    if (m(r'טבע|ירוק(?![\wא-ת])|טיול|hiking|nature|outdoors|greenery')) {
       sharpen('park', 0.76, s * 0.7);
       sharpen('low_noise', 0.66, s * 0.4);
     }
@@ -1092,7 +1115,7 @@ class PreferenceModelBuilder {
       sharpen('convenience', 0.70, s * 0.5);
     }
     // (53) Foodie / café culture → café & dining density, central.
-    if (m(r'קולינר|מסעד|בתי קפה|שף\b|אוכל טוב|foodie|caf[eé]|restaurant|dining')) {
+    if (m(r'קולינר|מסעד|בתי ?ה?קפה|שף(?![\wא-ת])|אוכל טוב|foodie|caf[eé]|restaurant|dining')) {
       if (lively) sharpen('nightlife', 0.72, s * 0.6); // bar/café-density dim
       sharpen('location', 0.66, s * 0.4);
     }
@@ -1149,16 +1172,16 @@ class PreferenceModelBuilder {
       if (lively) sharpen('young_area', 0.68, s * 0.4);
     }
     // (63) Religious / observant phrasing (mild — heavy handling is intent-driven).
-    if (m(r'דתי\b|שומר\w* שבת|כשר\b|בית כנסת|מסורתי|observant|kosher|religious')) {
+    if (m(r'דתי(?![\wא-ת])|שומר\w* שבת|כשר(?![\wא-ת])|בית ?ה?כנסת|מסורתי|observant|kosher|religious')) {
       sharpen('religious_area', 0.72, s * 0.5);
     }
     // (64) Works from home (broad) → space for an office + quiet.
-    if (m(r'מהבית|פרילנס|עצמאי|חדר עבודה|home office|freelanc|self.?employed')) {
+    if (m(r'מהבית|פרילנס|עצמאי|חדר ?ה?עבודה|home office|freelanc|self.?employed')) {
       sharpen('spaciousness', 0.72, s * 0.5);
       sharpen('low_noise', 0.66, s * 0.4);
     }
     // (65) View / high floor phrasing → view.
-    if (m(r'נוף\b|קומה גבוה|high floor|\bview\b|skyline')) {
+    if (m(r'נוף(?![\wא-ת])|קומה גבוה|high floor|\bview\b|skyline')) {
       sharpen('view', 0.78, s * 0.6);
     }
     // (66) Garden / outdoor-space lover → green + nicer area.

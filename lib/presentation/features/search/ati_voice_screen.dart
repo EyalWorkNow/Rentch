@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart';
@@ -291,45 +293,63 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0, -0.35),
-              radius: 1.25,
-              colors: [Color(0xFF0E2A44), Color(0xFF071726), Color(0xFF03080E)],
-              stops: [0.0, 0.55, 1.0],
-            ),
-          ),
+        body: _AuroraBackground(
           child: SafeArea(
             child: Column(
               children: [
-                _topBar(),
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 150),
+                  child: _topBar(),
+                ),
                 // Speed mode — fast (on-device) ↔ personalization (AI). Shared
                 // live with the text chat.
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: SpeedMode.immediate,
-                    builder: (_, immediate, __) => SpeedModeSlider(
-                      immediate: immediate,
-                      onChanged: SpeedMode.set,
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 300),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: SpeedMode.immediate,
+                      builder: (_, immediate, __) => SpeedModeSlider(
+                        immediate: immediate,
+                        onChanged: SpeedMode.set,
+                        darkGlass: true,
+                      ),
                     ),
                   ),
                 ),
-                if (_criteria.isNotEmpty) _criteriaChips(),
+                if (_criteria.isNotEmpty)
+                  _FadeScaleEntrance(
+                    delay: const Duration(milliseconds: 450),
+                    child: _criteriaChips(),
+                  ),
                 const Spacer(),
-                _statusPill(),
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 600),
+                  child: _statusPill(),
+                ),
                 const SizedBox(height: 6),
-                _blob(),
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 650),
+                  child: _blob(),
+                ),
                 const SizedBox(height: 10),
-                _captionText(caption),
-                _locationButton(),
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 750),
+                  child: _captionText(caption),
+                ),
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 800),
+                  child: _locationButton(),
+                ),
                 const Spacer(),
                 if (_results.isNotEmpty)
                   _resultsStrip()
                 else if (_resultCount > 0)
                   _resultsPeek(),
-                _controls(),
+                _FadeScaleEntrance(
+                  delay: const Duration(milliseconds: 900),
+                  child: _controls(),
+                ),
                 const SizedBox(height: 6),
               ],
             ),
@@ -793,6 +813,228 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Aurora Background (Northern Lights Entrance) ──────────────────────────
+
+class _AuroraBackground extends StatefulWidget {
+  const _AuroraBackground({required this.child});
+  final Widget child;
+
+  @override
+  State<_AuroraBackground> createState() => _AuroraBackgroundState();
+}
+
+class _AuroraBackgroundState extends State<_AuroraBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3000),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            gradient: RadialGradient(
+              center: Alignment(0, 0.65),
+              radius: 1.35,
+              colors: [
+                Color(0xFF071522),
+                Color(0xFF03070E),
+                Colors.black,
+              ],
+              stops: [0.0, 0.6, 1.0],
+            ),
+          ),
+          child: Stack(
+            children: [
+              // Wavy smoky snakes winding across the screen
+              if (t < 0.99)
+                Opacity(
+                  opacity: (1.0 - t).clamp(0.0, 1.0),
+                  child: CustomPaint(
+                    painter: _AuroraRibbonPainter(t),
+                    size: Size.infinite,
+                  ),
+                ),
+              // Heavy liquid glass overlay (behind text, blurs the snakes underneath)
+              if (t < 0.99)
+                Positioned.fill(
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.16),
+                      ),
+                    ),
+                  ),
+                ),
+              widget.child,
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AuroraRibbonPainter extends CustomPainter {
+  _AuroraRibbonPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // We draw 3 thick winding ribbon strokes to look like smoky snakes.
+    // We balance the maskFilter blur with a lighter BackdropFilter to keep it extremely fast and smooth.
+    final paintCyan = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 60.0
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF06B6D4).withValues(alpha: 0.40)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 35.0);
+
+    final paintGreen = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 70.0
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF10B981).withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 40.0);
+
+    final paintPurple = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 55.0
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFFD946EF).withValues(alpha: 0.32)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 32.0);
+
+    // Cyan Snake (slower, diagonal winding)
+    final pathCyan = Path();
+    for (double x = -50; x <= w + 50; x += 10) {
+      final baseY = h * 0.85 - (x / w) * (h * 0.75);
+      final y = baseY + 75 * math.sin((x / w) * math.pi * 1.8 + t * math.pi * 3.5);
+      if (x == -50) {
+        pathCyan.moveTo(x, y);
+      } else {
+        pathCyan.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(pathCyan, paintCyan);
+
+    // Green Snake (slower, diagonal winding)
+    final pathGreen = Path();
+    for (double x = -50; x <= w + 50; x += 10) {
+      final baseY = h * 0.92 - (x / w) * (h * 0.82);
+      final y = baseY + 90 * math.sin((x / w) * math.pi * 1.5 - t * math.pi * 2.8);
+      if (x == -50) {
+        pathGreen.moveTo(x, y);
+      } else {
+        pathGreen.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(pathGreen, paintGreen);
+
+    // Purple Snake (slower, diagonal winding)
+    final pathPurple = Path();
+    for (double x = -50; x <= w + 50; x += 10) {
+      final baseY = h * 0.78 - (x / w) * (h * 0.68);
+      final y = baseY + 70 * math.cos((x / w) * math.pi * 2.0 + t * math.pi * 3.2);
+      if (x == -50) {
+        pathPurple.moveTo(x, y);
+      } else {
+        pathPurple.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(pathPurple, paintPurple);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// ─── Cascading Entrance Animation ──────────────────────────────────────────
+
+class _FadeScaleEntrance extends StatefulWidget {
+  const _FadeScaleEntrance({
+    required this.child,
+    required this.delay,
+  });
+  final Widget child;
+  final Duration delay;
+  
+  @override
+  State<_FadeScaleEntrance> createState() => _FadeScaleEntranceState();
+}
+
+class _FadeScaleEntranceState extends State<_FadeScaleEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+  late final Animation<double> _scale = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutBack,
+  );
+  late final Animation<double> _opacity = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOut,
+  );
+  
+  Timer? _entranceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // A cancellable Timer (not a bare Future.delayed): the `if (mounted)` guard
+    // stops the callback, but the pending timer itself must be CANCELLED on
+    // dispose or it leaks (and trips the widget-test "!timersPending" assertion).
+    _entranceTimer = Timer(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _entranceTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Opacity(
+        opacity: _opacity.value,
+        child: Transform.scale(
+          scale: 0.5 + 0.5 * _scale.value,
+          child: child,
+        ),
+      ),
+      child: widget.child,
     );
   }
 }

@@ -185,13 +185,16 @@ void main() {
   });
 
   // ── lifestyle personas (the three under-served groups) ────────────────────
-  test('P1 couple → dining + gyms + parks, NOT nightlife (not pushed on couples)', () {
+  test('P1 childless couple → lifestyle (dining/gyms/nightlife/parks), NOT schools', () {
     final k = kinds('זוג צעיר מחפש דירה בזוגיות');
     expect(k, contains(NearbyKind.dining));
     expect(k, contains(NearbyKind.gyms));
     expect(k, contains(NearbyKind.parks));
-    expect(k, isNot(contains(NearbyKind.nightlife)));
+    // A childless couple DOES want nearby bars/entertainment (product decision).
+    expect(k, contains(NearbyKind.nightlife));
+    // ...but never schools/kindergartens (no kids mentioned).
     expect(k, isNot(contains(NearbyKind.schools)));
+    expect(k, isNot(contains(NearbyKind.kindergartens)));
   });
 
   test('P2 roommates/friends → nightlife + dining + gyms + supermarket', () {

@@ -46,6 +46,19 @@ class NearbySection {
   final int priority; // higher = more relevant → shown first
 }
 
+// fromText runs ~40 pattern matches per call and is invoked per query/card;
+// compile each CONSTANT pattern once instead of re-compiling on every call.
+final Map<String, RegExp> _reCache = <String, RegExp>{};
+RegExp _compile(String p) => _reCache[p] ??= RegExp(p, caseSensitive: false);
+
+// NOTE on word boundaries: Dart's \b is ASCII-only — it treats every Hebrew
+// letter as a NON-word char, so `רכב\b` never matches "רכב" at a space or
+// end-of-string. Around Hebrew tokens below we therefore use explicit Hebrew+
+// ASCII boundaries `(?<![\wא-ת])…(?![\wא-ת])` instead of \b (English tokens keep
+// \b, which is correct for ASCII). NOTE on the definite article: `word1 ?word2`
+// only allowed a space between words, so "אזור הצעיר"/"בית הספר"/"הרכבת הקלה"
+// silently missed — two-word Hebrew phrases now allow an optional `ה?` prefix on
+// the second word.
 /// Structured persona signals derived from the seeker's free-text query/persona.
 class NearbyProfile {
   const NearbyProfile({
@@ -81,6 +94,7 @@ class NearbyProfile {
     this.quiet = false, // wants QUIET — suppresses nightlife
     this.secular = false, // explicitly secular — suppresses synagogues/worship
     this.car = false, // owns/mentions a car → parking relevant
+    this.dog = false, // owns a DOG specifically → dog-parks relevant (cats don't)
   });
 
   final bool family, youngChild, schoolChild, teen, wantsSchools;
@@ -88,7 +102,7 @@ class NearbyProfile {
   final bool single, couple, roommates, active, nightlife, dining;
   final bool observant, culture, young, transitWanted, muslim, christian;
   final bool student, wfh, luxury, accessible, budget, pet, quiet, secular;
-  final bool car;
+  final bool car, dog;
   final String hmo;
 
   /// A lifestyle persona (as opposed to a family/health one).
@@ -125,14 +139,15 @@ class NearbyProfile {
       accessible ||
       budget ||
       pet ||
-      car;
+      car ||
+      quiet || // a suppressive intent is still an explicit signal — without this,
+      secular; // "דירה שקטה"/"חילוני" fell back to a stale saved persona
 
   /// Parse a Hebrew/English query or persona string into the signals. Mirrors the
   /// SearchIntent regexes so it stays consistent with the search engine.
   factory NearbyProfile.fromText(String raw) {
     final q = raw.toLowerCase();
-    bool has(String pattern) =>
-        RegExp(pattern, caseSensitive: false).hasMatch(q);
+    bool has(String pattern) => _compile(pattern).hasMatch(q);
 
     // ── everyday, colloquial Israeli Hebrew (+ common English) ────────────────
     // Regexes are deliberately loose: abbreviations (בי״ס/קופ״ח/רק״ל), slang
@@ -149,7 +164,7 @@ class NearbyProfile {
     final teen = !noKids &&
         has(r'תיכון|מתבגר|בגרות|נוער|בני ?נוער|בן ?נוער|teen|high ?school|adolescent');
     final schoolChild = !noKids &&
-        has(r'בית ?ספר|בתי ?ספר|בי[״"׳]?ס|ביה[״"׳]?ס|יסודי|חטיב|תלמיד|כיתה ?[א-ו]|בכיתה|'
+        has(r'בית ?ה?ספר|בתי ?ה?ספר|בי[״"׳]?ס|ביה[״"׳]?ס|יסודי|חטיב|תלמיד|כיתה ?[א-ו]|בכיתה|'
             r'elementary|middle ?school|grade ?school|primary school');
     // Broad family/kids signal — many everyday ways to say it.
     final family = !noKids &&
@@ -174,7 +189,7 @@ class NearbyProfile {
       hmo = 'מאוחדת';
     }
     final health = hmo.isNotEmpty ||
-        has(r'בית ?חולים|בתי ?חולים|קופת ?חולים|קופ[״"׳]?ח|קופ\b|מרפא\w*|'
+        has(r'בית ?ה?חולים|בתי ?ה?חולים|קופת ?ה?חולים|קופ[״"׳]?ח|קופ(?![\wא-ת])|מרפא\w*|'
             r'רופא|רופאה|בריאות|בריאותי|רפואה|רפואי|חולה|מחלה|טיפול\w* ?רפואי|'
             r'clinic|hospital|medical|health|doctor|pediatric|checkup');
 
@@ -184,28 +199,28 @@ class NearbyProfile {
         r'שותפ|רומיז|roomies|flatmate|roommate|share\s?(a|an|the)?\s?(flat|apartment|place)|'
         r'דירת ?שותפים|לגור עם ?חבר|גרים ?ביחד|גרים ?יחד|כמה ?חבר|קומונה');
     final couple = has(
-        r'זוג(?!\s*(נעל|גרב|מגפ|כפכף|גורב))|זוגי|זוגיות|בזוגיות|בן ?זוג|בת ?זוג|בני ?זוג|'
+        r'זוג(?!\s*(נעל|גרב|מגפ|כפכף|גורב))|זוגי|זוגיות|בזוגיות|בן ?ה?זוג|בת ?ה?זוג|בני ?ה?זוג|'
         r'נשוי|נשואה|נשואים|החבר ?שלי|החברה ?שלי|אני ?ו(ה)?חבר|שנינו|couple|partner|spouse|'
         r'married|boyfriend|girlfriend|two of us');
     final single = !couple &&
         !roommates &&
-        has(r'רווק|רווקה|לגור ?לבד|גר ?לבד|גרה ?לבד|גר ?לבדי|מחפש ?לבד|לבד ?בדירה|פנוי\b|פנויה\b|'
+        has(r'רווק|רווקה|לגור ?לבד|גר ?לבד|גרה ?לבד|גר ?לבדי|מחפש ?לבד|לבד ?בדירה|פנוי(?![\wא-ת])|פנויה(?![\wא-ת])|'
             r'\bsolo\b|\bsingle\b|living alone|on my own|by myself|young professional');
 
     final active = has(
-        r'חדר\w* ?כושר|כושר|חדכ\b|ספורט|ספורטיב|אימון|להתאמן|מתאמן|ריצה|לרוץ|'
+        r'חדר\w* ?ה?כושר|כושר|חדכ(?![\wא-ת])|ספורט|ספורטיב|אימון|להתאמן|מתאמן|ריצה|לרוץ|'
         r'יוגה|פילאטיס|קרוספיט|חוג ?ספורט|gym|fitness|workout|crossfit|running|yoga|pilates');
     final quiet = has(
         r'שקט|שקטה|שקטים|רגוע|רגועה|נינוח|פסטורל|שליו|שלווה|בלי ?רעש|ללא ?רעש|רחוק ?מרעש|'
         r'רחוק ?מכביש|לא ?רועש|quiet|calm|peaceful|tranquil|serene');
     final nightlife = !quiet &&
-        has(r'חיי ?לילה|בילוי|בילויים|לבלות|לצאת ?בערב|יציאות|לצאת ?בלילה|ברים|\bבר\b|פאב|'
+        has(r'חיי ?ה?לילה|בילוי|בילויים|לבלות|לצאת ?בערב|יציאות|לצאת ?בלילה|ברים|(?<![\wא-ת])בר(?![\wא-ת])|פאב|'
             r'מועדון|מסיבו?ת|לרקוד|סצנה|ליינות|nightlife|bars?|pubs?|club(bing|s)?|party|going out');
     final dining = has(
-        r'מסעד\w*|בית ?קפה|בתי ?קפה|\bקפה\b|בתי ?אוכל|לאכול ?בחוץ|אוכל ?טוב|אוכל ?באזור|'
+        r'מסעד\w*|בית ?ה?קפה|בתי ?ה?קפה|(?<![\wא-ת])קפה(?![\wא-ת])|בתי ?ה?אוכל|לאכול ?בחוץ|אוכל ?טוב|אוכל ?בא[יי]?זור|'
         r'קולינר|שף|restaurant|cafe|café|dining|foodie|eat ?out|good ?food');
     final pharmacy = has(
-        r'בית ?מרקחת|בתי ?מרקחת|מרקחת|תרופות|סופר ?פארם|סופרפארם|ניו ?פארם|be ?drug|'
+        r'בית ?ה?מרקחת|בתי ?ה?מרקחת|מרקחת|תרופות|סופר ?פארם|סופרפארם|ניו ?פארם|be ?drug|'
         r'pharmacy|drugstore|super.?pharm');
 
     // Explicitly secular → do NOT surface synagogues/mosques/churches.
@@ -213,7 +228,7 @@ class NearbyProfile {
     // Observant (Jewish). Guarded by !secular so "חילוני" wins.
     final observant = !secular &&
         (religiousNational ||
-            has(r'בית ?כנסת|בתי ?כנסת|מניין|מנין|שומר\w* ?שבת|שומר\w* ?מצוות|כיפה|ציצית|'
+            has(r'בית ?ה?כנסת|בתי ?ה?כנסת|מניין|מנין|שומר\w* ?שבת|שומר\w* ?מצוות|כיפה|ציצית|'
                 r'דתי|דתייה|דתיה|דתיים|חרד|מסורתי|כשר|כשרות|מקווה|עירוב|ישיבה|אולפנה|'
                 r'shul|synagogue|kosher|observant|religious|\bdati\b|haredi|orthodox jew'));
     final culture = has(
@@ -221,37 +236,43 @@ class NearbyProfile {
         r'ספרי[יה]|מופע|הצג\w*|קונצרט|culture|museum|theatre|theater|cinema|gallery|arts');
     // Young/lively AREA vibe — daily-life + going-out even without a household type.
     final young = has(
-        r'סביבה ?צעיר|אזור ?צעיר|שכונה ?צעיר|מקום ?צעיר|קהל ?צעיר|הרבה ?צעירים|צעירים ?באזור|'
-        r'תוסס|תוססת|שוקק|הומה ?אדם|אנרגטי|בוהמיינ|בוהמי|היפסטר|טרנדי|היפ\b|'
+        r'סביבה ?ה?צעיר|א[יי]?זור ?ה?צעיר|שכונה ?ה?צעיר|מקום ?ה?צעיר|קהל ?ה?צעיר|הרבה ?צעירים|צעירים ?בא[יי]?זור|'
+        r'תוסס|תוססת|שוקק|הומה ?אדם|אנרגטי|בוהמיינ|בוהמי|היפסטר|טרנדי|היפ(?![\wא-ת])|'
         r'young (area|crowd|neighborhood|vibe)|hipster|trendy|vibrant|lively');
     final transitWanted = has(
-        r'תחבורה ?ציבורית|תחבורה\b|קרוב ל?רכבת|ליד ?רכבת|רכבת ?קלה|רק[״"׳]?ל|רקל\b|'
-        r'קו ?אדום|קו ?סגול|מטרו|אוטובוס|תחנת ?רכבת|תחנת ?אוטובוס|בלי ?רכב|בלי ?אוטו|'
+        r'תחבורה ?ציבורית|תחבורה(?![\wא-ת])|קרוב ל?ה?רכבת|ליד ?ה?רכבת|רכבת ?ה?קלה|רק[״"׳]?ל|רקל(?![\wא-ת])|'
+        r'קו ?אדום|קו ?סגול|מטרו|אוטובוס|תחנת ?ה?רכבת|תחנת ?ה?אוטובוס|בלי ?רכב|בלי ?אוטו|'
         r'אין ?לי ?רכב|אין ?לי ?אוטו|לא ?נוהג|ללא ?רכב|train|\bbus\b|light.?rail|metro|public transport|car.?free');
     final muslim = has(
-        r'מסגד|מוסלמ|ערבי\b|ערבית|ערבים|מגזר ?ערבי|כפר ?ערבי|יישוב ?ערבי|mosque|muslim|arab');
+        r'מסגד|מוסלמ|ערבי(?![\wא-ת])|ערבית|ערבים|מגזר ?ערבי|כפר ?ערבי|יישוב ?ערבי|mosque|muslim|arab');
     final christian = has(r'כנסי[יה]|נוצר[יי]|christian|church');
 
     final student = has(
         r'סטודנט|סטודנטית|סטודנטים|אוניברסיט|מכללה|מכללת|קמפוס|לומד\w* ?תואר|תואר ?ראשון|'
         r'student|university|college|campus');
     final wfh = has(
-        r'עבוד\w* ?מהבית|עובד\w* ?מהבית|מהבית\b|מה ?בית|רימוט|פרילנס|עצמאי|חדר ?עבודה|'
+        r'עבוד\w* ?מהבית|עובד\w* ?מהבית|מהבית(?![\wא-ת])|מה ?בית|רימוט|פרילנס|עצמאי|חדר ?ה?עבודה|'
         r'\bwfh\b|work ?from ?home|remote ?work|home ?office|freelanc');
     final luxury = has(
-        r'יוקר|יוקרתי|מפואר|פאר|פרימיום|איכותי|יקר\b|וילה|פנטהאוז|פנטהאוס|דופלקס ?יוקרה|'
+        r'יוקר|יוקרתי|מפואר|פאר|פרימיום|איכותי|יקר(?![\wא-ת])|וילה|פנטהאוז|פנטהאוס|דופלקס ?יוקרה|'
         r'luxur|premium|penthouse|high.?end|upscale');
     final accessible = has(
-        r'נגיש|נגישות|כיסא ?גלגלים|כסא ?גלגלים|מוגבל|מוגבלות|\bנכה\b|נכות|עגלה|'
+        r'נגיש|נגישות|כיסא ?גלגלים|כסא ?גלגלים|מוגבל|מוגבלות|(?<![\wא-ת])נכה(?![\wא-ת])|נכות|עגלה|'
         r'בלי ?מדרגות|ללא ?מדרגות|צריך ?מעלית|חייב\w* ?מעלית|wheelchair|accessible|step.?free|mobility');
     final budget = has(
-        r'זול\b|זולה|בזול|תקציב ?נמוך|תקציב ?מוגבל|מוגבל\w* ?בתקציב|חסכ|לא ?יקר|מחיר ?טוב|'
+        r'זול(?![\wא-ת])|זולה|בזול|תקציב ?נמוך|תקציב ?מוגבל|מוגבל\w* ?בתקציב|חסכ|לא ?יקר|מחיר ?טוב|'
         r'משתלם|במחיר ?שפוי|budget|cheap|affordable|inexpensive|low ?cost');
     final pet = has(
         r'כלב|כלבה|כלבלב|חתול|חתולה|חיית ?מחמד|בעל ?חיים|בע[״"׳]?ח|\bdog\b|\bcat\b|\bpet\b');
-    // Owns / mentions a car → parking matters. NOT when they said car-free.
-    final car = !transitWanted &&
-        has(r'חני[יה]|מקום ?חני|רכב\b|אוטו\b|מכונית|נהג\w*|\bcar\b|parking|garage');
+    // A DOG specifically → dog-parks are relevant; a cat owner should not see them.
+    final dog = has(r'כלב|כלבה|כלבלב|\bdog\b');
+    // Owns / mentions a car → parking matters. Suppressed ONLY when the user is
+    // explicitly car-free — NOT merely because they also want public transport
+    // (wanting a train ≠ owning no car; "ליד הרכבת עם חנייה" needs BOTH).
+    final carFree = has(
+        r'בלי ?רכב|בלי ?אוטו|אין ?לי ?רכב|אין ?לי ?אוטו|ללא ?רכב|לא ?נוהג|car.?free|without ?a? ?car');
+    final car = !carFree &&
+        has(r'חני[יה]|מקום ?ה?חני|רכב(?![\wא-ת])|אוטו(?![\wא-ת])|מכונית|נהג\w*|\bcar\b|parking|garage');
 
     return NearbyProfile(
       family: family,
@@ -259,7 +280,7 @@ class NearbyProfile {
       schoolChild: schoolChild,
       teen: teen,
       wantsSchools: has(
-          r'בית ?ספר|בתי ?ספר|בי[״"׳]?ס|מוסדות ?חינוך|חינוך ?טוב|בתי ?ספר ?טוב|good ?schools?'),
+          r'בית ?ה?ספר|בתי ?ה?ספר|בי[״"׳]?ס|מוסדות ?חינוך|חינוך ?טוב|בתי ?ה?ספר ?ה?טוב|good ?schools?'),
       health: health,
       hmo: hmo,
       pharmacy: pharmacy,
@@ -284,11 +305,12 @@ class NearbyProfile {
       quiet: quiet,
       secular: secular,
       car: car,
+      dog: dog,
       groceries: has(
-          r'סופר\b|סופרמרקט|סופר ?מרקט|מכולת|פיצוצי|מרכול|קניות|מצרכים|מרכז ?קניות|קניון|'
-          r'שופרסל|רמי ?לוי|ויקטורי|יינות ?ביתן|אושר ?עד|טיב ?טעם|מגה\b|מחסני ?השוק|יוחננוף|'
+          r'סופר(?![\wא-ת])|סופרמרקט|סופר ?מרקט|מכולת|פיצוצי|מרכול|קניות|מצרכים|מרכז ?ה?קניות|קניון|'
+          r'שופרסל|רמי ?לוי|ויקטורי|יינות ?ביתן|אושר ?עד|טיב ?טעם|מגה(?![\wא-ת])|מחסני ?השוק|יוחננוף|'
           r'חצי ?חינם|קופיקס|am:?pm|ampm|supermarket|grocer|groceries|errands|shopping'),
-      green: has(r'פארק|גינה|גינות|שטח ?ירוק|הרבה ?ירוק|ירוק\b|טבע|טיילת|park|garden|green|nature'),
+      green: has(r'פארק|גינה|גינות|שטח ?ה?ירוק|הרבה ?ירוק|ירוק(?![\wא-ת])|טבע|טיילת|park|garden|green|nature'),
       senior: has(
           r'מבוגר|מבוגרת|מבוגרים|קשיש|גמלא|פנסיונ|פנסי|בגיל ?השלישי|סבא|סבתא|'
           r'זוג ?מבוגר|senior|elderly|retire|pensioner'),
@@ -387,11 +409,16 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   } else if (p.luxury || p.wfh) {
     add(NearbyKind.gyms, 58);
   }
-  // Nightlife — never for a quiet-seeker; couples aren't pushed toward bars.
+  // Nightlife/bars — a young household (single/roommates/student/young-area) AND a
+  // childless couple want going-out spots nearby; suppressed for a quiet-seeker or
+  // a family/senior. (A couple who mentioned kids reads as family and is excluded.)
   if (p.nightlife) {
     add(NearbyKind.nightlife, 83);
-  } else if (!p.quiet && (p.single || p.roommates || p.student || p.young)) {
-    add(NearbyKind.nightlife, 66);
+  } else if (!p.quiet &&
+      !p.family &&
+      !p.senior &&
+      (p.single || p.roommates || p.student || p.young || p.couple)) {
+    add(NearbyKind.nightlife, p.couple ? 62 : 66);
   }
   if (p.culture) {
     add(NearbyKind.culture, 82);
@@ -412,12 +439,12 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   // ── mobility (transit / bike-share / parking) ─────────────────────────────
   if (p.transitWanted) {
     add(NearbyKind.transit, 88);
-  } else if (youngL || p.budget) {
+  } else if (youngL || p.couple || p.budget) {
     add(NearbyKind.transit, 62);
   }
   if (p.transitWanted) {
     add(NearbyKind.bikeShare, 68);
-  } else if (youngL || p.active) {
+  } else if (youngL || p.couple || p.active) {
     add(NearbyKind.bikeShare, 56);
   }
   if (p.car) {
@@ -434,10 +461,8 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
   } else if (p.young) {
     add(NearbyKind.pools, 46);
   }
-  if (p.pet) {
-    add(NearbyKind.dogParks, 88);
-    add(NearbyKind.vets, 80);
-  }
+  if (p.dog) add(NearbyKind.dogParks, 88); // dog owners only, not cat owners
+  if (p.pet) add(NearbyKind.vets, 80); // any pet → a vet is relevant
   if (p.wfh) {
     add(NearbyKind.coworking, 85);
   } else if (p.student) {
@@ -446,7 +471,13 @@ List<NearbySection> relevantNearbySections(NearbyProfile p) {
     add(NearbyKind.coworking, 46);
   }
 
-  s.sort((a, b) => b.priority.compareTo(a.priority));
+  // Sort by priority desc; break ties by the enum's declaration order so the
+  // output is DETERMINISTIC (Dart's List.sort is not guaranteed stable, which
+  // would otherwise let equal-priority sections shuffle between runs).
+  s.sort((a, b) {
+    final byPrio = b.priority.compareTo(a.priority);
+    return byPrio != 0 ? byPrio : a.kind.index.compareTo(b.kind.index);
+  });
   return s;
 }
 
@@ -481,10 +512,18 @@ List<NearbySection> orderedNearbySections(NearbyProfile p) {
     NearbyKind.dogParks,
     NearbyKind.vets,
   ];
+  // HARD suppressions carry over to the full-reference list too: an explicitly
+  // secular seeker is never shown synagogues/mosques/churches even in the
+  // browse-all fallback (the relevant-list rule at [relevantNearbySections]
+  // would otherwise be silently undone here).
+  bool suppressed(NearbyKind k) =>
+      p.secular &&
+      (k == NearbyKind.synagogues || k == NearbyKind.worship);
+
   return [
     ...relevant,
     for (final k in fallbackOrder)
-      if (!have.contains(k))
+      if (!have.contains(k) && !suppressed(k))
         // clinics with no persona HMO → show all funds (hmo: '').
         NearbySection(k, hmo: '', priority: 0),
   ];

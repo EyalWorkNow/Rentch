@@ -211,6 +211,50 @@ class SearchQuery {
   /// When true, [areaDir] is what to AVOID ("לא בדרום העיר"), not what to prefer.
   final bool areaDirExclude;
 
+  /// Returns a copy with the given fields replaced (others kept). Only supports
+  /// SETTING values — passing null keeps the current one — which is all the
+  /// what-if mutators need (raise budget, relax rooms, drop a required feature).
+  SearchQuery copyWith({
+    String? city,
+    String? neighborhood,
+    int? minPrice,
+    int? maxPrice,
+    double? minRooms,
+    double? maxRooms,
+    String? propertyType,
+    Set<String>? amenities,
+    bool? nearTrain,
+    bool? cheapPreference,
+    TransactionTypeFilter? transactionType,
+    String? rawText,
+    Set<String>? intents,
+    Map<String, double>? weights,
+    Set<String>? requiredFeatures,
+    List<String>? excludeAreas,
+    String? areaDir,
+    bool? areaDirExclude,
+  }) =>
+      SearchQuery(
+        city: city ?? this.city,
+        neighborhood: neighborhood ?? this.neighborhood,
+        minPrice: minPrice ?? this.minPrice,
+        maxPrice: maxPrice ?? this.maxPrice,
+        minRooms: minRooms ?? this.minRooms,
+        maxRooms: maxRooms ?? this.maxRooms,
+        propertyType: propertyType ?? this.propertyType,
+        amenities: amenities ?? this.amenities,
+        nearTrain: nearTrain ?? this.nearTrain,
+        cheapPreference: cheapPreference ?? this.cheapPreference,
+        transactionType: transactionType ?? this.transactionType,
+        rawText: rawText ?? this.rawText,
+        intents: intents ?? this.intents,
+        weights: weights ?? this.weights,
+        requiredFeatures: requiredFeatures ?? this.requiredFeatures,
+        excludeAreas: excludeAreas ?? this.excludeAreas,
+        areaDir: areaDir ?? this.areaDir,
+        areaDirExclude: areaDirExclude ?? this.areaDirExclude,
+      );
+
   bool get isEmpty =>
       city == null &&
       neighborhood == null &&
@@ -463,7 +507,7 @@ class SmartSearch {
     // don't need to ask "rent or buy?" when the budget already makes it obvious.
     // Explicit MONTHLY phrasing ("בחודש"/"לחודש"/"שכ״ד") pins it to rent no matter
     // the number — "₪500,000 בחודש" is an (absurd) rent, not a purchase price.
-    final monthly = RegExp(r'בחודש|לחודש|חודשי|שכ["׳’]?ד|שכר דירה')
+    final monthly = RegExp(r'בחודש|לחודש|חודשי|שכ["׳’]?ד|שכר ?ה?דירה')
         .hasMatch(text);
     if (transactionType == TransactionTypeFilter.any && maxPrice != null) {
       if (monthly || maxPrice < 100000) {
@@ -700,7 +744,7 @@ class SmartSearch {
         maxRooms = 2;
       } else if (emptyNest) {
         minRooms = 2;
-      } else if (RegExp(r'(?<![א-ת])זוג|בני זוג|נשואים טריים|'
+      } else if (RegExp(r'(?<![א-ת])זוג|בני ?ה?זוג|נשואים טריים|'
               r'מצפים לילד|תינוק בדרך|בהריון|הריון ראשון')
           .hasMatch(text)) {
         // A COUPLE — even expecting their FIRST child — needs ~2 rooms (bedroom +
@@ -804,7 +848,7 @@ class SmartSearch {
   // "לאור" …) — Hebrew has no \b, so guard with letter lookaround. This bug nulled
   // the city of "קרוב לאוניברסיטה בתל אביב" (the "לא" in "לאוניברסיטה").
   static final _locNeg = RegExp(
-      r'(?<![א-ת])לא(?![א-ת])|בלי\b|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט|'
+      r'(?<![א-ת])לא(?![א-ת])|(?<![א-ת])בלי(?![א-ת])|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט|'
       r'\bnot\b|without|avoid|except',
       caseSensitive: false);
 
@@ -837,7 +881,7 @@ class SmartSearch {
     // "בתל אביב אבל לא רמת גן" (city already resolved to תל אביב).
     final negPhrase = RegExp(
         r'(?:לא|בלי|ללא|רחוק\s*מ|חוץ\s*מ|מלבד|למעט)\s+'
-        r'(?:ב|ל|ליד\s+|באזור\s+|רוצ\w+\s+ב?|מעוניינ?\w*\s+ב?)?'
+        r'(?:ב|ל|ליד\s+|בא[יי]?זור\s+|רוצ\w+\s+ב?|מעוניינ?\w*\s+ב?)?'
         r'([א-ת]{2,}(?:[\s\-]+[א-ת]{2,})?)',
         caseSensitive: false);
     for (final m in negPhrase.allMatches(text)) {

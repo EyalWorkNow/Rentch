@@ -2049,6 +2049,7 @@ class _StepDetails extends StatelessWidget {
                   'סטודיו',
                   'קוטג׳',
                   'בית פרטי',
+                  'משרד',
                 ],
                 onChanged: onTypeChanged,
               ),
@@ -4646,17 +4647,55 @@ class _DropdownRow extends StatelessWidget {
   final List<String> options;
   final ValueChanged<String?> onChanged;
 
+  IconData? _iconForOption(String option) {
+    switch (option) {
+      // Property types
+      case 'דירה':
+        return IconsaxPlusLinear.building;
+      case 'דירת גג':
+        return IconsaxPlusLinear.buildings;
+      case 'דירת גן':
+        return IconsaxPlusLinear.house_2;
+      case 'סטודיו':
+        return IconsaxPlusLinear.home_1;
+      case 'קוטג׳':
+        return IconsaxPlusLinear.home;
+      case 'בית פרטי':
+        return IconsaxPlusLinear.house;
+      case 'משרד':
+        return IconsaxPlusLinear.briefcase;
+      // Property conditions
+      case 'חדש מקבלן':
+        return IconsaxPlusLinear.magicpen;
+      case 'משופץ':
+        return IconsaxPlusLinear.brush;
+      case 'תקין':
+        return IconsaxPlusLinear.tick_circle;
+      case 'ישן':
+        return IconsaxPlusLinear.timer;
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final selectedIcon = _iconForOption(value);
+
     return DropdownButtonFormField<String>(
       initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         labelStyle:
             const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-        // Inherit the global rounded soft-filled theme (no boxy white border).
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        prefixIcon: selectedIcon != null
+            ? Padding(
+                padding: const EdgeInsets.only(left: 10, right: 10),
+                child: Icon(selectedIcon, size: 20, color: AppColors.primary),
+              )
+            : null,
       ),
       style: const TextStyle(
           color: AppColors.navy, fontWeight: FontWeight.w700, fontSize: 14),
@@ -4664,9 +4703,22 @@ class _DropdownRow extends StatelessWidget {
           size: 16, color: AppColors.textSecondary),
       dropdownColor: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      items: options
-          .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-          .toList(),
+      items: options.map((o) {
+        final itemIcon = _iconForOption(o);
+        return DropdownMenuItem(
+          value: o,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (itemIcon != null) ...[
+                Icon(itemIcon, size: 18, color: AppColors.primary),
+                const SizedBox(width: 10),
+              ],
+              Text(o),
+            ],
+          ),
+        );
+      }).toList(),
       onChanged: onChanged,
     );
   }

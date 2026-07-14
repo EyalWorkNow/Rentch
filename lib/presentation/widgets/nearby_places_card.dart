@@ -51,12 +51,21 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
   bool _loaded = false;
   int _open = 0; // accordion: index of the single expanded section (-1 = none)
   int _selected = 0; // carousel: index of the tag whose list is shown
+  int _currentPage = 0; // current page for place card pagination
   bool _showAllChips = false; // carousel: "הצג הכל" reveals every tag (wrap)
+  // Chat preview only: the user tapped "ראה עוד מקומות" → widen from the
+  // relevant-only subset to EVERY nearby kind with data.
+  bool _expandedAll = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    // Compute AFTER the first frame so opening the detail page is scrollable
+    // instantly — the POI section scan (up to ~20 kinds, hundreds of points each
+    // in a dense area) otherwise runs in a pre-frame microtask and freezes the
+    // opening frame. The card renders nothing until _loaded, so a one-frame defer
+    // is invisible.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
@@ -69,70 +78,82 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       IsraelGeoIndex.loadLifestylePois(),
     ]);
     if (!mounted) return;
-    // Chat preview → only what's relevant to the seeker; detail screen → ALL kinds
-    // with data (full reference), persona-relevant first.
-    final sections = widget.relevantOnly
+    // Chat preview → only what's relevant to the seeker (until they ask for more);
+    // detail screen → ALL kinds with data (full reference), persona-relevant first.
+    final sections = (widget.relevantOnly && !_expandedAll)
         ? relevantNearbySections(widget.profile)
         : orderedNearbySections(widget.profile);
     final out = <(NearbySection, List<NearbyPlace>)>[];
+    var scanned = 0;
     for (final s in sections) {
       final places = _dataFor(s);
       if (places.isNotEmpty) out.add((s, places));
+      // Yield to the event loop every few kinds so a dense area never blocks a
+      // single frame while the user is scrolling.
+      if (++scanned % 4 == 0) await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
     }
     setState(() {
       _sections
         ..clear()
         ..addAll(out);
+      _selected = _selected.clamp(0, out.isEmpty ? 0 : out.length - 1);
       _loaded = true;
     });
+  }
+
+  // Chat preview: widen from relevant-only to every nearby kind, on demand.
+  void _revealAllKinds() {
+    setState(() => _expandedAll = true);
+    _load();
   }
 
   List<NearbyPlace> _dataFor(NearbySection s) {
     final la = widget.lat, lo = widget.lon;
     switch (s.kind) {
       case NearbyKind.schools:
-        return IsraelGeoIndex.schoolsWithin(la, lo, km: 2);
+        return IsraelGeoIndex.schoolsWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.kindergartens:
-        return IsraelGeoIndex.kindergartensWithin(la, lo, km: 2);
+        return IsraelGeoIndex.kindergartensWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.clinics:
         return IsraelGeoIndex.clinicsWithin(la, lo,
-            km: 5, hmo: s.hmo.isEmpty ? null : s.hmo); // clinics matter farther
+            km: 5, hmo: s.hmo.isEmpty ? null : s.hmo, cap: 120); // clinics matter farther
       case NearbyKind.supermarkets:
-        return IsraelGeoIndex.supermarketsWithin(la, lo, km: 2);
+        return IsraelGeoIndex.supermarketsWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.parks:
-        return IsraelGeoIndex.parksWithin(la, lo, km: 2);
+        return IsraelGeoIndex.parksWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.pharmacies:
-        return IsraelGeoIndex.pharmaciesWithin(la, lo, km: 2);
+        return IsraelGeoIndex.pharmaciesWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.playgrounds:
-        return IsraelGeoIndex.playgroundsWithin(la, lo, km: 2);
+        return IsraelGeoIndex.playgroundsWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.dining:
-        return IsraelGeoIndex.diningWithin(la, lo, km: 2);
+        return IsraelGeoIndex.diningWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.gyms:
-        return IsraelGeoIndex.gymsWithin(la, lo, km: 3);
+        return IsraelGeoIndex.gymsWithin(la, lo, km: 3, cap: 120);
       case NearbyKind.nightlife:
-        return IsraelGeoIndex.nightlifeVenuesWithin(la, lo, km: 2);
+        return IsraelGeoIndex.nightlifeVenuesWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.synagogues:
-        return IsraelGeoIndex.synagoguesWithin(la, lo, km: 2);
+        return IsraelGeoIndex.synagoguesWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.culture:
-        return IsraelGeoIndex.cultureWithin(la, lo, km: 3);
+        return IsraelGeoIndex.cultureWithin(la, lo, km: 3, cap: 120);
       case NearbyKind.hospitals:
-        return IsraelGeoIndex.hospitalsWithin(la, lo, km: 5);
+        return IsraelGeoIndex.hospitalsWithin(la, lo, km: 5, cap: 120);
       case NearbyKind.transit:
-        return IsraelGeoIndex.transitStopsWithin(la, lo, km: 2);
+        return IsraelGeoIndex.transitStopsWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.worship:
-        return IsraelGeoIndex.worshipWithin(la, lo, km: 2);
+        return IsraelGeoIndex.worshipWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.pools:
-        return IsraelGeoIndex.poolsWithin(la, lo, km: 3);
+        return IsraelGeoIndex.poolsWithin(la, lo, km: 3, cap: 120);
       case NearbyKind.dogParks:
-        return IsraelGeoIndex.dogParksWithin(la, lo, km: 2);
+        return IsraelGeoIndex.dogParksWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.vets:
-        return IsraelGeoIndex.vetsWithin(la, lo, km: 3);
+        return IsraelGeoIndex.vetsWithin(la, lo, km: 3, cap: 120);
       case NearbyKind.bikeShare:
-        return IsraelGeoIndex.bikeShareWithin(la, lo, km: 2);
+        return IsraelGeoIndex.bikeShareWithin(la, lo, km: 2, cap: 120);
       case NearbyKind.coworking:
-        return IsraelGeoIndex.coworkingWithin(la, lo, km: 3);
+        return IsraelGeoIndex.coworkingWithin(la, lo, km: 3, cap: 120);
       case NearbyKind.parking:
-        return IsraelGeoIndex.parkingWithin(la, lo, km: 2);
+        return IsraelGeoIndex.parkingWithin(la, lo, km: 2, cap: 120);
     }
   }
 
@@ -206,17 +227,101 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
         // Selected tag's places as an ADAPTIVE wrap — each card sizes to its own
         // content so the FULL name shows (even a long one), and rows fill
         // asymmetrically to the width instead of a rigid symmetric grid.
-        if (_sections.isNotEmpty)
+        if (_sections.isNotEmpty) ...[
           LayoutBuilder(
             builder: (context, c) => Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final pl in _sections[sel].$2.take(9))
+                for (final pl in _sections[sel].$2.skip(_currentPage * 10).take(10))
                   _placeCard(pl, c.maxWidth),
               ],
             ),
           ),
+          // Pagination controls (only if total items > 10)
+          if (_sections[sel].$2.length > 10) ...[
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Previous page button (RTL right-side button)
+                TextButton(
+                  onPressed: _currentPage > 0 
+                      ? () => setState(() => _currentPage--) 
+                      : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    disabledForegroundColor: AppColors.textSecondary.withOpacity(0.3),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_forward_ios_rounded, size: 13),
+                      SizedBox(width: 4),
+                      Text('הקודם', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                    ],
+                  ),
+                ),
+                // Page Indicator
+                Text(
+                  'עמוד ${_currentPage + 1} מתוך ${(_sections[sel].$2.length / 10).ceil()}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy,
+                  ),
+                ),
+                // Next page button (RTL left-side button)
+                TextButton(
+                  onPressed: _currentPage < ((_sections[sel].$2.length / 10).ceil() - 1)
+                      ? () => setState(() => _currentPage++)
+                      : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    disabledForegroundColor: AppColors.textSecondary.withOpacity(0.3),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('הבא', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_back_ios_rounded, size: 13),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+        // Chat preview: once the relevant places are shown, let an interested
+        // seeker widen to EVERY nearby kind (parks, gyms, transit, culture…).
+        if (widget.relevantOnly && !_expandedAll) ...[
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              onTap: _revealAllKinds,
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppColors.primary),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('ראה עוד מקומות בסביבה',
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary)),
+                  const SizedBox(width: 4),
+                  Icon(IconsaxPlusLinear.discover_1,
+                      size: 17, color: AppColors.primary),
+                ]),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -304,7 +409,10 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final (icon, title, _) = _meta(_sections[index].$1.kind);
     final n = _sections[index].$2.length;
     return InkWell(
-      onTap: () => setState(() => _selected = index),
+      onTap: () => setState(() {
+        _selected = index;
+        _currentPage = 0;
+      }),
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
