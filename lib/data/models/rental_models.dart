@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:latlong2/latlong.dart';
 
 enum SearchSortOption {
@@ -275,6 +276,7 @@ class PropertyModel3d {
     this.ksplatUrl = '',
     this.textureFolder = '',
     this.assets = const [],
+    this.rooms = const [],
     this.modelQualityScore,
     this.scanDate,
   });
@@ -291,8 +293,19 @@ class PropertyModel3d {
   final String ksplatUrl;
   final String textureFolder;
   final List<PropertyModelAsset> assets;
+
+  /// Per-room 3D captures (Option-1 room-switcher). When the landlord scans an
+  /// apartment room-by-room, every viewable room lands here so the viewer can
+  /// offer a room picker. The legacy single-scan urls (glbUrl/plyUrl/ksplatUrl)
+  /// mirror the FIRST viewable room for back-compat with older readers.
+  final List<ScannedRoom> rooms;
+
   final int? modelQualityScore;
   final DateTime? scanDate;
+
+  /// Rooms that actually have a loadable mesh/splat (the ones worth showing).
+  List<ScannedRoom> get viewableRooms =>
+      rooms.where((r) => r.hasViewableAsset).toList(growable: false);
 
   bool get hasAnyAsset =>
       viewerUrl.trim().isNotEmpty ||
@@ -304,7 +317,8 @@ class PropertyModel3d {
       plyUrl.trim().isNotEmpty ||
       ksplatUrl.trim().isNotEmpty ||
       textureFolder.trim().isNotEmpty ||
-      assets.isNotEmpty;
+      assets.isNotEmpty ||
+      viewableRooms.isNotEmpty;
 
   PropertyModel3d copyWith({
     String? viewerUrl,
@@ -317,6 +331,7 @@ class PropertyModel3d {
     String? ksplatUrl,
     String? textureFolder,
     List<PropertyModelAsset>? assets,
+    List<ScannedRoom>? rooms,
     int? modelQualityScore,
     DateTime? scanDate,
   }) {
@@ -331,6 +346,7 @@ class PropertyModel3d {
       ksplatUrl: ksplatUrl ?? this.ksplatUrl,
       textureFolder: textureFolder ?? this.textureFolder,
       assets: assets ?? this.assets,
+      rooms: rooms ?? this.rooms,
       modelQualityScore: modelQualityScore ?? this.modelQualityScore,
       scanDate: scanDate ?? this.scanDate,
     );
@@ -338,6 +354,7 @@ class PropertyModel3d {
 
   factory PropertyModel3d.fromJson(Map<String, dynamic> json) {
     final rawAssets = json['assets'] as List<dynamic>? ?? const [];
+    final rawRooms = json['rooms'] as List<dynamic>? ?? const [];
     return PropertyModel3d(
       viewerUrl: json['viewerUrl']?.toString() ?? '',
       glbUrl: json['glbUrl']?.toString() ?? '',
@@ -352,6 +369,10 @@ class PropertyModel3d {
           .whereType<Map>()
           .map((item) =>
               PropertyModelAsset.fromJson(Map<String, dynamic>.from(item)))
+          .toList(growable: false),
+      rooms: rawRooms
+          .whereType<Map>()
+          .map((item) => ScannedRoom.fromJson(Map<String, dynamic>.from(item)))
           .toList(growable: false),
       modelQualityScore: _optionalInt(json['modelQualityScore']),
       scanDate: _optionalDate(json['scanDate']),
@@ -379,6 +400,7 @@ class PropertyModel3d {
       'ksplatUrl': ksplatUrl,
       'textureFolder': textureFolder,
       'assets': assets.map((item) => item.toJson()).toList(),
+      'rooms': rooms.map((r) => r.toJson()).toList(),
       'modelQualityScore': modelQualityScore,
       'scanDate': scanDate == null ? null : _formatDateOnly(scanDate!),
     };

@@ -161,19 +161,28 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     if (result == null || !mounted) return;
     setState(() {
       _roomScans = result;
+      if (result.isEmpty) {
+        _model3dDraft = null;
+        return;
+      }
+      // Persist the FULL room list (room-switcher viewer reads model3d.rooms) …
+      var draft = (_model3dDraft ?? const PropertyModel3d()).copyWith(
+        rooms: result,
+        scanDate: DateTime.now(),
+      );
+      // … and mirror the first viewable room into the legacy single-scan urls so
+      // older readers (and the single-scan card) still find a model.
       final firstViewable = result.firstWhere(
         (r) => r.hasViewableAsset,
         orElse: () => const ScannedRoom(name: ''),
       );
       if (firstViewable.hasViewableAsset) {
-        _model3dDraft = (_model3dDraft ?? const PropertyModel3d()).copyWith(
+        draft = draft.copyWith(
           glbUrl: firstViewable.meshGlbUrl ?? '',
           plyUrl: firstViewable.splatUrl ?? '',
-          scanDate: DateTime.now(),
         );
-      } else if (result.isEmpty) {
-        _model3dDraft = null;
       }
+      _model3dDraft = draft;
     });
   }
 
@@ -4724,19 +4733,28 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     if (result == null || !mounted) return;
     setState(() {
       _roomScans = result;
+      if (result.isEmpty) {
+        _model3dDraft = null;
+        return;
+      }
+      // Persist the FULL room list (room-switcher viewer reads model3d.rooms) …
+      var draft = (_model3dDraft ?? const PropertyModel3d()).copyWith(
+        rooms: result,
+        scanDate: DateTime.now(),
+      );
+      // … and mirror the first viewable room into the legacy single-scan urls so
+      // older readers (and the single-scan card) still find a model.
       final firstViewable = result.firstWhere(
         (r) => r.hasViewableAsset,
         orElse: () => const ScannedRoom(name: ''),
       );
       if (firstViewable.hasViewableAsset) {
-        _model3dDraft = (_model3dDraft ?? const PropertyModel3d()).copyWith(
+        draft = draft.copyWith(
           glbUrl: firstViewable.meshGlbUrl ?? '',
           plyUrl: firstViewable.splatUrl ?? '',
-          scanDate: DateTime.now(),
         );
-      } else if (result.isEmpty) {
-        _model3dDraft = null;
       }
+      _model3dDraft = draft;
     });
   }
 
@@ -4797,6 +4815,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _panoramaTourDraft = p.panoramaTour;
     _scanTourDraft = null;
     _model3dDraft = p.model3d;
+    // Re-hydrate the per-room list so editing an existing property keeps its
+    // scanned rooms (and the flow re-opens with them as initialRooms).
+    _roomScans = p.model3d?.rooms ?? const [];
     _wantsVerifiedListing = p.isVerifiedListing;
     _verificationVideoUrl = p.verification.videoUrl;
     _verificationCapturedAt = p.verification.capturedAt;

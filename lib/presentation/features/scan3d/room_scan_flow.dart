@@ -7,7 +7,13 @@ import 'package:dating_app/core/services/kiri_3d_service.dart';
 import 'package:dating_app/core/services/pending_scan_store.dart';
 import 'package:dating_app/core/services/roomplan_service.dart';
 import 'package:dating_app/data/models/scan3d_job.dart';
+import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
+
+// ScannedRoom now lives in the data layer so the persisted PropertyModel3d can
+// carry the full room list. Re-exported here so existing importers of this file
+// keep compiling unchanged.
+export 'package:dating_app/data/models/scanned_room.dart' show ScannedRoom;
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,68 +41,6 @@ import 'package:video_compress/video_compress.dart';
 // The screen returns the full List<ScannedRoom> to the caller (or pops with the
 // current list on back), so add_property can persist it on the draft.
 // ════════════════════════════════════════════════════════════════════════════
-
-/// One scanned room on the property draft. Either a cloud reconstruction (KIRI
-/// → mesh/splat URLs) or a fast on-device RoomPlan capture (local USDZ path).
-@immutable
-class ScannedRoom {
-  const ScannedRoom({
-    required this.name,
-    this.meshGlbUrl,
-    this.splatUrl,
-    this.usdzPath,
-    this.source = 'cloud',
-  });
-
-  /// Hebrew room name chosen by the user (סלון / מטבח / חדר שינה …).
-  final String name;
-
-  /// Textured mesh URL when reconstructed in the cloud.
-  final String? meshGlbUrl;
-
-  /// Gaussian-splat URL when reconstructed in the cloud.
-  final String? splatUrl;
-
-  /// Local USDZ path from an on-device RoomPlan capture (display is a backend
-  /// follow-up — for now we only confirm it was captured).
-  final String? usdzPath;
-
-  /// 'cloud' (KIRI) or 'roomplan' (iPhone Pro LiDAR).
-  final String source;
-
-  bool get isCloud => source == 'cloud';
-  bool get hasViewableAsset =>
-      (meshGlbUrl?.isNotEmpty ?? false) || (splatUrl?.isNotEmpty ?? false);
-
-  ScannedRoom copyWith({String? name}) => ScannedRoom(
-        name: name ?? this.name,
-        meshGlbUrl: meshGlbUrl,
-        splatUrl: splatUrl,
-        usdzPath: usdzPath,
-        source: source,
-      );
-
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        if (meshGlbUrl != null) 'meshGlbUrl': meshGlbUrl,
-        if (splatUrl != null) 'splatUrl': splatUrl,
-        if (usdzPath != null) 'usdzPath': usdzPath,
-        'source': source,
-      };
-
-  factory ScannedRoom.fromJson(Map<String, dynamic> json) => ScannedRoom(
-        name: json['name']?.toString() ?? 'חדר',
-        meshGlbUrl: _nonEmpty(json['meshGlbUrl']),
-        splatUrl: _nonEmpty(json['splatUrl']),
-        usdzPath: _nonEmpty(json['usdzPath']),
-        source: json['source']?.toString() ?? 'cloud',
-      );
-
-  static String? _nonEmpty(Object? v) {
-    final s = v?.toString().trim();
-    return (s == null || s.isEmpty) ? null : s;
-  }
-}
 
 /// Remembers the one-time interior-scan consent so we never nag a returning
 /// landlord. Backed by SharedPreferences (no new model field needed).

@@ -1138,12 +1138,21 @@ class _ParitySections extends StatelessWidget {
         surface: _cardSurface,
         onSurface: _onSurface,
         muted: _muted,
-        onTap: () => Scan3dViewerScreen.open(
-          context,
-          meshGlbUrl: _scan3dGlbUrl(property),
-          splatUrl: _scan3dSplatUrl(property),
-          title: 'סריקת תלת-מימד',
-        ),
+        onTap: () {
+          // Multi-room scan → room-switcher; single scan → the classic viewer.
+          final rooms = property.model3d?.viewableRooms ?? const [];
+          if (rooms.length > 1) {
+            Scan3dViewerScreen.openRooms(context, rooms,
+                title: 'סריקת תלת-מימד');
+          } else {
+            Scan3dViewerScreen.open(
+              context,
+              meshGlbUrl: _scan3dGlbUrl(property),
+              splatUrl: _scan3dSplatUrl(property),
+              title: 'סריקת תלת-מימד',
+            );
+          }
+        },
       ));
     }
 

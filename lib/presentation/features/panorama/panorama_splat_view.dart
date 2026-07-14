@@ -27,11 +27,19 @@ class PanoramaSplatView extends StatefulWidget {
     required this.splatUrl,
     this.title = 'סיור תלת-מימד',
     this.waypoints = const [],
+    this.showChrome = true,
   });
 
   /// HTTPS URL of the reconstructed splat (`.spz` preferred, `.ply` ok).
   final String splatUrl;
   final String title;
+
+  /// When false, hides this view's own top bar (close/title) and the teleport
+  /// waypoint controls — used when embedded inside a host that owns the chrome
+  /// (e.g. the multi-room [Scan3dViewerScreen] room-switcher).
+  /// ponytail: embedded mode drops in-room teleport nav; drag/orbit still works.
+  /// Add per-room waypoints back when a room actually needs preset poses.
+  final bool showChrome;
 
   /// Optional preset camera poses to teleport between. When empty, the viewer
   /// uses a sensible default orbit set so the scene is still navigable.
@@ -208,38 +216,41 @@ class _PanoramaSplatViewState extends State<PanoramaSplatView> {
             const Center(child: CircularProgressIndicator(color: Colors.white)),
 
           // top bar: close + title
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                child: Row(
-                  children: [
-                    _closeButton(inline: true),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+          if (widget.showChrome)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Row(
+                    children: [
+                      _closeButton(inline: true),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 6)
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
           // teleport-waypoint controls (forward / back between preset poses)
-          if (_ready)
+          if (_ready && widget.showChrome)
             Positioned(
               bottom: 0,
               left: 0,
