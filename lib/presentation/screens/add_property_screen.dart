@@ -631,7 +631,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       if (!mounted) return;
       setState(() {
         _scanTourDraft = imported.tour;
-        _model3dDraft = imported.model3d;
+        // Preserve any per-room scans already captured: the import refreshes the
+        // single-scan urls but must NOT silently drop the room list (and keeps
+        // _roomScans and model3d.rooms as one consistent source of truth).
+        _model3dDraft = imported.model3d.copyWith(rooms: _roomScans);
         _isScanSubmitting = false;
       });
       // A .ply/.spz is now converting server-side to a fast .ksplat → show the
@@ -5148,7 +5151,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       if (!mounted) return;
       setState(() {
         _scanTourDraft = imported.tour;
-        _model3dDraft = imported.model3d;
+        // Preserve any per-room scans already captured: the import refreshes the
+        // single-scan urls but must NOT silently drop the room list (and keeps
+        // _roomScans and model3d.rooms as one consistent source of truth).
+        _model3dDraft = imported.model3d.copyWith(rooms: _roomScans);
         _isScanSubmitting = false;
       });
     } on ScaniverseAssetImportException catch (error) {

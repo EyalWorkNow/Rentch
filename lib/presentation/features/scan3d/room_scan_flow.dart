@@ -100,7 +100,6 @@ class RoomScanFlowScreen extends StatefulWidget {
 
 class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
   late List<ScannedRoom> _rooms;
-  final _roomPlan = const RoomPlanService();
 
   @override
   void initState() {
@@ -118,8 +117,12 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
     }
     if (!mounted) return;
 
-    // 2) Tier routing.
-    final supportsRoomPlan = await _roomPlan.isSupported();
+    // 2) Tier routing. RoomPlan (iPhone-Pro LiDAR) is DISABLED: it produces a
+    // local USDZ that nothing uploads or converts to a viewable mesh, so the
+    // "fast scan" was a silent dead end (captured, then the temp file purged and
+    // the work lost). Until a backend USDZ→GLB step exists, route EVERYONE to the
+    // guided-video → KIRI cloud path, which actually produces a viewable room.
+    const supportsRoomPlan = false;
     if (!mounted) return;
 
     final room = await Navigator.of(context).push<ScannedRoom>(
@@ -457,10 +460,16 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
     }
 
     final named = await _askRoomName();
-    if (named == null || !mounted) return;
+    if (!mounted) return;
+    // Never throw away a completed, minutes-long, billed reconstruction: if the
+    // landlord dismisses the name sheet we keep the room with a default name
+    // (they can rename it) instead of silently discarding the scan.
+    final roomName = (named == null || named.trim().isEmpty)
+        ? 'חדר ${widget.roomNumber}'
+        : named.trim();
     Navigator.of(context).pop(
       ScannedRoom(
-        name: named,
+        name: roomName,
         meshGlbUrl: job.meshGlbUrl,
         splatUrl: job.splatUrl,
         source: 'cloud',

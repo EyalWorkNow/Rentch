@@ -1109,8 +1109,12 @@ class _ParitySections extends StatelessWidget {
 
     // ── Virtual tours / media (360° + 3D scan) ────────────────────────────
     final has360 = property.hasPanoramaTour;
+    // Show the 3D card if EITHER the legacy single-scan urls OR any viewable
+    // room exists — a multi-room scan can carry rooms with empty legacy urls,
+    // and the launcher already prefers viewableRooms, so gate on the same signal.
     final has3d = _scan3dGlbUrl(property) != null ||
-        _scan3dSplatUrl(property) != null;
+        _scan3dSplatUrl(property) != null ||
+        (property.model3d?.viewableRooms.isNotEmpty ?? false);
     children.add(_header(
       has360 || has3d ? 'סיורים' : 'סיור וירטואלי',
       IconsaxPlusLinear.video_play,
