@@ -1470,8 +1470,13 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
     if (e.isUnauthorized || code == 503) {
       return 'התכונה תיפתח בקרוב.';
     }
-    return 'בניית החדר נכשלה. נסו לצלם שוב באור טוב, תוך כדי הליכה '
-        'איטית בחדר — לא להסתובב במקום.';
+    // Every exception that reaches here is PRE-reconstruction (job creation or
+    // KIRI submission), so it is NEVER about the user's video — refilming can't
+    // help. A 5xx (KIRI submit error / out-of-credits / server overload) or any
+    // other create/start failure is a SERVICE issue: say so honestly instead of
+    // blaming the capture. (Genuine bad-video failures surface separately, as a
+    // non-ready terminal job → the "film again" message in _startCloudCapture.)
+    return 'השירות אינו זמין כרגע. נסו שוב עוד מספר דקות — הצילום שלכם תקין.';
   }
 
   static String _stageLabel(Scan3dStatus status) {
