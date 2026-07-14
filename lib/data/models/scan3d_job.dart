@@ -82,6 +82,7 @@ class Scan3dJob {
     this.meshGlbUrl,
     this.splatUrl,
     this.error,
+    this.timedOut = false,
   });
 
   /// Backend job id, used for upload / start / poll.
@@ -98,6 +99,12 @@ class Scan3dJob {
   /// Human-readable failure reason when [status] is [Scan3dStatus.failed].
   final String? error;
 
+  /// True when the CLIENT gave up polling before a server-terminal state — the
+  /// job is NOT failed, it's still reconstructing on the backend. The caller
+  /// must KEEP the PendingScanStore record so the background finalizer attaches
+  /// the model when it's ready (removing it here orphans a billed reconstruction).
+  final bool timedOut;
+
   bool get isReady => status == Scan3dStatus.ready;
   bool get isFailed => status == Scan3dStatus.failed;
   bool get isTerminal => isReady || isFailed;
@@ -112,6 +119,7 @@ class Scan3dJob {
     String? meshGlbUrl,
     String? splatUrl,
     String? error,
+    bool? timedOut,
   }) =>
       Scan3dJob(
         jobId: jobId ?? this.jobId,
@@ -119,6 +127,7 @@ class Scan3dJob {
         meshGlbUrl: meshGlbUrl ?? this.meshGlbUrl,
         splatUrl: splatUrl ?? this.splatUrl,
         error: error ?? this.error,
+        timedOut: timedOut ?? this.timedOut,
       );
 
   factory Scan3dJob.fromJson(Map<String, dynamic> json) {

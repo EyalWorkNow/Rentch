@@ -245,8 +245,14 @@ class Kiri3dService {
 
   /// Polls [jobId] every [_pollInterval] until the job is ready/failed or the
   /// [_pollBudget] elapses. Emits each intermediate [Scan3dJob] so the UI can
-  /// show progress; closes after a terminal state. On timeout it emits a
-  /// synthetic failed job and closes (never hangs).
+  /// show progress; closes after a terminal state. On timeout it emits a job
+  /// flagged [Scan3dJob.timedOut] and closes (never hangs).
+  ///
+  /// A timeout is NOT a failure — the backend keeps reconstructing and may
+  /// finish minutes later (KIRI can run past this foreground budget). The
+  /// timeout job stays [Scan3dStatus.processing] so the caller keeps the
+  /// PendingScanStore record and the background finalizer attaches the model
+  /// when it's ready, instead of orphaning a billed reconstruction.
   Stream<Scan3dJob> poll(String jobId) async* {
     final deadline = DateTime.now().add(_pollBudget);
     while (DateTime.now().isBefore(deadline)) {
@@ -266,8 +272,10 @@ class Kiri3dService {
     }
     yield Scan3dJob(
       jobId: jobId,
-      status: Scan3dStatus.failed,
-      error: 'Scan timed out after ${_pollBudget.inMinutes} minutes',
+      status: Scan3dStatus.processing,
+      timedOut: true,
+      error: 'Foreground poll ended after ${_pollBudget.inMinutes} min; '
+          'reconstruction continues in the background',
     );
   }
 

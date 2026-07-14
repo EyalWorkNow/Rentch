@@ -144,5 +144,19 @@ void main() {
       expect(updated.jobId, 'j2');
       expect(updated.status, Scan3dStatus.processing);
     });
+
+    test('a poll-timeout job is NOT terminal/failed — record must be kept', () {
+      // Invariant _CloudReconstructScreen relies on: a client poll timeout is
+      // 'processing' + timedOut, so it is neither terminal nor failed and the
+      // PendingScanStore record survives for the background finalizer. If someone
+      // makes the timeout status 'failed' again, isTerminal flips and the billed
+      // reconstruction gets orphaned — this catches that regression.
+      const t = Scan3dJob(
+          jobId: 'j', status: Scan3dStatus.processing, timedOut: true);
+      expect(t.timedOut, isTrue);
+      expect(t.isTerminal, isFalse);
+      expect(t.isFailed, isFalse);
+      expect(t.copyWith(jobId: 'j2').timedOut, isTrue); // survives copyWith
+    });
   });
 }

@@ -460,6 +460,13 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
       ),
     );
     if (job == null || !mounted) return;
+    // Poll timed out but the reconstruction is still running on the backend —
+    // NOT a failure. The pending record was kept, so the finalizer will attach
+    // the room automatically. Tell the user honestly; never say "film again".
+    if (job.timedOut) {
+      await _showScanContinuingInBackground();
+      return;
+    }
     if (!job.isReady) {
       setState(() => _error =
           'בניית החדר נכשלה. נסו לצלם סרטון שוב באור טוב, תוך כדי הליכה '
@@ -486,6 +493,30 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
   }
 
   Future<String?> _askRoomName() => showRoomNameSheet(context);
+
+  // The foreground poll ended but KIRI is still reconstructing — reassure the
+  // user; the background finalizer attaches the room when it's ready.
+  Future<void> _showScanContinuingInBackground() => showDialog<void>(
+        context: context,
+        builder: (_) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('הסריקה ממשיכה ברקע',
+                style: TextStyle(fontWeight: FontWeight.w900)),
+            content: const Text(
+              'בניית החדר לוקחת קצת יותר זמן. אפשר להמשיך — נוסיף את החדר לנכס '
+              'אוטומטית ברגע שהוא מוכן, גם אם תצאו מהמסך.',
+              style: TextStyle(fontSize: 15, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('הבנתי'),
+              ),
+            ],
+          ),
+        ),
+      );
 
   void _showComingSoon() {
     showDialog<void>(
@@ -1360,9 +1391,13 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         },
       );
       if (!mounted) return;
-      // Job reached a terminal state while the screen was open — it's no longer
-      // pending, so drop the background record before returning the result.
-      unawaited(PendingScanStore.instance.remove(job.jobId));
+      // A client-side poll TIMEOUT is not terminal — KIRI keeps reconstructing.
+      // KEEP the pending record so the background finalizer attaches the finished
+      // model; removing it here would orphan a billed reconstruction. Only drop
+      // the record on a genuine terminal (ready / server-failed).
+      if (!job.timedOut) {
+        unawaited(PendingScanStore.instance.remove(job.jobId));
+      }
       Navigator.of(context).pop(job);
     } on Kiri3dException catch (e) {
       if (!mounted) return;
