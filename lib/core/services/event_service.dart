@@ -193,21 +193,32 @@ class EventService {
   /// [rank], plus the top contributing dimensions (kept small). Emitted per result
   /// so that, joined to the later swipe/contact outcome on (sessionId, propertyId),
   /// the hand-tuned scores can finally be calibrated against real behaviour.
+  // Dedupe impressions per session: recommendForTenant fires one of these per
+  // surfaced result, and it re-ranks on every preload page / refresh — so the
+  // same property was being POSTed dozens of times, a burst that hammered the
+  // events endpoint (and yielded transient 500s) while adding no calibration
+  // signal (a property's fit% is stable within a session). One row per property
+  // per session is enough — this instance IS the session (sessionId is final),
+  // so the set's lifetime is exactly one session.
+  final Set<String> _impressionsLogged = <String>{};
+
   void logRankedImpression({
     required String propertyId,
     required int fitPct,
     required int rank,
     Map<String, double>? dims,
-  }) =>
-      log(
-        UserEventType.rankedImpression,
-        propertyId: propertyId,
-        metadata: {
-          'fitPct': fitPct.clamp(0, 100),
-          'rank': math.max(0, rank),
-          if (dims != null && dims.isNotEmpty) 'dims': topDims(dims, 5),
-        },
-      );
+  }) {
+    if (propertyId.isEmpty || !_impressionsLogged.add(propertyId)) return;
+    log(
+      UserEventType.rankedImpression,
+      propertyId: propertyId,
+      metadata: {
+        'fitPct': fitPct.clamp(0, 100),
+        'rank': math.max(0, rank),
+        if (dims != null && dims.isNotEmpty) 'dims': topDims(dims, 5),
+      },
+    );
+  }
 
   /// The [n] highest-contribution dimensions, rounded — keeps the impression
   /// payload well under the 2 KB metadata cap while retaining the score's drivers.
