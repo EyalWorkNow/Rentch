@@ -183,6 +183,30 @@ class Kiri3dService {
 
   /// Kicks off the (async) reconstruction. Returns true when the backend
   /// acknowledges with `{ok:true}`. Throws [Kiri3dException] on a server error.
+  /// Cheap pre-capture check: is 3D reconstruction actually configured on the
+  /// backend? Creates a job (the earliest point the backend returns 503 when the
+  /// KIRI key is missing) and reports availability. Returns false ONLY on a
+  /// definitive 503 "not configured"; any other outcome — success or a transient
+  /// error — returns true so we never block a working scan on a network blip.
+  // ponytail: the probe job on the available path is a throwaway (one meta row,
+  // no upload, no KIRI call — it ages out). Reuse it in the real run if that ever
+  // shows up as waste.
+  Future<bool> probeAvailable(String propertyId) async {
+    try {
+      await createJob(
+        propertyId: propertyId,
+        captureType: Scan3dCaptureType.video,
+        frameCount: 1,
+        fast: true,
+      );
+      return true;
+    } on Kiri3dException catch (e) {
+      return e.statusCode != 503;
+    } catch (_) {
+      return true; // unknown error → don't block; the real run will surface it
+    }
+  }
+
   Future<bool> start(String jobId) async {
     _ensureConfigured();
     if (jobId.trim().isEmpty) {

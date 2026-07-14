@@ -3160,6 +3160,10 @@ async function putScan3dMeta(jobId, meta) {
 //   → {jobId, uploadUrls:[presigned S3 PUT urls]}
 async function createScan3d(event) {
   if (!callerUidOf(event)) return json(401, { message: 'Authentication required.' });
+  // Fail early (before the client records/uploads anything) when 3D
+  // reconstruction isn't configured — the same 503 startScan3d returns, but at
+  // job-creation so the app can gate the whole flow up front.
+  if (!KIRI_API_KEY) return json(503, { message: '3D reconstruction not configured.' });
   let body = {};
   try { body = event.body ? JSON.parse(event.body) : {}; }
   catch { return json(400, { message: 'Invalid JSON body.' }); }

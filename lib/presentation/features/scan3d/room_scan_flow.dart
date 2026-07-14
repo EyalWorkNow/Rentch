@@ -434,6 +434,14 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
       _showComingSoon();
       return;
     }
+    // Preflight BEFORE asking the landlord to film: the client can't see the
+    // backend's config, so without this they would record a full guided video +
+    // wait for the transcode only to hit "not configured". Catch it up front.
+    if (!await Kiri3dService.instance.probeAvailable(widget.propertyId)) {
+      if (mounted) _showComingSoon();
+      return;
+    }
+    if (!mounted) return;
     final video = await Navigator.of(context).push<File>(
       MaterialPageRoute(
         fullscreenDialog: true,
