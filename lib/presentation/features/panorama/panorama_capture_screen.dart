@@ -1295,7 +1295,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'מצלמים פנורמה 360° ומעלים אותה כאן',
+                      'צלמו את החדר — וה-AI יהפוך ל-360° מלא',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontWeight: FontWeight.w900,
@@ -1304,8 +1304,9 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'הדרך הכי איכותית: אפליקציית Google Street View (חינם) — '
-                      'צילום כדור 360° מלא. אחר כך פשוט מעלים את התמונה לכאן.',
+                      'הדרך הכי פשוטה: מצלמים כמה תמונות רגילות של החדר (כל קיר) — '
+                      'וה-AI מרכיב מהן סיור 360° מלא ומדויק. יש לכם כבר פנורמה 360°? '
+                      'פשוט העלו אותה מהגלריה.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 16,
@@ -1315,33 +1316,27 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     const SizedBox(height: 22),
                     const _GuideStep(
                       number: '1',
-                      icon: IconsaxPlusBold.mobile,
-                      title: 'התקינו Google Street View',
+                      icon: IconsaxPlusBold.camera,
+                      title: 'צלמו את החדר',
                       body:
-                          'מה-App Store או Google Play — בחינם. (אפשר גם מצב "פנורמה" '
-                          'במצלמת הטלפון, אבל Street View נותן 360° מלא ואיכותי יותר.)',
+                          'עומדים במרכז החדר ומצלמים כמה תמונות רחבות — קיר-קיר, עד '
+                          'שכיסיתם את כל הזוויות. ככל שיש יותר תמונות, ה-360° מדויק יותר.',
                     ),
                     const _GuideStep(
                       number: '2',
-                      icon: IconsaxPlusBold.camera,
-                      title: 'צלמו את החדר ב-360°',
+                      icon: IconsaxPlusBold.magic_star,
+                      title: 'צרו 360° עם AI',
                       body:
-                          'בתוך Street View: "צור" ← מצלמה. עומדים במרכז החדר ומכוונים '
-                          'את הטלפון אל הנקודות עד שהכדור מתמלא.',
+                          'לוחצים על הכפתור ✨ למטה, בוחרים את התמונות שצילמתם — '
+                          'וה-AI מרכיב מהן סיור 360° מלא תוך דקה-שתיים.',
                     ),
                     const _GuideStep(
                       number: '3',
-                      icon: IconsaxPlusBold.gallery,
-                      title: 'שומרים לגלריה',
-                      body:
-                          'שומרים/מייצאים את הפנורמה אל התמונות בטלפון.',
-                    ),
-                    const _GuideStep(
-                      number: '4',
                       icon: IconsaxPlusBold.tick_circle,
-                      title: 'מעלים כאן',
+                      title: 'בוחרים גרסה',
                       body:
-                          'לוחצים על הכפתור למטה ובוחרים את הפנורמה מהגלריה. זהו — הסיור מוכן.',
+                          'אפשר לבחור בין הגרסה המקורית לגרסה מסודרת ונקייה — '
+                          'ולהחליף ביניהן בכל רגע. זהו, הסיור מוכן.',
                       isLast: true,
                     ),
                   ],
@@ -1380,18 +1375,20 @@ class _PanoramaGuideScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Row(children: [
                 Expanded(
+                  // In-app sweep capture is disabled — it produced broken/low-
+                  // quality 360s. Marked "בקרוב" until it's reworked; the AI path
+                  // below is the recommended way to build a 360 now.
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: BorderSide(color: AppColors.primary, width: 1.3),
+                      foregroundColor: AppColors.textDisabled,
+                      side: BorderSide(color: AppColors.textDisabled, width: 1.3),
                       padding: const EdgeInsets.symmetric(vertical: 13),
                     ),
-                    onPressed: () =>
-                        Navigator.of(context).pop(_CaptureChoice.sweep),
+                    onPressed: null, // disabled
                     icon: const Icon(IconsaxPlusBold.camera, size: 19),
-                    label: const Text('צלם באפליקציה',
+                    label: const Text('צלם באפליקציה (בקרוב)',
                         style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14.5)),
+                            fontWeight: FontWeight.w700, fontSize: 13)),
                   ),
                 ),
                 const SizedBox(width: 10),

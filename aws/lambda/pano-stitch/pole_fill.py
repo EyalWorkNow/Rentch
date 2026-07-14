@@ -206,18 +206,65 @@ def _blur_stretch_poles(equi: np.ndarray, valid: np.ndarray) -> np.ndarray:
     return out
 
 
-def _heal_wrap_seam(equi: np.ndarray, w_blend: int = 4) -> np.ndarray:
-    """Blend the left/right edges so the 360° horizontal wrap is seamless."""
-    out = equi.copy()
-    w = out.shape[1]
-    if w < 2 * w_blend:
-        return out
-    left = out[:, :w_blend].astype(np.float32)
-    right = out[:, -w_blend:].astype(np.float32)
-    avg = ((left + right) / 2.0).astype(np.uint8)
-    out[:, :w_blend] = avg
-    out[:, -w_blend:] = avg
+def _vsmooth(col: np.ndarray, sigma: float) -> np.ndarray:
+    """Vertical Gaussian smoothing of a (h, C) column, numpy-only (no cv2)."""
+    r = max(1, int(round(sigma)))
+    xs = np.arange(-3 * r, 3 * r + 1)
+    k = np.exp(-0.5 * (xs / r) ** 2)
+    k /= k.sum()
+    pad = len(k) // 2
+    padded = np.pad(col.astype(np.float32), ((pad, pad), (0, 0)), mode='edge')
+    out = np.empty_like(col, dtype=np.float32)
+    for c in range(col.shape[1]):
+        out[:, c] = np.convolve(padded[:, c], k, mode='valid')
     return out
+
+
+def _heal_wrap_seam(equi: np.ndarray, band: int | None = None) -> np.ndarray:
+    """Seamlessly close the 360° horizontal wrap.
+
+    The far-left (longitude −180°) and far-right (+180°) columns are the SAME
+    ray, so any difference between them is a capture artifact — dominated by a
+    low-frequency EXPOSURE / white-balance drift between the two ends of the
+    pano (the tell-tale bright vertical stripe at the wrap), plus a little
+    high-frequency misalignment.
+
+    The old heal averaged the outer 4 px and stamped the SAME block on both
+    edges — it only shrank the hard step, never removed the exposure stripe and
+    left a visible 4 px patch. This does two numpy-only passes instead:
+
+      1) EXPOSURE/COLOUR MATCH — measure each edge's smoothed per-row colour and
+         push both edges halfway toward their shared midpoint, with a correction
+         that decays into the interior. Kills the brightness stripe, keeps
+         texture.
+      2) WIDE FEATHER — cross-fade a band on each side toward the (now matched)
+         seam value with a linear ramp, so the boundary is a gradient over ~1%
+         of the width instead of a 4 px block.
+    """
+    h, w = equi.shape[:2]
+    if w < 16:
+        return equi.copy()
+    b = int(band) if band else max(8, w // 96)     # ~1% of width
+    b = max(4, min(b, w // 4))
+    out = equi.astype(np.float32)
+
+    # (1) low-frequency exposure/colour match between the two edges.
+    left_lf = _vsmooth(out[:, :b].mean(axis=1), h / 24.0)    # (h, C)
+    right_lf = _vsmooth(out[:, -b:].mean(axis=1), h / 24.0)  # (h, C)
+    half = (right_lf - left_lf) / 2.0                        # push each side halfway
+    ramp = np.linspace(1.0, 0.0, b, dtype=np.float32)[None, :, None]  # (1, b, 1)
+    out[:, :b] += half[:, None, :] * ramp
+    out[:, -b:] -= half[:, None, :] * ramp[:, ::-1, :]
+
+    # (2) narrow feather toward the matched seam value (residual high-freq step).
+    fb = max(3, b // 2)
+    mid = (out[:, :1] + out[:, -1:]) / 2.0                   # (h, 1, C)
+    a = np.linspace(0.5, 0.0, fb, dtype=np.float32)[None, :, None]    # weight of mid
+    out[:, :fb] = out[:, :fb] * (1 - a) + mid * a
+    out[:, -fb:] = out[:, -fb:] * (1 - a[:, ::-1, :]) + mid * a[:, ::-1, :]
+
+    # round (not truncate) so an unchanged pixel stays put instead of drifting −1.
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -300,9 +347,27 @@ def selfcheck() -> int:
     assert out2.shape == (out_w // 2, out_w, 3)
     assert out2[: h // 8].mean() > 5, "blur-stretch fallback left empty pole"
 
+    # 5b. wrap heal on a deliberately exposure-DRIFTED pano: the visible
+    #     horizontal STEP across the 360° wrap must collapse. The old 4px
+    #     average left a hard block edge here (edge-column diff looked fine but
+    #     the step didn't); this guards against regressing to that.
+    drift = np.clip(
+        np.linspace(50, 210, out_w)[None, :, None]
+        + np.zeros((out_w // 2, out_w, 3), np.float32), 0, 255).astype(np.uint8)
+    healed = _heal_wrap_seam(drift)
+
+    def _seam_step(im, bb=16):
+        prof = im.mean(axis=2).mean(axis=0)
+        win = np.concatenate([prof[-bb:], prof[:bb]])
+        return float(np.abs(np.diff(win)).max())
+
+    step_before, step_after = _seam_step(drift), _seam_step(healed)
+    assert step_after < step_before * 0.35, \
+        f"wrap-seam step not healed: {step_before:.1f} -> {step_after:.1f}"
+
     print(f"  output {out.shape[1]}x{out.shape[0]}  "
           f"zenith={top_band.mean():.1f} nadir={bot_band.mean():.1f} "
-          f"seam={seam:.1f}")
+          f"seam={seam:.1f}  wrap-step {step_before:.0f}->{step_after:.0f}")
     print("ALL ASSERTIONS PASSED")
 
     # write a visible artifact next to the script for manual inspection.

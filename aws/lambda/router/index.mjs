@@ -2851,33 +2851,59 @@ function validatePoses(raw, frameCount) {
 // complaint. Feeding MORE photos (up to 6) shrinks the unseen area it has to fill.
 const AI_PANO_PROMPT = [
   'You are given one or more images — photos or WIDE PANORAMAS — of the SAME real',
-  'room/apartment. Combine them into ONE photorealistic 360°×180° EQUIRECTANGULAR',
-  'panorama of THIS EXACT space, ready to load into a spherical/VR 360 viewer where',
-  'the user rotates a full circle and looks up and down.',
+  'room/apartment. Merge them into ONE photorealistic monoscopic 360°×180°',
+  'EQUIRECTANGULAR panorama of THIS EXACT space, to be mapped onto a full sphere in',
+  'a VR/360 viewer where the user turns a complete circle and looks straight up and',
+  'straight down.',
   '',
-  'FAITHFULNESS — THIS IS THE MOST IMPORTANT RULE:',
+  'OUTPUT FORMAT (non-negotiable):',
+  '• A SINGLE equirectangular (spherical / lat-long) image whose content is laid out',
+  '  for a 2:1 sphere: the full horizontal width spans exactly 360° of longitude,',
+  '  the full height spans 180° of latitude (zenith at the very top row, nadir at',
+  '  the very bottom row).',
+  '• This is NOT a fisheye, NOT a "tiny planet", NOT a stereographic or circular',
+  '  crop, NOT a flat wide photo. No circular frame, no black border, no vignette.',
+  '',
+  'FAITHFULNESS — THE MOST IMPORTANT RULE:',
   '• Reproduce ONLY what is actually visible in the photos. Keep the EXACT same',
   '  furniture, wall colors, flooring, windows, doors, fixtures, materials and',
   '  layout — same positions, same proportions.',
   '• Do NOT invent, add, remove, move, or restyle ANY object. No new furniture,',
   '  windows, doors, artwork, plants, lamps, rugs, or decorations that are not in',
   '  the photos. No extra rooms, hallways, or fantasy elements.',
-  '• For gaps the photos do NOT cover, do NOT guess objects. Simply CONTINUE the',
-  '  adjacent real wall / floor / ceiling with the same plain color and texture —',
-  '  an empty neutral surface is CORRECT; inventing furniture there is WRONG.',
+  '• CRITICAL: never add WINDOWS, doors, openings, skylights or glass to a wall',
+  '  that is solid in the photos — keep every solid wall solid. Do NOT relight or',
+  '  change the time of day; reproduce the SAME lighting that is in the photos.',
+  '• For directions the photos do NOT cover, do NOT guess objects. Simply CONTINUE',
+  '  the adjacent real wall / floor / ceiling with the same plain color and texture',
+  '  — an empty neutral surface is CORRECT; inventing furniture there is WRONG.',
   '• If unsure whether something exists, leave it OUT. Under-fill, never fabricate.',
   '',
-  'GEOMETRY & QUALITY (all mandatory):',
-  '1) TRUE equirectangular projection: the horizon is a straight horizontal line',
-  '   across the vertical middle; the CEILING fills the top edge and the FLOOR the',
-  '   bottom edge; walls curve naturally toward the top/bottom poles.',
-  '2) SEAMLESS horizontal wrap: the far LEFT and far RIGHT edges match EXACTLY,',
-  '   pixel-continuous, so there is NO visible seam when the view wraps 360°.',
-  '3) FULL coverage — no black bars, no blank areas, no missing ceiling/floor, and',
-  '   NO duplicated or mirror-repeated furniture around the circle.',
-  '4) Very HIGH quality: sharp focus, clean straight vertical lines near the center,',
-  '   realistic real-estate interior lighting, natural white balance.',
-  'Do NOT include any text, watermark, logo, people, or a circular fisheye frame.',
+  'EQUIRECTANGULAR GEOMETRY (all mandatory):',
+  '1) The HORIZON is a single straight horizontal line across the vertical middle',
+  '   of the image. Eye-level walls sit in the middle band.',
+  '2) POLES: the ceiling converges smoothly to the TOP edge and the floor to the',
+  '   BOTTOM edge. Content stretches horizontally toward both poles (as real',
+  '   equirectangular projection does) and meets each pole as one consistent',
+  '   surface — no black cap, no swirl, no pinch artifact at top or bottom.',
+  '3) Vertical structures (wall corners, door frames, window edges) are STRAIGHT',
+  '   and vertical when near the horizontal center, and bow naturally only as they',
+  '   approach the poles. No wavy or melting walls.',
+  '',
+  'SEAMLESS 360° WRAP (critical for the viewer):',
+  '4) The far-LEFT column and the far-RIGHT column are the SAME physical direction,',
+  '   so they must be pixel-continuous: matching geometry, color AND brightness, so',
+  '   there is NO visible seam or line when the view wraps past 360°.',
+  '5) Keep EXPOSURE and WHITE BALANCE consistent all the way around the circle — no',
+  '   bright or dark vertical band, no color shift from one side to the other. One',
+  '   even, natural real-estate interior exposure across the whole panorama.',
+  '',
+  'COVERAGE & INTEGRITY:',
+  '6) FULL coverage — no black bars, no blank wedges, no missing ceiling or floor.',
+  '7) Each real object appears EXACTLY ONCE. Do NOT duplicate, tile, mirror or',
+  '   repeat furniture, windows or wall sections around the circle to fill space.',
+  '8) HIGH quality: sharp focus, clean edges, realistic interior lighting, natural',
+  '   white balance, no text, watermark, logo, or people.',
 ].join('\n');
 
 // POST /panorama/:id/ai-generate → kick off the gpt-image-2 generation. Because
@@ -3044,6 +3070,10 @@ function panoData(meta) {
 //                             zip download link → {status:'ready', meshGlbUrl, splatUrl}
 
 const KIRI_MAX_FRAMES = 300; // KIRI accepts 20–300 images per project.
+// A KIRI reconstruction finishes well within an hour. Past this we stop masking
+// a stuck/failed job as 'processing' forever and report a terminal 'failed', so
+// the client can surface an error and stop polling.
+const SCAN3D_MAX_AGE_MS = 90 * 60 * 1000;
 
 async function getScan3dMeta(jobId) {
   try {
@@ -3199,6 +3229,15 @@ async function getScan3d(event, jobId) {
   if (meta.status === 'failed') {
     return json(200, { status: 'failed', error: meta.error || 'reconstruction failed' });
   }
+  // Age failsafe: never leave a job masked as 'processing' indefinitely. This
+  // is the catch-all for a KIRI job stuck Uploading/Queuing, a persistently
+  // oversized/corrupt result zip, or an expired download link that never
+  // resolves — all of which otherwise loop as 'processing' forever.
+  if (meta.createdAt && Date.now() - meta.createdAt > SCAN3D_MAX_AGE_MS) {
+    const failed = { ...meta, status: 'failed', error: 'Reconstruction timed out' };
+    await putScan3dMeta(jobId, failed);
+    return json(200, { status: 'failed', error: failed.error });
+  }
   if (!KIRI_API_KEY || !meta.serialize) {
     return json(200, { status: 'processing' });
   }
@@ -3236,6 +3275,13 @@ async function getScan3d(event, jobId) {
     const zipRes = await fetchToBuffer(modelUrl, { maxBytes: MAX_KIRI_ZIP_BYTES });
     if (!zipRes.ok) {
       console.warn('KIRI zip download failed', zipRes.status, zipRes.tooLarge ? '(over size cap)' : '');
+      // An over-size result is PERMANENT (it will be too big on every retry) —
+      // fail terminally instead of looping 'processing'. A plain download blip
+      // stays 'processing' (transient; the age failsafe bounds it).
+      if (zipRes.tooLarge) {
+        await putScan3dMeta(jobId, { ...meta, status: 'failed', error: 'Model too large to process' });
+        return json(200, { status: 'failed', error: 'Model too large to process' });
+      }
       return json(200, { status: 'processing' });
     }
     const zipBuf = zipRes.buffer;
@@ -3244,8 +3290,10 @@ async function getScan3d(event, jobId) {
     try {
       entries = new AdmZip(zipBuf).getEntries();
     } catch (e) {
+      // A corrupt/unreadable zip won't fix itself — terminal failure.
       console.warn('KIRI zip unpack failed', e.message);
-      return json(200, { status: 'processing' });
+      await putScan3dMeta(jobId, { ...meta, status: 'failed', error: 'Corrupt reconstruction bundle' });
+      return json(200, { status: 'failed', error: 'Corrupt reconstruction bundle' });
     }
 
     // Pick the largest matching file per kind (the model, not a stray sample).

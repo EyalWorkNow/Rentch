@@ -201,6 +201,10 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
 
   Future<Uint8List?> _loadBytes(String url) async {
     try {
+      // Bundled demo panoramas (guest mode) ship as assets, not files/URLs.
+      if (url.startsWith('asset://')) {
+        return (await rootBundle.load(url.substring(8))).buffer.asUint8List();
+      }
       final isLocal = url.startsWith('/') || url.startsWith('file://');
       if (isLocal) {
         final p = url.startsWith('file://') ? url.substring(7) : url;
@@ -338,7 +342,7 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
     };
   }
 
-  var viewer, vt;
+  var viewer, vt, builtNodes;
   try {
     viewer = new Viewer({
       container: 'pano',
@@ -361,7 +365,7 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
     vt = viewer.getPlugin(VirtualTourPlugin);
 
     // attach panoData per node so partial panos sit correctly.
-    var nodes = TOUR.nodes.map(function(n){
+    builtNodes = TOUR.nodes.map(function(n){
       var node = {
         id: n.id,
         panorama: n.panorama,
@@ -375,7 +379,7 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
       return node;
     });
 
-    vt.setNodes(nodes, TOUR.startNodeId);
+    vt.setNodes(builtNodes, TOUR.startNodeId);
   } catch (e) {
     document.body.innerHTML = '<div id="err">'+e+'</div>';
   }
@@ -440,42 +444,68 @@ class _PanoramaPsvTourViewState extends State<PanoramaPsvTourView> {
   })();
 
   // ── version switcher ──────────────────────────────────────────────────────
-  // For a node with >1 landlord-visible render, show pills; tapping swaps the
-  // current panorama in place (staying on the node) via viewer.setPanorama.
+  // For a node with >1 landlord-visible render, show pills. Tapping a pill makes
+  // ONLY that render visible: we rebuild the CURRENT node's panorama via
+  // vt.setNodes (viewer.setPanorama alone is ignored by the VirtualTour plugin)
+  // and remember the choice per node so it survives navigation.
   (function(){
     var bar = document.getElementById('vbar');
-    if (!viewer || !bar) return;
-    var current = null; // list for the node we're on
-    function paint(){
+    if (!viewer || !vt || !bar) return;
+    var current = null;                 // version list for the node we're on
+    var currentNodeId = null;
+    var chosen = {};                    // nodeId -> chosen version index (sticky)
+
+    function idxOf(list){
+      var id = currentNodeId;
+      if (id in chosen) return Math.min(chosen[id], list.length - 1);
+      for (var i = 0; i < list.length; i++) if (list[i].def) return i; // published
+      return 0;
+    }
+    function paint(sel){
       Array.prototype.forEach.call(bar.children, function(c, i){
-        c.className = 'vchip' + (current && current[i].active ? ' on' : '');
+        c.className = 'vchip' + (i === sel ? ' on' : '');
       });
     }
-    function pick(v){
-      try {
-        viewer.setPanorama(v.src, { panoData: panoDataFor(v), transition: false });
-      } catch (e) {}
-      current.forEach(function(x){ x.active = (x === v); });
-      paint();
+    function applyPanorama(list, sel){
+      var v = list[sel];
+      for (var i = 0; i < builtNodes.length; i++){
+        if (builtNodes[i].id === currentNodeId){
+          builtNodes[i].panorama = v.src;
+          builtNodes[i].panoData = panoDataFor(v);
+          break;
+        }
+      }
+      // Rebuild the tour on the same node → shows ONLY the chosen render.
+      try { vt.setNodes(builtNodes, currentNodeId); } catch (e) {}
+    }
+    function pick(sel){
+      chosen[currentNodeId] = sel;
+      paint(sel);
+      applyPanorama(current, sel);      // triggers node-changed → render() re-syncs
     }
     function render(nodeId){
+      currentNodeId = nodeId;
       var list = VERSIONS[nodeId];
       current = list || null;
       bar.innerHTML = '';
       if (!list || list.length < 2) { bar.style.display = 'none'; return; }
-      // entering a node shows its default (published) render.
-      list.forEach(function(x){ x.active = !!x.def; });
-      list.forEach(function(v){
+      var sel = idxOf(list);
+      // make sure the shown panorama matches the (sticky) selection.
+      var shownSrc = null;
+      for (var i = 0; i < builtNodes.length; i++)
+        if (builtNodes[i].id === nodeId) { shownSrc = builtNodes[i].panorama; break; }
+      if (shownSrc !== list[sel].src) { applyPanorama(list, sel); return; }
+      list.forEach(function(v, i){
         var b = document.createElement('div');
         b.className = 'vchip';
         b.textContent = v.source;
-        b.addEventListener('click', function(){ pick(v); });
+        b.addEventListener('click', function(){ pick(i); });
         bar.appendChild(b);
       });
       bar.style.display = 'flex';
-      paint();
+      paint(sel);
     }
-    if (vt) vt.addEventListener('node-changed', function(e){ render(e.node.id); });
+    vt.addEventListener('node-changed', function(e){ render(e.node.id); });
     render(TOUR.startNodeId);
   })();
 </script>
