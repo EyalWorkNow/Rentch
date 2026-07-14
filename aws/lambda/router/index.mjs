@@ -4185,8 +4185,20 @@ const SEARCH_LISTINGS_TOOL = {
     properties: {
       city: { type: 'string', description: 'עיר' },
       neighborhood: { type: 'string', description: 'שכונה' },
-      minRooms: { type: 'number', description: 'מינימום חדרים' },
-      maxRooms: { type: 'number', description: 'מקסימום חדרים' },
+      rooms: {
+        type: 'number',
+        description:
+          'מספר חדרים מבוקש כשהמשתמש נוקב במספר יחיד ("דירת 3 חדרים", "3 חדרים", '
+          + '"שלושה חדרים"). זהו המקרה הנפוץ — השתמש בו תמיד למספר בודד. אפשר חצי (3.5).',
+      },
+      minRooms: {
+        type: 'number',
+        description: 'מינימום חדרים — רק לטווח מפורש ("לפחות 3", "3 עד 4", "מ-3").',
+      },
+      maxRooms: {
+        type: 'number',
+        description: 'מקסימום חדרים — רק לטווח מפורש ("עד 4", "3 עד 4", "לא יותר מ-4").',
+      },
       minPrice: { type: 'integer', description: 'מחיר חודשי מינימלי בשקלים' },
       maxPrice: { type: 'integer', description: 'מחיר חודשי מקסימלי בשקלים' },
       pets: { type: 'boolean', description: 'מתיר חיות מחמד' },
@@ -4241,8 +4253,13 @@ async function runSearchListings(args = {}) {
   const limit = Math.min(Math.max(Number(args.limit) || 6, 1), 12);
   const wantCity = (args.city || '').toString().trim().toLowerCase();
   const wantHood = (args.neighborhood || '').toString().trim().toLowerCase();
-  const minRooms = num(args.minRooms);
-  const maxRooms = num(args.maxRooms);
+  // A single stated room count ("דירת 3 חדרים") is the common case: treat it as a
+  // tight band [n, n+0.5] so a 3-room search matches 3 and 3.5 (the real near-
+  // substitute) but never 2 or 4. An explicit min/max range wins if the model set it.
+  const exactRooms = num(args.rooms);
+  const minRooms = num(args.minRooms) ?? exactRooms;
+  const maxRooms = num(args.maxRooms)
+    ?? (exactRooms !== undefined ? exactRooms + 0.5 : undefined);
   const minPrice = num(args.minPrice);
   const maxPrice = num(args.maxPrice);
   const pets = args.pets === true;

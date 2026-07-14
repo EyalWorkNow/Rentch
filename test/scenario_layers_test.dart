@@ -65,7 +65,7 @@ void main() {
         .weightsFor(const NearbyProfile(single: true, secular: true, dog: true));
     expect(w, isNotNull);
     expect(w!['transit_stops'], 5); // top weight in this scenario
-    expect(w['nightlife'], 4);
+    expect(w['nightlife'], 5); // v2 weights nightlife on par with transit
     expect(w.containsKey('poi_retail'), isTrue); // base layer, low weight
   });
 
@@ -86,8 +86,8 @@ void main() {
     expect(b, isNotNull);
     // transit_stops weight 5 → 0.5 + 5*0.09 = 0.95 target on 'transit'
     expect(b!['transit'], closeTo(0.95, 1e-9));
-    // nightlife weight 4 → 0.86
-    expect(b['nightlife'], closeTo(0.86, 1e-9));
+    // nightlife weight 5 → 0.95
+    expect(b['nightlife'], closeTo(0.95, 1e-9));
     // dog_parks → 'park' dimension present, targets clamp to ≤1.0
     expect(b['park'], isNotNull);
     for (final t in b.values) {
