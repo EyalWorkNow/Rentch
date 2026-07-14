@@ -287,6 +287,27 @@ class AwsApiClient {
   Future<void> startAiPanoramaGenerate(String jobId) =>
       post('/panorama/$jobId/ai-generate', const {});
 
+  /// Create a VARIANT (tidy / lighting) of an EXISTING full 360 already in our
+  /// bucket — no re-upload, the job references [srcUrl] directly. [variant] is
+  /// one of 'tidy' | 'day' | 'evening' | 'night'; the server picks the matching
+  /// hardened prompt (same room, change only that). Returns the job id; then
+  /// call [startAiPanoramaGenerate] and poll [getPanorama].
+  Future<String?> createAiVariantJob({
+    required String propertyId,
+    required String srcUrl,
+    required String variant,
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/panorama', {
+      'propertyId': propertyId,
+      'captureMode': 'ai',
+      'srcUrl': srcUrl,
+      'variant': variant,
+    });
+    final data = res['data'] as Map<String, dynamic>?;
+    return data?['jobId'] as String?;
+  }
+
   /// Enhance an EXISTING panorama (already in our bucket) into a complete 360:
   /// generative ceiling/floor fill + 360-wrap completion. Returns the job id;
   /// then call [startEnhancePanorama] + poll [getPanorama].

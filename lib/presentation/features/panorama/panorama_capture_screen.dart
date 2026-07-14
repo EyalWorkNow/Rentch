@@ -591,6 +591,126 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     await _startEnhance(node.id, showModal: true);
   }
 
+  // Create an AI VARIANT of an EXISTING full 360 (tidy / lighting) — a new
+  // version generated FROM the current 360, the original untouched. Pick a mode,
+  // confirm, then generate. Only offered on a full 360 (the ✨-complete action
+  // covers partial panos).
+  static const List<({String v, String label, String emoji, String desc})>
+      _variantOptions = [
+    (v: 'tidy', label: 'מסודר', emoji: '🧹', desc: 'מסדר ומנקה — אותם רהיטים, בלי בלגן'),
+    (v: 'day', label: 'יום', emoji: '☀️', desc: 'תאורת יום טבעית ובהירה'),
+    (v: 'evening', label: 'ערב', emoji: '🌇', desc: 'אור ערב חמים ורך'),
+    (v: 'night', label: 'לילה', emoji: '🌙', desc: 'תאורת לילה נעימה'),
+  ];
+
+  Future<void> _pickAndCreateVariant(int i) async {
+    if (i < 0 || i >= _nodes.length) return;
+    final node = _nodes[i];
+    if (node.isLocal) {
+      _toast('צריך חיבור לאינטרנט — ה-360 עדיין לא הועלה.');
+      return;
+    }
+    final choice =
+        await showModalBottomSheet<({String v, String label, String emoji, String desc})>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 6),
+              child: Text('יצירת גרסה חדשה של ה-360',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text('ה-AI ייצור גרסה חדשה מה-360 הקיים — אותו חלל בדיוק, בלי לשנות את המקור.',
+                  style: TextStyle(fontSize: 13, color: Colors.black54)),
+            ),
+            for (final o in _variantOptions)
+              ListTile(
+                leading: Text(o.emoji, style: const TextStyle(fontSize: 24)),
+                title: Text(o.label,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(o.desc, style: const TextStyle(fontSize: 12)),
+                onTap: () => Navigator.of(ctx).pop(o),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('ליצור גרסת «${choice.label}»?'),
+        content: Text(
+            'ה-AI ייצור גרסת ${choice.label} מה-360 הקיים (${choice.desc}). '
+            'המקור יישאר, והגרסה תתווסף לבחירה. ~1–2 דקות.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('ביטול')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('צור גרסה')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await _startVariant(node.id, choice.v, '${choice.label} ✨');
+  }
+
+  // Submit an AI-variant job for an existing 360 and attach the result as a new
+  // named version. Persisted to [PendingPanoStore] (with the label) so it
+  // survives leaving the screen — same resilient path as enhance.
+  Future<void> _startVariant(String nodeId, String variant, String label) async {
+    if (_enhancing.contains(nodeId)) return;
+    final node = _nodeById(nodeId);
+    if (node == null || node.isLocal) return;
+
+    final msg = ValueNotifier<String>('מתחילים…');
+    _showAiProgress(msg);
+    var modalOpen = true;
+    void closeModal() {
+      if (modalOpen && mounted) {
+        modalOpen = false;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
+    setState(() => _enhancing.add(nodeId));
+    try {
+      final jobId = await AwsApiClient.instance.createAiVariantJob(
+        propertyId: 'draft_${DateTime.now().millisecondsSinceEpoch}',
+        srcUrl: node.imageUrl,
+        variant: variant,
+      );
+      if (jobId == null) {
+        _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
+        return;
+      }
+      await PendingPanoStore.instance.add(PendingPano(
+          jobId: jobId,
+          nodeId: nodeId,
+          submittedAt: DateTime.now(),
+          label: label));
+      msg.value = 'ה-AI מייצר גרסת «$label»… (1–2 דקות)';
+      await AwsApiClient.instance.startAiPanoramaGenerate(jobId);
+      await _pollEnhanceJob(jobId, nodeId, showedModal: true, label: label);
+    } catch (_) {
+      _toast('שגיאה ביצירת הגרסה. נסו שוב.');
+    } finally {
+      closeModal();
+      if (mounted) setState(() => _enhancing.remove(nodeId));
+    }
+  }
+
   // Unified enhance entry (auto, manual, resume all funnel here). Persists the
   // job to [PendingPanoStore] the instant it's submitted, so closing/reopening
   // the capture screen resumes it instead of orphaning it. [showModal] drives
@@ -644,7 +764,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // original stays as 'מקור'). Leaving the screen ends the loop WITHOUT dropping
   // the persisted record, so a later resume can finish the job.
   Future<void> _pollEnhanceJob(String jobId, String nodeId,
-      {bool showedModal = false}) async {
+      {bool showedModal = false, String label = 'משופר ✨'}) async {
     for (var t = 0; t < 150; t++) {
       await Future<void>.delayed(const Duration(seconds: 2));
       if (!mounted) return; // record kept → resumed on re-entry
@@ -656,10 +776,10 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         if (i < 0) return; // node deleted while enhancing
         setState(() => _nodes[i] = _nodes[i].addVersion(
               PanoVersion(
-                  imageUrl: s.imageUrl, haov: 360, vaov: 180, source: 'משופר ✨'),
+                  imageUrl: s.imageUrl, haov: 360, vaov: 180, source: label),
             ));
         final name = _nodes[i].label.isNotEmpty ? _nodes[i].label : 'הנקודה';
-        _toast('נוספה גרסה משופרת ל־$name ✨ — אפשר להשוות ולבחור');
+        _toast('נוספה גרסה «$label» ל־$name — אפשר להשוות ולבחור');
         return;
       }
       if (s.status == 'failed') {
@@ -684,7 +804,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       setState(() => _enhancing.add(p.nodeId));
       unawaited(() async {
         try {
-          await _pollEnhanceJob(p.jobId, p.nodeId);
+          await _pollEnhanceJob(p.jobId, p.nodeId,
+              label: p.label ?? 'משופר ✨');
         } finally {
           if (mounted) setState(() => _enhancing.remove(p.nodeId));
         }
@@ -881,6 +1002,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                       onRename: () => _renameNode(i),
                       onPreview: () => _previewNode(_nodes[i]),
                       onEnhance: () => _enhanceNode(i),
+                      onCreateVariant: () => _pickAndCreateVariant(i),
                       onSelectVersion: (v) => setState(
                           () => _nodes[i] = _nodes[i].selectVersion(v)),
                       onToggleVersionHidden: (v) => _toggleVersionHidden(i, v),
@@ -988,6 +1110,7 @@ class _NodeTile extends StatelessWidget {
     required this.onRename,
     required this.onPreview,
     required this.onEnhance,
+    required this.onCreateVariant,
     required this.onSelectVersion,
     required this.onToggleVersionHidden,
     this.enhancing = false,
@@ -998,6 +1121,7 @@ class _NodeTile extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onPreview;
   final VoidCallback onEnhance;
+  final VoidCallback onCreateVariant;
   final ValueChanged<int> onSelectVersion;
   final ValueChanged<int> onToggleVersionHidden;
 
@@ -1153,6 +1277,15 @@ class _NodeTile extends StatelessWidget {
                 icon: const Text('✨', style: TextStyle(fontSize: 17)),
                 onPressed: onEnhance,
                 tooltip: 'השלם ל-360° מלא',
+                visualDensity: VisualDensity.compact,
+              )
+            // A full 360 → offer AI variants (tidy / lighting) of the same space.
+            else
+              IconButton(
+                icon: Icon(Icons.palette_outlined,
+                    color: AppColors.primary, size: 20),
+                onPressed: onCreateVariant,
+                tooltip: 'צור גרסה (תאורה / מסודר)',
                 visualDensity: VisualDensity.compact,
               ),
             IconButton(

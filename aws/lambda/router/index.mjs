@@ -2660,6 +2660,24 @@ async function createPanorama(event) {
   // model has to invent); gpt-image-2 merges them into ONE seamless
   // equirectangular 360. Presign a PUT per input image.
   if (body.captureMode === 'ai') {
+    const resultKey = `panoramas/results/${jobId}.png`;
+    const variant = String(body.variant || '').slice(0, 24);
+    // Variant mode: generate a lighting/tidy alternative FROM an existing full
+    // 360 already in our bucket — reference it by key, no re-upload, no slots.
+    if (body.srcUrl) {
+      let srcKey = null;
+      try {
+        const p = new URL(body.srcUrl).pathname.replace(/^\/+/, '');
+        if (p) srcKey = decodeURIComponent(p);
+      } catch { /* fall through to the upload path */ }
+      if (srcKey) {
+        await putPanoMeta(jobId, {
+          jobId, propertyId, inputKeys: [srcKey], resultKey, captureMode: 'ai',
+          variant, status: 'pending', createdAt: ts,
+        });
+        return json(200, { data: { jobId } }); // src already in bucket → no uploads
+      }
+    }
     const n = Math.max(1, Math.min(6, Number(body.imageCount) || 1));
     const inputKeys = [];
     const uploadUrls = [];
@@ -2672,10 +2690,9 @@ async function createPanorama(event) {
         { expiresIn: 21600 },
       ));
     }
-    const resultKey = `panoramas/results/${jobId}.png`;
     await putPanoMeta(jobId, {
       jobId, propertyId, inputKeys, resultKey, captureMode: 'ai',
-      status: 'pending', createdAt: ts,
+      variant, status: 'pending', createdAt: ts,
     });
     return json(200, { data: { jobId, uploadUrls } });
   }
@@ -2929,6 +2946,29 @@ const AI_PANO_PROMPT = [
   '   white balance, no text, watermark, logo, or people.',
 ].join('\n');
 
+// Variant generation: take an EXISTING full 360 and produce a lighting/tidy
+// alternative of the SAME space. Shared "keep everything, change only X" guard
+// so the model never re-invents the room or (the landlord's nightmare) adds a
+// window to a solid wall — the exact failure that burned us before.
+const _PANO_KEEP = [
+  'You are given ONE equirectangular 360°×180° panorama of a real room. Return the',
+  'SAME room as ONE equirectangular (2:1 lat-long) panorama: identical layout,',
+  'walls, windows, doors, furniture, objects and proportions, all in the same',
+  'places. Preserve the equirectangular projection and the seamless left↔right',
+  '360° wrap (the far-left and far-right columns stay pixel-continuous). Do NOT',
+  'add, remove, move or restyle ANY object, and NEVER add a window, door, opening',
+  'or skylight to a wall that is solid. No text, watermark, logo or people.',
+].join('\n');
+const VARIANT_PROMPTS = {
+  tidy: `${_PANO_KEEP}\nONLY change: TIDY the room. Straighten and organize what is already there — square up the books already on the shelves (keep the books), align cushions, fold throws, coil loose cables, clear litter/clutter from the surfaces and the floor. Keep it lived-in and homey, just neat and clean. Keep the SAME lighting and time of day.`,
+  day: `${_PANO_KEEP}\nONLY change: the LIGHTING to bright natural midday daylight — soft even sunlight, neutral white balance, gentle realistic shadows. Keep every object and every window exactly as they are.`,
+  evening: `${_PANO_KEEP}\nONLY change: the LIGHTING to a warm early-evening mood — soft golden interior light, the existing lamps glowing warmly, gentle warm tones. Keep every object and every window exactly as they are.`,
+  night: `${_PANO_KEEP}\nONLY change: the LIGHTING to night — dark outside the existing windows, warm interior lamplight as the main light source, a cozy low-key mood. Keep every object and every window exactly as they are.`,
+};
+function promptForVariant(v) {
+  return (v && VARIANT_PROMPTS[v]) || AI_PANO_PROMPT;
+}
+
 // POST /panorama/:id/ai-generate → kick off the gpt-image-2 generation. Because
 // it takes ~50s (over the API-Gateway limit) we self-invoke this function as an
 // async Event (see the `op:'aiGenerate'` hook at the top of the handler) and the
@@ -2979,7 +3019,7 @@ async function runAiGenerate(jobId) {
         form.append('model', 'gpt-image-2');
         form.append('size', '1536x1024');
         if (quality) form.append('quality', quality);
-        form.append('prompt', AI_PANO_PROMPT);
+        form.append('prompt', promptForVariant(meta.variant));
         for (const bytes of imgs) {
           form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
         }

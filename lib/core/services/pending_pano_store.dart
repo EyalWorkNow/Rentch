@@ -28,6 +28,7 @@ class PendingPano {
     required this.jobId,
     required this.nodeId,
     this.submittedAt,
+    this.label,
   });
 
   final String jobId;
@@ -38,17 +39,25 @@ class PendingPano {
   /// When it was submitted (best-effort, for stale cleanup).
   final DateTime? submittedAt;
 
+  /// The version name to give the finished 360 (e.g. 'מסודר ✨', 'ערב ✨'). Null
+  /// for the plain complete-to-full-360 enhance, which defaults to 'משופר ✨'.
+  final String? label;
+
   Map<String, dynamic> toJson() => {
         'jobId': jobId,
         'nodeId': nodeId,
         if (submittedAt != null)
           'submittedAt': submittedAt!.toUtc().toIso8601String(),
+        if (label != null && label!.isNotEmpty) 'label': label,
       };
 
   factory PendingPano.fromJson(Map<String, dynamic> json) => PendingPano(
         jobId: json['jobId']?.toString() ?? '',
         nodeId: json['nodeId']?.toString() ?? '',
         submittedAt: DateTime.tryParse(json['submittedAt']?.toString() ?? ''),
+        label: (json['label']?.toString().isNotEmpty ?? false)
+            ? json['label'].toString()
+            : null,
       );
 
   bool get isValid => jobId.isNotEmpty && nodeId.isNotEmpty;
