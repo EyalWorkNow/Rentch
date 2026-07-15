@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -175,26 +176,30 @@ class _ActionButtonState extends State<_ActionButton>
               ],
             ),
             child: ClipOval(
-              // Solid frosted glass — NO live BackdropFilter blur. These buttons
-              // sit directly over the ANIMATING swipe card, so a real backdrop
-              // blur re-samples the moving content every frame (×3 buttons) — a
-              // top cause of the swipe stutter, even on iOS. A semi-opaque fill
-              // reads the same for a fraction of the cost (same pattern already
-              // used for the frosted pills elsewhere in discover).
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    width: 1.5,
+              child: BackdropFilter(
+                // Very heavy glass blur. Routed through PlatformFx so iOS gets
+                // the full heavy look while Android/Impeller (where this sits
+                // over the animating deck) is trimmed enough to stay smooth.
+                filter: ImageFilter.blur(
+                    sigmaX: PlatformFx.blurSigma(34),
+                    sigmaY: PlatformFx.blurSigma(34)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    // Dark GRAY (not black), with relative transparency so the
+                    // heavy blur reads as frosted glass.
+                    color: const Color(0xFF2C2C2E).withValues(alpha: 0.4),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 1.5,
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Icon(
-                    widget.icon,
-                    size: widget.iconSize,
-                    color: actualIconColor,
+                  child: Center(
+                    child: Icon(
+                      widget.icon,
+                      size: widget.iconSize,
+                      color: actualIconColor,
+                    ),
                   ),
                 ),
               ),
