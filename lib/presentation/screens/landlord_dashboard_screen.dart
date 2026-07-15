@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/presentation/features/calendar/availability_calendar_screen.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
@@ -1448,6 +1449,24 @@ class _QuickActionsGrid extends StatelessWidget {
                 icon: IconsaxPlusLinear.buildings_2,
                 color: AppColors.primaryDark,
                 onTap: onProperties,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // היומן — mark free viewing windows tenants can book from the chat.
+        Row(
+          children: [
+            Expanded(
+              child: _QABtn(
+                label: 'היומן שלי — זמנים פנויים לצפייה',
+                icon: IconsaxPlusLinear.calendar_1,
+                color: AppColors.primary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AvailabilityCalendarScreen(),
+                  ),
+                ),
               ),
             ),
           ],
