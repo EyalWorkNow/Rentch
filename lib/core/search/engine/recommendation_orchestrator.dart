@@ -507,6 +507,40 @@ class _BaselineCache {
   static MarketContext? sale;
 }
 
+// PERF: FeatureEngineer.engineer() does ~25 geo/gov lookups per property and is
+// catalogue-stable (its output depends only on the property + the market
+// baseline, NOT the query — the query is applied later in scoring/gating). A
+// single user action re-runs the whole pipeline 7-12× (cohort fallbacks +
+// what-if counting), and each swipe re-ranks, so without memoization every
+// candidate is re-engineered from scratch each time. Cache the feature vector
+// per property, generation-keyed by the market baseline's OBJECT identity: the
+// cached baseline is a stable object for a given catalogue, so it holds across
+// the repeat runs and auto-clears when the catalogue (baseline) is replaced.
+class _PfvMemo {
+  _PfvMemo._();
+  static int marketId = 0;
+  // Keyed by the property OBJECT identity (not id): the same objects are reused
+  // across a search's repeat runs (cache hit), while a different object — an
+  // edited listing, or a distinct test fixture that reuses an id — never yields
+  // a stale vector. Cleared whenever the market baseline object changes.
+  static final Map<int, PropertyFeatureVector> byObj =
+      <int, PropertyFeatureVector>{};
+}
+
+PropertyFeatureVector _engineerCached(RentalProperty p, MarketContext market) {
+  final mid = identityHashCode(market);
+  if (_PfvMemo.marketId != mid) {
+    _PfvMemo.marketId = mid;
+    _PfvMemo.byObj.clear();
+  }
+  final oid = identityHashCode(p);
+  final hit = _PfvMemo.byObj[oid];
+  if (hit != null) return hit;
+  final v = FeatureEngineer.engineer(p, market); // the REAL engineer, not self
+  _PfvMemo.byObj[oid] = v;
+  return v;
+}
+
 class RecommendationEngine {
   const RecommendationEngine._();
 
@@ -767,7 +801,7 @@ class RecommendationEngine {
           .sublist(0, kMaxRankCandidates);
     }
     final pfvs = [
-      for (final p in candidates) FeatureEngineer.engineer(p, market),
+      for (final p in candidates) _engineerCached(p, market),
     ];
 
     // Part 2 — preference model
@@ -1030,7 +1064,7 @@ class RecommendationEngine {
       }).toList();
       if (extra.isNotEmpty) {
         final extraRanked = RankingEngine.rank(
-          [for (final p in extra) FeatureEngineer.engineer(p, market)],
+          [for (final p in extra) _engineerCached(p, market)],
           model,
         );
         final fill = DiversityReranker.select(extraRanked,
@@ -1655,7 +1689,7 @@ class RecommendationEngine {
     final model = PreferenceModelBuilder.build(
         query: query, profile: profile, market: market);
     final ranked = RankingEngine.rank(
-      [for (final p in candidates) FeatureEngineer.engineer(p, market)],
+      [for (final p in candidates) _engineerCached(p, market)],
       model,
     );
     // Return the honest fit% (_statedMatch), NOT the raw blended score: it reads
