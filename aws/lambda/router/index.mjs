@@ -737,6 +737,11 @@ async function fireSavedSearchAlerts(property, ownerUid) {
     const propTitle = (property.city || addr || 'דירה חדשה');
     const propId = String(property.id || '');
 
+    // SCALE: send in PARALLEL, not one-await-at-a-time. 300 sequential FCM sends
+    // (~100ms each) were ~30s — blowing the 20s Lambda timeout and blocking the
+    // publish response. Promise.all collapses that to ~one round-trip. (Proper
+    // fix is async off the request path via a stream/queue — infra follow-up.)
+    const sends = [];
     for (const s of searches) {
       const targetUid = String(s.userId || '');
       if (!targetUid || targetUid === ownerUid) continue;
@@ -746,15 +751,16 @@ async function fireSavedSearchAlerts(property, ownerUid) {
       notified.add(targetUid);
       const name = (s.name || 'החיפוש השמור שלך').toString().slice(0, 60);
       const price = Number(property.price) > 0 ? ` · ${Number(property.price)} ₪` : '';
-      await notify(
+      sends.push(notify(
         targetUid,
         'saved_search',
         'דירה חדשה שמתאימה לך 🔔',
         `${propTitle}${price} — תואם ל"${name}"`,
         { propertyId: propId, savedSearchId: String(s.id || ''), deepLink: `rently://property/${propId}` },
-      );
+      ));
       if (notified.size >= 300) break; // cap fan-out per create (anti-flood)
     }
+    await Promise.all(sends);
   } catch (e) {
     console.warn('saved-search alerts failed:', e.message);
   }
@@ -1385,6 +1391,12 @@ export const handler = async (event) => {
         }
 
         const written = await putItem(table, writeId, body);
+        // SCALE: keep the denormalized popularity counter on the property row
+        // current with an atomic ADD, so the feed never has to COUNT-query.
+        if (written.statusCode === 200 &&
+            (tableKey === 'property_views' || tableKey === 'property_likes')) {
+          await incrementPropertyCounter(tableKey, body);
+        }
         // Fire-and-forget push notifications on real events. Never block or fail
         // the write on a push problem — awaited so the Lambda doesn't get frozen
         // mid-send, but every error is swallowed inside the helpers.
@@ -1636,8 +1648,26 @@ async function attachRankSignals(listed, query, cohort = null) {
       maxBudget: num(query.maxBudget) ?? num(query.maxPrice),
       targetPrice: num(query.price) ?? num(query.budget),
     };
-    const ids = items.map((p) => String(p.id || '')).filter(Boolean).slice(0, 60);
-    const counts = await loadPopularityCounts(ids);
+    // SCALE: read DENORMALIZED counts off the property rows we already loaded —
+    // no per-listing COUNT queries (was up to 120 DDB reads for one feed load,
+    // each COUNT billing every row of a popular listing's GSI partition). The
+    // counts are kept current by an atomic ADD on every view/like write (see
+    // incrementPropertyCounter). Only pre-denormalization listings fall back.
+    const counts = {};
+    const missing = [];
+    for (const p of items.slice(0, 60)) {
+      const id = String(p.id || '');
+      if (!id) continue;
+      if (p.viewCount !== undefined || p.likeCount !== undefined) {
+        counts[id] = {
+          views: Number(p.viewCount) || 0,
+          likes: Number(p.likeCount) || 0,
+        };
+      } else {
+        missing.push(id);
+      }
+    }
+    if (missing.length) Object.assign(counts, await loadPopularityCounts(missing));
     scoreListings(items, ctx, counts, Date.now());
     return json(200, parsed);
   } catch (e) {
@@ -1663,6 +1693,30 @@ function num(v) {
 // swap for a denormalised count on the property row if the catalogue explodes.
 const _popCache = new Map(); // id → { views, likes, exp }
 const POP_TTL_MS = 90 * 1000;
+
+// SCALE: maintain a denormalized counter on the property row via an atomic ADD,
+// so reads are O(1) off the row instead of O(views+likes) COUNT queries. Guarded
+// by attribute_exists so a like/view on a missing listing can't create a phantom
+// property. Fully fail-soft — a counter hiccup never fails the underlying write.
+async function incrementPropertyCounter(tableKey, body) {
+  const pid = body && (body.propertyId || body.property_id);
+  if (!pid) return;
+  const attr = tableKey === 'property_likes' ? 'likeCount' : 'viewCount';
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLES.properties.name,
+      Key: { id: String(pid) },
+      UpdateExpression: 'ADD #c :one',
+      ExpressionAttributeNames: { '#c': attr },
+      ExpressionAttributeValues: { ':one': 1 },
+      ConditionExpression: 'attribute_exists(id)',
+    }));
+  } catch (e) {
+    if (e && e.name !== 'ConditionalCheckFailedException') {
+      console.warn('incrementPropertyCounter', attr, e.message);
+    }
+  }
+}
 
 async function loadPopularityCounts(ids) {
   const out = {};

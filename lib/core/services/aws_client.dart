@@ -28,16 +28,47 @@ class AwsApiClient {
 
   bool get isConfigured => AppConfig.awsApiGatewayUrl.trim().isNotEmpty;
 
+  // SCALE: coalesce identical concurrent GETs (many widgets asking for the same
+  // data → one network call) and optionally serve a short-TTL cached response
+  // for slow-changing reads (tour/scan status, snapshots). Cuts the per-user
+  // request multiplier — at hundreds of thousands of users this is the
+  // difference between one read and a redundant storm of identical reads.
+  final Map<String, Future<Map<String, dynamic>>> _inflight = {};
+  final Map<String, ({DateTime exp, Map<String, dynamic> data})> _getCache = {};
+
   // ── Core HTTP methods ─────────────────────────────────────────────────────
 
+  /// GET with in-flight dedup (always) + an optional [cacheTtl] short cache.
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, String>? query,
+    Duration? cacheTtl,
   }) async {
     final uri = _uri(path, query: query);
-    final headers = await _headers();
-    final response = await _http.get(uri, headers: headers).timeout(_timeout);
-    return _decode(response);
+    final key = uri.toString();
+    final now = DateTime.now();
+    if (cacheTtl != null) {
+      final c = _getCache[key];
+      if (c != null && c.exp.isAfter(now)) return c.data;
+    }
+    final existing = _inflight[key];
+    if (existing != null) return existing; // coalesce concurrent identical GETs
+    final future = () async {
+      final headers = await _headers();
+      final response = await _http.get(uri, headers: headers).timeout(_timeout);
+      final data = _decode(response);
+      if (cacheTtl != null) {
+        if (_getCache.length > 200) _getCache.clear(); // bounded
+        _getCache[key] = (exp: DateTime.now().add(cacheTtl), data: data);
+      }
+      return data;
+    }();
+    _inflight[key] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(key);
+    }
   }
 
   Future<Map<String, dynamic>> post(

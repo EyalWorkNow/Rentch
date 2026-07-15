@@ -2513,7 +2513,13 @@ class DatingProvider extends ChangeNotifier {
       sessionId: _newDetailSessionId(propertyId),
       startedAt: now,
     );
-    session.heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    // SCALE: this polled every 15s and fired heartbeatViewSession (a write) PLUS
+    // refreshPropertySignals (TWO 200-row queries) each tick — ~20k req/s at
+    // 500k viewers, and O(V²) reads on a viral listing. Now every 60s, and the
+    // heavy signal refresh only on alternate ticks (~every 2 min): live counts
+    // change slowly, so this is an 8× cut in the heavy reads with no real UX loss.
+    var tick = 0;
+    session.heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       final activeSession = _activeDetailSessions[propertyId];
       if (activeSession == null) return;
       unawaited(
@@ -2524,7 +2530,7 @@ class DatingProvider extends ChangeNotifier {
           currentPhotoIndex: activeSession.currentPhotoIndex,
         ),
       );
-      unawaited(refreshPropertySignals(propertyId));
+      if (tick++ % 2 == 0) unawaited(refreshPropertySignals(propertyId));
     });
     _activeDetailSessions[propertyId] = session;
 
