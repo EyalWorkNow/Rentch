@@ -86,10 +86,14 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     return PropertyPanoramaTour(nodes: linked);
   }
 
-  // Cap imported panoramas at this width: WebGL MAX_TEXTURE_SIZE is 4096 on many
-  // mobile GPUs and Pannellum refuses larger images. image_picker downscales
-  // natively at pick time (cheap + low memory), so the result always renders.
-  static const double _maxPanoWidth = 4096;
+  // Cap imported panoramas at this width for QUALITY. 4096 halved the resolution
+  // of a real 360 (usually shot at 8K-11K) — noticeably soft in full-screen/VR.
+  // The active viewer is Photo Sphere Viewer, whose equirectangular adapter reads
+  // gl.MAX_TEXTURE_SIZE and DOWNSCALES the panorama to fit the device (verified
+  // in psv-core), so 8192 renders at full quality on capable GPUs (every iPhone
+  // A11+ = 16384) and is auto-trimmed to the limit on old ones — no black sphere.
+  // image_picker downscales natively at pick time, so this is also the memory cap.
+  static const double _maxPanoWidth = 8192;
 
   // Shared: name → mandatory upload → place on the map → add the node.
   Future<void> _uploadAndAdd({

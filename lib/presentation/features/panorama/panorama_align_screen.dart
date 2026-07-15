@@ -78,7 +78,9 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
   // sensible default width for a freshly imported pano.
   static const double _kPanoFovDeg = 149;
   static const double _kMinWidthDeg = 30;
-  static const double _kMaxPanoWidth = 4096; // WebGL-safe import downscale
+  // Higher-res stitch inputs → a higher-res stitched 360 (pano-stitch runs at
+  // 3 GB / 300 s, so 8192 inputs are fine). PSV downscales the output per-device.
+  static const double _kMaxPanoWidth = 8192;
 
   // ── Import ─────────────────────────────────────────────────────────────────
 
