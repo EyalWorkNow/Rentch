@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
@@ -848,7 +849,7 @@ class _GuestModeDialog extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(40),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
@@ -938,7 +939,7 @@ class _LandlordAgentDialog extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(40),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 460, maxHeight: 520),
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
@@ -1113,7 +1114,7 @@ class _LoginTabState extends State<_LoginTab> {
       transitionDuration: const Duration(milliseconds: 360),
       pageBuilder: (ctx, anim1, anim2) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: SlideTransition(
@@ -1383,7 +1384,7 @@ class _LoginTabState extends State<_LoginTab> {
             ClipRRect(
               borderRadius: BorderRadius.circular(40),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06),
@@ -1799,7 +1800,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (ctx, anim1, anim2) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: SlideTransition(
@@ -1914,7 +1915,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       transitionDuration: const Duration(milliseconds: 450),
       pageBuilder: (ctx, anim1, anim2) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: SlideTransition(
@@ -1967,7 +1968,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(56),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(25), sigmaY: PlatformFx.blurSigma(25)),
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.06),
@@ -3359,7 +3360,7 @@ class _LandlordCtaButton extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(100),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(12), sigmaY: PlatformFx.blurSigma(12)),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:dating_app/core/ui/platform_fx.dart';
 
 import 'package:dating_app/presentation/features/assistant/erik_design.dart';
 import 'package:dating_app/presentation/features/assistant/erik_presence.dart';
@@ -364,7 +365,7 @@ class ErikTextComposer extends StatelessWidget {
         // sigma reduced 22→14: this glass sits over the CONTINUOUSLY animating
         // orb, so the blur re-samples the layer below every frame — a lower sigma
         // is a materially cheaper per-frame convolution with no visible loss.
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           decoration: BoxDecoration(

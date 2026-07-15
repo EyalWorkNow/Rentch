@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -882,7 +883,7 @@ class _AuroraBackgroundState extends State<_AuroraBackground>
                 Positioned.fill(
                   child: ClipRect(
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.16),
                       ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
@@ -804,7 +805,7 @@ class _AssistantScreenState extends State<AssistantScreen>
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(22), sigmaY: PlatformFx.blurSigma(22)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
           decoration: BoxDecoration(
@@ -1039,7 +1040,7 @@ class _AssistantScreenState extends State<AssistantScreen>
       builder: (ctx) => ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(20), sigmaY: PlatformFx.blurSigma(20)),
           child: Container(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
             decoration: BoxDecoration(
@@ -1158,7 +1159,7 @@ class _DraftSheet extends StatelessWidget {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(22), sigmaY: PlatformFx.blurSigma(22)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           decoration: BoxDecoration(

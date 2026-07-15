@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
@@ -110,7 +111,7 @@ class SpeedModeSlider extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
             child: Padding(
               padding: const EdgeInsets.all(pad),
               child: Directionality(

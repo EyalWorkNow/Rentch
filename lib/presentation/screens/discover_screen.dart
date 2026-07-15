@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -190,6 +191,21 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   DateTime _topCardShownAt = DateTime.now();
   final List<String> _comparisonIds = <String>[];
 
+  // Stable deck the CardSwiper advances through — captured from
+  // filteredProperties whenever the STRUCTURAL deckRevision changes (filter /
+  // sort / catalog / pagination), NOT on every swipe. This is what lets the
+  // swiper advance internally instead of being torn down + rebuilt per swipe.
+  List<RentalProperty> _deck = const [];
+  int _deckRev = -1;
+
+  List<RentalProperty> _deckFor(DatingProvider p) {
+    if (_deckRev != p.deckRevision) {
+      _deck = List<RentalProperty>.of(p.filteredProperties);
+      _deckRev = p.deckRevision;
+    }
+    return _deck;
+  }
+
   /// Wraps [DatingProvider.handlePropertySwipe] to emit dwell + comparison-set
   /// signals at the decision moment, then delegates unchanged.
   Future<bool> _onSwipe(
@@ -197,10 +213,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     int? currentIndex,
     CardSwiperDirection direction,
   ) async {
+    RentalProperty? swiped;
     try {
-      final props = context.read<DatingProvider>().filteredProperties;
+      // The swiper advances the stable _deck snapshot, so previousIndex indexes
+      // _deck (not the shrinking filteredProperties). Resolve the exact card.
+      final props = _deck;
       if (previousIndex >= 0 && previousIndex < props.length) {
         final decided = props[previousIndex];
+        swiped = decided;
         final dwellMs =
             DateTime.now().difference(_topCardShownAt).inMilliseconds;
         AppEvents.instance.service
@@ -222,11 +242,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       _topCardShownAt = DateTime.now();
     } catch (_) {/* fail-soft */}
 
-    // Delegate to the (untouched) outcome handler in the provider.
+    // Delegate to the outcome handler, passing the EXACT swiped card (resolved
+    // from the stable deck) so accounting never mis-indexes the shrinking list.
     return context.read<DatingProvider>().handlePropertySwipe(
           previousIndex,
           currentIndex,
           direction,
+          swiped: swiped,
         );
   }
 
@@ -446,6 +468,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final properties = provider.filteredProperties;
+        // Stable deck the swiper advances (rebuilt only on structural changes).
+        final deck = _deckFor(provider);
 
         return Scaffold(
           appBar: null,
@@ -467,12 +491,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                 Positioned.fill(
                                   child: properties.isNotEmpty
                                       ? CardSwiper(
-                                          key: ValueKey(
-                                            provider.filteredPropertiesRevision,
-                                          ),
+                                          // Key on the STRUCTURAL deck revision,
+                                          // not per-swipe — so a swipe advances
+                                          // the swiper instead of rebuilding it.
+                                          key: ValueKey(provider.deckRevision),
                                           controller:
                                               provider.propertySwiperController,
-                                          cardsCount: properties.length,
+                                          cardsCount: deck.length,
                                           // Card returns to its full long size —
                                           // only the floating header sits above it
                                           // now (the search bar is an overlay).
@@ -487,7 +512,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                           maxAngle: 16,
                                           isLoop: false,
                                           numberOfCardsDisplayed:
-                                              math.min(3, properties.length),
+                                              math.min(3, deck.length),
                                           backCardOffset: const Offset(0, 20),
                                           allowedSwipeDirection:
                                               const AllowedSwipeDirection.only(
@@ -503,21 +528,21 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                             verticalOffsetPercentage,
                                           ) {
                                             if (index < 0 ||
-                                                index >= properties.length) {
+                                                index >= deck.length) {
                                               return const SizedBox.shrink();
                                             }
                                             return Stack(
                                               children: [
                                                 ProfileCard(
                                                   key: ValueKey(
-                                                    properties[index].id,
+                                                    deck[index].id,
                                                   ),
-                                                  property: properties[index],
+                                                  property: deck[index],
                                                   horizontalOffsetPercentage:
                                                       horizontalOffsetPercentage,
                                                 ),
                                                 FomoCardOverlay(
-                                                  property: properties[index],
+                                                  property: deck[index],
                                                   likedIds: provider.likedPropertyIds,
                                                 ),
                                               ],
@@ -806,7 +831,7 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
           // Glassmorphism background blur
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
               child: Container(
                 color: Colors.black.withOpacity(0.76),
               ),
@@ -4158,7 +4183,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(12), sigmaY: PlatformFx.blurSigma(12)),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
@@ -4182,7 +4207,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(12), sigmaY: PlatformFx.blurSigma(12)),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
@@ -4309,7 +4334,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
@@ -4349,7 +4374,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
                       child: Container(
                         height: 48,
                         decoration: BoxDecoration(
@@ -4483,7 +4508,7 @@ class _PropertyPreviewCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
@@ -4522,7 +4547,7 @@ class _PropertyPreviewCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(99),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(8), sigmaY: PlatformFx.blurSigma(8)),
                     child: GestureDetector(
                       onTap: onOpenDetails,
                       child: Container(
@@ -4553,7 +4578,7 @@ class _PropertyPreviewCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       color: Colors.black
@@ -5988,7 +6013,7 @@ class _PillSelectorState extends State<_PillSelector> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(14), sigmaY: PlatformFx.blurSigma(14)),
                   child: Padding(
                     padding: const EdgeInsets.all(pad),
                     child: Directionality(

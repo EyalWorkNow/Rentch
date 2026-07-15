@@ -1,8 +1,8 @@
 import 'dart:ui';
+import 'package:dating_app/core/ui/platform_fx.dart';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
-import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/search/scorecard_view.dart';

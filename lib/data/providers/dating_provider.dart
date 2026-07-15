@@ -203,6 +203,11 @@ class DatingProvider extends ChangeNotifier {
   int _catalogRevision = 0;
   int _filterRevision = 0;
   int _filterLayoutRevision = 0;
+  // Swipe-deck STRUCTURAL revision: bumps only when the deck is genuinely
+  // replaced (filter/sort/catalog change), NOT on a per-swipe card removal. The
+  // CardSwiper keys on THIS so a swipe advances it internally instead of tearing
+  // down and rebuilding the whole deck (the "stutter between swipes").
+  int _deckRevision = 0;
   int _filteredCatalogRevision = -1;
   int _filteredFilterRevision = -1;
   int _featureWeightCatalogRevision = -1;
@@ -344,6 +349,7 @@ class DatingProvider extends ChangeNotifier {
   void _invalidateFilterCache() {
     _filterRevision++;
     _filterLayoutRevision++;
+    _deckRevision++; // structural deck change → the swiper may re-key
     _filteredPropertiesCache = null;
     // The unified engine relevance is filter-dependent — drop it so a match score
     // read after a filter change recomputes fresh instead of returning a stale
@@ -826,6 +832,11 @@ class DatingProvider extends ChangeNotifier {
   }
 
   int get filteredPropertiesRevision => _filterLayoutRevision;
+
+  /// Structural deck revision for the CardSwiper key — changes only when the
+  /// deck is replaced (filter/sort/catalog), never on a single swipe, so the
+  /// swiper advances internally instead of rebuilding every card each swipe.
+  int get deckRevision => _deckRevision;
 
   /// Single source of truth for "does this property show up under [filters]".
   /// Combines the filter predicate with the same blocked-owner / reported
@@ -2830,12 +2841,21 @@ class DatingProvider extends ChangeNotifier {
   Future<bool> handlePropertySwipe(
     int previousIndex,
     int? currentIndex,
-    CardSwiperDirection direction,
-  ) async {
-    final deck = filteredProperties;
-    if (previousIndex < 0 || previousIndex >= deck.length) return false;
-
-    final property = deck[previousIndex];
+    CardSwiperDirection direction, {
+    RentalProperty? swiped,
+  }) async {
+    // The swiper now advances a STABLE deck snapshot, so [previousIndex] indexes
+    // that snapshot, not the live (shrinking) filteredProperties. The caller
+    // passes the exact [swiped] property — use it directly. Fall back to the
+    // index only for any legacy caller that still relies on it.
+    final RentalProperty property;
+    if (swiped != null) {
+      property = swiped;
+    } else {
+      final deck = filteredProperties;
+      if (previousIndex < 0 || previousIndex >= deck.length) return false;
+      property = deck[previousIndex];
+    }
     // Latency-to-decision: card visible → swipe. Null on the first card of a
     // deck (no prior shown-time). Reset the clock for the next top card.
     // ponytail: first swipe's latency is lost; acceptable vs threading a

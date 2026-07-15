@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
@@ -814,7 +815,7 @@ class _LikedPropertyBox extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(10), sigmaY: PlatformFx.blurSigma(10)),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -1051,7 +1052,7 @@ class _ActionButtonState extends State<_ActionButton>
             ),
             child: ClipOval(
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(16), sigmaY: PlatformFx.blurSigma(16)),
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.12),

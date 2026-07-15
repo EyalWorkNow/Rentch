@@ -285,7 +285,7 @@ class _AuraGlowChip extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(16), sigmaY: PlatformFx.blurSigma(16)),
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
           decoration: BoxDecoration(

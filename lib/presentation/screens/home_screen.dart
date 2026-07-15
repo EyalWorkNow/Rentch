@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -212,8 +213,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(100),
                         child: BackdropFilter(
-                          // 20 blur gives a premium liquid glass refraction
-                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                          // 20 blur gives a premium liquid-glass refraction; on
+                          // Android/Impeller this bar floats over the animating
+                          // swipe deck and re-blurs the moving backdrop every
+                          // frame, so trim it there via PlatformFx (iOS unchanged).
+                          filter: ImageFilter.blur(
+                              sigmaX: PlatformFx.blurSigma(20),
+                              sigmaY: PlatformFx.blurSigma(20)),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             curve: Curves.easeOutCubic,

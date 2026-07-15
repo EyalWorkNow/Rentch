@@ -1,8 +1,8 @@
 import 'dart:ui';
+import 'package:dating_app/core/ui/platform_fx.dart';
 
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart' show ScoredProperty;
-import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/why_details.dart';
 import 'package:flutter/material.dart';

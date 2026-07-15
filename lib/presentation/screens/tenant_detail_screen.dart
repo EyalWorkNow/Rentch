@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -1230,7 +1231,7 @@ class _TenantBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
         child: Container(
           padding: EdgeInsets.fromLTRB(
               20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),

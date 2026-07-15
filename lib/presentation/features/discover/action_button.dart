@@ -175,23 +175,26 @@ class _ActionButtonState extends State<_ActionButton>
               ],
             ),
             child: ClipOval(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      width: 1.5,
-                    ),
+              // Solid frosted glass — NO live BackdropFilter blur. These buttons
+              // sit directly over the ANIMATING swipe card, so a real backdrop
+              // blur re-samples the moving content every frame (×3 buttons) — a
+              // top cause of the swipe stutter, even on iOS. A semi-opaque fill
+              // reads the same for a fraction of the cost (same pattern already
+              // used for the frosted pills elsewhere in discover).
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    width: 1.5,
                   ),
-                  child: Center(
-                    child: Icon(
-                      widget.icon,
-                      size: widget.iconSize,
-                      color: actualIconColor,
-                    ),
+                ),
+                child: Center(
+                  child: Icon(
+                    widget.icon,
+                    size: widget.iconSize,
+                    color: actualIconColor,
                   ),
                 ),
               ),

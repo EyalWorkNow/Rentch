@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/finance/affordability.dart';
@@ -1722,8 +1723,8 @@ class _RoundTemplateButton extends StatelessWidget {
       child: ClipOval(
         child: BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: translucent ? 14 : 0,
-            sigmaY: translucent ? 14 : 0,
+            sigmaX: PlatformFx.blurSigma(translucent ? 14 : 0),
+            sigmaY: PlatformFx.blurSigma(translucent ? 14 : 0),
           ),
           child: Container(
             width: 52,
@@ -1954,7 +1955,7 @@ class _FloatingNavBtn extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
           child: Container(
             width: 46,
             height: 46,
@@ -2782,7 +2783,7 @@ class _BottomBar extends StatelessWidget {
     final isProcessing = property.virtualTour?.isProcessing == true;
     return ClipRRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
         child: Container(
           padding: EdgeInsets.fromLTRB(
               20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),

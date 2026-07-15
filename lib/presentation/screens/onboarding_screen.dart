@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
 import 'package:dating_app/presentation/screens/home_screen.dart';
@@ -205,7 +206,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(999),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
                           child: GestureDetector(
                             onTap: _next,
                             child: Container(
