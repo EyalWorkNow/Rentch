@@ -78,9 +78,31 @@ void main() async {
     debugPrint('Scaniverse initialization skipped: $error');
   }
 
-  // Load the gov-data reference layer (localities/transit/socioeconomic/market)
-  // for the recommendation engine. Fully fail-soft: the engine falls back to
-  // built-in heuristics if the assets can't be read.
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+  runApp(const RentlyApp());
+
+  // PERF: the gov-data reference layer is ~9 MB of JSON (stat_areas 5.8 MB +
+  // schools 1.6 MB + ~13 more) that used to be parsed on the main isolate
+  // BEFORE runApp — a blank screen for the whole parse (the slow-launch cause).
+  // It's only needed by the recommendation ranker, which is fully fail-soft, so
+  // load it in the BACKGROUND after the first frame; ranking uses built-in
+  // heuristics until it lands. See _loadReferenceData().
+  unawaited(_loadReferenceData());
+
+  // Deep links: rently://property/<id> → open the apartment in-app. Fail-soft.
+  _deepLinks = DeepLinkService(appNavigatorKey);
+  unawaited(_deepLinks!.init());
+}
+
+/// Background load of the ranker's gov-data reference layer, off the first-frame
+/// path. Each await yields so the UI keeps rendering between loaders. Fully
+/// fail-soft: any failure just leaves the ranker on its built-in heuristics.
+Future<void> _loadReferenceData() async {
   try {
     await GovData.instance.init();
     await ScenarioLayers.instance.ensureLoaded(); // curated persona→display-layer spec
@@ -93,18 +115,6 @@ void main() async {
   } catch (error) {
     debugPrint('GovData init skipped: $error');
   }
-
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ),
-  );
-  runApp(const RentlyApp());
-
-  // Deep links: rently://property/<id> → open the apartment in-app. Fail-soft.
-  _deepLinks = DeepLinkService(appNavigatorKey);
-  unawaited(_deepLinks!.init());
 }
 
 class RentlyApp extends StatelessWidget {

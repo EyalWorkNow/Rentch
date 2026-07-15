@@ -541,9 +541,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                                   horizontalOffsetPercentage:
                                                       horizontalOffsetPercentage,
                                                 ),
-                                                FomoCardOverlay(
-                                                  property: deck[index],
-                                                  likedIds: provider.likedPropertyIds,
+                                                // Isolate the FOMO overlay's
+                                                // always-on animations (live-
+                                                // viewers pulse, hot badge) so
+                                                // their continuous repaints don't
+                                                // invalidate the whole card/deck.
+                                                RepaintBoundary(
+                                                  child: FomoCardOverlay(
+                                                    property: deck[index],
+                                                    likedIds:
+                                                        provider.likedPropertyIds,
+                                                  ),
                                                 ),
                                               ],
                                             );
@@ -561,14 +569,18 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                     bottom: 140,
                                     left: 0,
                                     right: 0,
-                                    child: ActionButtons(
-                                      onSwipeLeft: provider.swipePropertyLeft,
-                                      onSwipeRight: provider.swipePropertyRight,
-                                      onVirtualTour: () {
-                                        if (properties.isEmpty) return;
-                                        openPropertyTour(
-                                            context, properties.first);
-                                      },
+                                    // Isolate the buttons' pulse animation from
+                                    // the deck's repaints.
+                                    child: RepaintBoundary(
+                                      child: ActionButtons(
+                                        onSwipeLeft: provider.swipePropertyLeft,
+                                        onSwipeRight: provider.swipePropertyRight,
+                                        onVirtualTour: () {
+                                          if (properties.isEmpty) return;
+                                          openPropertyTour(
+                                              context, properties.first);
+                                        },
+                                      ),
                                     ),
                                   ),
 
@@ -670,6 +682,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // button that sits next to the "גלה" selector.
   Future<void> _openAreaLasso(
       BuildContext context, DatingProvider provider) async {
+    // The map/lasso overview is the one view that wants the WHOLE catalogue, so
+    // pull the remaining pages now (on demand) rather than eager-loading 1500
+    // properties at app startup. Fire-and-forget — the map fills in as it lands.
+    unawaited(provider.ensureFullCatalogLoaded());
     final f = provider.filters;
     final area = f.hasCustomArea
         ? SearchArea.custom(polygon: f.customAreaPolygon)

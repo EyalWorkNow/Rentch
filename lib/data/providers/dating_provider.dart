@@ -1604,12 +1604,23 @@ class DatingProvider extends ChangeNotifier {
       'propertiesLoaded': _baseProperties.length,
     });
 
-    // After 3 seconds (UI is settled), proactively load remaining DB pages in
-    // the background so the Lasso grid shows every property, not just 150.
-    if (_hasMoreProperties) {
-      Future<void>.delayed(const Duration(seconds: 3))
-          .then((_) => _fetchAllRemainingPages());
-    }
+    // PERF: we no longer eager-preload ~1500 properties at startup. That bulk
+    // load appended + re-ranked the whole growing catalogue on the UI isolate
+    // during the first ~15 s (the startup "rebuild storm"), while all the swipe
+    // deck needs is loadMorePropertiesIfNeeded() (paged on demand as the user
+    // swipes). The full catalogue is only needed for the Lasso/map overview, so
+    // it's now loaded on demand when that opens — see ensureFullCatalogLoaded().
+  }
+
+  bool _fullCatalogRequested = false;
+
+  /// Loads every remaining DB page — call when a view that needs the WHOLE
+  /// catalogue opens (the Lasso/map overview). Idempotent: the heavy paginated
+  /// load runs once per session, off the startup/first-frame path.
+  Future<void> ensureFullCatalogLoaded() async {
+    if (_fullCatalogRequested || !_hasMoreProperties) return;
+    _fullCatalogRequested = true;
+    await _fetchAllRemainingPages();
   }
 
   /// Fetches all pages after the first one without blocking the UI.
