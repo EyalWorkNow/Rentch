@@ -1728,10 +1728,34 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       if (s != null) out.add(s);
       if (out.length >= limit) break;
     }
-    return out.isNotEmpty
-        ? out
-        : provider.recommendForTenant(provider.allProperties, q, limit: limit);
+    if (out.isEmpty) {
+      return provider.recommendForTenant(provider.allProperties, q,
+          limit: limit);
+    }
+    // Always give אתי a useful set to show: a strict filter (tight room band +
+    // city + budget) can legitimately return only 1-3, but the user expects a
+    // few options. Top up with the engine's CLOSEST near-misses (best-of-
+    // everything, soft-gated → same-city / nearest room-count rank first),
+    // deduped, up to [_kMinResults]. If the whole catalogue has fewer, we show
+    // whatever exists.
+    if (out.length < _kMinResults) {
+      final seen = {for (final s in out) s.property.id};
+      final relaxed =
+          provider.recommendForTenant(provider.allProperties, q, limit: limit);
+      for (final s in relaxed) {
+        if (seen.add(s.property.id)) {
+          out.add(s);
+          if (out.length >= _kMinResults) break;
+        }
+      }
+    }
+    return out;
   }
+
+  /// אתי always surfaces at least this many options when any exist — a single
+  /// exact match reads as "nothing found" to a searcher, so we backfill with the
+  /// closest near-misses.
+  static const int _kMinResults = 4;
 
   // VERIFICATION GATE (fast-mode anti-hallucination): before showing anything,
   // confirm every result really matches what the user asked for, so אתי never
