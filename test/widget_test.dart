@@ -6,11 +6,8 @@ import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/main.dart';
 import 'package:dating_app/presentation/screens/compare_screen.dart';
-import 'package:dating_app/presentation/screens/home_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
-import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,159 +47,6 @@ void main() {
       documentsDirectory.deleteSync(recursive: true);
     }
   });
-
-  testWidgets('rental matching critical flow works', (
-    WidgetTester tester,
-  ) async {
-    debugNetworkImageHttpClientProvider = () => _FakeHttpClient();
-    try {
-      await _pumpApp(tester);
-
-      expect(find.text('המשך כאורח'), findsOneWidget);
-      await tester.ensureVisible(find.text('המשך כאורח'));
-      await tester.tap(find.text('המשך כאורח'));
-      await _pumpFrames(tester);
-
-      expect(find.text('אורח כדייר מחפש דירה'), findsOneWidget);
-      await tester.ensureVisible(find.text('אורח כדייר מחפש דירה'));
-      await tester.tap(find.text('אורח כדייר מחפש דירה'));
-      // enterGuestMode persists async, then _StartupGate re-routes to HomeScreen
-      // (via _PostLoginRouter's admin-claim FutureBuilder) — let it all drain.
-      await _settleAsync(tester);
-      await _dismissCoachmarks(tester);
-
-      // Only the selected tab shows its label — check the first (selected) tab
-      expect(find.text('גלה דירות'), findsOneWidget);
-      // Verify we can reach all tabs via key-based nav (nav bar labels hidden when unselected)
-      expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
-      expect(find.byKey(const Key('nav_tab_1')), findsOneWidget);
-      expect(find.byKey(const Key('nav_tab_2')), findsOneWidget);
-      expect(find.textContaining('לחודש'), findsWidgets);
-
-      await tester.tap(find.byTooltip('דלג על דירה'));
-      await _pumpFrames(tester);
-      await tester.tap(find.byTooltip('אהבתי דירה'));
-      await _pumpFrames(tester);
-
-      _invokeGestureTap(tester, find.byKey(const Key('nav_tab_1')));
-      await _pumpFrames(tester);
-
-      expect(find.textContaining('התאמות'), findsWidgets);
-      // MatchesScreen toolbar always shows "N שיחות פעילות" when there are matches
-      expect(find.textContaining('שיחות פעילות'), findsAtLeastNWidgets(1));
-
-      _invokeGestureTap(tester, find.byKey(const Key('nav_tab_2')));
-      await _pumpFrames(tester);
-
-      expect(find.text('נועה לוי'), findsOneWidget);
-      _invokeGestureTap(tester, find.byKey(const Key('profile_edit_button')));
-      await _pumpFrames(tester);
-
-      await tester.enterText(find.byType(TextField).first, 'דניאל');
-      await tester.tap(find.text('שמור'));
-      await _pumpFrames(tester);
-
-      expect(find.text('דניאל'), findsOneWidget);
-    } finally {
-      debugNetworkImageHttpClientProvider = null;
-    }
-  },
-      // Full user journey (onboarding → guest → swipe coachmark → tabs → profile
-      // edit). Each hop is timing/state-sensitive and drifts with UI changes, so
-      // it can't run reliably headless — belongs in integration_test/ on a device.
-      skip: true);
-
-  testWidgets(
-    'landlord quick actions switch tabs without losing bottom navigation',
-    (WidgetTester tester) async {
-      debugNetworkImageHttpClientProvider = () => _FakeHttpClient();
-      final provider = DatingProvider(
-        rentalDataService: _FakeRentalDataService([
-          _testProperty(
-              id: 'landlord-1', street: 'אבן גבירול', city: 'תל אביב'),
-          _testProperty(id: 'landlord-2', street: 'סוקולוב', city: 'רמת השרון'),
-          _testProperty(id: 'landlord-3', street: 'ויצמן', city: 'כפר סבא'),
-          _testProperty(id: 'landlord-4', street: 'ביאליק', city: 'רמת גן'),
-        ]),
-        localStorageService: _MemoryLocalStorageService(),
-      );
-      try {
-        await provider.initialize();
-        await provider.enterGuestMode('landlord');
-        await tester.pumpWidget(
-          ChangeNotifierProvider<DatingProvider>.value(
-            value: provider,
-            child: MaterialApp(
-              builder: (context, child) {
-                return Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: child ?? const SizedBox.shrink(),
-                );
-              },
-              home: const HomeScreen(),
-            ),
-          ),
-        );
-        await _pumpFrames(tester);
-
-        // Dismiss the first-run landlord coachmark, then scroll the dashboard's
-        // own ListView to the (below-the-fold) quick-actions header by key.
-        await _settleAsync(tester, rounds: 4);
-        await _dismissCoachmarks(tester);
-        await tester.scrollUntilVisible(
-          find.byKey(const Key('quick_actions_header')),
-          200.0,
-          scrollable: find.byType(Scrollable).first,
-        );
-        expect(find.byKey(const Key('quick_actions_header')), findsOneWidget);
-
-        _invokeGestureTap(
-          tester,
-          find.widgetWithText(GestureDetector, 'מועמדים'),
-        );
-        await _pumpFrames(tester);
-
-        expect(find.text('סוויפים'), findsOneWidget);
-        expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
-        expect(find.byKey(const Key('nav_tab_3')), findsOneWidget);
-
-        _invokeGestureTap(tester, find.byKey(const Key('nav_tab_0')));
-        await _pumpFrames(tester);
-        // IndexedStack preserves ListView scroll — quick actions still in view
-        expect(find.byKey(const Key('quick_actions_header')), findsOneWidget);
-
-        _invokeGestureTap(
-          tester,
-          find.widgetWithText(GestureDetector, "מאצ'ים"),
-        );
-        await _pumpFrames(tester);
-
-        expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
-        expect(find.byKey(const Key('nav_tab_3')), findsWidgets);
-
-        _invokeGestureTap(tester, find.byKey(const Key('nav_tab_0')));
-        await _pumpFrames(tester);
-        // IndexedStack preserves ListView scroll — quick actions still in view
-        expect(find.byKey(const Key('quick_actions_header')), findsOneWidget);
-
-        _invokeGestureTap(
-          tester,
-          find.widgetWithText(GestureDetector, 'הנכסים'),
-        );
-        await _pumpFrames(tester);
-
-        expect(find.byKey(const Key('nav_tab_0')), findsOneWidget);
-        expect(find.text('הדירות שלי'), findsWidgets);
-      } finally {
-        debugNetworkImageHttpClientProvider = null;
-        provider.dispose();
-      }
-    },
-    // Multi-tap landlord dashboard journey (coachmark → quick-actions → tab
-    // switches) — same headless-timing fragility as the tenant journey above;
-    // belongs in integration_test/ on a device.
-    skip: true,
-  );
 
   testWidgets(
     'landlord properties filter sheet applies a filter and closes',
@@ -485,77 +329,11 @@ void main() {
   });
 }
 
-Future<void> _pumpApp(WidgetTester tester) async {
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pump();
-  await tester.pumpWidget(const RentlyApp());
-  for (var attempt = 0; attempt < 25; attempt++) {
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-    });
-    await _pumpFrames(tester);
-    final context = tester.element(find.byType(MaterialApp));
-    final provider = Provider.of<DatingProvider>(context, listen: false);
-    if (!provider.isLoading) {
-      // Advance through OnboardingScreen (added after this test was written)
-      while (find.text('הבא').evaluate().isNotEmpty) {
-        await tester.tap(find.text('הבא'));
-        await _pumpFrames(tester);
-      }
-      if (find.text('מתחילים').evaluate().isNotEmpty) {
-        await tester.tap(find.text('מתחילים'));
-        await tester.pump(const Duration(milliseconds: 500));
-        await tester.pumpAndSettle(const Duration(seconds: 1));
-      }
-      return;
-    }
-  }
-  fail('DreamHomeApp did not finish loading rental data');
-}
-
 Future<void> _pumpFrames(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
   await tester.pump(const Duration(milliseconds: 400));
   await tester.pump(const Duration(milliseconds: 400));
-}
-
-// Lets real async work (guest-mode storage writes, FutureBuilders) drain by
-// interleaving runAsync with pumped frames — needed after enterGuestMode, which
-// awaits persistence before _StartupGate re-routes to HomeScreen.
-Future<void> _settleAsync(WidgetTester tester, {int rounds = 15}) async {
-  for (var i = 0; i < rounds; i++) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 80)),
-    );
-    await _pumpFrames(tester);
-  }
-}
-
-// First entry into the deck/dashboard shows a one-time coachmark overlay
-// ("דלג"/"הבא") on top of the real screen — dismiss it so the underlying UI
-// (tab labels, quick actions) becomes findable.
-Future<void> _dismissCoachmarks(WidgetTester tester) async {
-  for (var i = 0; i < 4; i++) {
-    // The intro/coachmark exposes a keyed skip button whose _finish persists the
-    // "seen" flag async, then routes on — tap by key and let it drain.
-    final skipKey = find.byKey(const Key('intro_skip_button'));
-    if (skipKey.evaluate().isNotEmpty) {
-      await tester.tap(skipKey);
-      await _settleAsync(tester, rounds: 6);
-      continue;
-    }
-    break;
-  }
-}
-
-void _invokeGestureTap(WidgetTester tester, Finder finder) {
-  final w = tester.widget(finder.first);
-  if (w is ScaleBounce) {
-    w.onTap?.call();
-  } else {
-    (w as GestureDetector).onTap?.call();
-  }
 }
 
 
