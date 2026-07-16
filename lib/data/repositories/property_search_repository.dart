@@ -272,7 +272,18 @@ class PropertySearchRepository {
     final ranked = [for (final cand in matched) cand.property];
     final scored = [
       for (final cand in matched)
-        _Scored(cand.property, fvOf[cand.property.id]!, clientScoreOf[cand.property.id]!),
+        _Scored(
+          cand.property,
+          fvOf[cand.property.id]!,
+          clientScoreOf[cand.property.id]!,
+          // Server CANONICAL vector + A/B bucket, read VERBATIM from the raw row
+          // (train/serve parity — landmine #1). Kept alongside the client
+          // `features`; never recomputed.
+          cand.raw['rankFeatures'] is Map
+              ? Map<String, dynamic>.from(cand.raw['rankFeatures'] as Map)
+              : null,
+          cand.raw['abVariant']?.toString(),
+        ),
     ];
     // Fire-and-forget per-impression feature log (the phase-2 LightGBM training
     // set), now in the backend-ranked order. Fail-soft — never blocks the UI.
@@ -596,6 +607,11 @@ class PropertySearchRepository {
             'rank': i,
             'score': scored[i].score,
             'features': scored[i].features,
+            // Server canonical vector + A/B bucket VERBATIM (parity — landmine
+            // #1). Omitted, not faked, when the backend didn't attach them.
+            if (scored[i].rankFeatures != null)
+              'rankFeatures': scored[i].rankFeatures,
+            if (scored[i].abVariant != null) 'abVariant': scored[i].abVariant,
           },
       ];
       final query = c.queryText?.trim();
@@ -642,8 +658,17 @@ class _Candidate {
 /// A scored listing carrying the feature vector that produced its score, so the
 /// rank is both explainable and loggable.
 class _Scored {
-  const _Scored(this.property, this.features, this.score);
+  const _Scored(
+    this.property,
+    this.features,
+    this.score, [
+    this.rankFeatures,
+    this.abVariant,
+  ]);
   final RentalProperty property;
   final Map<String, double> features;
   final double score;
+  // Server-supplied canonical ranking vector + A/B bucket, carried verbatim.
+  final Map<String, dynamic>? rankFeatures;
+  final String? abVariant;
 }

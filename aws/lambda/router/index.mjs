@@ -34,7 +34,7 @@ import AdmZip from 'adm-zip';
 // service account (sign a JWT with RS256) and to load that account off disk.
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { scoreListings } from './lib/ranking.mjs';
+import { scoreListings, round3 } from './lib/ranking.mjs';
 import {
   querySignals, cohortFromSignals, resolveCohortFrom,
   COHORT_KEYS, COHORT_DEFS, isListingVisibleToCohort,
@@ -44,6 +44,18 @@ import { passesEligibility } from './lib/eligibility.mjs';
 // (implicit-feedback score), item-item collaborative filtering, and the LightGBM
 // training-data join. DB reads stay here; the math lives in ./lib/cf.mjs.
 import { implicitScore, cfRecommend, trainingRowsFrom } from './lib/cf.mjs';
+// Phase-1 learned-ranker serving hook (DORMANT until a model is provisioned) +
+// Phase-0 deterministic A/B bucketing. RANK_FEATURE_ORDER is the canonical
+// feature-key list the client, trainer and scorer all agree on.
+import {
+  RANK_FEATURE_ORDER, loadModel, scoreWithModel, blendScore, modelAlpha,
+  rankFeaturesFrom,
+} from './lib/model_scorer.mjs';
+import { variantFor } from './lib/ab.mjs';
+// Ranking A/B: control (variant 0) always sees the pure linear score; treatment
+// (variant 1) gets the model blend WHEN a model is loaded. With no model both
+// variants are identical (pure linear) — the experiment is a no-op until then.
+const RANK_EXPERIMENT = 'rank_model_v1';
 
 // ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
 // These modules live in ./lib and expose the Israeli-data spine used to enrich a
@@ -1544,7 +1556,7 @@ export const handler = async (event) => {
             // Per-listing eligibility gate: hide listings whose landlord-defined
             // tenant criteria this caller fails (never the caller's own rows).
             const eligible = await applyEligibilityGate(gated, callerUid);
-            return await attachRankSignals(eligible, query, cohort);
+            return await attachRankSignals(eligible, query, cohort, callerUid);
           }
           return listed;
         }
@@ -1822,11 +1834,15 @@ async function listItems(table, query) {
 // Cohort-aware main-feed scorer. Loads popularity counts from DynamoDB, then
 // delegates the (pure, unit-tested) scoring to ranking.scoreListings. Community
 // affinity is a SOFT signal there — no listing is excluded. Fail-soft.
-async function attachRankSignals(listed, query, cohort = null) {
+async function attachRankSignals(listed, query, cohort = null, callerUid = null) {
   try {
     const parsed = JSON.parse(listed.body);
     const items = Array.isArray(parsed.items) ? parsed.items : [];
-    if (items.length === 0) return listed;
+    if (items.length === 0) {
+      // Still stamp the A/B variant so an empty page logs consistently.
+      parsed.abVariant = variantFor(callerUid, RANK_EXPERIMENT, 2);
+      return json(200, parsed);
+    }
 
     const ctx = {
       cohort,
@@ -1854,12 +1870,72 @@ async function attachRankSignals(listed, query, cohort = null) {
       }
     }
     if (missing.length) Object.assign(counts, await loadPopularityCounts(missing));
+    // Pure linear scoring (unchanged): sets p.rankSignals + p.rankScore.
     scoreListings(items, ctx, counts, Date.now());
+
+    // ── Feature parity (landmine #1) ──────────────────────────────────────────
+    // Surface the EXACT feature vector the server scored on as `rankFeatures` on
+    // every listing — a stable, ordered object keyed by RANK_FEATURE_ORDER (+
+    // cohort). This is the canonical vector the client logs back verbatim on
+    // /search/log and the trainer/scorer index into. No training/serving skew.
+    for (const p of items) {
+      p.rankFeatures = rankFeaturesFrom(p.rankSignals);
+    }
+
+    // ── A/B (Phase 0) ─────────────────────────────────────────────────────────
+    const abVariant = variantFor(callerUid, RANK_EXPERIMENT, 2);
+    parsed.abVariant = abVariant;
+    parsed.rankExperiment = RANK_EXPERIMENT;
+    // Also stamp per-listing (same user-level value) so the client can log it on
+    // each impression row verbatim alongside rankFeatures — parity with the client
+    // reader that threads abVariant off the listing item.
+    for (const p of items) p.abVariant = abVariant;
+
+    // ── Model serving hook (Phase 1, dormant-ready) ──────────────────────────
+    // When a model is loaded AND the caller is in the treatment bucket, blend
+    // finalScore = α·linear + (1−α)·model (α = RANK_MODEL_ALPHA, default 0.7).
+    // With NO model loaded — the default — behavior is EXACTLY today's pure
+    // linear score for BOTH buckets. Fail-soft: any model error → pure linear.
+    let modelApplied = false;
+    if (abVariant === 1) {
+      try {
+        const model = await loadModel({ s3Get: rankModelS3Get });
+        if (model) {
+          const alpha = modelAlpha();
+          for (const p of items) {
+            const modelScore = scoreWithModel(model, p.rankFeatures);
+            const blended = round3(blendScore(p.rankScore, modelScore, alpha));
+            if (p.rankSignals) {
+              p.rankSignals.linearRankScore = p.rankScore; // keep the transparent baseline
+              p.rankSignals.modelScore = round3(modelScore);
+            }
+            p.rankScore = blended;
+          }
+          modelApplied = true;
+        }
+      } catch (e) {
+        console.warn('model blend failed → pure linear:', e.message);
+      }
+    }
+    parsed.rankModel = modelApplied; // client can log whether the model was live
+
     return json(200, parsed);
   } catch (e) {
     console.warn('attachRankSignals failed:', e.message);
     return listed;
   }
+}
+
+// S3 getter injected into loadModel so the model_scorer reuses this Lambda's
+// existing S3 client + stream helper instead of importing its own.
+async function rankModelS3Get(ref) {
+  let r = String(ref).trim();
+  if (r.startsWith('s3://')) r = r.slice(5);
+  const slash = r.indexOf('/');
+  const Bucket = slash > 0 ? r.slice(0, slash) : S3_BUCKET;
+  const Key = slash > 0 ? r.slice(slash + 1) : r;
+  const obj = await s3.send(new GetObjectCommand({ Bucket, Key }));
+  return await streamToString(obj.Body);
 }
 
 // Fail-open audience gate over a catalog page. Filters OUT listings the pure
@@ -2112,6 +2188,13 @@ function mergeInteraction(cur, body) {
   if (pv != null) r.photosViewed = Math.max(Number(r.photosViewed) || 0, pv);
   const sd = num(body.scrollDepth);
   if (sd != null) r.scrollDepth = Math.max(Number(r.scrollDepth) || 0, sd);
+  // Listing "size" for dwell length-normalization (landmine #3). Stable per
+  // listing; latest-wins. The handler backfills these from the property row when
+  // the client omits them, so a media-heavy listing doesn't auto-score on dwell.
+  const mc = num(body.mediaCount);
+  if (mc != null) r.mediaCount = mc;
+  const dl = num(body.descLen);
+  if (dl != null) r.descLen = dl;
   if (body.entrySource != null) r.entrySource = String(body.entrySource).slice(0, 40); // latest wins
   const er = num(body.entryRank);
   if (er != null) r.entryRank = er;
@@ -2144,6 +2227,18 @@ async function handleInteraction(event) {
     const rec = mergeInteraction(cur, body);
     rec.userId = uid;
     rec.propertyId = propertyId;
+    // Dwell length-normalization needs the listing's "size". Prefer client-sent
+    // mediaCount/descLen (already merged above); otherwise derive them ONCE from
+    // the property row so a photo-heavy / long-copy listing doesn't over-score on
+    // raw dwell. Fail-soft: on a lookup miss the score just uses the base expected
+    // dwell (mediaCount/descLen default to 0 inside implicitScore).
+    if (rec.mediaCount === undefined || rec.descLen === undefined) {
+      const size = await deriveListingSize(propertyId).catch(() => null);
+      if (size) {
+        if (rec.mediaCount === undefined) rec.mediaCount = size.mediaCount;
+        if (rec.descLen === undefined) rec.descLen = size.descLen;
+      }
+    }
     rec.score = implicitScore(rec);
     rec.updatedAt = Date.now();
     await ddb.send(new PutCommand({ TableName: T, Item: rec }));
@@ -2152,6 +2247,33 @@ async function handleInteraction(event) {
     console.warn('interactions write failed:', e.message);
     return json(200, { ok: false, score: 0 });   // fail-soft: never 500
   }
+}
+
+// Count a property's "media" for dwell length-normalization: photos + video +
+// 360/3d. Defensive over the various shapes a listing row can carry.
+function mediaCountOf(p) {
+  if (!p || typeof p !== 'object') return 0;
+  let n = 0;
+  if (Array.isArray(p.imageUrls)) n += p.imageUrls.length;
+  if (p.videoUrl || (Array.isArray(p.videoUrls) && p.videoUrls.length)) n += 1;
+  // 360 panorama and/or a 3D splat model each count as one rich-media asset.
+  if (p.panoramaUrl || p.panoUrl || (Array.isArray(p.panoramas) && p.panoramas.length)) n += 1;
+  if (p.model3d && (p.model3d.ksplatUrl || p.model3d.meshGlbUrl || p.model3d.splatUrl)) n += 1;
+  return n;
+}
+
+// GetItem the property row and return { mediaCount, descLen } for dwell
+// normalization. Fail-soft → null (caller falls back to the base expected dwell).
+async function deriveListingSize(propertyId) {
+  const out = await ddb.send(new GetCommand({
+    TableName: TABLES.properties.name, Key: { id: propertyId },
+  }));
+  const p = out.Item;
+  if (!p) return null;
+  return {
+    mediaCount: mediaCountOf(p),
+    descLen: p.description ? String(p.description).length : 0,
+  };
 }
 
 // POST /reco/cf — item-item co-engagement collaborative filtering. Reads are

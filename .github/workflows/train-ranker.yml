@@ -1,0 +1,113 @@
+name: train-ranker
+
+# Produces the Rently listing-ranker model.json (LightGBM dump_model format) and
+# uploads it to S3, where the Node Lambda scorer (lib/model_scorer.mjs) picks it
+# up via RANK_MODEL_S3. Cheap cron job — NO Fargate, NO serving service.
+#
+# SAFE TO EXIST UN-CONFIGURED: every step that needs a secret is guarded, so on a
+# repo without the secrets set the job runs the offline selfcheck and then skips
+# the pull/train/upload cleanly (green, no error). Wire the secrets below to arm.
+#
+# Secrets to set (Settings → Secrets and variables → Actions):
+#   ML_EXPORT_URL     — full https URL of GET /ml/export on the router Lambda
+#   ML_EXPORT_TOKEN   — admin bearer token (the notif-admin uid's token)
+#   RANK_MODEL_BUCKET — S3 bucket name for the artifact
+#   RANK_MODEL_KEY    — S3 key, e.g. models/ranker/model.json (must match the
+#                       scorer's RANK_MODEL_S3)
+#   AWS_ROLE_ARN      — IAM role to assume via OIDC (s3:PutObject on the key)
+#   AWS_REGION        — e.g. us-east-1
+
+on:
+  schedule:
+    - cron: "17 4 * * *"   # daily 04:17 UTC — off-peak
+  workflow_dispatch: {}     # manual "Run workflow" button
+
+permissions:
+  contents: read
+  id-token: write           # for aws-actions OIDC role assumption
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r ml/requirements.txt
+
+      - name: Offline selfcheck (always runs — proves the pipeline works)
+        run: bash ml/selfcheck.sh
+
+      # ── Pull the real labeled rows from GET /ml/export ──────────────────────
+      # Guarded: if the export secrets are absent we skip training entirely and
+      # the job still succeeds (dormant / pre-launch).
+      - name: Pull training export
+        id: pull
+        env:
+          ML_EXPORT_URL: ${{ secrets.ML_EXPORT_URL }}
+          ML_EXPORT_TOKEN: ${{ secrets.ML_EXPORT_TOKEN }}
+        run: |
+          if [ -z "$ML_EXPORT_URL" ] || [ -z "$ML_EXPORT_TOKEN" ]; then
+            echo "ML_EXPORT_URL / ML_EXPORT_TOKEN not set — skipping real training."
+            echo "have_data=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          curl -fsS "$ML_EXPORT_URL" \
+            -H "Authorization: Bearer $ML_EXPORT_TOKEN" -o rows.json
+          echo "have_data=true" >> "$GITHUB_OUTPUT"
+
+      # Decide up front whether an S3 upload is even possible (secrets present).
+      # Referencing secrets in `if:` is unreliable, so we hoist them into an
+      # output here and gate later steps on it.
+      - name: Check upload config
+        id: cfg
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          RANK_MODEL_BUCKET: ${{ secrets.RANK_MODEL_BUCKET }}
+          RANK_MODEL_KEY: ${{ secrets.RANK_MODEL_KEY }}
+        run: |
+          if [ -n "$AWS_ROLE_ARN" ] && [ -n "$RANK_MODEL_BUCKET" ] && [ -n "$RANK_MODEL_KEY" ]; then
+            echo "can_upload=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "AWS_ROLE_ARN / RANK_MODEL_BUCKET / RANK_MODEL_KEY not all set — upload will be skipped."
+            echo "can_upload=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Train on real data. The cold-start guard inside train.py decides
+      # whether a model is actually emitted (< 200 rows or one class → no file). ─
+      - name: Train
+        if: steps.pull.outputs.have_data == 'true'
+        run: |
+          python ml/train.py --input rows.json --output model.json \
+            --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      # ── Upload to S3 only if a model was actually produced AND the bucket
+      # secret is set. Missing model (cold-start) or missing bucket → skip. ─────
+      - name: Configure AWS credentials
+        if: steps.pull.outputs.have_data == 'true' && steps.cfg.outputs.can_upload == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload model.json to S3
+        if: steps.pull.outputs.have_data == 'true' && steps.cfg.outputs.can_upload == 'true'
+        env:
+          RANK_MODEL_BUCKET: ${{ secrets.RANK_MODEL_BUCKET }}
+          RANK_MODEL_KEY: ${{ secrets.RANK_MODEL_KEY }}
+        run: |
+          if [ ! -s model.json ]; then
+            echo "No model.json (cold-start guard tripped) — nothing to upload."
+            exit 0
+          fi
+          if [ -z "$RANK_MODEL_BUCKET" ] || [ -z "$RANK_MODEL_KEY" ]; then
+            echo "RANK_MODEL_BUCKET / RANK_MODEL_KEY not set — skipping upload."
+            exit 0
+          fi
+          aws s3 cp model.json "s3://$RANK_MODEL_BUCKET/$RANK_MODEL_KEY"
+          aws s3 cp model.meta.json "s3://$RANK_MODEL_BUCKET/${RANK_MODEL_KEY%.json}.meta.json" || true
+          echo "Uploaded to s3://$RANK_MODEL_BUCKET/$RANK_MODEL_KEY"

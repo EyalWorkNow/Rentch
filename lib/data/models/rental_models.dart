@@ -861,6 +861,8 @@ class RentalProperty {
     List<AudienceSuggestion>? audienceSuggested,
     this.exclusiveToAudience = false,
     this.eligibility = const EligibilityConfig(),
+    this.rankFeatures,
+    this.abVariant,
   })  : audienceCohorts =
             List.unmodifiable(audienceCohorts ?? const <String>[]),
         audienceSuggested =
@@ -951,6 +953,14 @@ class RentalProperty {
   /// Per-listing tenant-eligibility criteria (F3). Defaults to a disabled empty
   /// config, so listings persisted before this feature deserialize cleanly.
   final EligibilityConfig eligibility;
+
+  /// Server-supplied CANONICAL ranking feature vector (`rankFeatures`) and A/B
+  /// bucket (`abVariant`), carried VERBATIM from the backend feed row so deck
+  /// impressions/outcomes can log them back UNCHANGED (train/serve parity —
+  /// landmine #1). The client never recomputes these. Null when the backend
+  /// didn't attach them (e.g. the bundled-asset fallback catalog).
+  final Map<String, dynamic>? rankFeatures;
+  final String? abVariant;
 
   bool get hasPanoramaTour => panoramaTour?.isNotEmpty ?? false;
 
@@ -1053,6 +1063,8 @@ class RentalProperty {
     List<AudienceSuggestion>? audienceSuggested,
     bool? exclusiveToAudience,
     EligibilityConfig? eligibility,
+    Map<String, dynamic>? rankFeatures,
+    String? abVariant,
   }) {
     return RentalProperty(
       id: id ?? this.id,
@@ -1095,6 +1107,8 @@ class RentalProperty {
       audienceSuggested: audienceSuggested ?? this.audienceSuggested,
       exclusiveToAudience: exclusiveToAudience ?? this.exclusiveToAudience,
       eligibility: eligibility ?? this.eligibility,
+      rankFeatures: rankFeatures ?? this.rankFeatures,
+      abVariant: abVariant ?? this.abVariant,
     );
   }
 
@@ -1196,6 +1210,13 @@ class RentalProperty {
       audienceSuggested: _parseAudienceSuggestions(json['audienceSuggested']),
       exclusiveToAudience: _asBoolFlag(json['exclusiveToAudience']),
       eligibility: _parseEligibilityConfig(json['eligibility']),
+      // Carried VERBATIM — never recomputed client-side (train/serve parity).
+      rankFeatures: json['rankFeatures'] is Map
+          ? Map<String, dynamic>.from(json['rankFeatures'] as Map)
+          : null,
+      abVariant: (json['abVariant']?.toString().isNotEmpty ?? false)
+          ? json['abVariant'].toString()
+          : null,
     );
   }
 
@@ -1249,6 +1270,8 @@ class RentalProperty {
           audienceSuggested.map((item) => item.toJson()).toList(),
       'exclusiveToAudience': exclusiveToAudience,
       'eligibility': eligibility.toJson(),
+      if (rankFeatures != null) 'rankFeatures': rankFeatures,
+      if (abVariant != null) 'abVariant': abVariant,
     };
   }
 }

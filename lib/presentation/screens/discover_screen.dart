@@ -213,6 +213,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     if (_deckRev != p.deckRevision) {
       _deck = List<RentalProperty>.of(p.filteredProperties);
       _deckRev = p.deckRevision;
+      // A new deck surfaced → log impressions for the cards now visible at the
+      // top (landmine #2). Fire-and-forget + deduped in the provider; safe here.
+      p.logVisibleDeckImpressions(_deck, from: 0);
     }
     return _deck;
   }
@@ -267,9 +270,17 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       _topCardShownAt = DateTime.now();
     } catch (_) {/* fail-soft */}
 
+    // The swipe advanced the deck — the card at [currentIndex] (and the back
+    // cards behind it) just surfaced. Log their impressions (deduped in the
+    // provider), so each newly-shown card becomes a real "shown" signal.
+    final provider = context.read<DatingProvider>();
+    if (currentIndex != null) {
+      provider.logVisibleDeckImpressions(_deck, from: currentIndex);
+    }
+
     // Delegate to the outcome handler, passing the EXACT swiped card (resolved
     // from the stable deck) so accounting never mis-indexes the shrinking list.
-    return context.read<DatingProvider>().handlePropertySwipe(
+    return provider.handlePropertySwipe(
           previousIndex,
           currentIndex,
           direction,

@@ -4,7 +4,7 @@
 //
 // cf.mjs is dependency-free, so unlike index.mjs it can be imported directly.
 import assert from 'node:assert/strict';
-import { implicitScore, cfRecommend, trainingRowsFrom } from './lib/cf.mjs';
+import { implicitScore, cfRecommend, trainingRowsFrom, expectedDwellMs } from './lib/cf.mjs';
 
 let n = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); n++; };
@@ -15,9 +15,21 @@ eq(implicitScore({}), 0, 'empty record → 0');
 eq(implicitScore({ contacted: true }), 5, 'contact +5');
 eq(implicitScore({ superliked: true }), 4, 'superlike +4');
 eq(implicitScore({ liked: true }), 3, 'like +3');
-eq(implicitScore({ dwellMs: 40000 }), 2, 'dwell>30s +2');
-eq(implicitScore({ dwellMs: 12000 }), 1, 'dwell>8s +1');
-eq(implicitScore({ dwellMs: 5000 }), 0, 'dwell<=8s +0');
+// Length-normalized dwell (landmine #3). With no media/desc info the expected
+// dwell is the 6s BASE, so ratio = dwellMs/6000.
+eq(expectedDwellMs(0, 0), 6000, 'bare listing expects the 6s base');
+eq(expectedDwellMs(4, 100), 6000 + 4 * 1800 + 100 * 12, 'expected scales w/ media+desc');
+eq(implicitScore({ dwellMs: 40000 }), 2, 'dwell ≫ expected → +2 (bounded)');
+eq(implicitScore({ dwellMs: 12000 }), 2, 'dwell 2× expected → +2 (bound hit)');
+eq(implicitScore({ dwellMs: 3000 }), 0, 'dwell ≤ 0.5× expected → +0 (skim)');
+// SAME dwell, but a media-heavy listing (higher expected) contributes LESS — the
+// core anti-skew property: a big listing can't auto-score higher on raw dwell.
+{
+  const bare = implicitScore({ dwellMs: 9000, mediaCount: 0, descLen: 0 });
+  const heavy = implicitScore({ dwellMs: 9000, mediaCount: 12, descLen: 800 });
+  ok(bare > heavy, 'same dwell scores lower on a media-heavy listing');
+  ok(heavy >= 0, 'normalized dwell never goes negative');
+}
 eq(implicitScore({ opened360: true }), 1.5, 'opened360 +1.5');
 eq(implicitScore({ opened3d: true }), 1.5, 'opened3d +1.5');
 eq(implicitScore({ openedVideo: true }), 1.5, 'openedVideo +1.5');
@@ -45,8 +57,8 @@ eq(implicitScore({ passed: true, bounced: true, dwellMs: 0 }), -3, 'negative sum
 // so assert the clamp mechanically via a synthetic over-negative record isn't
 // reachable; instead confirm the floor holds for the max negative + no positives.
 ok(implicitScore({ passed: true, bounced: true }) >= -5, 'never below -5 floor');
-// mixed: like3 + dwell1 + view0.5 - pass2 = 2.5
-eq(implicitScore({ liked: true, dwellMs: 12000, viewCount: 1, passed: true }), 2.5,
+// mixed: like3 + dwell2 (12s = 2× the 6s expected → bound) + view0.5 - pass2 = 3.5
+eq(implicitScore({ liked: true, dwellMs: 12000, viewCount: 1, passed: true }), 3.5,
   'mixed positive/negative sums correctly');
 
 // ── cfRecommend: co-engaged property ranks above non-co-engaged; seen excluded ─

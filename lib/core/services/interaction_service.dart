@@ -35,6 +35,8 @@ class InteractionService {
     String? entrySource,
     int? entryRank,
     String? action,
+    int? mediaCount,
+    int? descLen,
   }) async {
     if (propertyId.trim().isEmpty || !AwsApiClient.instance.isConfigured) return;
     try {
@@ -51,6 +53,10 @@ class InteractionService {
           'entrySource': entrySource,
         if (entryRank != null && entryRank >= 0) 'entryRank': entryRank,
         if (action != null && action.isNotEmpty) 'action': action,
+        // Listing "size" so the backend can length-normalize dwell (a media-rich
+        // or long-description listing earns more dwell for the same interest).
+        if (mediaCount != null && mediaCount >= 0) 'mediaCount': mediaCount,
+        if (descLen != null && descLen >= 0) 'descLen': descLen,
       });
     } catch (error) {
       if (kDebugMode) debugPrint('InteractionService.record: $error');

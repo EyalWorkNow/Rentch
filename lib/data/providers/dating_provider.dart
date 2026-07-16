@@ -28,6 +28,7 @@ import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:dating_app/data/models/user_signals.dart';
 import 'package:dating_app/data/models/persona_profile.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/core/services/appwrite_client.dart' show ID;
 import 'package:dating_app/core/services/interaction_service.dart';
 import 'package:dating_app/core/services/signature_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
@@ -262,6 +263,35 @@ class DatingProvider extends ChangeNotifier {
   // UNIFIED structural core of the deck score (same ranker as the search surface).
   // Populated in _sortProperties; a cache miss falls back to an on-demand score.
   Map<String, double> _engineRelevance = const {};
+
+  // ── Main-feed impression logging + ε-greedy exploration (Phase 0) ───────────
+  // Stable id for the CURRENT deck ordering. Re-minted every time _sortProperties
+  // rebuilds the deck (filter/sort/catalog change), so it groups all impressions
+  // of one feed and lets the backend join later swipe/click outcomes back to the
+  // exact feed that surfaced the card — the same role searchId plays on the
+  // search surface. Impression logging is skipped until it exists.
+  String? _feedSearchId;
+  // Dedup: one impression per property per feed session. Keyed by propertyId,
+  // cleared whenever _feedSearchId changes (a genuinely new feed).
+  final Set<String> _loggedDeckImpressions = <String>{};
+  // Session-cumulative count of how many times each listing has been shown at/near
+  // the top of the deck — the "under-explored" signal the ε-greedy promotion reads
+  // (fewer prior impressions ⇒ more likely to be promoted). Not cleared per feed.
+  final Map<String, int> _deckImpressionCount = <String, int>{};
+  // The listing (if any) the ε-greedy rule promoted into a top-K slot for the
+  // CURRENT feed, so its impression is tagged explored:true. Null on greedy feeds.
+  String? _exploredPropertyId;
+
+  // ε-greedy exploration knobs. With probability [_epsilonExplore] a single
+  // under-explored listing is promoted into slot [_exploreSlot] of the top-K,
+  // injecting position variance for future debiasing and surfacing cold inventory.
+  // Bounded to EXACTLY ONE promotion per feed so exploration never dominates, and
+  // gated to best-match sort (an explicit price/size sort is left untouched).
+  static const double _epsilonExplore = 0.10;
+  static const int _exploreTopK = 3; // promote from outside the greedy top-3…
+  static const int _exploreSlot = 2; // …into the 3rd slot (visible, not the #1).
+  // Impressions are logged for this many cards from the current top of the deck.
+  static const int _impressionWindow = 3;
   // Collaborative-filtering recommendations from the backend (`POST /reco/cf`),
   // ordered highest-cfScore first. Consumed as a gentle deck boost via [_cfBoost]
   // and exposed (see [cfRecommendedIds]) so a "מומלץ בשבילך" section can use them.
@@ -1311,6 +1341,12 @@ class DatingProvider extends ChangeNotifier {
     DateTime now,
     SearchArea area,
   ) {
+    // A new deck ordering begins here → mint a fresh feed id, reset the per-feed
+    // impression dedup, and clear last feed's exploration mark. All deck
+    // impressions logged until the next re-sort group under this one id.
+    _feedSearchId = ID.unique();
+    _loggedDeckImpressions.clear();
+    _exploredPropertyId = null;
     final matchContext = _MatchContext(
       filters: filters,
       now: now,
@@ -1367,6 +1403,137 @@ class DatingProvider extends ChangeNotifier {
           return a.id.compareTo(b.id);
       }
     });
+
+    // ε-greedy exploration (best-match only): with probability ε, promote one
+    // under-explored listing into a top-K slot in place of the greedy pick.
+    if (filters.sortBy == SearchSortOption.bestMatch) {
+      _applyExploration(properties);
+    }
+  }
+
+  /// ε-GREEDY EXPLORATION (data-engine / landmine #4). With probability
+  /// [_epsilonExplore] (=0.10) this promotes a SINGLE under-explored listing out
+  /// of the greedy tail and into slot [_exploreSlot] of the top-K, so the deck
+  /// occasionally shows fresh/cold inventory and — crucially — injects position
+  /// variance the backend can later use to debias the click log. Bounded to at
+  /// most one promotion per feed, so it never dominates the greedy order.
+  ///
+  /// Determinism: the explore/greedy coin is a DETERMINISTIC hash of the deck's
+  /// content + filter/catalog revisions — NOT Random()/DateTime.now() — so the
+  /// same feed always makes the same decision (reproducible for debugging and
+  /// stable across the rebuilds a single feed undergoes), while distinct feeds
+  /// vary (≈ε of them explore). Promotion target = the most under-explored
+  /// listing: fewest prior impressions THIS session, tie-broken by lowest server
+  /// popularity (marketSignals engagement), then id for a total order.
+  void _applyExploration(List<RentalProperty> properties) {
+    if (properties.length <= _exploreTopK) return;
+
+    // Deterministic coin in [0,1) seeded from stable, non-time content.
+    final seed = Object.hash(
+      _filterRevision,
+      _catalogRevision,
+      properties.length,
+      properties[0].id,
+      properties[1].id,
+      properties[2].id,
+    );
+    final u = (seed & 0x7fffffff) / 0x80000000;
+    if (u >= _epsilonExplore) return; // greedy feed — leave the order untouched.
+
+    // Pick the most under-explored listing from OUTSIDE the greedy top-K.
+    var bestIndex = -1;
+    var bestImpressions = 1 << 30;
+    var bestPopularity = 1 << 30;
+    for (var i = _exploreTopK; i < properties.length; i++) {
+      final p = properties[i];
+      final impressions = _deckImpressionCount[p.id] ?? 0;
+      final popularity = _serverPopularity(p);
+      if (impressions < bestImpressions ||
+          (impressions == bestImpressions && popularity < bestPopularity)) {
+        bestIndex = i;
+        bestImpressions = impressions;
+        bestPopularity = popularity;
+      }
+    }
+    if (bestIndex < 0) return;
+
+    final promoted = properties.removeAt(bestIndex);
+    properties.insert(_exploreSlot, promoted);
+    _exploredPropertyId = promoted.id;
+  }
+
+  /// Cheap server-popularity proxy (lower = more under-explored). Mirrors the
+  /// search repo's engagement weighting over the embedded market signals.
+  int _serverPopularity(RentalProperty p) {
+    final m = p.marketSignals;
+    return m.likes * 2 + m.saves * 3 + m.contactRequests * 4 + m.views;
+  }
+
+  /// Photos + video + 360 count for a listing (media already holds images and
+  /// videos; a panorama tour is the separate 360 asset). Sent with interactions
+  /// so the backend can length-normalize dwell.
+  int _mediaCountOf(RentalProperty p) =>
+      p.media.length + (p.hasPanoramaTour ? 1 : 0);
+
+  /// Length of the listing's descriptive text. [RentalProperty] has no dedicated
+  /// description field, so its [searchableText] (city/neighborhood/features/…) is
+  /// used as the best available content-length proxy for dwell normalization.
+  int _descLenOf(RentalProperty p) => p.searchableText.length;
+
+  /// MAIN-FEED IMPRESSION LOGGING (landmine #2). Logs one impression per listing
+  /// SHOWN at/near the top of the deck, so "shown-then-passed" becomes a real
+  /// negative distinct from "never shown". Carries the server [rankFeatures] /
+  /// [abVariant] VERBATIM (parity — landmine #1), the deck [rank], the per-feed
+  /// [_feedSearchId] join key, and the ε-greedy explored flag. Deduped to one row
+  /// per property per feed. Fire-and-forget; never blocks or reorders the deck.
+  void logDeckImpression(RentalProperty property, int rank) {
+    final feedId = _feedSearchId;
+    if (feedId == null ||
+        property.id.isEmpty ||
+        !AwsApiClient.instance.isConfigured) {
+      return;
+    }
+    if (!_loggedDeckImpressions.add(property.id)) return; // one per feed.
+    _deckImpressionCount[property.id] =
+        (_deckImpressionCount[property.id] ?? 0) + 1;
+    // Bound the session map so a long browse can't grow it without limit.
+    if (_deckImpressionCount.length > 2000) {
+      for (final k in _deckImpressionCount.keys
+          .take(_deckImpressionCount.length - 2000)
+          .toList()) {
+        _deckImpressionCount.remove(k);
+      }
+    }
+    unawaited(
+      AwsApiClient.instance.post('/search/log', {
+        'searchId': feedId,
+        'source': 'deck',
+        'ts': DateTime.now().toUtc().toIso8601String(),
+        'impressions': [
+          {
+            'propertyId': property.id,
+            'rank': math.max(0, rank),
+            'explored': property.id == _exploredPropertyId,
+            // VERBATIM server fields — omitted (not faked) when the backend
+            // didn't attach them, e.g. the bundled-asset fallback catalog.
+            if (property.rankFeatures != null)
+              'rankFeatures': property.rankFeatures,
+            if (property.abVariant != null) 'abVariant': property.abVariant,
+          },
+        ],
+      }).catchError((_) => <String, dynamic>{}),
+    );
+  }
+
+  /// Logs impressions for the [_impressionWindow] cards from [from] in [deck]
+  /// (the cards that just surfaced at/near the top). Dedup makes it safe to call
+  /// on every deck build and after every swipe.
+  void logVisibleDeckImpressions(List<RentalProperty> deck, {int from = 0}) {
+    if (from < 0) from = 0;
+    final end = math.min(deck.length, from + _impressionWindow);
+    for (var i = from; i < end; i++) {
+      logDeckImpression(deck[i], i);
+    }
   }
 
   List<RentalProperty>? _ownerLeadsCache;
@@ -2739,12 +2906,16 @@ class DatingProvider extends ChangeNotifier {
   }) {
     _postSearchOutcome(propertyId, 'contact', dwellMs: viewToContactMs);
     // Strongest engagement action for the per-property interaction store.
+    final property = propertyById(propertyId);
     unawaited(InteractionService.instance.record(
       propertyId: propertyId,
       action: 'contact',
       dwellMs: viewToContactMs,
       entrySource: entrySource,
       entryRank: entryRank,
+      // Listing size → backend length-normalizes dwell.
+      mediaCount: property == null ? null : _mediaCountOf(property),
+      descLen: property == null ? null : _descLenOf(property),
     ));
   }
 
@@ -3166,6 +3337,9 @@ class DatingProvider extends ChangeNotifier {
       dwellMs: dwellMs,
       entrySource: 'deck',
       entryRank: entryRank,
+      // Listing size → backend length-normalizes dwell.
+      mediaCount: _mediaCountOf(property),
+      descLen: _descLenOf(property),
     ));
     final ratio = _priceToBudgetRatio(property);
     final liked = direction != SwipeDirection.skip;

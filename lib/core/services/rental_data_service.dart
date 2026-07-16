@@ -262,6 +262,10 @@ class RentalDataService {
       'verificationVideoUrl': data['verificationVideoUrl']?.toString() ?? '',
       'verifiedAt': data['verifiedAt'],
       'createdAt': data['createdAt'] ?? data[r'$createdAt'],
+      // Canonical server ranking signals, threaded VERBATIM (train/serve parity
+      // — landmine #1). `rankFeatures` may arrive as a JSON string or an object.
+      if (_decodeJsonMap(data['rankFeatures']) case final rf?) 'rankFeatures': rf,
+      if (data['abVariant'] != null) 'abVariant': data['abVariant'],
       if (virtualTour != null) 'virtualTour': virtualTour,
       if (_decodeJsonMap(data['panoramaTour']) case final pano?)
         'panoramaTour': pano,
