@@ -46,4 +46,12 @@ PY
 
 SIZE="$(wc -c < "$MODEL" | tr -d ' ')"
 echo "== model.json size: ${SIZE} bytes =="
+
+# Cross-language loop: the JS Lambda scorer must read this Python-trained model.
+if command -v node >/dev/null 2>&1; then
+  node "$(dirname "$0")/_scorer_check.mjs" "$MODEL"
+else
+  echo "WARN: node not found — skipping JS scorer cross-check"
+fi
+
 echo "SELFCHECK PASSED"
