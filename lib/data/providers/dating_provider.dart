@@ -852,8 +852,54 @@ class DatingProvider extends ChangeNotifier {
   ) {
     if (_blockedOwnerNames.contains(property.ownerName)) return false;
     if (_reportedPropertyIds.contains(property.id)) return false;
+    if (!_passesLandlordEligibility(property)) return false;
     return _passesFilters(property, filters, now, area);
   }
+
+  /// F2 client-side audience gate — a best-effort SECOND layer over the
+  /// AUTHORITATIVE server-side cohort gate (GET /properties already filters
+  /// fail-open). Hides an audience-exclusive listing only when the tenant is
+  /// PROVABLY ineligible; every uncertain case fails open (shows it).
+  bool _passesLandlordEligibility(RentalProperty property) {
+    return passesAudienceGate(
+      exclusive: property.exclusiveToAudience,
+      audienceCohorts: property.audienceCohorts,
+      tenantCohort: _resolvedTenantCohort(),
+      isOwner: _belongsToCurrentLandlord(property),
+    );
+  }
+
+  /// Pure decision for the F2 audience gate, extracted for unit testing.
+  /// Returns true (SHOW) unless the listing is [exclusive], has a non-empty
+  /// [audienceCohorts] list, the viewer is not the owner, and [tenantCohort] is
+  /// a KNOWN value that is NOT in that list — the only case that HIDES. All
+  /// unknowns (not exclusive / empty list / owner / null-or-empty cohort) fail
+  /// open, mirroring the server's fail-open contract.
+  static bool passesAudienceGate({
+    required bool exclusive,
+    required List<String> audienceCohorts,
+    required String? tenantCohort,
+    required bool isOwner,
+  }) {
+    if (!exclusive) return true;
+    if (audienceCohorts.isEmpty) return true;
+    if (isOwner) return true;
+    final cohort = tenantCohort?.trim() ?? '';
+    if (cohort.isEmpty) return true; // can't determine cohort → fail open
+    return audienceCohorts.contains(cohort); // known & not targeted → hide
+  }
+
+  /// The tenant's resolved cohort in the landlord AUDIENCE taxonomy
+  /// (young_professional / family / couple / single / …), or null when it can't
+  /// be resolved on-device. TODAY this is always null by necessity: the app
+  /// sends raw cohort SIGNALS (household / religiousStream / carFree / …) to the
+  /// backend `resolveCohort`, which owns the 14-cohort resolution — no single
+  /// authoritative cohort key exists client-side, and guessing one would be a
+  /// fabricated gate. So [passesAudienceGate] is pass-through here and the SERVER
+  /// gate is the real enforcement. When a client-resolved cohort lands, return
+  /// it from this method and the gate above begins enforcing — nothing else
+  /// needs to change.
+  String? _resolvedTenantCohort() => null;
 
   int filteredCountFor(SearchFilters filters) {
     if (_searchAreas.isEmpty) return 0;
@@ -1986,10 +2032,49 @@ class DatingProvider extends ChangeNotifier {
       role: _userRole,
       discoverable: !_isGuestMode,
     ));
+    // Bridge the eligibility-relevant attributes to the backend
+    // `users.searchProfile` that the per-listing gate reads. Best-effort and
+    // non-blocking: fired unawaited and fully swallowing errors inside
+    // updateProfileFields, so it can never block or fail the local save.
+    unawaited(_syncEligibilityFields(updatedProfile));
     AppEvents.instance
       ..setUserId(updatedProfile.id)
       ..log(UserEventType.profileUpdated);
     notifyListeners();
+  }
+
+  // Maps the tenant profile's eligibility-relevant attributes to the backend
+  // searchProfile keys and pushes them via POST /profile/fields. Field map is a
+  // LOCKED contract with the gate:
+  //   occupation  ← occupation (English key), only if non-null
+  //   priceMax    ← budgetMax
+  //   numChildren ← numChildren (only if non-null)
+  //   hasPets     ← hasPets (only if non-null)
+  //   carFree     ← !hasCar   (INVERTED; omitted when hasCar is null)
+  //   wfh              ← wfh              (1:1, only if non-null)
+  //   household        ← household        (English key, only if non-null)
+  //   lifeStage        ← lifeStage        (English key, only if non-null)
+  //   isOleh           ← isOleh           (1:1, only if non-null)
+  //   age              ← age              (only if non-null)
+  //   accessibilityNeed← accessibilityNeed(1:1, only if non-null)
+  // Fully fail-soft: updateProfileFields swallows all errors, so this never
+  // blocks the local save.
+  Future<void> _syncEligibilityFields(TenantProfile profile) async {
+    final fields = <String, dynamic>{
+      'priceMax': profile.budgetMax,
+      if (profile.occupation != null) 'occupation': profile.occupation,
+      if (profile.numChildren != null) 'numChildren': profile.numChildren,
+      if (profile.hasPets != null) 'hasPets': profile.hasPets,
+      if (profile.hasCar != null) 'carFree': !profile.hasCar!,
+      if (profile.wfh != null) 'wfh': profile.wfh,
+      if (profile.household != null) 'household': profile.household,
+      if (profile.lifeStage != null) 'lifeStage': profile.lifeStage,
+      if (profile.isOleh != null) 'isOleh': profile.isOleh,
+      if (profile.age != null) 'age': profile.age,
+      if (profile.accessibilityNeed != null)
+        'accessibilityNeed': profile.accessibilityNeed,
+    };
+    await AwsApiClient.instance.updateProfileFields(fields);
   }
 
   // Binds the in-memory profile to the real Firebase UID and pulls the user's

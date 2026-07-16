@@ -4,6 +4,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
+import 'package:dating_app/core/services/audience_service.dart';
 import 'package:dating_app/core/services/israel_locations.dart';
 import 'package:dating_app/core/services/legal_consent_service.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
@@ -17,6 +18,7 @@ import 'package:dating_app/presentation/features/panorama/panorama_capture_scree
 import 'package:dating_app/presentation/features/pricing/fair_rent_hint.dart';
 import 'package:dating_app/presentation/features/scan3d/room_scan_flow.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/widgets/eligibility_editor_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -60,6 +62,36 @@ final List<String> _propertyFeatureLabels = PropertyFeatureCatalog.allLabels;
 // full asking price rather than a monthly rent, so they need a much wider range.
 const int _kMaxSalePrice = 20000000; // 20M ₪
 
+// The 14 tenant cohorts (F1 audience targeting): stable backend key → Hebrew
+// label shown to the landlord. Keys MUST match the taxonomy the /audience/suggest
+// endpoint and the match engine use, so a suggested cohort merges cleanly into
+// the landlord's declared picks.
+const List<(String, String)> _audienceCohortOptions = [
+  ('family', 'משפחה'),
+  ('couple', 'זוג'),
+  ('single', 'רווק/ה'),
+  ('young_professional', 'צעיר/ה מקצועי/ת'),
+  ('student', 'סטודנט/ית'),
+  ('new_parents', 'הורים טריים'),
+  ('single_parent', 'הורה יחיד'),
+  ('remote', 'עובד/ת מרחוק'),
+  ('senior', 'גיל הזהב'),
+  ('oleh', 'עולה חדש'),
+  ('arab_family', 'משפחה ערבית'),
+  ('charedi', 'חרדי'),
+  ('dati_leumi', 'דתי-לאומי'),
+  ('investor', 'משקיע'),
+];
+
+// Hebrew label for a cohort key; falls back to the raw key for any unknown
+// cohort the backend might return so nothing renders blank.
+String _audienceCohortLabel(String key) {
+  for (final option in _audienceCohortOptions) {
+    if (option.$1 == key) return option.$2;
+  }
+  return key;
+}
+
 PropertyLegal _buildPropertyLegal({
   required bool acceptedTerms,
   required bool thirdPartyTransferAllowed,
@@ -101,7 +133,13 @@ class AddPropertyScreen extends StatefulWidget {
 }
 
 class _AddPropertyScreenState extends State<AddPropertyScreen> {
-  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'מדיה'];
+  static const _stepLabels = [
+    'מיקום',
+    'פרטי הנכס',
+    'מאפיינים',
+    'קהל יעד',
+    'מדיה'
+  ];
 
   final _pageCtrl = PageController();
   int _step = 0;
@@ -136,6 +174,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   // Where the (broker) listing is advertised. Rently is ON by default — you're
   // publishing here; brokers can also mark other channels for their own tracking.
   final Set<String> _publishChannels = {'rently'};
+  // F1/F2 audience targeting.
+  final _audienceNoteCtrl = TextEditingController();
+  final Set<String> _audienceCohorts = {};
+  List<AudienceSuggestion> _audienceSuggested = const [];
+  bool _exclusiveToAudience = false;
+  // F3 per-listing tenant-eligibility criteria.
+  EligibilityConfig _eligibility = const EligibilityConfig();
+  bool _isSuggestingAudience = false;
   bool _isSaving = false;
   bool _isSubmittingTour = false;
   bool _isScanSubmitting = false;
@@ -251,6 +297,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     _totalFloorsCtrl.dispose();
     _sizeCtrl.dispose();
     _entryDateCtrl.dispose();
+    _audienceNoteCtrl.dispose();
     for (final item in _mediaDrafts) {
       item.dispose();
     }
@@ -331,7 +378,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         return size > 0 &&
             _price > 0 &&
             _rooms > 0;
-      case 3:
+      case 4:
         if (_wantsVerifiedListing) {
           return _verificationVideoUrl.isNotEmpty;
         }
@@ -352,7 +399,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
       return;
     }
-    if (_step < 3) {
+    if (_step < 4) {
       setState(() => _step++);
       _pageCtrl.nextPage(
         duration: const Duration(milliseconds: 320),
@@ -797,6 +844,54 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     );
   }
 
+  // Ask the backend which cohorts fit this listing. Fail-soft (AudienceService
+  // returns [] on any error), so the wizard never blocks on it.
+  Future<void> _requestAudienceSuggestions() async {
+    if (_isSuggestingAudience) return;
+    setState(() => _isSuggestingAudience = true);
+    try {
+      final suggestions = await AudienceService.instance.suggest(
+        price: _price,
+        rooms: _rooms,
+        sizeM2: int.tryParse(_sizeCtrl.text.trim()) ?? 0,
+        city: _cityCtrl.text.trim(),
+        neighborhood: _neighborhoodCtrl.text.trim(),
+        propertyType: _propertyType,
+        condition: _condition,
+        featureLabels: _selectedFeatures.toList(),
+        declaredCohorts: _audienceCohorts.toList(),
+        note: _audienceNoteCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() => _audienceSuggested = suggestions);
+    } finally {
+      if (mounted) setState(() => _isSuggestingAudience = false);
+    }
+  }
+
+  void _toggleAudienceCohort(String key) {
+    setState(() {
+      if (_audienceCohorts.contains(key)) {
+        _audienceCohorts.remove(key);
+      } else {
+        _audienceCohorts.add(key);
+      }
+    });
+  }
+
+  // F3: open the eligibility editor sheet pre-filled from the current draft and
+  // merge the returned rules back in (preserving the master enabled flag).
+  Future<void> _openEligibilityEditor() async {
+    final rules = await showEligibilityEditor(context, initial: _eligibility);
+    if (rules == null || !mounted) return;
+    setState(() {
+      _eligibility = EligibilityConfig(
+        enabled: _eligibility.enabled,
+        rules: rules,
+      );
+    });
+  }
+
   Future<void> _save() async {
     // SEC-rate: prevent property spam
     if (!RateLimiter.instance.allowPropertyAdd()) {
@@ -976,6 +1071,13 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         verification: verification,
         designTemplate: _designTemplate,
         designAccent: _designAccent,
+        audienceCohorts: _audienceCohorts.toList(),
+        audienceNote: _audienceNoteCtrl.text.trim().isEmpty
+            ? null
+            : _audienceNoteCtrl.text.trim(),
+        audienceSuggested: _audienceSuggested,
+        exclusiveToAudience: _exclusiveToAudience,
+        eligibility: _eligibility,
         createdAt: DateTime.now(),
       );
 
@@ -1071,7 +1173,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             preferredSize: const Size.fromHeight(64),
             child: _StepIndicator(
               step: _step,
-              total: 4,
+              total: 5,
               labels: _stepLabels,
             ),
           ),
@@ -1140,6 +1242,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 }
               }),
             ),
+            _StepAudience(
+              noteCtrl: _audienceNoteCtrl,
+              selectedCohorts: _audienceCohorts,
+              onToggleCohort: _toggleAudienceCohort,
+              suggestions: _audienceSuggested,
+              isSuggesting: _isSuggestingAudience,
+              onRequestSuggestions: _requestAudienceSuggestions,
+              exclusiveToAudience: _exclusiveToAudience,
+              onExclusiveChanged: (v) =>
+                  setState(() => _exclusiveToAudience = v),
+            ),
             _StepPhotos(
               mediaDrafts: _mediaDrafts,
               virtualTourDraft: _virtualTourDraft,
@@ -1197,12 +1310,20 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 _mediaDrafts[i].dispose();
                 _mediaDrafts.removeAt(i);
               }),
+              eligibility: _eligibility,
+              onEligibilityEnabledChanged: (v) => setState(() {
+                _eligibility = EligibilityConfig(
+                  enabled: v,
+                  rules: _eligibility.rules,
+                );
+              }),
+              onEditEligibility: _openEligibilityEditor,
             ),
           ],
         ),
         bottomNavigationBar: _WizardNavBar(
           step: _step,
-          total: 4,
+          total: 5,
           isLoading: _isSaving,
           onNext: _next,
           onPrev: _prev,
@@ -2315,7 +2436,415 @@ class _StepFeatures extends StatelessWidget {
   }
 }
 
-// ─── Step 4: Photos ───────────────────────────────────────────────────────────
+// ─── Step 4: Audience (F1/F2) ─────────────────────────────────────────────────
+
+class _StepAudience extends StatelessWidget {
+  const _StepAudience({
+    required this.noteCtrl,
+    required this.selectedCohorts,
+    required this.onToggleCohort,
+    required this.suggestions,
+    required this.isSuggesting,
+    required this.onRequestSuggestions,
+    required this.exclusiveToAudience,
+    required this.onExclusiveChanged,
+  });
+
+  final TextEditingController noteCtrl;
+  final Set<String> selectedCohorts;
+  final ValueChanged<String> onToggleCohort;
+  final List<AudienceSuggestion> suggestions;
+  final bool isSuggesting;
+  final VoidCallback onRequestSuggestions;
+  final bool exclusiveToAudience;
+  final ValueChanged<bool> onExclusiveChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only surface suggestions the landlord hasn't already picked — a suggested
+    // cohort that's now declared just disappears from the "add" row (the Set of
+    // declared cohorts is the single source of truth, so there are no dupes).
+    final pendingSuggestions =
+        suggestions.where((s) => !selectedCohorts.contains(s.cohort)).toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 130),
+      children: [
+        _SectionHint(
+          icon: IconsaxPlusLinear.people,
+          title: 'למי הדירה מתאימה?',
+          subtitle: 'עוזר לנו להראות את הדירה לשוכרים הנכונים',
+        ),
+        const SizedBox(height: 16),
+        _FormCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'תיאור חופשי',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteCtrl,
+                maxLines: 3,
+                minLines: 2,
+                maxLength: 240,
+                textInputAction: TextInputAction.newline,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'תאר/י בכמה מילים למי הדירה הכי מתאימה',
+                  hintStyle: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  filled: true,
+                  fillColor: AppColors.background,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppColors.borderLight),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: AppColors.borderLight),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide:
+                        BorderSide(color: AppColors.primary, width: 1.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _SectionHint(
+          icon: IconsaxPlusLinear.user_tag,
+          title: 'קהלי יעד',
+          subtitle: 'בחר/י את הקהלים שהדירה מתאימה להם',
+        ),
+        const SizedBox(height: 12),
+        _FormCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (selectedCohorts.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '${selectedCohorts.length} קהלים נבחרו',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 10,
+                children: _audienceCohortOptions.map((option) {
+                  final key = option.$1;
+                  final selected = selectedCohorts.contains(key);
+                  return _AudienceChip(
+                    label: option.$2,
+                    selected: selected,
+                    onTap: () => onToggleCohort(key),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // AI suggestion CTA + results.
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: isSuggesting ? null : onRequestSuggestions,
+            icon: isSuggesting
+                ? SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.primary),
+                  )
+                : Icon(IconsaxPlusLinear.magic_star,
+                    size: 18, color: AppColors.primary),
+            label: Text(isSuggesting ? 'מחפש קהלים...' : 'הצע לי קהלים נוספים'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary, width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+        ),
+        if (suggestions.isNotEmpty && pendingSuggestions.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text(
+              'כל הקהלים שהוצעו כבר נבחרו',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        if (pendingSuggestions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _FormCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'קהלים מוצעים · הקש/י כדי להוסיף',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final s in pendingSuggestions)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _SuggestedAudienceRow(
+                      suggestion: s,
+                      onAdd: () => onToggleCohort(s.cohort),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        // F2 exclusivity control.
+        _SectionHint(
+          icon: IconsaxPlusLinear.eye,
+          title: 'חשיפת הדירה',
+          subtitle: 'בקרה על מי רואה את המודעה',
+        ),
+        const SizedBox(height: 12),
+        _FormCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'הצג את הדירה רק לשוכרים מתאימים',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: exclusiveToAudience,
+                    onChanged: onExclusiveChanged,
+                    activeColor: AppColors.primary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'שוכרים שאינם באחד הקהלים שבחרת לא יראו את המודעה בכלל.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
+              ),
+              if (exclusiveToAudience && selectedCohorts.isEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.coral.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: AppColors.coral.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(IconsaxPlusLinear.info_circle,
+                          size: 16, color: AppColors.coral),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'לא נבחרו קהלים — אף שוכר לא יראה את המודעה. בחר/י לפחות קהל אחד.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.coral,
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// A cohort selection pill — same idiom as the feature pills in _StepFeatures.
+class _AudienceChip extends StatelessWidget {
+  const _AudienceChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.background,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.borderLight,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.check_rounded : Icons.person_outline,
+              size: 16,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// One model-suggested cohort: Hebrew label + confidence + reason, tappable to
+// add it into the landlord's declared picks.
+class _SuggestedAudienceRow extends StatelessWidget {
+  const _SuggestedAudienceRow({
+    required this.suggestion,
+    required this.onAdd,
+  });
+  final AudienceSuggestion suggestion;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (suggestion.confidence.clamp(0, 1) * 100).round();
+    return GestureDetector(
+      onTap: onAdd,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.add_circle_outline,
+                size: 20, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        _audienceCohortLabel(suggestion.cohort),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.navy,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$pct% התאמה',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (suggestion.reason.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      suggestion.reason,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Step 5: Photos ───────────────────────────────────────────────────────────
 
 class _StepPhotos extends StatelessWidget {
   const _StepPhotos({
@@ -2356,6 +2885,9 @@ class _StepPhotos extends StatelessWidget {
     required this.onAiTrainingChanged,
     required this.onAddMediaUrl,
     required this.onRemoveMedia,
+    this.eligibility,
+    this.onEligibilityEnabledChanged,
+    this.onEditEligibility,
   });
   final List<_PropertyMediaDraft> mediaDrafts;
   final PropertyVirtualTour? virtualTourDraft;
@@ -2394,6 +2926,13 @@ class _StepPhotos extends StatelessWidget {
   final ValueChanged<bool> onAiTrainingChanged;
   final void Function(String url, PropertyMediaType type) onAddMediaUrl;
   final ValueChanged<int> onRemoveMedia;
+
+  /// Per-listing tenant-eligibility config (F3). When non-null the last step
+  /// renders the eligibility entry card (master switch + editor button). Null in
+  /// flows that don't expose the feature.
+  final EligibilityConfig? eligibility;
+  final ValueChanged<bool>? onEligibilityEnabledChanged;
+  final VoidCallback? onEditEligibility;
 
   void _showMediaPickerSheet(BuildContext context) {
     showModalBottomSheet<void>(
@@ -2661,6 +3200,22 @@ class _StepPhotos extends StatelessWidget {
             ],
           ),
         ),
+        if (eligibility != null &&
+            onEligibilityEnabledChanged != null &&
+            onEditEligibility != null) ...[
+          const SizedBox(height: 20),
+          const _SectionHint(
+            icon: IconsaxPlusLinear.filter_search,
+            title: 'קריטריונים לשוכר',
+            subtitle: 'הגדר/י מי רואה את הדירה לפי תנאי סף',
+          ),
+          const SizedBox(height: 12),
+          EligibilityEntryCard(
+            config: eligibility!,
+            onEnabledChanged: onEligibilityEnabledChanged!,
+            onEdit: onEditEligibility!,
+          ),
+        ],
       ],
     );
   }
@@ -4736,7 +5291,13 @@ class EditPropertyScreen extends StatefulWidget {
 }
 
 class _EditPropertyScreenState extends State<EditPropertyScreen> {
-  static const _stepLabels = ['מיקום', 'פרטי הנכס', 'מאפיינים', 'מדיה'];
+  static const _stepLabels = [
+    'מיקום',
+    'פרטי הנכס',
+    'מאפיינים',
+    'קהל יעד',
+    'מדיה'
+  ];
 
   final _pageCtrl = PageController();
   int _step = 0;
@@ -4765,6 +5326,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late int _designAccent;
   late final Set<String> _selectedFeatures;
   late final Set<String> _publishChannels;
+  // F1/F2 audience targeting.
+  late final TextEditingController _audienceNoteCtrl;
+  late final Set<String> _audienceCohorts;
+  late List<AudienceSuggestion> _audienceSuggested;
+  late bool _exclusiveToAudience;
+  // F3 per-listing tenant-eligibility criteria.
+  late EligibilityConfig _eligibility;
+  bool _isSuggestingAudience = false;
   bool _isSaving = false;
   bool _isSubmittingTour = false;
   bool _isScanSubmitting = false;
@@ -4775,6 +5344,20 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   PropertyPanoramaTour? _panoramaTourDraft;
   List<ScannedRoom> _roomScans = const [];
   Timer? _scanPollTimer;
+
+  // Opens the eligibility editor sheet (F3), pre-filled from the current draft,
+  // and folds the returned rule list back into _eligibility (keeping the master
+  // enabled flag). Cancelling leaves the draft untouched.
+  Future<void> _openEligibilityEditor() async {
+    final rules = await showEligibilityEditor(context, initial: _eligibility);
+    if (rules == null || !mounted) return;
+    setState(() {
+      _eligibility = EligibilityConfig(
+        enabled: _eligibility.enabled,
+        rules: rules,
+      );
+    });
+  }
 
   // Opens the per-room 3D scan flow on the EDIT screen. Mirrors the add
   // screen's _openRoomScan: keeps the rooms in screen state and surfaces the
@@ -4866,6 +5449,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _publishChannels = p.publishChannels.isEmpty
         ? <String>{'rently'}
         : Set<String>.from(p.publishChannels);
+    _audienceNoteCtrl = TextEditingController(text: p.audienceNote ?? '');
+    _audienceCohorts = Set<String>.from(p.audienceCohorts);
+    _audienceSuggested = List<AudienceSuggestion>.from(p.audienceSuggested);
+    _exclusiveToAudience = p.exclusiveToAudience;
+    _eligibility = p.eligibility;
     _virtualTourDraft = p.virtualTour;
     _panoramaTourDraft = p.panoramaTour;
     _scanTourDraft = null;
@@ -4898,6 +5486,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _totalFloorsCtrl.dispose();
     _sizeCtrl.dispose();
     _entryDateCtrl.dispose();
+    _audienceNoteCtrl.dispose();
     for (final item in _mediaDrafts) {
       item.dispose();
     }
@@ -4978,7 +5567,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         return size > 0 &&
             _price > 0 &&
             _rooms > 0;
-      case 3:
+      case 4:
         if (_wantsVerifiedListing) {
           return _verificationVideoUrl.isNotEmpty;
         }
@@ -4999,7 +5588,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       );
       return;
     }
-    if (_step < 3) {
+    if (_step < 4) {
       setState(() => _step++);
       _pageCtrl.nextPage(
         duration: const Duration(milliseconds: 320),
@@ -5355,6 +5944,40 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     );
   }
 
+  // Fail-soft cohort suggestions (see the add-screen twin).
+  Future<void> _requestAudienceSuggestions() async {
+    if (_isSuggestingAudience) return;
+    setState(() => _isSuggestingAudience = true);
+    try {
+      final suggestions = await AudienceService.instance.suggest(
+        price: _price,
+        rooms: _rooms,
+        sizeM2: int.tryParse(_sizeCtrl.text.trim()) ?? 0,
+        city: _cityCtrl.text.trim(),
+        neighborhood: _neighborhoodCtrl.text.trim(),
+        propertyType: _propertyType,
+        condition: _condition,
+        featureLabels: _selectedFeatures.toList(),
+        declaredCohorts: _audienceCohorts.toList(),
+        note: _audienceNoteCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() => _audienceSuggested = suggestions);
+    } finally {
+      if (mounted) setState(() => _isSuggestingAudience = false);
+    }
+  }
+
+  void _toggleAudienceCohort(String key) {
+    setState(() {
+      if (_audienceCohorts.contains(key)) {
+        _audienceCohorts.remove(key);
+      } else {
+        _audienceCohorts.add(key);
+      }
+    });
+  }
+
   Future<void> _save() async {
     final city = _cityCtrl.text.trim();
     final street = _streetCtrl.text.trim();
@@ -5475,6 +6098,13 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         isActive: _isActive,
         designTemplate: _designTemplate,
         designAccent: _designAccent,
+        audienceCohorts: _audienceCohorts.toList(),
+        audienceNote: _audienceNoteCtrl.text.trim().isEmpty
+            ? null
+            : _audienceNoteCtrl.text.trim(),
+        audienceSuggested: _audienceSuggested,
+        exclusiveToAudience: _exclusiveToAudience,
+        eligibility: _eligibility,
         createdAt: widget.property.createdAt,
       );
 
@@ -5523,7 +6153,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
-          child: _StepIndicator(step: _step, total: 4, labels: _stepLabels),
+          child: _StepIndicator(step: _step, total: 5, labels: _stepLabels),
         ),
       ),
       body: Column(
@@ -5592,6 +6222,17 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                     }
                   }),
                 ),
+                _StepAudience(
+                  noteCtrl: _audienceNoteCtrl,
+                  selectedCohorts: _audienceCohorts,
+                  onToggleCohort: _toggleAudienceCohort,
+                  suggestions: _audienceSuggested,
+                  isSuggesting: _isSuggestingAudience,
+                  onRequestSuggestions: _requestAudienceSuggestions,
+                  exclusiveToAudience: _exclusiveToAudience,
+                  onExclusiveChanged: (v) =>
+                      setState(() => _exclusiveToAudience = v),
+                ),
                 _StepPhotos(
                   mediaDrafts: _mediaDrafts,
                   virtualTourDraft: _virtualTourDraft,
@@ -5650,6 +6291,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                     _mediaDrafts[i].dispose();
                     _mediaDrafts.removeAt(i);
                   }),
+                  eligibility: _eligibility,
+                  onEligibilityEnabledChanged: (v) => setState(() {
+                    _eligibility = EligibilityConfig(
+                      enabled: v,
+                      rules: _eligibility.rules,
+                    );
+                  }),
+                  onEditEligibility: _openEligibilityEditor,
                 ),
               ],
             ),
@@ -5658,7 +6307,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       ),
       bottomNavigationBar: _EditPropertyFooter(
         step: _step,
-        total: 4,
+        total: 5,
         isLoading: _isSaving,
         saveLabel: 'עדכון הנכס',
         onNext: _next,

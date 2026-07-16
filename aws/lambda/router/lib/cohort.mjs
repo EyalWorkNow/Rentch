@@ -104,3 +104,55 @@ export function resolveCohortFrom(query, profile) {
   if (fromQuery) return fromQuery;
   return cohortFromSignals({ ...profileSignals(profile), ...definedOnly(qs) });
 }
+
+// ── Audience targeting (Phase — landlord-declared cohorts) ───────────────────
+// The complete set of valid cohort keys cohortFromSignals can return. Shared as
+// the single source of truth for: validating landlord-declared audiences, the
+// Gemini suggestion enum, and the visibility gate below.
+export const COHORT_KEYS = [
+  'investor', 'arab_family', 'oleh', 'charedi', 'dati_leumi', 'senior',
+  'single_parent', 'new_parents', 'remote', 'student', 'young_professional',
+  'family', 'couple', 'single',
+];
+
+// Short Hebrew definition per cohort — fed to Gemini so the audience-suggestion
+// prompt reasons over a well-defined taxonomy (not free-association).
+export const COHORT_DEFS = {
+  investor: 'משקיע/ת נדל"ן — קונה לתשואה/השקעה, לא למגורים עצמיים',
+  arab_family: 'משפחה ערבית — קרבה לקהילה ולשירותים ערביים',
+  oleh: 'עולים חדשים / דוברי אנגלית או צרפתית, קהילה תומכת קליטה',
+  charedi: 'משפחה חרדית — בית כנסת, מוסדות חרדיים, אופי שכונה דתי',
+  dati_leumi: 'משפחה דתית-לאומית — עירוב, בתי כנסת, מוסדות דתיים-לאומיים',
+  senior: 'גיל שלישי / צרכי נגישות — מעלית, קומה נמוכה, קרבה למרפאות',
+  single_parent: 'הורה יחיד/ה — קרבה לתחבורה, גנים ובתי ספר, ללא רכב',
+  new_parents: 'הורים טריים / הריון — שקט, מרחב לתינוק, קרבה לגנים',
+  remote: 'עובד/ת מהבית (סינגל/צעיר) — חדר עבודה, אינטרנט, שקט ביום',
+  student: 'סטודנט/ית — מחיר נמוך, קרבה לקמפוס ולתחבורה, שותפים',
+  young_professional: 'צעיר/ה מקצועי/ת — עיר תוססת, חיי לילה, קרבה למרכז',
+  family: 'משפחה (כללי) — מספר חדרים, קרבה לבתי ספר, שכונה שקטה',
+  couple: 'זוג — 2-3 חדרים, שכונה נעימה',
+  single: 'רווק/ה — יחידה קטנה, גמישות, מיקום נוח',
+};
+
+// Fail-OPEN visibility gate for the tenant-facing catalog. Pure + dependency-free
+// so it unit-tests without aws-sdk. A listing is HIDDEN from a caller ONLY when
+// ALL of these hold — otherwise it is always shown:
+//   • listing.exclusiveToAudience === true, AND
+//   • listing.audienceCohorts is a non-empty array, AND
+//   • the caller is NOT the listing owner, AND
+//   • the caller's resolved cohort is a non-empty KNOWN cohort key, AND
+//   • that cohort is NOT in listing.audienceCohorts.
+// Any missing/unknown signal (null cohort, unknown cohort, empty audience, not
+// exclusive, owner viewing own listing) → visible. Never throws.
+export function isListingVisibleToCohort(listing, callerCohort, callerUid) {
+  if (!listing || typeof listing !== 'object') return true;
+  if (listing.exclusiveToAudience !== true) return true;       // not restricted
+  // Owner always sees their own listing (never hide a landlord's row from them).
+  if (callerUid && listing.ownerUserId &&
+      String(listing.ownerUserId) === String(callerUid)) return true;
+  const audience = Array.isArray(listing.audienceCohorts) ? listing.audienceCohorts : [];
+  if (audience.length === 0) return true;                      // no audience → open
+  if (!callerCohort || typeof callerCohort !== 'string') return true; // unknown → open
+  if (!COHORT_KEYS.includes(callerCohort)) return true;        // unrecognized → open
+  return audience.includes(callerCohort);                      // gate on membership
+}

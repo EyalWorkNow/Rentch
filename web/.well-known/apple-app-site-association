@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "ARFSXMWT96.com.eyalatiyawork.rentch",
+        "paths": [ "/prod/p/*" ]
+      }
+    ]
+  }
+}

@@ -37,7 +37,9 @@ import { readFileSync } from 'node:fs';
 import { scoreListings } from './lib/ranking.mjs';
 import {
   querySignals, cohortFromSignals, resolveCohortFrom,
+  COHORT_KEYS, COHORT_DEFS, isListingVisibleToCohort,
 } from './lib/cohort.mjs';
+import { passesEligibility } from './lib/eligibility.mjs';
 
 // ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
 // These modules live in ./lib and expose the Israeli-data spine used to enrich a
@@ -595,6 +597,20 @@ async function enrichListingOnCreate(body) {
     }
   })());
 
+  // 1b) Audience suggestions — best-effort, only when the landlord gave us
+  // something to reason from (a note and/or declared cohorts) and the client
+  // didn't already supply suggestions. Fail-soft: a missing field just stays out.
+  tasks.push((async () => {
+    try {
+      if (Array.isArray(body.audienceSuggested)) return; // client already populated
+      const declaredCohorts = Array.isArray(body.audienceCohorts) ? body.audienceCohorts : [];
+      const note = (body.audienceNote || '').toString();
+      if (!declaredCohorts.length && !note.trim()) return; // nothing to reason from
+      const sug = await suggestAudienceCohorts({ listing: body, declaredCohorts, note });
+      if (sug && sug.length) body.audienceSuggested = sug;
+    } catch (e) { console.warn('enrich: audienceSuggested failed:', e.message); }
+  })());
+
   // 2→4) Geo chain: geocode first (lat/lng feed the other two), then price badge
   // + neighbourhood score in parallel. Uses the lazily-loaded Connectors.
   tasks.push((async () => {
@@ -708,6 +724,118 @@ async function extractSmartTags(body) {
     if (tags.length >= 12) break;
   }
   return tags;
+}
+
+// ── Audience cohort suggestion ───────────────────────────────────────────────
+// Reasons over the 14-cohort taxonomy + the listing's own data + the cohorts the
+// landlord already declared + their free-text note, and proposes ADDITIONAL
+// relevant cohorts (never repeating a declared one), each with a 0-1 confidence
+// and a one-line Hebrew reason. Pure best-effort: returns [] on any GPT/parse
+// error or a missing key, so it NEVER blocks a publish or 500s a request.
+// Runs on OpenAI (GPT) — same model as אתי — NOT Gemini.
+// Shared by POST /audience/suggest and enrichListingOnCreate.
+async function suggestAudienceCohorts({ listing, declaredCohorts, note }) {
+  if (!OPENAI_API_KEY) return [];
+  const l = (listing && typeof listing === 'object') ? listing : {};
+  const declared = (Array.isArray(declaredCohorts) ? declaredCohorts : [])
+    .filter((c) => COHORT_KEYS.includes(c));
+  const declaredSet = new Set(declared);
+  const noteText = (note || '').toString().slice(0, 500);
+
+  // Compact listing summary for the model (only the fields that inform targeting).
+  const feats = Array.isArray(l.featureLabels) ? l.featureLabels
+    : (Array.isArray(l.features) ? l.features
+      : (Array.isArray(l.smartTags) ? l.smartTags : (Array.isArray(l.tags) ? l.tags : [])));
+  const summary = {
+    price: num(l.price), rooms: num(l.rooms), sizeM2: num(l.sizeM2),
+    city: (l.city || '').toString().slice(0, 60),
+    neighborhood: (l.neighborhood || '').toString().slice(0, 60),
+    propertyType: (l.propertyType || '').toString().slice(0, 40),
+    condition: (l.condition || '').toString().slice(0, 40),
+    features: (Array.isArray(feats) ? feats : []).slice(0, 30)
+      .map((x) => String(x).slice(0, 40)),
+  };
+
+  // The taxonomy, with a short Hebrew definition per key, so the model reasons
+  // over a closed, well-defined set (the enum then hard-limits the output keys).
+  const taxonomy = COHORT_KEYS.map((k) => `- ${k}: ${COHORT_DEFS[k]}`).join('\n');
+  const sys =
+    'אתה יועץ שיווק לדירות להשכרה בישראל. יש לך טקסונומיה סגורה של 14 קהלי יעד. '
+    + 'בהינתן נתוני דירה, הקהלים שבעל הדירה כבר בחר, והערה חופשית שלו — הצע קהלים '
+    + 'נוספים ורלוונטיים שהוא לא בחר. אל תחזור על קהל שכבר נבחר. השתמש אך ורק '
+    + 'במפתחות מהרשימה (בשדה cohort). לכל הצעה: confidence בין 0 ל-1 ו-reason משפט '
+    + 'קצר אחד בעברית המנמק מדוע הדירה מתאימה לקהל הזה, מבוסס על הנתונים בלבד. אל '
+    + 'תמציא עובדות. החזר עד 5 הצעות, מהחזק לחלש. '
+    + 'החזר אך ורק אובייקט JSON תקין בפורמט '
+    + '{"suggestions":[{"cohort":"<key>","confidence":<0-1>,"reason":"<טקסט>"}]} '
+    + 'ללא טקסט נוסף וללא סימוני markdown.'
+    + `\n\nהקהלים:\n${taxonomy}`;
+  const userMsg =
+    `נתוני הדירה: ${JSON.stringify(summary)}\n`
+    + `קהלים שבעל הדירה כבר בחר: ${JSON.stringify(declared)}\n`
+    + `הערה חופשית של בעל הדירה: ${noteText || '(אין)'}`;
+
+  try {
+    const text = await openaiChat(sys, [{ role: 'user', text: userMsg }]);
+    // Strip an accidental ```json fence the model might add, then parse.
+    const clean = (text || '')
+      .replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+    const parsed = clean ? JSON.parse(clean) : {};
+    const raw = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const seen = new Set();
+    const out = [];
+    for (const s of raw) {
+      const cohort = String(s?.cohort || '');
+      if (!COHORT_KEYS.includes(cohort)) continue; // only valid keys
+      if (declaredSet.has(cohort) || seen.has(cohort)) continue; // ADDITIONAL only, dedupe
+      let confidence = Number(s?.confidence);
+      if (!Number.isFinite(confidence)) confidence = 0.5;
+      confidence = Math.max(0, Math.min(1, confidence)); // clamp 0-1
+      const reason = String(s?.reason || '').trim().slice(0, 200);
+      seen.add(cohort);
+      out.push({ cohort, confidence, reason });
+    }
+    out.sort((a, b) => b.confidence - a.confidence); // strongest first
+    return out.slice(0, 5); // cap
+  } catch (e) {
+    console.warn('suggestAudienceCohorts failed:', e.message);
+    return [];
+  }
+}
+
+// POST /audience/suggest — auth-gated wrapper around suggestAudienceCohorts.
+// Never 500s the client: a Gemini/parse failure degrades to { suggestions: [] }.
+async function handleAudienceSuggest(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const listing = (body.listing && typeof body.listing === 'object') ? body.listing : {};
+  const declaredCohorts = Array.isArray(body.declaredCohorts) ? body.declaredCohorts : [];
+  const note = (body.note || '').toString();
+  const suggestions = await suggestAudienceCohorts({ listing, declaredCohorts, note });
+  return json(200, { suggestions });
+}
+
+// POST /profile/fields — a direct client→searchProfile write, so a real tenant
+// who never chats with the assistant can still populate the profile the
+// per-listing eligibility gate reads. Body: { fields: { <field>: <value>, ... } }.
+// Only allowlisted (PROFILE_WRITABLE_FIELDS) keys are written; the rest are
+// silently ignored. Confidence 0.9 / source 'profile'. Never 500s: fail-soft to
+// { saved: 0 } on any error.
+async function handleProfileFields(event) {
+  try {
+    const uid = callerUidOf(event);
+    if (!uid) return json(401, { message: 'Authentication required.' });
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    const fields = (body.fields && typeof body.fields === 'object') ? body.fields : {};
+    const saved = await saveUserProfileFields(uid, fields, 0.9, 'profile');
+    return json(200, { saved });
+  } catch (e) {
+    console.warn('handleProfileFields failed:', e.message);
+    return json(200, { saved: 0 });
+  }
 }
 
 // ── Instant saved-search alerts ──────────────────────────────────────────────
@@ -1182,6 +1310,22 @@ export const handler = async (event) => {
       return await handleMatchLeads(event);
     }
 
+    // ── Audience cohort suggestion (landlord targeting) ─────────────────────
+    // POST /audience/suggest → given a draft listing + the cohorts the landlord
+    // already picked + a free-text note, Gemini proposes ADDITIONAL relevant
+    // cohorts (each with confidence + one-line Hebrew reason). Fail-soft → [].
+    if (segments[0] === 'audience' && segments[1] === 'suggest' && method === 'POST') {
+      return await handleAudienceSuggest(event);
+    }
+
+    // ── Direct tenant profile write (feeds the eligibility gate) ─────────────
+    // POST /profile/fields → { fields: {<field>:<value>,...} }. Writes allowlisted
+    // keys to the caller's users.searchProfile (conf 0.9, source 'profile') so
+    // non-chatting tenants aren't hidden from gated listings. Returns { saved:n }.
+    if (segments[0] === 'profile' && segments[1] === 'fields' && method === 'POST') {
+      return await handleProfileFields(event);
+    }
+
     // ── Ranker impression log (LightGBM training data) ──────────────────────
     // POST /search/log → append per-impression feature vectors + outcomes.
     if (segments[0] === 'search' && segments[1] === 'log' && method === 'POST') {
@@ -1358,7 +1502,14 @@ export const handler = async (event) => {
             // Query params are checked first; the profile is loaded only if they
             // don't already determine the cohort. Fail-soft → null → default.
             const cohort = await resolveCohort(query, callerUid).catch(() => null);
-            return await attachRankSignals(listed, query, cohort);
+            // FAIL-OPEN audience gate: drop listings a landlord marked exclusive to
+            // cohorts this caller isn't in — but never hide a landlord's own rows,
+            // and never hide anything when the cohort/audience signal is missing.
+            const gated = applyAudienceGate(listed, cohort, callerUid);
+            // Per-listing eligibility gate: hide listings whose landlord-defined
+            // tenant criteria this caller fails (never the caller's own rows).
+            const eligible = await applyEligibilityGate(gated, callerUid);
+            return await attachRankSignals(eligible, query, cohort);
           }
           return listed;
         }
@@ -1672,6 +1823,49 @@ async function attachRankSignals(listed, query, cohort = null) {
     return json(200, parsed);
   } catch (e) {
     console.warn('attachRankSignals failed:', e.message);
+    return listed;
+  }
+}
+
+// Fail-open audience gate over a catalog page. Filters OUT listings the pure
+// isListingVisibleToCohort helper deems hidden for this caller; any parse hiccup
+// or missing signal returns the page untouched (never hides more than intended).
+// Pagination fields (hasMore/lastKey) are preserved as-is — a short page after
+// filtering is acceptable and the cursor still advances correctly.
+function applyAudienceGate(listed, cohort, callerUid) {
+  try {
+    const parsed = JSON.parse(listed.body);
+    if (!Array.isArray(parsed.items)) return listed;
+    parsed.items = parsed.items.filter(
+      (l) => isListingVisibleToCohort(l, cohort, callerUid));
+    return json(200, parsed);
+  } catch (e) {
+    console.warn('applyAudienceGate failed:', e.message);
+    return listed;
+  }
+}
+
+// FAIL-OPEN eligibility gate: a landlord can attach precise tenant criteria
+// (listing.eligibility) so only matching tenants see the listing. We need the
+// caller's FULL searchProfile to evaluate rules, so — only when some candidate
+// listing actually has eligibility enabled — load the profile ONCE and reuse it
+// across the page. The pure per-listing decision lives in lib/eligibility.mjs.
+// Owner-visibility and disabled/empty rules are handled inside passesEligibility.
+async function applyEligibilityGate(listed, callerUid) {
+  try {
+    const parsed = JSON.parse(listed.body);
+    if (!Array.isArray(parsed.items)) return listed;
+    const anyEnabled = parsed.items.some(
+      (l) => l && l.eligibility && l.eligibility.enabled === true);
+    if (!anyEnabled) return listed; // no gated listings → no profile read needed
+    // Single profile read for the whole page (fail-soft → null → gate treats
+    // every tenant field as unknown, i.e. must-rules hide, important-rules open).
+    const profile = callerUid ? await loadUserProfile(callerUid).catch(() => null) : null;
+    parsed.items = parsed.items.filter(
+      (l) => passesEligibility(l, profile, callerUid));
+    return json(200, parsed);
+  } catch (e) {
+    console.warn('applyEligibilityGate failed:', e.message);
     return listed;
   }
 }
@@ -4228,6 +4422,7 @@ const PROFILE_WRITABLE_FIELDS = new Set([
   'accessibilityNeed',
   'isSolo',
   'leaseFlex',
+  'occupation',       // tenant job/occupation — read by the per-listing eligibility gate
 ]);
 
 // Resolve the searcher's cohort for main-feed ranking, cheapest-first: the GET
@@ -4241,32 +4436,56 @@ async function resolveCohort(query, callerUid) {
   return resolveCohortFrom(query, profile);
 }
 
-// Merge-writes one profile field. Read-modify-write on the whole searchProfile
-// map so a missing parent isn't a problem and the field key can be dynamic.
+// Pure merge: fold a {field:value} batch into an existing searchProfile map,
+// keeping ONLY allowlisted keys (the trust boundary) and wrapping each in the
+// {value, confidence, source, updatedAt} envelope. Returns { sp, written } where
+// `sp` is the new map to persist and `written` is how many keys were accepted.
+// Extracted so both the single- and batch-writers share one code path and so it
+// can be unit-tested without DynamoDB (see profile_fields.selfcheck.mjs).
+function mergeProfileFields(current, fields, confidence, source) {
+  const sp = (current && current.searchProfile) || {};
+  const conf = typeof confidence === 'number' ? Math.max(0, Math.min(1, confidence)) : 0.6;
+  const src = typeof source === 'string' ? source.slice(0, 40) : 'assistant';
+  const now = new Date().toISOString();
+  let written = 0;
+  for (const [field, value] of Object.entries(fields || {})) {
+    if (!PROFILE_WRITABLE_FIELDS.has(field)) continue; // drop non-allowlisted
+    sp[field] = { value, confidence: conf, source: src, updatedAt: now };
+    written += 1;
+  }
+  return { sp, written };
+}
+
+// Merge-writes a BATCH of profile fields in ONE read-modify-write of the whole
+// searchProfile map (vs. one round-trip per field). Read-modify-write so a
+// missing parent isn't a problem and field keys can be dynamic. Returns the
+// count of allowlisted keys actually written (0 if uid missing / all dropped).
 // ponytail: last-writer-wins under concurrent writes — fine, a user's assistant
 // turns are serialized; upgrade to a nested UpdateExpression if that changes.
-async function saveUserProfileField(uid, field, value, confidence, source) {
-  if (!uid || !PROFILE_WRITABLE_FIELDS.has(field)) return false;
+async function saveUserProfileFields(uid, fields, confidence, source) {
+  if (!uid) return 0;
   try {
     const current = await loadUserProfile(uid);
-    const sp = (current && current.searchProfile) || {};
-    sp[field] = {
-      value,
-      confidence: typeof confidence === 'number' ? Math.max(0, Math.min(1, confidence)) : 0.6,
-      source: typeof source === 'string' ? source.slice(0, 40) : 'assistant',
-      updatedAt: new Date().toISOString(),
-    };
+    const { sp, written } = mergeProfileFields(current, fields, confidence, source);
+    if (written === 0) return 0; // nothing allowlisted → skip the write entirely
     await ddb.send(new UpdateCommand({
       TableName: TABLES.users.name,
       Key: { id: uid },
       UpdateExpression: 'SET searchProfile = :sp',
       ExpressionAttributeValues: { ':sp': sp },
     }));
-    return true;
+    return written;
   } catch (e) {
-    console.warn('saveUserProfileField failed:', e.message);
-    return false;
+    console.warn('saveUserProfileFields failed:', e.message);
+    return 0;
   }
+}
+
+// Merge-writes one profile field. Thin wrapper over the batch writer.
+async function saveUserProfileField(uid, field, value, confidence, source) {
+  if (!uid || !PROFILE_WRITABLE_FIELDS.has(field)) return false;
+  const written = await saveUserProfileFields(uid, { [field]: value }, confidence, source);
+  return written > 0;
 }
 
 const UPDATE_USER_PROFILE_TOOL = {

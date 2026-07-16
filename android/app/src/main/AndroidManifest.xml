@@ -52,6 +52,18 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="rently"/>
             </intent-filter>
+            <!-- App Link: the https share link opens the apartment in-app without
+                 the browser bounce. autoVerify makes Android fetch
+                 https://<host>/.well-known/assetlinks.json to confirm ownership;
+                 keep the host + pathPrefix in sync with publicShareBaseUrl. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="g7b9nx11sk.execute-api.us-east-1.amazonaws.com"
+                      android:pathPrefix="/prod/p"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

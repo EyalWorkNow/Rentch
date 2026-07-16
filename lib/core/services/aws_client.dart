@@ -431,6 +431,24 @@ class AwsApiClient {
     return get('/persona/${Uri.encodeComponent(userId)}');
   }
 
+  // ── Eligibility search-profile sync ───────────────────────────────────────
+
+  /// Pushes eligibility-relevant tenant attributes to the backend
+  /// `users.searchProfile` that the per-listing gate reads
+  /// (`POST /profile/fields`, body `{ "fields": { <key>:<value> } }` → `{saved:n}`).
+  /// Fail-soft: a no-op when unconfigured or when there is nothing to send, and
+  /// never throws so it can never block the local profile save.
+  Future<int> updateProfileFields(Map<String, dynamic> fields) async {
+    if (!isConfigured || fields.isEmpty) return 0;
+    try {
+      final res = await post('/profile/fields', {'fields': fields});
+      return (res['saved'] as num?)?.toInt() ?? 0;
+    } catch (error) {
+      if (kDebugMode) debugPrint('AwsApiClient.updateProfileFields: $error');
+      return 0;
+    }
+  }
+
   // ── Admin broadcast console ───────────────────────────────────────────────
 
   /// Sends a company/system notification to all users.

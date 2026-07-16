@@ -215,6 +215,14 @@ class MatchEngine {
     blended -= dealBreakerHits * weights.dealBreakerPenalty;
     final score = blended.clamp(0, 100).round();
 
+    // A hard conflict = at least one unmet non-negotiable from either side.
+    // This is the authoritative "hide, don't merely down-rank" gate for callers
+    // (e.g. the feed's eligibility filter). It is kept in lock-step with
+    // [dealBreakerConflicts] — `excluded` is true EXACTLY when there is a
+    // conflict to show — so consumers can trust it. The −45/hit penalty above
+    // only softens the score for the insight card; it never gates on its own.
+    final hasHardConflict = conflicts.isNotEmpty;
+
     if (tenantFit >= 70) {
       reasons.add(const MatchReason(
         kind: MatchReasonKind.mutualInterest,
@@ -230,7 +238,7 @@ class MatchEngine {
       tenantFitScore: tenantFit,
       reasons: _dedupe(reasons),
       dealBreakerConflicts: conflicts,
-      excluded: dealBreakerHits > 0,
+      excluded: hasHardConflict,
     );
   }
 

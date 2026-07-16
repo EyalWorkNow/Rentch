@@ -54,6 +54,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'גמיש',
   ];
 
+  // Occupation vocabulary — LOCKED to match the landlord eligibility criterion
+  // UI + backend allowlist. Key (English) is what we store on
+  // searchProfile.occupation; the Hebrew label is shown to the tenant. Order is
+  // presentation-only.
+  static const List<(String, String)> _occupationOptions = [
+    ('hightech', 'הייטק'),
+    ('healthcare', 'בריאות/רפואה'),
+    ('education', 'חינוך/הוראה'),
+    ('finance', 'פיננסים/בנקאות'),
+    ('law', 'משפטים'),
+    ('engineering', 'הנדסה'),
+    ('selfemployed', 'עצמאי/ת'),
+    ('public', 'שירות ציבורי'),
+    ('retail', 'מסחר/שירות'),
+    ('academia', 'אקדמיה'),
+    ('student', 'סטודנט/ית'),
+    ('other', 'אחר'),
+  ];
+
+  // Household type vocabulary — LOCKED to the gate's `household` allowlist. Store
+  // the English key on searchProfile.household; show the Hebrew label.
+  static const List<(String, String)> _householdOptions = [
+    ('family', 'משפחה'),
+    ('single', 'רווק/ה'),
+    ('couple', 'זוג'),
+    ('student', 'סטודנט/ית'),
+  ];
+
+  // Life-stage vocabulary — LOCKED to the gate's `lifeStage` allowlist. Note the
+  // hyphen in 'young-professional' (backend key is exact).
+  static const List<(String, String)> _lifeStageOptions = [
+    ('student', 'סטודנט/ית'),
+    ('young-professional', 'צעיר/ה מקצועי/ת'),
+    ('family', 'משפחה'),
+    ('senior', 'גיל הזהב'),
+  ];
+
   static const List<double> _roomOptions = [
     1.0,
     1.5,
@@ -76,6 +113,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late int _budget;
   late double _rooms;
   late String _moveIn;
+  String? _occupation;
+  // Eligibility attributes the per-listing gate can filter on. Null = unset.
+  int? _numChildren;
+  bool? _hasPets;
+  bool? _hasCar;
+  bool? _wfh;
+  String? _household;
+  String? _lifeStage;
+  bool? _isOleh;
+  int? _age;
+  bool? _accessibilityNeed;
   late List<String> _details;
   late List<String> _dealBreakers;
   late List<_PhotoEntry> _photos;
@@ -106,6 +154,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _budget = p.budgetMax;
     _rooms = p.desiredRooms;
     _moveIn = p.moveInWindow.isNotEmpty ? p.moveInWindow : 'גמיש';
+    // Pre-fill occupation from the saved profile; only keep it if it's a known
+    // vocabulary key (guards against stale/legacy values).
+    _occupation = _occupationOptions.any((o) => o.$1 == p.occupation)
+        ? p.occupation
+        : null;
+    _numChildren = p.numChildren;
+    _hasPets = p.hasPets;
+    _hasCar = p.hasCar;
+    _wfh = p.wfh;
+    // Keep the stored key only if it's a known vocabulary value.
+    _household = _householdOptions.any((o) => o.$1 == p.household)
+        ? p.household
+        : null;
+    _lifeStage = _lifeStageOptions.any((o) => o.$1 == p.lifeStage)
+        ? p.lifeStage
+        : null;
+    _isOleh = p.isOleh;
+    _age = p.age;
+    _accessibilityNeed = p.accessibilityNeed;
     _details = List<String>.from(p.importantDetails);
     _dealBreakers = List<String>.from(p.dealBreakers);
     _photos = p.photoUrls.map(_PhotoEntry.remote).toList();
@@ -328,6 +395,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       monthlyIncome: monthlyIncome,
       workLat: _workLat,
       workLon: _workLon,
+      occupation: _occupation,
+      numChildren: _numChildren,
+      hasPets: _hasPets,
+      hasCar: _hasCar,
+      wfh: _wfh,
+      household: _household,
+      lifeStage: _lifeStage,
+      isOleh: _isOleh,
+      age: _age,
+      accessibilityNeed: _accessibilityNeed,
     );
 
     if (!mounted) return;
@@ -788,6 +865,313 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                             textAlign: TextAlign.right,
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Occupation — the tenant's work field. Some listings
+                          // are gated by a landlord occupation criterion; picking
+                          // one here lets those listings surface for the tenant.
+                          const Text(
+                            'עיסוק / תחום עבודה',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _occupationOptions.map((opt) {
+                              final selected = opt.$1 == _occupation;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _occupation = opt.$1);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    opt.$2,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.navy,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'עוזר לנו להתאים דירות שבעל הדירה ייעד לתחום עיסוק מסוים.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              height: 1.4,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Number of children — some listings are gated on
+                          // household size. Chips 0..5+; null leaves it unset.
+                          const Text(
+                            'מספר ילדים',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: List.generate(6, (i) {
+                              final selected = _numChildren == i;
+                              final label = i == 5 ? '5+' : i.toString();
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() =>
+                                      _numChildren = selected ? null : i);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  width: 44,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: selected
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Pet + car — כן/לא toggles. Pushed to the eligibility
+                          // gate (car is inverted to `carFree` on the backend).
+                          _YesNoRow(
+                            label: 'יש חיית מחמד?',
+                            value: _hasPets,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _hasPets = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          _YesNoRow(
+                            label: 'יש רכב?',
+                            value: _hasCar,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _hasCar = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Remote work — 1:1 to the gate's `wfh` criterion.
+                          _YesNoRow(
+                            label: 'עובד/ת מרחוק?',
+                            value: _wfh,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _wfh = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // New immigrant — 1:1 to the gate's `isOleh` criterion.
+                          _YesNoRow(
+                            label: 'עולה חדש/ה?',
+                            value: _isOleh,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _isOleh = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Accessibility — 1:1 to the gate's `accessibilityNeed`.
+                          _YesNoRow(
+                            label: 'צריך/ה נגישות?',
+                            value: _accessibilityNeed,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _accessibilityNeed = v);
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Household type — chips storing the English key.
+                          const Text(
+                            'סוג משק בית',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _householdOptions.map((opt) {
+                              final selected = opt.$1 == _household;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() =>
+                                      _household = selected ? null : opt.$1);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    opt.$2,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.navy,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Life stage — chips storing the English key
+                          // ('young-professional' keeps its hyphen).
+                          const Text(
+                            'שלב חיים',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _lifeStageOptions.map((opt) {
+                              final selected = opt.$1 == _lifeStage;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() =>
+                                      _lifeStage = selected ? null : opt.$1);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    opt.$2,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.navy,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Age — stepper; backs minAge/maxAge on the gate.
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'גיל',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              _AgeStepper(
+                                value: _age,
+                                min: 18,
+                                max: 99,
+                                onChanged: (v) {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _age = v);
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1475,6 +1859,148 @@ class _SourceButton extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Yes/No selector row (RTL) ────────────────────────────────────────────────
+
+class _YesNoRow extends StatelessWidget {
+  const _YesNoRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool? value; // null = unset
+  final ValueChanged<bool?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Tapping the already-selected option clears it back to unset.
+        _chip('כן', value == true, () => onChanged(value == true ? null : true)),
+        const SizedBox(width: 8),
+        _chip('לא', value == false,
+            () => onChanged(value == false ? null : false)),
+      ],
+    );
+  }
+
+  Widget _chip(String text, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.background,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.borderLight,
+          ),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.navy,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Age stepper ──────────────────────────────────────────────────────────────
+
+class _AgeStepper extends StatelessWidget {
+  const _AgeStepper({
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final int? value; // null = unset
+  final int min;
+  final int max;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = value;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Decrement: below min clears back to unset.
+        _btn('−', () {
+          if (v == null) return;
+          onChanged(v <= min ? null : v - 1);
+        }),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 44,
+          child: Text(
+            v == null ? '—' : v.toString(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.navy,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Increment: from unset starts at min.
+        _btn('+', () {
+          if (v == null) {
+            onChanged(min);
+          } else if (v < max) {
+            onChanged(v + 1);
+          }
+        }),
+      ],
+    );
+  }
+
+  Widget _btn(String text, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.navy,
+            ),
+          ),
         ),
       ),
     );

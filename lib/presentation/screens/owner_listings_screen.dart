@@ -1,3 +1,4 @@
+import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -26,14 +27,14 @@ class OwnerListingsScreen extends StatelessWidget {
   final String ownerName;
   final bool isSelf;
 
-  // ponytail: no backend web page — share a message + deep link. The link only
-  // opens the page once a URL scheme / universal link is registered; the text
-  // works everywhere today. Upgrade: register `rently://` + host a web page.
+  // Share the working public share link (same format as the property share
+  // sheet): the backend /p/<id> page opens the app (rently://) or falls back to
+  // the store. The old https://rently.app/owner/<id> URL was dead (no such host).
   String _shareLink() {
     final id = ownerUserId.trim().isNotEmpty
         ? ownerUserId.trim()
         : Uri.encodeComponent(ownerName.trim());
-    return 'https://rently.app/owner/$id';
+    return '${AppConfig.publicShareBaseUrl}/p/$id';
   }
 
   String _shareMessage() =>

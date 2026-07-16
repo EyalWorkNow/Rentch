@@ -725,6 +725,99 @@ class PropertyVerification {
   }
 }
 
+/// A model-suggested target cohort for a listing's audience (F1). Distinct from
+/// [RentalProperty.audienceCohorts], which are the landlord-confirmed keys; this
+/// carries the raw suggestion with a [confidence] score and a human [reason].
+class AudienceSuggestion {
+  const AudienceSuggestion({
+    required this.cohort,
+    this.confidence = 0,
+    this.reason = '',
+  });
+
+  final String cohort;
+  final double confidence;
+  final String reason;
+
+  factory AudienceSuggestion.fromJson(Map<String, dynamic> json) {
+    return AudienceSuggestion(
+      cohort: json['cohort']?.toString() ?? '',
+      confidence: _optionalDouble(json['confidence']) ?? 0,
+      reason: json['reason']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'cohort': cohort,
+      'confidence': confidence,
+      'reason': reason,
+    };
+  }
+}
+
+/// A single landlord-defined tenant-eligibility criterion. [key] is one of the
+/// known criterion keys (budgetMin, maxChildren, noPets, hasCar, occupation,
+/// wfh, household, lifeStage, oleh, minAge, maxAge, accessibility). [value] is
+/// polymorphic and kept as-is: a num for budgetMin/maxChildren/minAge/maxAge, a
+/// `List<String>` for occupation/household/lifeStage, and absent/ignored for the
+/// boolean criteria (noPets/hasCar/wfh/oleh/accessibility). [importance] is the
+/// per-criterion hardness: 'must' (default), 'important', or 'prefer'.
+class EligibilityRule {
+  const EligibilityRule({
+    required this.key,
+    this.value,
+    this.importance = 'must',
+  });
+
+  final String key;
+  final dynamic value;
+  final String importance;
+
+  factory EligibilityRule.fromJson(Map<String, dynamic> json) {
+    return EligibilityRule(
+      key: json['key']?.toString() ?? '',
+      value: _parseEligibilityValue(json['value']),
+      importance: _parseEligibilityImportance(json['importance']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'key': key,
+      if (value != null) 'value': value,
+      'importance': importance,
+    };
+  }
+}
+
+/// Per-listing tenant-eligibility config (F3). [enabled] gates whether the
+/// [rules] are applied at all; both default to off/empty so listings persisted
+/// before this feature load cleanly. [rules] is unmodifiable once parsed.
+class EligibilityConfig {
+  const EligibilityConfig({
+    this.enabled = false,
+    this.rules = const <EligibilityRule>[],
+  });
+
+  final bool enabled;
+  final List<EligibilityRule> rules;
+
+  factory EligibilityConfig.fromJson(Map<String, dynamic> json) {
+    return EligibilityConfig(
+      enabled: _asBoolFlag(json['enabled']),
+      rules: List.unmodifiable(_parseEligibilityRules(json['rules'])),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'enabled': enabled,
+      'rules': rules.map((rule) => rule.toJson()).toList(),
+    };
+  }
+}
+
 class RentalProperty {
   RentalProperty({
     required this.id,
@@ -763,7 +856,16 @@ class RentalProperty {
     this.designAccent = 0,
     this.createdAt,
     this.panoramaTour,
-  })  : sourceUrl = sourceUrl.isNotEmpty ? sourceUrl : (url ?? ''),
+    List<String>? audienceCohorts,
+    this.audienceNote,
+    List<AudienceSuggestion>? audienceSuggested,
+    this.exclusiveToAudience = false,
+    this.eligibility = const EligibilityConfig(),
+  })  : audienceCohorts =
+            List.unmodifiable(audienceCohorts ?? const <String>[]),
+        audienceSuggested =
+            List.unmodifiable(audienceSuggested ?? const <AudienceSuggestion>[]),
+        sourceUrl = sourceUrl.isNotEmpty ? sourceUrl : (url ?? ''),
         featureFlags = featureFlags ?? PropertyFeatureSet.fromJson(features),
         model3d = _resolveModel3d(model3d, virtualTour),
         legal = legal ?? const PropertyLegal(),
@@ -829,6 +931,26 @@ class RentalProperty {
   /// Optional DIY 360° walkthrough (Street-View-style panorama nodes). Distinct
   /// from [virtualTour]/[model3d] (heavy backend 3D reconstruction).
   final PropertyPanoramaTour? panoramaTour;
+
+  /// Audience targeting (F1/F2). [audienceCohorts] are the landlord-confirmed
+  /// target cohort keys from the 14-value taxonomy (investor, arab_family, oleh,
+  /// charedi, dati_leumi, senior, single_parent, new_parents, remote, student,
+  /// young_professional, family, couple, single). [audienceNote] is the
+  /// landlord's free-text ideal-tenant description. [audienceSuggested] holds the
+  /// model's raw cohort suggestions. [exclusiveToAudience] is the F2 hard gate:
+  /// when true the listing is shown only to matching cohorts. All default to
+  /// empty/null/false, so listings persisted before these fields load cleanly.
+  ///
+  /// Round-trip invariant: `fromJson(toJson())` preserves all four fields, and
+  /// `fromJson` on a map missing every audience key yields the defaults above.
+  final List<String> audienceCohorts;
+  final String? audienceNote;
+  final List<AudienceSuggestion> audienceSuggested;
+  final bool exclusiveToAudience;
+
+  /// Per-listing tenant-eligibility criteria (F3). Defaults to a disabled empty
+  /// config, so listings persisted before this feature deserialize cleanly.
+  final EligibilityConfig eligibility;
 
   bool get hasPanoramaTour => panoramaTour?.isNotEmpty ?? false;
 
@@ -926,6 +1048,11 @@ class RentalProperty {
     int? designAccent,
     DateTime? createdAt,
     PropertyPanoramaTour? panoramaTour,
+    List<String>? audienceCohorts,
+    String? audienceNote,
+    List<AudienceSuggestion>? audienceSuggested,
+    bool? exclusiveToAudience,
+    EligibilityConfig? eligibility,
   }) {
     return RentalProperty(
       id: id ?? this.id,
@@ -963,6 +1090,11 @@ class RentalProperty {
       designAccent: designAccent ?? this.designAccent,
       createdAt: createdAt ?? this.createdAt,
       panoramaTour: panoramaTour ?? this.panoramaTour,
+      audienceCohorts: audienceCohorts ?? this.audienceCohorts,
+      audienceNote: audienceNote ?? this.audienceNote,
+      audienceSuggested: audienceSuggested ?? this.audienceSuggested,
+      exclusiveToAudience: exclusiveToAudience ?? this.exclusiveToAudience,
+      eligibility: eligibility ?? this.eligibility,
     );
   }
 
@@ -1059,6 +1191,11 @@ class RentalProperty {
           ) ??
           _generateDeterministicMockDate(json['id']?.toString() ?? ''),
       panoramaTour: PropertyPanoramaTour.fromJsonOrNull(json['panoramaTour']),
+      audienceCohorts: _decodeStringListValue(json['audienceCohorts']),
+      audienceNote: json['audienceNote']?.toString(),
+      audienceSuggested: _parseAudienceSuggestions(json['audienceSuggested']),
+      exclusiveToAudience: _asBoolFlag(json['exclusiveToAudience']),
+      eligibility: _parseEligibilityConfig(json['eligibility']),
     );
   }
 
@@ -1106,6 +1243,12 @@ class RentalProperty {
       'designAccent': designAccent,
       'createdAt': createdAt?.toUtc().toIso8601String(),
       if (panoramaTour != null) 'panoramaTour': panoramaTour!.toJson(),
+      'audienceCohorts': audienceCohorts,
+      'audienceNote': audienceNote,
+      'audienceSuggested':
+          audienceSuggested.map((item) => item.toJson()).toList(),
+      'exclusiveToAudience': exclusiveToAudience,
+      'eligibility': eligibility.toJson(),
     };
   }
 }
@@ -1124,6 +1267,16 @@ class TenantProfile {
     this.monthlyIncome,
     this.workLat,
     this.workLon,
+    this.occupation,
+    this.numChildren,
+    this.hasPets,
+    this.hasCar,
+    this.wfh,
+    this.household,
+    this.lifeStage,
+    this.isOleh,
+    this.age,
+    this.accessibilityNeed,
   });
 
   final String id;
@@ -1152,6 +1305,50 @@ class TenantProfile {
   final double? workLat;
   final double? workLon;
 
+  /// Tenant's occupation / work field, stored as an English vocabulary key
+  /// (e.g. 'hightech', 'healthcare', 'student'). Persisted so the per-listing
+  /// eligibility gate can filter by the landlord's occupation criterion. The
+  /// backend reads it off the user's `searchProfile.occupation`. Optional —
+  /// null when the tenant hasn't picked one; old stored profiles load fine.
+  final String? occupation;
+
+  /// Number of children living with the tenant. Feeds the per-listing
+  /// eligibility gate (a landlord may cap household size). Optional — null when
+  /// unspecified; old stored profiles load fine without it.
+  final int? numChildren;
+
+  /// Whether the tenant has a pet. Some listings are gated on pet policy.
+  /// Optional — null leaves the pet criterion unconstrained.
+  final bool? hasPets;
+
+  /// Whether the tenant owns a car. Persisted here; pushed to the backend gate
+  /// INVERTED as `carFree` (carFree = !hasCar). Optional — null when unspecified.
+  final bool? hasCar;
+
+  /// Whether the tenant works remotely. Feeds the per-listing eligibility gate's
+  /// `wfh` criterion (1:1, no inversion). Optional — null leaves it unconstrained.
+  final bool? wfh;
+
+  /// Household type — one of: family, single, couple, student (English key).
+  /// Backs the gate's `household` criterion. Optional — null when unspecified.
+  final String? household;
+
+  /// Life stage — one of: student, young-professional, family, senior (English
+  /// key). Backs the gate's `lifeStage` criterion. Optional — null when unset.
+  final String? lifeStage;
+
+  /// Whether the tenant is a new immigrant (עולה חדש). Backs the gate's `isOleh`
+  /// criterion (1:1). Optional — null leaves it unconstrained.
+  final bool? isOleh;
+
+  /// Tenant's age. Backs the gate's minAge/maxAge criteria via searchProfile
+  /// `age`. Optional — null when unspecified; old stored profiles load fine.
+  final int? age;
+
+  /// Whether the tenant needs accessibility. Backs the gate's `accessibilityNeed`
+  /// criterion (1:1). Optional — null leaves it unconstrained.
+  final bool? accessibilityNeed;
+
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
   TenantProfile copyWith({
@@ -1167,6 +1364,16 @@ class TenantProfile {
     int? monthlyIncome,
     double? workLat,
     double? workLon,
+    String? occupation,
+    int? numChildren,
+    bool? hasPets,
+    bool? hasCar,
+    bool? wfh,
+    String? household,
+    String? lifeStage,
+    bool? isOleh,
+    int? age,
+    bool? accessibilityNeed,
   }) {
     return TenantProfile(
       id: id ?? this.id,
@@ -1181,6 +1388,16 @@ class TenantProfile {
       monthlyIncome: monthlyIncome ?? this.monthlyIncome,
       workLat: workLat ?? this.workLat,
       workLon: workLon ?? this.workLon,
+      occupation: occupation ?? this.occupation,
+      numChildren: numChildren ?? this.numChildren,
+      hasPets: hasPets ?? this.hasPets,
+      hasCar: hasCar ?? this.hasCar,
+      wfh: wfh ?? this.wfh,
+      household: household ?? this.household,
+      lifeStage: lifeStage ?? this.lifeStage,
+      isOleh: isOleh ?? this.isOleh,
+      age: age ?? this.age,
+      accessibilityNeed: accessibilityNeed ?? this.accessibilityNeed,
     );
   }
 
@@ -1203,6 +1420,22 @@ class TenantProfile {
       monthlyIncome: _optionalInt(json['monthlyIncome']),
       workLat: _optionalDouble(json['workLat']),
       workLon: _optionalDouble(json['workLon']),
+      occupation: (json['occupation'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (json['occupation'] as String).trim(),
+      numChildren: _optionalInt(json['numChildren']),
+      hasPets: _optionalBool(json['hasPets']),
+      hasCar: _optionalBool(json['hasCar']),
+      wfh: _optionalBool(json['wfh']),
+      household: (json['household'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (json['household'] as String).trim(),
+      lifeStage: (json['lifeStage'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (json['lifeStage'] as String).trim(),
+      isOleh: _optionalBool(json['isOleh']),
+      age: _optionalInt(json['age']),
+      accessibilityNeed: _optionalBool(json['accessibilityNeed']),
     );
   }
 
@@ -1222,6 +1455,16 @@ class TenantProfile {
       if (monthlyIncome != null) 'monthlyIncome': monthlyIncome,
       if (workLat != null) 'workLat': workLat,
       if (workLon != null) 'workLon': workLon,
+      if (occupation != null) 'occupation': occupation,
+      if (numChildren != null) 'numChildren': numChildren,
+      if (hasPets != null) 'hasPets': hasPets,
+      if (hasCar != null) 'hasCar': hasCar,
+      if (wfh != null) 'wfh': wfh,
+      if (household != null) 'household': household,
+      if (lifeStage != null) 'lifeStage': lifeStage,
+      if (isOleh != null) 'isOleh': isOleh,
+      if (age != null) 'age': age,
+      if (accessibilityNeed != null) 'accessibilityNeed': accessibilityNeed,
     };
   }
 }
@@ -2251,6 +2494,71 @@ List<String> _decodeStringListValue(Object? rawValue) {
   return const [];
 }
 
+List<AudienceSuggestion> _parseAudienceSuggestions(Object? rawValue) {
+  var value = rawValue;
+  if (value is String && value.trim().isNotEmpty) {
+    value = _decodeJsonSafely(value);
+  }
+  if (value is! List) return const [];
+  return value
+      .whereType<Map>()
+      .map((item) =>
+          AudienceSuggestion.fromJson(Map<String, dynamic>.from(item)))
+      .toList();
+}
+
+EligibilityConfig _parseEligibilityConfig(Object? rawValue) {
+  var value = rawValue;
+  if (value is String && value.trim().isNotEmpty) {
+    value = _decodeJsonSafely(value);
+  }
+  if (value is Map) {
+    return EligibilityConfig.fromJson(Map<String, dynamic>.from(value));
+  }
+  return const EligibilityConfig();
+}
+
+List<EligibilityRule> _parseEligibilityRules(Object? rawValue) {
+  var value = rawValue;
+  if (value is String && value.trim().isNotEmpty) {
+    value = _decodeJsonSafely(value);
+  }
+  if (value is! List) return const [];
+  return value
+      .whereType<Map>()
+      .map((item) => EligibilityRule.fromJson(Map<String, dynamic>.from(item)))
+      .toList();
+}
+
+/// Keeps an eligibility rule's [value] in whatever JSON type it arrived as:
+/// num stays num, a list becomes a clean `List<String>`, bools stay bool. A
+/// JSON-encoded string is decoded; a numeric string is coerced to num. Boolean
+/// criteria carry no value and yield null (so toJson omits the key).
+dynamic _parseEligibilityValue(Object? rawValue) {
+  if (rawValue == null) return null;
+  if (rawValue is num || rawValue is bool) return rawValue;
+  if (rawValue is List) return _decodeStringListValue(rawValue);
+  if (rawValue is String) {
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) return null;
+    final decoded = _decodeJsonSafely(trimmed);
+    if (decoded is List) return _decodeStringListValue(decoded);
+    final asNum = num.tryParse(trimmed);
+    if (asNum != null) return asNum;
+    return rawValue;
+  }
+  return rawValue;
+}
+
+String _parseEligibilityImportance(Object? rawValue) {
+  final normalized = rawValue?.toString().trim().toLowerCase();
+  return switch (normalized) {
+    'important' => 'important',
+    'prefer' || 'preferred' => 'prefer',
+    _ => 'must',
+  };
+}
+
 PropertyModel3d? _resolveModel3d(
   PropertyModel3d? model3d,
   PropertyVirtualTour? virtualTour,
@@ -2488,6 +2796,16 @@ double? _optionalDouble(Object? value) {
   if (value is double) return value;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
+}
+
+bool? _optionalBool(Object? value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  final s = value.toString().trim().toLowerCase();
+  if (s == 'true' || s == '1' || s == 'yes') return true;
+  if (s == 'false' || s == '0' || s == 'no') return false;
+  return null;
 }
 
 DateTime? _optionalDate(Object? value) {

@@ -505,6 +505,67 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
+  # ── Public share page: /p/{id} (NO auth) ────────────────────────────────────
+  # The share link https://<api>/prod/p/<id> must be reachable by WhatsApp/social
+  # link-preview crawlers and by ordinary browsers that send NO Authorization
+  # header. The {proxy+} method above is gated by the Firebase CUSTOM authorizer,
+  # which returns 401 to anonymous requests before the router ever runs — so this
+  # dedicated resource re-exposes the SAME router Lambda with AuthorizationType:
+  # NONE. The router already handles GET /p/:id (propertyOgPage → OG card for
+  # crawlers, rently:// app-open interstitial for humans). Mirrors ProxyMethod's
+  # AWS_PROXY integration but omits AuthorizerId.
+  PublicShareResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !GetAtt Api.RootResourceId
+      PathPart: 'p'
+
+  PublicShareIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !Ref PublicShareResource
+      PathPart: '{id}'
+
+  PublicShareMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref PublicShareIdResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters: { method.request.path.id: true }
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations'
+
+  # CORS preflight — no auth on OPTIONS (mirrors ProxyOptions)
+  PublicShareOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref PublicShareIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates: { 'application/json': '{"statusCode":200}' }
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Authorization,Content-Type,x-api-key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates: { 'application/json': '' }
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
   RouterPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -523,7 +584,7 @@ Resources:
 
   Deployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn: [ProxyMethod, ProxyOptions]
+    DependsOn: [ProxyMethod, ProxyOptions, PublicShareMethod, PublicShareOptions]
     Properties:
       RestApiId: !Ref Api
 

@@ -230,14 +230,14 @@ class _PropertyShareSheet extends StatelessWidget {
                       _ShareLinkButton(
                         onTap: () async {
                           Navigator.of(context).pop();
+                          // Copy the SAME public /p/<id> share link the message
+                          // uses — it opens the app at the apartment (rently://)
+                          // or falls back to the store. property.url is an
+                          // unrelated external listing URL, not a Rently link.
                           await _copyToClipboard(
                             context,
-                            property.url.trim().isEmpty
-                                ? message
-                                : property.url.trim(),
-                            property.url.trim().isEmpty
-                                ? 'פרטי הנכס הועתקו'
-                                : 'הקישור הועתק',
+                            '${AppConfig.publicShareBaseUrl}/p/${property.id}',
+                            'הקישור הועתק',
                           );
                         },
                       ),
