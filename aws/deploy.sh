@@ -50,13 +50,35 @@ done
 
 # 4. Deploy CloudFormation
 echo "==> Deploying CloudFormation stack: $STACK"
-# Secrets are NoEcho CFN params with empty defaults. Pass one only when its env
-# var is set — otherwise CloudFormation keeps the stack's PREVIOUS value, so a
-# deploy never wipes a key you set earlier. Set OPENAI_API_KEY in your shell to
-# (re)configure אתי's live GPT voice: OPENAI_API_KEY=sk-... ./deploy.sh
-PARAM_OVERRIDES=(CodeBucket="$CODE_BUCKET")
-[ -n "${OPENAI_API_KEY:-}" ] && PARAM_OVERRIDES+=(OpenAiApiKey="$OPENAI_API_KEY")
-[ -n "${GEMINI_API_KEY:-}" ] && PARAM_OVERRIDES+=(GeminiApiKey="$GEMINI_API_KEY")
+# Secrets are the SINGLE source of truth in SSM SecureString. We fetch and pass
+# them as REQUIRED params; the deploy FAILS LOUDLY if any is missing, so it can
+# never silently wipe a key (the 2026-07-03 incident where empty-default params
+# blanked GEMINI/OPENAI/KIRI). Set them once:
+#   aws ssm put-parameter --region "$REGION" --type SecureString --overwrite \
+#     --name /rentch/GEMINI_API_KEY --value '<key>'   # + OPENAI_API_KEY, KIRI_API_KEY
+# NOTE: for the FIRST drift-reconcile deploy, use aws/RECONCILE-DRIFT.md (review
+# the change set) rather than this auto-apply path.
+fetch_secret() {
+  local name="$1" val
+  val="$(aws ssm get-parameter --region "$REGION" --with-decryption \
+    --name "$name" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+  if [ -z "$val" ] || [ "$val" = "None" ]; then
+    echo "FATAL: SSM SecureString $name is missing/empty — refusing to deploy" >&2
+    echo "       (a deploy without it would wipe the live key). Set it with:" >&2
+    echo "  aws ssm put-parameter --region $REGION --type SecureString --overwrite --name $name --value '<key>'" >&2
+    exit 1
+  fi
+  printf '%s' "$val"
+}
+GEMINI_API_KEY="$(fetch_secret /rentch/GEMINI_API_KEY)"
+OPENAI_API_KEY="$(fetch_secret /rentch/OPENAI_API_KEY)"
+KIRI_API_KEY="$(fetch_secret /rentch/KIRI_API_KEY)"
+PARAM_OVERRIDES=(
+  CodeBucket="$CODE_BUCKET"
+  GeminiApiKey="$GEMINI_API_KEY"
+  OpenAiApiKey="$OPENAI_API_KEY"
+  KiriApiKey="$KIRI_API_KEY"
+)
 
 aws cloudformation deploy \
   --region "$REGION" \
