@@ -130,6 +130,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           stage: FunnelStage.contact,
           propertyId: widget.property.id,
         );
+        // Strongest funnel outcome for the search that surfaced this listing.
+        _analyticsProvider?.recordContactOutcome(
+          widget.property.id,
+          viewToContactMs: _viewStopwatch.elapsedMilliseconds,
+        );
       } catch (_) {/* fail-soft */}
     }
     action();

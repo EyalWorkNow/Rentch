@@ -40,6 +40,7 @@ enum UserEventType {
   undoSwipe,
   propertySaved,
   propertyUnsaved,
+  saveToggled, // {saved} — favorite/unfavorite from any surface (see logSaveToggled)
   propertyReported,
 
   // Matching
@@ -175,6 +176,7 @@ class EventService {
     required double priceToBudgetRatio,
     int? dwellMs,
     double? predictedFit,
+    String? searchId,
   }) =>
       log(
         UserEventType.swipeOutcome,
@@ -186,7 +188,19 @@ class EventService {
           // The score the ranker gave this listing when it was shown → paired
           // with the label (direction) this row calibrates prediction vs reality.
           if (predictedFit != null) 'predictedFit': predictedFit,
+          // Links this swipe back to the search that surfaced the card, so the
+          // /search/outcome label and this behavioral row are joinable.
+          if (searchId != null && searchId.isNotEmpty) 'searchId': searchId,
         },
+      );
+
+  /// Favorite / unfavorite toggle from any surface. [saved] is the new state
+  /// (true = just saved, false = just removed). A captured revealed-preference
+  /// signal distinct from a swipe — the user deliberately bookmarked a listing.
+  void logSaveToggled({required String propertyId, required bool saved}) => log(
+        UserEventType.saveToggled,
+        propertyId: propertyId,
+        metadata: {'saved': saved},
       );
 
   /// The ranker's OWN prediction for a shown listing — [fitPct] (0..100) at its

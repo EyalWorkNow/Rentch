@@ -830,7 +830,11 @@ async function handleProfileFields(event) {
     let body = {};
     try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
     const fields = (body.fields && typeof body.fields === 'object') ? body.fields : {};
-    const saved = await saveUserProfileFields(uid, fields, 0.9, 'profile');
+    // Optional provenance: declared syncs stay source='profile' (default, and the
+    // only source a `must` rule may hide on); inferred syncs pass source='search'.
+    const source = (typeof body.source === 'string' && body.source) ? body.source : 'profile';
+    const confidence = Number.isFinite(Number(body.confidence)) ? Number(body.confidence) : 0.9;
+    const saved = await saveUserProfileFields(uid, fields, confidence, source);
     return json(200, { saved });
   } catch (e) {
     console.warn('handleProfileFields failed:', e.message);
@@ -1330,6 +1334,12 @@ export const handler = async (event) => {
     // POST /search/log → append per-impression feature vectors + outcomes.
     if (segments[0] === 'search' && segments[1] === 'log' && method === 'POST') {
       return await handleSearchLog(event);
+    }
+
+    // POST /search/outcome → append ONE labeled row (click/like/…/skip) that a
+    // later join pairs with its impression row by (searchId, propertyId).
+    if (segments[0] === 'search' && segments[1] === 'outcome' && method === 'POST') {
+      return await handleSearchOutcome(event);
     }
 
     // ── Semantic kNN candidate source (step 3) ──────────────────────────────
@@ -1970,6 +1980,11 @@ async function handleSearchLog(event) {
   const queryText = (body.query || '').toString().slice(0, 500);
   const queryCriteria = (body.criteria && typeof body.criteria === 'object')
     ? body.criteria : {};
+  // Search-level context the ranker used: keep it on EVERY impression row so a
+  // training join never has to look up the parent search. Fail-soft defaults.
+  const weights = (body.weights && typeof body.weights === 'object') ? body.weights : {};
+  const cohort = (body.cohort === null || body.cohort === undefined) ? null : body.cohort;
+  const clientTs = Number.isFinite(Number(body.ts)) ? Number(body.ts) : null;
   const now = Date.now();
 
   let written = 0;
@@ -1988,6 +2003,11 @@ async function handleSearchLog(event) {
           searchId,
           query: queryText,
           criteria: queryCriteria,
+          // Search-level context (same on every impression of this search).
+          weights,
+          cohort,
+          ts: clientTs,                   // client-asserted search timestamp
+          kind: 'impression',             // pairs with 'outcome' rows via searchId
           propertyId,
           // The per-impression feature vector the ranker saw (training input).
           features: (imp.features && typeof imp.features === 'object') ? imp.features : {},
@@ -2004,6 +2024,47 @@ async function handleSearchLog(event) {
   }));
 
   return json(200, { ok: true, logged: written, searchId });
+}
+
+// POST /search/outcome — append ONE labeled row (the real training label).
+// Body: { searchId, propertyId, outcome, dwellMs? } with
+//   outcome ∈ {click, like, superlike, contact, skip}.
+// Auth-gated. A future join groups impression + outcome rows by (searchId,
+// propertyId) via the `kind` marker. Fully fail-soft — never 500.
+const OUTCOME_LABELS = new Set(['click', 'like', 'superlike', 'contact', 'skip']);
+async function handleSearchOutcome(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  try {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+
+    const searchId = (body.searchId || '').toString().slice(0, 64);
+    const propertyId = (body.propertyId || '').toString();
+    const outcome = (body.outcome || '').toString().slice(0, 24);
+    const dwellMs = Number.isFinite(Number(body.dwellMs)) ? Number(body.dwellMs) : null;
+
+    // Sanity-check before persisting; still 200 (fail-soft) so the client's
+    // fire-and-forget beacon never blocks the UI.
+    if (searchId && propertyId && OUTCOME_LABELS.has(outcome)) {
+      await ddb.send(new PutCommand({
+        TableName: SEARCH_LOG_TABLE,
+        Item: {
+          id: crypto.randomUUID(),
+          userId: uid,
+          createdAt: Date.now(),
+          searchId,
+          propertyId,
+          outcome,
+          dwellMs,
+          kind: 'outcome',              // pairs with 'impression' rows via searchId
+        },
+      }));
+    }
+  } catch (e) {
+    console.warn('search/outcome write failed:', e.message);
+  }
+  return json(200, { ok: true });
 }
 
 // POST /search/knn — embed the query text, then score every active listing that

@@ -435,13 +435,25 @@ class AwsApiClient {
 
   /// Pushes eligibility-relevant tenant attributes to the backend
   /// `users.searchProfile` that the per-listing gate reads
-  /// (`POST /profile/fields`, body `{ "fields": { <key>:<value> } }` → `{saved:n}`).
+  /// (`POST /profile/fields`, body `{ fields:{<key>:<value>}, source, confidence }`
+  /// → `{saved:n}`). [source] tags the provenance of the write (declared profile
+  /// vs. inferred search behaviour) and [confidence] its trust weight, so the
+  /// backend can let a high-confidence declared value win over a low-confidence
+  /// inferred one. Defaults keep every existing caller on `'profile'`/0.9.
   /// Fail-soft: a no-op when unconfigured or when there is nothing to send, and
   /// never throws so it can never block the local profile save.
-  Future<int> updateProfileFields(Map<String, dynamic> fields) async {
+  Future<int> updateProfileFields(
+    Map<String, dynamic> fields, {
+    String source = 'profile',
+    double confidence = 0.9,
+  }) async {
     if (!isConfigured || fields.isEmpty) return 0;
     try {
-      final res = await post('/profile/fields', {'fields': fields});
+      final res = await post('/profile/fields', {
+        'fields': fields,
+        'source': source,
+        'confidence': confidence,
+      });
       return (res['saved'] as num?)?.toInt() ?? 0;
     } catch (error) {
       if (kDebugMode) debugPrint('AwsApiClient.updateProfileFields: $error');

@@ -70,6 +70,13 @@ class PropertySearchRepository {
   final String _tableId;
   final _breaker = CircuitBreaker(name: 'property-search');
 
+  // The searchId minted for the most recent successful search(). One id per
+  // search call, reused for all of that search's impression rows, so the backend
+  // groups them — and so downstream engagement outcomes can be joined back to
+  // the search that produced them. Null until the first search runs.
+  String? _lastSearchId;
+  String? get lastSearchId => _lastSearchId;
+
   bool get isConfigured => AppConfig.canUseProperties && _tableId.isNotEmpty;
 
   Future<List<RentalProperty>> search(
@@ -77,6 +84,11 @@ class PropertySearchRepository {
     int limit = 100,
   }) async {
     if (!isConfigured || _breaker.isOpen) return const [];
+
+    // One stable id per search call, reused for every impression row of this
+    // search (grouping key on the backend + join key for later outcomes).
+    final searchId = ID.unique();
+    _lastSearchId = searchId;
 
     final queries = <String>[
       if (c.city != null && c.city!.trim().isNotEmpty)
@@ -117,7 +129,11 @@ class PropertySearchRepository {
       }
 
       final merged = _mergeCandidates(parsed, await knnFuture);
-      return _filterAndRank(merged, c);
+      // Persist the live cohort signals into the backend searchProfile ONCE per
+      // search (not per impression) so search stops being stateless. Best-effort
+      // and fully non-blocking — never affects the result list.
+      _persistCohortSignals(c);
+      return _filterAndRank(merged, c, searchId);
     } on CircuitOpenException {
       return const [];
     } catch (e) {
@@ -211,6 +227,7 @@ class PropertySearchRepository {
   List<RentalProperty> _filterAndRank(
     List<_Candidate> items,
     PropertySearchCriteria c,
+    String searchId,
   ) {
     final wantCity = c.city?.trim();
     final matched = items.where((cand) {
@@ -259,7 +276,7 @@ class PropertySearchRepository {
     ];
     // Fire-and-forget per-impression feature log (the phase-2 LightGBM training
     // set), now in the backend-ranked order. Fail-soft — never blocks the UI.
-    _logImpressions(scored, c, weights, cohort);
+    _logImpressions(scored, c, weights, cohort, searchId);
     return ranked;
   }
 
@@ -527,6 +544,39 @@ class PropertySearchRepository {
     return null;
   }
 
+  // Search-behaviour signal keys that map 1:1 onto their backend searchProfile
+  // key. `vibe` is the only rename (→ `vibePref`), handled separately below.
+  static const _profileSignalKeys = <String>[
+    'household', 'isOleh', 'wfh', 'carFree', 'lifeStage', 'age', 'sector',
+    'religiousStream', 'isReligious', 'langPref', 'isInvestor', 'intent',
+    'expecting', 'childAge', 'accessibilityNeed', 'hasChildren',
+  ];
+
+  /// Persists the live cohort signals extracted from this search into the backend
+  /// `users.searchProfile`, so search stops being stateless (each search enriches
+  /// the profile the per-listing gate + ranker read). Tagged source='search' /
+  /// confidence 0.5 so an inferred value never overrides a high-confidence
+  /// declared one. Only keys actually present in the signals are sent. Fully
+  /// fail-soft and non-blocking — must never affect the search result.
+  void _persistCohortSignals(PropertySearchCriteria c) {
+    final signals = c.cohortSignals;
+    if (signals.isEmpty) return;
+    if (!AwsApiClient.instance.isConfigured) return;
+    final fields = <String, dynamic>{
+      for (final k in _profileSignalKeys)
+        if (signals[k] != null) k: signals[k],
+      if (signals['vibe'] != null) 'vibePref': signals['vibe'],
+    };
+    if (fields.isEmpty) return;
+    // Fire-and-forget; updateProfileFields already swallows its own errors, but
+    // guard the call itself so nothing here can ever bubble into the result path.
+    try {
+      AwsApiClient.instance
+          .updateProfileFields(fields, source: 'search', confidence: 0.5)
+          .catchError((_) => 0);
+    } catch (_) {/* fail-soft */}
+  }
+
   /// Per-impression feature-vector log → `/search/log`. The training set for the
   /// phase-2 LightGBM lambdarank upgrade. Fully fail-soft.
   void _logImpressions(
@@ -534,6 +584,7 @@ class PropertySearchRepository {
     PropertySearchCriteria c,
     Map<String, double> weights,
     String? cohort,
+    String searchId,
   ) {
     if (scored.isEmpty) return;
     if (!AwsApiClient.instance.isConfigured) return;
@@ -547,7 +598,15 @@ class PropertySearchRepository {
             'features': scored[i].features,
           },
       ];
+      final query = c.queryText?.trim();
       final body = <String, dynamic>{
+        // Client-minted, stable per search: the backend groups all impressions
+        // under it (instead of generating a fresh random id per call) so later
+        // engagement outcomes can join back to this exact search.
+        'searchId': searchId,
+        // Raw NL search text (when the search came from the assistant), so the
+        // training log carries the query that produced these results.
+        if (query != null && query.isNotEmpty) 'query': query,
         'criteria': {
           'city': c.city,
           'minPrice': c.minPrice,

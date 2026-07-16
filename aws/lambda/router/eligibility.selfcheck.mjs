@@ -6,7 +6,8 @@ import { passesEligibility, readFieldValue } from './lib/eligibility.mjs';
 // Build a users-table row with the given searchProfile fields.
 const profile = (fields) => ({
   searchProfile: Object.fromEntries(
-    Object.entries(fields).map(([k, v]) => [k, { value: v, confidence: 1, source: 't' }])),
+    // source:'profile' = declared data (must-rules hard-gate only on declared).
+    Object.entries(fields).map(([k, v]) => [k, { value: v, confidence: 1, source: 'profile' }])),
 });
 // Build a listing with an eligibility block.
 const listing = (rules, extra = {}) => ({

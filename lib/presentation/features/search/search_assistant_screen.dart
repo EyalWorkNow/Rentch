@@ -1,5 +1,7 @@
+import 'package:provider/provider.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/property_search_repository.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +70,8 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
     );
     final found = await _repo.search(criteria);
     if (!mounted) return;
+    // Label outcomes from this surface too: hand the searchId to the provider.
+    context.read<DatingProvider>().setLastSearchId(_repo.lastSearchId);
     setState(() {
       _results = found;
       _step = _Step.results;

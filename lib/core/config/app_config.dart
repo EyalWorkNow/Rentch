@@ -125,14 +125,24 @@ class AppConfig {
     defaultValue: 'rently-reviews',
   );
 
+  // NOTE: these two constants act ONLY as an on/off gate for the dwell/session
+  // analytics repo (see canUsePropertyAnalytics + appwritePropertyViewSessionsTableId
+  // below). Their VALUE never reaches the backend — PropertyAnalyticsRepository
+  // routes through the AWS API via the fixed logical paths 'property_views' /
+  // 'property_likes' (aws.post('/property_views', …)), exactly like EventService
+  // uses 'events'. The backend's TABLE_PREFIX resolves the real DynamoDB table.
+  // They defaulted to '' which left dwell collection OFF in every prod build;
+  // giving them the real table names (rently- convention, matching
+  // dynamoPropertiesTable/dynamoUsersTable) turns collection ON while staying safe:
+  // only non-emptiness is observed at runtime.
   static const String dynamoPropertyViewsTable = String.fromEnvironment(
     'DYNAMO_PROPERTY_VIEWS_TABLE',
-    defaultValue: '',
+    defaultValue: 'rently-property-views',
   );
 
   static const String dynamoPropertyLikesTable = String.fromEnvironment(
     'DYNAMO_PROPERTY_LIKES_TABLE',
-    defaultValue: '',
+    defaultValue: 'rently-property-likes',
   );
 
   // Per-device state document ID (Appwrite → DynamoDB migration kept same concept).

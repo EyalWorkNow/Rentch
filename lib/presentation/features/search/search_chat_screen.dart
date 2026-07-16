@@ -1713,6 +1713,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     List<RentalProperty> serverRanked = const [];
     try {
       serverRanked = await _repo.search(criteria, limit: limit < 60 ? 60 : limit);
+      // Hand the minted searchId to the provider so a later swipe/click/contact
+      // on these cards can be labelled via POST /search/outcome.
+      provider.setLastSearchId(_repo.lastSearchId);
     } catch (_) {}
 
     if (serverRanked.isEmpty) {

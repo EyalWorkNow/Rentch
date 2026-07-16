@@ -141,6 +141,73 @@ class DatingProvider extends ChangeNotifier {
   // by the ranker (learnerFeatureSink) so a swipe can feed the learner in O(1).
   final Map<String, Map<String, double>> _pfvCache = {};
 
+  // The searchId of the most recent backend search that surfaced these cards.
+  // PropertySearchRepository is screen-local (each search screen owns its own
+  // instance + _lastSearchId), so the swipe/detail/contact handlers here cannot
+  // reach it directly — the search screen pushes it in via [setLastSearchId].
+  // Null-guarded everywhere: when unset (deck browsed without a prior search),
+  // outcome POSTs are simply skipped.
+  String? _lastSearchId;
+  String? get lastSearchId => _lastSearchId;
+
+  /// Records the searchId minted by the last backend search so subsequent
+  /// outcomes (swipe/click/contact) on the surfaced cards can be labelled.
+  /// Ignores empty/null so a non-backend fallback never clears a real id.
+  void setLastSearchId(String? searchId) {
+    if (searchId != null && searchId.isNotEmpty) _lastSearchId = searchId;
+  }
+
+  /// Best-effort label for the search that surfaced [propertyId]. Fires
+  /// `POST /search/outcome` with the real outcome so the backend records a
+  /// training label joinable to the impression logged at search time. Fully
+  /// non-blocking and error-swallowing — never affects the swipe/save UX. No-op
+  /// when there is no active searchId (deck browsed outside a search).
+  void _postSearchOutcome(
+    String propertyId,
+    String outcome, {
+    int? dwellMs,
+  }) {
+    final searchId = _lastSearchId;
+    if (searchId == null ||
+        searchId.isEmpty ||
+        propertyId.isEmpty ||
+        !AwsApiClient.instance.isConfigured) {
+      return;
+    }
+    unawaited(
+      AwsApiClient.instance.post('/search/outcome', {
+        'searchId': searchId,
+        'propertyId': propertyId,
+        'outcome': outcome,
+        if (dwellMs != null && dwellMs >= 0) 'dwellMs': dwellMs,
+      }).catchError((_) => <String, dynamic>{}),
+    );
+  }
+
+  /// Lazily populates [_pfvCache] with the learner feature vector for a single
+  /// deck card that was NOT surfaced via search (so a swipe on it can train the
+  /// FTRL learner). Reuses the EXACT feature computation [recommendForTenant]
+  /// uses — RecommendationEngine.recommend fills the [learnerFeatureSink] as a
+  /// side effect — scoped to just this property. Fail-soft: any error leaves the
+  /// cache untouched and the swipe still logs its label.
+  Map<String, double>? _ensureLearnerFeatures(RentalProperty property) {
+    final cached = _pfvCache[property.id];
+    if (cached != null) return cached;
+    try {
+      RecommendationEngine.recommend(
+        candidates: [property],
+        query: _queryFromFilters(_effectiveScoringFilters(_filters)),
+        profile: _tenantProfile,
+        limit: 1,
+        learner: _learner,
+        workLat: _tenantProfile?.workLat,
+        workLon: _tenantProfile?.workLon,
+        learnerFeatureSink: _pfvCache,
+      );
+    } catch (_) {/* fail-soft: swipe still records without a training example */}
+    return _pfvCache[property.id];
+  }
+
   Set<String> _likedPropertyIds = <String>{};
   Set<String> _passedPropertyIds = <String>{};
   Set<String> _ownerAcceptedPropertyIds = <String>{};
@@ -2644,7 +2711,16 @@ class DatingProvider extends ChangeNotifier {
     );
     unawaited(refreshPropertySignals(propertyId));
     unawaited(_persist());
+    // A detail open is a 'click' outcome for the search that surfaced the card.
+    _postSearchOutcome(propertyId, 'click');
     notifyListeners();
+  }
+
+  /// A user initiated contact on [propertyId] (strongest funnel outcome). Fires
+  /// the search 'contact' label; [viewToContactMs] carries the dwell-to-contact.
+  /// Best-effort/non-blocking — safe to call from the detail-screen contact path.
+  void recordContactOutcome(String propertyId, {int? viewToContactMs}) {
+    _postSearchOutcome(propertyId, 'contact', dwellMs: viewToContactMs);
   }
 
   void recordPropertyGallerySwipe(String propertyId, int currentPhotoIndex) {
@@ -3054,8 +3130,11 @@ class DatingProvider extends ChangeNotifier {
 
     // ── Close the FTRL loop: feed this real swipe into the online learner using
     // the feature vector stashed when the listing was ranked (O(1), no recompute).
-    // The learner is persisted with the rest of the state (see _persist / restore).
-    final feats = _pfvCache[property.id];
+    // Main-deck cards are NOT surfaced via search, so their vector is absent —
+    // compute it lazily for just this one property (same engine feature path) so
+    // deck swipes become training examples too. The learner is persisted with the
+    // rest of the state (see _persist / restore).
+    final feats = _ensureLearnerFeatures(property);
     if (feats != null) _learner.update(feats, liked ? 1.0 : 0.0);
 
     AppEvents.instance.service.logSwipeOutcome(
@@ -3064,6 +3143,17 @@ class DatingProvider extends ChangeNotifier {
       priceToBudgetRatio: ratio,
       dwellMs: dwellMs,
       predictedFit: _deckMatchScore[property.id]?.toDouble(),
+      searchId: _lastSearchId,
+    );
+    // Real training label for the search that surfaced this card (best-effort).
+    _postSearchOutcome(
+      property.id,
+      switch (direction) {
+        SwipeDirection.superlike => 'superlike',
+        SwipeDirection.like => 'like',
+        SwipeDirection.skip => 'skip',
+      },
+      dwellMs: dwellMs,
     );
     _foldUserSignal('swipeOutcome', {
       'direction': direction.name,
@@ -3694,11 +3784,18 @@ class DatingProvider extends ChangeNotifier {
   }
 
   Future<void> toggleSave(String propertyId) async {
+    final bool saved;
     if (_savedPropertyIds.contains(propertyId)) {
       _savedPropertyIds.remove(propertyId);
+      saved = false;
     } else {
       _savedPropertyIds.add(propertyId);
+      saved = true;
     }
+    // Capture the favorite/unfavorite as a behavioral signal (best-effort). The
+    // local set + persistence above is unchanged; this only adds the event.
+    AppEvents.instance.service
+        .logSaveToggled(propertyId: propertyId, saved: saved);
     await _persist();
     notifyListeners();
   }

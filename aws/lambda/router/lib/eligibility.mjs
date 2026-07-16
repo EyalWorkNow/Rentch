@@ -4,7 +4,9 @@
 // searchProfile matches get to SEE the listing in GET /properties. Each rule has
 // an "importance" that controls HOW HARD it gates visibility:
 //
-//   • must:      rule fails OR tenant value UNKNOWN → HIDE  (fail-closed)
+//   • must:      tenant value UNKNOWN → HIDE (fail-closed); a FAILED rule hides
+//                ONLY when the value is DECLARED (source==='profile'). An
+//                inferred value (source='search'/…) that fails does NOT hide.
 //   • important: HIDE only if the tenant value is KNOWN and the rule fails;
 //                UNKNOWN keeps the listing visible                (fail-open)
 //   • prefer:    never affects visibility (reserved for ranking; v1 no-op)
@@ -20,6 +22,20 @@ export function readFieldValue(profile, field) {
   const sp = (profile && profile.searchProfile) || {};
   const entry = sp[field];
   if (!entry || typeof entry !== 'object') return undefined;
+  const v = entry.value;
+  if (v === null || v === undefined || v === '') return undefined;
+  return v;
+}
+
+// Like readFieldValue, but returns the value ONLY when it was explicitly
+// DECLARED by the tenant (source === 'profile'). Inferred values (source
+// 'search'/'assistant'/…) are treated as "not declared" → undefined. Used by
+// the `must` fail path so an inferred value can never HARD-EXCLUDE a listing.
+export function readDeclaredValue(profile, field) {
+  const sp = (profile && profile.searchProfile) || {};
+  const entry = sp[field];
+  if (!entry || typeof entry !== 'object') return undefined;
+  if (entry.source !== 'profile') return undefined;
   const v = entry.value;
   if (v === null || v === undefined || v === '') return undefined;
   return v;
@@ -89,8 +105,13 @@ export function passesEligibility(listing, profile, callerUid) {
     const known = tenantValue !== undefined;
 
     if (importance === 'must') {
-      // Fail-closed: unknown OR failing rule hides the listing.
-      if (!known || !spec.pass(tenantValue, rule.value)) return false;
+      // Fail-closed on a truly-UNKNOWN value (missing field → hide). But a
+      // FAILED comparison may hide ONLY when the value is DECLARED
+      // (source==='profile'); an inferred value (e.g. source='search') that
+      // fails is treated as "not declared" and does NOT hide the listing.
+      if (!known) return false;
+      const declared = readDeclaredValue(profile, spec.field);
+      if (declared !== undefined && !spec.pass(declared, rule.value)) return false;
     } else if (importance === 'important') {
       // Fail-open: only a KNOWN value that fails hides the listing.
       if (known && !spec.pass(tenantValue, rule.value)) return false;
