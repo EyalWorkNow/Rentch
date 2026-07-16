@@ -98,6 +98,35 @@ enum UserEventType {
   // then joinable by (sessionId, propertyId), and `swipeOutcome` also carries the
   // predicted fit inline so a single swipe row is a complete training example.
   rankedImpression, // {fitPct, rank, dims:{dim:contribution}}
+
+  // ── Navigation & search-style telemetry ───────────────────────────────────
+  // Wide behavioural signal about HOW the user moves through the app and shapes
+  // their search — used to infer user type (decisive vs explorer), preferences,
+  // search style, and what pulls them toward the conversion action (leaving
+  // details / contacting a landlord). All fire-and-forget, clamped payloads.
+  backNavigated, // {fromRoute, toRoute, dwellMs, isSystemBack} — a back/pop
+  searchRefined, // {changedField, direction, refinementCount} — successive tweak
+  searchAbandoned, // {resultCount, dwellMs, hadInteraction} — left w/o engaging
+  leadFunnelStep, // {step, propertyId, msSincePrevStep} — path toward contact
+  hesitationSignal, // {context, dwellMs, reversals} — indecision markers
+  explorationBreadth, // {distinctPropertiesViewed, distinctAreas, priceRangeSpan}
+  sessionInsights, // per-session behavioural summary (see BehaviorInsights)
+}
+
+/// Whether a search refinement widened or narrowed the result set, for
+/// [EventService.logSearchRefined]. `lateral` = same breadth, different facet
+/// (e.g. moved the area without changing how many results it admits).
+enum RefinementDirection { broaden, narrow, lateral }
+
+/// Ordered path a user walks toward leaving their details with a landlord, for
+/// [EventService.logLeadFunnelStep]. Declared in funnel order so a consumer can
+/// compare `.index` to find the furthest step reached.
+enum LeadFunnelStep {
+  view, // saw the listing in a feed / result list
+  detail, // opened the full detail page
+  media, // engaged rich media (photos / 360 / 3D / video)
+  contactIntent, // tapped contact / "leave details" (intent, not yet sent)
+  contactSubmitted, // actually submitted the contact / lead
 }
 
 /// Direction of a swipe decision, as recorded by [EventService.logSwipeOutcome].
@@ -373,6 +402,143 @@ class EventService {
         UserEventType.priceSensitivity,
         metadata: {'maxOverBudgetRatioLiked': maxOverBudgetRatioLiked},
       );
+
+  // ── Navigation & search-style emit API ────────────────────────────────────
+  //
+  // Same fire-and-forget contract as the signals above. These capture HOW the
+  // user navigates and refines — a wide, privacy-safe behavioural signal for the
+  // ranker and product insights. Route/context labels are screen names, never PII.
+
+  /// (13) A back/pop navigation. [fromRoute] is the screen the user backed OUT
+  /// of, [toRoute] the screen they returned TO (both privacy-safe screen names,
+  /// never a URL/PII). [dwellMs] is time on the popped screen (didPush→didPop).
+  /// [isSystemBack] = true for an OS/gesture back (Android hardware back, iOS
+  /// edge-swipe) vs a tapped in-app back affordance, when distinguishable
+  /// (best-effort — defaults to system when an in-app back wasn't announced).
+  void logBackNavigation({
+    required String fromRoute,
+    required String toRoute,
+    required int dwellMs,
+    required bool isSystemBack,
+  }) =>
+      log(
+        UserEventType.backNavigated,
+        metadata: {
+          'fromRoute': _clampLabel(fromRoute),
+          'toRoute': _clampLabel(toRoute),
+          'dwellMs': math.max(0, dwellMs),
+          'isSystemBack': isSystemBack,
+        },
+      );
+
+  /// (14) A successive query/filter tweak. [changedField] is the facet touched
+  /// (e.g. 'price', 'area', 'rooms'); [direction] says whether it widened or
+  /// narrowed the result set; [refinementCount] is the running number of tweaks
+  /// this session (1-based) — a high count signals an explorer / picky searcher.
+  void logSearchRefined({
+    required String changedField,
+    required RefinementDirection direction,
+    required int refinementCount,
+  }) =>
+      log(
+        UserEventType.searchRefined,
+        metadata: {
+          'changedField': _clampLabel(changedField),
+          'direction': direction.name,
+          'refinementCount': math.max(0, refinementCount),
+        },
+      );
+
+  /// (15) User left a search/result surface without engaging any result.
+  /// [resultCount] = results shown, [dwellMs] = time on the surface,
+  /// [hadInteraction] = whether they scrolled/tapped anything short of opening a
+  /// result. A cluster of these on rich result sets flags mismatch/frustration.
+  void logSearchAbandoned({
+    required int resultCount,
+    required int dwellMs,
+    required bool hadInteraction,
+  }) =>
+      log(
+        UserEventType.searchAbandoned,
+        metadata: {
+          'resultCount': math.max(0, resultCount),
+          'dwellMs': math.max(0, dwellMs),
+          'hadInteraction': hadInteraction,
+        },
+      );
+
+  /// (16) One step on the path toward leaving details with a landlord.
+  /// [step] is the ordered [LeadFunnelStep]; [msSincePrevStep] is latency from
+  /// the previous step for this property (null for the first step). Emitting each
+  /// step — not just the final contact — reconstructs the full conversion path
+  /// and reveals where users stall before converting.
+  void logLeadFunnelStep({
+    required LeadFunnelStep step,
+    required String propertyId,
+    int? msSincePrevStep,
+  }) =>
+      log(
+        UserEventType.leadFunnelStep,
+        propertyId: propertyId,
+        metadata: {
+          'step': step.name,
+          'stepIndex': step.index,
+          if (msSincePrevStep != null)
+            'msSincePrevStep': math.max(0, msSincePrevStep),
+        },
+      );
+
+  /// (17) An indecision marker. [context] labels where it happened (e.g.
+  /// 'card', 'detail', 'contactForm'); [dwellMs] the lingering time; [reversals]
+  /// the count of back-and-forth actions (opened→backed→reopened, toggles). High
+  /// reversals distinguish a hesitant user from a decisive one.
+  void logHesitationSignal({
+    required String context,
+    required int dwellMs,
+    required int reversals,
+  }) =>
+      log(
+        UserEventType.hesitationSignal,
+        metadata: {
+          'context': _clampLabel(context),
+          'dwellMs': math.max(0, dwellMs),
+          'reversals': math.max(0, reversals),
+        },
+      );
+
+  /// (18) Session-level breadth of exploration. [distinctPropertiesViewed] and
+  /// [distinctAreas] size the search; [priceRangeSpan] is the max−min price of
+  /// listings the user engaged. Low breadth ⇒ decisive/targeted; high ⇒ explorer.
+  void logExplorationBreadth({
+    required int distinctPropertiesViewed,
+    required int distinctAreas,
+    required double priceRangeSpan,
+  }) =>
+      log(
+        UserEventType.explorationBreadth,
+        metadata: {
+          'distinctPropertiesViewed': math.max(0, distinctPropertiesViewed),
+          'distinctAreas': math.max(0, distinctAreas),
+          'priceRangeSpan': math.max(0.0, priceRangeSpan),
+        },
+      );
+
+  /// (19) A rolled-up per-session behavioural summary produced on-device by
+  /// [BehaviorInsights]. [summary] is a pre-built, bounded map describing the
+  /// user's session (counts, dwell distribution, refinement direction tally,
+  /// exploration breadth, furthest funnel step) — see BehaviorInsights for its
+  /// exact shape. Passed through verbatim; the shared 2 KB cap still applies.
+  void logSessionInsights(Map<String, dynamic> summary) => log(
+        UserEventType.sessionInsights,
+        metadata: summary,
+      );
+
+  /// Normalize a free-form label to a compact, privacy-safe token: trimmed and
+  /// hard-capped so no accidental long/PII string bloats a metadata row.
+  static String _clampLabel(String s, {int max = 64}) {
+    final t = s.trim();
+    return t.length <= max ? t : t.substring(0, max);
+  }
 
   Future<void> _writeEvent({
     required UserEventType type,

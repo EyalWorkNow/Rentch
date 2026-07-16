@@ -225,6 +225,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                               onTap: () =>
                                                   Navigator.of(context).push(
                                                 MaterialPageRoute(
+                                                  settings: const RouteSettings(
+                                                      name: 'MessageScreen'),
                                                   builder: (_) => MessageScreen(
                                                       matchId: pair.match.id),
                                                 ),
@@ -251,6 +253,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                             onTap: () =>
                                                 Navigator.of(context).push(
                                               MaterialPageRoute(
+                                                settings: const RouteSettings(
+                                                    name: 'MessageScreen'),
                                                 builder: (_) => MessageScreen(
                                                     matchId: pair.match.id),
                                               ),

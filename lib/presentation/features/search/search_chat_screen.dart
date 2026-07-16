@@ -13,6 +13,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:dating_app/core/services/assistant_service.dart';
+import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/recommendation_explainer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -86,6 +87,11 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   int _userTurns = 0;
   bool _searched = false;
+  // Search-style telemetry (fail-soft, no UX impact): running count of query
+  // refinements this session, and whether the user ever opened a result — the
+  // latter distinguishes an abandoned result set from an engaged one.
+  int _refinementCount = 0;
+  bool _openedResult = false;
   bool _busy = false;
   bool _lifestyleNoteShown = false; // show the "considered your lifestyle" note once
   bool _lastShowedResults = false; // did the last _send render listing cards
@@ -306,6 +312,31 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         rawText: _query.rawText,
       );
     });
+    // Search refinement: dropping a constraint always BROADENS the result set.
+    try {
+      final changed = price
+          ? 'price'
+          : rooms
+              ? 'rooms'
+              : city
+                  ? 'city'
+                  : neighborhood
+                      ? 'neighborhood'
+                      : propertyType
+                          ? 'propertyType'
+                          : train
+                              ? 'train'
+                              : cheap
+                                  ? 'cheap'
+                                  : (amenity ?? 'filter');
+      _refinementCount++;
+      AppEvents.instance.service.logSearchRefined(
+        changedField: changed,
+        direction: RefinementDirection.broaden,
+        refinementCount: _refinementCount,
+      );
+      BehaviorInsights.instance.noteSearchRefined(RefinementDirection.broaden);
+    } catch (_) {/* fail-soft */}
     _rerunSearch();
   }
 
@@ -355,11 +386,16 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
               _AssistantPropertyCard(
                 scored: m.scored[i],
                 nearbyProfile: _seekerNearbyProfile(),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => PropertyDetailScreen(
-                        property: m.scored[i].property,
-                        entrySource: 'search',
-                        entryRank: i))),
+                onTap: () {
+                  _openedResult = true; // engaged a result → not abandoned
+                  Navigator.of(context).push(MaterialPageRoute(
+                      settings:
+                          const RouteSettings(name: 'PropertyDetailScreen'),
+                      builder: (_) => PropertyDetailScreen(
+                          property: m.scored[i].property,
+                          entrySource: 'search',
+                          entryRank: i)));
+                },
               ),
             ],
           ),
@@ -414,6 +450,21 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   @override
   void dispose() {
+    // Search abandonment: results were surfaced but the user never opened any.
+    // Best-effort — this tab lives in an IndexedStack, so dispose fires on
+    // session teardown rather than every tab switch; it still captures a search
+    // that ended with real results left untouched. Fail-soft.
+    try {
+      final count = _lastResultCount;
+      if (_searched && count > 0 && !_openedResult) {
+        AppEvents.instance.service.logSearchAbandoned(
+          resultCount: count,
+          dwellMs: 0,
+          hadInteraction: true,
+        );
+        BehaviorInsights.instance.noteSearchAbandoned();
+      }
+    } catch (_) {/* fail-soft */}
     SpeedMode.immediate.removeListener(_onSpeedModeChanged);
     for (final t in _streamTimers) {
       t.cancel();

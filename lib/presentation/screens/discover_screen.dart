@@ -7,6 +7,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
+import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/core/services/aws_client.dart';
@@ -21,7 +22,9 @@ import 'package:dating_app/presentation/screens/saved_searches_screen.dart';
 import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/data/models/app_notification.dart';
 import 'package:dating_app/presentation/widgets/gamification/fomo_widgets.dart';
+import 'package:dating_app/presentation/widgets/recommended_for_you_strip.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
+import 'package:dating_app/main.dart' show markInAppBack;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -63,7 +66,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Run once on entry too (covers cold start), not just on later resumes.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkSavedSearches());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSavedSearches();
+      // Prime the collaborative-filtering picks that power the "מומלץ בשבילך"
+      // strip under the search bar. Fail-soft in the provider — never blocks or
+      // errors the UI, and leaves the strip hidden if nothing comes back.
+      if (mounted) {
+        context.read<DatingProvider>().loadCfRecommendations();
+      }
+    });
   }
 
   @override
@@ -226,6 +237,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         AppEvents.instance.service
             .logCardDwell(propertyId: decided.id, dwellMs: dwellMs);
 
+        // Lead funnel: this listing was surfaced/seen in the deck (the `view`
+        // step) — the entry point of the path toward leaving details. Mirror to
+        // BehaviorInsights (funnel + exploration breadth).
+        AppEvents.instance.service.logLeadFunnelStep(
+          step: LeadFunnelStep.view,
+          propertyId: decided.id,
+        );
+        BehaviorInsights.instance.noteFunnelStep(LeadFunnelStep.view);
+        BehaviorInsights.instance.notePropertyViewed(
+          propertyId: decided.id,
+          area: decided.city,
+          price: decided.price.toDouble(),
+        );
+
         _comparisonIds.add(decided.id);
         final isLike = direction == CardSwiperDirection.right ||
             direction == CardSwiperDirection.top;
@@ -291,6 +316,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
+                settings: const RouteSettings(name: 'PropertyDetailScreen'),
                 builder: (_) => PropertyDetailScreen(
                     property: p, entrySource: 'deck', entryRank: index),
               ),
@@ -670,6 +696,21 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     onClose: () => setState(() => _searchOpen = false),
                     onSubmit: _runNlSearch,
                     onClear: _clearNlSearch,
+                    // "מומלץ בשבילך" — resolve the CF-recommended ids to live
+                    // listings for the strip under the field. Empty ⇒ hidden.
+                    recommended: provider.cfRecommendedIds
+                        .map(provider.propertyById)
+                        .whereType<RentalProperty>()
+                        .toList(),
+                    onRecommendedTap: (p) {
+                      setState(() => _searchOpen = false);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PropertyDetailScreen(property: p, entrySource: 'cf'),
+                        ),
+                      );
+                    },
                   ),
                 ),
             ],
@@ -1144,6 +1185,8 @@ class _AnimatedNlSearch extends StatefulWidget {
     required this.onClose,
     required this.onSubmit,
     required this.onClear,
+    required this.recommended,
+    required this.onRecommendedTap,
   });
 
   final bool open;
@@ -1154,6 +1197,10 @@ class _AnimatedNlSearch extends StatefulWidget {
   final VoidCallback onClose;
   final ValueChanged<String> onSubmit;
   final VoidCallback onClear;
+  // CF-recommended listings for the "מומלץ בשבילך" strip revealed under the
+  // expanded field, and the tap handler that opens one.
+  final List<RentalProperty> recommended;
+  final ValueChanged<RentalProperty> onRecommendedTap;
 
   @override
   State<_AnimatedNlSearch> createState() => _AnimatedNlSearchState();
@@ -1273,6 +1320,23 @@ class _AnimatedNlSearchState extends State<_AnimatedNlSearch>
                 Padding(
                   padding: const EdgeInsets.only(top: 6, right: 8, left: 8),
                   child: _belowText(),
+                ),
+              // "מומלץ בשבילך" — CF picks, shown once the bar is fully open and
+              // the field is still empty (no active search yet). Rebuilds on
+              // typing via the controller so it hides the moment the user types.
+              if (t > 0.92 && widget.summary == null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8, left: 8),
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: widget.controller,
+                    builder: (context, value, _) {
+                      if (value.text.isNotEmpty) return const SizedBox.shrink();
+                      return RecommendedForYouStrip(
+                        properties: widget.recommended,
+                        onTap: widget.onRecommendedTap,
+                      );
+                    },
+                  ),
                 ),
             ],
           );
@@ -2170,7 +2234,10 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: GestureDetector(
-                            onTap: () => Navigator.of(context).pop(),
+                            onTap: () {
+                              markInAppBack();
+                              Navigator.of(context).pop();
+                            },
                             child: Container(
                               width: 36,
                               height: 36,
@@ -3968,7 +4035,10 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back_rounded,
                         color: AppColors.navy),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      markInAppBack();
+                      Navigator.of(context).pop();
+                    },
                   ),
                 ),
                 // Filter Dropdown Button replacing Search Bar

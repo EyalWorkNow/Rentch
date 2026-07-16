@@ -7,8 +7,10 @@ import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/interaction_service.dart';
+import 'package:dating_app/main.dart' show markInAppBack;
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/ask_rently_sheet.dart';
 import 'package:dating_app/presentation/widgets/price_badge.dart';
@@ -90,6 +92,30 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _mediaDwellMs = 0;
   bool _contacted = false; // guard so a single contact emits once
 
+  // Lead-conversion funnel: timestamp of the previous step for THIS detail view,
+  // so each step carries its latency-from-prev. Fail-soft, no UX impact.
+  DateTime? _lastFunnelStepAt;
+
+  /// Emits one lead-funnel step (raw `leadFunnelStep` event + BehaviorInsights
+  /// mirror), computing msSincePrevStep from the previous step reached on this
+  /// screen. Fully fail-soft; a no-op in landlord-preview mode.
+  void _noteFunnelStep(LeadFunnelStep step) {
+    if (widget.isLandlordPreview) return;
+    try {
+      final now = DateTime.now();
+      final delta = _lastFunnelStepAt == null
+          ? null
+          : now.difference(_lastFunnelStepAt!).inMilliseconds;
+      _lastFunnelStepAt = now;
+      AppEvents.instance.service.logLeadFunnelStep(
+        step: step,
+        propertyId: widget.property.id,
+        msSincePrevStep: delta,
+      );
+      BehaviorInsights.instance.noteFunnelStep(step);
+    } catch (_) {/* fail-soft */}
+  }
+
   /// Finalizes any background scan for this listing (attaching a finished model)
   /// and refreshes the cached "processing" state. Only the owner has a pending
   /// record; the provider notifies listeners so the banner / viewer updates.
@@ -119,6 +145,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       } else if (p.videoUrls.isNotEmpty) {
         _openedVideo = true;
       }
+      // Lead funnel: engaging rich media (360 / 3D / video) on the way to contact.
+      _noteFunnelStep(LeadFunnelStep.media);
       // The tour is a pushed route / sheet; approximate dwell as time until the
       // user is back on this screen by sampling on the next frame after return.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -131,28 +159,34 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   /// Records the in-app contact (like → match/chat) as a funnel + timing
   /// signal, then delegates to the supplied real action.
   void _contactTracked(VoidCallback action) {
-    if (!widget.isLandlordPreview && !_contacted) {
-      _contacted = true;
-      try {
-        final svc = AppEvents.instance.service;
-        svc.logContactInitiated(
-          propertyId: widget.property.id,
-          viewToContactMs: _viewStopwatch.elapsedMilliseconds,
-        );
-        svc.logFunnelStage(
-          stage: FunnelStage.contact,
-          propertyId: widget.property.id,
-        );
-        // Strongest funnel outcome for the search that surfaced this listing.
-        _analyticsProvider?.recordContactOutcome(
-          widget.property.id,
-          viewToContactMs: _viewStopwatch.elapsedMilliseconds,
-          entrySource: widget.entrySource,
-          entryRank: widget.entryRank,
-        );
-      } catch (_) {/* fail-soft */}
+    if (widget.isLandlordPreview || _contacted) {
+      action();
+      return;
     }
+    _contacted = true;
+    try {
+      final svc = AppEvents.instance.service;
+      svc.logContactInitiated(
+        propertyId: widget.property.id,
+        viewToContactMs: _viewStopwatch.elapsedMilliseconds,
+      );
+      svc.logFunnelStage(
+        stage: FunnelStage.contact,
+        propertyId: widget.property.id,
+      );
+      // Lead funnel: the contact / "leave details" button was TAPPED (intent).
+      _noteFunnelStep(LeadFunnelStep.contactIntent);
+      // Strongest funnel outcome for the search that surfaced this listing.
+      _analyticsProvider?.recordContactOutcome(
+        widget.property.id,
+        viewToContactMs: _viewStopwatch.elapsedMilliseconds,
+        entrySource: widget.entrySource,
+        entryRank: widget.entryRank,
+      );
+    } catch (_) {/* fail-soft */}
     action();
+    // [action] performs the like → the lead is actually submitted to the owner.
+    _noteFunnelStep(LeadFunnelStep.contactSubmitted);
   }
 
   @override
@@ -180,6 +214,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             propertyId: widget.property.id,
           );
         } catch (_) {/* fail-soft */}
+        // Lead-conversion funnel: opened the full detail page.
+        _noteFunnelStep(LeadFunnelStep.detail);
       });
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -310,7 +346,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             avgRating: avgRating,
             hasVirtualTour: hasVirtualTour,
             isLandlordPreview: widget.isLandlordPreview,
-            onBackTap: () => Navigator.of(context).pop(),
+            onBackTap: () {
+              markInAppBack();
+              Navigator.of(context).pop();
+            },
             onShareTap: () => showPropertyShareSheet(context, p),
             onLike: () => _contactTracked(() {
               context.read<DatingProvider>().likeProperty(p.id);
@@ -339,7 +378,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           hasVirtualTour: hasVirtualTour,
           isLandlordPreview: widget.isLandlordPreview,
           monthlyIncome: provider.tenantProfile?.monthlyIncome,
-          onBackTap: () => Navigator.of(context).pop(),
+          onBackTap: () {
+            markInAppBack();
+            Navigator.of(context).pop();
+          },
           onShareTap: () => showPropertyShareSheet(context, p),
           onLike: () => _contactTracked(() {
             context.read<DatingProvider>().likeProperty(p.id);

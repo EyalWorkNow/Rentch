@@ -17,6 +17,7 @@ import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/presentation/screens/owner_listings_screen.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
+import 'package:dating_app/main.dart' show markInAppBack;
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -1629,6 +1630,7 @@ class _LandlordProfileScreen extends StatelessWidget {
           GestureDetector(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
+                  settings: const RouteSettings(name: 'EditProfileScreen'),
                   builder: (_) => EditProfileScreen(profile: profile)),
             ),
             child: Container(
@@ -1765,6 +1767,7 @@ class _LandlordProfileScreen extends StatelessWidget {
             label: 'פרטי חשבון',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
+                  settings: const RouteSettings(name: 'EditProfileScreen'),
                   builder: (_) => EditProfileScreen(profile: profile)),
             ),
           ),
@@ -1775,6 +1778,7 @@ class _LandlordProfileScreen extends StatelessWidget {
               label: 'הדירות שלי · שיתוף לינק',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
+                  settings: const RouteSettings(name: 'OwnerListingsScreen'),
                   builder: (_) => OwnerListingsScreen(
                     ownerUserId: '',
                     ownerName: profile.name,
@@ -3140,7 +3144,10 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
+                    onTap: () {
+                      markInAppBack();
+                      Navigator.of(context).pop();
+                    },
                     child: Container(
                       width: 44,
                       height: 44,

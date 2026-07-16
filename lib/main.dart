@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/scenario_layers.dart';
@@ -32,6 +33,112 @@ import 'package:dating_app/core/services/deep_link_service.dart';
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 // Held so its link-stream subscription stays alive for the app's lifetime.
 DeepLinkService? _deepLinks;
+
+/// Single app-wide back-navigation observer. Created once (not per build) and
+/// attached to the [MaterialApp.navigatorObservers]; see [_BackNavigationObserver].
+final _BackNavigationObserver _backNavObserver = _BackNavigationObserver();
+
+// Best-effort in-app-vs-system back disambiguation. `didPop` alone can't tell an
+// OS/gesture back from a tapped in-app back, so an in-app back affordance may
+// announce itself via [markInAppBack] right before popping; a pop within
+// [_kInAppBackWindow] of that call is attributed to an in-app back.
+DateTime? _inAppBackAt;
+const Duration _kInAppBackWindow = Duration(milliseconds: 500);
+
+/// Public adoption hook: in-app back affordances (AppBar back arrow, custom
+/// "return" buttons) call this immediately before `Navigator.pop` so the
+/// resulting `backNavigated` event is tagged `isSystemBack: false`. Screens that
+/// don't call it simply have their backs counted as system/gesture backs
+/// (the common default). No-op-safe to call from anywhere.
+void markInAppBack() => _inAppBackAt = DateTime.now();
+
+/// Privacy-safe screen label for a route. Uses an explicit [RouteSettings.name]
+/// when a screen supplies one; otherwise falls back to the route's runtime type
+/// so pages / dialogs / bottom-sheets are still distinguishable. Never emits a
+/// URL, id, or argument — only a screen/route TYPE.
+///
+/// BLOCKER (documented, not fixable from the 3 owned files): this app pushes via
+/// ~91 unnamed `MaterialPageRoute`s in screen files, so most labels resolve to
+/// `<MaterialPageRoute<...>>` rather than a human screen name. Richer per-screen
+/// names require adding `settings: RouteSettings(name: 'ScreenX')` at those push
+/// sites (or wrapping screens with a RouteObserver-aware mixin) — all in files
+/// this task does not own.
+String _routeScreenName(Route<dynamic>? route) {
+  if (route == null) return 'none';
+  final name = route.settings.name;
+  if (name != null && name.trim().isNotEmpty) {
+    final n = name.trim();
+    return n.length <= 64 ? n : n.substring(0, 64);
+  }
+  return '<${route.runtimeType}>';
+}
+
+/// Captures every back/pop navigation and emits a `backNavigated` event
+/// (EventService) plus a note into [BehaviorInsights].
+///
+/// What it captures per pop:
+///   • fromRoute  — the screen the user backed OUT of ([_routeScreenName]).
+///   • toRoute    — the screen revealed underneath (returned TO).
+///   • dwellMs    — time on the popped screen, measured didPush → didPop.
+///   • isSystemBack — OS/gesture back (Android hardware back, iOS edge-swipe)
+///     vs a tapped in-app back affordance. didPop alone can't tell them apart,
+///     so an in-app back button MAY announce itself via [markInAppBack] just
+///     before popping; a pop within [_kInAppBackWindow] of that call is tagged
+///     in-app, otherwise it defaults to a system back (the common case).
+class _BackNavigationObserver extends NavigatorObserver {
+  // didPush timestamp per live route → dwell on didPop. Cleared on pop/remove/
+  // replace, so it never grows past the current navigation stack depth.
+  final Map<Route<dynamic>, DateTime> _pushedAt = <Route<dynamic>, DateTime>{};
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _pushedAt[route] = DateTime.now();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _handlePop(route, previousRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _pushedAt.remove(route);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (oldRoute != null) _pushedAt.remove(oldRoute);
+    if (newRoute != null) _pushedAt[newRoute] = DateTime.now();
+  }
+
+  void _handlePop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    try {
+      final pushedAt = _pushedAt.remove(route);
+      final dwellMs = pushedAt == null
+          ? 0
+          : DateTime.now().difference(pushedAt).inMilliseconds;
+      final from = _routeScreenName(route);
+      final to = _routeScreenName(previousRoute);
+
+      final marked = _inAppBackAt;
+      final isInApp = marked != null &&
+          DateTime.now().difference(marked) <= _kInAppBackWindow;
+      _inAppBackAt = null;
+
+      AppEvents.instance.service.logBackNavigation(
+        fromRoute: from,
+        toRoute: to,
+        dwellMs: dwellMs,
+        isSystemBack: !isInApp,
+      );
+      BehaviorInsights.instance.noteBackNavigation(
+        fromScreen: from,
+        dwellMs: dwellMs,
+        isSystemBack: !isInApp,
+      );
+    } catch (_) {/* fail-soft: telemetry must never break navigation */}
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -146,6 +253,7 @@ class RentlyApp extends StatelessWidget {
           return MaterialApp(
             title: 'Rently',
             navigatorKey: appNavigatorKey,
+            navigatorObservers: [_backNavObserver],
             debugShowCheckedModeBanner: false,
             theme: _buildTheme(palette),
             builder: (context, child) {
@@ -420,6 +528,10 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Begin the rolling behavioural-insights window for this session; it
+    // auto-flushes a `sessionInsights` summary periodically and on session end
+    // (see _emitSessionContext). Fail-soft and self-contained.
+    BehaviorInsights.instance.start();
     // Refresh the home-screen widget after relevant data changes (new match,
     // like, read state). Debounced so a burst of notifyListeners() coalesces
     // into a single widget write + network fetch.
@@ -444,6 +556,8 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
     _widgetSyncDebounce?.cancel();
     _provider?.removeListener(_onProviderChanged);
     WidgetsBinding.instance.removeObserver(this);
+    // Cancel the insights flush timer (and emit any final summary) on teardown.
+    BehaviorInsights.instance.stop();
     super.dispose();
   }
 
@@ -452,11 +566,16 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _emitSessionContext();
+      // Flush the final per-session behavioural summary as the app leaves the
+      // foreground (stop() cancels the periodic timer and emits once).
+      BehaviorInsights.instance.stop();
     } else if (state == AppLifecycleState.resumed) {
       // Refresh the home-screen widget's activity summary whenever the app
       // comes back to the foreground. Fail-soft inside the service.
       final provider = context.read<DatingProvider>();
       HomeWidgetService.sync(provider);
+      // Restart the insights window's periodic flush (stopped on pause).
+      BehaviorInsights.instance.start();
     }
   }
 

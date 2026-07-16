@@ -1153,7 +1153,9 @@ class _EmptyOwnerQueue extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MatchesScreen()),
+                    MaterialPageRoute(
+                        settings: const RouteSettings(name: 'MatchesScreen'),
+                        builder: (_) => const MatchesScreen()),
                   ),
                   icon: const RentlyIcon(IconsaxPlusLinear.message, size: 17),
                   label: const Text('עבור לשיחות'),
