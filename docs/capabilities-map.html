@@ -1,0 +1,267 @@
+<title>מפת יכולות — Rently</title>
+<style>
+  :root{
+    --bg:#f5f7f5; --panel:#ffffff; --panel-2:#eef2ef; --ink:#14201a; --ink-soft:#39473f; --muted:#657268; --hair:#e0e6e1;
+    --accent:#12876a; --accent-soft:#12876a14; --accent-ink:#0c6650;
+    --live:#1f9b6a; --live-bg:#1f9b6a16; --gated:#b7791a; --gated-bg:#b7791a16; --dorm:#6b7686; --dorm-bg:#6b768614; --dep:#c0473c; --dep-bg:#c0473c12;
+    --shadow:0 1px 2px #14201a08, 0 10px 28px -14px #14201a24;
+    --mono:ui-monospace,"SF Mono","Menlo","Cascadia Code",monospace;
+    --sans:-apple-system,"SF Pro Hebrew","Segoe UI",system-ui,"Arial Hebrew","Noto Sans Hebrew",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0b100d; --panel:#141a16; --panel-2:#1a2220; --ink:#e9f0ea; --ink-soft:#bcc9c0; --muted:#84928a; --hair:#25302a;
+    --accent:#2fc09a; --accent-soft:#2fc09a16; --accent-ink:#54d4b1;
+    --live:#4dc088; --live-bg:#4dc08816; --gated:#d99f3a; --gated-bg:#d99f3a16; --dorm:#8592a0; --dorm-bg:#8592a016; --dep:#e0685c; --dep-bg:#e0685c14;
+    --shadow:0 1px 2px #00000040, 0 14px 32px -16px #00000070;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0b100d; --panel:#141a16; --panel-2:#1a2220; --ink:#e9f0ea; --ink-soft:#bcc9c0; --muted:#84928a; --hair:#25302a;
+    --accent:#2fc09a; --accent-soft:#2fc09a16; --accent-ink:#54d4b1;
+    --live:#4dc088; --live-bg:#4dc08816; --gated:#d99f3a; --gated-bg:#d99f3a16; --dorm:#8592a0; --dorm-bg:#8592a016; --dep:#e0685c; --dep-bg:#e0685c14;
+    --shadow:0 1px 2px #00000040, 0 14px 32px -16px #00000070;
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f7f5; --panel:#ffffff; --panel-2:#eef2ef; --ink:#14201a; --ink-soft:#39473f; --muted:#657268; --hair:#e0e6e1;
+    --accent:#12876a; --accent-soft:#12876a14; --accent-ink:#0c6650;
+    --live:#1f9b6a; --live-bg:#1f9b6a16; --gated:#b7791a; --gated-bg:#b7791a16; --dorm:#6b7686; --dorm-bg:#6b768614; --dep:#c0473c; --dep-bg:#c0473c12;
+    --shadow:0 1px 2px #14201a08, 0 10px 28px -14px #14201a24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:16px;
+    background-image:radial-gradient(circle at 88% -8%,var(--accent-soft),transparent 44%)}
+  .wrap{max-width:1100px;margin:0 auto;padding:clamp(24px,5vw,58px) clamp(18px,4vw,44px) 100px}
+  code,.mono{font-family:var(--mono);font-size:.84em;direction:ltr;unicode-bidi:isolate}
+  h1,h2,h3,h4{text-wrap:balance;line-height:1.16;margin:0}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin:0 0 14px;direction:ltr;text-align:right;unicode-bidi:isolate}
+  header{border-bottom:1px solid var(--hair);padding-bottom:30px;margin-bottom:36px}
+  h1{font-size:clamp(28px,5vw,46px);font-weight:800;letter-spacing:-.015em}
+  .lede{font-size:clamp(16px,2.2vw,20px);color:var(--ink-soft);margin-top:15px;max-width:64ch}
+  .lede b{color:var(--ink)}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:22px;font-size:13px}
+  .lg{display:inline-flex;align-items:center;gap:7px;color:var(--muted)}
+  .lg::before{content:"";width:10px;height:10px;border-radius:50%}
+  .lg.live::before{background:var(--live)} .lg.gated::before{background:var(--gated)} .lg.dorm::before{background:var(--dorm)} .lg.dep::before{background:var(--dep)}
+
+  section{margin-top:46px}
+  h2{font-size:clamp(19px,2.8vw,26px);font-weight:800;letter-spacing:-.01em;display:flex;align-items:baseline;gap:11px}
+  h2 .num{font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:600}
+  .sub{color:var(--muted);margin-top:7px;max-width:70ch;font-size:14.5px}
+
+  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:22px}
+  .role{background:var(--panel);border:1px solid var(--hair);border-radius:13px;padding:17px 18px;box-shadow:var(--shadow);border-top:3px solid var(--accent)}
+  .role h3{font-size:16px;font-weight:750;margin-bottom:3px}
+  .role .nav{font-size:12px;color:var(--muted);font-family:var(--mono);direction:rtl;margin-bottom:9px}
+  .role ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+  .role li{font-size:13.5px;color:var(--ink-soft);padding-inline-start:16px;position:relative}
+  .role li::before{content:"";position:absolute;inset-inline-start:2px;top:8px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+  .tblwrap{overflow-x:auto;margin-top:20px;border:1px solid var(--hair);border-radius:13px;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;min-width:640px;background:var(--panel)}
+  th,td{text-align:right;padding:10px 14px;border-bottom:1px solid var(--hair);vertical-align:top}
+  thead th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;background:var(--panel-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td.k{font-weight:650;font-size:14px} td.s{font-size:13px;color:var(--ink-soft)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:11.5px;white-space:nowrap;padding:3px 9px;border-radius:20px}
+  .pill::before{content:"";width:8px;height:8px;border-radius:50%}
+  .pill.live{color:var(--live);background:var(--live-bg)}.pill.live::before{background:var(--live)}
+  .pill.gated{color:var(--gated);background:var(--gated-bg)}.pill.gated::before{background:var(--gated)}
+  .pill.dorm{color:var(--dorm);background:var(--dorm-bg)}.pill.dorm::before{background:var(--dorm)}
+  .pill.dep{color:var(--dep);background:var(--dep-bg)}.pill.dep::before{background:var(--dep)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:11px;margin-top:20px}
+  .tool{background:var(--panel);border:1px solid var(--hair);border-radius:11px;padding:13px 15px;box-shadow:var(--shadow)}
+  .tool h4{font-size:14px;font-weight:700;margin-bottom:3px}
+  .tool p{margin:0;font-size:12.5px;color:var(--muted)}
+
+  .flags{margin-top:22px;background:var(--panel);border:1px solid var(--hair);border-inline-start:4px solid var(--gated);border-radius:12px;padding:18px 22px;box-shadow:var(--shadow)}
+  .flags h3{font-size:16px;font-weight:750;margin-bottom:10px}
+  .flags ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+  .flags li{font-size:13.5px;color:var(--ink-soft);padding-inline-start:18px;position:relative}
+  .flags li::before{content:"⚑";position:absolute;inset-inline-start:0;color:var(--gated);font-size:11px;top:3px}
+  .flags b{color:var(--ink)}
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+</style>
+
+<div class="wrap" dir="rtl">
+  <header>
+    <p class="eyebrow">Rently · Capabilities Map — current state</p>
+    <h1>מה האפליקציה יודעת לעשות היום</h1>
+    <p class="lede">תמונת מצב מלאה ומעוגנת-בקוד של היכולות. <b>Rently הוא מרקטפלייס תלת-צדדי</b> — שוכרים, בעלי-דירות, ומתווכים — על גבי Flutter + AWS Lambda (Node) + DynamoDB, עם שכבת AI, מדיה מרחבית (360/3D), ומנוע התאמה אישית. הסטטוס לכל יכולת מסומן במפורש.</p>
+    <div class="legend">
+      <span class="lg live">🟢 חי ופעיל</span>
+      <span class="lg gated">🟡 מותנה במפתח/גישה</span>
+      <span class="lg dorm">⚫ רדום (מאחורי flag)</span>
+      <span class="lg dep">🔴 הוצא משימוש</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="num">00</span> שלושה תפקידים · שני מבני-ניווט</h2>
+    <p class="sub">התפקיד נקבע ב-<span class="mono">DatingProvider._userRole</span>. מתווך = כל זרימת בעל-הדירה + ארגז-כלים ייעודי (לכן שני layouts, לא שלושה).</p>
+    <div class="roles">
+      <div class="role"><h3>שוכר</h3><div class="nav">גלה · התאמות · אתי · פרופיל</div>
+        <ul><li>חיפוש (AI שיחתי + NL + פילטרים + ציור-אזור)</li><li>Swipe deck לדירות</li><li>פרופיל עשיר (~22 שדות)</li><li>שמורים · מועדפים · השוואה · צ'אט</li><li>"מומלץ בשבילך" (CF)</li></ul></div>
+      <div class="role"><h3>בעל דירה</h3><div class="nav">דשבורד · סוויפים · התאמות · דירות · פרופיל</div>
+        <ul><li>אשף העלאת דירה (5 שלבים)</li><li>קהל-יעד + הצעות AI · גייט זכאות</li><li>Swipe על שוכרים (לידים)</li><li>עוזר "אריק" · חוזים + חתימה</li><li>עוזר מס · יומן · תזכורות</li></ul></div>
+      <div class="role"><h3>מתווך</h3><div class="nav">בעל-דירה + ארגז-כלים</div>
+        <ul><li>10 כלי-סוכן (CRM, CMA, פייפליין…)</li><li>אינטליגנציית אזור + דירוג</li><li>ייבוא אנשי-קשר</li><li>ברושור ממותג · דוח לבעלים</li><li>מיתוג אינדיגו/שחור</li></ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">01</span> שוכר — יכולות</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>יכולת</th><th>סטטוס</th><th>מה</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Swipe deck</td><td><span class="pill live">חי</span></td><td class="s">גלישת Tinder על דירות מסוננות; אות dwell/comparison לדירוג. <span class="mono">discover_screen</span></td></tr>
+        <tr><td class="k">חיפוש חכם (NL)</td><td><span class="pill live">חי</span></td><td class="s">SmartSearch על המכשיר → SearchQuery → פילטרים חיים. ~18 אותות cohort</td></tr>
+        <tr><td class="k">פילטרים + ציור אזור</td><td><span class="pill live">חי</span></td><td class="s">תקציב/חדרים/גודל/קומה/מאפיינים (must-have מול nice) + פוליגון-מפה freehand</td></tr>
+        <tr><td class="k">אתי — חיפוש שיחתי</td><td><span class="pill live">חי</span></td><td class="s">עוזר-טקסט חם שמזקק קריטריונים ומציג תוצאות inline (GPT/Gemini)</td></tr>
+        <tr><td class="k">אתי בקול</td><td><span class="pill gated">מותנה</span></td><td class="s">3 מימושים: turn-based (חי) + Realtime + Gemini-Live (חסומי-גישה)</td></tr>
+        <tr><td class="k">"מומלץ בשבילך"</td><td><span class="pill live">חי</span></td><td class="s">CF item-item בתוך שורת החיפוש (חדש)</td></tr>
+        <tr><td class="k">דף דירה</td><td><span class="pill live">חי</span></td><td class="s">תמונות/וידאו/360/3D · 6 תבניות עיצוב · nearby/neighborhood-score/אימות</td></tr>
+        <tr><td class="k">התאמות + צ'אט</td><td><span class="pill live">חי</span></td><td class="s">רשימת התאמות דו-צדדית + צ'אט WebSocket per-match</td></tr>
+        <tr><td class="k">שמורים/מועדפים/השוואה</td><td><span class="pill live">חי</span></td><td class="s">חיפושים שמורים (התראות מקומיות) · מועדפים · השוואת side-by-side</td></tr>
+        <tr><td class="k">פרופיל/העדפות</td><td><span class="pill live">חי</span></td><td class="s">תקציב/חדרים/כניסה/עיסוק/ילדים/חיות/רכב/משק-בית/גיל/עולה/נגישות/deal-breakers/הכנסה/מיקום-עבודה</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span> בעל דירה — יכולות</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>יכולת</th><th>סטטוס</th><th>מה</th></tr></thead>
+      <tbody>
+        <tr><td class="k">אשף העלאת דירה</td><td><span class="pill live">חי</span></td><td class="s">5 שלבים: מיקום→פרטים→מאפיינים→קהל-יעד→מדיה. בדיקת מחיר anti-bait</td></tr>
+        <tr><td class="k">קהל-יעד + הצעות AI</td><td><span class="pill live">חי</span></td><td class="s">בחירת 14 קוהורטות + <span class="mono">/audience/suggest</span> (GPT) מציע קהלים נוספים עם נימוק</td></tr>
+        <tr><td class="k">גייט זכאות (must)</td><td><span class="pill live">חי</span></td><td class="s">עורך קריטריונים משוקלל (חובה/חשוב/עדיף) — רק שוכרים מתאימים רואים. source-aware</td></tr>
+        <tr><td class="k">לידים / דירוג שוכרים</td><td><span class="pill live">חי</span></td><td class="s">Swipe deck על שוכרים מעוניינים + <span class="mono">/match/leads</span> דו-צדדי</td></tr>
+        <tr><td class="k">אריק — עוזר קולי</td><td><span class="pill live">חי</span></td><td class="s">קונסיירז' voice-first (טקסט חי דרך GPT/Gemini; קול-Live חסום-גישה); בונה טיוטת דירה</td></tr>
+        <tr><td class="k">חוזים + חתימה</td><td><span class="pill live">חי</span></td><td class="s">טיוטת שכירות מתבנית עו"ד + שדרוג-AI (₪50) + חתימת Ed25519 tamper-evident</td></tr>
+        <tr><td class="k">עוזר מס · יומן · תזכורות</td><td><span class="pill live">חי</span></td><td class="s">מחשבון מס-שכירות (בעלים בלבד) · יומן זמינות · תזכורות</td></tr>
+        <tr><td class="k">אימות דירה</td><td><span class="pill dorm">חלקי</span></td><td class="s">מוצג כתג "מאומת" + דגלי anti-scam; זרימת KYC self-serve הוסרה</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> מתווך — ארגז הכלים</h2>
+    <p class="sub">מתווך יורש את כל זרימת בעל-הדירה + hub של 10 כלים (<span class="mono">broker_tools_screen</span>). כל הכלים חיים.</p>
+    <div class="grid">
+      <div class="tool"><h4>פנקס לקוחות</h4><p>CRM + ייבוא אנשי-קשר + התאמת דירות</p></div>
+      <div class="tool"><h4>התאמות חמות</h4><p>לקוחות שמחכים לדירה שיש לך עכשיו</p></div>
+      <div class="tool"><h4>פייפליין לידים</h4><p>כל הלידים במקום אחד</p></div>
+      <div class="tool"><h4>תיאום צפיות</h4><p>קביעה ומעקב ביקורים</p></div>
+      <div class="tool"><h4>ניתוח שוק (CMA)</h4><p>תמחור השוואתי</p></div>
+      <div class="tool"><h4>אינטליגנציית אזור</h4><p>כתובת→נתוני אזור + קהל-יעד; דירוג בלוקים סטטיסטיים</p></div>
+      <div class="tool"><h4>מעקב בלעדיות</h4><p>תוקף הסכמי בלעדיות</p></div>
+      <div class="tool"><h4>עמלות ופייפליין</h4><p>תחזית עמלות/הכנסה</p></div>
+      <div class="tool"><h4>דוח לבעל הנכס</h4><p>דוח פעילות לשליחה</p></div>
+      <div class="tool"><h4>ברושור ממותג</h4><p>דף-דירה ממותג לשיתוף</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> יכולות AI</h2>
+    <p class="sub">GPT (<span class="mono">gpt-5.4-mini</span>) ראשי לעוזרים עם Gemini כ-fallback. <b>טקסט OpenAI מומן ועובד</b> (אומת חי); <b>קול Realtime/Live חסום-גישה</b>.</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>יכולת</th><th>ספק</th><th>סטטוס</th></tr></thead>
+      <tbody>
+        <tr><td class="k">אתי — חיפוש (טקסט)</td><td class="s">OpenAI gpt-5.4-mini + Gemini fallback</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">אריק — עוזר בעל-דירה (טקסט+tools)</td><td class="s">OpenAI + Gemini fallback</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">חילוץ כוונה / דירה משיחה</td><td class="s">OpenAI→Gemini</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">הצעת קהלי-יעד</td><td class="s">OpenAI (GPT)</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">Smart-tags / Q&A על דירה / הסבר "למה"</td><td class="s">Gemini</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">שדרוג חוזה AI</td><td class="s">Gemini</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">STT / TTS</td><td class="s">OpenAI + Gemini fallback</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">קול Realtime (אתי)</td><td class="s">OpenAI Realtime gpt-realtime-mini</td><td><span class="pill gated">חסום-quota</span></td></tr>
+        <tr><td class="k">קול Live (אריק)</td><td class="s">Gemini Live native-audio</td><td><span class="pill gated">אין גישת-מודל</span></td></tr>
+        <tr><td class="k">AI-360 (תמונה→360)</td><td class="s">OpenAI gpt-image-2</td><td><span class="pill live">חי</span></td></tr>
+        <tr><td class="k">Embeddings / kNN סמנטי</td><td class="s">Gemini embedding-001</td><td><span class="pill dorm">רדום (flag off)</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> מדיה ומרחב (360 / 3D)</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>יכולת</th><th>סטטוס</th><th>מה</th></tr></thead>
+      <tbody>
+        <tr><td class="k">תמונות / וידאו</td><td><span class="pill live">חי</span></td><td class="s">העלאת S3 presigned</td></tr>
+        <tr><td class="k">360 פנורמה</td><td><span class="pill live">חי</span></td><td class="s">לכידה באפליקציה (sweep/sphere/pole/wide) + תפירת OpenCV בשרת + <b>HDR bracketing</b> (Mertens fusion) + pole-fill</td></tr>
+        <tr><td class="k">AI-360</td><td><span class="pill live">חי</span></td><td class="s">gpt-image-2 מייצר 360 equirectangular מ-1-2 תמונות</td></tr>
+        <tr><td class="k">סריקת 3D Gaussian-splat</td><td><span class="pill live">חי</span></td><td class="s">.ply/.spz→.ksplat converter (self-hosted) + viewer בתוך האפליקציה</td></tr>
+        <tr><td class="k">KIRI scan3d</td><td><span class="pill gated">מותנה מפתח</span></td><td class="s">Photo-scan mesh + 3DGS דרך KIRI Engine</td></tr>
+        <tr><td class="k">Teleport / Varjo 3D</td><td><span class="pill gated">מותנה מפתח</span></td><td class="s">לכידת סביבת-דירה תלת-ממדית</td></tr>
+        <tr><td class="k">Virtual staging (Luma)</td><td><span class="pill dep">הוצא</span></td><td class="s">endpoints הוסרו; נשאר רק poll legacy</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> מנוע התאמה + איסוף דאטה</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>רכיב</th><th>סטטוס</th><th>מה</th></tr></thead>
+      <tbody>
+        <tr><td class="k">MatchEngine דו-צדדי</td><td><span class="pill live">חי</span></td><td class="s">ציון שוכר↔דירה (שרת <span class="mono">/match/leads</span> + לקוח); deal-breaker gates</td></tr>
+        <tr><td class="k">14 קוהורטות + community-fit</td><td><span class="pill live">חי</span></td><td class="s">טקסונומיה + ניקוד לפי קבוצה (מחיר/שכונה)</td></tr>
+        <tr><td class="k">מנוע דירוג 34-מימד (MAUT)</td><td><span class="pill live">חי</span></td><td class="s">על נתוני-ממשל אמיתיים; attribution לכל מימד</td></tr>
+        <tr><td class="k">גייט זכאות source-aware</td><td><span class="pill live">חי</span></td><td class="s">must רק על נתונים מוצהרים; fail-open על מוסק</td></tr>
+        <tr><td class="k">Collaborative filtering</td><td><span class="pill live">חי</span></td><td class="s">item-item co-engagement (<span class="mono">/reco/cf</span> + טבלת interactions)</td></tr>
+        <tr><td class="k">GBDT + FTRL על המכשיר</td><td><span class="pill live">חי</span></td><td class="s">מתאמן מהחלקות (cold-start ~120); ה-GBM הסטטי כ-fallback</td></tr>
+        <tr><td class="k">Feature-parity + נרמול dwell</td><td><span class="pill live">חי</span></td><td class="s">השרת חושף <span class="mono">rankFeatures</span> לכל דירה (אין skew אימון↔הגשה); dwell מנורמל לפי מדיה/אורך</td></tr>
+        <tr><td class="k">אקספלורציה ε-greedy + A/B</td><td><span class="pill live">חי</span></td><td class="s">ε=0.10 מזריק שונות-מיקום; <span class="mono">variantFor(uid)</span>→abVariant (control מול treatment)</td></tr>
+        <tr><td class="k">איסוף התנהגות</td><td><span class="pill live">חי</span></td><td class="s">48 סוגי אירועים · interactions · search-log+outcomes · persona · back-nav · sessionInsights · impressions בפיד</td></tr>
+        <tr><td class="k">מנוע LightGBM (Python→Lambda)</td><td><span class="pill gated">בנוי · רדום</span></td><td class="s">train.py→model.json→scorer בתוך ה-Node Lambda (blend α·linear+model, treatment bucket). <b>הלולאה אומתה חי</b>; הדלקה בפקודה (<span class="mono">activate.sh</span>) כשיהיו ≥200 שורות מתויגות</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span> תשתית · אימות · תאימות</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>יכולת</th><th>סטטוס</th><th>מה</th></tr></thead>
+      <tbody>
+        <tr><td class="k">אימות</td><td><span class="pill live">חי</span></td><td class="s">Firebase JWT (Google/Apple/email/guest) + בחירת תפקיד + מחיקת חשבון</td></tr>
+        <tr><td class="k">צ'אט WebSocket</td><td><span class="pill live">חי</span></td><td class="s">ws + broadcaster + connections; פרטיות thread</td></tr>
+        <tr><td class="k">התראות FCM</td><td><span class="pill live">חי</span></td><td class="s">HTTP v1, inbox, tour-notifier ל"3D מוכן"</td></tr>
+        <tr><td class="k">Deep links</td><td><span class="pill live">חי</span></td><td class="s"><span class="mono">rently://</span> + דף שיתוף ציבורי; Universal Links מוגדר (תלוי אירוח AASA)</td></tr>
+        <tr><td class="k">תאימות App Store</td><td><span class="pill live">חי</span></td><td class="s">Sign-in-with-Apple · מחיקת חשבון · EULA · סינון UGC · מפתחות server-side</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span> בדיקות ואיכות</h2>
+    <p class="sub">חבילת היחידה ירוקה לגמרי; המסעות המלאים (E2E) רצים על מכשיר דרך <span class="mono">integration_test/</span>.</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th>חבילה</th><th>סטטוס</th><th>מה מכוסה</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Unit / widget (<span class="mono">flutter test</span>)</td><td><span class="pill live">ירוק</span></td><td class="s">684 עוברים · 0 כשלים · 0 skips. eligibility gate · GBDT · CF · move-in buckets · audience gate · deep-link · שדות שוכר · match engine · serialization של המודל · profile card · מסכי compare/landlord</td></tr>
+        <tr><td class="k">Backend self-checks (node)</td><td><span class="pill live">ירוק</span></td><td class="s">156 assertions — eligibility 35+6 · cf 44 · model_scorer 42 · profile_fields 19 · audience_gate 10</td></tr>
+        <tr><td class="k">ML pipeline (<span class="mono">ml/selfcheck.sh</span>)</td><td><span class="pill live">ירוק</span></td><td class="s">train.py→LightGBM→model.json + חוליה חוצה-שפתית (JS scorer קורא מודל-Python; AUC 0.76, good&gt;bad)</td></tr>
+        <tr><td class="k">Integration — מכשיר (<span class="mono">integration_test/</span>)</td><td><span class="pill live">2/2 על הסים</span></td><td class="s">מסע אורח-שוכר עד ה-home shell + landlord quick-actions — smoke עמידים-לסחיפה, אומתו על iPhone 17 Pro</td></tr>
+        <tr><td class="k">תשתית טסטים</td><td><span class="pill live">קיים</span></td><td class="s">Firebase mocks (signed-out core+auth) · fakes (data/storage/http) · dump-on-miss לאבחון סחיפה</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">09</span> דגלי-מציאות (הגינות מלאה)</h2>
+    <div class="flags">
+      <ul>
+        <li><b>אי-עקביות שם:</b> עוזר החיפוש מתויג "אתי" בניווט אבל מקודד "נועה" — כדאי לאחד.</li>
+        <li><b>3 מימושי קול מקבילים</b> (turn-based + Realtime + Gemini-Live) — ניסיוני; שני ה-Live חסומי-גישה.</li>
+        <li><b>Embeddings/kNN רדום</b> — <span class="mono">ENABLE_EMBEDDINGS</span> כבוי → semanticSim תמיד 0.5.</li>
+        <li><b>אימות דירה</b> = תג בלבד; KYC self-serve לא קיים.</li>
+        <li><b>לכידת 360</b> — הרבה וריאנטים + שלבי PLY-export ידניים; מוקשי stabilization פתוחים (קבצי <span class="mono">*_BUGS*.md</span>).</li>
+        <li><b>המנוע הנלמד (LightGBM)</b> בנוי ומאומת מקצה-לקצה (Python→model.json→scorer ב-Lambda, good0.63>bad0.41) אבל <b>רדום</b> — אפס שורות מתויגות (pre-launch). נדלק בפקודה אחת (<span class="mono">ml/activate.sh</span>) כשיצטבר נפח. ראה תוכנית ה-🧠.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <span>Rently · מפת יכולות — current state · מעוגן בקוד</span>
+    <span class="mono">capabilities v3 · 2026-07-16 · +tests &amp; quality</span>
+  </footer>
+</div>
