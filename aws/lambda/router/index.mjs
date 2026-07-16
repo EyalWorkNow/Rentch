@@ -4423,6 +4423,9 @@ const PROFILE_WRITABLE_FIELDS = new Set([
   'isSolo',
   'leaseFlex',
   'occupation',       // tenant job/occupation — read by the per-listing eligibility gate
+  'minRooms',         // tenant's desired room count — read by the eligibility gate (minRooms criterion)
+  'maxRooms',         // tenant's max desired room count (kept for completeness)
+  'moveInBucket',     // 'immediate' | 'month' | 'quarter' | 'flexible' — read by the moveInWithin criterion
 ]);
 
 // Resolve the searcher's cohort for main-feed ranking, cheapest-first: the GET

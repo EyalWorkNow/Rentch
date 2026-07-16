@@ -1469,6 +1469,68 @@ class TenantProfile {
   }
 }
 
+/// Canonical move-in buckets — a LOCKED contract shared by the tenant settings
+/// UI, the landlord-side UI, and the backend matching gate (`moveInBucket`).
+/// `$1` is the stored token; `$2` is the Hebrew label shown to the user. Order
+/// is presentation order (soonest → most flexible).
+const List<(String, String)> kMoveInBuckets = [
+  ('immediate', 'מיידי'),
+  ('month', 'עד חודש'),
+  ('quarter', 'עד 3 חודשים'),
+  ('flexible', 'גמיש'),
+];
+
+/// Normalizes ANY move-in value into one of the four canonical tokens:
+/// `immediate` | `month` | `quarter` | `flexible`.
+///
+/// Accepts a canonical token, an ISO `yyyy-MM-dd` date (bucketed by whole days
+/// from today: ≤14 → immediate, ≤30 → month, ≤90 → quarter, else flexible), or
+/// any legacy Hebrew free-text label from the older vocabularies. Unknown or
+/// empty input falls back to `flexible`.
+String moveInBucketOf(String moveInWindow) {
+  final raw = moveInWindow.trim();
+  if (raw.isEmpty) return 'flexible';
+
+  // Already a canonical token.
+  final lower = raw.toLowerCase();
+  if (lower == 'immediate' ||
+      lower == 'month' ||
+      lower == 'quarter' ||
+      lower == 'flexible') {
+    return lower;
+  }
+
+  // Concrete ISO date → bucket by days from today.
+  if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(raw)) {
+    final date = DateTime.tryParse(raw);
+    if (date != null) {
+      final now = DateTime.now();
+      final days = DateTime(date.year, date.month, date.day)
+          .difference(DateTime(now.year, now.month, now.day))
+          .inDays;
+      if (days <= 14) return 'immediate';
+      if (days <= 30) return 'month';
+      if (days <= 90) return 'quarter';
+      return 'flexible';
+    }
+  }
+
+  // Legacy / canonical Hebrew labels (any of the historical vocabularies).
+  if (raw.contains('מיידי') || raw.contains('מיד ')) return 'immediate';
+  if (raw.contains('גמיש')) return 'flexible';
+  // "עד חודש", "תוך חודש", "בחודש הקרוב", "כניסה תוך 30 יום". Checked before the
+  // quarter rule; none of these contain the plural "חודשים".
+  if (raw.contains('30 יום') ||
+      raw.contains('חודש הקרוב') ||
+      raw.contains('תוך חודש') ||
+      raw.contains('עד חודש')) {
+    return 'month';
+  }
+  // "עד 3 חודשים", "1-3 חודשים", "3-6 חודשים", "בעוד חודשיים".
+  if (raw.contains('חודשיים') || raw.contains('חודשים')) return 'quarter';
+  return 'flexible';
+}
+
 class SearchArea {
   const SearchArea({
     required this.id,

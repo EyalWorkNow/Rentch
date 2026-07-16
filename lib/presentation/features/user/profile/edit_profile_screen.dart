@@ -46,13 +46,9 @@ class _PhotoEntry {
 // ─── State ────────────────────────────────────────────────────────────────────
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  static const List<String> _moveInOptions = [
-    'מיידי',
-    'תוך חודש',
-    '1-3 חודשים',
-    '3-6 חודשים',
-    'גמיש',
-  ];
+  // Move-in buckets — reuse the LOCKED canonical contract (kMoveInBuckets) so
+  // this editor and the settings sheet never diverge. Chips show the Hebrew
+  // label ($2); we store the token ($1).
 
   // Occupation vocabulary — LOCKED to match the landlord eligibility criterion
   // UI + backend allowlist. Key (English) is what we store on
@@ -153,7 +149,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _workLon = p.workLon;
     _budget = p.budgetMax;
     _rooms = p.desiredRooms;
-    _moveIn = p.moveInWindow.isNotEmpty ? p.moveInWindow : 'גמיש';
+    _moveIn = moveInBucketOf(p.moveInWindow);
     // Pre-fill occupation from the saved profile; only keep it if it's a known
     // vocabulary key (guards against stale/legacy values).
     _occupation = _occupationOptions.any((o) => o.$1 == p.occupation)
@@ -755,12 +751,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _moveInOptions.map((opt) {
-                              final selected = opt == _moveIn;
+                            children: kMoveInBuckets.map((bucket) {
+                              final selected = bucket.$1 == _moveIn;
                               return GestureDetector(
                                 onTap: () {
                                   HapticFeedback.selectionClick();
-                                  setState(() => _moveIn = opt);
+                                  setState(() => _moveIn = bucket.$1);
                                 },
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
@@ -778,7 +774,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     ),
                                   ),
                                   child: Text(
-                                    opt,
+                                    bucket.$2,
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,

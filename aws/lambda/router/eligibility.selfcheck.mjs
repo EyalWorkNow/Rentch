@@ -115,4 +115,29 @@ ok(passesEligibility(
   ]),
   profile({ priceMax: 6000, hasPets: true }), 'tenant') === false, 'multi: one must-fail hides');
 
+// ── minRooms: desired minRooms >= value ──────────────────────────────────────
+ok(passesEligibility(
+  listing([{ key: 'minRooms', value: 3, importance: 'must' }]),
+  profile({ minRooms: 4 }), 'tenant') === true, 'minRooms pass (4 >= 3)');
+ok(passesEligibility(
+  listing([{ key: 'minRooms', value: 3, importance: 'must' }]),
+  profile({ minRooms: 2 }), 'tenant') === false, 'minRooms fail hides (2 >= 3)');
+ok(passesEligibility(
+  listing([{ key: 'minRooms', value: 3, importance: 'must' }]),
+  profile({}), 'tenant') === false, 'minRooms unknown + must hides');
+
+// ── moveInWithin: urgencyRank(tenant) <= urgencyRank(required) ────────────────
+ok(passesEligibility(
+  listing([{ key: 'moveInWithin', value: 'month', importance: 'must' }]),
+  profile({ moveInBucket: 'immediate' }), 'tenant') === true, 'moveInWithin immediate vs month → pass');
+ok(passesEligibility(
+  listing([{ key: 'moveInWithin', value: 'month', importance: 'must' }]),
+  profile({ moveInBucket: 'quarter' }), 'tenant') === false, 'moveInWithin quarter vs month → fail hides');
+ok(passesEligibility(
+  listing([{ key: 'moveInWithin', value: 'quarter', importance: 'must' }]),
+  profile({ moveInBucket: 'flexible' }), 'tenant') === true, 'moveInWithin flexible vs quarter → pass (flexible=0)');
+ok(passesEligibility(
+  listing([{ key: 'moveInWithin', value: 'month', importance: 'important' }]),
+  profile({}), 'tenant') === true, 'moveInWithin unknown + important shows (fail-open)');
+
 console.log(`eligibility.selfcheck: ${n} assertions passed`);

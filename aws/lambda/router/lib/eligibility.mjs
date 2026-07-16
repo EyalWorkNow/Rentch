@@ -32,6 +32,12 @@ const num = (v) => {
 };
 const inList = (v, list) => Array.isArray(list) && list.includes(v);
 
+// Move-in urgency ranking: lower = able to move sooner. A 'flexible' tenant can
+// move whenever, so it ranks as 0 (satisfies any requirement). Returns undefined
+// for an unrecognized token so callers can fail such rules closed.
+const MOVE_IN_RANK = { immediate: 0, month: 1, quarter: 2, flexible: 0 };
+const urgencyRank = (v) => (typeof v === 'string' && v in MOVE_IN_RANK ? MOVE_IN_RANK[v] : undefined);
+
 // Criteria catalog: key → { field, pass(tenantValue, ruleValue) → boolean }.
 // `field` names the tenant searchProfile key that decides KNOWN vs UNKNOWN.
 // `pass` is only ever called with a KNOWN (non-undefined) tenantValue.
@@ -48,6 +54,10 @@ const CRITERIA = {
   minAge:        { field: 'age',             pass: (tv, rv) => { const t = num(tv), r = num(rv); return t !== undefined && r !== undefined && t >= r; } },
   maxAge:        { field: 'age',             pass: (tv, rv) => { const t = num(tv), r = num(rv); return t !== undefined && r !== undefined && t <= r; } },
   accessibility: { field: 'accessibilityNeed', pass: (tv) => tv === true },
+  // Tenant's desired room count meets/exceeds the required minimum.
+  minRooms:      { field: 'minRooms',          pass: (tv, rv) => { const t = num(tv), r = num(rv); return t !== undefined && r !== undefined && t >= r; } },
+  // Tenant can move in at least as soon as the listing requires (rank ≤ required).
+  moveInWithin:  { field: 'moveInBucket',      pass: (tv, rv) => { const t = urgencyRank(tv), r = urgencyRank(rv); return t !== undefined && r !== undefined && t <= r; } },
 };
 
 // PURE: does `profile` (a users-table row) pass `listing`'s eligibility gate?

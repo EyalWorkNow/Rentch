@@ -2048,6 +2048,8 @@ class DatingProvider extends ChangeNotifier {
   // LOCKED contract with the gate:
   //   occupation  ← occupation (English key), only if non-null
   //   priceMax    ← budgetMax
+  //   minRooms    ← desiredRooms (number)
+  //   moveInBucket← moveInBucketOf(moveInWindow) — canonical bucket token
   //   numChildren ← numChildren (only if non-null)
   //   hasPets     ← hasPets (only if non-null)
   //   carFree     ← !hasCar   (INVERTED; omitted when hasCar is null)
@@ -2062,6 +2064,8 @@ class DatingProvider extends ChangeNotifier {
   Future<void> _syncEligibilityFields(TenantProfile profile) async {
     final fields = <String, dynamic>{
       'priceMax': profile.budgetMax,
+      'minRooms': profile.desiredRooms,
+      'moveInBucket': moveInBucketOf(profile.moveInWindow),
       if (profile.occupation != null) 'occupation': profile.occupation,
       if (profile.numChildren != null) 'numChildren': profile.numChildren,
       if (profile.hasPets != null) 'hasPets': profile.hasPets,

@@ -9,7 +9,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 // level ('must'/'important'/'prefer'). Only matching tenants see the listing.
 // Keys + value shapes MUST mirror EligibilityRule in rental_models.dart.
 
-enum _EligInput { number, stepper, boolean, multi }
+enum _EligInput { number, stepper, boolean, multi, single }
 
 class _Criterion {
   const _Criterion(
@@ -62,6 +62,12 @@ const _lifeStageOptions = <String, String>{
   'senior': 'גיל הזהב',
 };
 
+const _moveInOptions = <String, String>{
+  'immediate': 'מיידי',
+  'month': 'עד חודש',
+  'quarter': 'עד 3 חודשים',
+};
+
 const _catalog = <_Criterion>[
   _Criterion('budgetMin', 'תקציב חודשי מינימלי של השוכר ≥', _EligInput.number,
       unit: '₪', defaultNumber: 5000),
@@ -80,6 +86,10 @@ const _catalog = <_Criterion>[
   _Criterion('minAge', 'גיל מינימלי', _EligInput.number, defaultNumber: 18),
   _Criterion('maxAge', 'גיל מקסימלי', _EligInput.number, defaultNumber: 60),
   _Criterion('accessibility', 'צורך בנגישות', _EligInput.boolean),
+  _Criterion('minRooms', 'מספר חדרים מבוקש (מינימום)', _EligInput.number,
+      defaultNumber: 3),
+  _Criterion('moveInWithin', 'זמינות כניסה', _EligInput.single,
+      options: _moveInOptions),
 ];
 
 const _importanceLevels = <String>['must', 'important', 'prefer'];
@@ -146,6 +156,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
   final Map<String, String> _importance = {};
   final Map<String, int> _steppers = {};
   final Map<String, Set<String>> _multi = {};
+  final Map<String, String> _single = {};
   final Map<String, TextEditingController> _numCtrls = {};
 
   @override
@@ -168,6 +179,12 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
           break;
         case _EligInput.multi:
           _multi[crit.key] = _stringsFromValue(rule.value);
+          break;
+        case _EligInput.single:
+          final token = _stringFromValue(rule.value);
+          if (token != null && crit.options.containsKey(token)) {
+            _single[crit.key] = token;
+          }
           break;
         case _EligInput.boolean:
           break;
@@ -203,6 +220,11 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
     return {};
   }
 
+  String? _stringFromValue(dynamic v) {
+    if (v is String && v.trim().isNotEmpty) return v.trim();
+    return null;
+  }
+
   void _toggle(_Criterion crit, bool on) {
     setState(() {
       if (on) {
@@ -222,6 +244,8 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
             break;
           case _EligInput.multi:
             _multi.putIfAbsent(crit.key, () => <String>{});
+            break;
+          case _EligInput.single:
             break;
           case _EligInput.boolean:
             break;
@@ -255,6 +279,12 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
           if (picked.isEmpty) continue; // empty selection → skip
           rules.add(EligibilityRule(
               key: crit.key, value: picked, importance: importance));
+          break;
+        case _EligInput.single:
+          final token = _single[crit.key];
+          if (token == null || token.isEmpty) continue; // no choice → skip
+          rules.add(EligibilityRule(
+              key: crit.key, value: token, importance: importance));
           break;
         case _EligInput.boolean:
           rules.add(EligibilityRule(key: crit.key, importance: importance));
@@ -465,6 +495,26 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
                     set.remove(entry.key);
                   } else {
                     set.add(entry.key);
+                  }
+                }),
+              ),
+          ],
+        );
+      case _EligInput.single:
+        final selected = _single[crit.key];
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final entry in crit.options.entries)
+              _SelectChip(
+                label: entry.value,
+                selected: selected == entry.key,
+                onTap: () => setState(() {
+                  if (_single[crit.key] == entry.key) {
+                    _single.remove(crit.key);
+                  } else {
+                    _single[crit.key] = entry.key;
                   }
                 }),
               ),

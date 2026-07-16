@@ -3694,58 +3694,107 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) {
-      String selectedWindow = profile.moveInWindow.isNotEmpty ? profile.moveInWindow : 'גמיש';
-      final presets = ['מיידי', 'בחודש הקרוב', 'בעוד חודשיים', 'גמיש'];
+      // Stored value is either a canonical bucket token or an ISO 'yyyy-MM-dd'
+      // date. moveInBucketOf() resolves any of those (and legacy strings) to the
+      // bucket that should highlight.
+      String selectedValue =
+          profile.moveInWindow.trim().isNotEmpty ? profile.moveInWindow.trim() : 'flexible';
 
       return StatefulBuilder(
         builder: (context, setModalState) {
+          final activeBucket = moveInBucketOf(selectedValue);
+          final isExactDate =
+              RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(selectedValue);
+          final pickedDate =
+              isExactDate ? DateTime.tryParse(selectedValue) : null;
+
+          Widget buildRow({
+            required bool isSelected,
+            required String label,
+            required VoidCallback onTap,
+            IconData? leadingIcon,
+          }) {
+            return InkWell(
+              onTap: onTap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      leadingIcon ??
+                          (isSelected ? Icons.radio_button_checked : Icons.radio_button_off),
+                      color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           return _DirectInputSheet(
             title: 'מועד כניסה רצוי',
             subtitle: 'בחר מתי תרצה להיכנס לדירה החדשה',
             inputWidget: Column(
               mainAxisSize: MainAxisSize.min,
-              children: presets.map((preset) {
-                final isSelected = preset == selectedWindow;
-                return InkWell(
-                  onTap: () {
-                    setModalState(() {
-                      selectedWindow = preset;
-                    });
+              children: [
+                ...kMoveInBuckets.map((bucket) {
+                  final token = bucket.$1;
+                  return buildRow(
+                    // Highlight the bucket the stored value resolves into, unless
+                    // an exact date is chosen (then the date row owns the tick).
+                    isSelected: !isExactDate && token == activeBucket,
+                    label: bucket.$2,
+                    onTap: () => setModalState(() => selectedValue = token),
+                  );
+                }),
+                buildRow(
+                  isSelected: isExactDate,
+                  leadingIcon: Icons.calendar_today_outlined,
+                  label: pickedDate != null
+                      ? 'תאריך מדויק · ${pickedDate.day}/${pickedDate.month}/${pickedDate.year}'
+                      : 'בחר תאריך מדויק',
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final base = DateTime(now.year, now.month, now.day);
+                    final initial = (pickedDate != null && !pickedDate.isBefore(base))
+                        ? pickedDate
+                        : base;
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: initial,
+                      firstDate: base,
+                      lastDate: base.add(const Duration(days: 365 * 2)),
+                    );
+                    if (picked != null) {
+                      setModalState(() {
+                        selectedValue =
+                            '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                      });
+                    }
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? AppColors.primary : Colors.transparent,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                          color: isSelected ? AppColors.primary : const Color(0xFF64748B),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          preset,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
             onSave: () {
-              provider.updateTenantProfile(profile.copyWith(moveInWindow: selectedWindow));
+              provider.updateTenantProfile(profile.copyWith(moveInWindow: selectedValue));
               Navigator.pop(context);
             },
           );
