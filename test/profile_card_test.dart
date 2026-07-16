@@ -7,6 +7,7 @@ import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/discover/profile_card.dart';
+import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
@@ -38,26 +39,19 @@ void main() {
         await tester.pump(const Duration(milliseconds: 260));
       }
 
-      // Progress bars replaced the "X/Y" text counter; verify via the card image key
+      // ProfileCard renders one stable-keyed SafeMedia and swaps its `media`
+      // provider on navigation (gapless) — verify the shown image via that.
       expect(
-        find.byKey(
-          const ValueKey(
-            'six-media:5:https://example.com/six-media-5.jpg',
-          ),
-        ),
-        findsOneWidget,
+        tester.widget<SafeMedia>(find.byType(SafeMedia)).media?.url,
+        'https://example.com/six-media-5.jpg',
       );
 
       await _pumpCard(tester, provider, second);
 
       expect(tester.takeException(), isNull);
       expect(
-        find.byKey(
-          const ValueKey(
-            'four-media:0:https://example.com/four-media-0.jpg',
-          ),
-        ),
-        findsOneWidget,
+        tester.widget<SafeMedia>(find.byType(SafeMedia)).media?.url,
+        'https://example.com/four-media-0.jpg',
       );
     } finally {
       debugNetworkImageHttpClientProvider = null;
@@ -92,14 +86,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 260));
 
-      // Progress bars replaced the "X/Y" text counter; verify via the card image key
+      // Physical-right tap in RTL advances to the next image (index 1).
       expect(
-        find.byKey(
-          const ValueKey(
-            'rtl-media:1:https://example.com/rtl-media-1.jpg',
-          ),
-        ),
-        findsOneWidget,
+        tester.widget<SafeMedia>(find.byType(SafeMedia)).media?.url,
+        'https://example.com/rtl-media-1.jpg',
       );
       await tester.pump(const Duration(milliseconds: 900));
     } finally {
