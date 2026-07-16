@@ -40,6 +40,10 @@ import {
   COHORT_KEYS, COHORT_DEFS, isListingVisibleToCohort,
 } from './lib/cohort.mjs';
 import { passesEligibility } from './lib/eligibility.mjs';
+// Consumption / personalisation layer — pure helpers for the interaction store
+// (implicit-feedback score), item-item collaborative filtering, and the LightGBM
+// training-data join. DB reads stay here; the math lives in ./lib/cf.mjs.
+import { implicitScore, cfRecommend, trainingRowsFrom } from './lib/cf.mjs';
 
 // ── Connectors (owned by the Connectors agent — we only IMPORT from them) ─────
 // These modules live in ./lib and expose the Israeli-data spine used to enrich a
@@ -181,6 +185,12 @@ const TABLES = {
   // the client with confidence-scored facts for personalisation + targeting.
   // Owner-scoped: a caller may only read/write their own row (see below).
   persona:         { name: `${TABLE_PREFIX}persona`,         gsi: null },
+  // Consumption layer — one accumulated row per (user,property) engagement.
+  // Base key: pk userId(S) + sk propertyId(S). GSI propertyId-userId (pk
+  // propertyId, sk userId, projection ALL) backs item-item CF: given a property,
+  // find every OTHER user who engaged it. Not exposed via the generic handler —
+  // written/read only by the owner-scoped /interactions + /reco/cf routes.
+  interactions:    { name: `${TABLE_PREFIX}interactions`,    gsi: { name: 'propertyId-userId', pk: 'propertyId', filterKey: 'propertyId' } },
 };
 
 // One row per user (pk: userId) holding the set of their FCM device tokens, so
@@ -1349,6 +1359,21 @@ export const handler = async (event) => {
       return await handleSearchKnn(event);
     }
 
+    // ── Consumption layer: interaction store + CF + ML export ────────────────
+    // POST /interactions → record/accumulate a per-(user,property) interaction
+    // and recompute its implicit score. → { ok, score }. Fail-soft.
+    if (segments[0] === 'interactions' && !segments[1] && method === 'POST') {
+      return await handleInteraction(event);
+    }
+    // POST /reco/cf → item-item co-engagement recommendations. → { items:[...] }.
+    if (segments[0] === 'reco' && segments[1] === 'cf' && method === 'POST') {
+      return await handleRecoCf(event);
+    }
+    // GET /ml/export → LightGBM training set (admin-only). → { rows, count }.
+    if (segments[0] === 'ml' && segments[1] === 'export' && method === 'GET') {
+      return await handleMlExport(event);
+    }
+
     // ── Per-listing "Ask Rently" Q&A ────────────────────────────────────────
     // POST /listing/ask → answer a question about ONE listing, grounded strictly
     // in that listing + its enrichment. Auth-gated.
@@ -2065,6 +2090,177 @@ async function handleSearchOutcome(event) {
     console.warn('search/outcome write failed:', e.message);
   }
   return json(200, { ok: true });
+}
+
+// ── Consumption layer handlers (interaction store + CF + ML export) ──────────
+// The pure math lives in ./lib/cf.mjs; these functions only do the (bounded)
+// DynamoDB I/O around it. All three fail SOFT — they never 500 the client.
+
+// Merge one incoming interaction event into the stored (user,property) row.
+// Pure: MAX for accumulators (dwellMs/photosViewed/scrollDepth), OR for media
+// flags, latest-wins for entrySource/entryRank, and per-action booleans/counter.
+const INTERACTION_ACTIONS = new Set(['view', 'like', 'superlike', 'pass', 'contact', 'bounce']);
+function mergeInteraction(cur, body) {
+  const r = { ...(cur || {}) };
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const d = num(body.dwellMs);
+  if (d != null) r.dwellMs = Math.max(Number(r.dwellMs) || 0, d);          // keep max total
+  if (body.opened360) r.opened360 = true;                                  // OR media flags
+  if (body.opened3d) r.opened3d = true;
+  if (body.openedVideo) r.openedVideo = true;
+  const pv = num(body.photosViewed);
+  if (pv != null) r.photosViewed = Math.max(Number(r.photosViewed) || 0, pv);
+  const sd = num(body.scrollDepth);
+  if (sd != null) r.scrollDepth = Math.max(Number(r.scrollDepth) || 0, sd);
+  if (body.entrySource != null) r.entrySource = String(body.entrySource).slice(0, 40); // latest wins
+  const er = num(body.entryRank);
+  if (er != null) r.entryRank = er;
+  const action = (body.action || '').toString();
+  if (INTERACTION_ACTIONS.has(action)) {
+    if (action === 'view') r.viewCount = (Number(r.viewCount) || 0) + 1;
+    else if (action === 'like') r.liked = true;
+    else if (action === 'superlike') r.superliked = true;
+    else if (action === 'pass') r.passed = true;
+    else if (action === 'contact') r.contacted = true;
+    else if (action === 'bounce') r.bounced = true;
+  }
+  return r;
+}
+
+// POST /interactions — read-modify-write the caller's (user,property) row, merge
+// the incoming signal, recompute the implicit score, persist. → { ok, score }.
+async function handleInteraction(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  try {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    const propertyId = (body.propertyId || '').toString();
+    if (!propertyId) return json(200, { ok: false, score: 0 });
+    const T = TABLES.interactions.name;
+    const cur = (await ddb.send(new GetCommand({
+      TableName: T, Key: { userId: uid, propertyId },
+    }))).Item || {};
+    const rec = mergeInteraction(cur, body);
+    rec.userId = uid;
+    rec.propertyId = propertyId;
+    rec.score = implicitScore(rec);
+    rec.updatedAt = Date.now();
+    await ddb.send(new PutCommand({ TableName: T, Item: rec }));
+    return json(200, { ok: true, score: rec.score });
+  } catch (e) {
+    console.warn('interactions write failed:', e.message);
+    return json(200, { ok: false, score: 0 });   // fail-soft: never 500
+  }
+}
+
+// POST /reco/cf — item-item co-engagement collaborative filtering. Reads are
+// hard-capped so a heavy user can't blow the request budget. → { items:[...] }.
+async function handleRecoCf(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  try {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    const limit = Math.max(1, Math.min(100, Number(body.limit) || 20));
+    const T = TABLES.interactions.name;
+    const GSI = TABLES.interactions.gsi.name; // propertyId-userId
+
+    // Read caps keep the fan-out bounded no matter how active anyone is.
+    const SEED_CAP = 40;    // seeds we branch out from
+    const PER_SEED = 50;    // co-users pulled per seed property
+    const USER_CAP = 400;   // distinct co-users total
+    const MINE_CAP = 500;   // caller's own rows read
+    const COUSER_CAP = 200; // rows read per co-user
+
+    // a. the caller's interactions; seeds = positively-scored properties.
+    const mine = (await ddb.send(new QueryCommand({
+      TableName: T,
+      KeyConditionExpression: 'userId = :u',
+      ExpressionAttributeValues: { ':u': uid },
+      Limit: MINE_CAP,
+    }))).Items || [];
+    const seeds = mine.filter((r) => Number(r.score) > 0);
+    if (seeds.length === 0) return json(200, { items: [] });
+
+    // b. OTHER users who engaged each seed (GSI query, capped).
+    const coUserIds = new Set();
+    for (const s of seeds.slice(0, SEED_CAP)) {
+      if (coUserIds.size >= USER_CAP) break;
+      try {
+        const out = await ddb.send(new QueryCommand({
+          TableName: T, IndexName: GSI,
+          KeyConditionExpression: 'propertyId = :p',
+          ExpressionAttributeValues: { ':p': String(s.propertyId) },
+          Limit: PER_SEED,
+        }));
+        for (const row of (out.Items || [])) {
+          if (row.userId && row.userId !== uid) coUserIds.add(row.userId);
+          if (coUserIds.size >= USER_CAP) break;
+        }
+      } catch { /* one bad seed shouldn't sink the recommendation */ }
+    }
+    if (coUserIds.size === 0) return json(200, { items: [] });
+
+    // c. each co-user's positively-scored properties (base-table query, capped).
+    const ids = [...coUserIds].slice(0, USER_CAP);
+    const results = await Promise.all(ids.map(async (cuid) => {
+      try {
+        const out = await ddb.send(new QueryCommand({
+          TableName: T,
+          KeyConditionExpression: 'userId = :u',
+          ExpressionAttributeValues: { ':u': cuid },
+          Limit: COUSER_CAP,
+        }));
+        return {
+          userId: cuid,
+          interactions: (out.Items || []).map((r) => ({
+            propertyId: String(r.propertyId), score: Number(r.score) || 0,
+          })),
+        };
+      } catch { return { userId: cuid, interactions: [] }; }
+    }));
+    const coUsers = results.filter((r) => r.interactions.length);
+
+    const items = cfRecommend(
+      mine.map((r) => ({ propertyId: String(r.propertyId), score: Number(r.score) || 0 })),
+      coUsers, { limit },
+    );
+    return json(200, { items });
+  } catch (e) {
+    console.warn('reco/cf failed:', e.message);
+    return json(200, { items: [] });   // fail-soft on any error / too-little data
+  }
+}
+
+// GET /ml/export — LightGBM training-data export. Admin-only (notif-admin uid).
+// Joins impression rows (feature vectors) with outcome rows by (searchId,
+// propertyId) into labeled rows. Bounded scan; capped at 2000 rows. Fail-soft.
+async function handleMlExport(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!callerIsNotifAdmin(event)) return json(403, { message: 'Forbidden' });
+  try {
+    let items = [];
+    let lastKey;
+    do {
+      const out = await ddb.send(new ScanCommand({
+        TableName: SEARCH_LOG_TABLE,
+        ExclusiveStartKey: lastKey,
+        Limit: 1000,
+      }));
+      items = items.concat(out.Items || []);
+      lastKey = out.LastEvaluatedKey;
+    } while (lastKey && items.length < 8000);   // bounded sample
+
+    const impressions = items.filter((r) => r && r.kind === 'impression');
+    const outcomes = items.filter((r) => r && r.kind === 'outcome');
+    const rows = trainingRowsFrom(impressions, outcomes).slice(0, 2000);
+    return json(200, { rows, count: rows.length });
+  } catch (e) {
+    console.warn('ml/export failed:', e.message);
+    return json(200, { rows: [], count: 0 });
+  }
 }
 
 // POST /search/knn — embed the query text, then score every active listing that

@@ -114,7 +114,8 @@ class _SavedCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => PropertyDetailScreen(property: p),
+            builder: (_) =>
+                PropertyDetailScreen(property: p, entrySource: 'saved'),
           ),
         ),
         child: Container(

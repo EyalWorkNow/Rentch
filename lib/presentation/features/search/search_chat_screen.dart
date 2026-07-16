@@ -356,8 +356,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 scored: m.scored[i],
                 nearbyProfile: _seekerNearbyProfile(),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) =>
-                        PropertyDetailScreen(property: m.scored[i].property))),
+                    builder: (_) => PropertyDetailScreen(
+                        property: m.scored[i].property,
+                        entrySource: 'search',
+                        entryRank: i))),
               ),
             ],
           ),

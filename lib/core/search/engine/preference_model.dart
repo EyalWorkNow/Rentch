@@ -27,6 +27,7 @@ import 'package:dating_app/core/finance/monthly_cost.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/finance/rental_yield.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
+import 'package:dating_app/core/search/engine/gbdt.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/scenario_layers.dart';
 import 'package:dating_app/core/search/smart_search.dart';
@@ -71,6 +72,11 @@ const List<String> kScoringDimensions = [
   'employment', // job-place density nearby (short-commute proxy) — on a near-work intent
   'low_floor', // a low floor itself (not just an elevator) — on a "קומה נמוכה" intent
 ];
+
+// The EXACT feature ordering the on-device GBDT consumes: the same 'bias' + all
+// scoring dimensions the FTRL learnerFeatures() map emits, flattened to a dense
+// vector in this fixed order so every training row and every prediction align.
+const List<String> kGbdtFeatureOrder = ['bias', ...kScoringDimensions];
 
 // ═════════════════════════════════════════════════════════════════════════════
 // AttributeUtility — single-attribute satisfaction functions
@@ -342,6 +348,21 @@ class OnlineLogisticLearner {
   final Map<String, double> _n = {}; // accumulated squared gradient
   int updates = 0;
 
+  // ── On-device GBDT (learned NONLINEAR ranker) ──────────────────────────────
+  // Every FTRL update() ALSO appends (features,label) to a bounded ring-buffer.
+  // Once ~120 labelled swipes accrue (and every ~40 after) we (re)train a small
+  // gradient-boosted regression-tree model that captures nonlinear interactions
+  // the linear FTRL can't. The buffer is capped so memory + train cost stay flat;
+  // the buffer itself is NOT persisted (it re-accumulates from swipes) but the
+  // trained model IS (see toJson/fromJson) so predictions survive a restart.
+  static const int _gbdtBufferCap = 1500;
+  static const int _gbdtMinToTrain = 120;
+  static const int _gbdtTrainEvery = 40;
+  final List<List<double>> _gbBufX = [];
+  final List<double> _gbBufY = [];
+  int _gbSinceTrain = 0;
+  GbdtModel? _gbdt;
+
   /// Current per-feature weight (lazily materialized from z,n).
   double _weight(String k) {
     final z = _z[k] ?? 0.0;
@@ -375,17 +396,56 @@ class OnlineLogisticLearner {
       _n[k] = nPrev + gi * gi;
     }
     updates++;
+    // Same feedback also trains the on-device GBDT (buffer + periodic refit).
+    _bufferAndMaybeTrainGbdt(x, y);
   }
 
   /// Confidence in the learner's own predictions, growing with #updates.
   double get confidence => 1.0 - math.exp(-updates / 25.0);
 
+  // ── GBDT plumbing ──────────────────────────────────────────────────────────
+
+  /// Flatten a learnerFeatures() map into the dense GBDT vector (fixed order).
+  List<double> vectorizeFeatures(Map<String, double> x) =>
+      [for (final k in kGbdtFeatureOrder) x[k] ?? 0.0];
+
+  /// True once the on-device GBDT has trained on enough labelled swipes.
+  bool get gbdtReady => _gbdt?.isTrained ?? false;
+
+  /// GBDT relevance in [0,1] for a dense vector (see [vectorizeFeatures]).
+  /// Returns a neutral 0.5 before the model is ready.
+  double gbdtPredict(List<double> feats) => _gbdt?.predict(feats) ?? 0.5;
+
+  void _bufferAndMaybeTrainGbdt(Map<String, double> x, double y) {
+    _gbBufX.add(vectorizeFeatures(x));
+    _gbBufY.add(y.clamp(0.0, 1.0));
+    if (_gbBufX.length > _gbdtBufferCap) {
+      _gbBufX.removeAt(0); // drop oldest ⇒ a rolling window of recent behaviour
+      _gbBufY.removeAt(0);
+    }
+    _gbSinceTrain++;
+    if (_gbBufX.length >= _gbdtMinToTrain &&
+        (_gbdt == null || _gbSinceTrain >= _gbdtTrainEvery)) {
+      final m = GbdtModel()..train(_gbBufX, _gbBufY);
+      if (m.isTrained) _gbdt = m;
+      _gbSinceTrain = 0;
+    }
+  }
+
   Map<String, double> snapshotWeights(Iterable<String> keys) =>
       {for (final k in keys) k: _weight(k)};
 
   /// Serialize the LEARNED state (z, n, updates) for cross-session persistence.
-  /// Hyper-params (alpha/beta/l1/l2) are fixed config and are NOT stored.
-  Map<String, dynamic> toJson() => {'z': _z, 'n': _n, 'u': updates};
+  /// Hyper-params (alpha/beta/l1/l2) are fixed config and are NOT stored. The
+  /// trained GBDT is folded in here too (when present) so the existing
+  /// _learner.toJson() persistence hook carries it with zero caller changes; the
+  /// raw training buffer is intentionally omitted (it re-accumulates on swipes).
+  Map<String, dynamic> toJson() => {
+        'z': _z,
+        'n': _n,
+        'u': updates,
+        if (_gbdt != null) 'gbdt': _gbdt!.toJson(),
+      };
 
   /// Restore a learner from [toJson]. Unknown/absent fields degrade to an empty
   /// (cold) learner, so a corrupt or version-changed blob can never throw.
@@ -403,6 +463,10 @@ class OnlineLogisticLearner {
     load(l._n, j['n']);
     final u = j['u'];
     l.updates = u is int ? u : (u is num ? u.toInt() : 0);
+    final g = j['gbdt'];
+    if (g is Map) {
+      l._gbdt = GbdtModel.fromJson(Map<String, dynamic>.from(g));
+    }
     return l;
   }
 }

@@ -291,7 +291,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => PropertyDetailScreen(property: p),
+                builder: (_) => PropertyDetailScreen(
+                    property: p, entrySource: 'deck', entryRank: index),
               ),
             );
           },
@@ -4311,7 +4312,9 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => PropertyDetailScreen(
-                                        property: property),
+                                        property: property,
+                                        entrySource: 'deck',
+                                        entryRank: index),
                                   ),
                                 );
                             return _PropertyPreviewCard(

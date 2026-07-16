@@ -8,6 +8,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/event_service.dart';
+import 'package:dating_app/core/services/interaction_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/ask_rently_sheet.dart';
 import 'package:dating_app/presentation/widgets/price_badge.dart';
@@ -52,9 +53,21 @@ class PropertyDetailScreen extends StatefulWidget {
     super.key,
     required this.property,
     this.isLandlordPreview = false,
+    this.entrySource = 'detail',
+    this.entryRank,
   });
   final RentalProperty property;
   final bool isLandlordPreview;
+
+  /// Where the user came from when they opened this listing
+  /// ('search'|'deck'|'cf'|'saved'|'detail'). Threaded into the interaction
+  /// record so the store learns WHY the user entered. Defaults to 'detail'
+  /// (a link/notification/deep open) so every existing call site stays valid.
+  final String entrySource;
+
+  /// The position/rank at which this property was surfaced in the source list
+  /// (0-based). Null when the source has no meaningful ordering.
+  final int? entryRank;
 
   @override
   State<PropertyDetailScreen> createState() => _PropertyDetailScreenState();
@@ -134,6 +147,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         _analyticsProvider?.recordContactOutcome(
           widget.property.id,
           viewToContactMs: _viewStopwatch.elapsedMilliseconds,
+          entrySource: widget.entrySource,
+          entryRank: widget.entryRank,
         );
       } catch (_) {/* fail-soft */}
     }
@@ -199,6 +214,23 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           openedVideo: _openedVideo,
           mediaDwellMs: _mediaDwellMs,
         );
+        // Upsert the rich per-property engagement to the interaction store: the
+        // core "how long on each apartment + what interested them" capture,
+        // reusing the exact signals already computed above. A very short visit
+        // is a 'bounce'; anything longer is a real 'view'.
+        final dwellMs = _viewStopwatch.elapsedMilliseconds;
+        unawaited(InteractionService.instance.record(
+          propertyId: widget.property.id,
+          dwellMs: dwellMs,
+          photosViewed: _photosViewed,
+          opened360: _opened360,
+          opened3d: _opened3d,
+          openedVideo: _openedVideo,
+          scrollDepth: _maxScrollDepth,
+          entrySource: widget.entrySource,
+          entryRank: widget.entryRank,
+          action: dwellMs < 3000 ? 'bounce' : 'view',
+        ));
       } catch (_) {/* fail-soft */}
     }
     _pageController.dispose();

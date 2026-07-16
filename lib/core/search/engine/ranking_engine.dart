@@ -46,7 +46,8 @@ class RankedCandidate {
   /// Final calibrated relevance in [0,1].
   double score;
 
-  /// Per-scorer breakdown: maut / topsis / cosine / gbm / learner.
+  /// Per-scorer breakdown: maut / gbm / learner / gbdt (gbdt only once the
+  /// on-device learned tree model has trained).
   final Map<String, double> components;
 
   /// Weighted contribution of each scoring dimension to the MAUT score
@@ -264,9 +265,20 @@ class CalibratedEnsemble {
     // genuinely orthogonal signals: MAUT (personalised linear utility), GBM
     // (query-independent nonlinear interactions) and the online learner (behaviour).
     final learnerConf = model.learner.confidence;
+    // COLD START → WARM TRANSITION for the nonlinear-tree signal:
+    //   • Before the on-device GBDT has trained, `gbdt` is absent and the static
+    //     hand-tuned GBM carries the FULL 0.28 tree weight → behaviour is EXACTLY
+    //     as it was historically (static GBM only).
+    //   • Once the GBDT is ready, it TAKES OVER the nonlinear role with weight
+    //     0.25, and the static GBM is de-weighted to a small 0.03 anchor so the
+    //     two tree signals aren't double-counted (~0.28 total tree budget is
+    //     preserved, MAUT/learner weights unchanged). The static GBM stays as a
+    //     tiny domain-prior floor rather than dropping to zero.
+    final gbdtReady = model.learner.gbdtReady;
     final weights = <String, double>{
       'maut': 0.72,
-      'gbm': 0.28,
+      'gbm': gbdtReady ? 0.03 : 0.28,
+      if (gbdtReady) 'gbdt': 0.25,
       // the online learner earns trust only as it accumulates feedback
       'learner': 0.5 * learnerConf,
     };
@@ -308,8 +320,9 @@ class RankingEngine {
 
       final (maut, contrib) = MautScorer.score(pfv, model);
       final gbm = GradientBoostedScorer.score(pfv);
+      final learnerFeats = model.learnerFeatures(pfv);
       final learner = model.learner.confidence > 0.05
-          ? model.learner.predict(model.learnerFeatures(pfv))
+          ? model.learner.predict(learnerFeats)
           : maut; // cold learner defers to MAUT
 
       final components = <String, double>{
@@ -317,6 +330,12 @@ class RankingEngine {
         'gbm': gbm,
         'learner': learner,
       };
+      // Learned on-device GBDT: only present once it has trained on enough real
+      // swipes. Reuses the SAME feature vector the FTRL learner consumed.
+      if (model.learner.gbdtReady) {
+        components['gbdt'] =
+            model.learner.gbdtPredict(model.learner.vectorizeFeatures(learnerFeats));
+      }
 
       final blended = CalibratedEnsemble.combine(components, model);
       final constraint = model.constraints.softSatisfaction(pfv.property);

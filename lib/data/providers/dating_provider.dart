@@ -28,6 +28,7 @@ import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:dating_app/data/models/user_signals.dart';
 import 'package:dating_app/data/models/persona_profile.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/core/services/interaction_service.dart';
 import 'package:dating_app/core/services/signature_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/repositories/broker_cloud_sync.dart';
@@ -261,6 +262,12 @@ class DatingProvider extends ChangeNotifier {
   // UNIFIED structural core of the deck score (same ranker as the search surface).
   // Populated in _sortProperties; a cache miss falls back to an on-demand score.
   Map<String, double> _engineRelevance = const {};
+  // Collaborative-filtering recommendations from the backend (`POST /reco/cf`),
+  // ordered highest-cfScore first. Consumed as a gentle deck boost via [_cfBoost]
+  // and exposed (see [cfRecommendedIds]) so a "מומלץ בשבילך" section can use them.
+  List<String> _cfRecommendedIds = const [];
+  // O(1) rank lookup for [_cfBoost]: propertyId → 0-based CF rank.
+  Map<String, int> _cfRank = const {};
   List<String>? _availableFeaturesCache;
   List<String>? _availablePropertyTypesCache;
   List<String>? _availableConditionsCache;
@@ -351,6 +358,11 @@ class DatingProvider extends ChangeNotifier {
   // location-affinity bonus, scaled by how many likes back the centroid.
   static const double _learnedAreaWeight = 4.0;
   static const double _learnedAreaRadiusKm = 5.0;
+  // Max bounded boost a CF-recommended listing gets in the deck sort — the same
+  // small magnitude as the learned tag/area deltas, so CF complements the score
+  // rather than dominating it. The top CF pick gets the full boost, decaying
+  // linearly down the CF list.
+  static const double _maxCfBoost = 8.0;
 
   // Tenant preference match-keys that correspond to a concrete property feature,
   // so they can be evaluated against the property alone (no landlord profile
@@ -2719,8 +2731,21 @@ class DatingProvider extends ChangeNotifier {
   /// A user initiated contact on [propertyId] (strongest funnel outcome). Fires
   /// the search 'contact' label; [viewToContactMs] carries the dwell-to-contact.
   /// Best-effort/non-blocking — safe to call from the detail-screen contact path.
-  void recordContactOutcome(String propertyId, {int? viewToContactMs}) {
+  void recordContactOutcome(
+    String propertyId, {
+    int? viewToContactMs,
+    String? entrySource,
+    int? entryRank,
+  }) {
     _postSearchOutcome(propertyId, 'contact', dwellMs: viewToContactMs);
+    // Strongest engagement action for the per-property interaction store.
+    unawaited(InteractionService.instance.record(
+      propertyId: propertyId,
+      action: 'contact',
+      dwellMs: viewToContactMs,
+      entrySource: entrySource,
+      entryRank: entryRank,
+    ));
   }
 
   void recordPropertyGallerySwipe(String propertyId, int currentPhotoIndex) {
@@ -3050,7 +3075,8 @@ class DatingProvider extends ChangeNotifier {
       _passedPropertyIds.add(property.id);
       _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: false));
       AppEvents.instance.log(UserEventType.swipeLeft, propertyId: property.id);
-      _recordSwipeSignal(property, SwipeDirection.skip, dwellMs: decisionMs);
+      _recordSwipeSignal(property, SwipeDirection.skip,
+          dwellMs: decisionMs, entryRank: previousIndex);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       final isNewLike = _likedPropertyIds.add(property.id);
@@ -3064,6 +3090,7 @@ class DatingProvider extends ChangeNotifier {
         property,
         isSuperLike ? SwipeDirection.superlike : SwipeDirection.like,
         dwellMs: decisionMs,
+        entryRank: previousIndex,
       );
 
       // A tenant right-swipe registers the LIKE only — it is NOT a match. A
@@ -3123,8 +3150,23 @@ class DatingProvider extends ChangeNotifier {
     RentalProperty property,
     SwipeDirection direction, {
     int? dwellMs,
+    int? entryRank,
   }) {
     final now = DateTime.now();
+    // Upsert the swipe decision to the per-property interaction store: the
+    // deck is where these cards were surfaced, [entryRank] is their deck slot,
+    // and [dwellMs] the time-to-decision. Best-effort / non-blocking.
+    unawaited(InteractionService.instance.record(
+      propertyId: property.id,
+      action: switch (direction) {
+        SwipeDirection.superlike => 'superlike',
+        SwipeDirection.like => 'like',
+        SwipeDirection.skip => 'pass',
+      },
+      dwellMs: dwellMs,
+      entrySource: 'deck',
+      entryRank: entryRank,
+    ));
     final ratio = _priceToBudgetRatio(property);
     final liked = direction != SwipeDirection.skip;
 
@@ -4167,6 +4209,10 @@ class DatingProvider extends ChangeNotifier {
     final score = compressed +
         tagCompatibilityScore +
         _learnedScoreDelta(p) +
+        // Collaborative-filtering nudge: gently lift listings that users with
+        // similar behaviour engaged with. Bounded like the learned deltas so it
+        // complements — never dominates — the structural fit.
+        _cfBoost(p.id) +
         // Business-readiness (verification / media richness / completeness) is a
         // real listing-quality signal ORTHOGONAL to search-fit — kept as a small
         // post-band bonus so a verified, well-documented listing still edges out a
@@ -4176,6 +4222,36 @@ class DatingProvider extends ChangeNotifier {
     return _clampDouble(score, 0, 100).round();
   }
 
+
+  /// Ordered collaborative-filtering recommendations (highest cfScore first),
+  /// exposed so a "מומלץ בשבילך" section can surface them. Empty until
+  /// [loadCfRecommendations] has run.
+  List<String> get cfRecommendedIds => List.unmodifiable(_cfRecommendedIds);
+
+  /// Fetches CF recommendations from the backend and stores them (ordered) so
+  /// [_cfBoost] can gently lift them in the deck sort and a future recommended
+  /// section can list them. Fail-soft: leaves the current set intact on error /
+  /// empty response, and never throws.
+  Future<void> loadCfRecommendations({int limit = 20}) async {
+    try {
+      final ids = await InteractionService.instance.cfRecommendations(limit: limit);
+      if (ids.isEmpty) return;
+      _cfRecommendedIds = ids;
+      _cfRank = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+      _invalidateFilterCache(); // deck score depends on CF now → re-sort
+      notifyListeners();
+    } catch (_) {/* fail-soft */}
+  }
+
+  /// The bounded CF boost for [propertyId]: the top CF pick gets [_maxCfBoost],
+  /// decaying linearly to 0 across the CF list, 0 for anything not recommended.
+  double _cfBoost(String propertyId) {
+    final rank = _cfRank[propertyId];
+    if (rank == null) return 0;
+    final n = _cfRecommendedIds.length;
+    if (n <= 0) return 0;
+    return _maxCfBoost * (1 - rank / n);
+  }
 
   /// The bounded personalisation layer: small ± nudges folded out of the user's
   /// own revealed behaviour ([_userSignals]). Added AFTER structural compression

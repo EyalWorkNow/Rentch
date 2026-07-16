@@ -527,7 +527,9 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   Widget _propertyCard(RentalProperty p) {
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)),
+        MaterialPageRoute(
+            builder: (_) =>
+                PropertyDetailScreen(property: p, entrySource: 'search')),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
