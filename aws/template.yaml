@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Rentch backend — DynamoDB + S3 + Lambda + API Gateway (Firebase JWT auth)
+Description: Rentch backend ? DynamoDB + S3 + Lambda + API Gateway (Firebase JWT auth)
 
 Parameters:
   FirebaseProjectId:
@@ -31,53 +31,25 @@ Parameters:
     Default: pano-stitch.zip
     Description: S3 key of the OpenCV panorama-stitcher zip (Python + bundled opencv/numpy).
 
-  # ── Router secrets (Gemini assistant + /assistant/explain, Luma, Teleport).
-  #    Wired here so `cloudformation deploy` PRESERVES them instead of resetting
-  #    the function's env to the template — which is what silently wiped a
-  #    manually-set GEMINI_API_KEY and took the assistant offline. NoEcho + empty
-  #    default; deploy-pano.sh carries the live value forward and a shell env var
-  #    overrides it, so the key survives every deploy once set.
   GeminiApiKey:
     Type: String
     NoEcho: true
-    Default: ''
-    Description: Gemini API key — powers the "אתי"/Erik assistant and /assistant/explain.
-  GeminiLiveApiKey:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: Gemini Live key for the real-time voice assistant (optional).
-  LumaApiKey:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: Luma API key for virtual staging / splat reconstruction (optional).
-  TeleportClientId:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: Varjo Teleport client id for 3D capture (optional).
-  TeleportClientSecret:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: Varjo Teleport client secret (optional).
-  KiriApiKey:
-    Type: String
-    NoEcho: true
-    Default: ''
-    Description: KIRI Engine API key for /scan3d 3D reconstruction (Photo Scan + 3DGS) (optional).
+    Description: Gemini API key (REQUIRED, no default; provide from SSM at deploy so a missing value fails loudly instead of wiping the key).
   OpenAiApiKey:
     Type: String
     NoEcho: true
-    Default: ''
-    Description: OpenAI API key (optional). Wired here so a deploy PRESERVES it — pass OpenAiApiKey=... at deploy time; empty default keeps it unset. Powers GPT features once code consumes OPENAI_API_KEY.
-
+    Description: OpenAI API key (REQUIRED, no default; provide from SSM at deploy).
+  KiriApiKey:
+    Type: String
+    NoEcho: true
+    Description: KIRI Engine API key (REQUIRED, no default; provide from SSM at deploy).
 Resources:
 
-  # ── DynamoDB tables ─────────────────────────────────────────────────────────
+  # ?? DynamoDB tables ?????????????????????????????????????????????????????????
   PropertiesTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}properties'
       BillingMode: PAY_PER_REQUEST
@@ -102,6 +74,8 @@ Resources:
 
   MessagesTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}messages'
       BillingMode: PAY_PER_REQUEST
@@ -120,9 +94,11 @@ Resources:
             - { AttributeName: createdAt, KeyType: RANGE }
           Projection: { ProjectionType: ALL }
 
-  # Active WebSocket connections (connectionId ↔ matchId)
+  # Active WebSocket connections (connectionId ? matchId)
   ConnectionsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}ws-connections'
       BillingMode: PAY_PER_REQUEST
@@ -139,6 +115,8 @@ Resources:
 
   UsersTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}users'
       BillingMode: PAY_PER_REQUEST
@@ -155,35 +133,22 @@ Resources:
             - { AttributeName: updatedAt, KeyType: RANGE }
           Projection: { ProjectionType: ALL }
 
-  # Behavioral events — append-only rows from EventService. Query-able for
-  # research by userId (a user's full event stream) and by eventType (e.g. all
-  # swipeRight across users), each sorted by createdAt.
   EventsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}events'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - { AttributeName: id, AttributeType: S }
-        - { AttributeName: userId, AttributeType: S }
-        - { AttributeName: eventType, AttributeType: S }
-        - { AttributeName: createdAt, AttributeType: S }
       KeySchema:
         - { AttributeName: id, KeyType: HASH }
-      GlobalSecondaryIndexes:
-        - IndexName: userId-createdAt
-          KeySchema:
-            - { AttributeName: userId, KeyType: HASH }
-            - { AttributeName: createdAt, KeyType: RANGE }
-          Projection: { ProjectionType: ALL }
-        - IndexName: eventType-createdAt
-          KeySchema:
-            - { AttributeName: eventType, KeyType: HASH }
-            - { AttributeName: createdAt, KeyType: RANGE }
-          Projection: { ProjectionType: ALL }
 
   ReportsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}reports'
       BillingMode: PAY_PER_REQUEST
@@ -194,6 +159,8 @@ Resources:
 
   BlocksTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}blocks'
       BillingMode: PAY_PER_REQUEST
@@ -204,6 +171,8 @@ Resources:
 
   ReviewsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}reviews'
       BillingMode: PAY_PER_REQUEST
@@ -222,6 +191,8 @@ Resources:
 
   PropertyViewsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}property-views'
       BillingMode: PAY_PER_REQUEST
@@ -238,6 +209,8 @@ Resources:
 
   PropertyLikesTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}property-likes'
       BillingMode: PAY_PER_REQUEST
@@ -254,6 +227,8 @@ Resources:
 
   AppStateTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub '${TablePrefix}app-state'
       BillingMode: PAY_PER_REQUEST
@@ -262,22 +237,11 @@ Resources:
       KeySchema:
         - { AttributeName: id, KeyType: HASH }
 
-  # One accumulated persona row per user (id == Firebase uid). Confidence-scored
-  # facts for personalisation + (consent-gated) persona targeting. Owner-scoped
-  # in the router; covered by the router role's ${TablePrefix}* wildcard grant.
-  PersonaTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub '${TablePrefix}persona'
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - { AttributeName: id, AttributeType: S }
-      KeySchema:
-        - { AttributeName: id, KeyType: HASH }
-
-  # ── S3 media bucket ─────────────────────────────────────────────────────────
+  # ?? S3 media bucket ?????????????????????????????????????????????????????????
   MediaBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub 'rentch-media-${AWS::AccountId}'
       PublicAccessBlockConfiguration:
@@ -307,7 +271,7 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub '${MediaBucket.Arn}/*'
 
-  # ── IAM roles ───────────────────────────────────────────────────────────────
+  # ?? IAM roles ???????????????????????????????????????????????????????????????
   RouterRole:
     Type: AWS::IAM::Role
     Properties:
@@ -344,6 +308,20 @@ Resources:
               - Effect: Allow
                 Action: lambda:InvokeFunction
                 Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:rentch-pano-stitch'
+        - PolicyName: allow-invoke-splat-convert
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: arn:aws:lambda:us-east-1:543897290879:function:rentch-splat-convert
+        - PolicyName: router-self-invoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: arn:aws:lambda:us-east-1:543897290879:function:rentch-router
 
   AuthorizerRole:
     Type: AWS::IAM::Role
@@ -357,7 +335,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
-  # ── Lambda functions ────────────────────────────────────────────────────────
+  # ?? Lambda functions ????????????????????????????????????????????????????????
   RouterFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -375,12 +353,8 @@ Resources:
           S3_BUCKET: !Ref MediaBucket
           TABLE_PREFIX: !Ref TablePrefix
           PANO_STITCH_FN: rentch-pano-stitch
-          GEMINI_API_KEY: !Ref GeminiApiKey
-          GEMINI_LIVE_API_KEY: !Ref GeminiLiveApiKey
-          LUMA_API_KEY: !Ref LumaApiKey
-          TELEPORT_CLIENT_ID: !Ref TeleportClientId
-          TELEPORT_CLIENT_SECRET: !Ref TeleportClientSecret
           KIRI_API_KEY: !Ref KiriApiKey
+          GEMINI_API_KEY: !Ref GeminiApiKey
           OPENAI_API_KEY: !Ref OpenAiApiKey
           OPENAI_CHAT_MODEL: gpt-5.4-mini
           OPENAI_REALTIME_MODEL: gpt-realtime-mini
@@ -438,16 +412,12 @@ Resources:
         Variables:
           FIREBASE_PROJECT_ID: !Ref FirebaseProjectId
 
-  # ── API Gateway (REST) ──────────────────────────────────────────────────────
+  # ?? API Gateway (REST) ??????????????????????????????????????????????????????
   Api:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: rentch-api
-      # EDGE = CloudFront-fronted: TLS terminates at a POP near the client (Israel)
-      # and rides AWS's backbone to us-east-1, cutting the trans-Atlantic handshake/
-      # transit RTT on every call. Activate on the live stack with the surgical patch
-      # (see notes) or a CFN deploy; revert to [REGIONAL] to roll back.
-      EndpointConfiguration: { Types: [EDGE] }
+      EndpointConfiguration: { Types: [REGIONAL] }
 
   Authorizer:
     Type: AWS::ApiGateway::Authorizer
@@ -480,7 +450,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations'
 
-  # CORS preflight — no auth on OPTIONS
+  # CORS preflight ? no auth on OPTIONS
   ProxyOptions:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -496,67 +466,6 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Authorization,Content-Type,x-api-key'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-            ResponseTemplates: { 'application/json': '' }
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # ── Public share page: /p/{id} (NO auth) ────────────────────────────────────
-  # The share link https://<api>/prod/p/<id> must be reachable by WhatsApp/social
-  # link-preview crawlers and by ordinary browsers that send NO Authorization
-  # header. The {proxy+} method above is gated by the Firebase CUSTOM authorizer,
-  # which returns 401 to anonymous requests before the router ever runs — so this
-  # dedicated resource re-exposes the SAME router Lambda with AuthorizationType:
-  # NONE. The router already handles GET /p/:id (propertyOgPage → OG card for
-  # crawlers, rently:// app-open interstitial for humans). Mirrors ProxyMethod's
-  # AWS_PROXY integration but omits AuthorizerId.
-  PublicShareResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref Api
-      ParentId: !GetAtt Api.RootResourceId
-      PathPart: 'p'
-
-  PublicShareIdResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref Api
-      ParentId: !Ref PublicShareResource
-      PathPart: '{id}'
-
-  PublicShareMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref Api
-      ResourceId: !Ref PublicShareIdResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      RequestParameters: { method.request.path.id: true }
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations'
-
-  # CORS preflight — no auth on OPTIONS (mirrors ProxyOptions)
-  PublicShareOptions:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref Api
-      ResourceId: !Ref PublicShareIdResource
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        RequestTemplates: { 'application/json': '{"statusCode":200}' }
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Authorization,Content-Type,x-api-key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             ResponseTemplates: { 'application/json': '' }
       MethodResponses:
@@ -584,7 +493,7 @@ Resources:
 
   Deployment:
     Type: AWS::ApiGateway::Deployment
-    DependsOn: [ProxyMethod, ProxyOptions, PublicShareMethod, PublicShareOptions]
+    DependsOn: [ProxyMethod, ProxyOptions]
     Properties:
       RestApiId: !Ref Api
 
@@ -600,7 +509,7 @@ Resources:
           ThrottlingBurstLimit: 50
           ThrottlingRateLimit: 25
 
-  # ── WebSocket API (real-time chat) ──────────────────────────────────────────
+  # ?? WebSocket API (real-time chat) ??????????????????????????????????????????
   WsRole:
     Type: AWS::IAM::Role
     Properties:
@@ -784,10 +693,11 @@ Resources:
 
 Outputs:
   ApiUrl:
-    Description: REST base URL — pass as --dart-define=AWS_API_URL
+    Description: REST base URL ? pass as --dart-define=AWS_API_URL
     Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod'
   WsUrl:
-    Description: WebSocket URL — pass as --dart-define=AWS_WS_URL
+    Description: WebSocket URL ? pass as --dart-define=AWS_WS_URL
     Value: !Sub 'wss://${WsApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
   MediaBucketName:
     Value: !Ref MediaBucket
+
