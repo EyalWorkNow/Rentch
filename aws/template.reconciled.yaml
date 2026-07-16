@@ -1,0 +1,840 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Rentch backend ? DynamoDB + S3 + Lambda + API Gateway (Firebase JWT auth)
+Parameters:
+  FirebaseProjectId:
+    Type: String
+    Default: mydatingapp-4c043
+  CodeBucket:
+    Type: String
+    Description: S3 bucket holding the Lambda deployment zips
+  RouterKey:
+    Type: String
+    Default: router.zip
+  AuthorizerKey:
+    Type: String
+    Default: authorizer.zip
+  WsKey:
+    Type: String
+    Default: ws.zip
+  BroadcasterKey:
+    Type: String
+    Default: broadcaster.zip
+  WsAuthorizerKey:
+    Type: String
+    Default: ws-authorizer.zip
+  TablePrefix:
+    Type: String
+    Default: rentch-
+  PanoStitchKey:
+    Type: String
+    Default: pano-stitch.zip
+    Description: S3 key of the OpenCV panorama-stitcher zip (Python + bundled opencv/numpy).
+  GeminiApiKey:
+    Description: Gemini API key. Provide from SSM at deploy. REQUIRED (no default) so a deploy without it fails loudly instead
+      of wiping the key.
+    NoEcho: true
+    Type: String
+  OpenAiApiKey:
+    Description: OpenAI API key. Provide from SSM at deploy. REQUIRED (no default).
+    NoEcho: true
+    Type: String
+  KiriApiKey:
+    Description: KIRI Engine API key. Provide from SSM at deploy. REQUIRED (no default).
+    NoEcho: true
+    Type: String
+Resources:
+  PropertiesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}properties
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+        - AttributeName: ownerUserId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: status-createdAt
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ownerUserId-createdAt
+          KeySchema:
+            - AttributeName: ownerUserId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}messages
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: matchId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: matchId-createdAt
+          KeySchema:
+            - AttributeName: matchId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}ws-connections
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+        - AttributeName: matchId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: matchId-index
+          KeySchema:
+            - AttributeName: matchId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: discoverable
+          AttributeType: S
+        - AttributeName: updatedAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: discoverable-updatedAt
+          KeySchema:
+            - AttributeName: discoverable
+              KeyType: HASH
+            - AttributeName: updatedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  ReportsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}reports
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  BlocksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}blocks
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  ReviewsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}reviews
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: targetKey
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: targetKey-createdAt
+          KeySchema:
+            - AttributeName: targetKey
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  PropertyViewsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}property-views
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: propertyId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: propertyId-index
+          KeySchema:
+            - AttributeName: propertyId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  PropertyLikesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}property-likes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: propertyId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: propertyId-index
+          KeySchema:
+            - AttributeName: propertyId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  AppStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Fn::Sub: ${TablePrefix}app-state
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: rentch-media-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods:
+              - GET
+              - PUT
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: MediaBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadObjects
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource:
+              Fn::Sub: ${MediaBucket.Arn}/*
+  RouterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: rentch-data-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}*
+                  - Fn::Sub: arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}*/index/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource:
+                  Fn::Sub: ${MediaBucket.Arn}/*
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  Fn::Sub: arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:rentch-pano-stitch
+  AuthorizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  RouterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-router
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - RouterRole
+          - Arn
+      Timeout: 20
+      MemorySize: 256
+      Code:
+        S3Bucket:
+          Ref: CodeBucket
+        S3Key:
+          Ref: RouterKey
+      Environment:
+        Variables:
+          S3_BUCKET:
+            Ref: MediaBucket
+          TABLE_PREFIX:
+            Ref: TablePrefix
+          PANO_STITCH_FN: rentch-pano-stitch
+          KIRI_API_KEY:
+            Ref: KiriApiKey
+          GEMINI_API_KEY:
+            Ref: GeminiApiKey
+          OPENAI_API_KEY:
+            Ref: OpenAiApiKey
+          OPENAI_CHAT_MODEL: gpt-5.4-mini
+          OPENAI_REALTIME_MODEL: gpt-realtime-mini
+          OPENAI_REALTIME_VOICE: marin
+  PanoStitchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: rentch-pano-s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  Fn::Sub: ${MediaBucket.Arn}/*
+  PanoStitchFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-pano-stitch
+      Runtime: python3.12
+      Handler: app.handler
+      Role:
+        Fn::GetAtt:
+          - PanoStitchRole
+          - Arn
+      Timeout: 300
+      MemorySize: 3008
+      Code:
+        S3Bucket:
+          Ref: CodeBucket
+        S3Key:
+          Ref: PanoStitchKey
+  AuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-authorizer
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - AuthorizerRole
+          - Arn
+      Timeout: 10
+      MemorySize: 128
+      Code:
+        S3Bucket:
+          Ref: CodeBucket
+        S3Key:
+          Ref: AuthorizerKey
+      Environment:
+        Variables:
+          FIREBASE_PROJECT_ID:
+            Ref: FirebaseProjectId
+  Api:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: rentch-api
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  Authorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: firebase-authorizer
+      RestApiId:
+        Ref: Api
+      Type: TOKEN
+      IdentitySource: method.request.header.Authorization
+      AuthorizerUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+      AuthorizerResultTtlInSeconds: 300
+  ProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId:
+        Ref: Api
+      ParentId:
+        Fn::GetAtt:
+          - Api
+          - RootResourceId
+      PathPart: '{proxy+}'
+  ProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: Api
+      ResourceId:
+        Ref: ProxyResource
+      HttpMethod: ANY
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: Authorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations
+  ProxyOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId:
+        Ref: Api
+      ResourceId:
+        Ref: ProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode":200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: '''Authorization,Content-Type,x-api-key'''
+              method.response.header.Access-Control-Allow-Methods: '''GET,POST,PUT,DELETE,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: ''
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+  RouterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: RouterFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/*
+  AuthorizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: AuthorizerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/authorizers/${Authorizer}
+  Deployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ProxyMethod
+      - ProxyOptions
+    Properties:
+      RestApiId:
+        Ref: Api
+  Stage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId:
+        Ref: Api
+      DeploymentId:
+        Ref: Deployment
+      StageName: prod
+      MethodSettings:
+        - ResourcePath: /*
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 50
+          ThrottlingRateLimit: 25
+  WsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ws-connections
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                Resource:
+                  Fn::GetAtt:
+                    - ConnectionsTable
+                    - Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - Fn::GetAtt:
+                      - PropertiesTable
+                      - Arn
+                  - Fn::GetAtt:
+                      - MessagesTable
+                      - Arn
+                  - Fn::Sub: ${MessagesTable.Arn}/index/*
+  BroadcasterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: broadcaster
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:DeleteItem
+                Resource:
+                  - Fn::GetAtt:
+                      - ConnectionsTable
+                      - Arn
+                  - Fn::Sub: ${ConnectionsTable.Arn}/index/*
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:DescribeStream
+                  - dynamodb:ListStreams
+                Resource:
+                  Fn::GetAtt:
+                    - MessagesTable
+                    - StreamArn
+              - Effect: Allow
+                Action: execute-api:ManageConnections
+                Resource:
+                  Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WsApi}/*
+  WsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-ws
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - WsRole
+          - Arn
+      Timeout: 10
+      Code:
+        S3Bucket:
+          Ref: CodeBucket
+        S3Key:
+          Ref: WsKey
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE:
+            Ref: ConnectionsTable
+          TABLE_PREFIX:
+            Ref: TablePrefix
+  WsAuthorizerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-ws-authorizer
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - AuthorizerRole
+          - Arn
+      Timeout: 10
+      Code:
+        S3Bucket:
+          Ref: CodeBucket
+        S3Key:
+          Ref: WsAuthorizerKey
+      Environment:
+        Variables:
+          FIREBASE_PROJECT_ID:
+            Ref: FirebaseProjectId
+  BroadcasterFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: rentch-broadcaster
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - BroadcasterRole
+          - Arn
+      Timeout: 20
+      Code:
+        S3Bucket:
+          Ref: CodeBucket
+        S3Key:
+          Ref: BroadcasterKey
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE:
+            Ref: ConnectionsTable
+          WS_ENDPOINT:
+            Fn::Sub: https://${WsApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+  BroadcasterMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn:
+        Fn::GetAtt:
+          - MessagesTable
+          - StreamArn
+      FunctionName:
+        Ref: BroadcasterFunction
+      StartingPosition: LATEST
+      BatchSize: 10
+      MaximumRetryAttempts: 2
+  WsApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: rentch-ws
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+  WsApiAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId:
+        Ref: WsApi
+      Name: ws-firebase
+      AuthorizerType: REQUEST
+      IdentitySource:
+        - route.request.querystring.token
+      AuthorizerUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsAuthorizerFunction.Arn}/invocations
+  WsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: WsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WsFunction.Arn}/invocations
+  WsConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WsApi
+      RouteKey: $connect
+      AuthorizationType: CUSTOM
+      AuthorizerId:
+        Ref: WsApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${WsIntegration}
+  WsDisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WsApi
+      RouteKey: $disconnect
+      Target:
+        Fn::Sub: integrations/${WsIntegration}
+  WsSubscribeRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: WsApi
+      RouteKey: subscribe
+      Target:
+        Fn::Sub: integrations/${WsIntegration}
+  WsDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - WsConnectRoute
+      - WsDisconnectRoute
+      - WsSubscribeRoute
+    Properties:
+      ApiId:
+        Ref: WsApi
+  WsStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId:
+        Ref: WsApi
+      DeploymentId:
+        Ref: WsDeployment
+      StageName: prod
+  WsFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: WsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WsApi}/*
+  WsAuthorizerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: WsAuthorizerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WsApi}/*
+Outputs:
+  ApiUrl:
+    Description: REST base URL ? pass as --dart-define=AWS_API_URL
+    Value:
+      Fn::Sub: https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod
+  WsUrl:
+    Description: WebSocket URL ? pass as --dart-define=AWS_WS_URL
+    Value:
+      Fn::Sub: wss://${WsApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+  MediaBucketName:
+    Value:
+      Ref: MediaBucket
