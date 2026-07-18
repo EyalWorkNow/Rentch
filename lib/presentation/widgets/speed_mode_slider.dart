@@ -83,8 +83,8 @@ class SpeedModeSlider extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     Colors.white.withValues(alpha: 0.96),
-                    const Color(0xFFEAF9FB).withValues(alpha: 0.94),
-                    const Color(0xFFF8FBFD).withValues(alpha: 0.98),
+                    AppColors.tealPale.withValues(alpha: 0.94),
+                    AppColors.slate50.withValues(alpha: 0.98),
                   ],
                 ),
           border: Border.all(
@@ -234,7 +234,7 @@ class _SpeedThumb extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF14D3DC), Color(0xFF12B7C6), Color(0xFF2F80ED)],
+          colors: [Color(0xFF14D3DC), AppColors.tealBrand, Color(0xFF2F80ED)],
           stops: [0, 0.52, 1],
         ),
         border: Border.all(color: Colors.white.withValues(alpha: 0.30), width: 1),

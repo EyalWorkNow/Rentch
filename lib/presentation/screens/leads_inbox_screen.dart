@@ -1,0 +1,387 @@
+import 'dart:ui';
+
+import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/ui/platform_fx.dart';
+import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/screens/explore_screen.dart';
+import 'package:dating_app/presentation/screens/matches_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:provider/provider.dart';
+
+/// The merged landlord "לקוחות" screen: a single tab that hosts BOTH the
+/// candidate swipe deck (מועמדים) and the conversations list (הודעות) behind a
+/// 2-segment glass toggle. Both children are kept alive via an [IndexedStack]
+/// so swiping/scrolling state survives a toggle.
+class LeadsInboxScreen extends StatefulWidget {
+  const LeadsInboxScreen({super.key, this.initialSegment = 0});
+
+  /// Which segment to open on first build — 0 = מועמדים, 1 = הודעות.
+  final int initialSegment;
+
+  @override
+  State<LeadsInboxScreen> createState() => _LeadsInboxScreenState();
+}
+
+class _LeadsInboxScreenState extends State<LeadsInboxScreen> {
+  late int _selected = widget.initialSegment.clamp(0, 1);
+
+  void _select(int index) {
+    if (index == _selected) {
+      HapticFeedback.selectionClick();
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() => _selected = index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<DatingProvider>();
+    final leadsCount = provider.ownerLeads.length;
+    final unseenCount = provider.unseenMatchCount;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Center(
+                child: _SegmentToggle(
+                  selected: _selected,
+                  candidatesBadge: leadsCount,
+                  messagesBadge: unseenCount,
+                  onSelect: _select,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: _selected,
+              children: const [
+                ExploreScreen(embedded: true),
+                MatchesScreen(embedded: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A 2-segment glass pill with a sliding gradient thumb, press-scale and per
+/// segment count badges — reproduces the discover_screen selector look.
+class _SegmentToggle extends StatefulWidget {
+  const _SegmentToggle({
+    required this.selected,
+    required this.candidatesBadge,
+    required this.messagesBadge,
+    required this.onSelect,
+  });
+
+  final int selected;
+  final int candidatesBadge;
+  final int messagesBadge;
+  final ValueChanged<int> onSelect;
+
+  @override
+  State<_SegmentToggle> createState() => _SegmentToggleState();
+}
+
+class _SegmentToggleState extends State<_SegmentToggle> {
+  int? _pressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width - 40;
+        final width = maxWidth.clamp(0.0, 360.0);
+        const pad = 5.0;
+        final inner = (width - pad * 2).clamp(0.0, double.infinity);
+        final segW = inner / 2;
+        // Visual order left→right: [מועמדים, הודעות]. Segment 0 sits on the left.
+        final thumbLeft = widget.selected == 0 ? 0.0 : segW;
+
+        return SizedBox(
+          width: width,
+          height: 52,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.96),
+                  AppColors.tealPale.withValues(alpha: 0.94),
+                  AppColors.slate50.withValues(alpha: 0.98),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.78),
+                width: 1.4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.10),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: PlatformFx.blurSigma(14),
+                  sigmaY: PlatformFx.blurSigma(14),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(pad),
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          left: thumbLeft,
+                          width: segW,
+                          top: 0,
+                          bottom: 0,
+                          child: const _Thumb(),
+                        ),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: segW,
+                              child: _segment(
+                                index: 0,
+                                icon: IconsaxPlusLinear.profile_2user,
+                                label: 'מועמדים',
+                                badge: widget.candidatesBadge,
+                                isSelected: widget.selected == 0,
+                              ),
+                            ),
+                            SizedBox(
+                              width: segW,
+                              child: _segment(
+                                index: 1,
+                                icon: IconsaxPlusLinear.message,
+                                label: 'הודעות',
+                                badge: widget.messagesBadge,
+                                isSelected: widget.selected == 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _segment({
+    required int index,
+    required IconData icon,
+    required String label,
+    required int badge,
+    required bool isSelected,
+  }) {
+    final inactiveColor = AppColors.textSecondary.withValues(alpha: 0.84);
+    final pressed = _pressed == index;
+    final selectedShadow = [
+      Shadow(
+        color: AppColors.navy.withValues(alpha: 0.22),
+        offset: const Offset(0, 1),
+        blurRadius: 5,
+      ),
+    ];
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = index),
+        onTapUp: (_) => setState(() => _pressed = null),
+        onTapCancel: () => setState(() => _pressed = null),
+        onTap: () => widget.onSelect(index),
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          scale: pressed ? 0.93 : (isSelected ? 1.03 : 1),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutBack,
+                    scale: isSelected ? 1.14 : 1,
+                    child: Icon(
+                      icon,
+                      size: 17,
+                      color: isSelected ? Colors.white : inactiveColor,
+                      shadows: isSelected ? selectedShadow : null,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1,
+                      fontWeight:
+                          isSelected ? FontWeight.w900 : FontWeight.w800,
+                      color: isSelected ? Colors.white : inactiveColor,
+                      shadows: isSelected ? selectedShadow : null,
+                    ),
+                  ),
+                  if (badge > 0) ...[
+                    const SizedBox(width: 6),
+                    _CountBadge(count: badge, onSelected: isSelected),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The small rounded count pill shown next to a segment label.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count, required this.onSelected});
+
+  final int count;
+  final bool onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = onSelected ? Colors.white : AppColors.coral;
+    final fg = onSelected ? AppColors.primary : Colors.white;
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        count > 9 ? '9+' : '$count',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 10,
+          height: 1,
+          fontWeight: FontWeight.w900,
+          color: fg,
+        ),
+      ),
+    );
+  }
+}
+
+/// The sliding gradient thumb behind the selected segment.
+class _Thumb extends StatelessWidget {
+  const _Thumb();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF14D3DC),
+            AppColors.primary,
+            AppColors.coral,
+          ],
+          stops: const [0, 0.52, 1],
+        ),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.30),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 13,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: AppColors.coral.withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(23),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.30),
+                    Colors.white.withValues(alpha: 0.05),
+                    Colors.black.withValues(alpha: 0.07),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          PositionedDirectional(
+            top: 6,
+            start: 12,
+            width: 38,
+            height: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.48),
+                    Colors.white.withValues(alpha: 0.02),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

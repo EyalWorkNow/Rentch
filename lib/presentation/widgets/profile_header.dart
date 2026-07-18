@@ -1,4 +1,5 @@
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 
@@ -21,7 +22,7 @@ class ProfileHeader extends StatelessWidget {
         children: [
           SafeImage(
             source: profile.photoUrl,
-            fallback: const ColoredBox(color: Color(0xFFEAF4EF)),
+            fallback: const ColoredBox(color: AppColors.border),
           ),
           Container(
             decoration: BoxDecoration(

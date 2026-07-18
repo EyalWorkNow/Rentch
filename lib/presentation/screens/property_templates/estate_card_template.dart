@@ -517,7 +517,7 @@ class _EstateFactChips extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFAFAF7),
+                color: AppColors.slate50,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
               ),

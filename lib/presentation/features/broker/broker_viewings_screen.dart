@@ -102,7 +102,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F6FB),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -176,7 +176,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
+        color: AppColors.cloud,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.coral, width: 1.5),
       ),

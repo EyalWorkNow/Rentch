@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -181,7 +182,7 @@ class _FallbackOrbPainter extends CustomPainter {
   _FallbackOrbPainter({required this.t});
   final double t;
   static const _cols = [
-    Color(0xFF17C7D1),
+    AppColors.tealBrand,
     Color(0xFF6675FF),
     Color(0xFFFF6B85),
     Color(0xFFFFC957),

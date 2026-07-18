@@ -78,9 +78,9 @@ class TrustScoreBadge extends StatelessWidget {
   }
 
   Color _scoreColor(int s) {
-    if (s >= 80) return const Color(0xFF27AE60);
+    if (s >= 80) return AppColors.success;
     if (s >= 60) return AppColors.primary;
-    if (s >= 40) return const Color(0xFFF39C12);
+    if (s >= 40) return AppColors.warning;
     return AppColors.coral;
   }
 }
@@ -116,9 +116,9 @@ class _ArcPainter extends CustomPainter {
   }
 
   Color get _color {
-    if (score >= 80) return const Color(0xFF27AE60);
+    if (score >= 80) return AppColors.success;
     if (score >= 60) return AppColors.primary;
-    if (score >= 40) return const Color(0xFFF39C12);
+    if (score >= 40) return AppColors.warning;
     return AppColors.coral;
   }
 

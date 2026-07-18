@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/ui/platform_fx.dart';
 
 import 'package:dating_app/presentation/features/assistant/erik_design.dart';
@@ -420,8 +421,8 @@ class ErikTextComposer extends StatelessWidget {
                     children: [
                       _ComposerCircleButton(
                         icon: IconsaxPlusBold.add,
-                        background: const Color(0xFFF1F5F8),
-                        foreground: const Color(0xFF5B7A99),
+                        background: AppColors.slate100,
+                        foreground: AppColors.textSecondary,
                         onTap: onAddMedia,
                         size: 46,
                       ),

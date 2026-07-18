@@ -38,7 +38,12 @@ DateTime _lastActivity(RentalMatch match) {
 // ─── MatchesScreen ────────────────────────────────────────────────────────────
 
 class MatchesScreen extends StatefulWidget {
-  const MatchesScreen({super.key});
+  const MatchesScreen({super.key, this.embedded = false});
+
+  /// When true, the screen renders as a self-contained body inside a merged
+  /// host (no AppBar, transparent background). The toolbar/list/body stay
+  /// intact.
+  final bool embedded;
 
   @override
   State<MatchesScreen> createState() => _MatchesScreenState();
@@ -157,7 +162,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
             : '$total שיחות פעילות';
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF2F7FA),
+          appBar: null,
+          backgroundColor:
+              widget.embedded ? Colors.transparent : AppColors.slate100,
           body: SafeArea(
             bottom: false,
             child: provider.isLoading
@@ -351,7 +358,7 @@ class _MatchesToolbar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: AppColors.navy.withValues(alpha: 0.04),
@@ -367,7 +374,7 @@ class _MatchesToolbar extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: const Color(0xFFE2ECF1)),
+              border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -441,7 +448,7 @@ class _MatchesToolbar extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: showFilters
                           ? AppColors.navy
-                          : const Color(0xFFF2F4F5),
+                          : AppColors.slate100,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -647,14 +654,14 @@ class _MatchCardState extends State<_MatchCard> {
     if (match.ownerSigned && match.tenantSigned) {
       return (
         label: 'חתום',
-        color: const Color(0xFF27AE60),
+        color: AppColors.success,
         icon: IconsaxPlusLinear.tick_circle,
       );
     }
     if (match.contractSent) {
       return (
         label: 'חוזה נשלח',
-        color: const Color(0xFF27AE60),
+        color: AppColors.success,
         icon: IconsaxPlusLinear.document_text,
       );
     }
@@ -687,7 +694,7 @@ class _MatchCardState extends State<_MatchCard> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFE2ECF1), width: 1),
+          border: Border.all(color: AppColors.border, width: 1),
           boxShadow: [
             BoxShadow(
               color: AppColors.navy.withValues(alpha: 0.05),
@@ -912,7 +919,7 @@ class _MockupChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F7FA),
+        color: AppColors.slate100,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -982,9 +989,9 @@ class _LastMessagePreview extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FCFE),
+        color: AppColors.slate50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [

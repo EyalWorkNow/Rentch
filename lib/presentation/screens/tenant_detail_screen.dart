@@ -37,13 +37,13 @@ class TenantDetailScreen extends StatefulWidget {
 }
 
 // ─── Shared style tokens (mirrored from property_detail_screen.dart) ──────────
-const Color _kInk = Color(0xFF0F172A);
-const Color _kMuted = Color(0xFF64748B);
-const Color _kSlate = Color(0xFF334155);
-const Color _kSlate2 = Color(0xFF475569);
-const Color _kBorder = Color(0xFFE2E8F0);
-const Color _kFill = Color(0xFFF8FAFC);
-const Color _kTeal = Color(0xFF13BEC9);
+const Color _kInk = AppColors.ink;
+const Color _kMuted = AppColors.slate500;
+const Color _kSlate = AppColors.slate700;
+const Color _kSlate2 = AppColors.slate600;
+const Color _kBorder = AppColors.slate200;
+const Color _kFill = AppColors.slate50;
+const Color _kTeal = AppColors.tealBrand;
 
 class _TenantDetailScreenState extends State<TenantDetailScreen> {
   final PageController _pageController = PageController();
@@ -290,7 +290,7 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color:
-                                    const Color(0xFFFEF08A).withValues(alpha: 0.3),
+                                    AppColors.yellowPale.withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -299,13 +299,13 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                                   const RentlyIcon(
                                     IconsaxPlusLinear.star_1,
                                     size: 12,
-                                    color: Color(0xFFCA8A04),
+                                    color: AppColors.amberDark,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     _avgRating(widget.reviews),
                                     style: const TextStyle(
-                                      color: Color(0xFF854D0E),
+                                      color: AppColors.amberDeep,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -460,7 +460,7 @@ class _PhotoHero extends StatelessWidget {
                       const RentlyIcon(
                         IconsaxPlusLinear.star_1,
                         size: 14,
-                        color: Color(0xFFF39C12),
+                        color: AppColors.warning,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -620,7 +620,7 @@ class _SectionCardShell extends StatelessWidget {
         const SizedBox(height: 14),
         child,
         const SizedBox(height: 18),
-        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        const Divider(height: 1, color: AppColors.slate100),
       ],
     );
   }
@@ -893,7 +893,7 @@ class _MatchInsightCard extends StatelessWidget {
                   ),
                 ),
                 const Icon(Icons.check_circle_rounded,
-                    size: 16, color: Color(0xFF16A34A)),
+                    size: 16, color: AppColors.green),
               ],
             ),
           ),
@@ -944,13 +944,13 @@ class _MatchInsightCard extends StatelessWidget {
 
   (Color, Color) _tierColors(int score) {
     if (score >= 90) {
-      return (const Color(0xFF16A34A), const Color(0xFFDCFCE7));
+      return (AppColors.green, AppColors.border);
     }
     if (score >= 80) return (AppColors.primary, AppColors.primaryLight2);
     if (score >= 70) {
-      return (const Color(0xFF2563EB), const Color(0xFFDBEAFE));
+      return (AppColors.blue, AppColors.border);
     }
-    return (const Color(0xFFD97706), const Color(0xFFFEF3C7));
+    return (AppColors.amberDark, const Color(0xFFFEF3C7));
   }
 }
 
@@ -1173,7 +1173,7 @@ class _HorizontalTenantReviews extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF08A).withValues(alpha: 0.3),
+                        color: AppColors.yellowPale.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -1182,7 +1182,7 @@ class _HorizontalTenantReviews extends StatelessWidget {
                           const RentlyIcon(
                             IconsaxPlusLinear.star_1,
                             size: 12,
-                            color: Color(0xFFCA8A04),
+                            color: AppColors.amberDark,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1190,7 +1190,7 @@ class _HorizontalTenantReviews extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF854D0E),
+                              color: AppColors.amberDeep,
                             ),
                           ),
                         ],

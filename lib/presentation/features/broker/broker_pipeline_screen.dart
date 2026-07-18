@@ -62,7 +62,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F6FB),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -128,7 +128,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
+        color: AppColors.cloud,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.coral, width: 1.5),
       ),
@@ -445,7 +445,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       case LeadStage.newLead:
         return AppColors.primary;
       case LeadStage.contacted:
-        return const Color(0xFF4A6CF7);
+        return AppColors.superLike;
       case LeadStage.viewing:
         return AppColors.warning;
       case LeadStage.negotiation:

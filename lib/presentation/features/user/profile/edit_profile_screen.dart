@@ -1695,7 +1695,7 @@ class _PhotoCell extends StatelessWidget {
                   const Text(
                     'נשמרה בענן',
                     style: TextStyle(
-                      color: Color(0xFF27AE60),
+                      color: AppColors.success,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),

@@ -295,14 +295,14 @@ class ProfileScreen extends StatelessWidget {
             isDemoProfile ? 0 : provider.profileCompletion;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: AppColors.slate50,
           body: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFFF1F5F9),
-                  Color(0xFFF8FAFC),
-                  Color(0xFFE6F9FB), // light teal instead of pink
+                  AppColors.slate100,
+                  AppColors.slate50,
+                  AppColors.tealPale, // light teal instead of pink
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -325,7 +325,7 @@ class ProfileScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
+                            color: AppColors.slate900,
                           ),
                         ),
                         // Real, working notifications bell — far-left next to
@@ -379,11 +379,11 @@ class ProfileScreen extends StatelessWidget {
                                           : Image.network(realPhoto,
                                               fit: BoxFit.cover))
                                       : Container(
-                                          color: const Color(0xFFE2E8F0),
+                                          color: AppColors.slate200,
                                           child: const RentlyIcon(
                                             IconsaxPlusLinear.user,
                                             size: 100,
-                                            color: Color(0xFF64748B),
+                                            color: AppColors.slate500,
                                           ),
                                         ),
                                 ),
@@ -430,8 +430,8 @@ class ProfileScreen extends StatelessWidget {
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
                                   color: hasName
-                                      ? const Color(0xFF0F172A)
-                                      : const Color(0xFF94A3B8),
+                                      ? AppColors.slate900
+                                      : AppColors.slate400,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -449,12 +449,12 @@ class ProfileScreen extends StatelessWidget {
                                     color: Colors.white,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                        color: const Color(0xFFE2E8F0)),
+                                        color: AppColors.slate200),
                                   ),
                                   child: const RentlyIcon(
                                     IconsaxPlusLinear.edit_2,
                                     size: 14,
-                                    color: Color(0xFF0F172A),
+                                    color: AppColors.slate900,
                                   ),
                                 ),
                               ),
@@ -466,7 +466,7 @@ class ProfileScreen extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
+                              color: AppColors.slate500,
                             ),
                           ),
                         ],
@@ -480,7 +480,7 @@ class ProfileScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: AppColors.slate200),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.02),
@@ -499,7 +499,7 @@ class ProfileScreen extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F172A),
+                                  color: AppColors.slate900,
                                 ),
                               ),
                               Text(
@@ -507,7 +507,7 @@ class ProfileScreen extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A),
+                                  color: AppColors.slate900,
                                 ),
                               ),
                             ],
@@ -518,9 +518,9 @@ class ProfileScreen extends StatelessWidget {
                             child: LinearProgressIndicator(
                               value: completion / 100,
                               minHeight: 10,
-                              backgroundColor: const Color(0xFFF1F5F9),
+                              backgroundColor: AppColors.slate100,
                               valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF0F172A),
+                                AppColors.slate900,
                               ),
                             ),
                           ),
@@ -555,7 +555,7 @@ class ProfileScreen extends StatelessWidget {
                             count: provider.passedCount.toString(),
                             label: 'דילגתי',
                             icon: Icons.close_rounded,
-                            color: const Color(0xFF64748B),
+                            color: AppColors.slate500,
                           ),
                         ),
                       ],
@@ -568,7 +568,7 @@ class ProfileScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
+                        color: AppColors.slate900,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -576,7 +576,7 @@ class ProfileScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: AppColors.slate200),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.02),
@@ -631,7 +631,7 @@ class ProfileScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: AppColors.slate200),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,14 +639,14 @@ class ProfileScreen extends StatelessWidget {
                             const Row(
                               children: [
                                 RentlyIcon(IconsaxPlusLinear.user,
-                                    size: 18, color: Color(0xFF64748B)),
+                                    size: 18, color: AppColors.slate500),
                                 SizedBox(width: 8),
                                 Text(
                                   'עליי',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF0F172A),
+                                    color: AppColors.slate900,
                                   ),
                                 ),
                               ],
@@ -656,7 +656,7 @@ class ProfileScreen extends StatelessWidget {
                               profile.bio,
                               style: const TextStyle(
                                 fontSize: 14,
-                                color: Color(0xFF475569),
+                                color: AppColors.slate600,
                                 height: 1.5,
                               ),
                             ),
@@ -671,7 +671,7 @@ class ProfileScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: AppColors.slate200),
                       ),
                       child: Column(
                         children: [
@@ -1086,7 +1086,7 @@ class _StatsBar extends StatelessWidget {
             ),
             _StatBarItem(
               icon: IconsaxPlusLinear.message,
-              color: const Color(0xFF4A6CF7),
+              color: AppColors.superLike,
               value: matches.toString(),
               label: 'התאמות',
             ),
@@ -1422,10 +1422,10 @@ class _MiniCompletion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = percent >= 80
-        ? const Color(0xFF27AE60)
+        ? AppColors.success
         : percent >= 50
             ? AppColors.primary
-            : const Color(0xFFF39C12);
+            : AppColors.warning;
     return Container(
       width: 30,
       height: 30,
@@ -1637,7 +1637,7 @@ class _LandlordProfileScreen extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: const BoxDecoration(
-                color: Color(0xFFF5F7FA),
+                color: AppColors.cloud,
                 shape: BoxShape.circle,
               ),
               child: const Center(
@@ -1971,7 +1971,7 @@ class _LandlordProfileScreen extends StatelessWidget {
     final photoUrl = profile.photoUrl;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: AppColors.cloud,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -2148,7 +2148,7 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
       builder: (context, provider, _) {
         if (!provider.isBroker) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF5F7FA),
+            backgroundColor: AppColors.cloud,
             body: SafeArea(
               child: Center(
                 child: Padding(
@@ -2171,7 +2171,7 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
 
         final branding = provider.brokerBranding;
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
+          backgroundColor: AppColors.cloud,
           body: SafeArea(
             bottom: false,
             child: SingleChildScrollView(
@@ -2461,7 +2461,7 @@ class _BrokerLogoCard extends StatelessWidget {
           _BrokerLogoPreview(
             branding: branding,
             size: 68,
-            backgroundColor: const Color(0xFFF5F7FA),
+            backgroundColor: AppColors.cloud,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -2681,7 +2681,7 @@ class _TemplateChoiceTile extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFF7F8FF) : Colors.white,
+            color: selected ? AppColors.slate50 : Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: selected ? BrandPalette.broker.primary : AppColors.divider,
@@ -2746,11 +2746,11 @@ class _PropertyTemplatePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = switch (template) {
       BrokerPropertyTemplate.acidHero => branding.accentColor,
-      BrokerPropertyTemplate.dashboardGlass => const Color(0xFFEAF5EF),
-      BrokerPropertyTemplate.estateCard => const Color(0xFFF5F6F8),
+      BrokerPropertyTemplate.dashboardGlass => AppColors.border,
+      BrokerPropertyTemplate.estateCard => AppColors.cloud,
       BrokerPropertyTemplate.galleryEditorial => Colors.white,
       BrokerPropertyTemplate.cinematicGlass => branding.secondaryColor,
-      BrokerPropertyTemplate.rentlyClassic => const Color(0xFFE6F9FB),
+      BrokerPropertyTemplate.rentlyClassic => AppColors.tealPale,
     };
 
     return Container(
@@ -2838,9 +2838,9 @@ class _ChatTemplatePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = template == BrokerChatTemplate.nightSuite;
     final bg = switch (template) {
-      BrokerChatTemplate.rentlyClassic => const Color(0xFFF6FAFC),
+      BrokerChatTemplate.rentlyClassic => AppColors.slate50,
       BrokerChatTemplate.softGlass => branding.primaryColor.withValues(alpha: 0.12),
-      BrokerChatTemplate.editorialLight => const Color(0xFFFAF7F1),
+      BrokerChatTemplate.editorialLight => AppColors.cloud,
       BrokerChatTemplate.nightSuite => branding.secondaryColor,
     };
 
@@ -2962,7 +2962,7 @@ class _BrokerColorPresetTile extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFF7F8FF) : Colors.white,
+            color: selected ? AppColors.slate50 : Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: selected ? BrandPalette.broker.primary : AppColors.divider,
@@ -3122,7 +3122,7 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: AppColors.cloud,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -3386,7 +3386,7 @@ class _MockupStatBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.slate200),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -3415,7 +3415,7 @@ class _MockupStatBox extends StatelessWidget {
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF0F172A),
+              color: AppColors.slate900,
             ),
           ),
           const SizedBox(height: 2),
@@ -3424,7 +3424,7 @@ class _MockupStatBox extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
+              color: AppColors.slate500,
             ),
           ),
         ],
@@ -3478,7 +3478,7 @@ class _PreferenceTile extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
+                color: AppColors.slate900,
               ),
             ),
             const Spacer(),
@@ -3487,7 +3487,7 @@ class _PreferenceTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isEmpty
                     ? AppColors.primary.withValues(alpha: 0.08)
-                    : const Color(0xFFF1F5F9),
+                    : AppColors.slate100,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -3495,7 +3495,7 @@ class _PreferenceTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: isEmpty ? AppColors.primary : const Color(0xFF475569),
+                  color: isEmpty ? AppColors.primary : AppColors.slate600,
                 ),
               ),
             ),
@@ -3514,7 +3514,7 @@ class _SettingsDivider extends StatelessWidget {
     return const Divider(
       height: 1,
       thickness: 1,
-      color: Color(0xFFE2E8F0),
+      color: AppColors.slate200,
       indent: 20,
       endIndent: 20,
     );
@@ -3537,7 +3537,7 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color =
-        isDestructive ? AppColors.coral : const Color(0xFF0F172A);
+        isDestructive ? AppColors.coral : AppColors.slate900;
     return ScaleBounce(
       onTap: onTap,
       scaleDownTo: 0.96,
@@ -3554,7 +3554,7 @@ class _ActionRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isDestructive
                     ? AppColors.coral.withValues(alpha: 0.1)
-                    : const Color(0xFFF1F5F9),
+                    : AppColors.slate100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -3579,7 +3579,7 @@ class _ActionRow extends StatelessWidget {
               size: 16,
               color: isDestructive
                   ? AppColors.coral.withValues(alpha: 0.5)
-                  : const Color(0xFF94A3B8),
+                  : AppColors.slate400,
             ),
           ],
         ),
@@ -3607,10 +3607,10 @@ void _showBudgetSheet(BuildContext context, DatingProvider provider, TenantProfi
           keyboardType: TextInputType.number,
           autofocus: true,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.slate900),
           decoration: InputDecoration(
             prefixText: '₪ ',
-            prefixStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            prefixStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.slate900),
             hintText: 'לדוגמה: 5,000',
             hintStyle: TextStyle(fontSize: 20, color: Colors.grey.shade400),
             border: InputBorder.none,
@@ -3668,7 +3668,7 @@ void _showRoomsSheet(BuildContext context, DatingProvider provider, TenantProfil
                       color: isSelected ? AppColors.primary : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
+                        color: isSelected ? AppColors.primary : AppColors.slate200,
                       ),
                     ),
                     alignment: Alignment.center,
@@ -3677,7 +3677,7 @@ void _showRoomsSheet(BuildContext context, DatingProvider provider, TenantProfil
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                        color: isSelected ? Colors.white : AppColors.slate900,
                       ),
                     ),
                   ),
@@ -3738,7 +3738,7 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
                     Icon(
                       leadingIcon ??
                           (isSelected ? Icons.radio_button_checked : Icons.radio_button_off),
-                      color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+                      color: isSelected ? AppColors.primary : AppColors.slate500,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -3747,7 +3747,7 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
+                        color: isSelected ? AppColors.primary : AppColors.slate900,
                       ),
                     ),
                   ],
@@ -3846,7 +3846,7 @@ class _DirectInputSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
+                  color: AppColors.slate200,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -3856,7 +3856,7 @@ class _DirectInputSheet extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF0F172A),
+                  color: AppColors.slate900,
                 ),
               ),
               const SizedBox(height: 6),
@@ -3864,7 +3864,7 @@ class _DirectInputSheet extends StatelessWidget {
                 subtitle,
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF64748B),
+                  color: AppColors.slate500,
                 ),
               ),
               const SizedBox(height: 24),
@@ -3872,9 +3872,9 @@ class _DirectInputSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: AppColors.slate50,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: AppColors.slate200),
                 ),
                 child: inputWidget,
               ),

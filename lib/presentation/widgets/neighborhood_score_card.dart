@@ -85,7 +85,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: AppColors.slate200),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -107,7 +107,7 @@ class NeighborhoodScoreCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.ink,
                   ),
                 ),
                 const Spacer(),
@@ -143,7 +143,7 @@ class _HeadlineBadge extends StatelessWidget {
     if (score >= 80) return const Color(0xFF15803D); // strong
     if (score >= 60) return const Color(0xFF1D4ED8); // good
     if (score >= 40) return const Color(0xFFC2410C); // mixed
-    return const Color(0xFF9CA3AF); // low
+    return AppColors.slate400; // low
   }
 
   @override
@@ -193,7 +193,7 @@ class _SubScoreChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: AppColors.slate100,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -201,7 +201,7 @@ class _SubScoreChip extends StatelessWidget {
         style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF334155),
+          color: AppColors.slate700,
         ),
       ),
     );

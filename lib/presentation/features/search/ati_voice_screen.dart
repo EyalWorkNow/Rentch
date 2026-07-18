@@ -402,7 +402,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
                             ? Colors.white38
                             : const Color(0xFF34D399),
                         border: Border.all(
-                            color: const Color(0xFF071726), width: 2),
+                            color: AppColors.ink, width: 2),
                       ),
                     ),
                   ),
@@ -707,7 +707,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
             child: _roundBtn(
               icon: _recording ? IconsaxPlusBold.microphone : IconsaxPlusLinear.microphone,
               bg: _recording
-                  ? const Color(0xFF7CE0E6).withValues(alpha: 0.30)
+                  ? AppColors.tealBright.withValues(alpha: 0.30)
                   : Colors.white.withValues(alpha: 0.12),
               onTap: () {},
             ),
@@ -721,7 +721,7 @@ class _AtiVoiceScreenState extends State<AtiVoiceScreen> {
           ),
           _roundBtn(
             icon: IconsaxPlusLinear.close_circle,
-            bg: const Color(0xFFFF5A67),
+            bg: AppColors.coral,
             onTap: () => Navigator.of(context).maybePop(),
             big: true,
           ),
@@ -772,7 +772,7 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
 
   @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFF7CE0E6);
+    const accent = AppColors.tealBright;
     return GestureDetector(
       onTap: widget.onTap,
       child: AnimatedBuilder(
@@ -797,7 +797,7 @@ class _PulseLocationCtaState extends State<_PulseLocationCta>
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-                colors: [Color(0xFF17C7D1), Color(0xFF6675FF)]),
+                colors: [AppColors.tealBrand, Color(0xFF6675FF)]),
             borderRadius: BorderRadius.circular(30),
           ),
           child: const Row(
@@ -860,7 +860,7 @@ class _AuroraBackgroundState extends State<_AuroraBackground>
               center: Alignment(0, 0.65),
               radius: 1.35,
               colors: [
-                Color(0xFF071522),
+                AppColors.ink,
                 Color(0xFF03070E),
                 Colors.black,
               ],
@@ -914,14 +914,14 @@ class _AuroraRibbonPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 60.0
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFF06B6D4).withValues(alpha: 0.40)
+      ..color = AppColors.tealBrand.withValues(alpha: 0.40)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 35.0);
 
     final paintGreen = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 70.0
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFF10B981).withValues(alpha: 0.35)
+      ..color = AppColors.emerald.withValues(alpha: 0.35)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 40.0);
 
     final paintPurple = Paint()

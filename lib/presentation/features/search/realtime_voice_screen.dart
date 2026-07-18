@@ -110,7 +110,7 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
             gradient: RadialGradient(
               center: Alignment(0, -0.35),
               radius: 1.25,
-              colors: [Color(0xFF0E2A44), Color(0xFF071726), Color(0xFF03080E)],
+              colors: [AppColors.navy, AppColors.ink, Color(0xFF03080E)],
               stops: [0.0, 0.55, 1.0],
             ),
           ),
@@ -176,7 +176,7 @@ class _RealtimeVoiceScreenState extends State<RealtimeVoiceScreen> {
                       width: 68,
                       height: 68,
                       decoration: const BoxDecoration(
-                          color: Color(0xFFFF5A67), shape: BoxShape.circle),
+                          color: AppColors.coral, shape: BoxShape.circle),
                       child: const Icon(Icons.close_rounded,
                           color: Colors.white, size: 30),
                     ),

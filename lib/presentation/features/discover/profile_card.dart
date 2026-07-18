@@ -574,7 +574,7 @@ class _VerifiedListingBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF13BEC9).withValues(alpha: 0.94),
+        color: AppColors.tealBrand.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
@@ -755,9 +755,9 @@ class _MatchScoreBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = score >= 80
-        ? const Color(0xFF10B981) // emerald
+        ? AppColors.emerald // emerald
         : score >= 60
-            ? const Color(0xFFF59E0B) // amber
+            ? AppColors.amber // amber
             : AppColors.coral;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -790,7 +790,7 @@ class _SaleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const color = Color(0xFF6366F1); // indigo — distinct from rent
+    const color = AppColors.purple; // indigo — distinct from rent
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -825,7 +825,7 @@ class _PriceContextBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (ctx == PriceContext.average) return const SizedBox.shrink();
     final isBelow = ctx == PriceContext.belowAverage;
-    final color = isBelow ? const Color(0xFF10B981) : AppColors.coral;
+    final color = isBelow ? AppColors.emerald : AppColors.coral;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -855,7 +855,7 @@ class _MoreOptionsSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2B3A),
+        color: AppColors.inkSoft,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -883,7 +883,7 @@ class _MoreOptionsSheet extends StatelessWidget {
           _OptionTile(
             icon: Icons.block,
             label: 'חסום משתמש זה',
-            color: const Color(0xFFE74C3C),
+            color: AppColors.red,
             onTap: () {
               Navigator.pop(context);
               _showBlockConfirm(context, provider);
@@ -908,7 +908,7 @@ class _MoreOptionsSheet extends StatelessWidget {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          backgroundColor: const Color(0xFF1C2B3A),
+          backgroundColor: AppColors.inkSoft,
           title:
               const Text('סיבת הדיווח', style: TextStyle(color: Colors.white)),
           content: Column(
@@ -944,7 +944,7 @@ class _MoreOptionsSheet extends StatelessWidget {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          backgroundColor: const Color(0xFF1C2B3A),
+          backgroundColor: AppColors.inkSoft,
           title:
               const Text('חסימת משתמש', style: TextStyle(color: Colors.white)),
           content: Text(
@@ -971,7 +971,7 @@ class _MoreOptionsSheet extends StatelessWidget {
                 }
               },
               child: const Text('חסום',
-                  style: TextStyle(color: Color(0xFFE74C3C))),
+                  style: TextStyle(color: AppColors.red)),
             ),
           ],
         ),

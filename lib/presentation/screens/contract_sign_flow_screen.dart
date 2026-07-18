@@ -156,7 +156,7 @@ class _ProgressStrip extends StatelessWidget {
   }
 
   (String, String, Color, IconData) _state() {
-    const green = Color(0xFF16A34A);
+    const green = AppColors.green;
     if (contract.status == ContractStatus.cancelled) {
       return ('החוזה בוטל', '', AppColors.coral, Icons.cancel_outlined);
     }
@@ -222,7 +222,7 @@ class _Steps extends StatelessWidget {
   }
 
   Widget _dot(bool on, String label) {
-    const green = Color(0xFF16A34A);
+    const green = AppColors.green;
     return Column(
       children: [
         Container(
@@ -252,7 +252,7 @@ class _Steps extends StatelessWidget {
         child: Container(
           height: 2,
           margin: const EdgeInsets.only(bottom: 18),
-          color: on ? const Color(0xFF16A34A) : AppColors.borderLight,
+          color: on ? AppColors.green : AppColors.borderLight,
         ),
       );
 }
@@ -345,7 +345,7 @@ class _PartyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final sig = signature;
     final signed = sig != null;
-    const green = Color(0xFF16A34A);
+    const green = AppColors.green;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(

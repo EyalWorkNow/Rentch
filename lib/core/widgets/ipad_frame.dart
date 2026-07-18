@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:dating_app/core/constants/app_colors.dart';
 
 /// Phone-first layout adapter for large screens (iPad).
 ///
@@ -29,7 +30,7 @@ class IpadFrame extends StatelessWidget {
 
     final clamped = mq.copyWith(size: Size(phoneWidth, mq.size.height));
     return ColoredBox(
-      color: const Color(0xFF0E1116),
+      color: AppColors.ink,
       child: Center(
         child: ClipRect(
           child: SizedBox(

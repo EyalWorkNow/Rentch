@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// The assistant orb that lives in אתי's nav circle: a FIXED-size dark disc with
@@ -70,7 +71,7 @@ class _OrbPainter extends CustomPainter {
       s / 2,
       Paint()
         ..shader = const RadialGradient(
-          colors: [Color(0xFF3B3F63), Color(0xFF14162A)],
+          colors: [AppColors.slate700, AppColors.ink],
           stops: [0.0, 1.0],
         ).createShader(disc),
     );

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dating_app/core/constants/app_colors.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -148,7 +149,7 @@ class _PresencePainter extends CustomPainter {
 
   // A single warm spark used to inject life into the highlight; the orb's hue
   // is otherwise driven entirely by the passed-in accent (teal or black).
-  static const _spark = Color(0xFFFFFFFF);
+  static const _spark = AppColors.surface;
   static const _warm = Color(0xFFFFC9A3);
 
   bool get _listening => state == ErikState.listening;

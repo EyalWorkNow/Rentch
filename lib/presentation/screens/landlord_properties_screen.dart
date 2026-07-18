@@ -557,7 +557,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(26),
                                   border: Border.all(
-                                      color: const Color(0xFFE2ECF1)),
+                                      color: AppColors.border),
                                   boxShadow: [
                                     BoxShadow(
                                       color:
@@ -634,7 +634,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                                 decoration: BoxDecoration(
                                   color: hasActiveFilterOrSort
                                       ? AppColors.primary
-                                      : const Color(0xFFF2F4F5),
+                                      : AppColors.slate100,
                                   shape: BoxShape.circle,
                                   boxShadow: hasActiveFilterOrSort
                                       ? [
@@ -1315,7 +1315,7 @@ class _FilterPill extends StatelessWidget {
           color: isSelected ? AppColors.navy : Colors.white,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
+            color: isSelected ? AppColors.navy : AppColors.border,
             width: 1,
           ),
         ),

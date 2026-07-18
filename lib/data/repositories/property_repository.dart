@@ -143,6 +143,38 @@ class PropertyRepository {
     }
   }
 
+  // ── Read ───────────────────────────────────────────────────────────────────
+  // Fetch a single listing by id from the backend (GET /properties/<id>). Used
+  // by deep links when the shared apartment isn't in the local catalog (fresh
+  // install, filtered out, paginated away). Fail-soft: null on any error / 404
+  // (the client coerces 404 → {}, so an empty/idless map means "not found").
+  Future<RentalProperty?> fetchProperty(String id) async {
+    final trimmed = id.trim();
+    if (!isConfigured || trimmed.isEmpty) return null;
+    try {
+      final doc = await _breaker.call(
+        () => RetryPolicy.transient.execute(
+          () => tables.getRow(
+            databaseId: appwriteDatabaseId,
+            tableId: _tableId,
+            rowId: trimmed,
+          ),
+        ),
+      );
+      final data = doc.data;
+      if (data.isEmpty || (data['id'] == null && data['propertyId'] == null)) {
+        return null;
+      }
+      return RentalProperty.fromJson(data);
+    } on CircuitOpenException {
+      return null;
+    } catch (error) {
+      _log('fetch', trimmed, error);
+      return null;
+    }
+  }
+
+  // ── Delete ─────────────────────────────────────────────────────────────────
   Future<bool> deleteProperty(String propertyId) async {
     if (!isConfigured) return false;
 

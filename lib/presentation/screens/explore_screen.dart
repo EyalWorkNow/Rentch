@@ -3,8 +3,10 @@ import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/data/models/candidate_filters.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/property_likes_repository.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/tenant_detail_screen.dart';
@@ -17,7 +19,12 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  const ExploreScreen({super.key, this.embedded = false});
+
+  /// When true, the screen renders as a self-contained body inside a merged
+  /// host (no AppBar, transparent background) so it can sit under a shared
+  /// toggle. Everything else (deck, empty state, FABs) is unchanged.
+  final bool embedded;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -25,21 +32,110 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   int _currentIndex = 0;
+  CandidateFilters _filters = CandidateFilters.empty;
+
+  /// The representative liker for a property lead — the first tenant who liked
+  /// it. The candidate deck is property-based, so it surfaces one liker per
+  /// property; per-liker cards are a future enhancement. Returns null for demo
+  /// leads that have no real incoming like yet.
+  PropertyLike? _representativeLiker(
+      DatingProvider provider, RentalProperty property) {
+    final likes = provider.incomingLikesFor(property.id);
+    return likes.isEmpty ? null : likes.first;
+  }
+
+  /// Builds the REAL, per-candidate attributes for a lead, sourced from the
+  /// representative liker's snapshot. Every field is null (unknown → never
+  /// excluded) when the liker didn't carry it.
+  ///   * fitScore       — provider.leadFitScore (real, varies per property)
+  ///   * availableInDays — from the liked property's entry date (real)
+  ///   * budget          — the liker's snapshotted budgetMax (falls back to a
+  ///                       parsed budgetSnapshot string for older likes)
+  ///   * occupation/children/pets/car/wfh/household/income/verified — from the
+  ///     liker's structured attribute snapshot
+  CandidateAttributes _attributesFor(
+      DatingProvider provider, RentalProperty property) {
+    final entry = property.entryDateValue;
+    final availableInDays = entry == null
+        ? null
+        : entry.difference(DateTime.now()).inDays.clamp(0, 3650);
+
+    final liker = _representativeLiker(provider, property);
+    final budget = liker?.budgetMax?.toDouble() ??
+        _parseBudget(liker?.budgetSnapshot ?? '');
+
+    return CandidateAttributes(
+      fitScore: provider.leadFitScore(property),
+      availableInDays: availableInDays,
+      budget: budget,
+      occupation: liker?.occupation,
+      numChildren: liker?.numChildren,
+      hasPets: liker?.hasPets,
+      hasCar: liker?.hasCar,
+      wfh: liker?.wfh,
+      household: liker?.household,
+      income: liker?.monthlyIncome?.toDouble(),
+      verified: liker?.verified,
+    );
+  }
+
+  /// Pulls a ₪ amount out of a free-form snapshot like "עד ₪6,500". Returns null
+  /// when no number is present.
+  double? _parseBudget(String snapshot) {
+    if (snapshot.isEmpty) return null;
+    final digits = snapshot.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+    return double.tryParse(digits);
+  }
+
+  List<RentalProperty> _applyFilters(
+      DatingProvider provider, List<RentalProperty> leads) {
+    if (_filters.isEmpty) return leads;
+    return leads
+        .where((p) => _filters.matches(_attributesFor(provider, p)))
+        .toList();
+  }
+
+  Future<void> _openFilterSheet(DatingProvider provider) async {
+    final result = await showModalBottomSheet<CandidateFilters>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CandidateFilterSheet(initial: _filters),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _filters = result;
+        _currentIndex = 0;
+      });
+    }
+  }
+
+  void _setFilters(CandidateFilters next) {
+    setState(() {
+      _filters = next;
+      _currentIndex = 0;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final tenant = provider.tenantProfile;
-        final leads = provider.ownerLeads;
+        final allLeads = provider.ownerLeads;
+        final leads = _applyFilters(provider, allLeads);
         final total = leads.length;
 
         // Reset index safely if total changes
         final safeIndex = total > 0 ? _currentIndex.clamp(0, total - 1) : 0;
 
         return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
+          backgroundColor:
+              widget.embedded ? Colors.transparent : AppColors.background,
+          appBar: widget.embedded
+              ? null
+              : AppBar(
             automaticallyImplyLeading: false,
             backgroundColor: AppColors.background,
             elevation: 0,
@@ -47,7 +143,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             title: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFEDF1F5),
+                color: AppColors.slate100,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: Colors.black.withOpacity(0.04)),
                 boxShadow: [
@@ -139,10 +235,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: Column(
                     children: [
                       _buildAutoLikeCard(provider),
+                      if (allLeads.isNotEmpty)
+                        _CandidateFilterBar(
+                          filters: _filters,
+                          onQuickChange: _setFilters,
+                          onOpenSheet: () => _openFilterSheet(provider),
+                        ),
                       Expanded(
-                        child: leads.isEmpty
+                        child: allLeads.isEmpty
                             ? const _EmptyOwnerQueue()
-                            : Stack(
+                            : leads.isEmpty
+                                ? _NoMatchingCandidates(
+                                    onClear: () =>
+                                        _setFilters(CandidateFilters.empty),
+                                  )
+                                : Stack(
                                 children: [
                                   // Full-height card swiper
                                   Positioned.fill(
@@ -166,7 +273,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                         if (current != null && mounted) {
                                           setState(() => _currentIndex = current);
                                         }
-                                        return provider.handleOwnerSwipe(prev, current, dir);
+                                        return provider.handleOwnerSwipe(
+                                          prev,
+                                          current,
+                                          dir,
+                                          visibleLeads: leads,
+                                        );
                                       },
                                       cardBuilder: (context, index, hOffset, vOffset) {
                                         if (index < 0 || index >= leads.length) {
@@ -175,6 +287,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                         final lead = leads[index];
                                         return _LeadCard(
                                           tenant: tenant,
+                                          liker: _representativeLiker(
+                                              provider, lead),
                                           property: lead,
                                           reviews: provider.tenantReviews,
                                           hOffset: hOffset,
@@ -235,7 +349,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           colors: provider.autoLikeEnabled
               ? [
                   AppColors.primary.withOpacity(0.08),
-                  const Color(0xFF13BEC9).withOpacity(0.04),
+                  AppColors.tealBrand.withOpacity(0.04),
                 ]
               : [
                   Colors.white.withOpacity(0.9),
@@ -248,7 +362,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         border: Border.all(
           color: provider.autoLikeEnabled
               ? AppColors.primary.withOpacity(0.3)
-              : const Color(0xFFE2E8F0),
+              : AppColors.slate200,
           width: 1.5,
         ),
         boxShadow: [
@@ -268,7 +382,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             decoration: BoxDecoration(
               color: provider.autoLikeEnabled
                   ? AppColors.primary.withOpacity(0.12)
-                  : const Color(0xFFF1F5F9),
+                  : AppColors.slate100,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -308,8 +422,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
             value: provider.autoLikeEnabled,
             activeColor: AppColors.primary,
             activeTrackColor: AppColors.primary.withOpacity(0.3),
-            inactiveThumbColor: const Color(0xFF94A3B8),
-            inactiveTrackColor: const Color(0xFFE2E8F0),
+            inactiveThumbColor: AppColors.slate400,
+            inactiveTrackColor: AppColors.slate200,
             onChanged: (val) {
               HapticFeedback.mediumImpact();
               provider.toggleAutoLike();
@@ -321,7 +435,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Color _trustColor(int score) {
-    if (score >= 80) return const Color(0xFF27AE60);
+    if (score >= 80) return AppColors.success;
     if (score >= 50) return const Color(0xFFE67E22);
     return AppColors.coral;
   }
@@ -332,6 +446,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 class _LeadCard extends StatefulWidget {
   const _LeadCard({
     required this.tenant,
+    required this.liker,
     required this.property,
     required this.reviews,
     required this.hOffset,
@@ -339,12 +454,52 @@ class _LeadCard extends StatefulWidget {
     required this.fitReason,
   });
 
+  /// The current user's own profile — used ONLY as a placeholder stand-in for
+  /// demo leads that have no real incoming like ([liker] == null).
   final TenantProfile tenant;
+
+  /// The real tenant who liked this property (representative/first liker). When
+  /// present, the card renders THEIR name/photo/attributes — not the owner's.
+  /// The deck is property-based, so it shows one liker per property; per-liker
+  /// cards are a future enhancement.
+  final PropertyLike? liker;
+
   final RentalProperty property;
   final List<AppReview> reviews;
   final int hOffset;
   final bool isHighFit;
   final String? fitReason;
+
+  // ── Effective display data: liker's real values when present, else the
+  //    placeholder profile so demo leads keep rendering. ─────────────────────
+  String get _identity =>
+      liker != null && liker!.tenantId.isNotEmpty ? liker!.tenantId : tenant.id;
+
+  String get displayName =>
+      (liker?.tenantName.isNotEmpty ?? false) ? liker!.tenantName : tenant.name;
+
+  List<String> get displayPhotos {
+    final photo = liker?.tenantPhotoUrl ?? '';
+    if (liker != null) return photo.isEmpty ? const <String>[] : <String>[photo];
+    return tenant.photoUrls;
+  }
+
+  int get displayBudget => liker?.budgetMax ?? tenant.budgetMax;
+
+  double get displayRooms => liker?.rooms ?? tenant.desiredRooms;
+
+  String get displayMoveIn => (liker?.moveInSnapshot.isNotEmpty ?? false)
+      ? liker!.moveInSnapshot
+      : tenant.moveInWindow;
+
+  /// A short attribute pill: the liker's occupation (Hebrew label) when known,
+  /// otherwise the placeholder profile's first "important detail".
+  String? get displayDetail {
+    final occ = liker?.occupation;
+    if (occ != null && occ.isNotEmpty) return _occupationLabel(occ);
+    if (tenant.importantDetails.isNotEmpty) return tenant.importantDetails.first;
+    return null;
+  }
 
   @override
   State<_LeadCard> createState() => _LeadCardState();
@@ -356,7 +511,7 @@ class _LeadCardState extends State<_LeadCard> {
   @override
   void didUpdateWidget(covariant _LeadCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tenant.id != widget.tenant.id) {
+    if (oldWidget._identity != widget._identity) {
       _photoIndex = 0;
       return;
     }
@@ -364,7 +519,7 @@ class _LeadCardState extends State<_LeadCard> {
   }
 
   int _safePhotoIndex(int index) {
-    final photoCount = widget.tenant.photoUrls.length;
+    final photoCount = widget.displayPhotos.length;
     if (photoCount <= 0) return 0;
     return index.clamp(0, photoCount - 1).toInt();
   }
@@ -376,7 +531,7 @@ class _LeadCardState extends State<_LeadCard> {
 
   void _nextImage() {
     final current = _safePhotoIndex(_photoIndex);
-    if (current < widget.tenant.photoUrls.length - 1) {
+    if (current < widget.displayPhotos.length - 1) {
       setState(() => _photoIndex = current + 1);
     }
   }
@@ -385,7 +540,7 @@ class _LeadCardState extends State<_LeadCard> {
   Widget build(BuildContext context) {
     final isAccepting = widget.hOffset > 10;
     final isRejecting = widget.hOffset < -10;
-    final photos = widget.tenant.photoUrls;
+    final photos = widget.displayPhotos;
     final hasMultiple = photos.length > 1;
     final safePhotoIndex = _safePhotoIndex(_photoIndex);
     final currentPhoto = photos.isNotEmpty ? photos[safePhotoIndex] : '';
@@ -422,7 +577,7 @@ class _LeadCardState extends State<_LeadCard> {
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 220),
                 child: SafeImage(
-                  key: ValueKey('${widget.tenant.id}:$safePhotoIndex:$currentPhoto'),
+                  key: ValueKey('${widget._identity}:$safePhotoIndex:$currentPhoto'),
                   source: currentPhoto,
                   fallback: Container(
                     color: AppColors.navy,
@@ -674,7 +829,7 @@ class _LeadCardState extends State<_LeadCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      widget.tenant.name,
+                      widget.displayName,
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
@@ -689,7 +844,7 @@ class _LeadCardState extends State<_LeadCard> {
                         children: [
                           const Icon(
                             IconsaxPlusBold.tick_circle,
-                            color: Color(0xFF5AD4DC),
+                            color: AppColors.tealLight,
                             size: 14,
                           ),
                           const SizedBox(width: 5),
@@ -701,7 +856,7 @@ class _LeadCardState extends State<_LeadCard> {
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF5AD4DC),
+                                color: AppColors.tealLight,
                               ),
                             ),
                           ),
@@ -714,7 +869,7 @@ class _LeadCardState extends State<_LeadCard> {
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
-                          _fmt(widget.tenant.budgetMax),
+                          _fmt(widget.displayBudget),
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
@@ -743,18 +898,18 @@ class _LeadCardState extends State<_LeadCard> {
                         children: [
                           _StatPill(
                             icon: IconsaxPlusLinear.building,
-                            label: '${widget.tenant.desiredRooms.toStringAsFixed(widget.tenant.desiredRooms % 1 == 0 ? 0 : 1)} חדרים',
+                            label: '${widget.displayRooms.toStringAsFixed(widget.displayRooms % 1 == 0 ? 0 : 1)} חדרים',
                           ),
                           const SizedBox(width: 6),
                           _StatPill(
                             icon: IconsaxPlusLinear.calendar,
-                            label: widget.tenant.moveInWindow,
+                            label: widget.displayMoveIn,
                           ),
-                          if (widget.tenant.importantDetails.isNotEmpty) ...[
+                          if (widget.displayDetail != null) ...[
                             const SizedBox(width: 6),
                             _StatPill(
                               icon: IconsaxPlusLinear.info_circle,
-                              label: widget.tenant.importantDetails.first,
+                              label: widget.displayDetail!,
                             ),
                           ],
                         ],
@@ -832,14 +987,14 @@ class _LikedPropertyBox extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF13BEC9).withOpacity(0.2),
+                  color: AppColors.tealBrand.withOpacity(0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
                   child: RentlyIcon(
                     IconsaxPlusLinear.heart,
                     size: 16,
-                    color: Color(0xFF5AD4DC),
+                    color: AppColors.tealLight,
                   ),
                 ),
               ),
@@ -851,7 +1006,7 @@ class _LikedPropertyBox extends StatelessWidget {
                     const Text(
                       'התעניין/ה בנכס:',
                       style: TextStyle(
-                        color: Color(0xFF5AD4DC),
+                        color: AppColors.tealLight,
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                       ),
@@ -936,12 +1091,12 @@ class _ActionButtons extends StatelessWidget {
               _ActionButton(
                 icon: Icons.info_outline_rounded,
                 tooltip: 'הצג פרטים מלאים',
-                iconColor: const Color(0xFF072946),
+                iconColor: AppColors.navy,
                 backgroundColor: Colors.white,
                 size: 56,
                 iconSize: 26,
                 onPressed: onInfo,
-                shadowColor: const Color(0xFF072946),
+                shadowColor: AppColors.navy,
               ),
               const SizedBox(height: 6),
               Text(
@@ -1023,7 +1178,7 @@ class _ActionButtonState extends State<_ActionButton>
 
   @override
   Widget build(BuildContext context) {
-    final bool isDarkCenter = widget.iconColor == const Color(0xFF072946);
+    final bool isDarkCenter = widget.iconColor == AppColors.navy;
     final actualIconColor = isDarkCenter ? Colors.white : widget.iconColor;
 
     return Tooltip(
@@ -1173,6 +1328,649 @@ class _EmptyOwnerQueue extends StatelessWidget {
     );
   }
 }
+
+// ─── Candidate filters ────────────────────────────────────────────────────────
+
+/// Compact quick-chip row + "מסננים" button above the deck. The chips cover the
+/// most common candidate filters (high fit, immediate availability, verified,
+/// no pets) — all backed by real per-liker data; the fuller sheet is opened via
+/// [onOpenSheet].
+class _CandidateFilterBar extends StatelessWidget {
+  const _CandidateFilterBar({
+    required this.filters,
+    required this.onQuickChange,
+    required this.onOpenSheet,
+  });
+
+  final CandidateFilters filters;
+  final ValueChanged<CandidateFilters> onQuickChange;
+  final VoidCallback onOpenSheet;
+
+  static const double _highFit = 70;
+
+  @override
+  Widget build(BuildContext context) {
+    final isAll = filters.isEmpty;
+    final highFitOn = filters.minFitScore != null;
+    final immediateOn = filters.moveInWindow == 'immediate';
+    final verifiedOn = filters.verifiedOnly;
+    final noPetsOn = filters.hasPets == false;
+    final count = filters.activeCount;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 4, 18, 6),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                reverse: false,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _QuickChip(
+                      label: 'הכל',
+                      selected: isAll,
+                      onTap: () => onQuickChange(CandidateFilters.empty),
+                    ),
+                    const SizedBox(width: 8),
+                    _QuickChip(
+                      label: 'התאמה גבוהה',
+                      icon: IconsaxPlusBold.medal_star,
+                      selected: highFitOn,
+                      onTap: () => onQuickChange(
+                        highFitOn
+                            ? filters.copyWith(clearMinFitScore: true)
+                            : filters.copyWith(minFitScore: _highFit),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _QuickChip(
+                      label: 'פנוי מיידית',
+                      icon: IconsaxPlusLinear.calendar_tick,
+                      selected: immediateOn,
+                      onTap: () => onQuickChange(
+                        immediateOn
+                            ? filters.copyWith(clearMoveInWindow: true)
+                            : filters.copyWith(moveInWindow: 'immediate'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _QuickChip(
+                      label: 'מאומת',
+                      icon: IconsaxPlusLinear.shield_tick,
+                      selected: verifiedOn,
+                      onTap: () => onQuickChange(
+                        filters.copyWith(verifiedOnly: !verifiedOn),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _QuickChip(
+                      label: 'ללא חיות מחמד',
+                      icon: IconsaxPlusLinear.pet,
+                      selected: noPetsOn,
+                      onTap: () => onQuickChange(
+                        noPetsOn
+                            ? filters.copyWith(clearHasPets: true)
+                            : filters.copyWith(hasPets: false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onOpenSheet,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: count > 0 ? AppColors.primary : Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: count > 0 ? AppColors.primary : AppColors.slate200,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      IconsaxPlusLinear.setting_4,
+                      size: 16,
+                      color: count > 0 ? Colors.white : AppColors.navy,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'מסננים',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: count > 0 ? Colors.white : AppColors.navy,
+                      ),
+                    ),
+                    if (count > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.navy : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.navy : AppColors.slate200,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 14, color: selected ? Colors.white : AppColors.navy),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.navy,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Friendly empty state shown when active filters exclude every candidate.
+class _NoMatchingCandidates extends StatelessWidget {
+  const _NoMatchingCandidates({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: RentlyIcon(
+                IconsaxPlusLinear.filter_search,
+                color: AppColors.primary,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'אין מועמדים שתואמים למסננים',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.navy,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'נסה להרחיב את המסננים כדי לראות עוד מתעניינים.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                height: 1.6,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onClear,
+                icon: const RentlyIcon(IconsaxPlusLinear.close_circle, size: 17),
+                label: const Text('נקה מסננים'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet with the fuller candidate-filter controls. Every control here
+/// is now backed by real, per-liker data: the honest fit score, the liked
+/// property's availability, plus the tenant's attribute snapshot carried on the
+/// [PropertyLike] (occupation, household, #children, pets/car/WFH, income,
+/// verification). Unknown (null) attributes never exclude a candidate.
+class _CandidateFilterSheet extends StatefulWidget {
+  const _CandidateFilterSheet({required this.initial});
+
+  final CandidateFilters initial;
+
+  @override
+  State<_CandidateFilterSheet> createState() => _CandidateFilterSheetState();
+}
+
+class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
+  late CandidateFilters _draft = widget.initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomInset),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.slate200,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text(
+                  'מסננים',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.navy,
+                  ),
+                ),
+                const Spacer(),
+                if (_draft.isNotEmpty)
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => _draft = CandidateFilters.empty),
+                    child: Text(
+                      'נקה הכל',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Scrollable so the fuller control set never overflows on short
+            // devices; the grab handle, title and apply button stay pinned.
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Fit score ───────────────────────────────────────────
+                    _sectionTitle('רמת התאמה', IconsaxPlusBold.medal_star),
+                    const SizedBox(height: 6),
+                    Text(
+                      _draft.minFitScore == null
+                          ? 'כל רמות ההתאמה'
+                          : 'התאמה של ${_draft.minFitScore!.round()}% ומעלה',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        activeTrackColor: AppColors.primary,
+                        inactiveTrackColor: AppColors.slate200,
+                        thumbColor: AppColors.primary,
+                        overlayColor: AppColors.primary.withOpacity(0.12),
+                      ),
+                      child: Slider(
+                        value: (_draft.minFitScore ?? 0).clamp(0, 100),
+                        min: 0,
+                        max: 100,
+                        divisions: 20,
+                        label: '${(_draft.minFitScore ?? 0).round()}%',
+                        onChanged: (v) => setState(() {
+                          _draft = v <= 0
+                              ? _draft.copyWith(clearMinFitScore: true)
+                              : _draft.copyWith(minFitScore: v);
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Availability / move-in ──────────────────────────────
+                    _sectionTitle('מועד כניסה לנכס', IconsaxPlusLinear.calendar),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final token in CandidateFilters.moveInWindowTokens)
+                          _QuickChip(
+                            label: CandidateFilters.moveInWindowLabel(token),
+                            selected: _draft.moveInWindow == token,
+                            onTap: () => setState(() {
+                              _draft = _draft.moveInWindow == token
+                                  ? _draft.copyWith(clearMoveInWindow: true)
+                                  : _draft.copyWith(moveInWindow: token);
+                            }),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Occupation (multi-select) ───────────────────────────
+                    _sectionTitle('תחום עיסוק', IconsaxPlusLinear.briefcase),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final entry in _kOccupationLabels.entries)
+                          _QuickChip(
+                            label: entry.value,
+                            selected: _draft.occupation.contains(entry.key),
+                            onTap: () => _toggleSet('occupation', entry.key),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Household type (multi-select) ───────────────────────
+                    _sectionTitle('סוג משק בית', IconsaxPlusLinear.people),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final entry in _kHouseholdLabels.entries)
+                          _QuickChip(
+                            label: entry.value,
+                            selected: _draft.household.contains(entry.key),
+                            onTap: () => _toggleSet('household', entry.key),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Max #children ───────────────────────────────────────
+                    _sectionTitle('מספר ילדים (מקסימום)',
+                        IconsaxPlusLinear.profile_2user),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final n in const [0, 1, 2, 3, 4])
+                          _QuickChip(
+                            label: n == 0 ? 'ללא ילדים' : 'עד $n',
+                            selected: _draft.numChildrenMax == n,
+                            onTap: () => setState(() {
+                              _draft = _draft.numChildrenMax == n
+                                  ? _draft.copyWith(clearNumChildrenMax: true)
+                                  : _draft.copyWith(numChildrenMax: n);
+                            }),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Lifestyle toggles (pets / car / WFH) ────────────────
+                    _sectionTitle('אורח חיים', IconsaxPlusLinear.pet),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _QuickChip(
+                          label: 'ללא חיית מחמד',
+                          icon: IconsaxPlusLinear.pet,
+                          selected: _draft.hasPets == false,
+                          onTap: () => setState(() {
+                            _draft = _draft.hasPets == false
+                                ? _draft.copyWith(clearHasPets: true)
+                                : _draft.copyWith(hasPets: false);
+                          }),
+                        ),
+                        _QuickChip(
+                          label: 'בעל/ת רכב',
+                          icon: IconsaxPlusLinear.car,
+                          selected: _draft.hasCar == true,
+                          onTap: () => setState(() {
+                            _draft = _draft.hasCar == true
+                                ? _draft.copyWith(clearHasCar: true)
+                                : _draft.copyWith(hasCar: true);
+                          }),
+                        ),
+                        _QuickChip(
+                          label: 'עבודה מהבית',
+                          icon: IconsaxPlusLinear.home_2,
+                          selected: _draft.wfh == true,
+                          onTap: () => setState(() {
+                            _draft = _draft.wfh == true
+                                ? _draft.copyWith(clearWfh: true)
+                                : _draft.copyWith(wfh: true);
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Minimum income ──────────────────────────────────────
+                    _sectionTitle('הכנסה חודשית (מינימום)',
+                        IconsaxPlusLinear.wallet_money),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final v in const [8000.0, 12000.0, 16000.0, 20000.0])
+                          _QuickChip(
+                            label: '${_fmt(v.toInt())}+',
+                            selected: _draft.incomeMin == v,
+                            onTap: () => setState(() {
+                              _draft = _draft.incomeMin == v
+                                  ? _draft.copyWith(clearIncomeMin: true)
+                                  : _draft.copyWith(incomeMin: v);
+                            }),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Verified only ───────────────────────────────────────
+                    _sectionTitle('אימות פרופיל', IconsaxPlusLinear.shield_tick),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      children: [
+                        _QuickChip(
+                          label: 'מאומת בלבד',
+                          icon: IconsaxPlusLinear.shield_tick,
+                          selected: _draft.verifiedOnly,
+                          onTap: () => setState(() {
+                            _draft = _draft.copyWith(
+                                verifiedOnly: !_draft.verifiedOnly);
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(_draft),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.navy,
+                      side: const BorderSide(color: AppColors.borderLight),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('החל'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Toggles membership of [key] in the [field] set ('occupation' | 'household')
+  /// and stores the updated set on the draft.
+  void _toggleSet(String field, String key) {
+    final current =
+        field == 'occupation' ? _draft.occupation : _draft.household;
+    final next = Set<String>.from(current);
+    if (next.contains(key)) {
+      next.remove(key);
+    } else {
+      next.add(key);
+    }
+    setState(() {
+      _draft = field == 'occupation'
+          ? _draft.copyWith(occupation: next)
+          : _draft.copyWith(household: next);
+    });
+  }
+
+  Widget _sectionTitle(String label, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+            color: AppColors.navy,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Candidate attribute vocabularies (mirror the tenant profile editor) ──────
+
+/// Occupation keys → Hebrew label, matching the tenant profile / eligibility
+/// vocabulary so a liker's stored key renders and filters correctly.
+const Map<String, String> _kOccupationLabels = <String, String>{
+  'hightech': 'הייטק',
+  'healthcare': 'בריאות/רפואה',
+  'education': 'חינוך/הוראה',
+  'finance': 'פיננסים/בנקאות',
+  'law': 'משפטים',
+  'engineering': 'הנדסה',
+  'selfemployed': 'עצמאי/ת',
+  'public': 'שירות ציבורי',
+  'retail': 'מסחר/שירות',
+  'academia': 'אקדמיה',
+  'student': 'סטודנט/ית',
+  'other': 'אחר',
+};
+
+const Map<String, String> _kHouseholdLabels = <String, String>{
+  'family': 'משפחה',
+  'single': 'רווק/ה',
+  'couple': 'זוג',
+  'student': 'סטודנט/ית',
+};
+
+String _occupationLabel(String key) => _kOccupationLabels[key] ?? key;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

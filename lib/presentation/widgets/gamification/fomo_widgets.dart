@@ -271,11 +271,11 @@ class HotPropertyBadge extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
-      backgroundColor: const Color(0xFFFF5A67),
-      gradientColors: const [Color(0xFFFF5A67), Color(0xFFFF8C42)],
+      backgroundColor: AppColors.coral,
+      gradientColors: const [AppColors.coral, Color(0xFFFF8C42)],
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFFFF5A67).withValues(alpha: 0.4),
+          color: AppColors.coral.withValues(alpha: 0.4),
           blurRadius: 8,
           offset: const Offset(0, 2),
         ),
@@ -409,10 +409,10 @@ class _SuperLikeResetTimerState extends State<SuperLikeResetTimer> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF4A6CF7).withValues(alpha: 0.1),
+        color: AppColors.superLike.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF4A6CF7).withValues(alpha: 0.3),
+          color: AppColors.superLike.withValues(alpha: 0.3),
         ),
       ),
       child: Text(
@@ -420,7 +420,7 @@ class _SuperLikeResetTimerState extends State<SuperLikeResetTimer> {
         style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF4A6CF7),
+          color: AppColors.superLike,
         ),
       ),
     );

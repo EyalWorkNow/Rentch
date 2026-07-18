@@ -1,29 +1,22 @@
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/presentation/features/calendar/availability_calendar_screen.dart';
+import 'package:dating_app/data/models/availability_slot.dart';
+import 'package:dating_app/data/repositories/availability_repository.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/presentation/screens/add_property_screen.dart'
-    show AddPropertyScreen, EditPropertyScreen;
 import 'package:dating_app/presentation/screens/assistant_screen.dart';
-import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/presentation/screens/rent_tracking_screen.dart';
 import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
 import 'package:dating_app/presentation/features/landlord/reminders_screen.dart';
 import 'package:dating_app/presentation/features/broker/area_intel_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_tools_screen.dart';
-import 'package:dating_app/presentation/widgets/safe_media.dart';
-import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:dating_app/presentation/widgets/rently_icon.dart';
-import 'package:dating_app/presentation/widgets/pulse_widget.dart';
 import 'package:dating_app/presentation/widgets/fade_slide_entrance.dart';
 import 'package:provider/provider.dart';
-import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
 class LandlordDashboardScreen extends StatelessWidget {
   const LandlordDashboardScreen({
@@ -45,7 +38,6 @@ class LandlordDashboardScreen extends StatelessWidget {
         final profile = provider.tenantProfile;
         final landlordName = profile?.name ?? 'בעל הדירה';
         final photoUrl = profile?.photoUrl ?? '';
-        final matches = provider.matches.take(3).toList();
         final properties = provider.myProperties;
         
         // Calculate Expected Monthly Revenue
@@ -56,7 +48,7 @@ class LandlordDashboardScreen extends StatelessWidget {
 
         if (provider.isLoading) {
           return Scaffold(
-            backgroundColor: Color(0xFFF5F7FA),
+            backgroundColor: AppColors.cloud,
             body: Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             ),
@@ -64,7 +56,7 @@ class LandlordDashboardScreen extends StatelessWidget {
         }
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
+          backgroundColor: AppColors.cloud,
           body: SafeArea(
             bottom: false,
             child: ListView(
@@ -92,6 +84,18 @@ class LandlordDashboardScreen extends StatelessWidget {
                     pendingCount: stats.pendingCount,
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // ── My Calendar — prominent standalone card ──
+                FadeSlideEntrance(
+                  delay: const Duration(milliseconds: 120),
+                  child: _CalendarCard(
+                    onTap: () => _push(
+                      context,
+                      const AvailabilityCalendarScreen(),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
 
                 // ── Occupancy Arc Meter ──
@@ -115,21 +119,6 @@ class LandlordDashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // ── Quick Actions Grid ──
-                FadeSlideEntrance(
-                  delay: const Duration(milliseconds: 320),
-                  child: _QuickActionsGrid(
-                    pendingCount: stats.pendingCount,
-                    unseenCount: provider.unseenMatchCount,
-                    onAddProperty: () =>
-                        _push(context, const AddPropertyScreen()),
-                    onSwipes: onOpenSwipes,
-                    onMatches: onOpenMatches,
-                    onProperties: onOpenProperties,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
                 // ── Broker hub (מתווך only) — opens "כלי הסוכן" ──
                 if (context.watch<DatingProvider>().isBroker) ...[
                   FadeSlideEntrance(
@@ -146,65 +135,6 @@ class LandlordDashboardScreen extends StatelessWidget {
                     properties: properties,
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                // ── Active Matches ──
-                if (matches.isNotEmpty) ...[
-                  FadeSlideEntrance(
-                    delay: const Duration(milliseconds: 400),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionHeader(
-                          title: 'התאמות פעילות',
-                          subtitle: 'שיחות שמצפות לטיפול',
-                          onSeeAll: onOpenMatches,
-                        ),
-                        const SizedBox(height: 12),
-                        ...matches.map(
-                          (m) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _MatchRow(
-                              match: m,
-                              provider: provider,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // ── Properties Scroll ──
-                if (properties.isNotEmpty) ...[
-                  FadeSlideEntrance(
-                    delay: const Duration(milliseconds: 480),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionHeader(
-                          title: 'הנכסים שלי',
-                          subtitle: '${properties.length} נכסים פעילים',
-                          onSeeAll: onOpenProperties,
-                        ),
-                        const SizedBox(height: 12),
-                        _PropertiesScroll(
-                          properties: properties,
-                          provider: provider,
-                          context: context,
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  FadeSlideEntrance(
-                    delay: const Duration(milliseconds: 480),
-                    child: _EmptyPropertiesCard(
-                      onAdd: () => _push(context, const AddPropertyScreen()),
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 80),
               ],
             ),
@@ -313,7 +243,7 @@ class _AssistantChip extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(10, 8, 13, 8),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.primary, Color(0xFF0E9AA3)],
+            colors: [AppColors.primary, AppColors.tealDark],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
@@ -596,7 +526,7 @@ class _LargeProgressCard extends StatelessWidget {
                     Container(
                       height: 20,
                       width: double.infinity,
-                      color: const Color(0xFFEDF1F5),
+                      color: AppColors.slate100,
                     ),
                     LayoutBuilder(
                       builder: (context, constraints) {
@@ -810,7 +740,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                     child: _ArcStatChip(
                       label: 'ממתינים',
                       value: '${(widget.propertiesCount - widget.matchesCount).clamp(0, widget.propertiesCount)}',
-                      color: const Color(0xFFE8EDF2),
+                      color: AppColors.border,
                       textColor: AppColors.textSecondary,
                     ),
                   ),
@@ -879,7 +809,7 @@ class _WavePainter extends CustomPainter {
     final double height = size.height;
 
     // Background fill
-    final bgPaint = Paint()..color = const Color(0xFFF6FAFC);
+    final bgPaint = Paint()..color = AppColors.slate50;
     canvas.drawRect(Rect.fromLTWH(0, 0, width, height), bgPaint);
 
     if (progress <= 0.0) return;
@@ -1103,7 +1033,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F4F8),
+                      color: AppColors.slate100,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
@@ -1122,7 +1052,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
               // Period selector
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F4F8),
+                  color: AppColors.slate100,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -1331,7 +1261,7 @@ class _BarPainter extends CustomPainter {
     if (isHighlighted) {
       bgPaint.color = themeColor;
     } else {
-      bgPaint.color = const Color(0xFFF1F3F9);
+      bgPaint.color = AppColors.slate100;
     }
     canvas.drawRect(rect, bgPaint);
 
@@ -1364,7 +1294,7 @@ class _BarPainter extends CustomPainter {
       canvas.drawCircle(dotCenter, 6.5, outerCirclePaint);
 
       final innerDotPaint = Paint()
-        ..color = isHighlighted ? themeColor : const Color(0xFF0F172A)
+        ..color = isHighlighted ? themeColor : AppColors.slate900
         ..style = PaintingStyle.fill;
       canvas.drawCircle(dotCenter, 3.5, innerDotPaint);
     }
@@ -1374,206 +1304,6 @@ class _BarPainter extends CustomPainter {
   bool shouldRepaint(covariant _BarPainter oldDelegate) {
     return oldDelegate.isHighlighted != isHighlighted ||
         oldDelegate.themeColor != themeColor;
-  }
-}
-
-
-// ─── Quick Actions Grid ───────────────────────────────────────────────────────
-
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid({
-    required this.pendingCount,
-    required this.unseenCount,
-    required this.onAddProperty,
-    required this.onSwipes,
-    required this.onMatches,
-    required this.onProperties,
-  });
-
-  final int pendingCount;
-  final int unseenCount;
-  final VoidCallback onAddProperty;
-  final VoidCallback onSwipes;
-  final VoidCallback onMatches;
-  final VoidCallback onProperties;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'פעולות מהירות',
-          key: Key('quick_actions_header'),
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _QABtn(
-                label: 'הוסף דירה',
-                icon: IconsaxPlusLinear.add_square,
-                color: AppColors.primary,
-                onTap: onAddProperty,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _QABtn(
-                label: 'מועמדים',
-                icon: IconsaxPlusLinear.profile_2user,
-                badge: pendingCount,
-                color: AppColors.textPrimary,
-                onTap: onSwipes,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _QABtn(
-                label: "מאצ'ים",
-                icon: IconsaxPlusLinear.heart,
-                badge: unseenCount,
-                color: AppColors.coral,
-                onTap: onMatches,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _QABtn(
-                label: 'הנכסים',
-                icon: IconsaxPlusLinear.buildings_2,
-                color: AppColors.primaryDark,
-                onTap: onProperties,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // היומן — mark free viewing windows tenants can book from the chat.
-        Row(
-          children: [
-            Expanded(
-              child: _QABtn(
-                label: 'היומן שלי — זמנים פנויים לצפייה',
-                icon: IconsaxPlusLinear.calendar_1,
-                color: AppColors.primary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const AvailabilityCalendarScreen(),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _QABtn extends StatelessWidget {
-  const _QABtn({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.badge = 0,
-    required this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final int badge;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 17),
-                ),
-                if (badge > 0)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      constraints:
-                          const BoxConstraints(minWidth: 16, minHeight: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: color == AppColors.coral
-                            ? AppColors.primary
-                            : AppColors.coral,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          badge > 9 ? '9+' : '$badge',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -1680,24 +1410,46 @@ class _LandlordToolsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'כלים לבעל הדירה',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 4,
+              height: 40,
+              margin: const EdgeInsets.only(top: 2, left: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'כלים לבעל הדירה',
+                    style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'עזרה פשוטה לניהול הדירה — בלי כאב ראש',
+                    style: TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'עזרה פשוטה לניהול הדירה — בלי כאב ראש',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         // Area Intelligence — where to invest + who a location suits. Shown to
         // every landlord (brokers also reach it from "כלי הסוכן").
         _ToolTile(
@@ -1779,39 +1531,234 @@ class _ToolTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return GestureDetector(
-      onTap: enabled
-          ? () {
-              HapticFeedback.selectionClick();
-              onTap!();
-            }
-          : null,
-      child: Opacity(
-        opacity: enabled ? 1.0 : 0.55,
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.5,
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: enabled
+              ? () {
+                  HapticFeedback.selectionClick();
+                  onTap!();
+                }
+              : null,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.slate200),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.04),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Gradient-tinted icon tile
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        color.withValues(alpha: 0.16),
+                        color.withValues(alpha: 0.06),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: color.withValues(alpha: 0.12)),
+                  ),
+                  child: Icon(icon, color: color, size: 25),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontSize: 12.5,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Chevron in a soft circle (RTL: points left = forward)
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: AppColors.slate50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    IconsaxPlusLinear.arrow_left_2,
+                    color: AppColors.slate400,
+                    size: 17,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── My Calendar Card ─────────────────────────────────────────────────────────
+// Prominent standalone card near the top of the dashboard. Lets the landlord
+// open the availability calendar to mark free viewing windows tenants can book.
+class _CalendarCard extends StatefulWidget {
+  const _CalendarCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<_CalendarCard> createState() => _CalendarCardState();
+}
+
+class _CalendarCardState extends State<_CalendarCard> {
+  final AvailabilityRepository _repo = AvailabilityRepository();
+
+  AvailabilitySlot? _nextBooked;
+  bool _loading = true;
+
+  static const _daysHeb = [
+    'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final all = await _repo.loadAll();
+    final now = DateTime.now();
+    final booked = all
+        .where((s) => s.status == SlotStatus.booked && s.start.isAfter(now))
+        .toList()
+      ..sort((a, b) => a.start.compareTo(b.start));
+    if (!mounted) return;
+    setState(() {
+      _nextBooked = booked.isEmpty ? null : booked.first;
+      _loading = false;
+    });
+  }
+
+  String _whenLabel(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(d.year, d.month, d.day);
+    final diff = target.difference(today).inDays;
+    final day = diff == 0
+        ? 'היום'
+        : diff == 1
+            ? 'מחר'
+            : 'יום ${_daysHeb[d.weekday % 7]}';
+    final hh = d.hour.toString().padLeft(2, '0');
+    final mm = d.minute.toString().padLeft(2, '0');
+    return '$day · $hh:$mm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final booked = _nextBooked;
+    final hasBooking = booked != null;
+
+    final String title;
+    final String subtitle;
+    if (_loading) {
+      title = 'היומן שלי';
+      subtitle = 'טוען...';
+    } else if (hasBooking) {
+      final who = booked.bookedByName.trim().isEmpty
+          ? 'שוכר/ת'
+          : booked.bookedByName.trim();
+      title = 'צפייה הבאה · $who';
+      subtitle = _whenLabel(booked.start);
+    } else {
+      title = 'היומן שלי';
+      subtitle = 'אין צפיות מתוכננות · הוסף זמנים פנויים';
+    }
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          widget.onTap();
+        },
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.slate200),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                color: AppColors.primary.withValues(alpha: 0.10),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
           child: Row(
             children: [
+              // Calendar icon on a brand-tinted tile
               Container(
-                width: 54,
-                height: 54,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primaryDark,
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: color, size: 26),
+                child: Icon(
+                  hasBooking
+                      ? IconsaxPlusLinear.calendar_tick
+                      : IconsaxPlusLinear.calendar_1,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1820,991 +1767,49 @@ class _ToolTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 17,
+                        color: AppColors.navy,
+                        fontSize: 18,
                         fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: hasBooking
+                            ? AppColors.primary
+                            : AppColors.slate500,
                         fontSize: 13,
-                        height: 1.3,
-                        fontWeight: FontWeight.w500,
+                        fontWeight:
+                            hasBooking ? FontWeight.w800 : FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                IconsaxPlusLinear.arrow_left_2,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.photoUrl, required this.name});
-  final String photoUrl;
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final initials = name.trim().isNotEmpty
-        ? name
-            .trim()
-            .split(' ')
-            .map((w) => w.isEmpty ? '' : w[0])
-            .take(2)
-            .join()
-        : '?';
-    return AvatarPulseRing(
-      active: true,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border:
-              Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
-        ),
-        child: ClipOval(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _InitialsCircle(initials: initials),
-              if (photoUrl.isNotEmpty)
-                Image.network(
-                  photoUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              const SizedBox(width: 10),
+              // Chevron in a soft circle (RTL: points left = forward)
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
                 ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InitialsCircle extends StatelessWidget {
-  const _InitialsCircle({required this.initials});
-  final String initials;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.primary,
-      child: Center(
-        child: Text(
-          initials,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Activity Feed ────────────────────────────────────────────────────────────
-
-class _ActivitySection extends StatelessWidget {
-  const _ActivitySection({
-    required this.provider,
-    required this.context,
-    required this.onOpenSwipes,
-    required this.onOpenMatches,
-  });
-  final DatingProvider provider;
-  final BuildContext context;
-  final VoidCallback onOpenSwipes;
-  final VoidCallback onOpenMatches;
-
-  List<_ActivityItem> _buildItems() {
-    final items = <_ActivityItem>[];
-    final leads = provider.ownerLeads;
-    final unseen = provider.unseenMatchCount;
-    final props = provider.myProperties;
-
-    if (leads.isNotEmpty) {
-      items.add(_ActivityItem(
-        icon: IconsaxPlusLinear.profile_2user,
-        color: AppColors.primary,
-        title:
-            '${leads.length} ${leads.length == 1 ? 'שוכר מעוניין' : 'שוכרים מעוניינים'} בנכסים שלך',
-        subtitle: 'ממתינים לאישור — ככל שתגיב מהר יותר, כך טוב יותר',
-        cta: 'לסוויפ',
-        onTap: onOpenSwipes,
-      ));
-    }
-
-    if (unseen > 0) {
-      items.add(_ActivityItem(
-        icon: IconsaxPlusLinear.message,
-        color: AppColors.coral,
-        title: '$unseen הודעות שלא נקראו',
-        subtitle: 'שוכרים שכבר אישרת ממתינים לתגובה שלך',
-        cta: 'לשיחות',
-        onTap: onOpenMatches,
-      ));
-    }
-
-    if (props.isEmpty) {
-      items.add(_ActivityItem(
-        icon: IconsaxPlusLinear.add_square,
-        color: AppColors.primary,
-        title: 'הוסף את הנכס הראשון שלך',
-        subtitle: 'נכסים עם תמונות מקבלים פי 3 יותר פניות',
-        cta: 'הוסף',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AddPropertyScreen()),
-        ),
-      ));
-    } else {
-      items.add(_ActivityItem(
-        icon: IconsaxPlusLinear.chart_2,
-        color: Colors.white.withValues(alpha: 0.9),
-        title: 'פרופיל הנכסים שלך פעיל ומוצג לשוכרים',
-        subtitle:
-            '${props.length} ${props.length == 1 ? 'נכס' : 'נכסים'} פעילים — הוסף תמונות לשיפור הסיכויים',
-        cta: null,
-        onTap: null,
-      ));
-    }
-
-    return items;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final items = _buildItems();
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'מה קורה עכשיו',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            children: items.asMap().entries.map((e) {
-              final isLast = e.key == items.length - 1;
-              return _ActivityRow(item: e.value, isLast: isLast);
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActivityItem {
-  const _ActivityItem({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.cta,
-    required this.onTap,
-  });
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final String? cta;
-  final VoidCallback? onTap;
-}
-
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.item, required this.isLast});
-  final _ActivityItem item;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    final iconBgColor = item.color.withValues(alpha: 0.08);
-
-    return Column(
-      children: [
-        InkWell(
-          onTap: item.onTap,
-          borderRadius: BorderRadius.circular(22),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(item.icon, color: item.color, size: 19),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        item.subtitle,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11.5,
-                          height: 1.35,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (item.cta != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: item.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      item.cta!,
-                      style: TextStyle(
-                        color: item.color,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ] else
-                  const RentlyIcon(IconsaxPlusLinear.arrow_left,
-                      size: 14,
-                      color: AppColors.textSecondary),
-              ],
-            ),
-          ),
-        ),
-        if (!isLast)
-          const Divider(
-            height: 1,
-            indent: 70,
-            color: Color(0xFFEDF1F5),
-          ),
-      ],
-    );
-  }
-}
-
-// ─── Section Header ───────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.subtitle,
-    this.onSeeAll,
-  });
-
-  final String title;
-  final String subtitle;
-  final VoidCallback? onSeeAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                child: Icon(
+                  IconsaxPlusLinear.arrow_left_2,
+                  color: AppColors.primary,
+                  size: 18,
                 ),
               ),
             ],
           ),
-        ),
-        if (onSeeAll != null)
-          GestureDetector(
-            onTap: onSeeAll,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'הכל',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  SizedBox(width: 3),
-                  RentlyIcon(IconsaxPlusLinear.arrow_left,
-                      size: 12, color: AppColors.primary),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ─── Match Row ────────────────────────────────────────────────────────────────
-
-class _MatchRow extends StatelessWidget {
-  const _MatchRow({required this.match, required this.provider});
-  final RentalMatch match;
-  final DatingProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final property = provider.propertyById(match.propertyId);
-    if (property == null) return const SizedBox.shrink();
-    final lastMsg = match.messages.isNotEmpty ? match.messages.last.text : null;
-    final status = _status(match);
-    final isUnread = match.messages.isNotEmpty && !match.ownerSigned;
-
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => MessageScreen(matchId: match.id)),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Left accent bar
-            Container(
-              width: 4,
-              height: 76,
-              decoration: BoxDecoration(
-                color: status.color,
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Property thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                width: 60,
-                height: 60,
-                child: property.media.isNotEmpty
-                    ? SafeMedia(
-                        media: property.media.first,
-                        fallback: Container(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          child: Center(
-                            child: RentlyIcon(IconsaxPlusLinear.building,
-                                color: AppColors.primary, size: 22),
-                          ),
-                        ),
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                      )
-                    : Container(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        child: Center(
-                          child: RentlyIcon(IconsaxPlusLinear.building,
-                              color: AppColors.primary, size: 22),
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            property.address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusBadge(label: status.label, color: status.color),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (isUnread)
-                          Container(
-                            width: 7,
-                            height: 7,
-                            margin: const EdgeInsets.only(left: 5),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        Expanded(
-                          child: Text(
-                            lastMsg ?? 'שיחה חדשה ממתינה',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isUnread
-                                  ? AppColors.textPrimary
-                                  : AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: isUnread
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Arrow CTA
-            Container(
-              width: 34,
-              height: 34,
-              margin: const EdgeInsets.only(left: 12),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: RentlyIcon(
-                  IconsaxPlusLinear.arrow_left,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  ({String label, Color color}) _status(RentalMatch m) {
-    if (m.ownerSigned && m.tenantSigned) {
-      return (label: 'מאומת', color: const Color(0xFF1B9C6A));
-    }
-    if (m.contractSent) {
-      return (label: 'חוזה נשלח', color: AppColors.primary);
-    }
-    if (m.messages.length >= 3) {
-      return (label: 'פעיל', color: AppColors.textPrimary);
-    }
-    return (label: 'ממתין', color: AppColors.textSecondary);
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-            color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
-      ),
-    );
-  }
-}
-
-// ─── Properties Preview ───────────────────────────────────────────────────────
-
-class _PropertiesScroll extends StatelessWidget {
-  const _PropertiesScroll({
-    required this.properties,
-    required this.provider,
-    required this.context,
-  });
-  final List<RentalProperty> properties;
-  final DatingProvider provider;
-  final BuildContext context;
-
-  @override
-  Widget build(BuildContext outerContext) {
-    return SizedBox(
-      height: 188,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: properties.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => _PropertyMiniCard(
-          property: properties[i],
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => EditPropertyScreen(property: properties[i]),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PropertyMiniCard extends StatelessWidget {
-  const _PropertyMiniCard({required this.property, required this.onTap});
-  final RentalProperty property;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final media = property.media.isNotEmpty ? property.media.first : null;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 150,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Image
-              Positioned.fill(
-                child: media != null
-                    ? SafeMedia(
-                        media: media,
-                        fallback: Container(
-                          color: const Color(0xFF06243A),
-                          child: const Center(
-                            child: RentlyIcon(IconsaxPlusLinear.building,
-                                color: Colors.white30, size: 32),
-                          ),
-                        ),
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                      )
-                    : Container(
-                        color: const Color(0xFF06243A),
-                        child: const Center(
-                          child: RentlyIcon(IconsaxPlusLinear.building,
-                              color: Colors.white30, size: 32),
-                        ),
-                      ),
-              ),
-              // Bottom dark gradient overlay for text readability
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 105,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.85),
-                          Colors.black.withValues(alpha: 0.4),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              // Details
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      property.city.isNotEmpty
-                          ? property.city
-                          : property.address,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${property.priceLabel} • ${property.roomsLabel} ח\'',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.75),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Builder(
-                      builder: (context) {
-                        final isSale = property.transactionType == PropertyTransactionType.sale;
-                        final isActive = property.isActive;
-                        final String statusText;
-                        final Color statusColor;
-
-                        if (isActive) {
-                          statusText = isSale ? 'למכירה' : 'להשכרה';
-                          statusColor = AppColors.primary;
-                        } else {
-                          statusText = isSale ? 'נמכר' : 'הושכר';
-                          statusColor = AppColors.textSecondary;
-                        }
-
-                        // Solid accent fill + white text — stays readable even
-                        // when the broker theme makes statusColor black (the old
-                        // translucent-black-on-black badge was unreadable).
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            statusText,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        );
-                      }
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Empty properties ─────────────────────────────────────────────────────────
-
-class _EmptyPropertiesCard extends StatelessWidget {
-  const _EmptyPropertiesCard({required this.onAdd});
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onAdd,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: RentlyIcon(IconsaxPlusLinear.add_square,
-                  color: AppColors.primary, size: 26),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'הוסף את הנכס הראשון שלך',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'פרסם דירה עכשיו וקבל פניות משוכרים מתאימים',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ignore: unused_element
-class _PropertyQuickActionsSheet extends StatelessWidget {
-  const _PropertyQuickActionsSheet({required this.property});
-  final RentalProperty property;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF06243A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-          20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            property.address,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 18),
-          _SheetTile(
-            icon: IconsaxPlusLinear.edit,
-            label: 'ערוך פרטי הנכס',
-            color: AppColors.primary,
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => EditPropertyScreen(property: property),
-              ));
-            },
-          ),
-          _SheetTile(
-            icon: IconsaxPlusLinear.trash,
-            label: 'הסר נכס מהרשימה',
-            color: AppColors.coral,
-            onTap: () async {
-              Navigator.pop(context);
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: const Color(0xFF06243A),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22)),
-                  title: const Text('הסרת נכס',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w900)),
-                  content: const Text('האם אתה בטוח שברצונך להסיר נכס זה?',
-                      style: TextStyle(color: Colors.white70)),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('ביטול',
-                          style: TextStyle(color: Colors.white70)),
-                    ),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.coral),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('הסר'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true && context.mounted) {
-                await context
-                    .read<DatingProvider>()
-                    .removeLandlordProperty(property.id);
-              }
-            },
-          ),
-          _SheetTile(
-            icon: IconsaxPlusLinear.share,
-            label: 'שתף קישור לנכס',
-            color: Colors.white.withValues(alpha: 0.9),
-            onTap: () {
-              Navigator.pop(context);
-              showPropertyShareSheet(context, property);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SheetTile extends StatelessWidget {
-  const _SheetTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: TextStyle(
-                color:
-                    color == AppColors.coral ? AppColors.coral : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14.5,
-              ),
-            ),
-            const Spacer(),
-            RentlyIcon(IconsaxPlusLinear.arrow_left,
-                size: 16, color: Colors.white.withValues(alpha: 0.4)),
-          ],
         ),
       ),
     );

@@ -16,16 +16,16 @@ class ErikTokens {
   ErikTokens._();
 
   // ── Canvas (the calm "night" surface Erik lives on) ──────────────────────
-  static const Color bgDeep = Color(0xFF041C2F); // deepest navy
-  static const Color bgMid = Color(0xFF0B2F4D); // lifted navy (centre glow)
-  static const Color bgVeil = Color(0xFF072946); // sheet/veil navy
+  static const Color bgDeep = AppColors.ink; // deepest navy
+  static const Color bgMid = AppColors.navy; // lifted navy (centre glow)
+  static const Color bgVeil = AppColors.navy; // sheet/veil navy
 
   // ── Ink ──────────────────────────────────────────────────────────────────
   static const Color ink = Colors.white; // primary text on dark
-  static const Color inkSoft = Color(0xFFE6EEF6); // softened body copy
-  static const Color navyText = Color(0xFF072946); // dark text on light surfaces
+  static const Color inkSoft = AppColors.border; // softened body copy
+  static const Color navyText = AppColors.navy; // dark text on light surfaces
   static const Color muted = Color(0xFFA6BDD2); // secondary text
-  static const Color faint = Color(0xFF7E9BB6); // tertiary / hints
+  static const Color faint = AppColors.slate400; // tertiary / hints
 
   // ── Surfaces (glassmorphism) ───────────────────────────────────────────────
   static const Color assistantSurface = Color(0x1A5AD4DC);
@@ -38,7 +38,7 @@ class ErikTokens {
 
   // ── Status colours ─────────────────────────────────────────────────────────
   static const Color online = Color(0xFF4ADE80);
-  static const Color danger = Color(0xFFE5484D);
+  static const Color danger = AppColors.red;
 
   // ── Accent — ALWAYS from AppColors (getters, never const) ──────────────────
   static Color get accent => AppColors.primary;

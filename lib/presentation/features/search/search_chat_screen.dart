@@ -2128,7 +2128,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F8FB),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0.5,
@@ -2166,7 +2166,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                       width: 7,
                       height: 7,
                       decoration: const BoxDecoration(
-                          color: Color(0xFF27AE60), shape: BoxShape.circle)),
+                          color: AppColors.success, shape: BoxShape.circle)),
                   const SizedBox(width: 5),
                   Text('כאן בשבילך',
                       style: TextStyle(
@@ -2572,7 +2572,7 @@ class _AssistantPropertyCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFE2ECF1), width: 1),
+          border: Border.all(color: AppColors.border, width: 1),
           boxShadow: [
             BoxShadow(
                 color: AppColors.navy.withValues(alpha: 0.05),
@@ -2797,7 +2797,7 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F7FA),
+        color: AppColors.slate100,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [

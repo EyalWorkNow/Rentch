@@ -190,7 +190,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
               children: [
                 _grabber(),
                 _header(context),
-                const Divider(height: 1, color: Color(0xFFE8F0F5)),
+                const Divider(height: 1, color: AppColors.divider),
                 Expanded(
                   child: _messages.isEmpty ? _emptyState() : _conversation(),
                 ),
@@ -231,7 +231,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
         width: 44,
         height: 5,
         decoration: BoxDecoration(
-          color: const Color(0xFFD8E8F0),
+          color: AppColors.borderLight,
           borderRadius: BorderRadius.circular(999),
         ),
       );
@@ -261,7 +261,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.ink,
                   ),
                 ),
                 Text(
@@ -273,7 +273,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF64748B),
+                    color: AppColors.slate500,
                   ),
                 ),
               ],
@@ -282,7 +282,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
           IconButton(
             onPressed: () => Navigator.of(context).maybePop(),
             icon: const Icon(IconsaxPlusLinear.close_circle,
-                color: Color(0xFF94A3B8)),
+                color: AppColors.slate400),
             tooltip: 'סגירה',
           ),
         ],
@@ -301,7 +301,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
+              color: AppColors.slate600,
               height: 1.5,
             ),
           ),
@@ -348,7 +348,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF64748B),
+              color: AppColors.slate500,
             ),
           ),
         ],
@@ -366,7 +366,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: AppColors.slate100,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: TextField(
@@ -379,12 +379,12 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
                   style: const TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.ink,
                   ),
                   decoration: const InputDecoration(
                     hintText: 'כתבו שאלה על הדירה…',
                     hintStyle: TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: AppColors.slate400,
                       fontWeight: FontWeight.w500,
                     ),
                     border: InputBorder.none,
@@ -532,10 +532,10 @@ class _Bubble extends StatelessWidget {
     final fromUser = message.fromUser;
     final bg = fromUser
         ? AppColors.primary
-        : (message.failed ? const Color(0xFFFFF1F2) : const Color(0xFFF1F5F9));
+        : (message.failed ? AppColors.cloud : AppColors.slate100);
     final fg = fromUser
         ? Colors.white
-        : (message.failed ? const Color(0xFFB91C1C) : const Color(0xFF0F172A));
+        : (message.failed ? const Color(0xFFB91C1C) : AppColors.ink);
 
     return Align(
       alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,

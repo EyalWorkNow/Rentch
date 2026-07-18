@@ -60,27 +60,50 @@ class DeepLinkService {
   }
 
   Future<void> _openProperty(String id) async {
-    // On a cold start the catalog may still be loading — wait up to ~10s for the
-    // provider + the target listing, then push the detail page.
-    for (var i = 0; i < 20; i++) {
+    // On a cold start the navigator/provider may not exist yet — wait up to ~10s
+    // for them, then resolve the listing from the loaded catalog OR fetch it by
+    // id from the backend (so links to listings not in memory still open the
+    // apartment), and push the detail page.
+    for (var i = 0; i < 30; i++) {
       final ctx = navigatorKey.currentContext;
       if (ctx != null) {
-        // Safe: ctx is re-fetched fresh from the global key each iteration.
-        // ignore: use_build_context_synchronously
-        final provider = ctx.read<DatingProvider>();
-        if (!provider.isLoading) {
-          final p = provider.propertyById(id);
-          if (p != null) {
+        try {
+          // Safe: ctx is re-fetched fresh from the global key each iteration.
+          // ignore: use_build_context_synchronously
+          final provider = ctx.read<DatingProvider>();
+          // Fast path: the listing is already in the loaded catalog (covers seed
+          // listings, which exist ONLY in memory, and any already-fetched page).
+          final local = provider.propertyById(id);
+          if (local != null) {
             navigatorKey.currentState?.push(
               MaterialPageRoute(
-                  builder: (_) => PropertyDetailScreen(property: p)),
+                  builder: (_) => PropertyDetailScreen(property: local)),
             );
             return;
           }
+          // Not in the catalog. Wait for the initial load to settle FIRST — on a
+          // cold start the catalog fills ~1–2s after the link arrives, so giving
+          // up now would drop valid links (the bug this replaced). Once settled,
+          // fetch the listing directly from the backend by id (real shared links
+          // to listings not in memory). Only when the catalog is done AND the
+          // backend has nothing is the listing genuinely unknown/removed.
+          if (!provider.isLoading) {
+            final fetched = await provider.fetchPropertyById(id);
+            if (fetched != null) {
+              navigatorKey.currentState?.push(
+                MaterialPageRoute(
+                    builder: (_) => PropertyDetailScreen(property: fetched)),
+              );
+            }
+            return;
+          }
+          // still loading → fall through and retry after the delay
+        } catch (_) {
+          // Provider not wired into the tree yet (very early cold start) — retry.
         }
       }
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    // Not found (unknown/removed listing) → leave the user on the home screen.
+    // Navigator never came up (shouldn't happen) → leave on the home screen.
   }
 }

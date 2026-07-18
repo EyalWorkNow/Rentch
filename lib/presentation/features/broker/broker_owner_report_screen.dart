@@ -32,7 +32,7 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF6F7FC),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -545,7 +545,7 @@ class _SheetAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFF6F7FC),
+      color: AppColors.cloud,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),

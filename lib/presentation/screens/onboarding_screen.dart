@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
@@ -14,7 +15,7 @@ import 'package:dating_app/presentation/widgets/animations/micro_animations.dart
 /// broker-black accent — so it uses this fixed compile-time token rather than
 /// the runtime-swappable `AppColors.primary`, making it structurally immune to
 /// any global accent flip that may occur while a session is being established.
-const Color _kBrandTeal = Color(0xFF13BEC9);
+const Color _kBrandTeal = AppColors.tealBrand;
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -107,7 +108,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final slide = _slides[_page];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE7ECF8),
+      backgroundColor: AppColors.border,
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
@@ -441,9 +442,9 @@ class _OnboardingFallback extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFDCE7F8),
+            AppColors.slate200,
             Color(0xFF7F94A8),
-            Color(0xFF1D2935),
+            AppColors.inkSoft,
           ],
         ),
       ),

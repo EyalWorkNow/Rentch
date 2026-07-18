@@ -83,9 +83,9 @@ class ProfileCompletionBar extends StatelessWidget {
   }
 
   Color _barColor(int p) {
-    if (p >= 80) return const Color(0xFF27AE60);
+    if (p >= 80) return AppColors.success;
     if (p >= 50) return AppColors.primary;
-    return const Color(0xFFF39C12);
+    return AppColors.warning;
   }
 }
 
@@ -98,24 +98,24 @@ class _CompleteBanner extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF27AE60).withValues(alpha: 0.1),
+        color: AppColors.success.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF27AE60).withValues(alpha: 0.3),
+          color: AppColors.success.withValues(alpha: 0.3),
           width: 1.2,
         ),
       ),
       child: Row(
         children: [
           const Icon(Icons.verified_rounded,
-              color: Color(0xFF27AE60), size: 20),
+              color: AppColors.success, size: 20),
           const SizedBox(width: 8),
           Text(
             'הפרופיל מושלם — בעלי דירות רואים אותך ראשון',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF27AE60),
+              color: AppColors.success,
             ),
           ),
         ],

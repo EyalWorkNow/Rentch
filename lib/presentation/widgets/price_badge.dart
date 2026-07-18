@@ -12,6 +12,7 @@
 // (SizedBox.shrink) so the detail screen degrades cleanly with no enrichment.
 
 import 'package:flutter/material.dart';
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 /// A colored chip summarising how a listing's price compares to the area median.
@@ -131,14 +132,14 @@ class PriceBadge extends StatelessWidget {
         return const _BadgeStyle(
           label: 'מחיר מצוין לאזור',
           fg: Color(0xFF15803D),
-          bg: Color(0xFFE9F8EF),
+          bg: AppColors.tealPale,
           icon: IconsaxPlusLinear.trend_down,
         );
       case 'above_market':
         return const _BadgeStyle(
           label: 'מעל מחיר השוק',
           fg: Color(0xFFC2410C),
-          bg: Color(0xFFFDF1E7),
+          bg: AppColors.cloud,
           icon: IconsaxPlusLinear.trend_up,
         );
       case 'fair':
@@ -147,7 +148,7 @@ class PriceBadge extends StatelessWidget {
         return const _BadgeStyle(
           label: 'מחיר הוגן לאזור',
           fg: Color(0xFF1D4ED8),
-          bg: Color(0xFFEAF0FE),
+          bg: AppColors.slate100,
           icon: IconsaxPlusLinear.tick_circle,
         );
     }

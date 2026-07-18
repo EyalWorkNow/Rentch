@@ -7,8 +7,8 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/features/onboarding/app_intro.dart';
 import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
-import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_dashboard_screen.dart';
+import 'package:dating_app/presentation/screens/leads_inbox_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
@@ -38,9 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _ettiPeek = true;
   Timer? _ettiPeekTimer;
 
-  static const int _landlordSwipesTabIndex = 1;
-  static const int _landlordMatchesTabIndex = 2;
-  static const int _landlordPropertiesTabIndex = 3;
+  // The candidate deck + conversations are now merged into a single "לקוחות"
+  // tab (LeadsInboxScreen) at index 1, so both the old swipes/matches deep-links
+  // point there.
+  static const int _landlordLeadsTabIndex = 1;
+  static const int _landlordPropertiesTabIndex = 2;
 
   @override
   void initState() {
@@ -93,8 +95,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTabTap(int index, DatingProvider provider) {
     HapticFeedback.selectionClick();
     provider.setTabIndex(index);
-    final matchesIndex = provider.isLandlord ? 2 : 1;
-    if (index == matchesIndex) {
+    // Merged "לקוחות" tab (landlord) and "התאמות" tab (tenant) both live at
+    // index 1, so opening index 1 marks conversations seen for either role.
+    if (index == 1) {
       provider.markMatchesSeen();
     }
   }
@@ -144,14 +147,14 @@ class _HomeScreenState extends State<HomeScreen> {
         final screens = isLandlord
             ? <Widget>[
                 LandlordDashboardScreen(
-                  onOpenSwipes: () => openLandlordTab(_landlordSwipesTabIndex),
-                  onOpenMatches: () =>
-                      openLandlordTab(_landlordMatchesTabIndex),
+                  // Candidates + conversations are one merged tab now, so both
+                  // deep-links land on it (segment defaults to candidates).
+                  onOpenSwipes: () => openLandlordTab(_landlordLeadsTabIndex),
+                  onOpenMatches: () => openLandlordTab(_landlordLeadsTabIndex),
                   onOpenProperties: () =>
                       openLandlordTab(_landlordPropertiesTabIndex),
                 ),
-                const ExploreScreen(),
-                const MatchesScreen(),
+                const LeadsInboxScreen(),
                 const LandlordPropertiesScreen(),
                 const ProfileScreen(),
               ]
@@ -164,7 +167,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final items = isLandlord ? _landlordItems : _tenantItems;
         final safeIndex = provider.currentTabIndex.clamp(0, screens.length - 1);
-        final unseenCount = provider.unseenMatchCount;
+        // The merged "לקוחות" tab (landlord, index 1) reflects BOTH pending
+        // candidates and unread conversations; the tenant "התאמות" tab (also
+        // index 1) reflects unread conversations only.
+        final unseenCount = isLandlord
+            ? provider.unseenMatchCount + provider.ownerLeads.length
+            : provider.unseenMatchCount;
 
         return Scaffold(
           extendBody: true,
@@ -246,8 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 final isSelected = index == safeIndex;
                                 final isEtti = item.isAssistant;
                                 final showBadge =
-                                    index == (isLandlord ? 2 : 1) &&
-                                        unseenCount > 0;
+                                    index == 1 && unseenCount > 0;
                                 final isCompact = items.length >= 5;
                                 final isNotDiscover = safeIndex != 0;
                                 final double circleSize = isCompact
@@ -269,11 +276,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                       shape: BoxShape.circle,
                                       color: isSelected
                                           ? AppColors.primary
-                                          : const Color(0xFF1A1A1A),
+                                          : AppColors.ink,
                                       // תכלת stroke marks ONLY the אתי CTA circle.
                                       border: isEtti
                                           ? Border.all(
-                                              color: const Color(0xFF7CE0E6),
+                                              color: AppColors.tealBright,
                                               width: 1.8)
                                           : null,
                                       boxShadow: isSelected
@@ -421,14 +428,9 @@ const _landlordItems = [
     activeIcon: IconsaxPlusLinear.category,
   ),
   _NavItem(
-    label: 'סוויפים',
+    label: 'לקוחות',
     icon: IconsaxPlusLinear.profile_2user,
     activeIcon: IconsaxPlusLinear.profile_2user,
-  ),
-  _NavItem(
-    label: 'התאמות',
-    icon: IconsaxPlusLinear.message,
-    activeIcon: IconsaxPlusLinear.message,
   ),
   _NavItem(
     label: 'הדירות שלי',

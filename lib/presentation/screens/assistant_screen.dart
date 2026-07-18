@@ -1044,7 +1044,7 @@ class _AssistantScreenState extends State<AssistantScreen>
           child: Container(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
             decoration: BoxDecoration(
-              color: const Color(0xFF072946).withValues(alpha: 0.94),
+              color: AppColors.navy.withValues(alpha: 0.94),
               border: Border(
                   top: BorderSide(color: Colors.white.withValues(alpha: 0.15))),
             ),

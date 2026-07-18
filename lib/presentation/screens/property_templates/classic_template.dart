@@ -112,7 +112,7 @@ class _ClassicTemplate extends StatelessWidget {
                                 Text(
                                   title,
                                   style: const TextStyle(
-                                    color: Color(0xFF0F172A),
+                                    color: AppColors.ink,
                                     fontSize: 24,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: -0.5,
@@ -124,13 +124,13 @@ class _ClassicTemplate extends StatelessWidget {
                                     const RentlyIcon(
                                         IconsaxPlusLinear.location,
                                         size: 16,
-                                        color: Color(0xFF64748B)),
+                                        color: AppColors.slate500),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         p.address,
                                         style: const TextStyle(
-                                          color: Color(0xFF64748B),
+                                          color: AppColors.slate500,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -153,7 +153,7 @@ class _ClassicTemplate extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
+                          color: AppColors.ink,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -210,7 +210,7 @@ class _ClassicTemplate extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
+                                color: AppColors.ink,
                               ),
                             ),
                             Text(
@@ -218,7 +218,7 @@ class _ClassicTemplate extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
+                                color: AppColors.slate500,
                               ),
                             ),
                           ],
@@ -270,7 +270,7 @@ class _ClassicTemplate extends StatelessWidget {
                                         style: const TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
-                                          color: Color(0xFF64748B),
+                                          color: AppColors.slate500,
                                         ),
                                       ),
                                     ],
@@ -293,7 +293,7 @@ class _ClassicTemplate extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
+                                color: AppColors.ink,
                               ),
                             ),
                             GestureDetector(
@@ -306,7 +306,7 @@ class _ClassicTemplate extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF13BEC9),
+                                  color: AppColors.tealBrand,
                                 ),
                               ),
                             ),
@@ -316,7 +316,7 @@ class _ClassicTemplate extends StatelessWidget {
                         Text(
                           'נכס זה פורסם במקור באתר ${Uri.parse(p.url).host}. באפשרותך לפתוח את המודעה המקורית לצפייה בפרטים המלאים.',
                           style: const TextStyle(
-                            color: Color(0xFF475569),
+                            color: AppColors.slate600,
                             fontSize: 13.5,
                             height: 1.45,
                           ),
@@ -342,7 +342,7 @@ class _ClassicTemplate extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
+                                color: AppColors.ink,
                               ),
                             ),
                             Text(
@@ -350,7 +350,7 @@ class _ClassicTemplate extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
+                                color: AppColors.slate500,
                               ),
                             ),
                           ],
@@ -386,7 +386,7 @@ class _ClassicTemplate extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: AppColors.slate200),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.1),

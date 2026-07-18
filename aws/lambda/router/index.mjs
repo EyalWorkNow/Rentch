@@ -1056,7 +1056,7 @@ const _esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
 const SHARE_BASE = process.env.SHARE_BASE ||
   'https://g7b9nx11sk.execute-api.us-east-1.amazonaws.com/prod';
 const APP_STORE_URL = process.env.APP_STORE_URL ||
-  'https://apps.apple.com/app/rently';
+  'https://apps.apple.com/il/app/rently/id6773088152';
 
 // Public share page: rich OpenGraph tags so WhatsApp/Telegram/social render a
 // banner (photo + title + price) when the listing link is sent.
@@ -1070,25 +1070,38 @@ async function propertyOgPage(id, ua = '') {
   // so the page can't be used to harvest listings. Combined with the random,
   // unguessable 8-char ids (≈2.8e12 space → no enumeration), the endpoint leaks
   // nothing beyond the single card the sharer chose to send.
-  if (ua && !_OG_CRAWLERS.test(ua)) {
-    // A real person opened the link → try to open the APP at this apartment
-    // (rently://property/:id). If the app isn't installed the scheme does nothing,
-    // so after a short delay we fall back to the App Store. A manual button too,
-    // for browsers that block the auto-launch.
+  // A real person (not a link-preview crawler) opened the URL.
+  const isPerson = ua && !_OG_CRAWLERS.test(ua);
+  // The app is published on the App Store only (iOS). iOS visitors get the
+  // app-open interstitial with an App Store fallback; everyone else (Android /
+  // desktop) falls through to the rich card below — never a broken store redirect.
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  if (isPerson && isIOS) {
+    // Try to open the APP at this apartment (rently://property/:id). If the app
+    // is installed the page is backgrounded → we CANCEL the fallback (via the
+    // visibility/pagehide events, far more reliable than a timer delta). If it
+    // isn't installed the page stays visible → after ~1.2s we send them to the
+    // App Store product page. A manual button covers browsers that block the
+    // auto-launch.
     const jid = JSON.stringify(String(id));
     const store = JSON.stringify(APP_STORE_URL);
     const page = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>פתיחת הדירה ב-Rently…</title>
 <style>body{font-family:-apple-system,system-ui,Arial,sans-serif;margin:0;background:#0f1220;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
-.b{max-width:420px;padding:24px}a.btn{display:inline-block;background:#14D3DC;color:#04222b;font-weight:800;text-decoration:none;padding:14px 30px;border-radius:999px;margin-top:14px}</style>
+.b{max-width:420px;padding:24px}h1{font-size:21px;margin:0 0 6px}
+a.btn{display:inline-block;background:#14D3DC;color:#04222b;font-weight:800;text-decoration:none;padding:14px 30px;border-radius:999px;margin-top:16px}
+a.lnk{display:block;color:#8b93a7;font-size:13px;margin-top:16px;text-decoration:underline}</style>
 </head><body><div class="b"><h1>פותחים את הדירה באפליקציה…</h1>
-<p style="color:#c9cfe0">אם לא נפתח אוטומטית:</p>
+<p style="color:#c9cfe0">אם לא נפתח אוטומטית, לחצו:</p>
 <a class="btn" href="rently://property/${_esc(id)}" onclick="return go(event)">פתח ב-Rently</a>
+<a class="lnk" href="${_esc(APP_STORE_URL)}">אין לכם את האפליקציה? התקינו מ-App Store</a>
 <script>
-var ID=${jid},STORE=${store};
-function go(e){if(e)e.preventDefault();var t=Date.now();window.location='rently://property/'+ID;
-setTimeout(function(){if(Date.now()-t<1500)window.location=STORE;},1200);return false;}
+var ID=${jid},STORE=${store},DEEP='rently://property/'+ID,t;
+function toStore(){if(!document.hidden)window.location=STORE;}
+function go(e){if(e&&e.preventDefault)e.preventDefault();clearTimeout(t);t=setTimeout(toStore,1200);window.location=DEEP;return false;}
+document.addEventListener('visibilitychange',function(){if(document.hidden)clearTimeout(t);});
+window.addEventListener('pagehide',function(){clearTimeout(t);});
 go();
 </script></div></body></html>`;
     return {

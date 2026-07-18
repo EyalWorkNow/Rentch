@@ -14,6 +14,19 @@ class PropertyLike {
     this.budgetSnapshot = '',
     this.moveInSnapshot = '',
     this.createdAt,
+    this.budgetMax,
+    this.rooms,
+    this.occupation,
+    this.numChildren,
+    this.hasPets,
+    this.hasCar,
+    this.wfh,
+    this.household,
+    this.lifeStage,
+    this.monthlyIncome,
+    this.age,
+    this.isOleh,
+    this.verified,
   });
 
   final String propertyId;
@@ -34,10 +47,58 @@ class PropertyLike {
 
   final DateTime? createdAt;
 
+  // ── Structured tenant attribute snapshot ────────────────────────────────────
+  // Real tenant attributes captured at like-time so they reach the landlord's
+  // candidate deck (and its filters) cross-device. All optional/nullable: old
+  // likes carry none, and null means "unknown" (never excludes in the matcher).
+  final int? budgetMax;
+  final double? rooms;
+  final String? occupation;
+  final int? numChildren;
+  final bool? hasPets;
+  final bool? hasCar;
+  final bool? wfh;
+  final String? household;
+  final String? lifeStage;
+  final int? monthlyIncome;
+  final int? age;
+  final bool? isOleh;
+  final bool? verified;
+
   bool get hasIntro =>
       introMessage.isNotEmpty ||
       budgetSnapshot.isNotEmpty ||
       moveInSnapshot.isNotEmpty;
+
+  // ── Defensive parsers: DynamoDB may return numbers as num OR String ──────────
+  static int? _int(Object? v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim());
+  }
+
+  static double? _double(Object? v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().trim());
+  }
+
+  static bool? _bool(Object? v) {
+    if (v == null) return null;
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = v.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes') return true;
+    if (s == 'false' || s == '0' || s == 'no') return false;
+    return null;
+  }
+
+  static String? _str(Object? v) {
+    final s = v?.toString().trim();
+    return (s == null || s.isEmpty) ? null : s;
+  }
 
   factory PropertyLike.fromRow(Map<String, dynamic> row) {
     DateTime? parseDate(Object? v) =>
@@ -52,6 +113,19 @@ class PropertyLike {
       budgetSnapshot: row['budgetSnapshot']?.toString() ?? '',
       moveInSnapshot: row['moveInSnapshot']?.toString() ?? '',
       createdAt: parseDate(row['createdAt']),
+      budgetMax: _int(row['budgetMax']),
+      rooms: _double(row['rooms']),
+      occupation: _str(row['occupation']),
+      numChildren: _int(row['numChildren']),
+      hasPets: _bool(row['hasPets']),
+      hasCar: _bool(row['hasCar']),
+      wfh: _bool(row['wfh']),
+      household: _str(row['household']),
+      lifeStage: _str(row['lifeStage']),
+      monthlyIncome: _int(row['monthlyIncome']),
+      age: _int(row['age']),
+      isOleh: _bool(row['isOleh']),
+      verified: _bool(row['verified']),
     );
   }
 }
@@ -93,6 +167,21 @@ class PropertyLikesRepository {
     String budgetSnapshot = '',
     String moveInSnapshot = '',
     DateTime? at,
+    // Structured tenant attribute snapshot — each written ONLY when non-null so
+    // old-style payloads (no profile in scope) stay byte-identical.
+    int? budgetMax,
+    double? rooms,
+    String? occupation,
+    int? numChildren,
+    bool? hasPets,
+    bool? hasCar,
+    bool? wfh,
+    String? household,
+    String? lifeStage,
+    int? monthlyIncome,
+    int? age,
+    bool? isOleh,
+    bool? verified,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
     final id = likeId(propertyId, tenantId);
@@ -115,6 +204,22 @@ class PropertyLikesRepository {
           'budgetSnapshot': budgetSnapshot.trim(),
         if (moveInSnapshot.trim().isNotEmpty)
           'moveInSnapshot': moveInSnapshot.trim(),
+        if (budgetMax != null) 'budgetMax': budgetMax,
+        if (rooms != null) 'rooms': rooms,
+        if (occupation != null && occupation.trim().isNotEmpty)
+          'occupation': occupation.trim(),
+        if (numChildren != null) 'numChildren': numChildren,
+        if (hasPets != null) 'hasPets': hasPets,
+        if (hasCar != null) 'hasCar': hasCar,
+        if (wfh != null) 'wfh': wfh,
+        if (household != null && household.trim().isNotEmpty)
+          'household': household.trim(),
+        if (lifeStage != null && lifeStage.trim().isNotEmpty)
+          'lifeStage': lifeStage.trim(),
+        if (monthlyIncome != null) 'monthlyIncome': monthlyIncome,
+        if (age != null) 'age': age,
+        if (isOleh != null) 'isOleh': isOleh,
+        if (verified != null) 'verified': verified,
         'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
       });
     } catch (e) {

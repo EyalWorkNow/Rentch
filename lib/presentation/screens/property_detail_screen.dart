@@ -575,7 +575,7 @@ class _AskRentlyEntry extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
+                        color: AppColors.slate500,
                         height: 1.35,
                       ),
                     ),
@@ -726,7 +726,7 @@ class _ImageGallery extends StatelessWidget {
                   ),
                   child: const RentlyIcon(
                     IconsaxPlusLinear.arrow_right_3,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.slate900,
                     size: 20,
                   ),
                 ),
@@ -762,7 +762,7 @@ class _ImageGallery extends StatelessWidget {
                                 : IconsaxPlusLinear.save_2,
                             color: saved
                                 ? AppColors.primary
-                                : const Color(0xFF0F172A),
+                                : AppColors.slate900,
                             size: 20,
                           ),
                         ),
@@ -790,7 +790,7 @@ class _ImageGallery extends StatelessWidget {
                       ),
                       child: const RentlyIcon(
                         IconsaxPlusLinear.export_2,
-                        color: Color(0xFF0F172A),
+                        color: AppColors.slate900,
                         size: 20,
                       ),
                     ),
@@ -813,15 +813,15 @@ class _ImageGallery extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF13BEC9).withOpacity(0.2),
+                  color: AppColors.primary.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: const Color(0xFF13BEC9).withOpacity(0.3)),
+                      color: AppColors.primary.withOpacity(0.3)),
                 ),
                 child: Text(
                   property.transactionLabel,
-                  style: const TextStyle(
-                    color: Color(0xFF13BEC9),
+                  style: TextStyle(
+                    color: AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1008,10 +1008,10 @@ class _BrokerPropertyDetailTemplate extends StatelessWidget {
   Color get _pageBackground => switch (branding.propertyTemplate) {
         BrokerPropertyTemplate.acidHero => Color.alphaBlend(
             branding.accentColor.withValues(alpha: 0.18),
-            const Color(0xFFF7FAF2),
+            AppColors.cloud,
           ),
-        BrokerPropertyTemplate.dashboardGlass => const Color(0xFFEAF2F0),
-        BrokerPropertyTemplate.estateCard => const Color(0xFFF5F6F8),
+        BrokerPropertyTemplate.dashboardGlass => AppColors.border,
+        BrokerPropertyTemplate.estateCard => AppColors.cloud,
         BrokerPropertyTemplate.galleryEditorial => Colors.white,
         BrokerPropertyTemplate.cinematicGlass => branding.secondaryColor,
         BrokerPropertyTemplate.rentlyClassic => Colors.white,
@@ -2102,7 +2102,7 @@ class _OwnerCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.slate200),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
@@ -2126,12 +2126,12 @@ class _OwnerCard extends StatelessWidget {
                           gradient: LinearGradient(
                             colors: isAgency
                                 ? [
-                                    const Color(0xFF13BEC9),
-                                    const Color(0xFF0D9BA4)
+                                    AppColors.primary,
+                                    AppColors.tealDark
                                   ]
                                 : [
-                                    const Color(0xFF475569),
-                                    const Color(0xFF1E293B)
+                                    AppColors.slate600,
+                                    AppColors.inkSoft
                                   ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -2159,10 +2159,10 @@ class _OwnerCard extends StatelessWidget {
                               color: Colors.white,
                               shape: BoxShape.circle,
                             ),
-                            child: const RentlyIcon(
+                            child: RentlyIcon(
                               IconsaxPlusLinear.verify,
                               size: 16,
-                              color: Color(0xFF13BEC9),
+                              color: AppColors.primary,
                             ),
                           ),
                         ),
@@ -2178,7 +2178,7 @@ class _OwnerCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F172A),
+                            color: AppColors.slate900,
                           ),
                         ),
                         const SizedBox(height: 3),
@@ -2188,8 +2188,8 @@ class _OwnerCard extends StatelessWidget {
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: isAgency
-                                ? const Color(0xFF13BEC9)
-                                : const Color(0xFF64748B),
+                                ? AppColors.primary
+                                : AppColors.slate500,
                           ),
                         ),
                       ],
@@ -2200,7 +2200,7 @@ class _OwnerCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF08A).withValues(alpha: 0.3),
+                        color: AppColors.yellowPale.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -2209,7 +2209,7 @@ class _OwnerCard extends StatelessWidget {
                           const RentlyIcon(
                             IconsaxPlusLinear.star_1,
                             size: 14,
-                            color: Color(0xFFCA8A04),
+                            color: AppColors.amberDark,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -2217,7 +2217,7 @@ class _OwnerCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF854D0E),
+                              color: AppColors.amberDeep,
                             ),
                           ),
                         ],
@@ -2231,7 +2231,7 @@ class _OwnerCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.4,
-                  color: Color(0xFF475569),
+                  color: AppColors.slate600,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -2242,17 +2242,17 @@ class _OwnerCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
+                    color: AppColors.slate50,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                    border: Border.all(color: AppColors.slate100),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.format_quote_rounded,
                         size: 18,
-                        color: Color(0xFF13BEC9),
+                        color: AppColors.primary,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -2263,7 +2263,7 @@ class _OwnerCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 12.5,
                             fontStyle: FontStyle.italic,
-                            color: Color(0xFF475569),
+                            color: AppColors.slate600,
                             height: 1.45,
                           ),
                         ),
@@ -2274,7 +2274,7 @@ class _OwnerCard extends StatelessWidget {
               ],
 
               const SizedBox(height: 16),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              const Divider(height: 1, color: AppColors.slate100),
               const SizedBox(height: 12),
 
               Row(
@@ -2284,13 +2284,13 @@ class _OwnerCard extends StatelessWidget {
                     onTap: () => _showOwnerSheet(context, property, reviews),
                     child: Row(
                       children: [
-                        const RentlyIcon(IconsaxPlusLinear.profile_circle,
-                            size: 16, color: Color(0xFF13BEC9)),
+                        RentlyIcon(IconsaxPlusLinear.profile_circle,
+                            size: 16, color: AppColors.primary),
                         const SizedBox(width: 6),
-                        const Text(
+                        Text(
                           'פרופיל משכיר',
                           style: TextStyle(
-                            color: Color(0xFF13BEC9),
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w700,
                             fontSize: 13.5,
                           ),
@@ -2299,7 +2299,7 @@ class _OwnerCard extends StatelessWidget {
                         Text(
                           '(${reviews.length} חוות דעת)',
                           style: const TextStyle(
-                            color: Color(0xFF64748B),
+                            color: AppColors.slate500,
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                           ),
@@ -2307,10 +2307,10 @@ class _OwnerCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const RentlyIcon(
+                  RentlyIcon(
                     IconsaxPlusLinear.arrow_left,
                     size: 14,
-                    color: Color(0xFF13BEC9),
+                    color: AppColors.primary,
                   ),
                 ],
               ),
@@ -2329,22 +2329,22 @@ class _OwnerCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
-                      children: const [
+                      children: [
                         RentlyIcon(IconsaxPlusLinear.house_2,
-                            size: 16, color: Color(0xFF13BEC9)),
+                            size: 16, color: AppColors.primary),
                         SizedBox(width: 6),
                         Text(
                           'צפה בכל הדירות של בעל הנכס',
                           style: TextStyle(
-                            color: Color(0xFF13BEC9),
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w700,
                             fontSize: 13.5,
                           ),
                         ),
                       ],
                     ),
-                    const RentlyIcon(IconsaxPlusLinear.arrow_left,
-                        size: 14, color: Color(0xFF13BEC9)),
+                    RentlyIcon(IconsaxPlusLinear.arrow_left,
+                        size: 14, color: AppColors.primary),
                   ],
                 ),
               ),
@@ -2426,7 +2426,7 @@ class _MessageRequestButton extends StatelessWidget {
                   hintText: 'כתוב הודעה קצרה… (למשל: מתי אפשר לראות?)',
                   hintTextDirection: TextDirection.rtl,
                   filled: true,
-                  fillColor: const Color(0xFFF1F5F8),
+                  fillColor: AppColors.slate100,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
@@ -2621,14 +2621,14 @@ class _SectionCardShell extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            Icon(icon, color: const Color(0xFF13BEC9), size: 20),
+            Icon(icon, color: AppColors.primary, size: 20),
             const SizedBox(width: 8),
             Text(
               title,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
+                color: AppColors.slate900,
                 letterSpacing: -0.3,
               ),
             ),
@@ -2637,7 +2637,7 @@ class _SectionCardShell extends StatelessWidget {
         const SizedBox(height: 14),
         child,
         const SizedBox(height: 18),
-        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        const Divider(height: 1, color: AppColors.slate100),
       ],
     );
   }
@@ -2682,9 +2682,9 @@ class _FeatureWrap extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.slate50,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.slate200),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2692,7 +2692,7 @@ class _FeatureWrap extends StatelessWidget {
                 Icon(
                   icon,
                   size: 15,
-                  color: const Color(0xFF13BEC9),
+                  color: AppColors.primary,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -2700,7 +2700,7 @@ class _FeatureWrap extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF334155),
+                    color: AppColors.slate700,
                   ),
                 ),
               ],
@@ -2791,7 +2791,7 @@ class _MapSectionState extends State<_MapSection> {
                 )
               else
                 ColoredBox(
-                  color: const Color(0xFFE9EEF2),
+                  color: AppColors.border,
                   child: Center(
                     child: RentlyIcon(IconsaxPlusLinear.map_1,
                         color: AppColors.primary, size: 30),
@@ -2870,7 +2870,7 @@ class _BottomBar extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.85),
             border: const Border(
               top: BorderSide(
-                color: Color(0xFFE2E8F0),
+                color: AppColors.slate200,
                 width: 1,
               ),
             ),
@@ -2888,8 +2888,8 @@ class _BottomBar extends StatelessWidget {
                           label: const Text('עריכת נכס',
                               style: TextStyle(fontWeight: FontWeight.w700)),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF0F172A),
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            foregroundColor: AppColors.slate900,
+                            side: const BorderSide(color: AppColors.slate200),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
@@ -2901,8 +2901,8 @@ class _BottomBar extends StatelessWidget {
                           label: const Text('אהבתי',
                               style: TextStyle(fontWeight: FontWeight.w700)),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF0F172A),
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            foregroundColor: AppColors.slate900,
+                            side: const BorderSide(color: AppColors.slate200),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
@@ -2932,7 +2932,7 @@ class _BottomBar extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF13BEC9),
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -3262,7 +3262,7 @@ class _InteractiveTourScreen extends StatelessWidget {
         ? null
         : (tour.qualityScore! * 100).clamp(0, 100).round();
     return Scaffold(
-      backgroundColor: const Color(0xFF061C2D),
+      backgroundColor: AppColors.ink,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
@@ -3387,7 +3387,7 @@ class _InteractiveTourScreen extends StatelessWidget {
         ? tour.previewImageUrl.trim()
         : tour.viewerUrl.trim();
     return Scaffold(
-      backgroundColor: const Color(0xFF061C2D),
+      backgroundColor: AppColors.ink,
       body: SafeArea(
         child: Stack(
           children: [
@@ -3526,10 +3526,10 @@ class _AffordabilityStrip extends StatelessWidget {
   final int? monthlyIncome;
 
   static const _bandColors = <RentBand, Color>{
-    RentBand.comfortable: Color(0xFF22C55E),
-    RentBand.stretched: Color(0xFFF59E0B),
-    RentBand.high: Color(0xFFFF5A67),
-    RentBand.unknown: Color(0xFF64748B),
+    RentBand.comfortable: AppColors.greenBright,
+    RentBand.stretched: AppColors.amber,
+    RentBand.high: AppColors.coral,
+    RentBand.unknown: AppColors.slate500,
   };
 
   static const _bandLabels = <RentBand, String>{
@@ -3589,7 +3589,7 @@ class _AffordabilityStrip extends StatelessWidget {
                     child: Text(
                       item.label,
                       style: const TextStyle(
-                        color: Color(0xFF475569),
+                        color: AppColors.slate600,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                       ),
@@ -3598,7 +3598,7 @@ class _AffordabilityStrip extends StatelessWidget {
                   Text(
                     '₪${item.amount}',
                     style: const TextStyle(
-                      color: Color(0xFF0F172A),
+                      color: AppColors.slate900,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                     ),
@@ -3606,14 +3606,14 @@ class _AffordabilityStrip extends StatelessWidget {
                 ],
               ),
             ),
-          const Divider(height: 16, color: Color(0xFFE2E8F0)),
+          const Divider(height: 16, color: AppColors.slate200),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'סה״כ עלות כניסה',
                 style: TextStyle(
-                  color: Color(0xFF0F172A),
+                  color: AppColors.slate900,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w900,
                 ),
@@ -3639,7 +3639,7 @@ class _AffordabilityStrip extends StatelessWidget {
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.navy,
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: const BorderSide(color: AppColors.slate200),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -3689,30 +3689,30 @@ class _PropertySignalStrip extends StatelessWidget {
           _PropertySignalChip(
             icon: IconsaxPlusLinear.eye,
             label: '${signals.views} צפו',
-            color: const Color(0xFF22C55E),
+            color: AppColors.greenBright,
           ),
         if (signals.likes > 0)
           _PropertySignalChip(
             icon: IconsaxPlusLinear.heart,
             label: '${signals.likes} אהבו',
-            color: const Color(0xFFFF5A67),
+            color: AppColors.coral,
           ),
         if (property.isVerifiedListing)
           GestureDetector(
             onTap: () => VerificationInfoSheet.show(context),
-            child: const _PropertySignalChip(
+            child: _PropertySignalChip(
               icon: IconsaxPlusLinear.verify,
               label: 'דירה מאומתת',
-              color: Color(0xFF13BEC9),
+              color: AppColors.primary,
               showInfoHint: true,
             ),
           ),
         if (property.isNewListing)
-          const SignalStripPulse(
+          SignalStripPulse(
             child: _PropertySignalChip(
               icon: IconsaxPlusLinear.flash_1,
               label: 'דירה הועלתה לאחרונה',
-              color: Color(0xFF13BEC9),
+              color: AppColors.primary,
             ),
           ),
         if (signals.liveViewers > 0)
@@ -3722,7 +3722,7 @@ class _PropertySignalStrip extends StatelessWidget {
               label: signals.liveViewers == 1
                   ? 'מסתכל עכשיו'
                   : '${signals.liveViewers} מסתכלים עכשיו',
-              color: const Color(0xFF22C55E),
+              color: AppColors.greenBright,
             ),
           ),
         if (likesToday > 0)
@@ -3730,7 +3730,7 @@ class _PropertySignalStrip extends StatelessWidget {
             child: _PropertySignalChip(
               icon: IconsaxPlusLinear.heart,
               label: '$likesToday אהבו היום',
-              color: const Color(0xFFFF5A67),
+              color: AppColors.coral,
             ),
           ),
       ],
@@ -3907,14 +3907,14 @@ class _FactItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.slate200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: const Color(0xFF64748B)),
+              Icon(icon, size: 20, color: AppColors.slate500),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -3922,7 +3922,7 @@ class _FactItemCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.slate900,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -3936,7 +3936,7 @@ class _FactItemCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF64748B),
+              color: AppColors.slate500,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -3971,7 +3971,7 @@ class _HorizontalReviewsList extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.slate200),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3980,13 +3980,13 @@ class _HorizontalReviewsList extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: const Color(0xFFE2E8F0),
+                      backgroundColor: AppColors.slate200,
                       child: Text(
                         initial,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
+                          color: AppColors.slate900,
                         ),
                       ),
                     ),
@@ -4000,7 +4000,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A),
+                              color: AppColors.slate900,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -4010,7 +4010,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF64748B),
+                              color: AppColors.slate500,
                             ),
                           ),
                         ],
@@ -4021,7 +4021,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF08A).withValues(alpha: 0.3),
+                        color: AppColors.yellowPale.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -4030,7 +4030,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                           const RentlyIcon(
                             IconsaxPlusLinear.star_1,
                             size: 12,
-                            color: Color(0xFFCA8A04),
+                            color: AppColors.amberDark,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -4038,7 +4038,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF854D0E),
+                              color: AppColors.amberDeep,
                             ),
                           ),
                         ],
@@ -4053,7 +4053,7 @@ class _HorizontalReviewsList extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12.5,
                       height: 1.4,
-                      color: Color(0xFF475569),
+                      color: AppColors.slate600,
                     ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -4095,8 +4095,8 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
           onTap: () => setState(() => _expanded = !_expanded),
           child: Row(
             children: [
-              const Icon(IconsaxPlusLinear.flash_1,
-                  color: Color(0xFF13BEC9), size: 20),
+              Icon(IconsaxPlusLinear.flash_1,
+                  color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -4104,7 +4104,7 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.slate900,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -4113,7 +4113,7 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
                 width: 28,
                 height: 28,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFF1F5F9),
+                  color: AppColors.slate100,
                   shape: BoxShape.circle,
                 ),
                 child: AnimatedRotation(
@@ -4122,7 +4122,7 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
                   child: const Icon(
                     IconsaxPlusLinear.arrow_down_1,
                     size: 16,
-                    color: Color(0xFF64748B),
+                    color: AppColors.slate500,
                   ),
                 ),
               ),
@@ -4131,16 +4131,16 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF13BEC9).withOpacity(0.12),
+                  color: AppColors.primary.withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '?',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF13BEC9),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -4160,7 +4160,7 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
           duration: const Duration(milliseconds: 220),
         ),
         const SizedBox(height: 18),
-        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        const Divider(height: 1, color: AppColors.slate100),
       ],
     );
   }
@@ -4171,11 +4171,11 @@ class _MatchInsightCard extends StatelessWidget {
   final RentalProperty property;
 
   (Color, Color) _tierColors(MatchTier tier) => switch (tier) {
-        MatchTier.perfect => (const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+        MatchTier.perfect => (AppColors.green, AppColors.border),
         MatchTier.excellent => (AppColors.primary, AppColors.primaryLight2),
-        MatchTier.good => (const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
-        MatchTier.fair => (const Color(0xFFD97706), const Color(0xFFFEF3C7)),
-        MatchTier.weak => (AppColors.textSecondary, const Color(0xFFF1F5F9)),
+        MatchTier.good => (AppColors.blue, AppColors.border),
+        MatchTier.fair => (AppColors.amberDark, const Color(0xFFFEF3C7)),
+        MatchTier.weak => (AppColors.textSecondary, AppColors.slate100),
       };
 
   IconData _reasonIcon(MatchReasonKind kind) => switch (kind) {
@@ -4259,7 +4259,7 @@ class _MatchInsightCard extends StatelessWidget {
                           fontWeight: FontWeight.w600)),
                 ),
                 const Icon(Icons.check_circle_rounded,
-                    size: 16, color: Color(0xFF16A34A)),
+                    size: 16, color: AppColors.green),
               ],
             ),
           ),

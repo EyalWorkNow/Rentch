@@ -114,7 +114,7 @@ class _PanoramaMapPlacementScreenState
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2ECF1)),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
@@ -254,7 +254,7 @@ class _FloorPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()
-      ..color = const Color(0xFFEDF3F6)
+      ..color = AppColors.slate100
       ..strokeWidth = 1;
     const step = 28.0;
     for (var x = 0.0; x < size.width; x += step) {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/design/app_typography.dart';
 import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
@@ -281,8 +282,8 @@ class RentlyApp extends StatelessWidget {
       useMaterial3: true,
       // SF Hebrew Rounded primary (Hebrew text + all Latin via SF Pro Rounded
       // weight instances); SF Pro Rounded for pure-Latin contexts; Rubik fallback.
-      fontFamily: 'SF Hebrew Rounded',
-      fontFamilyFallback: const ['SF Pro Rounded', 'Rubik'],
+      fontFamily: AppType.family,
+      fontFamilyFallback: AppType.familyFallback,
       colorScheme: ColorScheme.fromSeed(
         seedColor: palette.primary,
         primary: palette.primary,
@@ -334,7 +335,7 @@ class RentlyApp extends StatelessWidget {
       sliderTheme: SliderThemeData(
         activeTrackColor: palette.primary,
         thumbColor: palette.primary,
-        inactiveTrackColor: const Color(0xFFD0EDF0),
+        inactiveTrackColor: AppColors.mist,
         overlayColor: palette.primary.withValues(alpha: 0.13),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -362,11 +363,11 @@ class RentlyApp extends StatelessWidget {
         hintStyle: const TextStyle(color: AppColors.textDisabled),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          borderSide: const BorderSide(color: AppColors.slate200),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          borderSide: const BorderSide(color: AppColors.slate200),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),

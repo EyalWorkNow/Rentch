@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 bool get _isUnderTest {
@@ -36,7 +37,7 @@ class GlowFocusDecorator extends StatelessWidget {
     super.key,
     required this.child,
     required this.isFocused,
-    this.glowColor = const Color(0xFF4A6CF7),
+    this.glowColor = AppColors.superLike,
     this.borderRadius = 16.0,
   });
 
@@ -218,7 +219,7 @@ class PulseRing extends StatefulWidget {
   const PulseRing({
     super.key,
     required this.child,
-    this.ringColor = const Color(0xFFFF5A67),
+    this.ringColor = AppColors.coral,
     this.maxRadius = 18.0,
     this.active = true,
   });
@@ -565,7 +566,7 @@ class OnlineDotPulse extends StatefulWidget {
 
   const OnlineDotPulse({
     super.key,
-    this.color = const Color(0xFF22C55E),
+    this.color = AppColors.greenBright,
     this.size = 10.0,
   });
 
@@ -659,11 +660,11 @@ class _ConfettiParticlesState extends State<ConfettiParticles>
 
     final rand = math.Random();
     final colors = [
-      const Color(0xFFFF5A67),
+      AppColors.coral,
       const Color(0xFFFFC72C),
-      const Color(0xFF4A6CF7),
-      const Color(0xFF22C55E),
-      const Color(0xFFEF4444),
+      AppColors.superLike,
+      AppColors.greenBright,
+      AppColors.red,
     ];
 
     for (int i = 0; i < 40; i++) {
@@ -830,13 +831,13 @@ class _AvatarPulseRingState extends State<AvatarPulseRing>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(
-              colors: [Color(0xFFFF5A67), Color(0xFF8E44AD)],
+              colors: [AppColors.coral, Color(0xFF8E44AD)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFF5A67).withValues(alpha: 0.3 * _scale.value),
+                color: AppColors.coral.withValues(alpha: 0.3 * _scale.value),
                 blurRadius: 8 * _scale.value,
                 spreadRadius: 2 * _scale.value,
               ),
@@ -1059,8 +1060,8 @@ class GalleryDotStretch extends StatelessWidget {
   const GalleryDotStretch({
     super.key,
     required this.isActive,
-    this.activeColor = const Color(0xFF4A6CF7),
-    this.inactiveColor = const Color(0xFFD1D5DB),
+    this.activeColor = AppColors.superLike,
+    this.inactiveColor = AppColors.slate300,
   });
 
   @override

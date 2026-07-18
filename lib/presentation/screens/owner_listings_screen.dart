@@ -69,9 +69,9 @@ class OwnerListingsScreen extends StatelessWidget {
               listings.any((p) => p.agencyListing) || provider.isBroker && isSelf;
 
           return Scaffold(
-            backgroundColor: const Color(0xFFF7FBFF),
+            backgroundColor: AppColors.slate50,
             appBar: AppBar(
-              backgroundColor: const Color(0xFFF7FBFF),
+              backgroundColor: AppColors.slate50,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               title: Text(
@@ -185,7 +185,7 @@ class _OwnerHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.slate200),
       ),
       child: Row(
         children: [
@@ -195,8 +195,8 @@ class _OwnerHeader extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isAgency
-                    ? [const Color(0xFF13BEC9), const Color(0xFF0D9BA4)]
-                    : [const Color(0xFF475569), const Color(0xFF1E293B)],
+                    ? [AppColors.tealBrand, AppColors.tealDark]
+                    : [AppColors.slate600, AppColors.inkSoft],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -223,7 +223,7 @@ class _OwnerHeader extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.ink,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -233,8 +233,8 @@ class _OwnerHeader extends StatelessWidget {
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: isAgency
-                        ? const Color(0xFF13BEC9)
-                        : const Color(0xFF64748B),
+                        ? AppColors.tealBrand
+                        : AppColors.slate500,
                   ),
                 ),
               ],
@@ -272,7 +272,7 @@ class _OwnerListingCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.slate200),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,7 +281,7 @@ class _OwnerListingCard extends StatelessWidget {
                 aspectRatio: 1.4,
                 child: SafeMedia(
                   media: property.primaryMedia,
-                  fallback: Container(color: const Color(0xFFE2E8F0)),
+                  fallback: Container(color: AppColors.slate200),
                 ),
               ),
               Expanded(
@@ -295,7 +295,7 @@ class _OwnerListingCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF0F172A),
+                          color: AppColors.ink,
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
@@ -306,7 +306,7 @@ class _OwnerListingCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Color(0xFF64748B),
+                          color: AppColors.slate500,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
                         ),

@@ -1,7 +1,12 @@
 import 'dart:async';
 
+import 'package:dating_app/core/chat/slot_message.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
+import 'package:dating_app/core/services/notification_service.dart';
+import 'package:dating_app/data/models/availability_slot.dart';
+import 'package:dating_app/data/repositories/availability_repository.dart';
+import 'package:dating_app/presentation/features/calendar/availability_calendar_screen.dart';
 import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
@@ -26,11 +31,11 @@ import 'package:dating_app/presentation/widgets/animations/micro_animations.dart
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
-const _bg = Color(0xFFF6FAFC);
+const _bg = AppColors.slate50;
 const _surface = Colors.white;
-const _border = Color(0xFFDCE8EF);
-const _outgoing = Color(0xFF12AEB8); // teal bubble
-const _incoming = Color(0xFFF0F5F8); // light-grey bubble
+const _border = AppColors.slate200;
+const _outgoing = AppColors.tealBrand; // teal bubble
+const _incoming = AppColors.slate100; // light-grey bubble
 
 class _ChatThemeSpec {
   const _ChatThemeSpec({
@@ -73,7 +78,7 @@ class _ChatThemeSpec {
     incomingColor: _incoming,
     primaryText: AppColors.navy,
     secondaryText: AppColors.textSecondary,
-    iconSurface: Color(0xFFF0F5F8),
+    iconSurface: AppColors.slate100,
     accent: AppColors.primary,
   );
 
@@ -86,7 +91,7 @@ class _ChatThemeSpec {
       BrokerChatTemplate.softGlass => _ChatThemeSpec(
           backgroundColor: Color.alphaBlend(
             branding.primaryColor.withValues(alpha: 0.06),
-            const Color(0xFFF7FAFC),
+            AppColors.slate50,
           ),
           appBarColor: Colors.white.withValues(alpha: 0.78),
           composerColor: Colors.white.withValues(alpha: 0.74),
@@ -105,21 +110,21 @@ class _ChatThemeSpec {
             colors: [
               branding.primaryColor.withValues(alpha: 0.14),
               branding.accentColor.withValues(alpha: 0.12),
-              const Color(0xFFF7FAFC),
+              AppColors.slate50,
             ],
           ),
         ),
       BrokerChatTemplate.editorialLight => _ChatThemeSpec(
-          backgroundColor: const Color(0xFFFAF7F1),
-          appBarColor: const Color(0xFFFFFCF7),
-          composerColor: const Color(0xFFFFFCF7),
+          backgroundColor: AppColors.cloud,
+          appBarColor: AppColors.surface,
+          composerColor: AppColors.surface,
           inputColor: Colors.white,
           borderColor: const Color(0xFFE9E0D2),
           outgoingColor: branding.secondaryColor,
           incomingColor: Colors.white,
           primaryText: branding.secondaryColor,
           secondaryText: const Color(0xFF8B8174),
-          iconSurface: const Color(0xFFF3EBDD),
+          iconSurface: AppColors.slate200,
           accent: branding.primaryColor,
         ),
       BrokerChatTemplate.nightSuite => _ChatThemeSpec(
@@ -192,6 +197,17 @@ class _MessageScreenState extends State<MessageScreen> {
   ChatProvider? _chatProvider;
   bool _chatInitialized = false;
   bool _actionsOpen = false;
+
+  // ── Viewing scheduling ────────────────────────────────────────────────────
+  final AvailabilityRepository _availabilityRepo = AvailabilityRepository();
+
+  /// Reserved notification id-space so viewing reminders never collide with the
+  /// lease (1M), saved-search (2M) or broker-viewing (3M) ranges.
+  static const int _viewingReminderBase = 4000000;
+
+  /// Confirm slotIds already turned into a booking + reminder this session, so
+  /// rebuilds can't double-schedule (repo-level booking is also idempotent).
+  final Set<String> _processedConfirmSlotIds = {};
 
   @override
   void didChangeDependencies() {
@@ -441,6 +457,13 @@ class _MessageScreenState extends State<MessageScreen> {
       builder: (_) => _ActionsSheet(
         match: match,
         ownerName: property.ownerName,
+        // Proposing viewing times is a landlord/owner-only action.
+        onProposeTimes: provider.isLandlord
+            ? () {
+                Navigator.pop(context);
+                _showProposeTimes(provider, property, tenantName);
+              }
+            : null,
         onQuickMessage: () {
           Navigator.pop(context);
           _showTemplates();
@@ -526,6 +549,148 @@ class _MessageScreenState extends State<MessageScreen> {
     }
   }
 
+  // ── Viewing scheduling ────────────────────────────────────────────────────
+
+  /// Send a structured (marker-carrying) chat message. Bypasses the plain-text
+  /// sanitizer/objectionable-content filter so the `[[...]]` payload survives.
+  Future<void> _sendStructured(
+      DatingProvider provider, String senderName, String text) async {
+    if (_chatProvider != null) {
+      await _chatProvider!.sendMessage(text);
+    } else {
+      await provider.sendMessage(
+          matchId: widget.matchId, sender: senderName, text: text);
+      _scrollToBottom();
+    }
+  }
+
+  /// Landlord action: pick up to 3 open, future availability slots and propose
+  /// them to the tenant as an in-chat card.
+  Future<void> _showProposeTimes(
+    DatingProvider provider,
+    RentalProperty property,
+    String senderName,
+  ) async {
+    final selected = await showModalBottomSheet<List<AvailabilitySlot>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ProposeTimesSheet(
+        repo: _availabilityRepo,
+        onAddTimes: () {
+          Navigator.pop(context);
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const AvailabilityCalendarScreen(),
+          ));
+        },
+      ),
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+
+    final proposal = SlotProposal(
+      propertyId: property.id,
+      options: selected
+          .map((s) => SlotOption(
+                slotId: s.id,
+                start: s.start,
+                durationMinutes: s.durationMinutes,
+              ))
+          .toList(),
+    );
+    await _sendStructured(
+        provider, senderName, SlotMessageCodec.encodeProposal(proposal));
+  }
+
+  /// Tenant action: confirm one proposed option. Sends a confirm card and books
+  /// the tenant's own 1h-before reminder.
+  Future<void> _confirmSlot(
+    DatingProvider provider,
+    String senderName,
+    RentalProperty property,
+    SlotOption option,
+  ) async {
+    final confirm = SlotConfirm(
+      slotId: option.slotId,
+      start: option.start,
+      durationMinutes: option.durationMinutes,
+      propertyId: property.id,
+    );
+    await _sendStructured(
+        provider, senderName, SlotMessageCodec.encodeConfirm(confirm));
+    await NotificationService.instance.scheduleReminder(
+      id: _viewingReminderBase + _slotKey(option.slotId),
+      title: 'צפייה בדירה בעוד שעה',
+      body: 'צפייה ב${property.address} בשעה ${_formatTime(option.start)}',
+      when: option.start.subtract(const Duration(hours: 1)),
+    );
+    if (mounted) _snack('הצפייה אושרה — נשלחה הודעה ונקבעה תזכורת');
+  }
+
+  /// Landlord side: for every confirm in the thread, book the matching slot and
+  /// schedule the landlord's own reminder. Idempotent — a per-session guard set
+  /// plus fixed reminder ids and a "keep existing booking" check mean processing
+  /// the same confirm twice never double-books or double-schedules.
+  Future<void> _syncViewingBookings(
+    List<ChatMessage> messages,
+    DatingProvider provider,
+    RentalProperty property,
+  ) async {
+    if (!provider.isLandlord) return;
+
+    final pending = <ChatMessage>[];
+    for (final m in messages) {
+      final parsed = SlotMessageCodec.parse(m.text);
+      if (parsed is SlotConfirmMessage &&
+          !_processedConfirmSlotIds.contains(parsed.confirm.slotId)) {
+        pending.add(m);
+      }
+    }
+    if (pending.isEmpty) return;
+
+    // Mark as processed up front so concurrent rebuilds don't re-enter.
+    for (final m in pending) {
+      final c = (SlotMessageCodec.parse(m.text) as SlotConfirmMessage).confirm;
+      _processedConfirmSlotIds.add(c.slotId);
+    }
+
+    final all = await _availabilityRepo.loadAll();
+    for (final m in pending) {
+      final c = (SlotMessageCodec.parse(m.text) as SlotConfirmMessage).confirm;
+      final who = m.sender.trim().isEmpty ? 'השוכר/ת' : m.sender.trim();
+
+      AvailabilitySlot? slot;
+      for (final s in all) {
+        if (s.id == c.slotId) {
+          slot = s;
+          break;
+        }
+      }
+      // Double-book guard: only claim a slot that's still open.
+      if (slot != null && slot.status == SlotStatus.open) {
+        await _availabilityRepo.save(slot.copyWith(
+          status: SlotStatus.booked,
+          bookedByName: who,
+        ));
+      }
+      // Fixed id per slot → rescheduling replaces rather than duplicates.
+      await NotificationService.instance.scheduleReminder(
+        id: _viewingReminderBase + _slotKey(c.slotId),
+        title: 'צפייה בדירה בעוד שעה',
+        body: 'צפייה עם $who ב${property.address} בשעה ${_formatTime(c.start)}',
+        when: c.start.subtract(const Duration(hours: 1)),
+      );
+    }
+  }
+
+  /// Small stable non-negative key from a slotId for notification ids.
+  int _slotKey(String s) {
+    var h = 0;
+    for (final u in s.codeUnits) {
+      h = (h * 31 + u) & 0x3FFFFF;
+    }
+    return h;
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -559,6 +724,14 @@ class _MessageScreenState extends State<MessageScreen> {
         final chatTheme = provider.isBroker
             ? _ChatThemeSpec.forBranding(provider.brokerBranding)
             : _ChatThemeSpec.standard;
+
+        // Landlord: turn any tenant confirmations into calendar bookings +
+        // reminders. Idempotent, so running it each rebuild is safe.
+        if (provider.isLandlord) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _syncViewingBookings(messages, provider, property);
+          });
+        }
 
         return Scaffold(
           backgroundColor: chatTheme.backgroundColor,
@@ -733,6 +906,8 @@ class _MessageScreenState extends State<MessageScreen> {
                       tenantName,
                       isLoading,
                       chatTheme,
+                      provider,
+                      property,
                     ),
                   ),
 
@@ -783,8 +958,18 @@ class _MessageScreenState extends State<MessageScreen> {
     String tenantName,
     bool isLoading,
     _ChatThemeSpec theme,
+    DatingProvider provider,
+    RentalProperty property,
   ) {
     if (messages.isEmpty && !isLoading) return _EmptyChat(theme: theme);
+
+    // Every slotId that has been confirmed anywhere in the thread → drives the
+    // "מאושר ✓ / disable the rest" state on proposal cards.
+    final confirmedSlotIds = <String>{};
+    for (final m in messages) {
+      final r = SlotMessageCodec.parse(m.text);
+      if (r is SlotConfirmMessage) confirmedSlotIds.add(r.confirm.slotId);
+    }
 
     return Stack(
       children: [
@@ -802,19 +987,43 @@ class _MessageScreenState extends State<MessageScreen> {
                 !isTenant && (prev == null || prev.sender != msg.sender);
             final isPending = msg.id.startsWith('temp_');
 
+            final parsed = SlotMessageCodec.parse(msg.text);
+            Widget row;
+            if (parsed is SlotProposalMessage) {
+              row = _SlotProposalCard(
+                proposal: parsed.proposal,
+                isMine: isTenant,
+                createdAt: msg.createdAt,
+                confirmedSlotIds: confirmedSlotIds,
+                // Only the recipient (tenant) can confirm; sender = read-only.
+                onConfirm: isTenant
+                    ? null
+                    : (opt) =>
+                        _confirmSlot(provider, tenantName, property, opt),
+              );
+            } else if (parsed is SlotConfirmMessage) {
+              row = _SlotConfirmCard(
+                confirm: parsed.confirm,
+                isMine: isTenant,
+                createdAt: msg.createdAt,
+              );
+            } else {
+              row = _MessageBubble(
+                message: msg,
+                isTenant: isTenant,
+                showAvatar: showAvatar,
+                isPending: isPending,
+                theme: theme,
+              );
+            }
+
             return Column(
               children: [
                 if (showDate) _DateDivider(date: msg.createdAt, theme: theme),
                 FadeSlideEntrance(
                   duration: const Duration(milliseconds: 250),
                   offset: const Offset(0.0, 15.0),
-                  child: _MessageBubble(
-                    message: msg,
-                    isTenant: isTenant,
-                    showAvatar: showAvatar,
-                    isPending: isPending,
-                    theme: theme,
-                  ),
+                  child: row,
                 ),
               ],
             );
@@ -918,7 +1127,7 @@ class _ContractBar extends StatelessWidget {
     return GestureDetector(
       onTap: action,
       child: Container(
-        color: _done ? const Color(0xFFE9F9F1) : const Color(0xFFEBF7FA),
+        color: _done ? AppColors.tealPale : AppColors.tealPale,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(children: [
           Icon(
@@ -968,6 +1177,7 @@ class _ActionsSheet extends StatelessWidget {
   const _ActionsSheet({
     required this.match,
     required this.ownerName,
+    required this.onProposeTimes,
     required this.onQuickMessage,
     required this.onAttachFile,
     required this.onAttachMedia,
@@ -979,6 +1189,7 @@ class _ActionsSheet extends StatelessWidget {
 
   final RentalMatch match;
   final String ownerName;
+  final VoidCallback? onProposeTimes;
   final VoidCallback onQuickMessage;
   final VoidCallback onAttachFile;
   final VoidCallback onAttachMedia;
@@ -1071,6 +1282,10 @@ class _ActionsSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
+          if (onProposeTimes != null) ...[
+            _ProposeTimesCard(onTap: onProposeTimes!),
+            const SizedBox(height: 10),
+          ],
           _SendContractCard(
             sent: match.contractSent,
             onTap: onSendContract,
@@ -1078,7 +1293,7 @@ class _ActionsSheet extends StatelessWidget {
           const SizedBox(height: 6),
           ...actions.map((a) => _ActionTile(item: a)),
           const SizedBox(height: 8),
-          const Divider(height: 1, color: Color(0xFFF0F5F8)),
+          const Divider(height: 1, color: AppColors.slate100),
           const SizedBox(height: 4),
           // ── Danger zone ──────────────────────────────────────────────────
           Material(
@@ -1166,9 +1381,9 @@ class _QuickActionButton extends StatelessWidget {
         child: Ink(
           height: 76,
           decoration: BoxDecoration(
-            color: const Color(0xFFF3F8FB),
+            color: AppColors.cloud,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDDEAF1)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1222,7 +1437,7 @@ class _SendContractCard extends StatelessWidget {
                     ],
                   )
                 : null,
-            color: enabled ? null : const Color(0xFFF3F8FB),
+            color: enabled ? null : AppColors.cloud,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: enabled
@@ -1237,7 +1452,7 @@ class _SendContractCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: enabled ? accent : const Color(0xFFE6EDF2),
+                  color: enabled ? accent : AppColors.border,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -1326,7 +1541,7 @@ class _ActionTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: item.enabled
                     ? AppColors.primaryLight2
-                    : const Color(0xFFF0F5F8),
+                    : AppColors.slate100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(item.icon, size: 18, color: color),
@@ -1734,7 +1949,7 @@ class _MessageInput extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFD3E2EA)),
+                border: Border.all(color: AppColors.slate200),
               ),
               child: TextField(
                 controller: controller,
@@ -1771,7 +1986,7 @@ class _MessageInput extends StatelessWidget {
             child: _IconBtn(
               icon: Icons.add_rounded,
               color: AppColors.navy,
-              bg: const Color(0xFFF0F5F8),
+              bg: AppColors.slate100,
               onTap: onActions,
             ),
           ),
@@ -1833,7 +2048,7 @@ class _SendBtn extends StatelessWidget {
                 ],
               )
             : const LinearGradient(
-                colors: [Color(0xFF1BC7D5), Color(0xFF0EA5B2)],
+                colors: [AppColors.tealBrand, AppColors.tealDark],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -2104,7 +2319,672 @@ class _TemplateTile extends StatelessWidget {
   }
 }
 
+// ─── Propose-viewing-times: actions-sheet CTA ─────────────────────────────────
+
+/// On-brand "propose viewing times" CTA, matching [_SendContractCard]. Only the
+/// landlord/owner sees this (gated at the call site).
+class _ProposeTimesCard extends StatelessWidget {
+  const _ProposeTimesCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                AppColors.primary.withValues(alpha: 0.14),
+                AppColors.primaryLight2,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.30),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(IconsaxPlusLinear.calendar_add,
+                    size: 24, color: Colors.white),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'הצע זמנים לצפייה',
+                      style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'בחר עד 3 מועדים פנויים לשליחה לשוכר',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_left_rounded,
+                  size: 24, color: AppColors.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Propose-viewing-times: slot picker sheet ─────────────────────────────────
+
+/// Lists the landlord's upcoming OPEN slots; multi-select up to 3. Pops with the
+/// chosen slots (or nothing on cancel). Empty state offers to open the calendar.
+class _ProposeTimesSheet extends StatefulWidget {
+  const _ProposeTimesSheet({required this.repo, required this.onAddTimes});
+
+  final AvailabilityRepository repo;
+  final VoidCallback onAddTimes;
+
+  @override
+  State<_ProposeTimesSheet> createState() => _ProposeTimesSheetState();
+}
+
+class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
+  static const int _maxPick = 3;
+
+  List<AvailabilitySlot> _slots = const [];
+  final Set<String> _selected = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final all = await widget.repo.loadAll();
+    final now = DateTime.now();
+    final open = all
+        .where((s) => s.isOpen && s.start.isAfter(now))
+        .toList()
+      ..sort((a, b) => a.start.compareTo(b.start));
+    if (!mounted) return;
+    setState(() {
+      _slots = open;
+      _loading = false;
+    });
+  }
+
+  void _toggle(AvailabilitySlot slot) {
+    setState(() {
+      if (_selected.contains(slot.id)) {
+        _selected.remove(slot.id);
+      } else {
+        if (_selected.length >= _maxPick) return;
+        _selected.add(slot.id);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight2,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(IconsaxPlusLinear.calendar_add,
+                      color: AppColors.primary, size: 18),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text('הצע זמנים לצפייה',
+                      style: TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('בחר עד 3 מועדים פנויים — השוכר יוכל לאשר אחד מהם.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+            const SizedBox(height: 14),
+            if (_loading)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 30),
+                child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary)),
+              )
+            else if (_slots.isEmpty)
+              _emptyState()
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _slots.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final s = _slots[i];
+                    final picked = _selected.contains(s.id);
+                    final atLimit = !picked && _selected.length >= _maxPick;
+                    return _SlotPickRow(
+                      slot: s,
+                      picked: picked,
+                      disabled: atLimit,
+                      onTap: () => _toggle(s),
+                    );
+                  },
+                ),
+              ),
+            if (!_loading && _slots.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: AppColors.slate200,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: _selected.isEmpty
+                      ? null
+                      : () {
+                          final chosen = _slots
+                              .where((s) => _selected.contains(s.id))
+                              .toList();
+                          Navigator.pop(context, chosen);
+                        },
+                  child: Text(
+                    _selected.isEmpty
+                        ? 'בחר מועדים לשליחה'
+                        : 'שלח ${_selected.length} מועדים לשוכר',
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight2,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(IconsaxPlusLinear.calendar_1,
+                color: AppColors.primary, size: 26),
+          ),
+          const SizedBox(height: 14),
+          const Text('אין זמנים פנויים',
+              style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 6),
+          const Text(
+            'הוסף מועדים פנויים ביומן כדי שתוכל להציע אותם לשוכר.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: AppColors.textSecondary, fontSize: 12.5, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: widget.onAddTimes,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(IconsaxPlusLinear.add, size: 18),
+              label: const Text('הוסף זמנים ביומן',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SlotPickRow extends StatelessWidget {
+  const _SlotPickRow({
+    required this.slot,
+    required this.picked,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  final AvailabilitySlot slot;
+  final bool picked;
+  final bool disabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: disabled ? 0.5 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: disabled ? null : onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: picked ? AppColors.tealPale : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: picked ? AppColors.primary : AppColors.slate200,
+                width: picked ? 1.5 : 1,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  picked
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: picked ? AppColors.primary : AppColors.slate200,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_formatSlotDate(slot.start),
+                          style: const TextStyle(
+                              color: AppColors.navy,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_formatTime(slot.start)} · ${slot.durationMinutes} דק׳',
+                        style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Proposal / confirm chat cards ────────────────────────────────────────────
+
+/// In-chat card rendering a landlord's proposal of viewing times. Tenants (the
+/// recipient) get an "אשר" button per option; the landlord (sender) sees each as
+/// read-only. Once one option is confirmed, it shows "מאושר ✓" and the rest are
+/// disabled.
+class _SlotProposalCard extends StatelessWidget {
+  const _SlotProposalCard({
+    required this.proposal,
+    required this.isMine,
+    required this.createdAt,
+    required this.confirmedSlotIds,
+    required this.onConfirm,
+  });
+
+  final SlotProposal proposal;
+  final bool isMine;
+  final DateTime createdAt;
+  final Set<String> confirmedSlotIds;
+  final void Function(SlotOption option)? onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final anyConfirmed =
+        proposal.options.any((o) => confirmedSlotIds.contains(o.slotId));
+
+    final card = Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+      ),
+      margin: const EdgeInsets.only(top: 8, bottom: 3),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight2,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(IconsaxPlusLinear.calendar_add,
+                    color: AppColors.primary, size: 17),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('מועדים מוצעים לצפייה',
+                    style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...proposal.options.map((o) {
+            final confirmed = confirmedSlotIds.contains(o.slotId);
+            return _SlotOptionRow(
+              option: o,
+              confirmed: confirmed,
+              // Disable other options once one is chosen.
+              dimmed: anyConfirmed && !confirmed,
+              canConfirm: onConfirm != null && !anyConfirmed,
+              onConfirm:
+                  onConfirm == null ? null : () => onConfirm!(o),
+            );
+          }),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _formatTime(createdAt),
+              style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: card,
+    );
+  }
+}
+
+class _SlotOptionRow extends StatelessWidget {
+  const _SlotOptionRow({
+    required this.option,
+    required this.confirmed,
+    required this.dimmed,
+    required this.canConfirm,
+    required this.onConfirm,
+  });
+
+  final SlotOption option;
+  final bool confirmed;
+  final bool dimmed;
+  final bool canConfirm;
+  final VoidCallback? onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: dimmed ? 0.5 : 1,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: confirmed ? AppColors.tealPale : AppColors.cloud,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: confirmed ? AppColors.success : AppColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_formatSlotDate(option.start),
+                      style: const TextStyle(
+                          color: AppColors.navy,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_formatTime(option.start)} · ${option.durationMinutes} דק׳',
+                    style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _trailing(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _trailing() {
+    if (confirmed) {
+      return const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded,
+              color: AppColors.success, size: 16),
+          SizedBox(width: 4),
+          Text('מאושר',
+              style: TextStyle(
+                  color: AppColors.success,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900)),
+        ],
+      );
+    }
+    if (canConfirm) {
+      return FilledButton(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        ),
+        onPressed: onConfirm,
+        child: const Text('אשר',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900)),
+      );
+    }
+    // Sender's read-only pending label (only when nothing chosen yet).
+    if (!dimmed) {
+      return const Text('ממתין לאישור',
+          style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700));
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+/// Compact "viewing confirmed" card shown to both sides.
+class _SlotConfirmCard extends StatelessWidget {
+  const _SlotConfirmCard({
+    required this.confirm,
+    required this.isMine,
+    required this.createdAt,
+  });
+
+  final SlotConfirm confirm;
+  final bool isMine;
+  final DateTime createdAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.74,
+      ),
+      margin: const EdgeInsets.only(top: 8, bottom: 3),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.tealPale,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.success,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.event_available_rounded,
+                color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('צפייה מאושרת',
+                    style: TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(
+                  '${_formatSlotDate(confirm.start)} · ${_formatTime(confirm.start)}',
+                  style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: card,
+    );
+  }
+}
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
+
+const _slotDaysHeb = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const _slotMonthsHeb = [
+  '',
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
+];
+
+/// e.g. "יום שני · 20 ביולי". RTL-safe (pure Hebrew + digits).
+String _formatSlotDate(DateTime d) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final target = DateTime(d.year, d.month, d.day);
+  final diff = target.difference(today).inDays;
+  final dayPart = diff == 0
+      ? 'היום'
+      : diff == 1
+          ? 'מחר'
+          : 'יום ${_slotDaysHeb[d.weekday % 7]}';
+  return '$dayPart · ${d.day} ב${_slotMonthsHeb[d.month]}';
+}
 
 String _formatTime(DateTime v) {
   return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';

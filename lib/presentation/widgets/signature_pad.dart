@@ -29,7 +29,7 @@ class SignaturePadController extends ChangeNotifier {
     final canvas = Canvas(recorder);
     canvas.scale(scale);
     final paint = Paint()
-      ..color = const Color(0xFF0F2A43)
+      ..color = AppColors.navy
       ..strokeWidth = 2.6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -102,7 +102,7 @@ class _SignaturePadState extends State<SignaturePad> {
             height: widget.height,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.slate50,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.borderLight),
             ),
@@ -127,7 +127,7 @@ class _SignaturePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0F2A43)
+      ..color = AppColors.navy
       ..strokeWidth = 2.6
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round

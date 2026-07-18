@@ -39,7 +39,7 @@ class _VerificationInfoSheetBody extends StatelessWidget {
       heightFactor: 0.9,
       child: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFFF7FBFF),
+          color: AppColors.slate50,
           borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
           boxShadow: [
             BoxShadow(
@@ -104,7 +104,7 @@ class _VerifiedHeader extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [Color(0xFF0E3050), Color(0xFF15BFC9)],
+          colors: [AppColors.navy, AppColors.tealBrand],
         ),
         borderRadius: BorderRadius.circular(24),
       ),

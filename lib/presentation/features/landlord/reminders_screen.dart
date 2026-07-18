@@ -90,7 +90,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: AppColors.background,
           surfaceTintColor: AppColors.background,
@@ -475,7 +475,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               style: const TextStyle(fontSize: 18, color: AppColors.textPrimary),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: const Color(0xFFF5F7FA),
+                fillColor: AppColors.cloud,
                 hintText: 'למשל: לגבות שכר ב-10 בחודש',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -492,7 +492,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F7FA),
+                  color: AppColors.cloud,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(

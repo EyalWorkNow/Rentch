@@ -44,7 +44,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
         height: h,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1A18),
+          color: AppColors.ink,
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
@@ -362,7 +362,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
         maxChildSize: 0.92,
         builder: (_, controller) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF0E1720),
+            color: AppColors.ink,
             borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
           ),
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
@@ -383,7 +383,7 @@ class AtiVoicePropertyCard extends StatelessWidget {
               Row(
                 children: [
                   const Icon(IconsaxPlusBold.magic_star,
-                      color: Color(0xFF7CE0E6), size: 20),
+                      color: AppColors.tealBright, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -433,9 +433,9 @@ class AtiVoicePropertyCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF7CE0E6).withValues(alpha: 0.12),
+        color: AppColors.tealBright.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF7CE0E6).withValues(alpha: 0.35)),
+        border: Border.all(color: AppColors.tealBright.withValues(alpha: 0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,12 +478,12 @@ class AtiVoicePropertyCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: accent
-            ? const Color(0xFF7CE0E6).withValues(alpha: 0.18)
+            ? AppColors.tealBright.withValues(alpha: 0.18)
             : Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: accent
-              ? const Color(0xFF7CE0E6).withValues(alpha: 0.5)
+              ? AppColors.tealBright.withValues(alpha: 0.5)
               : Colors.white.withValues(alpha: 0.14),
           width: 1,
         ),

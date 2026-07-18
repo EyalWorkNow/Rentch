@@ -136,13 +136,13 @@ class _AvailabilityCalendarScreenState
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF6F7FB),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           title: const Text('היומן שלי',
               style: TextStyle(fontWeight: FontWeight.w900)),
           backgroundColor: Colors.white,
           elevation: 0,
-          foregroundColor: const Color(0xFF072946),
+          foregroundColor: AppColors.navy,
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _addSlot,
@@ -191,7 +191,7 @@ class _AvailabilityCalendarScreenState
                 border: Border.all(
                     color: selected
                         ? AppColors.primary
-                        : const Color(0xFFE3E6EF)),
+                        : AppColors.slate200),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -201,14 +201,14 @@ class _AvailabilityCalendarScreenState
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color:
-                              selected ? Colors.white : const Color(0xFF6B7280))),
+                              selected ? Colors.white : AppColors.slate500)),
                   const SizedBox(height: 4),
                   Text('${d.day}',
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
                           color:
-                              selected ? Colors.white : const Color(0xFF072946))),
+                              selected ? Colors.white : AppColors.navy)),
                   const SizedBox(height: 3),
                   Container(
                     width: 18,
@@ -240,7 +240,7 @@ class _AvailabilityCalendarScreenState
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
           child: Text(header,
               style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF072946))),
+                  fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.navy)),
         ),
         if (slots.isEmpty)
           Expanded(
@@ -251,7 +251,7 @@ class _AvailabilityCalendarScreenState
                   const Text('🗓️', style: TextStyle(fontSize: 44)),
                   const SizedBox(height: 12),
                   const Text('אין עדיין זמנים פנויים ביום הזה',
-                      style: TextStyle(color: Color(0xFF6B7280))),
+                      style: TextStyle(color: AppColors.slate500)),
                   const SizedBox(height: 4),
                   Text('הקישו «הוסף זמן פנוי» למטה',
                       style: TextStyle(
@@ -280,7 +280,7 @@ class _AvailabilityCalendarScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE3E6EF)),
+        border: Border.all(color: AppColors.slate200),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -298,13 +298,13 @@ class _AvailabilityCalendarScreenState
         ),
         title: Text('${_time(s.start)} – ${_time(s.end)}',
             style: const TextStyle(
-                fontWeight: FontWeight.w800, color: Color(0xFF072946))),
+                fontWeight: FontWeight.w800, color: AppColors.navy)),
         subtitle: Text(
           booked
               ? 'נתפס${s.bookedByName.isNotEmpty ? ' · ${s.bookedByName}' : ''}'
               : 'פנוי לצפייה',
           style: TextStyle(
-              color: booked ? AppColors.coral : const Color(0xFF6B7280),
+              color: booked ? AppColors.coral : AppColors.slate500,
               fontWeight: FontWeight.w600),
         ),
         trailing: IconButton(

@@ -1450,7 +1450,7 @@ class _WizardNavBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(
-          top: BorderSide(color: Color(0xFFF0F3F6), width: 1.5),
+          top: BorderSide(color: AppColors.slate100, width: 1.5),
         ),
         boxShadow: [
           BoxShadow(
@@ -1470,7 +1470,7 @@ class _WizardNavBar extends StatelessWidget {
                 label: const Text('חזרה'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.navy,
-                  side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                  side: const BorderSide(color: AppColors.slate200, width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16)),
@@ -1553,7 +1553,7 @@ class _EditPropertyFooter extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(
-          top: BorderSide(color: Color(0xFFF0F3F6), width: 1.5),
+          top: BorderSide(color: AppColors.slate100, width: 1.5),
         ),
         boxShadow: [
           BoxShadow(
@@ -1598,7 +1598,7 @@ class _EditPropertyFooter extends StatelessWidget {
                   activeThumbColor: AppColors.success,
                   activeTrackColor: AppColors.success.withValues(alpha: 0.2),
                   inactiveThumbColor: AppColors.textSecondary,
-                  inactiveTrackColor: const Color(0xFFE2E8F0),
+                  inactiveTrackColor: AppColors.slate200,
                 ),
               ),
               const Spacer(),
@@ -1621,7 +1621,7 @@ class _EditPropertyFooter extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Divider(color: Color(0xFFEDF2F7), height: 1, thickness: 1),
+          const Divider(color: AppColors.slate100, height: 1, thickness: 1),
           const SizedBox(height: 10),
           // Row 2: Navigation buttons
           Row(
@@ -1634,7 +1634,7 @@ class _EditPropertyFooter extends StatelessWidget {
                     label: const Text('חזרה'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.navy,
-                      side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                      side: const BorderSide(color: AppColors.slate200, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16)),
@@ -1956,7 +1956,7 @@ class _TransactionTypeToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F3F6),
+        color: AppColors.slate100,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -3370,9 +3370,9 @@ class _VerificationVideoPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFD),
+        color: AppColors.slate50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0EBF2)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -3977,7 +3977,7 @@ class _RoomScanEntry extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [AppColors.navy, Color(0xFF1E3A8A)],
+                colors: [AppColors.navy, AppColors.indigoDeep],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -4090,7 +4090,7 @@ class _ScanActions extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [AppColors.navy, Color(0xFF1E3A8A)],
+                    colors: [AppColors.navy, AppColors.indigoDeep],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -4232,7 +4232,7 @@ class _ScanActions extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFD6E3F0)),
+                  border: Border.all(color: AppColors.slate200),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -4283,9 +4283,9 @@ class _ScanStatusCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFD),
+        color: AppColors.slate50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0EBF2)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4914,12 +4914,12 @@ class _DesignTemplatePicker extends StatelessWidget {
   ];
 
   static List<Color> _previewColors(String id) => switch (id) {
-        'acid_hero' => const [Color(0xFF111827), Color(0xFFECFF74)],
-        'dashboard_glass' => const [Color(0xFFEAF2F0), Color(0xFF13BEC9)],
-        'estate_card' => const [Color(0xFFF5F6F8), Color(0xFF6C5CE7)],
-        'gallery_editorial' => const [Colors.white, Color(0xFF111827)],
-        'cinematic_glass' => const [Color(0xFF0B1220), Color(0xFF8B5CF6)],
-        _ => const [Colors.white, Color(0xFF13BEC9)],
+        'acid_hero' => const [AppColors.ink, Color(0xFFECFF74)],
+        'dashboard_glass' => [AppColors.border, AppColors.primary],
+        'estate_card' => const [AppColors.cloud, AppColors.purple],
+        'gallery_editorial' => const [Colors.white, AppColors.ink],
+        'cinematic_glass' => const [AppColors.ink, AppColors.violet],
+        _ => [Colors.white, AppColors.primary],
       };
 
   static BrokerPropertyTemplate _templateFromId(String id) {
@@ -6115,7 +6115,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         const SnackBar(
           duration: Duration(milliseconds: 2500),
           content: Text('הנכס עודכן בהצלחה'),
-          backgroundColor: Color(0xFF1B9C6A),
+          backgroundColor: AppColors.success,
         ),
       );
       Navigator.of(context).pop();

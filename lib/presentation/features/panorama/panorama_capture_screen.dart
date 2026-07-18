@@ -420,7 +420,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         content: const Text(
           'לפנורמה אופקית אין תקרה ורצפה אמיתיות. אפשר להוסיף אותן בשתי תמונות '
           'נוספות — צילום אחד כלפי מטה (רצפה) ואחד כלפי מעלה (תקרה). זה לא חובה.',
-          style: TextStyle(color: Color(0xFF475569), height: 1.4),
+          style: TextStyle(color: AppColors.slate600, height: 1.4),
         ),
         actions: [
           TextButton(
@@ -531,7 +531,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                 Text(
                   'הסיבוב מכסה כ-${haov.round()}° לרוחב · ${vaov.round()}° לגובה. '
                   'אם האופק נראה מתוח, כוונן את שדה הראייה האנכי.',
-                  style: const TextStyle(color: Color(0xFF475569), height: 1.4),
+                  style: const TextStyle(color: AppColors.slate600, height: 1.4),
                 ),
                 const SizedBox(height: 8),
                 Slider(
@@ -1143,7 +1143,7 @@ class _NodeTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

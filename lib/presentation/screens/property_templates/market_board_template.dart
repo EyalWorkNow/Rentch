@@ -43,13 +43,13 @@ class _MarketBoardTemplate extends StatelessWidget {
   final VoidCallback onTour;
 
   // ── Terminal palette ──────────────────────────────────────────────────────
-  static const Color _panel = Color(0xFF0E1320);
-  static const Color _panelEdge = Color(0xFF1F2A3D);
-  static const Color _grid = Color(0xFF161E2E);
-  static const Color _ink = Color(0xFFF1F5FB);
-  static const Color _muted = Color(0xFF8A99B5);
+  static const Color _panel = AppColors.ink;
+  static const Color _panelEdge = AppColors.inkSoft;
+  static const Color _grid = AppColors.ink;
+  static const Color _ink = AppColors.slate100;
+  static const Color _muted = AppColors.slate400;
   static const Color _up = Color(0xFF34D399);
-  static const Color _down = Color(0xFFFF6B7A);
+  static const Color _down = AppColors.coral;
 
   /// Whole-day age of the listing — a real "days on market" read-out.
   int? get _daysOnMarket {

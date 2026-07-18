@@ -117,7 +117,7 @@ class ContractDetailScreen extends StatelessWidget {
     final (label, color, icon) = switch (c.status) {
       ContractStatus.signed => (
           'החוזה נחתם על ידי שני הצדדים',
-          const Color(0xFF16A34A),
+          AppColors.green,
           Icons.verified_rounded,
         ),
       ContractStatus.declined => (
@@ -439,7 +439,7 @@ class _SignatureSlot extends StatelessWidget {
             )
           else if (sig != null)
             const Icon(Icons.verified_rounded,
-                color: Color(0xFF16A34A), size: 26),
+                color: AppColors.green, size: 26),
         ],
       ),
     );
@@ -461,7 +461,7 @@ class _VerifiedLine extends StatelessWidget {
         final pending = !snap.hasData;
         final color = pending
             ? AppColors.textSecondary
-            : (ok ? const Color(0xFF16A34A) : AppColors.coral);
+            : (ok ? AppColors.green : AppColors.coral);
         final when = sig.signedAt;
         final dateStr = when == null
             ? ''
@@ -506,7 +506,7 @@ class _ContractDocumentPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = contract;
     return Scaffold(
-      backgroundColor: const Color(0xFFEDF1F5),
+      backgroundColor: AppColors.slate100,
       appBar: AppBar(title: const Text('תצוגה מקדימה של החוזה')),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -592,7 +592,7 @@ class _ContractDocumentPage extends StatelessWidget {
         textAlign: TextAlign.right,
         text: TextSpan(
           style: const TextStyle(
-              fontSize: 13.5, height: 1.7, color: Color(0xFF334155)),
+              fontSize: 13.5, height: 1.7, color: AppColors.slate700),
           children: out.isNotEmpty ? out : spans,
         ),
       ),
@@ -613,7 +613,7 @@ class _ContractDocumentPage extends StatelessWidget {
             Text(body,
                 textAlign: TextAlign.right,
                 style: const TextStyle(
-                    fontSize: 13, height: 1.6, color: Color(0xFF334155))),
+                    fontSize: 13, height: 1.6, color: AppColors.slate700)),
           ],
         ),
       );
@@ -639,7 +639,7 @@ class _ContractDocumentPage extends StatelessWidget {
           Icon(
             signed ? Icons.verified_rounded : Icons.schedule_rounded,
             size: 18,
-            color: signed ? const Color(0xFF16A34A) : AppColors.textSecondary,
+            color: signed ? AppColors.green : AppColors.textSecondary,
           ),
           const SizedBox(width: 4),
           Text(signed ? 'נחתם' : 'ממתין',
@@ -647,7 +647,7 @@ class _ContractDocumentPage extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: signed
-                      ? const Color(0xFF16A34A)
+                      ? AppColors.green
                       : AppColors.textSecondary)),
         ],
       );

@@ -550,7 +550,7 @@ class _AiImproveTile extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               AppColors.primary.withValues(alpha: 0.10),
-              const Color(0xFF4A6CF7).withValues(alpha: 0.08),
+              AppColors.superLike.withValues(alpha: 0.08),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
@@ -573,7 +573,7 @@ class _AiImproveTile extends StatelessWidget {
                           strokeWidth: 2, color: AppColors.primary),
                     )
                   : const Icon(IconsaxPlusBold.magicpen,
-                      size: 18, color: Color(0xFF4A6CF7)),
+                      size: 18, color: AppColors.superLike),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -593,7 +593,7 @@ class _AiImproveTile extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4A6CF7),
+                            color: AppColors.superLike,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text('פיצ׳ר בתשלום · $priceShekel₪',
@@ -778,7 +778,7 @@ class _PaywallSheet extends StatelessWidget {
                 decoration: const BoxDecoration(
                     color: Color(0x224A6CF7), shape: BoxShape.circle),
                 child: const Icon(IconsaxPlusBold.magicpen,
-                    size: 26, color: Color(0xFF4A6CF7)),
+                    size: 26, color: AppColors.superLike),
               ),
             ),
             const SizedBox(height: 14),

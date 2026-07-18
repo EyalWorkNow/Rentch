@@ -1113,15 +1113,18 @@ class RentalProperty {
   }
 
   factory RentalProperty.fromJson(Map<String, dynamic> json) {
-    final mediaJson = json['media'] as List<dynamic>? ?? const [];
-    final legacyImageUrls =
-        List<String>.from(json['imageUrls'] as List<dynamic>? ?? const []);
-    final legacyVideoUrls =
-        List<String>.from(json['videoUrls'] as List<dynamic>? ?? const []);
+    // Defensive: these list fields are sometimes stored as JSON-encoded strings
+    // (or empty strings) in the backend. A hard `as List<dynamic>?` cast threw
+    // 'String is not a subtype of List<dynamic>?' — which silently dropped the
+    // listing from search AND broke deep links to it. Decode tolerantly instead.
+    final mediaJson = _decodeListValue(json['media']);
+    final legacyImageUrls = _decodeStringListValue(json['imageUrls']);
+    final legacyVideoUrls = _decodeStringListValue(json['videoUrls']);
     final media = mediaJson.isNotEmpty
         ? mediaJson
+            .whereType<Map>()
             .map((item) =>
-                PropertyMedia.fromJson(Map<String, dynamic>.from(item as Map)))
+                PropertyMedia.fromJson(Map<String, dynamic>.from(item)))
             .toList()
         : [
             ...legacyImageUrls.map(
@@ -2560,6 +2563,18 @@ List<String> _resolveFeatureLabels(
   }
 
   return labels;
+}
+
+/// Tolerantly extracts a raw list from a value that may be a List, a JSON-encoded
+/// string, or neither (→ empty). Mirrors [_decodeStringListValue] for list-of-object
+/// fields like `media` that the backend sometimes stores as encoded strings.
+List<dynamic> _decodeListValue(Object? rawValue) {
+  if (rawValue is List) return rawValue;
+  if (rawValue is String && rawValue.trim().isNotEmpty) {
+    final parsed = _decodeJsonSafely(rawValue);
+    if (parsed is List) return parsed;
+  }
+  return const [];
 }
 
 List<String> _decodeStringListValue(Object? rawValue) {

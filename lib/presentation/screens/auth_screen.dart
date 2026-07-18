@@ -24,10 +24,10 @@ import 'package:dating_app/presentation/widgets/animations/micro_animations.dart
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
-const _kScreenBg = Color(0xFFF0F4F7);
+const _kScreenBg = AppColors.slate100;
 const _kCardBg = Colors.white;
-const _kInputBorder = Color(0xFFDDE3EE);
-const _kInputFill = Color(0xFFF7F9FC);
+const _kInputBorder = AppColors.slate200;
+const _kInputFill = AppColors.slate50;
 
 /// Fixed source-teal brand for the ENTIRE entry flow (welcome / login / signup
 /// / role-pick / guest entry). The entry experience must NEVER render the
@@ -35,7 +35,7 @@ const _kInputFill = Color(0xFFF7F9FC);
 /// compile-time constant here (instead of the runtime-swappable
 /// [_kBrandTeal]) makes the entry screens structurally immune to any
 /// global accent flip that happens while a session is being established.
-const Color _kBrandTeal = Color(0xFF13BEC9);
+const Color _kBrandTeal = AppColors.tealBrand;
 const Color _kPillBtn = _kBrandTeal;
 
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
@@ -253,13 +253,13 @@ class _AuthScreenState extends State<AuthScreen>
         ),
         content: SingleChildScrollView(
           child: SelectableText(message,
-              style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+              style: const TextStyle(color: AppColors.slate600, height: 1.4)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child:
-                const Text('סגור', style: TextStyle(color: Color(0xFF64748B))),
+                const Text('סגור', style: TextStyle(color: AppColors.slate500)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -715,14 +715,14 @@ class _SocialRow extends StatelessWidget {
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.15) : const Color(0xFFF1F3F4),
+                          color: isDark ? Colors.white.withOpacity(0.15) : AppColors.slate100,
                           borderRadius: BorderRadius.circular(4)),
                       child: Center(
                         child: Text('G',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,
-                                color: isDark ? Colors.white : const Color(0xFF4285F4))),
+                                color: isDark ? Colors.white : AppColors.superLike)),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1341,13 +1341,13 @@ class _LoginTabState extends State<_LoginTab> {
         ),
         content: SingleChildScrollView(
           child: SelectableText(message,
-              style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+              style: const TextStyle(color: AppColors.slate600, height: 1.4)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child:
-                const Text('סגור', style: TextStyle(color: Color(0xFF64748B))),
+                const Text('סגור', style: TextStyle(color: AppColors.slate500)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -2163,7 +2163,7 @@ class _EulaSheet extends StatelessWidget {
                     onPressed: onDecline,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: const BorderSide(color: AppColors.slate200),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(999)),
@@ -2311,8 +2311,8 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                           color: [
                             _kBrandTeal,
                             AppColors.coral,
-                            const Color(0xFFF39C12),
-                            const Color(0xFF4A6CF7),
+                            AppColors.warning,
+                            AppColors.superLike,
                           ][angle.toInt() % 4]
                               .withValues(alpha: 0.85),
                         ),
@@ -2323,11 +2323,11 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                     height: 84,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF2ECC71),
+                      color: AppColors.greenBright,
                       boxShadow: [
                         BoxShadow(
                           color:
-                              const Color(0xFF2ECC71).withValues(alpha: 0.35),
+                              AppColors.greenBright.withValues(alpha: 0.35),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
@@ -2762,7 +2762,7 @@ class _CompactBudgetPicker extends StatelessWidget {
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
               activeTrackColor: _kBrandTeal,
-              inactiveTrackColor: isDark ? Colors.white.withOpacity(0.12) : const Color(0xFFD0EDF0),
+              inactiveTrackColor: isDark ? Colors.white.withOpacity(0.12) : AppColors.mist,
               thumbColor: _kBrandTeal,
               overlayColor: _kBrandTeal.withValues(alpha: 0.16),
             ),
@@ -3347,50 +3347,6 @@ class _EulaSection extends StatelessWidget {
   }
 }
 
-/// Compact top-of-screen CTA on the welcome portal. Opens the landlord/agent
-/// chooser; the default tenant path never needs it.
-class _LandlordCtaButton extends StatelessWidget {
-  const _LandlordCtaButton({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(100),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(12), sigmaY: PlatformFx.blurSigma(12)),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: _kBrandTeal.withOpacity(0.22),
-              borderRadius: BorderRadius.circular(100),
-              border:
-                  Border.all(color: Colors.white.withOpacity(0.45), width: 1.2),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(IconsaxPlusLinear.home, color: Colors.white, size: 17),
-                SizedBox(width: 6),
-                Text(
-                  'כניסה כבעל דירה',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _WelcomePortal extends StatelessWidget {
   final VoidCallback onLogin;
   final VoidCallback onRegister;
@@ -3428,7 +3384,7 @@ class _WelcomePortal extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [AppColors.navy, Color(0xFF0F172A)],
+                  colors: [AppColors.navy, AppColors.slate900],
                 ),
               ),
             );
@@ -3483,12 +3439,6 @@ class _WelcomePortal extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                // Centered Landlord login button below the logo
-                Align(
-                  alignment: Alignment.center,
-                  child: _LandlordCtaButton(onTap: onLandlordCta),
-                ),
                 const Spacer(),
 
                 // Title Text (Hebrew, right-aligned)
@@ -3514,10 +3464,10 @@ class _WelcomePortal extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Action Buttons (Login / Sign Up)
+                // Account-type Buttons (Tenant / Landlord)
                 Row(
                   children: [
-                    // Login Button (App Brand Primary Teal)
+                    // Tenant Button (App Brand Primary Teal)
                     Expanded(
                       child: GestureDetector(
                         onTap: onLogin,
@@ -3528,41 +3478,55 @@ class _WelcomePortal extends StatelessWidget {
                             borderRadius: BorderRadius.circular(28),
                           ),
                           alignment: Alignment.center,
-                          child: const Text(
-                            'התחברות',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(IconsaxPlusLinear.search_normal,
+                                  color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'מחפש דירה',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 14),
 
-                    // Sign Up Button (Glass translucent)
+                    // Landlord Button (Solid Navy)
                     Expanded(
                       child: GestureDetector(
-                        onTap: onRegister,
+                        onTap: onLandlordCta,
                         child: Container(
                           height: 56,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08),
+                            color: AppColors.navy,
                             borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.18),
-                              width: 1.5,
-                            ),
                           ),
                           alignment: Alignment.center,
-                          child: const Text(
-                            'הרשמה',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(IconsaxPlusLinear.building,
+                                  color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'בעל דירה',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

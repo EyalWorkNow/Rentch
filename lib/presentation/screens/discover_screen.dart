@@ -428,10 +428,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                     horizontal: 6, vertical: 3),
                                 decoration: BoxDecoration(
                                   color:
-                                      const Color(0xFFEF4444).withOpacity(0.25),
+                                      AppColors.red.withOpacity(0.25),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: const Color(0xFFEF4444)
+                                      color: AppColors.red
                                           .withOpacity(0.4),
                                       width: 0.8),
                                 ),
@@ -641,12 +641,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                             color: Colors.white,
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color: const Color(0xFFE2E8F0),
+                                              color: AppColors.slate200,
                                               width: 1.5,
                                             ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: const Color(0xFFF59E0B)
+                                                color: AppColors.amber
                                                     .withOpacity(0.12),
                                                 blurRadius: 12,
                                                 offset: const Offset(0, 4),
@@ -655,7 +655,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                           ),
                                           child: const Icon(
                                             Icons.rotate_left_rounded,
-                                            color: Color(0xFFF59E0B),
+                                            color: AppColors.amber,
                                             size: 20,
                                           ),
                                         ),
@@ -781,7 +781,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFFE2E8F0),
+                color: AppColors.slate200,
                 width: 1.5,
               ),
               boxShadow: [
@@ -1040,7 +1040,7 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
                             gradient: LinearGradient(
-                              colors: [AppColors.primary, Color(0xFF5AD4DC)],
+                              colors: [AppColors.primary, AppColors.primaryLight],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -1576,7 +1576,7 @@ class _HeaderMenuButtonState extends State<_HeaderMenuButton>
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+            border: Border.all(color: AppColors.slate200, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -2253,7 +2253,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               width: 36,
                               height: 36,
                               decoration: const BoxDecoration(
-                                color: Color(0xFFF2F4F5),
+                                color: AppColors.slate100,
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.close,
@@ -2375,7 +2375,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                             rangeThumbShape:
                                 const _CustomRangeSliderThumbShape(),
                             activeTrackColor: AppColors.primary,
-                            inactiveTrackColor: const Color(0xFFE2ECF1),
+                            inactiveTrackColor: AppColors.border,
                           ),
                           child: RangeSlider(
                             values: RangeValues(
@@ -2556,7 +2556,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     borderSide: BorderSide(
                                       color: f.minRooms > 0
                                           ? AppColors.primary
-                                          : const Color(0xFFE2ECF1),
+                                          : AppColors.border,
                                     ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
@@ -2564,7 +2564,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     borderSide: BorderSide(
                                       color: f.minRooms > 0
                                           ? AppColors.primary
-                                          : const Color(0xFFE2ECF1),
+                                          : AppColors.border,
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
@@ -2621,7 +2621,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     borderSide: BorderSide(
                                       color: f.maxRooms < 10
                                           ? AppColors.primary
-                                          : const Color(0xFFE2ECF1),
+                                          : AppColors.border,
                                     ),
                                   ),
                                   enabledBorder: OutlineInputBorder(
@@ -2629,7 +2629,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                     borderSide: BorderSide(
                                       color: f.maxRooms < 10
                                           ? AppColors.primary
-                                          : const Color(0xFFE2ECF1),
+                                          : AppColors.border,
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
@@ -2691,7 +2691,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFFE2ECF1)),
+                            border: Border.all(color: AppColors.border),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.04),
@@ -2759,7 +2759,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                                 width: 40,
                                 height: 40,
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFFF2F4F5),
+                                  color: AppColors.slate100,
                                   shape: BoxShape.circle,
                                 ),
                                 child: const RentlyIcon(
@@ -3255,7 +3255,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         ),
                       ],
                       border: const Border(
-                        top: BorderSide(color: Color(0xFFE2ECF1)),
+                        top: BorderSide(color: AppColors.border),
                       ),
                     ),
                     child: Row(
@@ -3965,7 +3965,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: isSelected
-                                      ? const Color(0xFF2C64E3)
+                                      ? AppColors.blue
                                       : Colors.white,
                                   width: isSelected ? 3.0 : 2.0,
                                 ),
@@ -3996,7 +3996,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                               CustomPaint(
                                 size: const Size(10, 6),
                                 painter: _TrianglePainter(
-                                    color: const Color(0xFF2C64E3)),
+                                    color: AppColors.blue),
                               ),
                           ],
                         ),
@@ -4034,7 +4034,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFE2ECF1)),
+                    border: Border.all(color: AppColors.border),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.04),
@@ -4074,7 +4074,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                       offset: const Offset(0, 56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                        side: const BorderSide(color: Color(0xFFE2ECF1)),
+                        side: const BorderSide(color: AppColors.border),
                       ),
                       itemBuilder: (BuildContext context) => [
                         const PopupMenuItem<String>(
@@ -4164,7 +4164,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(26),
-                          border: Border.all(color: const Color(0xFFE2ECF1)),
+                          border: Border.all(color: AppColors.border),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.04),
@@ -4214,7 +4214,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFE2ECF1)),
+                    border: Border.all(color: AppColors.border),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.04),
@@ -5069,13 +5069,13 @@ class _SkeletonDiscoverViewState extends State<_SkeletonDiscoverView>
           animation: _shimmer,
           builder: (context, _) {
             final base = Color.lerp(
-              const Color(0xFFE8EDF2),
-              const Color(0xFFF4F6F9),
+              AppColors.border,
+              AppColors.cloud,
               _shimmer.value,
             )!;
             final highlight = Color.lerp(
-              const Color(0xFFDDE3EB),
-              const Color(0xFFEBEFF4),
+              AppColors.slate200,
+              AppColors.slate100,
               _shimmer.value,
             )!;
             return Column(
@@ -5489,7 +5489,7 @@ class _FilterLocationPill extends StatelessWidget {
           color: isSelected ? AppColors.navy : Colors.white,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: isSelected ? AppColors.navy : const Color(0xFFE2ECF1),
+            color: isSelected ? AppColors.navy : AppColors.border,
             width: 1,
           ),
         ),
@@ -5723,7 +5723,7 @@ class _PriceHistogram extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               height: heights[i].toDouble(),
               decoration: BoxDecoration(
-                color: inRange ? AppColors.primary : const Color(0xFFE2ECF1),
+                color: inRange ? AppColors.primary : AppColors.border,
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
@@ -5755,7 +5755,7 @@ class _PriceInputCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2ECF1)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -5808,7 +5808,7 @@ class _CircleSelectorButton extends StatelessWidget {
           color: isSelected ? AppColors.primary : Colors.white,
           shape: BoxShape.circle,
           border: Border.all(
-            color: isSelected ? AppColors.primary : const Color(0xFFE2ECF1),
+            color: isSelected ? AppColors.primary : AppColors.border,
             width: 1,
           ),
           boxShadow: isSelected
@@ -5856,9 +5856,9 @@ class _PropertyTypeCard extends StatelessWidget {
 
     final Color bgColor = isRequired
         ? AppColors.primary
-        : (isPreferred ? AppColors.navy : const Color(0xFFF7F9FA));
+        : (isPreferred ? AppColors.navy : AppColors.slate50);
     final Color iconBgColor =
-        isActive ? Colors.white24 : const Color(0xFFE2ECF1);
+        isActive ? Colors.white24 : AppColors.border;
     final Color labelColor = isActive ? Colors.white : AppColors.navy;
 
     return GestureDetector(
@@ -5872,7 +5872,7 @@ class _PropertyTypeCard extends StatelessWidget {
           color: bgColor,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: isActive ? bgColor : const Color(0xFFE2ECF1),
+            color: isActive ? bgColor : AppColors.border,
             width: 1.5,
           ),
           boxShadow: isActive
@@ -6089,8 +6089,8 @@ class _PillSelectorState extends State<_PillSelector> {
                   end: Alignment.bottomRight,
                   colors: [
                     Colors.white.withValues(alpha: 0.96),
-                    const Color(0xFFEAF9FB).withValues(alpha: 0.94),
-                    const Color(0xFFF8FBFD).withValues(alpha: 0.98),
+                    AppColors.tealPale.withValues(alpha: 0.94),
+                    AppColors.slate50.withValues(alpha: 0.98),
                   ],
                 ),
                 border: Border.all(
@@ -6278,7 +6278,7 @@ class _SlidingSelectorThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = isDiscoverSelected
         ? const Color(0xFF2F80ED)
-        : const Color(0xFFFF6B7A);
+        : AppColors.coral;
     final glowColor = isDiscoverSelected ? AppColors.superLike : AppColors.coral;
 
     return DecoratedBox(

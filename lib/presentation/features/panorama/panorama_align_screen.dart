@@ -553,11 +553,11 @@ class _Track extends StatelessWidget {
   final void Function(int i, double deltaDeg) onDragEnd;
 
   static const _bandColors = <Color>[
-    Color(0xFF3B82F6),
-    Color(0xFFF59E0B),
-    Color(0xFF10B981),
-    Color(0xFFEF4444),
-    Color(0xFF8B5CF6),
+    AppColors.superLike,
+    AppColors.amber,
+    AppColors.emerald,
+    AppColors.red,
+    AppColors.violet,
     Color(0xFF14B8A6),
   ];
 
@@ -574,7 +574,7 @@ class _Track extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2ECF1)),
+          border: Border.all(color: AppColors.border),
         ),
         child: Stack(
           children: [
@@ -697,7 +697,7 @@ class _BandTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2ECF1)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

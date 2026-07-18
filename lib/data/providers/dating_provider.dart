@@ -3033,15 +3033,38 @@ class DatingProvider extends ChangeNotifier {
     if (property != null &&
         property.ownerUserId.isNotEmpty &&
         property.ownerUserId != _currentOwnerUserId) {
+      // Snapshot the tenant's REAL attributes into the like so they reach the
+      // landlord's candidate deck (and its filters) cross-device. Fail-soft:
+      // when there's no profile in scope, every extra field stays null and the
+      // payload is identical to an old-style like.
+      final tp = _tenantProfile;
       unawaited(
         _propertyLikesRepository.addLike(
           propertyId: propertyId,
           ownerUserId: property.ownerUserId,
           tenantId: _currentAnalyticsUserId,
-          tenantName: _tenantProfile?.name ?? 'מתעניין/ת',
-          tenantPhotoUrl: _tenantProfile?.photoUrls.isNotEmpty == true
-              ? _tenantProfile!.photoUrls.first
-              : '',
+          tenantName: tp?.name ?? 'מתעניין/ת',
+          tenantPhotoUrl:
+              tp?.photoUrls.isNotEmpty == true ? tp!.photoUrls.first : '',
+          moveInSnapshot: tp?.moveInWindow ?? '',
+          budgetMax: tp?.budgetMax,
+          rooms: tp?.desiredRooms,
+          occupation: tp?.occupation,
+          numChildren: tp?.numChildren,
+          hasPets: tp?.hasPets,
+          hasCar: tp?.hasCar,
+          wfh: tp?.wfh,
+          household: tp?.household,
+          lifeStage: tp?.lifeStage,
+          monthlyIncome: tp?.monthlyIncome,
+          age: tp?.age,
+          isOleh: tp?.isOleh,
+          // No explicit tenant "verified" flag exists; derive it from the app's
+          // real trust signal (photo/bio/budget/etc.), the same score shown in
+          // the profile. Only stamped when there's a profile to score.
+          verified: tp == null
+              ? null
+              : GamificationService.computeTrustScore(tp, const []) >= 70,
           at: now,
         ),
       );
@@ -3505,9 +3528,14 @@ class DatingProvider extends ChangeNotifier {
   Future<bool> handleOwnerSwipe(
     int previousIndex,
     int? currentIndex,
-    CardSwiperDirection direction,
-  ) async {
-    final leads = ownerLeads;
+    CardSwiperDirection direction, {
+    List<RentalProperty>? visibleLeads,
+  }) async {
+    // Resolve the swiped index against the EXACT list the deck rendered. When
+    // the candidate filters are active the deck shows a subset of [ownerLeads],
+    // so falling back to the full list here would accept/reject the wrong
+    // property. Defaults to [ownerLeads] for the unfiltered path (identical).
+    final leads = visibleLeads ?? ownerLeads;
     if (previousIndex < 0 || previousIndex >= leads.length) return false;
 
     final property = leads[previousIndex];
@@ -3541,6 +3569,16 @@ class DatingProvider extends ChangeNotifier {
     };
     _propertyByIdCache = byId;
     return byId[propertyId];
+  }
+
+  /// Resolves a listing by id for deep links: returns the in-memory copy when
+  /// the catalog already holds it, otherwise fetches it straight from the
+  /// backend (so shared links to listings not currently loaded still open the
+  /// apartment). Fail-soft — null when the id is unknown/removed.
+  Future<RentalProperty?> fetchPropertyById(String id) async {
+    final local = propertyById(id);
+    if (local != null) return local;
+    return _propertyRepository.fetchProperty(id);
   }
 
   RentalMatch? matchById(String matchId) {

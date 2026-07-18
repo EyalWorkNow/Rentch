@@ -885,7 +885,7 @@ class _DemoBackdrop extends StatelessWidget {
         gradient: RadialGradient(
           center: Alignment.center,
           radius: 1.1,
-          colors: [Color(0xFF1B2430), Color(0xFF0B0F14)],
+          colors: [AppColors.inkSoft, AppColors.ink],
         ),
       ),
       child: const Center(

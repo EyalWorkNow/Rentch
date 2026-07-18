@@ -104,7 +104,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
+        backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -329,7 +329,7 @@ class _NotificationTile extends StatelessWidget {
     final unread = !notification.read;
     final accent = _typeAccent(notification.type);
     return Material(
-      color: unread ? Colors.white : const Color(0xFFFBFCFD),
+      color: unread ? Colors.white : AppColors.slate50,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
@@ -341,7 +341,7 @@ class _NotificationTile extends StatelessWidget {
             border: Border.all(
               color: unread
                   ? accent.withValues(alpha: 0.30)
-                  : const Color(0xFFE8EEF3),
+                  : AppColors.border,
               width: 1.2,
             ),
           ),

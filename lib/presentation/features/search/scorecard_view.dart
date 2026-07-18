@@ -57,7 +57,7 @@ class _ScorecardViewState extends State<ScorecardView> {
     return Container(
       margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7FBFD),
+        color: AppColors.slate50,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.borderLight),
       ),

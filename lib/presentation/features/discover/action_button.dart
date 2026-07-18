@@ -54,7 +54,7 @@ class ActionButtons extends StatelessWidget {
               _ActionButton(
                 icon: Icons.view_in_ar_rounded,
                 tooltip: 'פתח סיור תלת־ממדי',
-                iconColor: const Color(0xFF072946),
+                iconColor: AppColors.navy,
                 backgroundColor: Colors.white,
                 size: 56,
                 iconSize: 26,
@@ -62,7 +62,7 @@ class ActionButtons extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   onVirtualTour();
                 },
-                shadowColor: const Color(0xFF072946),
+                shadowColor: AppColors.navy,
               ),
               const SizedBox(height: 6),
               Text(
@@ -147,7 +147,7 @@ class _ActionButtonState extends State<_ActionButton>
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark3d = widget.iconColor == const Color(0xFF072946);
+    final bool isDark3d = widget.iconColor == AppColors.navy;
     final actualIconColor = isDark3d ? Colors.white : widget.iconColor;
 
     return Tooltip(
@@ -187,7 +187,7 @@ class _ActionButtonState extends State<_ActionButton>
                   decoration: BoxDecoration(
                     // Dark GRAY (not black), with relative transparency so the
                     // heavy blur reads as frosted glass.
-                    color: const Color(0xFF2C2C2E).withValues(alpha: 0.4),
+                    color: AppColors.inkSoft.withValues(alpha: 0.4),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.18),
