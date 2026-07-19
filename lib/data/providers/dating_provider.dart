@@ -1813,6 +1813,10 @@ class DatingProvider extends ChangeNotifier {
           await _availabilityRepo.save(slot.copyWith(
             status: SlotStatus.booked,
             bookedByName: p.who,
+            // Auto-tag the booked viewing to its property so the calendar card
+            // can show which apartment it's for (the slot may have been a
+            // general/any-listing window before it was booked).
+            propertyId: p.propertyId.isNotEmpty ? p.propertyId : null,
           ));
           bookedAny = true;
           final property = propertyById(p.propertyId);

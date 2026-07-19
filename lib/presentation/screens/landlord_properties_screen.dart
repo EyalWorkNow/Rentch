@@ -451,41 +451,22 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
 
         return Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: AppColors.background,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            toolbarHeight: 64,
-            leading: canPop
-                ? IconButton(
+          // Title + "X דירות פעילות" removed — the search/filter/tags rise to
+          // the top. Keep a minimal bar only for the back arrow when pushed.
+          appBar: canPop
+              ? AppBar(
+                  automaticallyImplyLeading: false,
+                  backgroundColor: AppColors.background,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  toolbarHeight: 52,
+                  leading: IconButton(
                     icon: const RentlyIcon(IconsaxPlusLinear.arrow_right,
                         color: AppColors.navy),
                     onPressed: () => Navigator.of(context).pop(),
-                  )
-                : null,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'הדירות שלי',
-                  style: TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
                   ),
-                ),
-                Text(
-                  '${allProperties.length} דירות פעילות',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+                )
+              : null,
           floatingActionButton: Padding(
             padding: const EdgeInsets.only(bottom: _floatingActionBottomInset),
             child: ScaleBounce(

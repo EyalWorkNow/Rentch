@@ -3586,68 +3586,24 @@ class _WelcomePortal extends StatelessWidget {
                 // Account-type Buttons (Tenant / Landlord)
                 Row(
                   children: [
-                    // Tenant Button (App Brand Primary Teal)
+                    // Tenant Button (Vibrant Teal Gradient + Glass Badge + Shine)
                     Expanded(
-                      child: GestureDetector(
+                      child: _InteractiveRoleButton(
+                        label: 'מחפש דירה',
+                        icon: IconsaxPlusLinear.search_normal,
+                        isPrimary: true,
                         onTap: onLogin,
-                        child: Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: _kBrandTeal,
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(IconsaxPlusLinear.search_normal,
-                                  color: Colors.white, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'מחפש דירה',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                     const SizedBox(width: 14),
 
-                    // Landlord Button (Solid Navy)
+                    // Landlord Button (Obsidian Glassmorphism + Luxury Badge)
                     Expanded(
-                      child: GestureDetector(
+                      child: _InteractiveRoleButton(
+                        label: 'בעל דירה',
+                        icon: IconsaxPlusLinear.building,
+                        isPrimary: false,
                         onTap: onLandlordCta,
-                        child: Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.navy,
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(IconsaxPlusLinear.building,
-                                  color: Colors.white, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'בעל דירה',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ],
@@ -3753,3 +3709,220 @@ class _WelcomePortal extends StatelessWidget {
     );
   }
 }
+
+class _InteractiveRoleButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  const _InteractiveRoleButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.isPrimary,
+  });
+
+  @override
+  State<_InteractiveRoleButton> createState() => _InteractiveRoleButtonState();
+}
+
+class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleCtrl;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 140),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) => _scaleCtrl.forward();
+  void _onTapUp(TapUpDetails details) {
+    _scaleCtrl.reverse();
+    widget.onTap();
+  }
+  void _onTapCancel() => _scaleCtrl.reverse();
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget buttonContent = Container(
+      height: 60,
+      decoration: widget.isPrimary
+          ? BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF38F2E2), // Vibrant bright turquoise
+                  _kBrandTeal,       // Brand teal
+                  Color(0xFF0C919A), // Deep teal shade
+                ],
+              ),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kBrandTeal.withValues(alpha: 0.45),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            )
+          : BoxDecoration(
+              color: AppColors.navyDeep.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.26),
+                width: 1.2,
+              ),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.14),
+                  Colors.transparent,
+                  AppColors.navy.withValues(alpha: 0.50),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Subtle radial glow inside primary button
+          if (widget.isPrimary)
+            Positioned(
+              top: -15,
+              right: -10,
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.25),
+                ),
+              ),
+            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Glass medallion for icon
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: widget.isPrimary
+                      ? Colors.white.withValues(alpha: 0.24)
+                      : Colors.white.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: widget.isPrimary
+                        ? Colors.white.withValues(alpha: 0.38)
+                        : Colors.white.withValues(alpha: 0.22),
+                    width: 1.0,
+                  ),
+                  boxShadow: widget.isPrimary
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Icon(
+                    widget.icon,
+                    color: Colors.white,
+                    size: 18.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  shadows: widget.isPrimary
+                      ? [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.18),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final Widget frostedOrSolid = widget.isPrimary
+        ? buttonContent
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(24),
+                sigmaY: PlatformFx.blurSigma(24),
+              ),
+              child: buttonContent,
+            ),
+          );
+
+    final Widget maybeShining = widget.isPrimary
+        ? ShineDecorator(
+            interval: const Duration(seconds: 4),
+            child: frostedOrSolid,
+          )
+        : frostedOrSolid;
+
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      behavior: HitTestBehavior.opaque,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: maybeShining,
+      ),
+    );
+  }
+}
+

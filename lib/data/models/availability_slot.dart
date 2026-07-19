@@ -18,6 +18,7 @@ class AvailabilitySlot {
     this.durationMinutes = 30,
     this.propertyId = '',
     this.note = '',
+    this.tag = '',
     this.status = SlotStatus.open,
     this.bookedByName = '',
     this.bookedByPhone = '',
@@ -32,6 +33,10 @@ class AvailabilitySlot {
   /// Optional listing the slot is for ('' = any / general availability).
   final String propertyId;
   final String note;
+
+  /// Optional short colored label the landlord attaches (e.g. 'דחוף',
+  /// 'בלעדי', 'טלפוני'). '' = untagged. Colors are resolved in the UI.
+  final String tag;
   final SlotStatus status;
   final String bookedByName;
   final String bookedByPhone;
@@ -52,6 +57,7 @@ class AvailabilitySlot {
     int? durationMinutes,
     String? propertyId,
     String? note,
+    String? tag,
     SlotStatus? status,
     String? bookedByName,
     String? bookedByPhone,
@@ -62,6 +68,7 @@ class AvailabilitySlot {
         durationMinutes: durationMinutes ?? this.durationMinutes,
         propertyId: propertyId ?? this.propertyId,
         note: note ?? this.note,
+        tag: tag ?? this.tag,
         status: status ?? this.status,
         bookedByName: bookedByName ?? this.bookedByName,
         bookedByPhone: bookedByPhone ?? this.bookedByPhone,
@@ -75,6 +82,7 @@ class AvailabilitySlot {
         durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 30,
         propertyId: json['propertyId']?.toString() ?? '',
         note: json['note']?.toString() ?? '',
+        tag: json['tag']?.toString() ?? '',
         status: json['status']?.toString() == 'booked'
             ? SlotStatus.booked
             : SlotStatus.open,
@@ -88,6 +96,7 @@ class AvailabilitySlot {
         'durationMinutes': durationMinutes,
         if (propertyId.isNotEmpty) 'propertyId': propertyId,
         if (note.isNotEmpty) 'note': note,
+        if (tag.isNotEmpty) 'tag': tag,
         'status': status == SlotStatus.booked ? 'booked' : 'open',
         if (bookedByName.isNotEmpty) 'bookedByName': bookedByName,
         if (bookedByPhone.isNotEmpty) 'bookedByPhone': bookedByPhone,
