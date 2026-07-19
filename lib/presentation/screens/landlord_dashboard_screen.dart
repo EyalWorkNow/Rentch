@@ -5,7 +5,7 @@ import 'package:dating_app/data/models/availability_slot.dart';
 import 'package:dating_app/data/repositories/availability_repository.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/presentation/screens/assistant_screen.dart';
+import 'package:dating_app/presentation/features/assistant/erik_chat_screen.dart';
 import 'package:dating_app/presentation/screens/notifications_screen.dart';
 import 'package:dating_app/presentation/screens/rent_tracking_screen.dart';
 import 'package:dating_app/presentation/features/tax/tax_helper_screen.dart';
@@ -237,7 +237,7 @@ class _AssistantChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AssistantScreen()),
+        MaterialPageRoute(builder: (_) => const ErikChatScreen()),
       ),
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 13, 8),
