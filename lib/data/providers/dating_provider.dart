@@ -2,9 +2,13 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:dating_app/core/chat/slot_message.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:dating_app/core/security/rate_limiter.dart'
     show RateLimiter, WriteDebouncer;
+import 'package:dating_app/core/services/notification_service.dart';
+import 'package:dating_app/data/models/availability_slot.dart';
+import 'package:dating_app/data/repositories/availability_repository.dart';
 import 'package:dating_app/core/services/cache_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/gamification_service.dart';
@@ -1600,18 +1604,42 @@ class DatingProvider extends ChangeNotifier {
   static const double _leadTimingWeight = 25; // move-in timing match
   static const double _leadTrustWeight = 15; // existing trust-score signal
 
-  /// Honest fit score in [0, 100] for the tenant who liked [property], scored
-  /// against the current tenant profile's REAL fields only. Drives both the
-  /// ranking order and the "התאמה גבוהה" badge — no fabricated trust.
+  /// The representative liker for a property lead — the first real tenant who
+  /// liked it (the candidate deck surfaces one liker per property). Null for a
+  /// demo lead that has no incoming like yet.
+  PropertyLike? _representativeLikerFor(RentalProperty property) {
+    final likes = _incomingLikesByProperty[property.id];
+    return (likes == null || likes.isEmpty) ? null : likes.first;
+  }
+
+  /// Honest fit score in [0, 100] for the tenant who liked [property]. Scored
+  /// against the REAL representative LIKER's snapshotted values (budget, move-in,
+  /// verification) when a like exists; falls back to the current tenant profile
+  /// only for demo leads with no incoming like. Drives both the ranking order
+  /// and the "התאמה גבוהה" badge — no fabricated trust. Fail-soft.
   double leadFitScore(RentalProperty property) {
     final tenant = _tenantProfile;
-    if (tenant == null) return 0;
+    final liker = _representativeLikerFor(property);
+    if (tenant == null && liker == null) return 0;
 
-    final budgetFit = _leadBudgetFit(tenant, property); // [0, 1]
-    final timingFit = _leadTimingFit(tenant, property); // [0, 1] or null
-    // Reuse the app's real trust signal (photo/bio/budget/etc.), normalised.
-    final trustFit =
-        GamificationService.computeTrustScore(tenant, const []) / 100.0;
+    // Budget: the liker's snapshotted max when present, else the profile's.
+    final budget = liker?.budgetMax ?? tenant?.budgetMax;
+    final budgetFit = _leadBudgetFit(budget, property); // [0, 1]
+
+    // Timing: the liker's move-in snapshot when present, else the profile's.
+    final window = (liker?.moveInSnapshot.trim().isNotEmpty ?? false)
+        ? liker!.moveInSnapshot
+        : (tenant?.moveInWindow ?? '');
+    final timingFit = _leadTimingFit(window, property); // [0, 1] or null
+
+    // Trust: for a real liker the one cross-device signal we carry is their
+    // verification flag; demo leads reuse the profile's computed trust score.
+    final double trustFit;
+    if (liker != null) {
+      trustFit = (liker.verified ?? false) ? 1.0 : 0.5;
+    } else {
+      trustFit = GamificationService.computeTrustScore(tenant!, const []) / 100.0;
+    }
 
     var score = budgetFit * _leadBudgetWeight + trustFit * _leadTrustWeight;
     // Only let timing move the score when we actually have a property entry
@@ -1629,13 +1657,20 @@ class DatingProvider extends ChangeNotifier {
   /// out. Budget is checked first (the strongest signal), then timing.
   String? leadFitReason(RentalProperty property) {
     final tenant = _tenantProfile;
-    if (tenant == null) return null;
-    if (_hasKnownPrice(property) &&
-        tenant.budgetMax >= property.price &&
-        _leadBudgetFit(tenant, property) >= 0.8) {
+    final liker = _representativeLikerFor(property);
+    if (tenant == null && liker == null) return null;
+
+    final budget = liker?.budgetMax ?? tenant?.budgetMax;
+    if (budget != null &&
+        _hasKnownPrice(property) &&
+        budget >= property.price &&
+        _leadBudgetFit(budget, property) >= 0.8) {
       return 'התקציב מתאים למחיר';
     }
-    final timingFit = _leadTimingFit(tenant, property);
+    final window = (liker?.moveInSnapshot.trim().isNotEmpty ?? false)
+        ? liker!.moveInSnapshot
+        : (tenant?.moveInWindow ?? '');
+    final timingFit = _leadTimingFit(window, property);
     if (timingFit != null && timingFit >= 0.8) {
       return 'כניסה בזמן שמתאים לך';
     }
@@ -1646,9 +1681,11 @@ class DatingProvider extends ChangeNotifier {
   // close to it scores high; a budget far BELOW the rent scores low (they
   // likely can't afford it). A comfortable margin above is fine, not penalised
   // hard. Unknown price → neutral 0.5 (we can't claim a fit we can't measure).
-  double _leadBudgetFit(TenantProfile tenant, RentalProperty property) {
-    if (!_hasKnownPrice(property) || property.price <= 0) return 0.5;
-    final ratio = tenant.budgetMax / property.price;
+  double _leadBudgetFit(int? budget, RentalProperty property) {
+    if (budget == null ||
+        !_hasKnownPrice(property) ||
+        property.price <= 0) return 0.5;
+    final ratio = budget / property.price;
     if (ratio >= 1.0) {
       // Budget covers rent. Closest-to-rent is the strongest signal; a very
       // large budget gap is fine but no longer a tighter "match", so it eases
@@ -1664,10 +1701,10 @@ class DatingProvider extends ChangeNotifier {
   // to compare against (so we never invent a timing match). Compares the
   // tenant's declared move-in window against the property's available-from
   // date: the sooner the tenant can move relative to availability, the better.
-  double? _leadTimingFit(TenantProfile tenant, RentalProperty property) {
+  double? _leadTimingFit(String moveInWindow, RentalProperty property) {
     final entryDate = property.entryDateValue;
     if (entryDate == null) return null;
-    final window = tenant.moveInWindow.trim();
+    final window = moveInWindow.trim();
     if (window.isEmpty) return null;
 
     final tenantReadyDays = _tenantMoveInDays(window);
@@ -1691,6 +1728,111 @@ class DatingProvider extends ChangeNotifier {
     if (window.contains('1-3') || window.contains('60')) return 90;
     if (window.contains('3-6')) return 180;
     return null;
+  }
+
+  // ── Viewing confirmations → bookings (global, reactive, idempotent) ─────────
+  // LATE so the repo (whose ctor eagerly calls SharedPreferences.getInstance)
+  // is built only on first use — never at provider construction — keeping
+  // pure-provider unit tests free of a SharedPreferences plugin dependency.
+  late final AvailabilityRepository _availabilityRepo = AvailabilityRepository();
+
+  /// Confirm slotIds already turned into a booking + reminder this session, so
+  /// repeated scans can't double-schedule (repo-level booking is idempotent too).
+  final Set<String> _processedConfirmSlotIds = {};
+
+  /// Re-entrancy guard so two overlapping triggers (per-chat + merged screen)
+  /// can't run the async scan concurrently.
+  bool _processingConfirms = false;
+
+  /// Landlord-side: scan EVERY match thread for tenant `[[SLOT_CONFIRM]]`
+  /// messages and, for each not-yet-processed confirm, book the matching OPEN
+  /// slot and schedule the landlord's 1h-before reminder. Making this global +
+  /// reactive (invoked when the landlord opens the merged לקוחות screen as well
+  /// as any individual chat) means a confirmation is booked even if the landlord
+  /// never opens that specific thread (SCHED-4).
+  ///
+  /// Idempotent: a per-session guard set, a "only claim a slot that's still
+  /// open" check and fixed reminder ids mean running it repeatedly never
+  /// double-books or double-schedules. The reminder is scheduled ONLY inside the
+  /// open-slot booking block, so no reminder fires when nothing was actually
+  /// booked (slot deleted / already taken) (SCHED-2). Fail-soft — never throws
+  /// into the UI. Notifies listeners when a booking is made so dependent widgets
+  /// (e.g. the dashboard "next viewing" card) can refresh (SCHED-3).
+  Future<void> processViewingConfirms() async {
+    if (!isLandlord) return;
+    if (_processingConfirms) return;
+    _processingConfirms = true;
+    try {
+      final pending =
+          <({SlotConfirm confirm, String who, String propertyId})>[];
+      for (final match in matches) {
+        for (final m in match.messages) {
+          final parsed = SlotMessageCodec.parse(m.text);
+          if (parsed is SlotConfirmMessage &&
+              !_processedConfirmSlotIds.contains(parsed.confirm.slotId)) {
+            final who = m.sender.trim().isEmpty ? 'השוכר/ת' : m.sender.trim();
+            pending.add((
+              confirm: parsed.confirm,
+              who: who,
+              propertyId: match.propertyId,
+            ));
+          }
+        }
+      }
+      if (pending.isEmpty) return;
+
+      // Mark processed up front so a concurrent trigger can't re-enter the
+      // same ids while we await the repo.
+      for (final p in pending) {
+        _processedConfirmSlotIds.add(p.confirm.slotId);
+      }
+
+      final all = await _availabilityRepo.loadAll();
+      var bookedAny = false;
+      for (final p in pending) {
+        final c = p.confirm;
+        AvailabilitySlot? slot;
+        for (final s in all) {
+          if (s.id == c.slotId) {
+            slot = s;
+            break;
+          }
+        }
+        // Double-book guard: only claim a slot that's still open — and only
+        // then schedule the reminder, so a deleted/already-booked slot never
+        // fires a phantom reminder (SCHED-2).
+        //
+        // KNOWN LOCAL-MVP LIMITATION (SCHED-1): a second tenant who confirms a
+        // slot this landlord already booked for a first tenant still sees
+        // "מאושר" on their own device. Resolving that race needs server-side
+        // slot state; locally we simply never re-book here.
+        if (slot != null && slot.status == SlotStatus.open) {
+          await _availabilityRepo.save(slot.copyWith(
+            status: SlotStatus.booked,
+            bookedByName: p.who,
+          ));
+          bookedAny = true;
+          final property = propertyById(p.propertyId);
+          final address = (property?.address.trim().isNotEmpty ?? false)
+              ? property!.address.trim()
+              : 'הנכס';
+          // Fixed id per slot → rescheduling replaces rather than duplicates.
+          await NotificationService.instance.scheduleReminder(
+            id: NotificationService.instance.viewingReminderId(c.slotId),
+            title: 'צפייה בדירה בעוד שעה',
+            body: 'צפייה עם ${p.who} ב$address בשעה '
+                '${c.start.hour.toString().padLeft(2, '0')}:'
+                '${c.start.minute.toString().padLeft(2, '0')}',
+            when: c.start.subtract(const Duration(hours: 1)),
+          );
+        }
+      }
+      if (bookedAny) notifyListeners();
+    } catch (e) {
+      if (kDebugMode) debugPrint('processViewingConfirms: $e');
+    } finally {
+      _processingConfirms = false;
+    }
   }
 
   /// Total number of tenant likes across the current landlord's properties —

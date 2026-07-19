@@ -201,14 +201,6 @@ class _MessageScreenState extends State<MessageScreen> {
   // ── Viewing scheduling ────────────────────────────────────────────────────
   final AvailabilityRepository _availabilityRepo = AvailabilityRepository();
 
-  /// Reserved notification id-space so viewing reminders never collide with the
-  /// lease (1M), saved-search (2M) or broker-viewing (3M) ranges.
-  static const int _viewingReminderBase = 4000000;
-
-  /// Confirm slotIds already turned into a booking + reminder this session, so
-  /// rebuilds can't double-schedule (repo-level booking is also idempotent).
-  final Set<String> _processedConfirmSlotIds = {};
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -618,7 +610,7 @@ class _MessageScreenState extends State<MessageScreen> {
     await _sendStructured(
         provider, senderName, SlotMessageCodec.encodeConfirm(confirm));
     await NotificationService.instance.scheduleReminder(
-      id: _viewingReminderBase + _slotKey(option.slotId),
+      id: NotificationService.instance.viewingReminderId(option.slotId),
       title: 'צפייה בדירה בעוד שעה',
       body: 'צפייה ב${property.address} בשעה ${_formatTime(option.start)}',
       when: option.start.subtract(const Duration(hours: 1)),
@@ -626,70 +618,12 @@ class _MessageScreenState extends State<MessageScreen> {
     if (mounted) _snack('הצפייה אושרה — נשלחה הודעה ונקבעה תזכורת');
   }
 
-  /// Landlord side: for every confirm in the thread, book the matching slot and
-  /// schedule the landlord's own reminder. Idempotent — a per-session guard set
-  /// plus fixed reminder ids and a "keep existing booking" check mean processing
-  /// the same confirm twice never double-books or double-schedules.
-  Future<void> _syncViewingBookings(
-    List<ChatMessage> messages,
-    DatingProvider provider,
-    RentalProperty property,
-  ) async {
-    if (!provider.isLandlord) return;
-
-    final pending = <ChatMessage>[];
-    for (final m in messages) {
-      final parsed = SlotMessageCodec.parse(m.text);
-      if (parsed is SlotConfirmMessage &&
-          !_processedConfirmSlotIds.contains(parsed.confirm.slotId)) {
-        pending.add(m);
-      }
-    }
-    if (pending.isEmpty) return;
-
-    // Mark as processed up front so concurrent rebuilds don't re-enter.
-    for (final m in pending) {
-      final c = (SlotMessageCodec.parse(m.text) as SlotConfirmMessage).confirm;
-      _processedConfirmSlotIds.add(c.slotId);
-    }
-
-    final all = await _availabilityRepo.loadAll();
-    for (final m in pending) {
-      final c = (SlotMessageCodec.parse(m.text) as SlotConfirmMessage).confirm;
-      final who = m.sender.trim().isEmpty ? 'השוכר/ת' : m.sender.trim();
-
-      AvailabilitySlot? slot;
-      for (final s in all) {
-        if (s.id == c.slotId) {
-          slot = s;
-          break;
-        }
-      }
-      // Double-book guard: only claim a slot that's still open.
-      if (slot != null && slot.status == SlotStatus.open) {
-        await _availabilityRepo.save(slot.copyWith(
-          status: SlotStatus.booked,
-          bookedByName: who,
-        ));
-      }
-      // Fixed id per slot → rescheduling replaces rather than duplicates.
-      await NotificationService.instance.scheduleReminder(
-        id: _viewingReminderBase + _slotKey(c.slotId),
-        title: 'צפייה בדירה בעוד שעה',
-        body: 'צפייה עם $who ב${property.address} בשעה ${_formatTime(c.start)}',
-        when: c.start.subtract(const Duration(hours: 1)),
-      );
-    }
-  }
-
-  /// Small stable non-negative key from a slotId for notification ids.
-  int _slotKey(String s) {
-    var h = 0;
-    for (final u in s.codeUnits) {
-      h = (h * 31 + u) & 0x3FFFFF;
-    }
-    return h;
-  }
+  // Landlord-side confirm→booking processing now lives in
+  // [DatingProvider.processViewingConfirms] so it is GLOBAL (scans every match
+  // thread) and reactive — a tenant's confirmation books the slot + schedules
+  // the landlord reminder + surfaces on the dashboard even if the landlord never
+  // opens this specific chat (SCHED-4). It is idempotent and fail-soft, so the
+  // per-thread trigger below and the merged-screen trigger both call it safely.
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
@@ -726,10 +660,10 @@ class _MessageScreenState extends State<MessageScreen> {
             : _ChatThemeSpec.standard;
 
         // Landlord: turn any tenant confirmations into calendar bookings +
-        // reminders. Idempotent, so running it each rebuild is safe.
+        // reminders. Global + idempotent, so running it each rebuild is safe.
         if (provider.isLandlord) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _syncViewingBookings(messages, provider, property);
+            if (mounted) provider.processViewingConfirms();
           });
         }
 

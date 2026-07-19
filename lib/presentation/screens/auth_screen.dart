@@ -125,6 +125,17 @@ class _AuthScreenState extends State<AuthScreen>
     });
   }
 
+  // Wide/tablet register tab account-type selector. Same landlord/broker dialog
+  // as the mobile CTA, but the wide layout switches tabs instead of views, so it
+  // sets _pendingRole and moves to the register tab. Picking nothing (dismiss)
+  // leaves the role untouched.
+  Future<void> _onWidePickAccountType() async {
+    final picked = await _promptLandlordOrAgent(context);
+    if (!mounted || picked == null) return;
+    setState(() => _pendingRole = picked);
+    _tabController.animateTo(1);
+  }
+
   Future<void> _onGuestEnter() async {
     final role = await showDialog<String>(
       context: context,
@@ -289,6 +300,8 @@ class _AuthScreenState extends State<AuthScreen>
           onLogin: _onEnter,
           onGuestLogin: _onGuestEnter,
           onDone: _onEnter,
+          registerRole: _pendingRole ?? 'tenant',
+          onPickAccountType: _onWidePickAccountType,
         ),
       );
     }
@@ -310,8 +323,13 @@ class _AuthScreenState extends State<AuthScreen>
       case AuthView.welcome:
         return _WelcomePortal(
           key: const ValueKey('welcome_portal'),
-          onLogin: () => setState(() => _currentView = AuthView.login),
-          onRegister: () => setState(() => _currentView = AuthView.register),
+          // Taking the tenant path ("מחפש דירה") must clear any landlord/broker
+          // role left over from a prior "בעל דירה" tap, otherwise the stale
+          // _pendingRole would register/log this user in as a landlord.
+          onLogin: () => setState(() {
+            _pendingRole = null;
+            _currentView = AuthView.login;
+          }),
           onGoogleLogin: _loginWithGoogleForWelcome,
           onAppleLogin: _loginWithAppleForWelcome,
           onGuestLogin: _onGuestEnter,
@@ -397,12 +415,20 @@ class _WideLayout extends StatelessWidget {
     required this.onLogin,
     required this.onGuestLogin,
     required this.onDone,
+    required this.registerRole,
+    required this.onPickAccountType,
   });
 
   final TabController tabController;
   final VoidCallback onLogin;
   final VoidCallback onGuestLogin;
   final VoidCallback onDone;
+
+  /// Role for the register tab: 'tenant' (default), 'landlord' or 'broker'.
+  final String registerRole;
+
+  /// Opens the landlord/broker account-type dialog for the register tab.
+  final VoidCallback onPickAccountType;
 
   @override
   Widget build(BuildContext context) {
@@ -451,11 +477,27 @@ class _WideLayout extends StatelessWidget {
                                       tabController.animateTo(1),
                                   onBack: () {},
                               ),
-                              _RegisterFlow(
-                                  onDone: onDone,
-                                  onSwitchToLogin: () =>
-                                      tabController.animateTo(0),
-                                  onBack: () {},
+                              Column(
+                                children: [
+                                  _WideAccountTypeSelector(
+                                    role: registerRole,
+                                    onPick: onPickAccountType,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Expanded(
+                                    child: _RegisterFlow(
+                                      // Keyed by role so re-picking the account
+                                      // type rebuilds the flow with the new role
+                                      // (the flow captures initialRole once).
+                                      key: ValueKey('wide_register_$registerRole'),
+                                      initialRole: registerRole,
+                                      onDone: onDone,
+                                      onSwitchToLogin: () =>
+                                          tabController.animateTo(0),
+                                      onBack: () {},
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -468,6 +510,84 @@ class _WideLayout extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Wide Account-Type Selector ───────────────────────────────────────────────
+
+/// Sits above the register form in the wide/tablet layout. Shows the currently
+/// chosen account type and opens the landlord/broker dialog so the wide flow can
+/// register a landlord or broker (mirrors the mobile "אני בעל דירה" CTA).
+class _WideAccountTypeSelector extends StatelessWidget {
+  const _WideAccountTypeSelector({required this.role, required this.onPick});
+
+  final String role;
+  final VoidCallback onPick;
+
+  static const _labels = {
+    'tenant': 'מחפש/ת דירה',
+    'landlord': 'בעל/ת דירה',
+    'broker': 'מתווך/ת נדל״ן',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final isTenant = role == 'tenant';
+    final label = _labels[role] ?? _labels['tenant']!;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onPick,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _kInputFill,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _kInputBorder),
+        ),
+        child: Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _kBrandTeal.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+                isTenant
+                    ? IconsaxPlusLinear.profile_circle
+                    : IconsaxPlusLinear.home,
+                color: _kBrandTeal,
+                size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('סוג חשבון',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
+                Text(label,
+                    style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+          Text(isTenant ? 'בעל דירה / מתווך' : 'שינוי',
+              style: const TextStyle(
+                  color: _kBrandTeal,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_left_rounded,
+              color: _kBrandTeal, size: 20),
+        ]),
       ),
     );
   }
@@ -1639,6 +1759,7 @@ class _LoginTabState extends State<_LoginTab> {
 
 class _RegisterFlow extends StatefulWidget {
   const _RegisterFlow({
+    super.key,
     required this.onDone,
     required this.onSwitchToLogin,
     required this.onBack,
@@ -3349,7 +3470,6 @@ class _EulaSection extends StatelessWidget {
 
 class _WelcomePortal extends StatelessWidget {
   final VoidCallback onLogin;
-  final VoidCallback onRegister;
   final VoidCallback onGoogleLogin;
   final VoidCallback onAppleLogin;
   final VoidCallback onGuestLogin;
@@ -3358,7 +3478,6 @@ class _WelcomePortal extends StatelessWidget {
   const _WelcomePortal({
     super.key,
     required this.onLogin,
-    required this.onRegister,
     required this.onGoogleLogin,
     required this.onAppleLogin,
     required this.onGuestLogin,

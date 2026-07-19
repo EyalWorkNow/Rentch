@@ -52,6 +52,23 @@ class NotificationService {
   /// below this offset.
   static const int leaseIdBase = 1000000;
 
+  /// Reserved id-space for viewing (apartment-tour) reminders. A DELIBERATELY
+  /// SMALL 19-bit mask (see [viewingReminderId]) caps the span at 512k so the
+  /// band 4_000_000..4_524_287 stays disjoint from the lease band (1M + key*2,
+  /// up to ~9.4M with a 22-bit key) and the saved-search band (2M + key) — a
+  /// wider mask here would let viewing ids collide with those (SCHED-5).
+  static const int viewingReminderBase = 4000000;
+
+  /// Stable, non-negative notification id for a viewing reminder keyed by
+  /// [slotId]. Masked to 19 bits so it never leaves the reserved viewing band.
+  int viewingReminderId(String slotId) {
+    var h = 0;
+    for (final unit in slotId.codeUnits) {
+      h = (h * 31 + unit) & 0x7FFFF; // ≤ 524_287 → band stays 4.0M..4_524_287
+    }
+    return viewingReminderBase + h;
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
 
   /// Initialise the plugin + timezone database. Safe to call more than once.

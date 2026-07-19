@@ -1640,11 +1640,17 @@ class _CalendarCard extends StatefulWidget {
   State<_CalendarCard> createState() => _CalendarCardState();
 }
 
-class _CalendarCardState extends State<_CalendarCard> {
+class _CalendarCardState extends State<_CalendarCard>
+    with WidgetsBindingObserver {
   final AvailabilityRepository _repo = AvailabilityRepository();
 
   AvailabilitySlot? _nextBooked;
   bool _loading = true;
+
+  /// The initial didChangeDependencies fires only to register the provider
+  /// dependency; later fires mean the provider notified (e.g. a new viewing was
+  /// booked) → reload.
+  bool _dependenciesReady = false;
 
   static const _daysHeb = [
     'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'
@@ -1653,7 +1659,34 @@ class _CalendarCardState extends State<_CalendarCard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh "next viewing" whenever the watched DatingProvider notifies —
+    // e.g. right after processViewingConfirms() books a slot — so the card is
+    // never stale (SCHED-3). The first call just registers the dependency.
+    if (_dependenciesReady) {
+      _load();
+    } else {
+      _dependenciesReady = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Returning to the app can surface viewings booked while the landlord was
+    // elsewhere; reload so the next-viewing line stays current (SCHED-3).
+    if (state == AppLifecycleState.resumed) _load();
   }
 
   Future<void> _load() async {
@@ -1687,6 +1720,10 @@ class _CalendarCardState extends State<_CalendarCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Subscribe to the provider so didChangeDependencies re-fires (and we
+    // reload) whenever a viewing is booked via processViewingConfirms (SCHED-3).
+    context.watch<DatingProvider>();
+
     final booked = _nextBooked;
     final hasBooking = booked != null;
 

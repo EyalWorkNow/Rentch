@@ -27,6 +27,18 @@ class LeadsInboxScreen extends StatefulWidget {
 class _LeadsInboxScreenState extends State<LeadsInboxScreen> {
   late int _selected = widget.initialSegment.clamp(0, 1);
 
+  @override
+  void initState() {
+    super.initState();
+    // SCHED-4: process viewing confirmations globally the moment the landlord
+    // opens the merged לקוחות screen — so a tenant's confirm becomes a booking +
+    // reminder + dashboard entry even if the landlord never opens that specific
+    // thread. Idempotent + fail-soft (guarded inside the provider).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<DatingProvider>().processViewingConfirms();
+    });
+  }
+
   void _select(int index) {
     if (index == _selected) {
       HapticFeedback.selectionClick();
@@ -63,9 +75,14 @@ class _LeadsInboxScreenState extends State<LeadsInboxScreen> {
           Expanded(
             child: IndexedStack(
               index: _selected,
-              children: const [
-                ExploreScreen(embedded: true),
-                MatchesScreen(embedded: true),
+              children: [
+                ExploreScreen(
+                  embedded: true,
+                  // NAV-B: the candidates empty-state "עבור לשיחות" flips to the
+                  // הודעות segment instead of pushing a chrome-less screen.
+                  onGoToMessages: () => _select(1),
+                ),
+                const MatchesScreen(embedded: true),
               ],
             ),
           ),
@@ -117,29 +134,16 @@ class _SegmentToggleState extends State<_SegmentToggle> {
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.96),
-                  AppColors.tealPale.withValues(alpha: 0.94),
-                  AppColors.slate50.withValues(alpha: 0.98),
-                ],
-              ),
+              color: AppColors.slate100.withValues(alpha: 0.85),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.78),
-                width: 1.4,
+                color: AppColors.slate200.withValues(alpha: 0.8),
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.navy.withValues(alpha: 0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 12),
-                ),
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.14),
-                  blurRadius: 18,
-                  offset: const Offset(0, 5),
+                  color: AppColors.navy.withValues(alpha: 0.05),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -309,39 +313,36 @@ class _CountBadge extends StatelessWidget {
   }
 }
 
-/// The sliding gradient thumb behind the selected segment.
 class _Thumb extends StatelessWidget {
   const _Thumb();
 
   @override
   Widget build(BuildContext context) {
+    final isBroker = AppColors.primary == const Color(0xFF000000);
+    final gradientColors = isBroker
+        ? [const Color(0xFF3C3C3C), const Color(0xFF000000)]
+        : [
+            AppColors.primaryLight,
+            AppColors.primary,
+          ];
+
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(23),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF14D3DC),
-            AppColors.primary,
-            AppColors.coral,
-          ],
-          stops: const [0, 0.52, 1],
+          colors: gradientColors,
         ),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.30),
+          color: Colors.white.withValues(alpha: 0.35),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 13,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: AppColors.coral.withValues(alpha: 0.18),
-            blurRadius: 20,
-            offset: const Offset(0, 7),
+            color: AppColors.primary.withValues(alpha: 0.24),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

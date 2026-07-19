@@ -166,6 +166,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
           backgroundColor:
               widget.embedded ? Colors.transparent : AppColors.slate100,
           body: SafeArea(
+            // When embedded in the merged לקוחות screen the host already applies
+            // the top inset above the segment toggle — re-applying it here would
+            // double the status-bar gap (NAV-A).
+            top: !widget.embedded,
             bottom: false,
             child: provider.isLoading
                 ? Center(
@@ -352,21 +356,8 @@ class _MatchesToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Column(
         children: [
           Container(
@@ -377,9 +368,9 @@ class _MatchesToolbar extends StatelessWidget {
               border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: AppColors.navy.withValues(alpha: 0.05),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -447,7 +438,7 @@ class _MatchesToolbar extends StatelessWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       color: showFilters
-                          ? AppColors.navy
+                          ? AppColors.primary
                           : AppColors.slate100,
                       shape: BoxShape.circle,
                     ),
@@ -546,7 +537,7 @@ class _FilterPill extends StatelessWidget {
     return FilterChipAnimated(
       isSelected: isSelected,
       onTap: onTap,
-      activeColor: AppColors.navy,
+      activeColor: AppColors.primary,
       inactiveColor: Colors.white,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

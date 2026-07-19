@@ -4873,7 +4873,6 @@ class _NoMorePropertiesState extends StatelessWidget {
     // from "you swiped through everything" — the copy should match the situation.
     final city = provider.filters.city.trim();
     final hasActiveSearch = city.isNotEmpty ||
-        provider.filters.minBudget != null ||
         provider.filters.maxBudget != 0 ||
         provider.filters.minRooms > 1;
     final title = hasActiveSearch

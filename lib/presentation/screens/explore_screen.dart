@@ -19,12 +19,18 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key, this.embedded = false});
+  const ExploreScreen({super.key, this.embedded = false, this.onGoToMessages});
 
   /// When true, the screen renders as a self-contained body inside a merged
   /// host (no AppBar, transparent background) so it can sit under a shared
   /// toggle. Everything else (deck, empty state, FABs) is unchanged.
   final bool embedded;
+
+  /// When non-null, the "עבור לשיחות" empty-state button switches the merged
+  /// host to its הודעות segment instead of pushing a chrome-less MatchesScreen
+  /// (which has no back button and strands the user). Null → the standalone
+  /// fallback push (NAV-B).
+  final VoidCallback? onGoToMessages;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -231,6 +237,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ? Center(
                   child: CircularProgressIndicator(color: AppColors.primary))
               : SafeArea(
+                  // When embedded in the merged לקוחות screen the host already
+                  // applies the top inset above the segment toggle — re-applying
+                  // it here would double the status-bar gap (NAV-A).
+                  top: !widget.embedded,
                   bottom: false,
                   child: Column(
                     children: [
@@ -243,7 +253,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                       Expanded(
                         child: allLeads.isEmpty
-                            ? const _EmptyOwnerQueue()
+                            ? _EmptyOwnerQueue(
+                                onGoToMessages: widget.onGoToMessages)
                             : leads.isEmpty
                                 ? _NoMatchingCandidates(
                                     onClear: () =>
@@ -270,8 +281,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                         up: true,
                                       ),
                                       onSwipe: (prev, current, dir) {
-                                        if (current != null && mounted) {
-                                          setState(() => _currentIndex = current);
+                                        // The deck's ValueKey is derived from the
+                                        // visible ids, so accept/reject shrinks the
+                                        // list and the CardSwiper fully resets to
+                                        // its internal index 0 (top card). Mirror
+                                        // that here — using [current] would leave
+                                        // _currentIndex stale and point the counter
+                                        // + ⓘ button at the wrong candidate.
+                                        if (mounted) {
+                                          setState(() => _currentIndex = 0);
                                         }
                                         return provider.handleOwnerSwipe(
                                           prev,
@@ -1237,7 +1255,11 @@ class _ActionButtonState extends State<_ActionButton>
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyOwnerQueue extends StatelessWidget {
-  const _EmptyOwnerQueue();
+  const _EmptyOwnerQueue({this.onGoToMessages});
+
+  /// When set, "עבור לשיחות" switches the merged host to its הודעות segment
+  /// instead of pushing a back-button-less MatchesScreen.
+  final VoidCallback? onGoToMessages;
 
   @override
   Widget build(BuildContext context) {
@@ -1307,11 +1329,20 @@ class _EmptyOwnerQueue extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        settings: const RouteSettings(name: 'MatchesScreen'),
-                        builder: (_) => const MatchesScreen()),
-                  ),
+                  onPressed: () {
+                    // Prefer switching the merged host's segment (keeps chrome +
+                    // back affordance); fall back to the standalone push.
+                    if (onGoToMessages != null) {
+                      onGoToMessages!();
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                            settings:
+                                const RouteSettings(name: 'MatchesScreen'),
+                            builder: (_) => const MatchesScreen()),
+                      );
+                    }
+                  },
                   icon: const RentlyIcon(IconsaxPlusLinear.message, size: 17),
                   label: const Text('עבור לשיחות'),
                   style: OutlinedButton.styleFrom(
