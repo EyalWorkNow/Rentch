@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/presentation/features/assistant/erik_design.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/assistant_screen.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -18,16 +18,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// "אריק" — the landlord's personal assistant, as a full CHAT surface (on par
-/// with the tenant assistant אתי): a scrollable conversation with streaming
-/// replies, a typing indicator, quick-reply chips, an inline listing-draft
-/// preview, and a one-tap voice mode (the premium orb) — all in Erik's calm,
-/// dark, high-legibility identity built for older users.
-///
-/// The heavy lifting (Gemini chat, draft building, TTS) is the SAME shared
-/// engine the voice orb uses ([AssistantService], [buildPropertyFromErikDraft]);
-/// this screen is the text-first surface over it. The voice orb
-/// ([AssistantScreen]) is reachable as a mode and shares the same transcript.
+/// "אריק" — the landlord's personal assistant, as a full CHAT surface designed
+/// to look EXACTLY like the tenant assistant אתי: the same light `cloud`
+/// canvas, white/teal message bubbles (18/4-tail radius), typing indicator,
+/// staggered quick-reply chips, and floating rounded input bar. The heavy
+/// lifting is the SAME shared engine the voice orb uses ([AssistantService],
+/// [buildPropertyFromErikDraft]); the voice orb ([AssistantScreen]) is a mode
+/// reachable from here and shares the same transcript.
 class ErikChatScreen extends StatefulWidget {
   const ErikChatScreen({super.key});
 
@@ -35,14 +32,12 @@ class ErikChatScreen extends StatefulWidget {
   State<ErikChatScreen> createState() => _ErikChatScreenState();
 }
 
-class _ErikChatScreenState extends State<ErikChatScreen>
-    with TickerProviderStateMixin {
+class _ErikChatScreenState extends State<ErikChatScreen> {
   final _service = AssistantService();
   final _picker = ImagePicker();
   final _storage = StorageService();
   final _input = TextEditingController();
   final _scroll = ScrollController();
-  final _inputFocus = FocusNode();
 
   final List<_ErikMsg> _messages = [];
   final List<String> _photoUrls = [];
@@ -66,12 +61,14 @@ class _ErikChatScreenState extends State<ErikChatScreen>
 
   String get _storeKey => 'erik_transcript_$_uid';
 
+  static const _botName = 'אריק';
+
   static const _greeting =
       'שלום, נעים מאוד. קוראים לי אריק ואני כאן כדי לעזור לך.\n'
       'אפשר לספר לי על דירה שתרצה להשכיר ואבנה לך מודעה, לעזור לנסח תיאור, '
       'לתמחר, או פשוט לענות על שאלות. מה שנוח לך — לכתוב או לדבר.';
 
-  // Concrete example prompts, shown on the welcome screen (like אתי's starters).
+  // Concrete example prompts, shown as chips on the welcome message (like אתי).
   static const _starters = [
     'אני רוצה לפרסם דירה חדשה',
     'עזור לי לנסח תיאור לדירה',
@@ -89,9 +86,9 @@ class _ErikChatScreenState extends State<ErikChatScreen>
   @override
   void dispose() {
     _streamTimer?.cancel();
+    _service.dispose(); // owns AudioPlayer/recorder/TTS/HttpClient — don't leak
     _input.dispose();
     _scroll.dispose();
-    _inputFocus.dispose();
     super.dispose();
   }
 
@@ -115,7 +112,11 @@ class _ErikChatScreenState extends State<ErikChatScreen>
       }
     } catch (_) {}
     if (_messages.isEmpty) {
-      _messages.add(_ErikMsg(role: 'assistant', text: _greeting, isWelcome: true));
+      _messages.add(_ErikMsg(
+          role: 'assistant',
+          text: _greeting,
+          isWelcome: true,
+          chips: _starters));
     }
     if (mounted) setState(() {});
     _jumpToEnd();
@@ -125,7 +126,9 @@ class _ErikChatScreenState extends State<ErikChatScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final turns = _messages
-          .where((m) => m.text.trim().isNotEmpty)
+          // Never persist the welcome turn: on reload it would lose its starter
+          // chips AND get replayed to the backend as wasted history.
+          .where((m) => m.text.trim().isNotEmpty && !m.isWelcome)
           .map((m) => AssistantTurn(
                 role: m.role,
                 text: m.text,
@@ -142,7 +145,11 @@ class _ErikChatScreenState extends State<ErikChatScreen>
     setState(() {
       _messages
         ..clear()
-        ..add(_ErikMsg(role: 'assistant', text: _greeting, isWelcome: true));
+        ..add(_ErikMsg(
+            role: 'assistant',
+            text: _greeting,
+            isWelcome: true,
+            chips: _starters));
       _draft = null;
       _photoUrls.clear();
       _busy = false;
@@ -190,7 +197,7 @@ class _ErikChatScreenState extends State<ErikChatScreen>
       final msg = _ErikMsg(
         role: 'assistant',
         text: reply.reply,
-        suggestions: reply.suggestions,
+        chips: reply.suggestions,
         listings: reply.listings,
         draft: reply.propertyDraft,
       );
@@ -223,28 +230,39 @@ class _ErikChatScreenState extends State<ErikChatScreen>
     if (stream) _startStreaming(msg);
   }
 
-  // Word-by-word reveal (ported from אתי) — cheap, big perceived-speed win.
+  // A brief chunked reveal — enough to feel alive, but CAPPED to ~0.4s total
+  // (not 38ms/word, which added ~1.5s of fake delay on a long reply). Short
+  // replies appear at once. Scrolls once at the end, not per tick (no jank).
   void _startStreaming(_ErikMsg msg) {
     _streamTimer?.cancel();
     final total = msg.words.length;
-    if (total <= 1) {
+    if (total <= 4) {
       msg.streaming = false;
+      _scrollToEnd();
       return;
     }
-    _streamTimer = Timer.periodic(const Duration(milliseconds: 38), (t) {
+    const steps = 12; // whole reveal finishes in ~steps * 32ms ≈ 0.4s
+    final perStep = (total / steps).ceil();
+    _streamTimer = Timer.periodic(const Duration(milliseconds: 32), (t) {
       if (!mounted) {
         t.cancel();
         return;
       }
       setState(() {
-        msg.shownWords += 1;
+        msg.shownWords += perStep;
         if (msg.shownWords >= total) {
+          msg.shownWords = total;
           msg.streaming = false;
           t.cancel();
         }
       });
-      _scrollToEnd();
+      if (!msg.streaming) _scrollToEnd();
     });
+  }
+
+  void _onChipTap(String chip) {
+    HapticFeedback.selectionClick();
+    _send(chip);
   }
 
   // ── Media ───────────────────────────────────────────────────────────────────
@@ -265,27 +283,24 @@ class _ErikChatScreenState extends State<ErikChatScreen>
           await _storage.saveImageLocally(file, folderName: 'erik_property');
       final remoteUrl = await _storage.uploadToCloud(localPath);
       final path = remoteUrl ?? localPath;
-      final wasFirst = _photoUrls.isEmpty;
+      // Just add the photo and let the draft card update live (it shows the new
+      // count + keeps its publish button) — no chat spam, the card stays put so
+      // the user can publish from the very same card. If there's no pending
+      // draft, drop a light user bubble so the attachment is still visible.
       setState(() {
         _photoUrls.add(path);
         _picking = false;
-        _messages.add(_ErikMsg(
-          role: 'user',
-          text: video ? '🎥 סרטון נוסף' : '📷 תמונה נוספה',
-          mediaUrls: [path],
-        ));
-        _messages.add(_ErikMsg(
-          role: 'assistant',
-          text: 'קיבלתי, תודה! ${_photoUrls.length == 1 ? 'זו התמונה הראשונה. ' : ''}'
-              'אפשר להוסיף עוד, או להמשיך.',
-        ));
+        if (_draft == null) {
+          _messages.add(_ErikMsg(
+            role: 'user',
+            text: video ? '🎥 סרטון נוסף' : '📷 תמונה נוספה',
+            mediaUrls: [path],
+          ));
+        }
       });
       _saveTranscript();
-      _scrollToEnd();
-      // If a draft was waiting only on a photo, offer to publish now.
-      if (wasFirst && _draft != null) {
-        setState(() => _messages.last.draft = _draft);
-      }
+      _snack(video ? 'סרטון נוסף ✓' : 'תמונה נוספה ✓ (${_photoUrls.length})');
+      if (_draft == null) _scrollToEnd();
     } catch (e) {
       if (kDebugMode) debugPrint('Erik pickMedia failed: $e');
       if (mounted) {
@@ -299,9 +314,9 @@ class _ErikChatScreenState extends State<ErikChatScreen>
     HapticFeedback.selectionClick();
     showModalBottomSheet(
       context: context,
-      backgroundColor: ErikTokens.bgMid,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(ErikTokens.rXl))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
@@ -312,7 +327,7 @@ class _ErikChatScreenState extends State<ErikChatScreen>
                 width: 44,
                 height: 5,
                 decoration: BoxDecoration(
-                    color: ErikTokens.lineStrong,
+                    color: AppColors.borderLight,
                     borderRadius: BorderRadius.circular(3)),
               ),
               const SizedBox(height: 16),
@@ -336,14 +351,16 @@ class _ErikChatScreenState extends State<ErikChatScreen>
         width: 46,
         height: 46,
         decoration: BoxDecoration(
-          color: ErikTokens.accent.withValues(alpha: 0.16),
+          color: AppColors.primaryLight2,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(icon, color: ErikTokens.accent, size: 22),
+        child: Icon(icon, color: AppColors.primary, size: 22),
       ),
       title: Text(label,
-          style: const TextStyle(
-              color: ErikTokens.ink, fontSize: 17, fontWeight: FontWeight.w800)),
+          style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16.5,
+              fontWeight: FontWeight.w700)),
     );
   }
 
@@ -384,9 +401,8 @@ class _ErikChatScreenState extends State<ErikChatScreen>
         _draft = null;
         _photoUrls.clear();
         _publishing = false;
-        // Clear the pending draft card so it can't be published twice.
         for (final m in _messages) {
-          m.draft = null;
+          m.draft = null; // clear the pending card so it can't publish twice
         }
         _messages.add(_ErikMsg(
           role: 'assistant',
@@ -419,7 +435,6 @@ class _ErikChatScreenState extends State<ErikChatScreen>
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => const AssistantScreen(),
     ));
-    // The orb may have added turns to the shared transcript — reload.
     _streamTimer?.cancel();
     await _loadTranscript();
   }
@@ -444,319 +459,219 @@ class _ErikChatScreenState extends State<ErikChatScreen>
 
   void _snack(String m) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      backgroundColor: ErikTokens.bgMid,
-      content: Text(m, style: const TextStyle(color: ErikTokens.ink, fontSize: 15)),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
-  // ── Build ────────────────────────────────────────────────────────────────────
+  // ── Build (identical layout language to אתי's chat) ──────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final showWelcomeStarters =
-        _messages.length == 1 && _messages.first.isWelcome;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: ErikTokens.bgDeep,
-        resizeToAvoidBottomInset: true,
-        body: Stack(
-          children: [
-            _ambientBackground(),
-            SafeArea(
-              child: Column(
-                children: [
-                  _appBar(),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => FocusScope.of(context).unfocus(),
-                      behavior: HitTestBehavior.opaque,
-                      child: ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
-                        itemCount: _messages.length +
-                            (_busy ? 1 : 0) +
-                            (showWelcomeStarters ? 1 : 0),
-                        itemBuilder: (context, i) {
-                          if (_busy && i == _messages.length) {
-                            return const _TypingBubble();
-                          }
-                          if (showWelcomeStarters && i == _messages.length) {
-                            return _starterChips();
-                          }
-                          return _messageRow(_messages[i], i);
-                        },
-                      ),
-                    ),
-                  ),
-                  _inputBar(),
+        backgroundColor: AppColors.cloud,
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0.5,
+          titleSpacing: 0,
+          title: Row(children: [
+            const SizedBox(width: 12),
+            // Erik has no photo — a primary orb with a mic, framed like אתי's.
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primaryLight, AppColors.primary],
+                ),
+                border: Border.all(color: AppColors.primary, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4))
                 ],
               ),
+              child: const Icon(IconsaxPlusBold.microphone_2,
+                  color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$_botName · העוזר האישי',
+                    style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16)),
+                Row(children: [
+                  Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                          color: AppColors.success, shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Text('כאן בשבילך',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11)),
+                ]),
+              ],
+            ),
+          ]),
+          actions: [
+            IconButton(
+              tooltip: _speakReplies ? 'הקראה פעילה' : 'הקראה כבויה',
+              icon: Icon(
+                  _speakReplies
+                      ? IconsaxPlusBold.volume_high
+                      : IconsaxPlusLinear.volume_slash,
+                  color: _speakReplies ? AppColors.primary : AppColors.textSecondary,
+                  size: 24),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                setState(() => _speakReplies = !_speakReplies);
+                _snack(_speakReplies ? 'אריק יקריא את התשובות' : 'הקראה כבויה');
+              },
+            ),
+            IconButton(
+              tooltip: 'שיחה חדשה',
+              icon: Icon(IconsaxPlusLinear.refresh_2,
+                  color: AppColors.textSecondary, size: 24),
+              onPressed: _newConversation,
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _ambientBackground() {
-    return Positioned.fill(
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0, -0.35),
-            radius: 1.3,
-            colors: [ErikTokens.bgMid, ErikTokens.bgDeep],
+        body: Column(children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: ListView.builder(
+                controller: _scroll,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+                itemCount: _messages.length + (_busy ? 1 : 0),
+                itemBuilder: (_, i) {
+                  if (i >= _messages.length) return const _Typing();
+                  final isLast = i == _messages.length - 1;
+                  final bubble = _bubble(_messages[i], isLast);
+                  return isLast ? _FadeSlideIn(child: bubble) : bubble;
+                },
+              ),
+            ),
           ),
-        ),
-        child: Stack(children: [
-          Positioned(
-            top: -80,
-            right: -60,
-            child: ErikAmbientGlow(size: 320, color: ErikTokens.accent.withValues(alpha: 0.14)),
-          ),
-          Positioned(
-            bottom: -100,
-            left: -80,
-            child: ErikAmbientGlow(size: 360, color: ErikTokens.accentGlow.withValues(alpha: 0.10)),
-          ),
+          _inputBar(),
         ]),
       ),
     );
   }
 
-  Widget _appBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      child: Row(
-        children: [
-          _glassCircle(IconsaxPlusLinear.arrow_right_3, () {
-            HapticFeedback.selectionClick();
-            Navigator.of(context).maybePop();
-          }),
-          const SizedBox(width: 10),
-          // Erik identity — avatar orb + name + live presence dot
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [ErikTokens.accentGlow, ErikTokens.accent],
-              ),
-              boxShadow: ErikTokens.accentShadow(opacity: 0.4, blur: 14),
-            ),
-            child: const Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('אריק · העוזר האישי שלך',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: ErikTokens.ink,
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w900)),
-                Row(children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                        color: ErikTokens.online, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Text('כאן בשבילך',
-                      style: TextStyle(
-                          color: ErikTokens.muted,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700)),
-                ]),
-              ],
-            ),
-          ),
-          // Read-aloud toggle (helpful for older users)
-          _glassCircle(
-            _speakReplies ? IconsaxPlusBold.volume_high : IconsaxPlusLinear.volume_slash,
-            () {
-              HapticFeedback.selectionClick();
-              setState(() => _speakReplies = !_speakReplies);
-              _snack(_speakReplies ? 'אריק יקריא את התשובות' : 'הקראה כבויה');
-            },
-            active: _speakReplies,
-          ),
-          const SizedBox(width: 8),
-          _glassCircle(IconsaxPlusLinear.refresh, _newConversation),
-        ],
-      ),
-    );
-  }
-
-  Widget _glassCircle(IconData icon, VoidCallback onTap, {bool active = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: active ? ErikTokens.accent.withValues(alpha: 0.20) : ErikTokens.glassHi,
-          shape: BoxShape.circle,
-          border: Border.all(color: active ? ErikTokens.accent : ErikTokens.line),
-        ),
-        child: Icon(icon, color: active ? ErikTokens.accent : ErikTokens.ink, size: 21),
-      ),
-    );
-  }
-
-  // ── Message rendering ────────────────────────────────────────────────────────
-
-  Widget _messageRow(_ErikMsg m, int index) {
+  Widget _bubble(_ErikMsg m, bool isLast) {
     final isUser = m.role == 'user';
-    final isLast = index == _messages.length - 1;
-    final bubble = Column(
-      crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        _textBubble(m, isUser),
-        if (m.draft != null) ...[
-          const SizedBox(height: 10),
-          _draftCard(m.draft!),
-        ],
-        if (m.listings.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ...m.listings.take(3).map(_listingCard),
-        ],
-        if (!isUser && !m.streaming && m.suggestions.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          _suggestionChips(m.suggestions),
-        ],
-        if (m.canRetry && !m.streaming) ...[
-          const SizedBox(height: 8),
-          _retryButton(m.retryText),
-        ],
-      ],
-    );
-    final row = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Align(
-        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * 0.86),
-          child: bubble,
-        ),
-      ),
-    );
-    // Gentle entrance for the newest bubble only (like אתי's _FadeSlideIn).
-    return isLast ? ErikFadeInUp(child: row) : row;
-  }
-
-  Widget _textBubble(_ErikMsg m, bool isUser) {
     final text = m.streaming ? m.streamedText : m.text;
-    if (text.trim().isEmpty && m.mediaUrls.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isUser ? ErikTokens.userSurface : ErikTokens.card,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(ErikTokens.rLg),
-          topRight: const Radius.circular(ErikTokens.rLg),
-          bottomLeft: Radius.circular(isUser ? ErikTokens.rLg : 5),
-          bottomRight: Radius.circular(isUser ? 5 : ErikTokens.rLg),
-        ),
-        border: isUser ? null : Border.all(color: ErikTokens.line),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isUser ? Colors.white : ErikTokens.ink,
-          fontSize: 17,
-          height: 1.5,
-          fontWeight: FontWeight.w600,
-        ),
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (text.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.all(14),
+              constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.82),
+              decoration: BoxDecoration(
+                color: isUser ? AppColors.primary : Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isUser ? 18 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 18),
+                ),
+                boxShadow: isUser
+                    ? null
+                    : [
+                        BoxShadow(
+                            color: AppColors.navy.withValues(alpha: 0.05),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4))
+                      ],
+              ),
+              child: Text(text,
+                  style: TextStyle(
+                      color: isUser
+                          ? AppColors.textOnPrimary
+                          : AppColors.textPrimary,
+                      fontSize: 15,
+                      height: 1.45)),
+            ),
+          if (m.draft != null && !m.streaming) _draftCard(m.draft!),
+          if (m.listings.isNotEmpty && !m.streaming)
+            ...m.listings.take(3).map(_listingCard),
+          if (!isUser && !m.streaming && m.chips.isNotEmpty) _chipsRow(m.chips),
+          if (m.canRetry && !m.streaming) _retryButton(m.retryText),
+        ],
       ),
     );
   }
 
-  Widget _suggestionChips(List<String> chips) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (var i = 0; i < chips.length; i++)
-          ErikFadeInUp(
-            delay: Duration(milliseconds: i * 70),
-            offset: 10,
-            child: ScaleBounce(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                _send(chips[i]);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: ErikTokens.accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(ErikTokens.rPill),
-                  border: Border.all(color: ErikTokens.accent.withValues(alpha: 0.42)),
+  Widget _chipsRow(List<String> chips) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (int i = 0; i < chips.length; i++)
+            _AnimatedChip(
+              delayMs: i * 70,
+              child: GestureDetector(
+                onTap: _busy ? null : () => _onChipTap(chips[i]),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight2,
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(chips[i],
+                      style: TextStyle(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
                 ),
-                child: Text(chips[i],
-                    style: TextStyle(
-                        color: ErikTokens.accentGlow,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800)),
               ),
             ),
-          ),
-      ],
-    );
-  }
-
-  Widget _starterChips() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 6, bottom: 8),
-            child: Text('אפשר להתחיל מ:',
-                style: TextStyle(
-                    color: ErikTokens.muted,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800)),
-          ),
-          _suggestionChips(_starters),
         ],
       ),
     );
   }
 
   Widget _retryButton(String text) {
-    return ScaleBounce(
-      onTap: () => _send(text),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: ErikTokens.glassHi,
-          borderRadius: BorderRadius.circular(ErikTokens.rPill),
-          border: Border.all(color: ErikTokens.line),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: OutlinedButton.icon(
+        onPressed: () => _send(text),
+        icon: Icon(IconsaxPlusLinear.refresh, size: 18, color: AppColors.primary),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primaryDark,
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(IconsaxPlusLinear.refresh, color: ErikTokens.ink, size: 18),
-          const SizedBox(width: 8),
-          const Text('נסה שוב',
-              style: TextStyle(
-                  color: ErikTokens.ink, fontSize: 15, fontWeight: FontWeight.w800)),
-        ]),
+        label: const Text('נסה שוב'),
       ),
     );
   }
 
-  // ── Inline listing-draft preview card (replaces the old raw bottom sheet) ──
+  // ── Inline listing-draft preview card (light, אתי card language) ────────────
 
   Widget _draftCard(Map<String, dynamic> draft) {
     String s(String key) => (draft[key]?.toString().trim() ?? '');
@@ -773,71 +688,114 @@ class _ErikChatScreenState extends State<ErikChatScreen>
       if (s('entryDate').isNotEmpty) (IconsaxPlusBold.calendar_1, 'כניסה: ${s('entryDate')}'),
     ];
     return Container(
-      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      width: MediaQuery.of(context).size.width * 0.82,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            ErikTokens.accent.withValues(alpha: 0.16),
-            ErikTokens.card,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(ErikTokens.rLg),
-        border: Border.all(color: ErikTokens.accent.withValues(alpha: 0.4)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.navy.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 8)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(IconsaxPlusBold.home_trend_up, color: ErikTokens.accentGlow, size: 22),
-            const SizedBox(width: 8),
-            const Text('טיוטת מודעה מוכנה',
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight2,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(IconsaxPlusBold.home_trend_up,
+                  color: AppColors.primary, size: 19),
+            ),
+            const SizedBox(width: 10),
+            Text('טיוטת מודעה מוכנה',
                 style: TextStyle(
-                    color: ErikTokens.ink, fontSize: 17, fontWeight: FontWeight.w900)),
+                    color: AppColors.textPrimary,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800)),
           ]),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ...rows.map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 9),
                 child: Row(children: [
-                  Icon(r.$1, color: ErikTokens.accent, size: 18),
+                  Icon(r.$1, color: AppColors.primary, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(r.$2,
-                        style: const TextStyle(
-                            color: ErikTokens.ink,
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700)),
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ]),
               )),
-          Row(children: [
-            Icon(
-                _photoUrls.isEmpty ? IconsaxPlusLinear.gallery_slash : IconsaxPlusBold.gallery,
-                color: _photoUrls.isEmpty ? ErikTokens.muted : ErikTokens.online,
-                size: 18),
-            const SizedBox(width: 10),
-            Text(
-                _photoUrls.isEmpty
-                    ? 'עוד לא צורפו תמונות'
-                    : '${_photoUrls.length} תמונות מצורפות',
-                style: TextStyle(
-                    color: _photoUrls.isEmpty ? ErikTokens.muted : ErikTokens.online,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700)),
-          ]),
-          const SizedBox(height: 14),
+          // Tappable "add photos" affordance — the natural way to attach photos
+          // AFTER the details are in, without having to hit publish and be
+          // rejected first.
+          ScaleBounce(
+            onTap: _openMediaSheet,
+            scaleDownTo: 0.98,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              decoration: BoxDecoration(
+                color: _photoUrls.isEmpty
+                    ? AppColors.primaryLight2
+                    : AppColors.success.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: _photoUrls.isEmpty
+                        ? AppColors.primary.withValues(alpha: 0.35)
+                        : AppColors.success.withValues(alpha: 0.4)),
+              ),
+              child: Row(children: [
+                Icon(
+                    _photoUrls.isEmpty
+                        ? IconsaxPlusBold.camera
+                        : IconsaxPlusBold.gallery,
+                    color:
+                        _photoUrls.isEmpty ? AppColors.primary : AppColors.success,
+                    size: 19),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                      _photoUrls.isEmpty
+                          ? 'הוסף תמונות של הדירה'
+                          : '${_photoUrls.length} תמונות · הוסף עוד',
+                      style: TextStyle(
+                          color: _photoUrls.isEmpty
+                              ? AppColors.primaryDark
+                              : AppColors.success,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800)),
+                ),
+                Icon(IconsaxPlusLinear.add,
+                    color:
+                        _photoUrls.isEmpty ? AppColors.primary : AppColors.success,
+                    size: 20),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(children: [
             Expanded(
               child: ScaleBounce(
                 onTap: _publishing ? null : () => _publish(draft),
+                scaleDownTo: 0.97,
                 child: Container(
-                  height: 52,
+                  height: 50,
                   decoration: BoxDecoration(
-                    color: ErikTokens.accent,
-                    borderRadius: BorderRadius.circular(ErikTokens.rMd),
-                    boxShadow: ErikTokens.accentShadow(),
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
                     child: _publishing
@@ -846,11 +804,11 @@ class _ErikChatScreenState extends State<ErikChatScreen>
                             height: 22,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2.4, color: Colors.white))
-                        : const Text('פרסם עכשיו',
+                        : Text('פרסם עכשיו',
                             style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w900)),
+                                color: AppColors.textOnPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800)),
                   ),
                 ),
               ),
@@ -858,22 +816,24 @@ class _ErikChatScreenState extends State<ErikChatScreen>
             const SizedBox(width: 10),
             ScaleBounce(
               onTap: () => _editInForm(draft),
+              scaleDownTo: 0.97,
               child: Container(
-                height: 52,
+                height: 50,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: ErikTokens.glassHi,
-                  borderRadius: BorderRadius.circular(ErikTokens.rMd),
-                  border: Border.all(color: ErikTokens.line),
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderLight),
                 ),
                 child: Row(children: [
-                  Icon(IconsaxPlusLinear.edit_2, color: ErikTokens.ink, size: 18),
+                  Icon(IconsaxPlusLinear.edit_2,
+                      color: AppColors.textSecondary, size: 18),
                   const SizedBox(width: 7),
-                  const Text('עריכה',
+                  Text('עריכה',
                       style: TextStyle(
-                          color: ErikTokens.ink,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800)),
+                          color: AppColors.textPrimary,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700)),
                 ]),
               ),
             ),
@@ -884,140 +844,157 @@ class _ErikChatScreenState extends State<ErikChatScreen>
   }
 
   Widget _listingCard(AssistantListing l) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: ErikTokens.glass(),
-        child: Row(children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: ErikTokens.glassLo,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(IconsaxPlusBold.building_4, color: ErikTokens.accent, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: ErikTokens.ink,
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w800)),
-                if (l.subtitle != null)
-                  Text(l.subtitle!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: ErikTokens.muted, fontSize: 13)),
-                if (l.price != null)
-                  Text('₪${l.price}',
-                      style: TextStyle(
-                          color: ErikTokens.accentGlow,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  // ── Input bar ────────────────────────────────────────────────────────────────
-
-  Widget _inputBar() {
     return Container(
-      padding: EdgeInsets.fromLTRB(
-          12, 8, 12, 10 + MediaQuery.viewInsetsOf(context).bottom * 0),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      width: MediaQuery.of(context).size.width * 0.82,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ErikTokens.bgDeep.withValues(alpha: 0.6),
-        border: Border(top: BorderSide(color: ErikTokens.line)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Add media
-          _roundInputBtn(
-            IconsaxPlusLinear.add,
-            _openMediaSheet,
-            filled: false,
-          ),
-          const SizedBox(width: 8),
-          // Text field
-          Expanded(
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 50, maxHeight: 130),
-              decoration: BoxDecoration(
-                color: ErikTokens.glassHi,
-                borderRadius: BorderRadius.circular(ErikTokens.rXl),
-                border: Border.all(color: ErikTokens.line),
-              ),
-              child: TextField(
-                controller: _input,
-                focusNode: _inputFocus,
-                textDirection: TextDirection.rtl,
-                minLines: 1,
-                maxLines: 5,
-                textInputAction: TextInputAction.send,
-                onSubmitted: _send,
-                style: const TextStyle(
-                    color: ErikTokens.ink, fontSize: 16.5, fontWeight: FontWeight.w600),
-                cursorColor: ErikTokens.accent,
-                decoration: InputDecoration(
-                  hintText: 'כתוב לאריק, או דבר איתו…',
-                  hintStyle: TextStyle(
-                      color: ErikTokens.muted, fontSize: 16, fontWeight: FontWeight.w500),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Send OR voice, depending on whether there's text
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _input,
-            builder: (context, value, _) {
-              final hasText = value.text.trim().isNotEmpty;
-              return hasText
-                  ? _roundInputBtn(IconsaxPlusBold.send_1, () => _send(_input.text),
-                      filled: true)
-                  : _roundInputBtn(IconsaxPlusBold.microphone_2, _openVoice,
-                      filled: true, gradient: true);
-            },
-          ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.navy.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
         ],
       ),
+      child: Row(children: [
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight2,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(IconsaxPlusBold.building_4, color: AppColors.primary, size: 24),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700)),
+              if (l.subtitle != null)
+                Text(l.subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+              if (l.price != null)
+                Text('₪${l.price}',
+                    style: TextStyle(
+                        color: AppColors.primaryDark,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 
-  Widget _roundInputBtn(IconData icon, VoidCallback onTap,
-      {bool filled = false, bool gradient = false}) {
-    return ScaleBounce(
-      onTap: onTap,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: gradient ? null : (filled ? ErikTokens.accent : ErikTokens.glassHi),
-          gradient: gradient
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [ErikTokens.accentGlow, ErikTokens.accent])
-              : null,
-          border: filled ? null : Border.all(color: ErikTokens.line),
-          boxShadow: filled ? ErikTokens.accentShadow(opacity: 0.35, blur: 16) : null,
+  // ── Input bar (identical to אתי's floating rounded bar) ─────────────────────
+
+  Widget _inputBar() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(13, 6, 13, 13),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.borderLight),
+            boxShadow: [
+              BoxShadow(
+                  color: AppColors.navy.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6)),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Send — on the right (first child in RTL).
+              GestureDetector(
+                onTap: () => _send(_input.text),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                      color: AppColors.primary, shape: BoxShape.circle),
+                  child: Icon(IconsaxPlusLinear.send_1,
+                      color: AppColors.textOnPrimary, size: 20),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 130),
+                  child: TextField(
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 5,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: const TextStyle(fontSize: 15),
+                    decoration: const InputDecoration(
+                      hintText: 'ספר לי במילים שלך...',
+                      isCollapsed: true,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Attach media (+) — add photos/video any time, not only from the
+              // draft card. Outlined so it reads as secondary to send/voice.
+              GestureDetector(
+                onTap: _openMediaSheet,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight2,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.30)),
+                  ),
+                  child: Icon(IconsaxPlusLinear.add,
+                      color: AppColors.primary, size: 24),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Voice-conversation button → opens the premium orb visualizer.
+              GestureDetector(
+                onTap: _openVoice,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(IconsaxPlusLinear.voice_square,
+                      color: Colors.white, size: 24),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Icon(icon, color: filled ? Colors.white : ErikTokens.ink, size: 23),
       ),
     );
   }
@@ -1029,7 +1006,7 @@ class _ErikMsg {
     required this.role,
     required this.text,
     this.mediaUrls = const [],
-    this.suggestions = const [],
+    this.chips = const [],
     this.listings = const [],
     this.draft,
     this.isWelcome = false,
@@ -1040,7 +1017,7 @@ class _ErikMsg {
   final String role; // 'user' | 'assistant'
   final String text;
   final List<String> mediaUrls;
-  final List<String> suggestions;
+  final List<String> chips;
   final List<AssistantListing> listings;
   Map<String, dynamic>? draft;
   final bool isWelcome;
@@ -1054,16 +1031,81 @@ class _ErikMsg {
   String get streamedText => words.take(shownWords).join(' ');
 }
 
-/// Three-dot "Erik is typing" bubble (dark variant of אתי's indicator).
-class _TypingBubble extends StatefulWidget {
-  const _TypingBubble();
+// ── Shared animation widgets, copied 1:1 from אתי's chat so the two surfaces
+//    are visually identical. ────────────────────────────────────────────────
 
+/// Quick-reply chip that springs in (fade + scale + rise), staggered by index.
+class _AnimatedChip extends StatefulWidget {
+  const _AnimatedChip({required this.child, required this.delayMs});
+  final Widget child;
+  final int delayMs;
   @override
-  State<_TypingBubble> createState() => _TypingBubbleState();
+  State<_AnimatedChip> createState() => _AnimatedChipState();
 }
 
-class _TypingBubbleState extends State<_TypingBubble>
+class _AnimatedChipState extends State<_AnimatedChip>
     with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 340));
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curve = CurvedAnimation(parent: _c, curve: Curves.easeOutBack);
+    return FadeTransition(
+      opacity: _c,
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.8, end: 1.0).animate(curve),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero)
+              .animate(curve),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Gentle fade + slide-up for the newest bubble.
+class _FadeSlideIn extends StatelessWidget {
+  const _FadeSlideIn({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      builder: (_, t, child) => Opacity(
+        opacity: t.clamp(0, 1),
+        child: Transform.translate(offset: Offset(0, (1 - t) * 14), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Three-dot "Erik is typing" bubble — identical to אתי's.
+class _Typing extends StatefulWidget {
+  const _Typing();
+  @override
+  State<_Typing> createState() => _TypingState();
+}
+
+class _TypingState extends State<_Typing> with SingleTickerProviderStateMixin {
   late final AnimationController _c =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
         ..repeat();
@@ -1076,33 +1118,31 @@ class _TypingBubbleState extends State<_TypingBubble>
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
-          decoration: BoxDecoration(
-            color: ErikTokens.card,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(ErikTokens.rLg),
-              topRight: Radius.circular(ErikTokens.rLg),
-              bottomLeft: Radius.circular(5),
-              bottomRight: Radius.circular(ErikTokens.rLg),
-            ),
-            border: Border.all(color: ErikTokens.line),
-          ),
-          child: AnimatedBuilder(
-            animation: _c,
-            builder: (context, _) {
-              return Row(mainAxisSize: MainAxisSize.min, children: [
-                for (var i = 0; i < 3; i++) ...[
-                  if (i > 0) const SizedBox(width: 6),
-                  _dot(i),
-                ],
-              ]);
-            },
-          ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+                color: AppColors.navy.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) {
+            return Row(mainAxisSize: MainAxisSize.min, children: [
+              for (int i = 0; i < 3; i++) ...[
+                _dot(i),
+                if (i < 2) const SizedBox(width: 5),
+              ],
+            ]);
+          },
         ),
       ),
     );
@@ -1110,13 +1150,15 @@ class _TypingBubbleState extends State<_TypingBubble>
 
   Widget _dot(int i) {
     final phase = (_c.value + i * 0.2) % 1.0;
-    final scale = 0.6 + 0.6 * (0.5 + 0.5 * (1 - (phase * 2 - 1).abs()));
+    final scale = 0.6 + 0.6 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
     return Transform.scale(
       scale: scale,
       child: Container(
         width: 8,
         height: 8,
-        decoration: BoxDecoration(color: ErikTokens.accent, shape: BoxShape.circle),
+        decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.7),
+            shape: BoxShape.circle),
       ),
     );
   }

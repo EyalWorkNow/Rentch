@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
@@ -13,6 +14,7 @@ import 'package:dating_app/presentation/features/assistant/erik_design.dart';
 import 'package:dating_app/presentation/features/assistant/erik_presence.dart';
 import 'package:dating_app/presentation/features/assistant/erik_voice_call.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
+import 'package:dating_app/presentation/widgets/liquid_glass_orb.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -63,6 +65,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   Map<String, dynamic>? _draft;
   bool _thinking = false;
   bool _listening = false;
+  bool _speaking = false; // Erik's TTS is actively playing
   bool _voiceReplies = true;
   bool _publishing = false;
   String _partial = '';
@@ -97,6 +100,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   /// drive Erik's orb. One place, so the orb and status line stay in sync.
   ErikState get _erikState {
     if (_thinking) return ErikState.thinking;
+    if (_speaking) return ErikState.speaking;
     if (_listening) return ErikState.listening;
     return ErikState.idle;
   }
@@ -107,6 +111,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   /// The short status line under the orb, derived from the real state.
   String get _statusLine {
     if (_thinking) return 'חושב...';
+    if (_speaking) return 'אריק מדבר...';
     if (_listening) return 'מקשיב לך...';
     if (_conversationMode) return 'מקשיב לך...';
     return 'שלום, אני אריק';
@@ -293,7 +298,9 @@ class _AssistantScreenState extends State<AssistantScreen>
   /// listening as soon as he finishes — so the user just keeps talking.
   Future<void> _speakAndContinue(String text) async {
     if (_voiceReplies) {
+      if (mounted) setState(() => _speaking = true);
       await _service.speak(text);
+      if (mounted) setState(() => _speaking = false);
     }
     if (_conversationMode && mounted && !_thinking && !_publishing) {
       _listenTurn();
@@ -595,109 +602,55 @@ class _AssistantScreenState extends State<AssistantScreen>
     if (mounted) Navigator.of(context).maybePop();
   }
 
-  Future<void> _toggleVoice() async {
-    if (_voiceReplies) await _service.stopSpeaking();
-    setState(() => _voiceReplies = !_voiceReplies);
-  }
 
   // ── UI ───────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    // Same caption rule as אתי: the user's live words while listening, else
+    // Erik's latest reply.
+    final caption = (_erikState == ErikState.listening && _userLine.isNotEmpty)
+        ? _userLine
+        : _erikReply;
     return Scaffold(
       backgroundColor: _kBgDeep,
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          // ── The calm "night" canvas: a deep navy radial that lifts toward the
-          // centre, so the orb feels lit from within the screen. ──
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0, -0.15),
-                  radius: 1.25,
-                  colors: [_kBgMid, _kBgDeep],
-                  stops: [0.0, 1.0],
-                ),
-              ),
-            ),
-          ),
-          // Soft, brand-driven ambient aurora — on-theme (auto black for brokers,
-          // teal for tenants), gently animated so the screen breathes.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _pulse,
-                builder: (context, _) {
-                  final t = _pulse.value;
-                  return Stack(
-                    children: [
-                      Positioned(
-                        top: -150 + 14 * t,
-                        right: -120,
-                        child: _ambientGlow(
-                            360, _kAccent2.withValues(alpha: 0.14 + 0.05 * t)),
-                      ),
-                      Positioned(
-                        bottom: -160,
-                        left: -130 + 14 * (1 - t),
-                        child: _ambientGlow(
-                            400, _kAccent.withValues(alpha: 0.13 + 0.04 * t)),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // ── Top bar: back + kebab options (minimal, floats over the canvas) ──
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
+          // ── Voice canvas — identical to אתי's: animated northern-lights
+          // ribbons over a deep radial, under a heavy liquid-glass blur. ──
+          _AuroraBackground(
             child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                child: Row(
-                  children: [
-                    _glassCircleBtn(
-                        IconsaxPlusLinear.arrow_right_3, _close),
-                    const Spacer(),
-                    _glassCircleBtn(
-                      IconsaxPlusLinear.more,
-                      _showOptionsMenu,
-                      color: _kInk.withValues(alpha: 0.72),
-                    ),
-                  ],
-                ),
+              child: Column(
+                children: [
+                  _EntranceFadeScale(
+                    delay: const Duration(milliseconds: 150),
+                    child: _voiceTopBar(),
+                  ),
+                  const Spacer(),
+                  _EntranceFadeScale(
+                    delay: const Duration(milliseconds: 600),
+                    child: _voiceStatusPill(),
+                  ),
+                  const SizedBox(height: 6),
+                  _EntranceFadeScale(
+                    delay: const Duration(milliseconds: 650),
+                    child: _voiceOrb(),
+                  ),
+                  const SizedBox(height: 10),
+                  _EntranceFadeScale(
+                    delay: const Duration(milliseconds: 750),
+                    child: _voiceCaption(caption),
+                  ),
+                  const Spacer(),
+                  _EntranceFadeScale(
+                    delay: const Duration(milliseconds: 900),
+                    child: _voiceControls(),
+                  ),
+                  const SizedBox(height: 6),
+                ],
               ),
             ),
-          ),
-
-          // ── The orb stage — the whole interface ─────────────────────────────
-          AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, _) {
-              return ErikOrbStage(
-                clock: _pulse.value,
-                state: _erikState,
-                connecting: false,
-                callActive: _callActive,
-                statusLine: _statusLine,
-                erikReply: _erikReply,
-                userLine: _userLine,
-                soundLevel: _soundLevelNotifier,
-                voiceOn: _voiceReplies,
-                onTapOrb: _toggleConversation,
-                onToggleMic: _toggleMic,
-                onOpenKeyboard: _openComposer,
-                onToggleVoice: _toggleVoice,
-                onClose: _close,
-              );
-            },
           ),
 
           // ── Text composer (keyboard fallback) ───────────────────────────────
@@ -732,40 +685,241 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
   }
 
-  /// A soft circular brand glow used in the ambient background.
-  Widget _ambientGlow(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, Colors.transparent],
+  // ── Voice UI — styled to match אתי's voice screen exactly ─────────────────
+
+  Widget _voiceTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 1, 6, 0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(IconsaxPlusLinear.arrow_down_1,
+                color: Colors.white70, size: 32),
+            onPressed: _close,
+          ),
+          const Spacer(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [_kAccent2, _kAccent],
+                      ),
+                      border: Border.all(
+                          color: _kAccent.withValues(alpha: 0.6), width: 1.5),
+                    ),
+                    child: const Icon(IconsaxPlusBold.microphone_2,
+                        color: Colors.white, size: 20),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 11,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _erikState == ErikState.idle
+                            ? Colors.white38
+                            : const Color(0xFF34D399),
+                        border: Border.all(color: AppColors.ink, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('אריק',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3)),
+                  Text('העוזר האישי שלך',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+            ],
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'אפשרויות',
+            icon: const Icon(IconsaxPlusLinear.edit_2,
+                color: Colors.white70, size: 28),
+            onPressed: _showOptionsMenu,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _voiceStatusPill() {
+    final IconData icon;
+    switch (_erikState) {
+      case ErikState.listening:
+        icon = IconsaxPlusBold.microphone_2;
+        break;
+      case ErikState.thinking:
+        icon = IconsaxPlusBold.magicpen;
+        break;
+      case ErikState.speaking:
+        icon = IconsaxPlusBold.voice_square;
+        break;
+      case ErikState.idle:
+        icon = IconsaxPlusLinear.microphone;
+        break;
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(
+            scale: Tween(begin: 0.9, end: 1.0).animate(anim), child: child),
+      ),
+      child: Container(
+        key: ValueKey(_statusLine),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: _kAccent.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: _kAccent.withValues(alpha: 0.32)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: _kAccent),
+            const SizedBox(width: 8),
+            Text(
+              _statusLine,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _glassCircleBtn(IconData icon, VoidCallback onTap, {Color? color}) {
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.07),
-            shape: BoxShape.circle,
-            border: Border.all(color: _kLine),
+  Widget _voiceOrb() {
+    final active = _callActive;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _toggleConversation,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: _kAccent.withValues(alpha: active ? 0.34 : 0.16),
+              blurRadius: active ? 72 : 44,
+              spreadRadius: active ? 8 : 2,
+            ),
+          ],
+        ),
+        child: ValueListenableBuilder<double>(
+          valueListenable: _soundLevelNotifier,
+          builder: (context, level, _) => LiquidGlassOrb(
+            size: 175,
+            level: level.clamp(0.0, 1.0),
+            speaking: _erikState == ErikState.speaking,
           ),
-          child: Icon(icon, color: color ?? _kInk, size: 22),
         ),
       ),
     );
   }
+
+  Widget _voiceCaption(String caption) {
+    final isUserSpeaking =
+        _erikState == ErikState.listening && _userLine.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Text(
+            caption,
+            key: ValueKey(caption),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isUserSpeaking ? Colors.white70 : Colors.white,
+              fontSize: 19,
+              height: 1.5,
+              fontStyle: isUserSpeaking ? FontStyle.italic : FontStyle.normal,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _voiceControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _voiceRoundBtn(
+            icon: _listening
+                ? IconsaxPlusBold.microphone
+                : IconsaxPlusLinear.microphone,
+            bg: _listening
+                ? AppColors.tealBright.withValues(alpha: 0.30)
+                : Colors.white.withValues(alpha: 0.12),
+            onTap: _toggleMic,
+          ),
+          _voiceRoundBtn(
+            icon: IconsaxPlusLinear.keyboard,
+            bg: Colors.white.withValues(alpha: 0.12),
+            onTap: _openComposer,
+          ),
+          _voiceRoundBtn(
+            icon: IconsaxPlusLinear.close_circle,
+            bg: AppColors.coral,
+            onTap: _close,
+            big: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _voiceRoundBtn({
+    required IconData icon,
+    required Color bg,
+    required VoidCallback onTap,
+    bool big = false,
+  }) {
+    final size = big ? 68.0 : 58.0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+        child: Icon(icon, color: Colors.white, size: big ? 30 : 26),
+      ),
+    );
+  }
+
 
   // ── Minimal draft sheet (uses the existing publish flow) ──────────────────────
 
@@ -1379,6 +1533,211 @@ class _OptionTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Voice canvas — copied 1:1 from אתי's voice screen so Erik's voice mode is
+//    visually identical: animated northern-lights ribbons over a deep radial,
+//    under a heavy liquid-glass blur, plus the staggered cascade entrance. ────
+
+class _AuroraBackground extends StatefulWidget {
+  const _AuroraBackground({required this.child});
+  final Widget child;
+
+  @override
+  State<_AuroraBackground> createState() => _AuroraBackgroundState();
+}
+
+class _AuroraBackgroundState extends State<_AuroraBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3000),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            gradient: RadialGradient(
+              center: Alignment(0, 0.65),
+              radius: 1.35,
+              colors: [
+                AppColors.ink,
+                Color(0xFF03070E),
+                Colors.black,
+              ],
+              stops: [0.0, 0.6, 1.0],
+            ),
+          ),
+          child: Stack(
+            children: [
+              if (t < 0.99)
+                Opacity(
+                  opacity: (1.0 - t).clamp(0.0, 1.0),
+                  child: CustomPaint(
+                    painter: _AuroraRibbonPainter(t),
+                    size: Size.infinite,
+                  ),
+                ),
+              if (t < 0.99)
+                Positioned.fill(
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                          sigmaX: PlatformFx.blurSigma(14),
+                          sigmaY: PlatformFx.blurSigma(14)),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.16),
+                      ),
+                    ),
+                  ),
+                ),
+              widget.child,
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AuroraRibbonPainter extends CustomPainter {
+  _AuroraRibbonPainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    final paintCyan = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 60.0
+      ..strokeCap = StrokeCap.round
+      ..color = AppColors.tealBrand.withValues(alpha: 0.40)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 35.0);
+
+    final paintGreen = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 70.0
+      ..strokeCap = StrokeCap.round
+      ..color = AppColors.emerald.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 40.0);
+
+    final paintPurple = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 55.0
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFFD946EF).withValues(alpha: 0.32)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 32.0);
+
+    final pathCyan = Path();
+    for (double x = -50; x <= w + 50; x += 10) {
+      final baseY = h * 0.85 - (x / w) * (h * 0.75);
+      final y = baseY + 75 * math.sin((x / w) * math.pi * 1.8 + t * math.pi * 3.5);
+      if (x == -50) {
+        pathCyan.moveTo(x, y);
+      } else {
+        pathCyan.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(pathCyan, paintCyan);
+
+    final pathGreen = Path();
+    for (double x = -50; x <= w + 50; x += 10) {
+      final baseY = h * 0.92 - (x / w) * (h * 0.82);
+      final y = baseY + 90 * math.sin((x / w) * math.pi * 1.5 - t * math.pi * 2.8);
+      if (x == -50) {
+        pathGreen.moveTo(x, y);
+      } else {
+        pathGreen.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(pathGreen, paintGreen);
+
+    final pathPurple = Path();
+    for (double x = -50; x <= w + 50; x += 10) {
+      final baseY = h * 0.78 - (x / w) * (h * 0.68);
+      final y = baseY + 70 * math.cos((x / w) * math.pi * 2.0 + t * math.pi * 3.2);
+      if (x == -50) {
+        pathPurple.moveTo(x, y);
+      } else {
+        pathPurple.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(pathPurple, paintPurple);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+/// Staggered fade + scale entrance (from אתי's voice screen).
+class _EntranceFadeScale extends StatefulWidget {
+  const _EntranceFadeScale({required this.child, required this.delay});
+  final Widget child;
+  final Duration delay;
+
+  @override
+  State<_EntranceFadeScale> createState() => _EntranceFadeScaleState();
+}
+
+class _EntranceFadeScaleState extends State<_EntranceFadeScale>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+  late final Animation<double> _scale =
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
+  late final Animation<double> _opacity =
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+
+  Timer? _entranceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _entranceTimer = Timer(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _entranceTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Opacity(
+        opacity: _opacity.value,
+        child: Transform.scale(scale: 0.5 + 0.5 * _scale.value, child: child),
+      ),
+      child: widget.child,
     );
   }
 }

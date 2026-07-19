@@ -1099,24 +1099,30 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     } else {
       final nextQ = _searched ? null : _nextInterviewQuestion();
       final asked = _interviewAsked.length;
-      final wantsNow = _wantsResultsNow(text) && asked >= 2;
-      final interviewDone =
-          _searched || asked >= 6 || (asked >= 4 && nextQ == null);
+      // A skip is offered from the SECOND question on (after the first is
+      // answered); tapping it — or saying "תראי לי" — searches immediately.
+      final wantsNow = _wantsResultsNow(text) && asked >= 1;
+      // Focused interview: at most 3 questions, then search.
+      final interviewDone = _searched || asked >= 3 || nextQ == null;
       if (!_query.isEmpty && (interviewDone || wantsNow)) {
         shouldSearch = true;
       } else if (nextQ != null) {
         // Ask the next question (with its "why") instead of searching yet.
         final intro = _interviewIntroShown
             ? ''
-            : 'כדי למצוא לך משהו שבאמת מתאים, אשאל אותך כמה שאלות קצרות 🙂\n\n';
+            : 'כמה שאלות קצרות כדי לדייק בשבילך 🙂\n\n';
         _interviewIntroShown = true;
         _interviewAsked.add(nextQ.key);
+        // From the 2nd question on, add a skip chip so the user is never stuck.
+        final chips = asked >= 1
+            ? [...nextQ.chips, 'תראי לי דירות עכשיו']
+            : nextQ.chips;
         if (!mounted) return;
         setState(() {
           _messages.add(_ChatMsg(
             role: 'assistant',
             text: '$intro${nextQ.q}\n\n💡 ${nextQ.why}',
-            chips: nextQ.chips,
+            chips: chips,
           ));
           _busy = false;
         });
@@ -1488,77 +1494,44 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   // ── Personalization interview ──────────────────────────────────────────────
   /// The next question אתי should ask in the guided interview, or null when the
   /// interview is complete (all relevant questions asked). Adaptive: she skips
-  /// what she already knows and asks the persona-relevant ones — i.e. she DECIDES
-  /// what matters for THIS person — and every question carries a "why". Ordered
-  /// most-decisive first (area/budget/household → the #1 priority → persona-
-  /// specific → hard must-haves → timeline → commute), capped at 6 in [_send].
+  /// what she already knows and asks only what's still missing — she DECIDES
+  /// what matters — and every question carries a short "why". Ordered
+  /// most-decisive first (area → budget → household → the #1 priority) and
+  /// capped at 3 questions in [_send].
   ({String key, String q, String why, List<String> chips})? _nextInterviewQuestion() {
     final s = SmartSearch.cohortSignals(_conversationText);
     final household = _persona['household'] ?? s['household'];
-    final text = _conversationText;
     bool has(String k) => _interviewAsked.contains(k);
     final out = <({String key, String q, String why, List<String> chips})>[];
     void add(String key, String q, String why, List<String> chips) {
       if (!has(key)) out.add((key: key, q: q, why: why, chips: chips));
     }
 
-    // Essentials — only while still unknown.
-    if (_query.city == null && (_query.neighborhood == null)) {
-      add('area', 'באיזה אזור או עיר לחפש?',
-          'המיקום קובע כמעט הכל — שכונה, נגישות ומרחק מהעבודה.',
+    // A FOCUSED interview: at most 3 short, precise questions (capped in
+    // [_send]). Ordered most-decisive first, adaptive — she skips whatever she
+    // already knows from the free text, so a rich opener may ask fewer.
+    // 1) WHERE
+    if (_query.city == null && _query.neighborhood == null) {
+      add('area', 'באיזה אזור לחפש?',
+          'המיקום קובע כמעט הכל.',
           ['תל אביב', 'ירושלים', 'חיפה', 'מרכז/השרון', 'באר שבע']);
     }
+    // 2) HOW MUCH
     if (_query.maxPrice == null) {
-      add('budget', 'מה התקציב החודשי המקסימלי?',
-          'ככה אני מציגה רק דירות שבאמת אפשריות לך — בלי לבזבז לך זמן.',
+      add('budget', 'תקציב חודשי מקסימלי?',
+          'שאראה רק דירות אפשריות.',
           ['עד 4,000', '4,000-6,000', '6,000-9,000', 'מעל 9,000']);
     }
+    // 3) WHO (only while unknown)
     if (household == null) {
       add('household', 'מי גר בדירה?',
-          'זה קובע כמה חדרים צריך ואילו שירותים בשכונה חשובים לך.',
+          'קובע כמה חדרים וצרכים בשכונה.',
           ['לבד', 'זוג', 'משפחה עם ילדים', 'שותפים']);
     }
-    // The single most important factor — always asked once.
-    add('priority', 'אם היית צריך לבחור דבר אחד הכי חשוב — מה זה?',
-        'זה מה שידחוף הכי חזק את ההצעות הרלוונטיות למעלה.',
-        ['מיקום מרכזי', 'שקט ואיכות חיים', 'תמורה למחיר', 'דירה מרווחת', 'קרוב לעבודה']);
-
-    // Persona-specific — she asks only what fits THIS person.
-    final family = household == 'family' ||
-        _persona['baby'] == 'true' ||
-        RegExp(r'משפח|ילד|תינוק').hasMatch(text);
-    if (family) {
-      add('schools', 'כמה חשובה קרבה לגנים ובתי ספר טובים?',
-          'למשפחה זה משנה את סדר ההצעות — אני מדרגת לפי מוסדות חינוך באזור.',
-          ['קריטי', 'חשוב', 'פחות חשוב']);
-    }
-    final senior = s['lifeStage'] == 'senior' ||
-        s['accessibilityNeed'] == 'true' ||
-        RegExp(r'מבוגר|נגיש|כיסא גלגלים|מעלית חובה').hasMatch(text);
-    if (senior) {
-      add('accessibility', 'צריך נגישות מלאה — מעלית או קומה נמוכה?',
-          'נגישות היא סינון קשיח אצלי — לא אציג דירה שלא באמת מתאימה.',
-          ['חובה מעלית', 'קומה נמוכה', 'לא קריטי']);
-    }
-    if (RegExp(r'כלב|חתול|חיית מחמד|בעל חיים').hasMatch(text)) {
-      add('pet', 'יש חיית מחמד שצריך להתחשב בה?',
-          'דירה שמאשרת חיות + קומה נמוכה זה הבדל גדול לבעל כלב.',
-          ['כן, כלב', 'כן, חתול', 'אין']);
-    }
-    // Hard must-haves (a real filter, not a preference).
-    add('musthave', 'יש משהו שהוא חובה מוחלטת בדירה?',
-        'זה סינון קשיח — לא רק העדפה. דירה בלי זה פשוט לא תעלה.',
-        ['ממ״ד', 'מעלית', 'חניה', 'מרפסת', 'אין חובות']);
-    // Timeline.
-    add('timeline', 'מתי צריכים להיכנס לדירה?',
-        'דחיפות משנה מה כדאי להראות — כניסה מיידית מול גמישות.',
-        ['מיידי', 'חודש-חודשיים', 'גמיש']);
-    // Commute (skip for a senior — usually retired).
-    if (!senior) {
-      add('commute', 'יש מקום עבודה קבוע שחשוב להיות קרוב אליו?',
-          'אם כן, אני יכולה לדרג את ההצעות לפי זמן הנסיעה בפועל.',
-          ['כן, יש', 'עובד/ת מהבית', 'לא רלוונטי']);
-    }
+    // The single most important factor — the always-relevant closer.
+    add('priority', 'הכי חשוב לך בדירה?',
+        'זה מה שידחוף את ההצעות הנכונות למעלה.',
+        ['מיקום מרכזי', 'שקט', 'תמורה למחיר', 'דירה מרווחת', 'קרוב לעבודה']);
 
     return out.isEmpty ? null : out.first;
   }
