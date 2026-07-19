@@ -3760,41 +3760,41 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
   @override
   Widget build(BuildContext context) {
     final Widget buttonContent = Container(
-      height: 60,
+      height: 58,
       decoration: widget.isPrimary
           ? BoxDecoration(
               gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
                 colors: [
-                  Color(0xFF38F2E2), // Vibrant bright turquoise
-                  _kBrandTeal,       // Brand teal
-                  Color(0xFF0C919A), // Deep teal shade
+                  Color(0xFF38F2E2), // Bright vibrant turquoise/cyan
+                  _kBrandTeal,       // Core brand teal
+                  Color(0xFF0D96A0), // Deeper teal
                 ],
               ),
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.45),
+                color: Colors.white.withValues(alpha: 0.42),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
                   color: _kBrandTeal.withValues(alpha: 0.45),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
                 ),
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             )
           : BoxDecoration(
-              color: AppColors.navyDeep.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(30),
+              color: AppColors.navyDeep.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.26),
+                color: Colors.white.withValues(alpha: 0.24),
                 width: 1.2,
               ),
               gradient: LinearGradient(
@@ -3803,91 +3803,57 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
                 colors: [
                   Colors.white.withValues(alpha: 0.14),
                   Colors.transparent,
-                  AppColors.navy.withValues(alpha: 0.50),
+                  AppColors.navy.withValues(alpha: 0.45),
                 ],
               ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Subtle radial glow inside primary button
-          if (widget.isPrimary)
-            Positioned(
-              top: -15,
-              right: -10,
-              child: Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.25),
-                ),
+          // Sleek squircle icon chip without distracting double-borders
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: widget.isPrimary
+                  ? Colors.white.withValues(alpha: 0.22)
+                  : Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Icon(
+                widget.icon,
+                color: Colors.white,
+                size: 19,
               ),
             ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Glass medallion for icon
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: widget.isPrimary
-                      ? Colors.white.withValues(alpha: 0.24)
-                      : Colors.white.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: widget.isPrimary
-                        ? Colors.white.withValues(alpha: 0.38)
-                        : Colors.white.withValues(alpha: 0.22),
-                    width: 1.0,
-                  ),
-                  boxShadow: widget.isPrimary
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: Icon(
-                    widget.icon,
-                    color: Colors.white,
-                    size: 18.5,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  shadows: widget.isPrimary
-                      ? [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-            ],
+          ),
+          const SizedBox(width: 10),
+          Text(
+            widget.label,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              shadows: widget.isPrimary
+                  ? [
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
+            ),
           ),
         ],
       ),
@@ -3896,7 +3862,7 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
     final Widget frostedOrSolid = widget.isPrimary
         ? buttonContent
         : ClipRRect(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(20),
             child: BackdropFilter(
               filter: ImageFilter.blur(
                 sigmaX: PlatformFx.blurSigma(24),
