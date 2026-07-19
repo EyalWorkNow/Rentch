@@ -27,6 +27,12 @@ class PropertyLike {
     this.age,
     this.isOleh,
     this.verified,
+    this.smoker,
+    this.hasGuarantor,
+    this.leaseMonths,
+    this.incomeProofReady,
+    this.workLat,
+    this.workLon,
   });
 
   final String propertyId;
@@ -64,6 +70,15 @@ class PropertyLike {
   final int? age;
   final bool? isOleh;
   final bool? verified;
+  final bool? smoker;
+  final bool? hasGuarantor;
+  final int? leaseMonths;
+  final bool? incomeProofReady;
+
+  /// Tenant's work-location coords, snapshotted so the landlord's commute filter
+  /// (מרחק ממקום העבודה) can measure distance to each liked property.
+  final double? workLat;
+  final double? workLon;
 
   bool get hasIntro =>
       introMessage.isNotEmpty ||
@@ -126,6 +141,12 @@ class PropertyLike {
       age: _int(row['age']),
       isOleh: _bool(row['isOleh']),
       verified: _bool(row['verified']),
+      smoker: _bool(row['smoker']),
+      hasGuarantor: _bool(row['hasGuarantor']),
+      leaseMonths: _int(row['leaseMonths']),
+      incomeProofReady: _bool(row['incomeProofReady']),
+      workLat: _double(row['workLat']),
+      workLon: _double(row['workLon']),
     );
   }
 }
@@ -182,49 +203,130 @@ class PropertyLikesRepository {
     int? age,
     bool? isOleh,
     bool? verified,
+    bool? smoker,
+    bool? hasGuarantor,
+    int? leaseMonths,
+    bool? incomeProofReady,
+    double? workLat,
+    double? workLon,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
-    final id = likeId(propertyId, tenantId);
+    try {
+      await _api.post(
+        _path,
+        buildAddLikeBody(
+          propertyId: propertyId,
+          ownerUserId: ownerUserId,
+          tenantId: tenantId,
+          tenantName: tenantName,
+          tenantPhotoUrl: tenantPhotoUrl,
+          introMessage: introMessage,
+          budgetSnapshot: budgetSnapshot,
+          moveInSnapshot: moveInSnapshot,
+          at: at,
+          budgetMax: budgetMax,
+          rooms: rooms,
+          occupation: occupation,
+          numChildren: numChildren,
+          hasPets: hasPets,
+          hasCar: hasCar,
+          wfh: wfh,
+          household: household,
+          lifeStage: lifeStage,
+          monthlyIncome: monthlyIncome,
+          age: age,
+          isOleh: isOleh,
+          verified: verified,
+          smoker: smoker,
+          hasGuarantor: hasGuarantor,
+          leaseMonths: leaseMonths,
+          incomeProofReady: incomeProofReady,
+          workLat: workLat,
+          workLon: workLon,
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('PropertyLikesRepository.addLike failed: $e');
+    }
+  }
+
+  /// Builds the exact JSON body [addLike] posts. Pure and side-effect-free so the
+  /// "only send optional fields when present" contract is unit-testable without a
+  /// live gateway. Each optional attribute is emitted ONLY when non-null (and
+  /// non-blank for strings), so old-style payloads stay byte-identical.
+  @visibleForTesting
+  static Map<String, dynamic> buildAddLikeBody({
+    required String propertyId,
+    required String ownerUserId,
+    required String tenantId,
+    required String tenantName,
+    String tenantPhotoUrl = '',
+    String introMessage = '',
+    String budgetSnapshot = '',
+    String moveInSnapshot = '',
+    DateTime? at,
+    int? budgetMax,
+    double? rooms,
+    String? occupation,
+    int? numChildren,
+    bool? hasPets,
+    bool? hasCar,
+    bool? wfh,
+    String? household,
+    String? lifeStage,
+    int? monthlyIncome,
+    int? age,
+    bool? isOleh,
+    bool? verified,
+    bool? smoker,
+    bool? hasGuarantor,
+    int? leaseMonths,
+    bool? incomeProofReady,
+    double? workLat,
+    double? workLon,
+  }) {
     final note = introMessage.trim();
     final clampedNote = note.length > introMessageMaxLength
         ? note.substring(0, introMessageMaxLength)
         : note;
-    try {
-      await _api.post(_path, {
-        'id': id,
-        'propertyId': propertyId,
-        'ownerUserId': ownerUserId,
-        'tenantId': tenantId,
-        'tenantName': tenantName,
-        'tenantPhotoUrl': tenantPhotoUrl,
-        // Only send the optional fields when present, so the payload stays
-        // identical to old likes when no note is attached.
-        if (clampedNote.isNotEmpty) 'introMessage': clampedNote,
-        if (budgetSnapshot.trim().isNotEmpty)
-          'budgetSnapshot': budgetSnapshot.trim(),
-        if (moveInSnapshot.trim().isNotEmpty)
-          'moveInSnapshot': moveInSnapshot.trim(),
-        if (budgetMax != null) 'budgetMax': budgetMax,
-        if (rooms != null) 'rooms': rooms,
-        if (occupation != null && occupation.trim().isNotEmpty)
-          'occupation': occupation.trim(),
-        if (numChildren != null) 'numChildren': numChildren,
-        if (hasPets != null) 'hasPets': hasPets,
-        if (hasCar != null) 'hasCar': hasCar,
-        if (wfh != null) 'wfh': wfh,
-        if (household != null && household.trim().isNotEmpty)
-          'household': household.trim(),
-        if (lifeStage != null && lifeStage.trim().isNotEmpty)
-          'lifeStage': lifeStage.trim(),
-        if (monthlyIncome != null) 'monthlyIncome': monthlyIncome,
-        if (age != null) 'age': age,
-        if (isOleh != null) 'isOleh': isOleh,
-        if (verified != null) 'verified': verified,
-        'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
-      });
-    } catch (e) {
-      if (kDebugMode) debugPrint('PropertyLikesRepository.addLike failed: $e');
-    }
+    return {
+      'id': likeId(propertyId, tenantId),
+      'propertyId': propertyId,
+      'ownerUserId': ownerUserId,
+      'tenantId': tenantId,
+      'tenantName': tenantName,
+      'tenantPhotoUrl': tenantPhotoUrl,
+      // Only send the optional fields when present, so the payload stays
+      // identical to old likes when no note is attached.
+      if (clampedNote.isNotEmpty) 'introMessage': clampedNote,
+      if (budgetSnapshot.trim().isNotEmpty)
+        'budgetSnapshot': budgetSnapshot.trim(),
+      if (moveInSnapshot.trim().isNotEmpty)
+        'moveInSnapshot': moveInSnapshot.trim(),
+      if (budgetMax != null) 'budgetMax': budgetMax,
+      if (rooms != null) 'rooms': rooms,
+      if (occupation != null && occupation.trim().isNotEmpty)
+        'occupation': occupation.trim(),
+      if (numChildren != null) 'numChildren': numChildren,
+      if (hasPets != null) 'hasPets': hasPets,
+      if (hasCar != null) 'hasCar': hasCar,
+      if (wfh != null) 'wfh': wfh,
+      if (household != null && household.trim().isNotEmpty)
+        'household': household.trim(),
+      if (lifeStage != null && lifeStage.trim().isNotEmpty)
+        'lifeStage': lifeStage.trim(),
+      if (monthlyIncome != null) 'monthlyIncome': monthlyIncome,
+      if (age != null) 'age': age,
+      if (isOleh != null) 'isOleh': isOleh,
+      if (verified != null) 'verified': verified,
+      if (smoker != null) 'smoker': smoker,
+      if (hasGuarantor != null) 'hasGuarantor': hasGuarantor,
+      if (leaseMonths != null) 'leaseMonths': leaseMonths,
+      if (incomeProofReady != null) 'incomeProofReady': incomeProofReady,
+      if (workLat != null) 'workLat': workLat,
+      if (workLon != null) 'workLon': workLon,
+      'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
+    };
   }
 
   Future<void> removeLike({

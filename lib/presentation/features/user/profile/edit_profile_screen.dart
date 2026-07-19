@@ -120,6 +120,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool? _isOleh;
   int? _age;
   bool? _accessibilityNeed;
+  bool? _smoker;
+  bool? _hasGuarantor;
+  int? _leaseMonths;
+  bool? _incomeProofReady;
   late List<String> _details;
   late List<String> _dealBreakers;
   late List<_PhotoEntry> _photos;
@@ -169,6 +173,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _isOleh = p.isOleh;
     _age = p.age;
     _accessibilityNeed = p.accessibilityNeed;
+    _smoker = p.smoker;
+    _hasGuarantor = p.hasGuarantor;
+    _leaseMonths = p.leaseMonths;
+    _incomeProofReady = p.incomeProofReady;
     _details = List<String>.from(p.importantDetails);
     _dealBreakers = List<String>.from(p.dealBreakers);
     _photos = p.photoUrls.map(_PhotoEntry.remote).toList();
@@ -401,6 +409,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       isOleh: _isOleh,
       age: _age,
       accessibilityNeed: _accessibilityNeed,
+      smoker: _smoker,
+      hasGuarantor: _hasGuarantor,
+      leaseMonths: _leaseMonths,
+      incomeProofReady: _incomeProofReady,
     );
 
     if (!mounted) return;
@@ -1035,6 +1047,93 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               HapticFeedback.selectionClick();
                               setState(() => _accessibilityNeed = v);
                             },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Smoking — snapshotted so the landlord's "מעשן" filter
+                          // can act on it.
+                          _YesNoRow(
+                            label: 'מעשן/ת?',
+                            value: _smoker,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _smoker = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Guarantor — backs the landlord's "ערבות" filter.
+                          _YesNoRow(
+                            label: 'יש ערב/ערבות?',
+                            value: _hasGuarantor,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _hasGuarantor = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Income proof — backs the "אסמכתאות הכנסה" filter.
+                          _YesNoRow(
+                            label: 'אישור הכנסה מוכן?',
+                            value: _incomeProofReady,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _incomeProofReady = v);
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Desired lease length (months) — backs the landlord's
+                          // "משך שכירות מבוקש" filter. Chips; tap again to clear.
+                          const Text(
+                            'משך שכירות מבוקש (חודשים)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: const <int>[6, 12, 24, 36].map((m) {
+                              final selected = _leaseMonths == m;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() =>
+                                      _leaseMonths = selected ? null : m);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '$m',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
                           const SizedBox(height: 20),
 

@@ -7,9 +7,13 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
+import 'package:dating_app/presentation/screens/explore_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('UNIFY — swipe deck is now stat-area aware: high-SES block outranks a '
@@ -476,6 +480,65 @@ void main() {
       isNot(contains(guestDemo.id)),
     );
 
+    provider.dispose();
+  });
+
+  // Regression: the candidates deck card (_FactGrid) used a Row with
+  // CrossAxisAlignment.stretch inside a vertical scroll view, which forced an
+  // infinite height and blanked the whole deck at runtime (analyze/unit tests
+  // passed — only layout throws). Rendering the real ExploreScreen here fails if
+  // that (or any layout crash) comes back.
+  testWidgets('candidates deck renders a lead card without a layout crash',
+      (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final ownLead = _property(id: 'own-lead', ownerUserId: 'owner-1');
+    final storage = _MemoryLocalStorageService()
+      ..state = {
+        'schema': 'rental_match_v2',
+        'tenantProfile': const TenantProfile(
+          id: 'owner-1',
+          name: 'Owner One',
+          bio: '',
+          photoUrls: <String>[],
+          budgetMax: 6000,
+          desiredRooms: 3,
+          moveInWindow: 'within 30 days',
+          importantDetails: <String>[],
+        ).toJson(),
+        'likedPropertyIds': [ownLead.id],
+        'customProperties': [ownLead.toJson()],
+        'userRole': 'landlord',
+        'hasActiveSession': true,
+        'roleExplicitlyChosen': true,
+      };
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(const []),
+      localStorageService: storage,
+    );
+    await provider.initialize();
+    expect(provider.ownerLeads, isNotEmpty,
+        reason: 'precondition: the landlord has a candidate lead');
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<DatingProvider>.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: ExploreScreen(embedded: true)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull,
+        reason: 'the deck must lay out without an infinite-height crash');
+    expect(find.byType(CardSwiper), findsOneWidget,
+        reason: 'the candidate card deck must render');
+
+    // Unmount, then advance the clock past any pending fail-soft delayed
+    // timers (throttled refreshes) so the binding's no-pending-timers teardown
+    // check is satisfied.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 2));
     provider.dispose();
   });
 

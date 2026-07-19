@@ -25,6 +25,7 @@ class CandidateFilters {
     this.budgetMax,
     this.moveInWindow,
     this.minFitScore,
+    this.maxFitScore,
     this.numChildrenMax,
     this.hasPets,
     this.hasCar,
@@ -33,6 +34,18 @@ class CandidateFilters {
     this.incomeMin,
     this.wfh,
     this.verifiedOnly = false,
+    this.ageMin,
+    this.ageMax,
+    this.lifeStage = const <String>{},
+    this.roomsMin,
+    this.recentOnly = false,
+    this.minIncomeToRentRatio,
+    this.oleh,
+    this.maxCommuteKm,
+    this.smoker,
+    this.hasGuarantor,
+    this.minLeaseMonths,
+    this.incomeProofReady,
   });
 
   /// Candidate's declared budget floor / ceiling (₪ per month). null = inactive.
@@ -43,8 +56,10 @@ class CandidateFilters {
   /// One of [moveInWindowTokens]. Matched against days-until-available.
   final String? moveInWindow;
 
-  /// Minimum honest fit score in [0, 100]. null = inactive.
+  /// Honest fit-score window in [0, 100]. null = inactive (open on that end),
+  /// so the landlord can pick a RANGE (e.g. 30–70) for flexibility.
   final double? minFitScore;
+  final double? maxFitScore;
 
   /// Household size / attribute constraints (future-proof; unpopulated today).
   final int? numChildrenMax;
@@ -55,6 +70,51 @@ class CandidateFilters {
   final double? incomeMin;
   final bool? wfh;
   final bool verifiedOnly;
+
+  /// Candidate age window (years). null on an end = open there.
+  final int? ageMin;
+  final int? ageMax;
+
+  /// Life-stage keys the candidate must fall into (student / young-professional
+  /// / family / senior). Empty = inactive.
+  final Set<String> lifeStage;
+
+  /// Minimum desired rooms the candidate declared. null = inactive.
+  final double? roomsMin;
+
+  /// When true, keep only candidates whose like is recent (≤ 7 days old).
+  /// Unknown like-age passes.
+  final bool recentOnly;
+
+  /// Minimum income-to-rent ratio (e.g. 2.5 ⇒ income ≥ 2.5× the liked
+  /// property's rent). null = inactive. Computed per candidate from the liker's
+  /// income and the liked property's price.
+  final double? minIncomeToRentRatio;
+
+  /// When true, keep only candidates who are new immigrants (עולה חדש); when
+  /// false, only non-oleh. null = inactive. Unknown liker value passes.
+  final bool? oleh;
+
+  /// Maximum distance (km) between the candidate's work location and the liked
+  /// property. null = inactive. Unknown commute (no work location) passes.
+  final double? maxCommuteKm;
+
+  /// Candidate smoking status constraint. null = inactive. Unknown passes.
+  final bool? smoker;
+
+  /// When true, keep only candidates who have a guarantor (ערב). null = inactive.
+  final bool? hasGuarantor;
+
+  /// Minimum desired lease length in months (e.g. 12 ⇒ ≥ 12 months). null =
+  /// inactive. Unknown lease length passes.
+  final int? minLeaseMonths;
+
+  /// When true, keep only candidates whose income proof is ready. null =
+  /// inactive. Unknown passes.
+  final bool? incomeProofReady;
+
+  /// A like at or under this age (days) counts as "recent" for [recentOnly].
+  static const int recentLikeMaxDays = 7;
 
   /// Canonical move-in / availability buckets and their inclusive day ceilings.
   static const Map<String, int> moveInWindowMaxDays = <String, int>{
@@ -87,6 +147,17 @@ class CandidateFilters {
     }
   }
 
+  /// Canonical life-stage tokens (locked to the eligibility gate's allowlist —
+  /// note the hyphen in 'young-professional') and their Hebrew labels (RTL UI).
+  static const Map<String, String> lifeStageLabels = <String, String>{
+    'student': 'סטודנט/ית',
+    'young-professional': 'צעיר/ה מקצועי/ת',
+    'family': 'משפחה',
+    'senior': 'גיל הזהב',
+  };
+
+  static String lifeStageLabel(String token) => lifeStageLabels[token] ?? token;
+
   bool get isEmpty => activeCount == 0;
   bool get isNotEmpty => !isEmpty;
 
@@ -96,7 +167,7 @@ class CandidateFilters {
     if (budgetMin != null) n++;
     if (budgetMax != null) n++;
     if (moveInWindow != null) n++;
-    if (minFitScore != null) n++;
+    if (minFitScore != null || maxFitScore != null) n++;
     if (numChildrenMax != null) n++;
     if (hasPets != null) n++;
     if (hasCar != null) n++;
@@ -105,6 +176,17 @@ class CandidateFilters {
     if (incomeMin != null) n++;
     if (wfh != null) n++;
     if (verifiedOnly) n++;
+    if (ageMin != null || ageMax != null) n++;
+    if (lifeStage.isNotEmpty) n++;
+    if (roomsMin != null) n++;
+    if (recentOnly) n++;
+    if (minIncomeToRentRatio != null) n++;
+    if (oleh != null) n++;
+    if (maxCommuteKm != null) n++;
+    if (smoker != null) n++;
+    if (hasGuarantor != null) n++;
+    if (minLeaseMonths != null) n++;
+    if (incomeProofReady != null) n++;
     return n;
   }
 
@@ -112,6 +194,7 @@ class CandidateFilters {
   /// attributes always pass — we never exclude on a signal we can't measure.
   bool matches(CandidateAttributes c) {
     if (minFitScore != null && c.fitScore < minFitScore!) return false;
+    if (maxFitScore != null && c.fitScore > maxFitScore!) return false;
 
     if (c.budget != null) {
       if (budgetMin != null && c.budget! < budgetMin!) return false;
@@ -149,6 +232,62 @@ class CandidateFilters {
     }
     if (verifiedOnly && c.verified != null && c.verified != true) return false;
 
+    if (c.age != null) {
+      if (ageMin != null && c.age! < ageMin!) return false;
+      if (ageMax != null && c.age! > ageMax!) return false;
+    }
+
+    if (lifeStage.isNotEmpty &&
+        c.lifeStage != null &&
+        !lifeStage.contains(c.lifeStage)) {
+      return false;
+    }
+
+    if (roomsMin != null && c.rooms != null && c.rooms! < roomsMin!) {
+      return false;
+    }
+
+    if (recentOnly &&
+        c.likedInDays != null &&
+        c.likedInDays! > recentLikeMaxDays) {
+      return false;
+    }
+
+    // Affordability: income-to-rent ratio floor.
+    if (minIncomeToRentRatio != null &&
+        c.incomeToRentRatio != null &&
+        c.incomeToRentRatio! < minIncomeToRentRatio!) {
+      return false;
+    }
+
+    if (oleh != null && c.isOleh != null && c.isOleh != oleh) return false;
+
+    if (maxCommuteKm != null &&
+        c.commuteKm != null &&
+        c.commuteKm! > maxCommuteKm!) {
+      return false;
+    }
+
+    if (smoker != null && c.smoker != null && c.smoker != smoker) return false;
+
+    if (hasGuarantor != null &&
+        c.hasGuarantor != null &&
+        c.hasGuarantor != hasGuarantor) {
+      return false;
+    }
+
+    if (minLeaseMonths != null &&
+        c.leaseMonths != null &&
+        c.leaseMonths! < minLeaseMonths!) {
+      return false;
+    }
+
+    if (incomeProofReady != null &&
+        c.incomeProofReady != null &&
+        c.incomeProofReady != incomeProofReady) {
+      return false;
+    }
+
     return true;
   }
 
@@ -157,6 +296,7 @@ class CandidateFilters {
     double? budgetMax,
     String? moveInWindow,
     double? minFitScore,
+    double? maxFitScore,
     int? numChildrenMax,
     bool? hasPets,
     bool? hasCar,
@@ -165,16 +305,39 @@ class CandidateFilters {
     double? incomeMin,
     bool? wfh,
     bool? verifiedOnly,
+    int? ageMin,
+    int? ageMax,
+    Set<String>? lifeStage,
+    double? roomsMin,
+    bool? recentOnly,
+    double? minIncomeToRentRatio,
+    bool? oleh,
+    double? maxCommuteKm,
+    bool? smoker,
+    bool? hasGuarantor,
+    int? minLeaseMonths,
+    bool? incomeProofReady,
     // Explicit clears — copyWith can't null-out a field via the params above.
     bool clearBudgetMin = false,
     bool clearBudgetMax = false,
     bool clearMoveInWindow = false,
     bool clearMinFitScore = false,
+    bool clearMaxFitScore = false,
     bool clearNumChildrenMax = false,
     bool clearHasPets = false,
     bool clearHasCar = false,
     bool clearIncomeMin = false,
     bool clearWfh = false,
+    bool clearAgeMin = false,
+    bool clearAgeMax = false,
+    bool clearRoomsMin = false,
+    bool clearMinIncomeToRentRatio = false,
+    bool clearOleh = false,
+    bool clearMaxCommuteKm = false,
+    bool clearSmoker = false,
+    bool clearHasGuarantor = false,
+    bool clearMinLeaseMonths = false,
+    bool clearIncomeProofReady = false,
   }) {
     return CandidateFilters(
       budgetMin: clearBudgetMin ? null : (budgetMin ?? this.budgetMin),
@@ -182,6 +345,7 @@ class CandidateFilters {
       moveInWindow:
           clearMoveInWindow ? null : (moveInWindow ?? this.moveInWindow),
       minFitScore: clearMinFitScore ? null : (minFitScore ?? this.minFitScore),
+      maxFitScore: clearMaxFitScore ? null : (maxFitScore ?? this.maxFitScore),
       numChildrenMax:
           clearNumChildrenMax ? null : (numChildrenMax ?? this.numChildrenMax),
       hasPets: clearHasPets ? null : (hasPets ?? this.hasPets),
@@ -191,6 +355,25 @@ class CandidateFilters {
       incomeMin: clearIncomeMin ? null : (incomeMin ?? this.incomeMin),
       wfh: clearWfh ? null : (wfh ?? this.wfh),
       verifiedOnly: verifiedOnly ?? this.verifiedOnly,
+      ageMin: clearAgeMin ? null : (ageMin ?? this.ageMin),
+      ageMax: clearAgeMax ? null : (ageMax ?? this.ageMax),
+      lifeStage: lifeStage ?? this.lifeStage,
+      roomsMin: clearRoomsMin ? null : (roomsMin ?? this.roomsMin),
+      recentOnly: recentOnly ?? this.recentOnly,
+      minIncomeToRentRatio: clearMinIncomeToRentRatio
+          ? null
+          : (minIncomeToRentRatio ?? this.minIncomeToRentRatio),
+      oleh: clearOleh ? null : (oleh ?? this.oleh),
+      maxCommuteKm:
+          clearMaxCommuteKm ? null : (maxCommuteKm ?? this.maxCommuteKm),
+      smoker: clearSmoker ? null : (smoker ?? this.smoker),
+      hasGuarantor:
+          clearHasGuarantor ? null : (hasGuarantor ?? this.hasGuarantor),
+      minLeaseMonths:
+          clearMinLeaseMonths ? null : (minLeaseMonths ?? this.minLeaseMonths),
+      incomeProofReady: clearIncomeProofReady
+          ? null
+          : (incomeProofReady ?? this.incomeProofReady),
     );
   }
 
@@ -228,6 +411,17 @@ class CandidateAttributes {
     this.occupation,
     this.income,
     this.verified,
+    this.age,
+    this.lifeStage,
+    this.rooms,
+    this.likedInDays,
+    this.incomeToRentRatio,
+    this.isOleh,
+    this.commuteKm,
+    this.smoker,
+    this.hasGuarantor,
+    this.leaseMonths,
+    this.incomeProofReady,
   });
 
   /// Honest fit score in [0, 100] (always known — computed from real signals).
@@ -248,4 +442,38 @@ class CandidateAttributes {
   final String? occupation;
   final double? income;
   final bool? verified;
+
+  /// Candidate age in years, if the like snapshot carried one.
+  final int? age;
+
+  /// Candidate life-stage key (student / young-professional / family / senior).
+  final String? lifeStage;
+
+  /// Candidate's declared desired rooms, if known.
+  final double? rooms;
+
+  /// How many days ago the like was created (0 = today). Drives [recentOnly].
+  final int? likedInDays;
+
+  /// Candidate income ÷ the liked property's rent, if both are known.
+  final double? incomeToRentRatio;
+
+  /// Whether the candidate is a new immigrant (עולה חדש), if known.
+  final bool? isOleh;
+
+  /// Distance (km) from the candidate's work location to the liked property,
+  /// if a work location is on file.
+  final double? commuteKm;
+
+  /// Candidate smoking status, if known.
+  final bool? smoker;
+
+  /// Whether the candidate has a guarantor (ערב), if known.
+  final bool? hasGuarantor;
+
+  /// Candidate's desired lease length in months, if known.
+  final int? leaseMonths;
+
+  /// Whether the candidate's income proof is ready, if known.
+  final bool? incomeProofReady;
 }

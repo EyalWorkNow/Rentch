@@ -1303,6 +1303,10 @@ class TenantProfile {
     this.isOleh,
     this.age,
     this.accessibilityNeed,
+    this.smoker,
+    this.hasGuarantor,
+    this.leaseMonths,
+    this.incomeProofReady,
   });
 
   final String id;
@@ -1375,6 +1379,19 @@ class TenantProfile {
   /// criterion (1:1). Optional — null leaves it unconstrained.
   final bool? accessibilityNeed;
 
+  /// Whether the tenant smokes. Snapshotted into the like so the landlord's
+  /// candidate filter (מעשן) can act on it. Optional — null = unspecified.
+  final bool? smoker;
+
+  /// Whether the tenant can provide a guarantor (ערב). Optional — null = unset.
+  final bool? hasGuarantor;
+
+  /// Desired lease length in months (e.g. 12). Optional — null = unspecified.
+  final int? leaseMonths;
+
+  /// Whether the tenant has income proof ready. Optional — null = unspecified.
+  final bool? incomeProofReady;
+
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
   TenantProfile copyWith({
@@ -1400,6 +1417,10 @@ class TenantProfile {
     bool? isOleh,
     int? age,
     bool? accessibilityNeed,
+    bool? smoker,
+    bool? hasGuarantor,
+    int? leaseMonths,
+    bool? incomeProofReady,
   }) {
     return TenantProfile(
       id: id ?? this.id,
@@ -1424,6 +1445,10 @@ class TenantProfile {
       isOleh: isOleh ?? this.isOleh,
       age: age ?? this.age,
       accessibilityNeed: accessibilityNeed ?? this.accessibilityNeed,
+      smoker: smoker ?? this.smoker,
+      hasGuarantor: hasGuarantor ?? this.hasGuarantor,
+      leaseMonths: leaseMonths ?? this.leaseMonths,
+      incomeProofReady: incomeProofReady ?? this.incomeProofReady,
     );
   }
 
@@ -1462,6 +1487,10 @@ class TenantProfile {
       isOleh: _optionalBool(json['isOleh']),
       age: _optionalInt(json['age']),
       accessibilityNeed: _optionalBool(json['accessibilityNeed']),
+      smoker: _optionalBool(json['smoker']),
+      hasGuarantor: _optionalBool(json['hasGuarantor']),
+      leaseMonths: _optionalInt(json['leaseMonths']),
+      incomeProofReady: _optionalBool(json['incomeProofReady']),
     );
   }
 
@@ -1491,6 +1520,10 @@ class TenantProfile {
       if (isOleh != null) 'isOleh': isOleh,
       if (age != null) 'age': age,
       if (accessibilityNeed != null) 'accessibilityNeed': accessibilityNeed,
+      if (smoker != null) 'smoker': smoker,
+      if (hasGuarantor != null) 'hasGuarantor': hasGuarantor,
+      if (leaseMonths != null) 'leaseMonths': leaseMonths,
+      if (incomeProofReady != null) 'incomeProofReady': incomeProofReady,
     };
   }
 }

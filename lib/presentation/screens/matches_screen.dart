@@ -53,7 +53,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
   String _query = '';
   String _ageFilter = _kFilterAll;
   String _scheduleFilter = _kFilterAll;
-  bool _showFilters = true;
+  // Filters start CLOSED — the bar only opens when the user taps the icon.
+  bool _showFilters = false;
+  // Paid message-requests (people with no match who paid extra to write you)
+  // live behind a header icon, not stacked on top of the conversation list.
+  bool _showRequests = false;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -153,13 +157,6 @@ class _MatchesScreenState extends State<MatchesScreen> {
             .toList();
         final filtered = _applyFilters(
             allMatches.where((m) => !m.isRequest).toList(), provider);
-        final total = allMatches
-            .where((m) => provider.propertyById(m.propertyId) != null)
-            .length;
-
-        final subtitleText = _isFiltering
-            ? '${filtered.length} מתוך $total דירות'
-            : '$total שיחות פעילות';
 
         return Scaffold(
           appBar: null,
@@ -178,21 +175,19 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     ? _EmptyMatches(isLandlord: provider.isLandlord)
                     : Column(
                         children: [
-                          Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: Text(
-                                subtitleText,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          // Paid message-requests entry — an icon + count that
+                          // reveals the "paid to write you" inquiries on tap.
+                          if (requestPairs.isNotEmpty)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                              child: _RequestsToggle(
+                                count: requestPairs.length,
+                                active: _showRequests,
+                                onTap: () => setState(
+                                    () => _showRequests = !_showRequests),
                               ),
                             ),
-                          ),
                           _MatchesToolbar(
                             controller: _searchCtrl,
                             query: _query,
@@ -219,10 +214,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                     padding: const EdgeInsets.fromLTRB(
                                         16, 12, 16, 120),
                                     children: [
-                                      if (requestPairs.isNotEmpty) ...[
+                                      if (_showRequests &&
+                                          requestPairs.isNotEmpty) ...[
                                         _MessagesSectionHeader(
                                           icon: Icons.mark_email_unread_outlined,
-                                          label: 'מבקשים לשלוח הודעה',
+                                          label: 'פניות בתשלום',
                                           count: requestPairs.length,
                                         ),
                                         const SizedBox(height: 10),
@@ -325,6 +321,83 @@ class _MessagesSectionHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Header pill that reveals the paid message-requests (tenants with no match who
+/// paid extra to write the landlord about a listing). Tap to expand/collapse.
+class _RequestsToggle extends StatelessWidget {
+  const _RequestsToggle({
+    required this.count,
+    required this.active,
+    required this.onTap,
+  });
+
+  final int count;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.primary
+              : AppColors.primary.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: active
+                ? AppColors.primary
+                : AppColors.primary.withOpacity(0.25),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.mark_email_unread_rounded,
+              size: 18,
+              color: active ? Colors.white : AppColors.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'פניות בתשלום',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: active ? Colors.white : AppColors.navy,
+              ),
+            ),
+            const SizedBox(width: 7),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color:
+                    active ? Colors.white.withOpacity(0.25) : AppColors.coral,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              active ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 18,
+              color: active ? Colors.white : AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

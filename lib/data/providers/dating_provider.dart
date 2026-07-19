@@ -1618,7 +1618,10 @@ class DatingProvider extends ChangeNotifier {
   /// only for demo leads with no incoming like. Drives both the ranking order
   /// and the "התאמה גבוהה" badge — no fabricated trust. Fail-soft.
   double leadFitScore(RentalProperty property) {
-    final tenant = _tenantProfile;
+    var tenant = _tenantProfile;
+    if (isLandlord && tenant?.id == 'tenant-local') {
+      tenant = getCachedProfile('tenant-test') ?? tenant;
+    }
     final liker = _representativeLikerFor(property);
     if (tenant == null && liker == null) return 0;
 
@@ -3201,6 +3204,12 @@ class DatingProvider extends ChangeNotifier {
           monthlyIncome: tp?.monthlyIncome,
           age: tp?.age,
           isOleh: tp?.isOleh,
+          smoker: tp?.smoker,
+          hasGuarantor: tp?.hasGuarantor,
+          leaseMonths: tp?.leaseMonths,
+          incomeProofReady: tp?.incomeProofReady,
+          workLat: tp?.workLat,
+          workLon: tp?.workLon,
           // No explicit tenant "verified" flag exists; derive it from the app's
           // real trust signal (photo/bio/budget/etc.), the same score shown in
           // the profile. Only stamped when there's a profile to score.

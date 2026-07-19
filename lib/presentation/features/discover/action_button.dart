@@ -13,11 +13,26 @@ class ActionButtons extends StatelessWidget {
     required this.onSwipeLeft,
     required this.onSwipeRight,
     required this.onVirtualTour,
+    this.middleIcon = Icons.view_in_ar_rounded,
+    this.middleLabel = '3D',
+    this.middleTooltip = 'פתח סיור תלת־ממדי',
+    this.likeTooltip = 'אהבתי דירה',
+    this.passTooltip = 'דלג על דירה',
   });
 
   final VoidCallback onSwipeLeft;
   final VoidCallback onSwipeRight;
+
+  /// The centre button's action (3D tour on discover; candidate details here).
   final VoidCallback onVirtualTour;
+
+  /// Centre button appearance — customised so the landlord candidate deck can
+  /// reuse the exact same button set with an "info" middle instead of 3D.
+  final IconData middleIcon;
+  final String middleLabel;
+  final String middleTooltip;
+  final String likeTooltip;
+  final String passTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +49,7 @@ class ActionButtons extends StatelessWidget {
             active: true,
             child: _ActionButton(
               icon: IconsaxPlusBold.heart,
-              tooltip: 'אהבתי דירה',
+              tooltip: likeTooltip,
               iconColor: AppColors.primary,
               backgroundColor: Colors.white,
               size: 72,
@@ -52,8 +67,8 @@ class ActionButtons extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _ActionButton(
-                icon: Icons.view_in_ar_rounded,
-                tooltip: 'פתח סיור תלת־ממדי',
+                icon: middleIcon,
+                tooltip: middleTooltip,
                 iconColor: AppColors.navy,
                 backgroundColor: Colors.white,
                 size: 56,
@@ -66,7 +81,7 @@ class ActionButtons extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '3D',
+                middleLabel,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
@@ -79,7 +94,7 @@ class ActionButtons extends StatelessWidget {
           // ✕ X — pass (left in RTL, matches swipe left direction)
           _ActionButton(
             icon: Icons.close_rounded,
-            tooltip: 'דלג על דירה',
+            tooltip: passTooltip,
             iconColor: AppColors.coral,
             backgroundColor: Colors.white,
             size: 62,
