@@ -54,7 +54,16 @@ class _ErikChatScreenState extends State<ErikChatScreen>
   bool _picking = false;
   Timer? _streamTimer;
 
-  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+  String get _uid {
+    // Fail-soft: FirebaseAuth.instance throws if no app is initialised (e.g.
+    // tests / a cold boot before Firebase). A guest transcript is fine then.
+    try {
+      return FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    } catch (_) {
+      return 'guest';
+    }
+  }
+
   String get _storeKey => 'erik_transcript_$_uid';
 
   static const _greeting =

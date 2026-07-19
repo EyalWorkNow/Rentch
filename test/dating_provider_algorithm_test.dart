@@ -7,6 +7,7 @@ import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
+import 'package:dating_app/presentation/features/assistant/erik_chat_screen.dart';
 import 'package:dating_app/presentation/screens/explore_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -537,6 +538,46 @@ void main() {
     // Unmount, then advance the clock past any pending fail-soft delayed
     // timers (throttled refreshes) so the binding's no-pending-timers teardown
     // check is satisfied.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 2));
+    provider.dispose();
+  });
+
+  // Erik's new chat surface must lay out (dark canvas, bubbles, starter chips,
+  // input bar) without a crash and show the welcome + starters at rest.
+  testWidgets('Erik chat screen renders the welcome + starter chips',
+      (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final storage = _MemoryLocalStorageService()
+      ..state = {
+        'schema': 'rental_match_v2',
+        'userRole': 'landlord',
+        'hasActiveSession': true,
+        'roleExplicitlyChosen': true,
+      };
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(const []),
+      localStorageService: storage,
+    );
+    await provider.initialize();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<DatingProvider>.value(
+        value: provider,
+        child: const MaterialApp(
+          home: ErikChatScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull,
+        reason: 'the chat surface must lay out without a crash');
+    expect(find.text('אריק · העוזר האישי שלך'), findsOneWidget,
+        reason: 'the identity header must render');
+    expect(find.text('אני רוצה לפרסם דירה חדשה'), findsOneWidget,
+        reason: 'starter chips must render on the welcome state');
+
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 2));
     provider.dispose();
