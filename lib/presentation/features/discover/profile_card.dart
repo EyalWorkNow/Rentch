@@ -574,7 +574,7 @@ class _VerifiedListingBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.tealBrand.withValues(alpha: 0.94),
+        color: AppColors.primary.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),

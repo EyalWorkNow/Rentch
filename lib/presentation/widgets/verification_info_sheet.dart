@@ -101,10 +101,10 @@ class _VerifiedHeader extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [AppColors.navy, AppColors.tealBrand],
+          colors: [AppColors.navy, AppColors.primary],
         ),
         borderRadius: BorderRadius.circular(24),
       ),

@@ -1146,7 +1146,7 @@ class _VerifiedShield extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.tealBrand.withOpacity(0.94),
+        color: AppColors.primary.withOpacity(0.94),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withOpacity(0.22)),
       ),

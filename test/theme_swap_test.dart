@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/constants/app_styles.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 
 /// Verifies the "swap the theme accent" contract holds PER COLOUR TYPE:
@@ -69,6 +70,19 @@ void main() {
       expect(AppColors.scoreStrong, AppColors.successDeep); // green, not pink
       expect(AppColors.scoreMixed, AppColors.warningDeep); // orange, not pink
       expect(AppColors.scoreStrong, isNot(AppColors.primary));
+    });
+
+    test('AppStyles button styles track the live accent (getters, not frozen fields)', () {
+      // Regression: these used to be `static ... =` fields evaluated once at
+      // class-load, which froze every button at the default teal after a swap.
+      AppColors.customPrimary = hotPink;
+      AppColors.applyRole('tenant');
+      final primaryBg =
+          AppStyles.primaryButton.backgroundColor?.resolve(<WidgetState>{});
+      expect(primaryBg, hotPink, reason: 'primaryButton must use the swapped accent');
+      final outlineSide =
+          AppStyles.outlinedButton.side?.resolve(<WidgetState>{});
+      expect(outlineSide?.color, hotPink);
     });
 
     testWidgets('a token-driven accent gradient repaints after a swap', (tester) async {

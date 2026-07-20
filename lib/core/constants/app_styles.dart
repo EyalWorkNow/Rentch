@@ -42,30 +42,34 @@ class AppStyles {
     color: AppColors.textOnPrimary,
   );
 
-  // Button Styles
-  static ButtonStyle primaryButton = ElevatedButton.styleFrom(
-    backgroundColor: AppColors.primary,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8),
-    ),
-    padding: const EdgeInsets.symmetric(vertical: 16),
-  );
+  // Button Styles.
+  // These are GETTERS, not fields, on purpose: a `static ... =` field is
+  // evaluated once at class-load and would freeze the accent at its default
+  // value, so every button kept the old colour after a theme swap. Getters
+  // re-read the live [AppColors.primary] on every access.
+  static ButtonStyle get primaryButton => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      );
 
-  static ButtonStyle secondaryButton = ElevatedButton.styleFrom(
-    backgroundColor: AppColors.secondary,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8),
-    ),
-    padding: const EdgeInsets.symmetric(vertical: 16),
-  );
+  static ButtonStyle get secondaryButton => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.secondary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      );
 
-  static ButtonStyle outlinedButton = OutlinedButton.styleFrom(
-    side: BorderSide(color: AppColors.primary),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8),
-    ),
-    padding: const EdgeInsets.symmetric(vertical: 16),
-  );
+  static ButtonStyle get outlinedButton => OutlinedButton.styleFrom(
+        side: BorderSide(color: AppColors.primary),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      );
 
   // Input Decoration
   static InputDecoration inputDecoration(String label, {String? hint}) {

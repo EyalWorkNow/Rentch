@@ -195,7 +195,7 @@ class _OwnerHeader extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: isAgency
-                    ? [AppColors.tealBrand, AppColors.tealDark]
+                    ? [AppColors.primary, AppColors.primaryDark]
                     : [AppColors.slate600, AppColors.inkSoft],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -233,7 +233,7 @@ class _OwnerHeader extends StatelessWidget {
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: isAgency
-                        ? AppColors.tealBrand
+                        ? AppColors.primary
                         : AppColors.slate500,
                   ),
                 ),

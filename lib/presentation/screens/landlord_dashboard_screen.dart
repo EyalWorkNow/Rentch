@@ -255,7 +255,7 @@ class _AssistantChip extends StatelessWidget {
               )
             : BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.tealDark],
+                  colors: [AppColors.primary, AppColors.primaryDark],
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
                 ),

@@ -162,7 +162,7 @@ class _AvailabilityCalendarScreenState
       case 'טלפוני':
         return AppColors.amberDark;
       case 'גמיש':
-        return AppColors.tealDark;
+        return AppColors.primaryDark;
       default:
         return AppColors.slate500;
     }
@@ -553,7 +553,7 @@ class _AvailabilityCalendarScreenState
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    AppColors.tealBrand,
+                                    AppColors.primary,
                                     AppColors.primary,
                                   ],
                                 ),

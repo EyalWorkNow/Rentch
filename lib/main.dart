@@ -8,7 +8,6 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/search/scenario_layers.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
-import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/home_widget_service.dart';
 import 'package:dating_app/core/services/notif_admin_gate.dart';
 import 'package:dating_app/core/services/notification_permission_service.dart';
@@ -250,13 +249,12 @@ class RentlyApp extends StatelessWidget {
           // build from this one gated source).
           final themeRole = provider.themeRole;
           AppColors.applyRole(themeRole);
-          final palette = BrandPalette.forRole(themeRole);
           return MaterialApp(
             title: 'Rently',
             navigatorKey: appNavigatorKey,
             navigatorObservers: [_backNavObserver],
             debugShowCheckedModeBanner: false,
-            theme: _buildTheme(palette),
+            theme: _buildTheme(),
             builder: (context, child) {
               return Directionality(
                 textDirection: TextDirection.rtl,
@@ -277,7 +275,7 @@ class RentlyApp extends StatelessWidget {
     );
   }
 
-  ThemeData _buildTheme(BrandPalette palette) {
+  ThemeData _buildTheme() {
     return ThemeData(
       useMaterial3: true,
       // SF Hebrew Rounded primary (Hebrew text + all Latin via SF Pro Rounded
@@ -285,8 +283,8 @@ class RentlyApp extends StatelessWidget {
       fontFamily: AppType.family,
       fontFamilyFallback: AppType.familyFallback,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: palette.primary,
-        primary: palette.primary,
+        seedColor: AppColors.primary,
+        primary: AppColors.primary,
         secondary: AppColors.coral,
         surface: AppColors.surface,
       ),
@@ -314,8 +312,8 @@ class RentlyApp extends StatelessWidget {
         titleMedium: TextStyle(fontWeight: FontWeight.w700),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: palette.primaryLight2,
-        selectedColor: palette.primary,
+        backgroundColor: AppColors.primaryLight2,
+        selectedColor: AppColors.primary,
         labelStyle: const TextStyle(
           color: AppColors.navy,
           fontWeight: FontWeight.w700,
@@ -333,14 +331,14 @@ class RentlyApp extends StatelessWidget {
         ),
       ),
       sliderTheme: SliderThemeData(
-        activeTrackColor: palette.primary,
-        thumbColor: palette.primary,
+        activeTrackColor: AppColors.primary,
+        thumbColor: AppColors.primary,
         inactiveTrackColor: AppColors.mist,
-        overlayColor: palette.primary.withValues(alpha: 0.13),
+        overlayColor: AppColors.primary.withValues(alpha: 0.13),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: palette.primary,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
@@ -371,7 +369,7 @@ class RentlyApp extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: palette.primary, width: 1.5),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 14),

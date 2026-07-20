@@ -2127,7 +2127,7 @@ class _OwnerCard extends StatelessWidget {
                             colors: isAgency
                                 ? [
                                     AppColors.primary,
-                                    AppColors.tealDark
+                                    AppColors.primaryDark
                                   ]
                                 : [
                                     AppColors.slate600,

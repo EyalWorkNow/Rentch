@@ -154,6 +154,9 @@ class AppColors {
   static const Color purple = Color(0xFF6C5CE7);
   static const Color red = Color(0xFFEF4444);
   static const Color slate600 = Color(0xFF475569);
+  // FIXED brand-teal consts (kept const for identity/entry screens that must
+  // stay teal). For anything that should FOLLOW the accent, use primary /
+  // primaryLight / primaryDark / primaryLight2 directly — not these.
   static const Color tealBrand = Color(0xFF059669);
   static const Color tealBright = Color(0xFF34D399);
   static const Color tealDark = Color(0xFF047857);

@@ -263,10 +263,10 @@ class _PropertyPreviewCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: [AppColors.navy, AppColors.tealBrand],
+          colors: [AppColors.navy, AppColors.primary],
         ),
         borderRadius: BorderRadius.circular(24),
       ),

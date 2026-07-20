@@ -43,7 +43,7 @@ const Color _kSlate = AppColors.slate700;
 const Color _kSlate2 = AppColors.slate600;
 const Color _kBorder = AppColors.slate200;
 const Color _kFill = AppColors.slate50;
-const Color _kTeal = AppColors.tealBrand;
+Color get _kTeal => AppColors.primary;
 
 class _TenantDetailScreenState extends State<TenantDetailScreen> {
   final PageController _pageController = PageController();
@@ -494,7 +494,7 @@ class _PhotoHero extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: _kTeal.withValues(alpha: 0.3)),
                 ),
-                child: const Text(
+                child: Text(
                   'מחפש דירה',
                   style: TextStyle(
                     color: _kTeal,
@@ -1004,7 +1004,7 @@ class _LikedPropertyDetailedCard extends StatelessWidget {
                       children: [
                         Text(
                           property.propertyType,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _kTeal,
                             fontSize: 12,
                             fontWeight: FontWeight.w800,

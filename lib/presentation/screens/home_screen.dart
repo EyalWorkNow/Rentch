@@ -280,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       // תכלת stroke marks ONLY the אתי CTA circle.
                                       border: isEtti
                                           ? Border.all(
-                                              color: AppColors.tealBright,
+                                              color: AppColors.primaryLight,
                                               width: 1.8)
                                           : null,
                                       boxShadow: isSelected

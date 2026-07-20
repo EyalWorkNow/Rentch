@@ -83,7 +83,7 @@ class SpeedModeSlider extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     Colors.white.withValues(alpha: 0.96),
-                    AppColors.tealPale.withValues(alpha: 0.94),
+                    AppColors.primaryLight2.withValues(alpha: 0.94),
                     AppColors.slate50.withValues(alpha: 0.98),
                   ],
                 ),

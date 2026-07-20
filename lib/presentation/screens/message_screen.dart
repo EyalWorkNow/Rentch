@@ -34,7 +34,7 @@ import 'package:dating_app/presentation/widgets/animations/micro_animations.dart
 const _bg = AppColors.slate50;
 const _surface = Colors.white;
 const _border = AppColors.slate200;
-const _outgoing = AppColors.tealBrand; // teal bubble
+Color get _outgoing => AppColors.primary; // brand bubble, follows accent
 const _incoming = AppColors.slate100; // light-grey bubble
 
 class _ChatThemeSpec {
@@ -1061,7 +1061,7 @@ class _ContractBar extends StatelessWidget {
     return GestureDetector(
       onTap: action,
       child: Container(
-        color: _done ? AppColors.tealPale : AppColors.tealPale,
+        color: _done ? AppColors.primaryLight2 : AppColors.primaryLight2,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(children: [
           Icon(
@@ -1981,8 +1981,8 @@ class _SendBtn extends StatelessWidget {
                   AppColors.primary.withValues(alpha: 0.3),
                 ],
               )
-            : const LinearGradient(
-                colors: [AppColors.tealBrand, AppColors.tealDark],
+            : LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryDark],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -2574,7 +2574,7 @@ class _SlotPickRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: Ink(
             decoration: BoxDecoration(
-              color: picked ? AppColors.tealPale : Colors.white,
+              color: picked ? AppColors.primaryLight2 : Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: picked ? AppColors.primary : AppColors.slate200,
@@ -2748,7 +2748,7 @@ class _SlotOptionRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: confirmed ? AppColors.tealPale : AppColors.cloud,
+          color: confirmed ? AppColors.primaryLight2 : AppColors.cloud,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: confirmed ? AppColors.success : AppColors.border,
@@ -2848,7 +2848,7 @@ class _SlotConfirmCard extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8, bottom: 3),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.tealPale,
+        color: AppColors.primaryLight2,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.success.withValues(alpha: 0.5)),
       ),
