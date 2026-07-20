@@ -97,21 +97,21 @@ class _AvailabilityCalendarScreenState
         textDirection: TextDirection.rtl,
         child: Theme(
           data: Theme.of(ctx).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.black, // Header background & active circle
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary, // Header background & active circle
               onPrimary: Colors.white, // Header text & active text
               surface: Colors.white, // Dialog background
               onSurface: AppColors.navy, // Default text color
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: Colors.black, // Action buttons color
+                foregroundColor: AppColors.primary, // Action buttons color
                 textStyle: const TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
             datePickerTheme: DatePickerThemeData(
               backgroundColor: Colors.white,
-              headerBackgroundColor: Colors.black,
+              headerBackgroundColor: AppColors.primary,
               headerForegroundColor: Colors.white,
               dayForegroundColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
@@ -121,7 +121,7 @@ class _AvailabilityCalendarScreenState
               }),
               dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return Colors.black;
+                  return AppColors.primary;
                 }
                 return Colors.transparent;
               }),

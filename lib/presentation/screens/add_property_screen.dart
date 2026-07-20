@@ -1154,7 +1154,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.navy,
+          backgroundColor: AppColors.primary,
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
             icon: const RentlyIcon(IconsaxPlusLinear.arrow_right,
@@ -1355,8 +1355,9 @@ class _StepIndicator extends StatelessWidget {
                 height: 2,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
+                  // White progress on the accent-coloured bar — reads on any accent.
                   color: lineIdx < step
-                      ? AppColors.primary
+                      ? Colors.white
                       : Colors.white.withValues(alpha: 0.28),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -1373,26 +1374,24 @@ class _StepIndicator extends StatelessWidget {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: isDone
-                      ? AppColors.primary
-                      : (isActive ? Colors.white : Colors.transparent),
+                  color: isDone || isActive ? Colors.white : Colors.transparent,
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isDone || isActive
-                        ? AppColors.primary
+                        ? Colors.white
                         : Colors.white.withValues(alpha: 0.45),
                     width: 2,
                   ),
                 ),
                 child: Center(
                   child: isDone
-                      ? const Icon(Icons.check_rounded,
-                          color: Colors.white, size: 14)
+                      ? Icon(Icons.check_rounded,
+                          color: AppColors.primary, size: 14)
                       : Text(
                           '${idx + 1}',
                           style: TextStyle(
                             color: isActive
-                                ? AppColors.navy
+                                ? AppColors.primary
                                 : Colors.white.withValues(alpha: 0.7),
                             fontWeight: FontWeight.w900,
                             fontSize: 12,
@@ -6136,7 +6135,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.navy,
+        backgroundColor: AppColors.primary,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const RentlyIcon(IconsaxPlusLinear.arrow_right,

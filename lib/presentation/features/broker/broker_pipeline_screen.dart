@@ -147,7 +147,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: Colors.black,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           onPressed: _openAddLead,
           icon: const Icon(Icons.person_add_alt_1),

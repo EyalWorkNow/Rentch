@@ -144,7 +144,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: Colors.black,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           onPressed: _openSchedule,
           icon: const Icon(Icons.add),

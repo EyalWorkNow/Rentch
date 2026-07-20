@@ -132,7 +132,7 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: Colors.black,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           onPressed: () => _openEditor(),
           icon: const Icon(Icons.add),

@@ -15,7 +15,7 @@ import 'package:dating_app/presentation/widgets/animations/micro_animations.dart
 /// broker-black accent — so it uses this fixed compile-time token rather than
 /// the runtime-swappable `AppColors.primary`, making it structurally immune to
 /// any global accent flip that may occur while a session is being established.
-const Color _kBrandTeal = AppColors.tealBrand;
+Color get _kBrandTeal => AppColors.primary; // entry CTA, follows the accent
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -244,7 +244,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     Container(
                                       width: 50,
                                       height: 50,
-                                      decoration: const BoxDecoration(
+                                      decoration: BoxDecoration(
                                         color: _kBrandTeal,
                                         shape: BoxShape.circle,
                                       ),

@@ -149,7 +149,7 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: Colors.black,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           onPressed: () => _openEditor(),
           icon: const Icon(Icons.add),

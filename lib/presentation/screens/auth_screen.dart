@@ -31,12 +31,13 @@ const _kInputFill = AppColors.slate50;
 
 /// Fixed source-teal brand for the ENTIRE entry flow (welcome / login / signup
 /// / role-pick / guest entry). The entry experience must NEVER render the
-/// broker-black accent — a broker only gets black once inside the app. Using a
-/// compile-time constant here (instead of the runtime-swappable
-/// [_kBrandTeal]) makes the entry screens structurally immune to any
-/// global accent flip that happens while a session is being established.
-const Color _kBrandTeal = AppColors.tealBrand;
-const Color _kPillBtn = _kBrandTeal;
+/// broker-black accent — a broker only gets black once inside the app. The
+/// entry flow's accent is kept teal by `main.dart` gating `themeRole` to teal
+/// for login/signup/onboarding, so these getters read teal during entry AND
+/// follow a custom accent the user picks — the entry buttons are no longer
+/// frozen. (Were compile-time consts; that froze every entry CTA at teal.)
+Color get _kBrandTeal => AppColors.primary;
+Color get _kPillBtn => AppColors.primary;
 
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
 
@@ -580,12 +581,12 @@ class _WideAccountTypeSelector extends StatelessWidget {
             ),
           ),
           Text(isTenant ? 'בעל דירה / מתווך' : 'שינוי',
-              style: const TextStyle(
+              style: TextStyle(
                   color: _kBrandTeal,
                   fontSize: 13,
                   fontWeight: FontWeight.w800)),
           const SizedBox(width: 4),
-          const Icon(Icons.chevron_left_rounded,
+          Icon(Icons.chevron_left_rounded,
               color: _kBrandTeal, size: 20),
         ]),
       ),
@@ -3763,13 +3764,13 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
       height: 58,
       decoration: widget.isPrimary
           ? BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
                 colors: [
-                  Color(0xFF38F2E2), // Bright vibrant turquoise/cyan
+                  AppColors.primaryLight, // Bright vibrant turquoise/cyan
                   _kBrandTeal,       // Core brand teal
-                  Color(0xFF0D96A0), // Deeper teal
+                  AppColors.primaryDark, // Deeper teal
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
