@@ -166,6 +166,37 @@ class DatingProvider extends ChangeNotifier {
     if (searchId != null && searchId.isNotEmpty) _lastSearchId = searchId;
   }
 
+  // Phase-1: the DISCOVER swipe deck is ranked on-device and never went through
+  // the server /search/log path, so its swipes produced NO training rows. But
+  // each card carries the server-canonical `rankFeatures`, so a swipe there IS a
+  // valid (features, label) pair. We mint one stable searchId per session and,
+  // at swipe time, log the impression + let the swipe outcome join to it.
+  String? _discoverSearchIdCache;
+  String get _discoverSearchId =>
+      _discoverSearchIdCache ??= 'discover_${DateTime.now().microsecondsSinceEpoch}';
+
+  /// Fire-and-forget: log ONE discover impression (the server feature vector the
+  /// card carries) so the swipe outcome has an impression to join to. No-op when
+  /// the card has no server rankFeatures (on-device-only listing) or offline.
+  void _logDiscoverImpression(RentalProperty p, int rank) {
+    final rf = p.rankFeatures;
+    if (rf == null || rf.isEmpty || !AwsApiClient.instance.isConfigured) return;
+    unawaited(
+      AwsApiClient.instance.post('/search/log', {
+        'searchId': _discoverSearchId,
+        'impressions': [
+          {
+            'propertyId': p.id,
+            'rankFeatures': rf,
+            'rank': rank,
+            if (p.abVariant != null) 'abVariant': p.abVariant,
+            'outcome': 'impression',
+          }
+        ],
+      }).catchError((_) => <String, dynamic>{}),
+    );
+  }
+
   /// Best-effort label for the search that surfaced [propertyId]. Fires
   /// `POST /search/outcome` with the real outcome so the backend records a
   /// training label joinable to the impression logged at search time. Fully
@@ -175,8 +206,17 @@ class DatingProvider extends ChangeNotifier {
     String propertyId,
     String outcome, {
     int? dwellMs,
+  }) =>
+      _postOutcomeWith(_lastSearchId, propertyId, outcome, dwellMs: dwellMs);
+
+  /// Post a training label under an EXPLICIT searchId (so the discover deck can
+  /// label against its own session id without clobbering a live AI-search id).
+  void _postOutcomeWith(
+    String? searchId,
+    String propertyId,
+    String outcome, {
+    int? dwellMs,
   }) {
-    final searchId = _lastSearchId;
     if (searchId == null ||
         searchId.isEmpty ||
         propertyId.isEmpty ||
@@ -3612,6 +3652,13 @@ class DatingProvider extends ChangeNotifier {
       AppEvents.instance.log(UserEventType.swipeLeft, propertyId: property.id);
       _recordSwipeSignal(property, SwipeDirection.skip,
           dwellMs: decisionMs, entryRank: previousIndex);
+      // Phase-1: the swipe IS the primary label. A left-swipe is the NEGATIVE
+      // class for the learned ranker (previously only click/contact were sent,
+      // so the training set had zero negatives-vs-positives balance). Log the
+      // discover impression + join the label to it via the session searchId.
+      _logDiscoverImpression(property, previousIndex);
+      _postOutcomeWith(_discoverSearchId, property.id, 'skip',
+          dwellMs: decisionMs);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       final isNewLike = _likedPropertyIds.add(property.id);
@@ -3627,6 +3674,12 @@ class DatingProvider extends ChangeNotifier {
         dwellMs: decisionMs,
         entryRank: previousIndex,
       );
+      // Phase-1: a right/up-swipe is the POSITIVE class — the label the model
+      // learns to predict. Log the discover impression + join the label to it.
+      _logDiscoverImpression(property, previousIndex);
+      _postOutcomeWith(_discoverSearchId, property.id,
+          isSuperLike ? 'superlike' : 'like',
+          dwellMs: decisionMs);
 
       // A tenant right-swipe registers the LIKE only — it is NOT a match. A
       // match is two-sided and is created when the other side (the landlord)

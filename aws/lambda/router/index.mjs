@@ -2124,7 +2124,22 @@ async function handleSearchLog(event) {
           kind: 'impression',             // pairs with 'outcome' rows via searchId
           propertyId,
           // The per-impression feature vector the ranker saw (training input).
-          features: (imp.features && typeof imp.features === 'object') ? imp.features : {},
+          // CRITICAL (Phase-1): store the SERVER-canonical `rankFeatures`
+          // (RANK_FEATURE_ORDER keys: freshness/popularity/…), NOT the client's
+          // `features` (tag_overlap/price_fit/recency/…). The trainer vectorises
+          // by RANK_FEATURE_ORDER, so storing the client vector = a train/serve
+          // feature SKEW that trains the model on ~all-zeros. Fall back to the
+          // client vector only when rankFeatures is absent (older clients).
+          features: (imp.rankFeatures &&
+                  typeof imp.rankFeatures === 'object' &&
+                  Object.keys(imp.rankFeatures).length > 0)
+              ? imp.rankFeatures
+              : ((imp.features && typeof imp.features === 'object')
+                  ? imp.features
+                  : {}),
+          // Keep the client's own vector too (future features / debugging).
+          clientFeatures:
+              (imp.features && typeof imp.features === 'object') ? imp.features : {},
           rank: Number.isFinite(Number(imp.rank)) ? Number(imp.rank) : null,
           score: Number.isFinite(Number(imp.score)) ? Number(imp.score) : null,
           // The label the model learns to predict.
