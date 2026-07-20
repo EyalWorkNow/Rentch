@@ -81,7 +81,12 @@ class BrokerClient {
     );
   }
 
+  /// Bump when a breaking field change lands so [fromJson] can migrate old
+  /// cloud/local blobs instead of silently dropping data.
+  static const int schemaVersion = 1;
+
   Map<String, dynamic> toJson() => {
+        '_schemaV': schemaVersion,
         'id': id,
         'name': name,
         'phone': phone,

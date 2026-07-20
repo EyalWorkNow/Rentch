@@ -69,7 +69,10 @@ class BrokerExclusivity {
     );
   }
 
+  static const int schemaVersion = 1;
+
   Map<String, dynamic> toJson() => {
+        '_schemaV': schemaVersion,
         'id': id,
         'propertyTitle': propertyTitle,
         'ownerName': ownerName,

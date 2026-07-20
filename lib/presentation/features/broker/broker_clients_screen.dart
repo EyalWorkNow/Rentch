@@ -110,21 +110,22 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
         .map((c) => c.phone.replaceAll(RegExp(r'\D'), ''))
         .where((p) => p.isNotEmpty)
         .toSet();
-    var added = 0;
-    var next = _clients;
+    final toAdd = <BrokerClient>[];
     for (var i = 0; i < selected.length; i++) {
       final c = selected[i];
       final phone = c.phones.first.number;
       final digits = phone.replaceAll(RegExp(r'\D'), '');
       if (digits.isNotEmpty && existing.contains(digits)) continue;
-      next = await _repo.save(BrokerClient(
+      toAdd.add(BrokerClient(
         id: 'c-${DateTime.now().microsecondsSinceEpoch}-$i',
         name: (c.displayName ?? '').trim(),
         phone: phone,
       ));
       if (digits.isNotEmpty) existing.add(digits);
-      added++;
     }
+    // One disk write + one cloud push for the whole import, not one per contact.
+    final next = await _repo.saveAll(toAdd);
+    final added = toAdd.length;
     if (!mounted) return;
     setState(() => _clients = next);
     ScaffoldMessenger.of(context).showSnackBar(

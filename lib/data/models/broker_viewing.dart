@@ -103,8 +103,11 @@ class BrokerViewing {
     );
   }
 
+  static const int schemaVersion = 1;
+
   Map<String, dynamic> toJson() {
     return {
+      '_schemaV': schemaVersion,
       'id': id,
       'dateTime': dateTime.toIso8601String(),
       'propertyId': propertyId,

@@ -51,6 +51,21 @@ class BrokerClientRepository {
     return next;
   }
 
+  /// Inserts/updates MANY clients in one pass — one disk write + ONE cloud
+  /// push (vs a save-per-client, which on a contacts import fired N sequential
+  /// writes and N cloud POSTs). Newer entries win on id collision.
+  Future<List<BrokerClient>> saveAll(List<BrokerClient> clients) async {
+    if (clients.isEmpty) return loadAll();
+    final all = await loadAll();
+    final incomingIds = clients.map((c) => c.id).toSet();
+    final next = [
+      ...clients,
+      ...all.where((c) => !incomingIds.contains(c.id)),
+    ];
+    await _persist(next);
+    return next;
+  }
+
   /// Removes the client with [id]. Returns the updated list.
   Future<List<BrokerClient>> delete(String id) async {
     final all = await loadAll();

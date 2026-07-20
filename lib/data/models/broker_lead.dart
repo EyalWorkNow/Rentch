@@ -117,8 +117,11 @@ class BrokerLead {
     );
   }
 
+  static const int schemaVersion = 1;
+
   Map<String, dynamic> toJson() {
     return {
+      '_schemaV': schemaVersion,
       'id': id,
       'clientName': clientName,
       'phone': phone,
