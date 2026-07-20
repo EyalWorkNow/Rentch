@@ -1,8 +1,10 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/notification_service.dart';
+import 'package:dating_app/data/models/broker_deal.dart';
 import 'package:dating_app/data/models/broker_lead.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/broker_deal_repository.dart';
 import 'package:dating_app/data/repositories/broker_lead_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -24,7 +26,47 @@ class BrokerPipelineScreen extends StatefulWidget {
 
 class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   final BrokerLeadRepository _repo = BrokerLeadRepository();
+  final BrokerDealRepository _dealRepo = BrokerDealRepository();
   final NotificationService _notifications = NotificationService.instance;
+
+  /// Bridge the pipeline → commission silo: moving a lead to "נסגר בהצלחה"
+  /// offers to create a matching deal in the commission tracker, pre-filled from
+  /// the lead, so the broker doesn't re-type the same client/property.
+  Future<void> _onStageSelected(BrokerLead lead, LeadStage stage) async {
+    final wasWon = lead.stage == LeadStage.closedWon;
+    await _save(lead.copyWith(stage: stage));
+    if (stage != LeadStage.closedWon || wasWon || !mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('ליד נסגר בהצלחה 🎉'),
+          content: const Text('ליצור עסקה במעקב העמלות מהליד הזה?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('לא עכשיו')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('צור עסקה')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await _dealRepo.save(BrokerDeal(
+      id: 'deal_${DateTime.now().microsecondsSinceEpoch}',
+      propertyTitle: lead.propertyTitle,
+      clientName: lead.clientName,
+      dealAmount: 0,
+    ));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('נוצרה עסקה במעקב העמלות — השלם שם את הסכום'),
+      ));
+    }
+  }
   List<BrokerLead> _leads = const [];
   bool _loading = true;
 
@@ -392,7 +434,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
                           selectedColor: AppColors.primaryLight2,
                           onSelected: (_) {
                             Navigator.pop(sheetContext);
-                            _save(lead.copyWith(stage: stage));
+                            _onStageSelected(lead, stage);
                           },
                         ),
                     ],
