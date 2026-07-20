@@ -2774,11 +2774,11 @@ class _MapSectionState extends State<_MapSection> {
                             color: AppColors.primary,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: const [
+                            boxShadow: [
                               BoxShadow(
-                                  color: Color(0x4413BEC9),
+                                  color: AppColors.primary.withValues(alpha: 0.27),
                                   blurRadius: 10,
-                                  offset: Offset(0, 4)),
+                                  offset: const Offset(0, 4)),
                             ],
                           ),
                           child: const RentlyIcon(IconsaxPlusLinear.building,

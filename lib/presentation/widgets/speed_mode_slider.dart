@@ -231,11 +231,13 @@ class _SpeedThumb extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(23),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF14D3DC), AppColors.tealBrand, Color(0xFF2F80ED)],
-          stops: [0, 0.52, 1],
+          // Accent-driven so the whole track re-tints when the theme accent swaps
+          // (was a fixed cyan→teal→blue gradient that half-ignored the theme).
+          colors: [AppColors.primaryLight, AppColors.primary, AppColors.primaryDark],
+          stops: const [0, 0.52, 1],
         ),
         border: Border.all(color: Colors.white.withValues(alpha: 0.30), width: 1),
         boxShadow: [

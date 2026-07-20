@@ -773,30 +773,35 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            height: 42,
-            width: 42,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.slate200,
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+          ClipOval(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                height: 42,
+                width: 42,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.87), // 13% transparent (87% opaque)
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.slate200.withValues(alpha: 0.6),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: const Center(
-              child: RentlyIcon(
-                IconsaxPlusLinear.setting_4,
-                size: 20,
-                color: AppColors.navy,
+                child: const Center(
+                  child: RentlyIcon(
+                    IconsaxPlusLinear.setting_4,
+                    size: 20,
+                    color: AppColors.navy,
+                  ),
+                ),
               ),
             ),
           ),
@@ -6287,7 +6292,7 @@ class _SlidingSelectorThumb extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF14D3DC),
+            AppColors.primaryLight, // was a fixed cyan bookend that ignored the theme
             AppColors.primary,
             accent,
           ],

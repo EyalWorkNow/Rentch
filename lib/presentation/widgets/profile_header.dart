@@ -87,9 +87,9 @@ class ProfileHeader extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.edit_rounded,
-                    color: Color(0xFF146C5A),
+                    color: AppColors.primaryDark,
                   ),
                 ),
               ),
