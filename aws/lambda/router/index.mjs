@@ -1401,6 +1401,10 @@ export const handler = async (event) => {
     if (segments[0] === 'user' && segments[1] === 'embedding' && method === 'POST') {
       return await handleUserEmbedding(event);
     }
+    // POST /listing/audience → LOOK-ALIKE tenants for a landlord's own listing.
+    if (segments[0] === 'listing' && segments[1] === 'audience' && method === 'POST') {
+      return await handleListingAudience(event);
+    }
     // GET /ml/export → LightGBM training set (admin-only). → { rows, count }.
     if (segments[0] === 'ml' && segments[1] === 'export' && method === 'GET') {
       return await handleMlExport(event);
@@ -2386,6 +2390,81 @@ async function handleUserEmbedding(event) {
   } catch (e) {
     console.warn('user/embedding failed:', e.message);
     return json(200, { ok: false, reason: 'error' });
+  }
+}
+
+// ── Phase-3: LOOK-ALIKE AUDIENCES ────────────────────────────────────────────
+// POST /listing/audience — for a landlord's OWN listing, rank the tenant
+// population by how close their user vector sits to the listing's embedding
+// ("tenants who'd love this apartment"), excluding tenants who already engaged.
+// This is targeting over the REAL population (vs an LLM cohort guess on a draft).
+// Body: { propertyId, topK? }. Fail-soft; dormant (empty) until user vectors
+// accumulate. Brute-force cosine over the persona table — fine at Phase-3 scale.
+async function handleListingAudience(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!EMBEDDINGS_ENABLED) return json(200, { ok: false, reason: 'embeddings_off', audience: [] });
+  try {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    const propertyId = String(body.propertyId || '');
+    if (!propertyId) return json(400, { message: 'propertyId required' });
+
+    const prop = (await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name, Key: { id: propertyId },
+    }))).Item;
+    if (!prop) return json(404, { message: 'Not found' });
+    if (prop.ownerUserId !== uid) return json(403, { message: 'Forbidden' });
+    const listingVec = Array.isArray(prop.embedding) && prop.embedding.length
+      ? prop.embedding : null;
+    if (!listingVec) return json(200, { ok: false, reason: 'listing_not_embedded', audience: [] });
+
+    // Tenants already interested → excluded from the "new audience".
+    const engaged = new Set();
+    try {
+      const likes = await ddb.send(new QueryCommand({
+        TableName: TABLES.property_likes.name,
+        IndexName: TABLES.property_likes.gsi.name,
+        KeyConditionExpression: 'propertyId = :p',
+        ExpressionAttributeValues: { ':p': propertyId },
+        Limit: 500,
+      }));
+      for (const l of likes.Items || []) if (l.tenantId) engaged.add(String(l.tenantId));
+    } catch { /* no likes / GSI hiccup — audience just includes everyone */ }
+
+    // Scan the persona table for stored user vectors (bounded).
+    const candidates = [];
+    let lastKey;
+    do {
+      const page = await ddb.send(new ScanCommand({
+        TableName: TABLES.persona.name,
+        ExclusiveStartKey: lastKey,
+        ProjectionExpression: 'id, userEmbedding',
+        Limit: 1000,
+      }));
+      for (const it of page.Items || []) {
+        if (Array.isArray(it.userEmbedding) && it.userEmbedding.length) {
+          candidates.push({ id: String(it.id), userEmbedding: it.userEmbedding });
+        }
+      }
+      lastKey = page.LastEvaluatedKey;
+    } while (lastKey && candidates.length < 5000);
+
+    const topK = Math.max(1, Math.min(100, Number(body.topK) || 25));
+    const audience = topKBySimilarity(listingVec, candidates, topK, engaged)
+      .map((a) => ({ tenantId: a.id, score: Math.round(a.score * 100) }));
+
+    return json(200, {
+      ok: true,
+      propertyId,
+      candidatesScanned: candidates.length,
+      alreadyEngaged: engaged.size,
+      audienceCount: audience.length,
+      audience,
+    });
+  } catch (e) {
+    console.warn('listing/audience failed:', e.message);
+    return json(200, { ok: false, reason: 'error', audience: [] });
   }
 }
 

@@ -2,6 +2,7 @@
 import assert from 'node:assert';
 import {
   userEmbeddingFrom, weightedCentroid, cosine01, l2normalize, ACTION_WEIGHT,
+  topKBySimilarity,
 } from './user_embedding.mjs';
 
 // l2normalize → unit length
@@ -42,6 +43,26 @@ assert.strictEqual(weightedCentroid([{ vec: [1], weight: 0 }]), null, 'zero weig
 {
   const c = userEmbeddingFrom([{ embedding: [1, 0], action: 'like' }, { embedding: [1, 0, 0], action: 'like' }]);
   assert.strictEqual(c.length, 2, 'mismatched dim skipped');
+}
+
+// look-alike: ranks by cosine, respects exclude + dim-mismatch + k
+{
+  const q = [1, 0];
+  const cands = [
+    { id: 'a', vec: [1, 0], name: 'near' },     // score 1
+    { id: 'b', vec: [0.7, 0.7], name: 'mid' },  // score ~0.85
+    { id: 'c', vec: [-1, 0], name: 'far' },     // score 0
+    { id: 'd', vec: [1, 0, 0] },                // wrong dim → skipped
+    { id: 'e' },                                 // no vec → skipped
+  ];
+  const top = topKBySimilarity(q, cands, 2, new Set(['c']));
+  assert.strictEqual(top.length, 2, 'k respected');
+  assert.strictEqual(top[0].id, 'a', 'closest first');
+  assert.strictEqual(top[0].name, 'near', 'meta carried through');
+  assert.strictEqual(top[1].id, 'b', 'second closest');
+  assert.ok(!top.some((t) => t.id === 'c'), 'exclude honored');
+  assert.ok(!top.some((t) => t.id === 'd' || t.id === 'e'), 'bad vectors skipped');
+  assert.strictEqual(topKBySimilarity([], cands).length, 0, 'empty query → []');
 }
 
 console.log('user_embedding self-check: OK');

@@ -67,6 +67,23 @@ export function userEmbeddingFrom(engaged) {
   return weightedCentroid(items);
 }
 
+// Rank candidates by cosine to a query vector — the LOOK-ALIKE primitive
+// (Phase-3). candidates: [{ id, vec|embedding|userEmbedding, ...meta }].
+// Returns [{ ...meta, id, score }] sorted desc, capped at k, skipping `exclude`
+// ids and any candidate whose vector is absent or of a mismatched dimension.
+export function topKBySimilarity(queryVec, candidates, k = 20, exclude = new Set()) {
+  if (!Array.isArray(queryVec) || !queryVec.length) return [];
+  const out = [];
+  for (const c of candidates || []) {
+    if (!c || !c.id || (exclude && exclude.has && exclude.has(c.id))) continue;
+    const v = c.vec || c.embedding || c.userEmbedding;
+    if (!Array.isArray(v) || v.length !== queryVec.length) continue;
+    out.push({ ...c, score: cosine01(queryVec, v) });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out.slice(0, Math.max(1, k));
+}
+
 // Cosine similarity mapped to [0,1] — MUST match index.mjs cosineSim so a
 // user↔listing score is on the same scale as the query↔listing KNN score.
 export function cosine01(a, b) {
