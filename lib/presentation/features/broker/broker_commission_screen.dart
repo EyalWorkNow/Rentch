@@ -108,6 +108,28 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
   }
 
   Future<void> _delete(BrokerDeal d) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('למחוק את העסקה?'),
+          content: Text(d.propertyTitle.trim().isEmpty
+              ? 'הרשומה תימחק לצמיתות.'
+              : '"${d.propertyTitle.trim()}" תימחק לצמיתות.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('ביטול')),
+            FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('מחק')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
     await _repo.delete(d.id);
     await _reload();
   }
@@ -120,14 +142,15 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
-          title: const Text('עמלות ופייפליין',
-              style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('עמלות ופייפליין'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
           onPressed: () => _openEditor(),
           icon: const Icon(Icons.add),
           label: const Text('עסקה חדשה',

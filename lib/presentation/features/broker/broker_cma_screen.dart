@@ -76,19 +76,33 @@ CmaPriceRange? cmaRange(List<num> prices) {
 class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
   String? _subjectId;
 
-  /// Comps = market listings near the subject: same transaction type, same city
-  /// (case-insensitive), rooms within ±1, a real price, and not the subject.
+  /// Comps = market listings genuinely comparable to the subject: same
+  /// transaction type, same city, rooms within ±1, SAME property type (a villa
+  /// must not comp an apartment) and SIMILAR size (within ±35%) so ₪/m²
+  /// percentiles aren't skewed by a 40m² vs 200m² pairing. Type/size filters
+  /// apply only when both values are known (never drop a comp for missing data).
   List<RentalProperty> _comparablesFor(
     RentalProperty subject,
     List<RentalProperty> market,
   ) {
     final city = subject.city.trim().toLowerCase();
+    final subjType = subject.propertyType.trim().toLowerCase();
+    final subjSize = subject.sizeM2;
     return market.where((p) {
       if (p.id == subject.id) return false;
       if (p.price <= 0) return false;
       if (p.transactionType != subject.transactionType) return false;
       if (p.city.trim().toLowerCase() != city) return false;
-      return (p.rooms - subject.rooms).abs() <= 1.0;
+      if ((p.rooms - subject.rooms).abs() > 1.0) return false;
+      final pType = p.propertyType.trim().toLowerCase();
+      if (subjType.isNotEmpty && pType.isNotEmpty && pType != subjType) {
+        return false;
+      }
+      if (subjSize > 0 && p.sizeM2 > 0) {
+        final ratio = p.sizeM2 / subjSize;
+        if (ratio < 0.65 || ratio > 1.35) return false;
+      }
+      return true;
     }).toList()
       ..sort((a, b) => a.price.compareTo(b.price));
   }
@@ -110,10 +124,11 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
-          title: const Text('ניתוח שוק ותמחור',
-              style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('ניתוח שוק ותמחור'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
         ),
         body: mine.isEmpty
             ? _emptyState('אין לך נכסים פעילים לניתוח עדיין.')
