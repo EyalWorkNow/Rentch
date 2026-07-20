@@ -149,13 +149,10 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
-          elevation: 0,
-          title: const Text(
-            'פנקס לקוחות',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          title: const Text('פנקס לקוחות'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
           actions: [
             IconButton(
@@ -209,16 +206,30 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
   }
 }
 
-/// A tappable strip that opens the full hot-matches screen, showing the count of
-/// brand-new listing↔client matches the broker hasn't seen yet.
+/// A tappable strip that opens the full hot-matches screen, showing the LIVE
+/// count of strong listing↔client pairings across the broker's clients.
 class _HotMatchesStrip extends StatelessWidget {
   const _HotMatchesStrip({required this.clients, required this.properties});
 
   final List<BrokerClient> clients;
   final List<RentalProperty> properties;
 
+  static const _matcher = BrokerMatcher();
+  static const int _minHotScore = 70;
+
+  int get _hotCount {
+    var n = 0;
+    for (final c in clients) {
+      for (final m in _matcher.rank(c, properties)) {
+        if (m.score >= _minHotScore) n++;
+      }
+    }
+    return n;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final count = _hotCount;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Material(
@@ -252,13 +263,29 @@ class _HotMatchesStrip extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'נכסים חדשים שמתאימים ללקוחות שלך',
+                        count > 0
+                            ? '$count התאמות חזקות ממתינות'
+                            : 'נכסים שמתאימים ללקוחות שלך',
                         style: TextStyle(
                             fontSize: 14, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
                 ),
+                if (count > 0)
+                  Container(
+                    margin: const EdgeInsets.only(left: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryDark,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text('$count',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900)),
+                  ),
                 Icon(Icons.chevron_left, color: AppColors.textSecondary),
               ],
             ),

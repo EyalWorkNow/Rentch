@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/broker_lead.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -23,6 +24,7 @@ class BrokerPipelineScreen extends StatefulWidget {
 
 class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
   final BrokerLeadRepository _repo = BrokerLeadRepository();
+  final NotificationService _notifications = NotificationService.instance;
   List<BrokerLead> _leads = const [];
   bool _loading = true;
 
@@ -39,15 +41,47 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       _leads = leads;
       _loading = false;
     });
+    // Re-arm follow-up reminders on load so an OS-dropped reminder is recreated.
+    for (final l in leads) {
+      await _scheduleReminder(l);
+    }
+  }
+
+  /// Schedule a follow-up nudge at 09:00 on the lead's next-follow-up day. A
+  /// closed lead, no follow-up date, or an already-past date → cancel (past-due
+  /// is surfaced by the red overdue banner, not a notification).
+  Future<void> _scheduleReminder(BrokerLead lead) async {
+    final id = _notifications.leadFollowUpId(lead.id);
+    final due = lead.nextFollowUp;
+    if (due == null || lead.stage.isClosed) {
+      await _notifications.cancel(id);
+      return;
+    }
+    final when = DateTime(due.year, due.month, due.day, 9);
+    if (when.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+      await _notifications.cancel(id);
+      return;
+    }
+    final who = lead.clientName.trim().isEmpty ? 'הליד' : lead.clientName.trim();
+    final what =
+        lead.propertyTitle.trim().isEmpty ? '' : ' — ${lead.propertyTitle.trim()}';
+    await _notifications.scheduleReminder(
+      id: id,
+      title: 'פולואפ ליד',
+      body: 'הגיע הזמן לחזור ל$who$what',
+      when: when,
+    );
   }
 
   Future<void> _save(BrokerLead lead) async {
     final next = await _repo.save(lead);
     if (!mounted) return;
     setState(() => _leads = next);
+    await _scheduleReminder(lead);
   }
 
   Future<void> _delete(String id) async {
+    await _notifications.cancel(_notifications.leadFollowUpId(id));
     final next = await _repo.delete(id);
     if (!mounted) return;
     setState(() => _leads = next);
@@ -64,15 +98,14 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          title: const Text(
-            'פייפליין לידים',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          title: const Text('פייפליין לידים'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primary,
+          backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           onPressed: _openAddLead,
           icon: const Icon(Icons.person_add_alt_1),

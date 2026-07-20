@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -5,8 +8,11 @@ import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// ברושור נכס ממותג — the broker (מתווך) picks a listing and gets a polished,
 /// WhatsApp-ready one-pager: hero photo, address, price, key facts/features and
@@ -22,6 +28,40 @@ class BrokerBrochureScreen extends StatefulWidget {
 
 class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
   String? _selectedId;
+  final GlobalKey _cardKey = GlobalKey();
+  bool _sharing = false;
+
+  /// Capture the ON-SCREEN branded card as a PNG and share THAT (with the
+  /// listing text) — so the "ממותג" one-pager actually reaches the client, not
+  /// the generic text share. Falls back to the text sheet on any capture error.
+  Future<void> _shareBrochure(RentalProperty property) async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final boundary = _cardKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        if (mounted) showPropertyShareSheet(context, property);
+        return;
+      }
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) {
+        if (mounted) showPropertyShareSheet(context, property);
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/brochure_${property.id}.png');
+      await file.writeAsBytes(data.buffer.asUint8List());
+      final text =
+          '${property.address}\n${property.priceLabel} ${property.priceSuffixLabel}';
+      await Share.shareXFiles([XFile(file.path)], text: text);
+    } catch (_) {
+      if (mounted) showPropertyShareSheet(context, property); // graceful fallback
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,18 +76,10 @@ class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
-          elevation: 0,
-          centerTitle: false,
-          title: const Text(
-            'ברושור נכס ממותג',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
+          title: const Text('ברושור נכס ממותג'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
         ),
         body: properties.isEmpty
@@ -66,16 +98,21 @@ class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
                       ),
                       if (selected != null) ...[
                         const SizedBox(height: 20),
-                        _BrochureCard(
-                          property: selected,
-                          branding: branding,
-                          agentName: agentName,
+                        // RepaintBoundary so the branded card can be captured to
+                        // an image and shared as the actual one-pager.
+                        RepaintBoundary(
+                          key: _cardKey,
+                          child: _BrochureCard(
+                            property: selected,
+                            branding: branding,
+                            agentName: agentName,
+                          ),
                         ),
                         const SizedBox(height: 22),
                         _ShareButton(
                           color: branding.primaryColor,
-                          onTap: () =>
-                              showPropertyShareSheet(context, selected),
+                          busy: _sharing,
+                          onTap: () => _shareBrochure(selected),
                         ),
                       ],
                     ],
@@ -446,21 +483,29 @@ class _BrandFooter extends StatelessWidget {
 }
 
 class _ShareButton extends StatelessWidget {
-  const _ShareButton({required this.color, required this.onTap});
+  const _ShareButton(
+      {required this.color, required this.onTap, this.busy = false});
 
   final Color color;
   final VoidCallback onTap;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 60,
       child: FilledButton.icon(
-        onPressed: onTap,
-        icon: const Icon(IconsaxPlusBold.send_2, size: 24),
-        label: const Text(
-          'שתף ברושור',
-          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+        onPressed: busy ? null : onTap,
+        icon: busy
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.4, color: Colors.white))
+            : const Icon(IconsaxPlusBold.send_2, size: 24),
+        label: Text(
+          busy ? 'מכין ברושור…' : 'שתף ברושור',
+          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
         ),
         style: FilledButton.styleFrom(
           backgroundColor: color,

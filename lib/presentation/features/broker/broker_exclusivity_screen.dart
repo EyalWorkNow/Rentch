@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/broker_exclusivity.dart';
 import 'package:dating_app/data/repositories/broker_exclusivity_repository.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ class BrokerExclusivityScreen extends StatefulWidget {
 class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
   late final BrokerExclusivityRepository _repo =
       widget.repository ?? BrokerExclusivityRepository();
+  final NotificationService _notifications = NotificationService.instance;
 
   List<BrokerExclusivity> _mandates = const [];
   bool _loading = true;
@@ -40,6 +42,38 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
       _mandates = list;
       _loading = false;
     });
+    // Re-arm reminders on every load — a reminder the OS dropped (reboot, app
+    // update) is recreated here, so "don't miss a renewal" actually holds even
+    // if the broker rarely opens the tool.
+    for (final m in list) {
+      await _scheduleReminder(m);
+    }
+  }
+
+  /// Schedule a renewal nudge 7 days before the mandate ends (09:00). If that's
+  /// already past but the mandate isn't expired, remind tomorrow morning.
+  /// Expired → cancel. Fail-soft inside NotificationService.
+  Future<void> _scheduleReminder(BrokerExclusivity m) async {
+    final id = _notifications.exclusivityReminderId(m.id);
+    final now = DateTime.now();
+    if (m.isExpired(now)) {
+      await _notifications.cancel(id);
+      return;
+    }
+    var when = DateTime(m.endDate.year, m.endDate.month, m.endDate.day, 9)
+        .subtract(const Duration(days: 7));
+    if (when.isBefore(now.add(const Duration(minutes: 1)))) {
+      when = DateTime(now.year, now.month, now.day + 1, 9);
+    }
+    final what = m.propertyTitle.trim().isEmpty
+        ? 'הבלעדיות'
+        : 'הבלעדיות על ${m.propertyTitle.trim()}';
+    await _notifications.scheduleReminder(
+      id: id,
+      title: 'חידוש בלעדיות',
+      body: '$what מסתיימת ב-${_date(m.endDate)}. כדאי לחדש לפני שתפוג.',
+      when: when,
+    );
   }
 
   Future<void> _openEditor([BrokerExclusivity? existing]) async {
@@ -51,10 +85,34 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
     );
     if (result == null) return;
     await _repo.save(result);
+    await _scheduleReminder(result);
     await _reload();
   }
 
   Future<void> _delete(BrokerExclusivity m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('למחוק את הבלעדיות?'),
+          content: Text(m.propertyTitle.trim().isEmpty
+              ? 'הרשומה תימחק לצמיתות.'
+              : '"${m.propertyTitle.trim()}" תימחק לצמיתות.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('ביטול')),
+            FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('מחק')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await _notifications.cancel(_notifications.exclusivityReminderId(m.id));
     await _repo.delete(m.id);
     await _reload();
   }
@@ -67,14 +125,15 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
-          title: const Text('בלעדיות',
-              style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('בלעדיות'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
           onPressed: () => _openEditor(),
           icon: const Icon(Icons.add),
           label: const Text('בלעדיות חדשה',

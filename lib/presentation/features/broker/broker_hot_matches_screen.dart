@@ -69,23 +69,32 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
     });
   }
 
-  /// For each *recently added* listing, the clients it matches whose pairing the
-  /// broker hasn't seen yet. We gate on [RentalProperty.isNewListing] so the
-  /// screen surfaces fresh opportunities, not the whole back-catalogue.
+  /// STRONG client↔listing pairings the broker hasn't dismissed yet. A "hot
+  /// match" is a genuinely good fit (score ≥ [_minHotScore]) over the WHOLE
+  /// inventory — not gated on [isNewListing], which is inert for market listings
+  /// that carry no createdAt (so the old gate silently showed nothing for a
+  /// broker who works market inventory). Fresh listings are surfaced first.
+  static const int _minHotScore = 70;
+
   List<_HotMatch> _computeHot(
     List<BrokerClient> clients,
     List<RentalProperty> properties,
     Set<String> seen,
   ) {
-    final fresh = properties.where((p) => p.isNewListing).toList();
     final out = <_HotMatch>[];
     for (final client in clients) {
-      for (final m in _matcher.rank(client, fresh)) {
+      for (final m in _matcher.rank(client, properties)) {
+        if (m.score < _minHotScore) continue;
         final hot = _HotMatch(client: client, match: m);
         if (!seen.contains(hot.key)) out.add(hot);
       }
     }
-    out.sort((a, b) => b.match.score.compareTo(a.match.score));
+    out.sort((a, b) {
+      final fa = a.match.property.isNewListing ? 1 : 0;
+      final fb = b.match.property.isNewListing ? 1 : 0;
+      if (fa != fb) return fb - fa; // fresh listings first
+      return b.match.score.compareTo(a.match.score);
+    });
     return out;
   }
 
@@ -126,13 +135,10 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
-          elevation: 0,
-          title: const Text(
-            'התאמות חמות',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          title: const Text('התאמות חמות'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
           actions: [
             if (_hot.isNotEmpty)

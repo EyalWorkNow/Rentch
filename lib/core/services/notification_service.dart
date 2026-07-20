@@ -61,12 +61,26 @@ class NotificationService {
 
   /// Stable, non-negative notification id for a viewing reminder keyed by
   /// [slotId]. Masked to 19 bits so it never leaves the reserved viewing band.
-  int viewingReminderId(String slotId) {
+  int viewingReminderId(String slotId) => _bandedId(viewingReminderBase, slotId);
+
+  /// Reserved bands for the broker tools — each a disjoint 19-bit span so
+  /// exclusivity, lead-follow-up and viewing reminders never collide.
+  static const int exclusivityReminderBase = 5000000; // 5.0M..5_524_287
+  static const int leadFollowUpBase = 6000000; //        6.0M..6_524_287
+
+  /// Stable id for an exclusivity-mandate expiry reminder.
+  int exclusivityReminderId(String mandateId) =>
+      _bandedId(exclusivityReminderBase, mandateId);
+
+  /// Stable id for a lead follow-up reminder.
+  int leadFollowUpId(String leadId) => _bandedId(leadFollowUpBase, leadId);
+
+  int _bandedId(int base, String key) {
     var h = 0;
-    for (final unit in slotId.codeUnits) {
-      h = (h * 31 + unit) & 0x7FFFF; // ≤ 524_287 → band stays 4.0M..4_524_287
+    for (final unit in key.codeUnits) {
+      h = (h * 31 + unit) & 0x7FFFF; // ≤ 524_287 → band stays base..base+524_287
     }
-    return viewingReminderBase + h;
+    return base + h;
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
