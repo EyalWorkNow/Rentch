@@ -18,6 +18,7 @@ import {
 import {
   DynamoDBDocumentClient,
   GetCommand,
+  BatchGetCommand,
   PutCommand,
   UpdateCommand,
   DeleteCommand,
@@ -51,6 +52,7 @@ import {
   RANK_FEATURE_ORDER, loadModel, scoreWithModel, blendScore, modelAlpha,
   rankFeaturesFrom,
 } from './lib/model_scorer.mjs';
+import { userEmbeddingFrom, cosine01 } from './lib/user_embedding.mjs';
 import { variantFor } from './lib/ab.mjs';
 // Ranking A/B: control (variant 0) always sees the pure linear score; treatment
 // (variant 1) gets the model blend WHEN a model is loaded. With no model both
@@ -1394,6 +1396,11 @@ export const handler = async (event) => {
     if (segments[0] === 'reco' && segments[1] === 'cf' && method === 'POST') {
       return await handleRecoCf(event);
     }
+    // POST /user/embedding → (re)compute + store the caller's user vector (the
+    // action-weighted mean of the embeddings of listings they engaged with).
+    if (segments[0] === 'user' && segments[1] === 'embedding' && method === 'POST') {
+      return await handleUserEmbedding(event);
+    }
     // GET /ml/export → LightGBM training set (admin-only). → { rows, count }.
     if (segments[0] === 'ml' && segments[1] === 'export' && method === 'GET') {
       return await handleMlExport(event);
@@ -1883,6 +1890,23 @@ async function attachRankSignals(listed, query, cohort = null, callerUid = null)
       }
     }
     if (missing.length) Object.assign(counts, await loadPopularityCounts(missing));
+
+    // ── Phase-2: personalised semantic signal ────────────────────────────────
+    // If the caller has a stored user vector, set each listing's semanticSim to
+    // cosine(userVec, listingVec) BEFORE scoring — scoreListings reads
+    // p.semanticSim as the `semantic` component (else it stays a neutral 0.5, so
+    // no regression for users without a vector or listings without an embedding).
+    if (EMBEDDINGS_ENABLED && callerUid) {
+      const userVec = await loadUserEmbedding(callerUid);
+      if (userVec) {
+        for (const p of items) {
+          if (Array.isArray(p.embedding) && p.embedding.length === userVec.length) {
+            p.semanticSim = cosine01(userVec, p.embedding);
+          }
+        }
+      }
+    }
+
     // Pure linear scoring (unchanged): sets p.rankSignals + p.rankScore.
     scoreListings(items, ctx, counts, Date.now());
 
@@ -1893,6 +1917,9 @@ async function attachRankSignals(listed, query, cohort = null, callerUid = null)
     // /search/log and the trainer/scorer index into. No training/serving skew.
     for (const p of items) {
       p.rankFeatures = rankFeaturesFrom(p.rankSignals);
+      // Strip the 768-float embedding from the response — it's a large payload
+      // (~6KB/listing) only needed server-side for the cosine above.
+      if (p.embedding !== undefined) delete p.embedding;
     }
 
     // ── A/B (Phase 0) ─────────────────────────────────────────────────────────
@@ -2302,6 +2329,78 @@ async function deriveListingSize(propertyId) {
     mediaCount: mediaCountOf(p),
     descLen: p.description ? String(p.description).length : 0,
   };
+}
+
+// ── Phase-2: the USER TOWER (content-based user embedding) ───────────────────
+// POST /user/embedding — the client sends the property ids it engaged with; we
+// fetch those listings' embeddings, action-weight + mean-pool them into a user
+// vector (lib/user_embedding.mjs), and store it on the persona row so the feed
+// ranker can score cosine(userVec, listingVec) as a personalised semantic
+// signal. Fully fail-soft. Body: { liked:[id], contacted:[id]?, superliked:[id]? }.
+async function handleUserEmbedding(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  if (!EMBEDDINGS_ENABLED) return json(200, { ok: false, reason: 'embeddings_off' });
+  try {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    const liked = Array.isArray(body.liked) ? body.liked : [];
+    const contacted = new Set((Array.isArray(body.contacted) ? body.contacted : []).map(String));
+    const superliked = new Set((Array.isArray(body.superliked) ? body.superliked : []).map(String));
+    const ids = [...new Set(liked.map(String).filter(Boolean))].slice(0, 300);
+    if (ids.length === 0) return json(200, { ok: false, reason: 'no_ids' });
+
+    const engaged = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const res = await ddb.send(new BatchGetCommand({
+        RequestItems: {
+          [TABLES.properties.name]: {
+            Keys: chunk.map((id) => ({ id })),
+            ProjectionExpression: 'id, embedding',
+          },
+        },
+      }));
+      const rows = res.Responses?.[TABLES.properties.name] || [];
+      for (const r of rows) {
+        if (!Array.isArray(r.embedding) || !r.embedding.length) continue;
+        const action = contacted.has(r.id) ? 'contact'
+          : superliked.has(r.id) ? 'superlike' : 'like';
+        engaged.push({ embedding: r.embedding, action });
+      }
+    }
+
+    const vec = userEmbeddingFrom(engaged);
+    if (!vec) return json(200, { ok: false, reason: 'no_embedded_likes', count: 0 });
+
+    await ddb.send(new UpdateCommand({
+      TableName: TABLES.persona.name,
+      Key: { id: uid },
+      UpdateExpression:
+        'SET userEmbedding = :v, userEmbeddingDim = :d, userEmbeddingUpdatedAt = :t',
+      ExpressionAttributeValues: {
+        ':v': vec, ':d': vec.length, ':t': new Date().toISOString(),
+      },
+    }));
+    return json(200, { ok: true, dim: vec.length, count: engaged.length });
+  } catch (e) {
+    console.warn('user/embedding failed:', e.message);
+    return json(200, { ok: false, reason: 'error' });
+  }
+}
+
+// The caller's stored user vector (or null). Fail-soft — a miss/absence just
+// means the feed's semantic signal stays neutral for this user.
+async function loadUserEmbedding(uid) {
+  try {
+    const res = await ddb.send(new GetCommand({
+      TableName: TABLES.persona.name,
+      Key: { id: uid },
+      ProjectionExpression: 'userEmbedding',
+    }));
+    const v = res.Item?.userEmbedding;
+    return Array.isArray(v) && v.length ? v : null;
+  } catch { return null; }
 }
 
 // POST /reco/cf — item-item co-engagement collaborative filtering. Reads are
