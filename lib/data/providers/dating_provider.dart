@@ -166,6 +166,24 @@ class DatingProvider extends ChangeNotifier {
     if (searchId != null && searchId.isNotEmpty) _lastSearchId = searchId;
   }
 
+  // ── Phase-2: keep the server-side USER EMBEDDING fresh ──────────────────────
+  // Post the ids of listings the tenant liked so the server pools their
+  // embeddings into a user vector (drives personalised semantic ranking).
+  // Debounced: only every few new likes, fail-soft, never blocks the UI.
+  int _lastUserEmbLikeCount = 0;
+
+  void _maybeRefreshUserEmbedding({bool force = false}) {
+    final n = _likedPropertyIds.length;
+    if (n < 3 || !AwsApiClient.instance.isConfigured) return;
+    if (!force && n - _lastUserEmbLikeCount < 3) return; // every ~3 new likes
+    _lastUserEmbLikeCount = n;
+    unawaited(
+      AwsApiClient.instance.post('/user/embedding', {
+        'liked': _likedPropertyIds.toList(),
+      }).catchError((_) => <String, dynamic>{}),
+    );
+  }
+
   // Phase-1: the DISCOVER swipe deck is ranked on-device and never went through
   // the server /search/log path, so its swipes produced NO training rows. But
   // each card carries the server-canonical `rankFeatures`, so a swipe there IS a
@@ -2248,6 +2266,10 @@ class DatingProvider extends ChangeNotifier {
       // own uploads even though they're safely stored server-side.
       unawaited(restoreAuthenticatedSession());
       unawaited(_refreshRemoteCatalogAfterAuth());
+      // Phase-2: refresh the server user vector on launch for a returning user
+      // who already has likes (so personalised semantic ranking works without
+      // needing 3 fresh swipes first). Fire-and-forget, fail-soft.
+      _maybeRefreshUserEmbedding(force: true);
       unawaited(_refreshCurrentTenantReviewsAfterAuth());
       // Pull mutual matches a landlord created for this tenant on another device,
       // so the chat shows up in their conversations (was local-only → invisible).
@@ -3680,6 +3702,8 @@ class DatingProvider extends ChangeNotifier {
       _postOutcomeWith(_discoverSearchId, property.id,
           isSuperLike ? 'superlike' : 'like',
           dwellMs: decisionMs);
+      // Phase-2: refresh the server user vector as likes accumulate (debounced).
+      _maybeRefreshUserEmbedding();
 
       // A tenant right-swipe registers the LIKE only — it is NOT a match. A
       // match is two-sided and is created when the other side (the landlord)
