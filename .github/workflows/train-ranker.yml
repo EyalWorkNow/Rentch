@@ -1,4 +1,5 @@
 name: train-ranker
+# Registered on the default branch (main) so GitHub Actions lists it. v2.
 
 # Produces the Rently listing-ranker model.json (LightGBM dump_model format) and
 # uploads it to S3, where the Node Lambda scorer (lib/model_scorer.mjs) picks it
