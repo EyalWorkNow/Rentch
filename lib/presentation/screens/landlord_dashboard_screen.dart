@@ -123,7 +123,7 @@ class LandlordDashboardScreen extends StatelessWidget {
                 if (context.watch<DatingProvider>().isBroker) ...[
                   FadeSlideEntrance(
                     delay: const Duration(milliseconds: 340),
-                    child: const _BrokerToolsCard(),
+                    child: _BrokerToolsCard(),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -152,7 +152,7 @@ class LandlordDashboardScreen extends StatelessWidget {
 // ─── Header Widget ──────────────────────────────────────────────────────────
 
 class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({
+  _DashboardHeader({
     required this.name,
     required this.photoUrl,
     required this.pendingCount,
@@ -222,7 +222,9 @@ class _DashboardHeader extends StatelessWidget {
             // Personal assistant ("עוזר אישי") — replaces the avatar. A clear
             // icon + tag opens Erik, the voice/text assistant built for older
             // landlords.
-            const _AssistantChip(),
+            // NOT const: its gradient is the swappable accent; a const widget
+            // never rebuilds and would freeze on the first-build accent.
+            _AssistantChip(),
           ],
         ),
       ],
@@ -231,7 +233,9 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 class _AssistantChip extends StatelessWidget {
-  const _AssistantChip();
+  // Non-const constructor on purpose: paints the swappable brand accent, so it
+  // must be allowed to rebuild when the accent changes.
+  _AssistantChip();
 
   @override
   Widget build(BuildContext context) {
@@ -356,7 +360,7 @@ class _SystemPerformanceGrid extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+  _MetricCard({
     required this.title,
     required this.value,
     required this.unit,
@@ -442,7 +446,7 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _LargeProgressCard extends StatelessWidget {
-  const _LargeProgressCard({
+  _LargeProgressCard({
     required this.title,
     required this.progressValue,
     required this.conversionRate,
@@ -571,7 +575,7 @@ class _LargeProgressCard extends StatelessWidget {
 // ─── Occupancy Arc Meter ──────────────────────────────────────────────────────
 
 class _OccupancyArcMeter extends StatefulWidget {
-  const _OccupancyArcMeter({
+  _OccupancyArcMeter({
     required this.matchesCount,
     required this.propertiesCount,
     required this.expectedRevenue,
@@ -880,7 +884,7 @@ class _WavePainter extends CustomPainter {
 // ─── Weekly Activity Chart ────────────────────────────────────────────────────
 
 class _WeeklyActivityChart extends StatefulWidget {
-  const _WeeklyActivityChart({
+  _WeeklyActivityChart({
     required this.properties,
     required this.isGuest,
   });
@@ -1328,7 +1332,7 @@ class _BarPainter extends CustomPainter {
 // Highlighted indigo card shown above the landlord tools when the user is a
 // broker. Opens the "כלי הסוכן" hub with all 10 broker tools.
 class _BrokerToolsCard extends StatelessWidget {
-  const _BrokerToolsCard();
+  _BrokerToolsCard();
 
   @override
   Widget build(BuildContext context) {
@@ -1411,7 +1415,7 @@ class _BrokerToolsCard extends StatelessWidget {
 }
 
 class _LandlordToolsSection extends StatelessWidget {
-  const _LandlordToolsSection({required this.properties});
+  _LandlordToolsSection({required this.properties});
 
   final List<RentalProperty> properties;
 
@@ -1644,7 +1648,7 @@ class _ToolTile extends StatelessWidget {
 // Prominent standalone card near the top of the dashboard. Lets the landlord
 // open the availability calendar to mark free viewing windows tenants can book.
 class _CalendarCard extends StatefulWidget {
-  const _CalendarCard({required this.onTap});
+  _CalendarCard({required this.onTap});
 
   final VoidCallback onTap;
 

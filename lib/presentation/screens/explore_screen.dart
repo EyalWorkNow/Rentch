@@ -502,7 +502,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 // ─── Lead Card ────────────────────────────────────────────────────────────────
 
 class _LeadCard extends StatefulWidget {
-  const _LeadCard({
+  _LeadCard({
     required this.tenant,
     required this.liker,
     required this.property,
@@ -859,10 +859,10 @@ class _LeadCardState extends State<_LeadCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (widget.isHighFit) const _HighFitPill(),
+                        if (widget.isHighFit) _HighFitPill(),
                         if (widget.isHighFit && widget.displayVerified)
                           const SizedBox(height: 6),
-                        if (widget.displayVerified) const _VerifiedShield(),
+                        if (widget.displayVerified) _VerifiedShield(),
                         if (widget.additionalInterested > 0) ...[
                           if (widget.isHighFit || widget.displayVerified)
                             const SizedBox(height: 6),
@@ -1073,7 +1073,7 @@ class _SpecPill extends StatelessWidget {
 
 /// "התאמה גבוהה" top badge — the high-fit pill.
 class _HighFitPill extends StatelessWidget {
-  const _HighFitPill();
+  _HighFitPill();
 
   @override
   Widget build(BuildContext context) {
@@ -1139,7 +1139,7 @@ class _MoreInterestedPill extends StatelessWidget {
 /// Verified-profile shield top badge — teal pill, styled like ProfileCard's
 /// verified-listing badge.
 class _VerifiedShield extends StatelessWidget {
-  const _VerifiedShield();
+  _VerifiedShield();
 
   @override
   Widget build(BuildContext context) {
@@ -1221,7 +1221,7 @@ Color _fitColor(double score) {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyOwnerQueue extends StatelessWidget {
-  const _EmptyOwnerQueue({this.onGoToMessages});
+  _EmptyOwnerQueue({this.onGoToMessages});
 
   /// When set, "עבור לשיחות" switches the merged host to its הודעות segment
   /// instead of pushing a back-button-less MatchesScreen.
@@ -1375,7 +1375,7 @@ class _CandidateTopBar extends StatelessWidget {
 /// The one and only entry point to the candidate filter sheet — a compact,
 /// pill-shaped icon button that shows the active-filter count as a badge.
 class _FiltersIconButton extends StatelessWidget {
-  const _FiltersIconButton({required this.count, required this.onTap});
+  _FiltersIconButton({required this.count, required this.onTap});
 
   final int count;
   final VoidCallback onTap;
@@ -1447,7 +1447,7 @@ class _FiltersIconButton extends StatelessWidget {
 /// Minimal auto-like indicator: a small label + a compact adaptive Switch.
 /// Binds to [DatingProvider.autoLikeEnabled] / [DatingProvider.toggleAutoLike].
 class _AutoLikeToggle extends StatelessWidget {
-  const _AutoLikeToggle({required this.enabled, required this.onToggle});
+  _AutoLikeToggle({required this.enabled, required this.onToggle});
 
   final bool enabled;
   final VoidCallback onToggle;
@@ -1541,7 +1541,7 @@ class _QuickChip extends StatelessWidget {
 
 /// Friendly empty state shown when active filters exclude every candidate.
 class _NoMatchingCandidates extends StatelessWidget {
-  const _NoMatchingCandidates({required this.onClear});
+  _NoMatchingCandidates({required this.onClear});
 
   final VoidCallback onClear;
 
@@ -1615,7 +1615,7 @@ class _NoMatchingCandidates extends StatelessWidget {
 /// [PropertyLike] (occupation, household, #children, pets/car/WFH, income,
 /// verification). Unknown (null) attributes never exclude a candidate.
 class _CandidateFilterSheet extends StatefulWidget {
-  const _CandidateFilterSheet({required this.initial});
+  _CandidateFilterSheet({required this.initial});
 
   final CandidateFilters initial;
 

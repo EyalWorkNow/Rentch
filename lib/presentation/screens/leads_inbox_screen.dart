@@ -168,7 +168,10 @@ class _SegmentToggleState extends State<_SegmentToggle> {
                           width: segW,
                           top: 0,
                           bottom: 0,
-                          child: const _Thumb(),
+                          // NOT const: the thumb's gradient is the swappable
+                          // accent, and a const widget never rebuilds — so it
+                          // would freeze on the accent value from first build.
+                          child: _Thumb(),
                         ),
                         Row(
                           children: [
@@ -283,7 +286,7 @@ class _SegmentToggleState extends State<_SegmentToggle> {
 
 /// The small rounded count pill shown next to a segment label.
 class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count, required this.onSelected});
+  _CountBadge({required this.count, required this.onSelected});
 
   final int count;
   final bool onSelected;
@@ -314,7 +317,9 @@ class _CountBadge extends StatelessWidget {
 }
 
 class _Thumb extends StatelessWidget {
-  const _Thumb();
+  // Non-const constructor on purpose: this widget paints the swappable brand
+  // accent, so it must be allowed to rebuild when the accent changes.
+  _Thumb();
 
   @override
   Widget build(BuildContext context) {

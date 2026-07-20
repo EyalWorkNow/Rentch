@@ -716,7 +716,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                       // List or empty state
                       Expanded(
                         child: allProperties.isEmpty
-                            ? const _EmptyPropertiesState()
+                            ? _EmptyPropertiesState()
                             : filtered.isEmpty
                                 ? _EmptyFilteredState(
                                     onClear: _clearSearchAndFilters,
@@ -990,7 +990,7 @@ class _PropertyManageCard extends StatelessWidget {
 /// glass tag — only when > 0 (dormant until user vectors exist → renders
 /// nothing, so no empty clutter today). Fail-soft, one call per card.
 class _AudienceChip extends StatefulWidget {
-  const _AudienceChip({required this.propertyId});
+  _AudienceChip({required this.propertyId});
   final String propertyId;
 
   @override
@@ -1114,7 +1114,7 @@ class _StatusDot extends StatelessWidget {
 // ─── Thumbnail ───────────────────────────────────────────────────────────────
 
 class _PropertyThumb extends StatelessWidget {
-  const _PropertyThumb({required this.media});
+  _PropertyThumb({required this.media});
 
   final PropertyMedia? media;
 
@@ -1193,7 +1193,7 @@ class _GlassTag extends StatelessWidget {
 // ─── Empty states ────────────────────────────────────────────────────────────
 
 class _EmptyPropertiesState extends StatelessWidget {
-  const _EmptyPropertiesState();
+  _EmptyPropertiesState();
 
   @override
   Widget build(BuildContext context) {
@@ -1243,7 +1243,7 @@ class _EmptyPropertiesState extends StatelessWidget {
 }
 
 class _EmptyFilteredState extends StatelessWidget {
-  const _EmptyFilteredState({required this.onClear});
+  _EmptyFilteredState({required this.onClear});
 
   final VoidCallback onClear;
 
@@ -1315,7 +1315,7 @@ class _EmptyFilteredState extends StatelessWidget {
 }
 
 class _FilterPill extends StatelessWidget {
-  const _FilterPill({
+  _FilterPill({
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -1356,7 +1356,7 @@ class _FilterPill extends StatelessWidget {
 
 /// Big, friendly choice row for the "create or use ours" contract sheet.
 class _ContractSourceButton extends StatelessWidget {
-  const _ContractSourceButton({
+  _ContractSourceButton({
     required this.icon,
     required this.title,
     required this.subtitle,

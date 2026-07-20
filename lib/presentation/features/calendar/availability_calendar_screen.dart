@@ -1102,7 +1102,7 @@ class _NewSlotConfig {
 }
 
 class _NewSlotSheet extends StatefulWidget {
-  const _NewSlotSheet({required this.day, required this.properties});
+  _NewSlotSheet({required this.day, required this.properties});
 
   final DateTime day;
   final List<RentalProperty> properties;

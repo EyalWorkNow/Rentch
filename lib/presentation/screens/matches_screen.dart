@@ -281,7 +281,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
 }
 
 class _MessagesSectionHeader extends StatelessWidget {
-  const _MessagesSectionHeader({
+  _MessagesSectionHeader({
     required this.icon,
     required this.label,
     required this.count,
@@ -328,7 +328,7 @@ class _MessagesSectionHeader extends StatelessWidget {
 /// Header pill that reveals the paid message-requests (tenants with no match who
 /// paid extra to write the landlord about a listing). Tap to expand/collapse.
 class _RequestsToggle extends StatelessWidget {
-  const _RequestsToggle({
+  _RequestsToggle({
     required this.count,
     required this.active,
     required this.onTap,
@@ -403,7 +403,7 @@ class _RequestsToggle extends StatelessWidget {
 }
 
 class _MatchesToolbar extends StatelessWidget {
-  const _MatchesToolbar({
+  _MatchesToolbar({
     required this.controller,
     required this.query,
     required this.ageFilter,
@@ -595,7 +595,7 @@ class _MatchesToolbar extends StatelessWidget {
 }
 
 class _FilterPill extends StatelessWidget {
-  const _FilterPill({
+  _FilterPill({
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -630,7 +630,7 @@ class _FilterPill extends StatelessWidget {
 // ─── Empty filter results ─────────────────────────────────────────────────────
 
 class _EmptyFilterResults extends StatelessWidget {
-  const _EmptyFilterResults({required this.onClear});
+  _EmptyFilterResults({required this.onClear});
   final VoidCallback onClear;
 
   @override
@@ -697,7 +697,7 @@ class _EmptyFilterResults extends StatelessWidget {
 // ─── Match card ───────────────────────────────────────────────────────────────
 
 class _MatchCard extends StatefulWidget {
-  const _MatchCard({
+  _MatchCard({
     required this.match,
     required this.property,
     required this.onTap,
@@ -1010,7 +1010,7 @@ class _MockupChip extends StatelessWidget {
 }
 
 class _FreshnessBadge extends StatelessWidget {
-  const _FreshnessBadge({required this.match});
+  _FreshnessBadge({required this.match});
 
   final RentalMatch match;
 
@@ -1043,7 +1043,7 @@ class _FreshnessBadge extends StatelessWidget {
 }
 
 class _LastMessagePreview extends StatelessWidget {
-  const _LastMessagePreview({required this.message});
+  _LastMessagePreview({required this.message});
 
   final ChatMessage? message;
 
@@ -1126,7 +1126,7 @@ class _StatusChip extends StatelessWidget {
 // ─── Empty matches (no matches at all) ───────────────────────────────────────
 
 class _EmptyMatches extends StatelessWidget {
-  const _EmptyMatches({required this.isLandlord});
+  _EmptyMatches({required this.isLandlord});
   final bool isLandlord;
 
   @override

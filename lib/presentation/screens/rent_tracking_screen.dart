@@ -421,7 +421,7 @@ class _MonthRow extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.title, required this.onStart});
+  _EmptyState({required this.title, required this.onStart});
 
   final String title;
   final VoidCallback onStart;

@@ -165,7 +165,7 @@ class OwnerListingsScreen extends StatelessWidget {
 }
 
 class _OwnerHeader extends StatelessWidget {
-  const _OwnerHeader({
+  _OwnerHeader({
     required this.name,
     required this.isAgency,
     required this.count,
@@ -252,7 +252,7 @@ class _OwnerHeader extends StatelessWidget {
 }
 
 class _OwnerListingCard extends StatelessWidget {
-  const _OwnerListingCard({required this.property});
+  _OwnerListingCard({required this.property});
 
   final RentalProperty property;
 

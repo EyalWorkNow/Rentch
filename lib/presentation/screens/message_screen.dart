@@ -1025,7 +1025,7 @@ class _ChatBackground extends StatelessWidget {
 // ─── Compact contract strip ───────────────────────────────────────────────────
 
 class _ContractBar extends StatelessWidget {
-  const _ContractBar({
+  _ContractBar({
     required this.match,
     required this.isLandlord,
     required this.onSign,
@@ -1295,7 +1295,7 @@ class _ActionsSheet extends StatelessWidget {
 }
 
 class _QuickActionButton extends StatelessWidget {
-  const _QuickActionButton({
+  _QuickActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -1344,7 +1344,7 @@ class _QuickActionButton extends StatelessWidget {
 
 /// Prominent, on-brand "send contract" CTA card used in the actions sheet.
 class _SendContractCard extends StatelessWidget {
-  const _SendContractCard({required this.sent, required this.onTap});
+  _SendContractCard({required this.sent, required this.onTap});
 
   final bool sent;
   final VoidCallback? onTap;
@@ -1454,7 +1454,7 @@ class _ActionItem {
 }
 
 class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.item});
+  _ActionTile({required this.item});
   final _ActionItem item;
 
   @override
@@ -1513,7 +1513,7 @@ class _ActionTile extends StatelessWidget {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _EmptyChat extends StatelessWidget {
-  const _EmptyChat({required this.theme});
+  _EmptyChat({required this.theme});
 
   final _ChatThemeSpec theme;
 
@@ -1561,7 +1561,7 @@ class _EmptyChat extends StatelessWidget {
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({
+  _MessageBubble({
     required this.message,
     required this.isTenant,
     required this.showAvatar,
@@ -1755,7 +1755,7 @@ class _MediaBubbleContent extends StatelessWidget {
 }
 
 class _SenderAvatar extends StatelessWidget {
-  const _SenderAvatar({required this.show});
+  _SenderAvatar({required this.show});
   final bool show;
 
   @override
@@ -1962,7 +1962,7 @@ class _IconBtn extends StatelessWidget {
 }
 
 class _SendBtn extends StatelessWidget {
-  const _SendBtn({required this.isSending, required this.onTap});
+  _SendBtn({required this.isSending, required this.onTap});
 
   final bool isSending;
   final VoidCallback onTap;
@@ -2043,7 +2043,7 @@ class _TemplateMessage {
 }
 
 class _TemplateLibrarySheet extends StatelessWidget {
-  const _TemplateLibrarySheet({required this.onSelect});
+  _TemplateLibrarySheet({required this.onSelect});
   final ValueChanged<String> onSelect;
 
   static const _templates = [
@@ -2196,7 +2196,7 @@ class _TemplateLibrarySheet extends StatelessWidget {
 }
 
 class _TemplateTile extends StatelessWidget {
-  const _TemplateTile({required this.template, required this.onTap});
+  _TemplateTile({required this.template, required this.onTap});
 
   final _TemplateMessage template;
   final VoidCallback onTap;
@@ -2258,7 +2258,7 @@ class _TemplateTile extends StatelessWidget {
 /// On-brand "propose viewing times" CTA, matching [_SendContractCard]. Only the
 /// landlord/owner sees this (gated at the call site).
 class _ProposeTimesCard extends StatelessWidget {
-  const _ProposeTimesCard({required this.onTap});
+  _ProposeTimesCard({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -2337,7 +2337,7 @@ class _ProposeTimesCard extends StatelessWidget {
 /// Lists the landlord's upcoming OPEN slots; multi-select up to 3. Pops with the
 /// chosen slots (or nothing on cancel). Empty state offers to open the calendar.
 class _ProposeTimesSheet extends StatefulWidget {
-  const _ProposeTimesSheet({required this.repo, required this.onAddTimes});
+  _ProposeTimesSheet({required this.repo, required this.onAddTimes});
 
   final AvailabilityRepository repo;
   final VoidCallback onAddTimes;
@@ -2551,7 +2551,7 @@ class _ProposeTimesSheetState extends State<_ProposeTimesSheet> {
 }
 
 class _SlotPickRow extends StatelessWidget {
-  const _SlotPickRow({
+  _SlotPickRow({
     required this.slot,
     required this.picked,
     required this.disabled,
@@ -2628,7 +2628,7 @@ class _SlotPickRow extends StatelessWidget {
 /// read-only. Once one option is confirmed, it shows "מאושר ✓" and the rest are
 /// disabled.
 class _SlotProposalCard extends StatelessWidget {
-  const _SlotProposalCard({
+  _SlotProposalCard({
     required this.proposal,
     required this.isMine,
     required this.createdAt,
@@ -2726,7 +2726,7 @@ class _SlotProposalCard extends StatelessWidget {
 }
 
 class _SlotOptionRow extends StatelessWidget {
-  const _SlotOptionRow({
+  _SlotOptionRow({
     required this.option,
     required this.confirmed,
     required this.dimmed,
@@ -2829,7 +2829,7 @@ class _SlotOptionRow extends StatelessWidget {
 
 /// Compact "viewing confirmed" card shown to both sides.
 class _SlotConfirmCard extends StatelessWidget {
-  const _SlotConfirmCard({
+  _SlotConfirmCard({
     required this.confirm,
     required this.isMine,
     required this.createdAt,

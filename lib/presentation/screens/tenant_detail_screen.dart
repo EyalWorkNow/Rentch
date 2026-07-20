@@ -550,7 +550,7 @@ class _AvatarFallback extends StatelessWidget {
 }
 
 class _CarouselDots extends StatelessWidget {
-  const _CarouselDots({required this.count, required this.current});
+  _CarouselDots({required this.count, required this.current});
   final int count;
   final int current;
 
@@ -586,7 +586,7 @@ class _CarouselDots extends StatelessWidget {
 // ─── Section card shell (mirrors property page primitive) ────────────────────
 
 class _SectionCardShell extends StatelessWidget {
-  const _SectionCardShell({
+  _SectionCardShell({
     required this.title,
     required this.icon,
     required this.child,
@@ -819,7 +819,7 @@ class _ChipWrap extends StatelessWidget {
 // ─── Match insight (mirrors property page _MatchInsightCard layout) ──────────
 
 class _MatchInsightCard extends StatelessWidget {
-  const _MatchInsightCard({required this.tenant, required this.property});
+  _MatchInsightCard({required this.tenant, required this.property});
   final TenantProfile tenant;
   final RentalProperty property;
 
@@ -957,7 +957,7 @@ class _MatchInsightCard extends StatelessWidget {
 // ─── Liked property card (kept from original, restyled to match) ─────────────
 
 class _LikedPropertyDetailedCard extends StatelessWidget {
-  const _LikedPropertyDetailedCard({required this.property});
+  _LikedPropertyDetailedCard({required this.property});
   final RentalProperty property;
 
   @override
