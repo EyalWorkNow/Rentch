@@ -4641,6 +4641,35 @@ class DatingProvider extends ChangeNotifier {
   /// Server-side ranked tenant leads (the two-sided model applied across the
   /// landlord's interested tenants). Scales without loading every tenant's
   /// profile on-device. Returns [] when offline/unconfigured.
+  /// Phase-3: the LOOK-ALIKE audience for one of the landlord's listings — how
+  /// many tenants in the population are the best-fit target (by embedding
+  /// similarity), and their scores. Returns (count, topScore%) — empty/0 when
+  /// the server ranking is dormant (no user vectors yet) or off-network.
+  Future<({int count, int topScore})> fetchListingAudience(String propertyId,
+      {int topK = 25}) async {
+    if (propertyId.isEmpty || !AwsApiClient.instance.isConfigured) {
+      return (count: 0, topScore: 0);
+    }
+    try {
+      final res = await AwsApiClient.instance.post(
+        '/listing/audience',
+        {'propertyId': propertyId, 'topK': topK},
+      );
+      final list = res['audience'];
+      final count = (res['audienceCount'] as num?)?.toInt() ??
+          (list is List ? list.length : 0);
+      int top = 0;
+      if (list is List && list.isNotEmpty) {
+        final first = list.first;
+        if (first is Map) top = (first['score'] as num?)?.toInt() ?? 0;
+      }
+      return (count: count, topScore: top);
+    } catch (error) {
+      if (kDebugMode) debugPrint('fetchListingAudience: $error');
+      return (count: 0, topScore: 0);
+    }
+  }
+
   Future<List<RankedLead>> fetchRankedLeads() async {
     if (!AwsApiClient.instance.isConfigured) {
       return const [];
