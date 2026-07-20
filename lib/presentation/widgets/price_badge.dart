@@ -131,14 +131,14 @@ class PriceBadge extends StatelessWidget {
       case 'great_deal':
         return const _BadgeStyle(
           label: 'מחיר מצוין לאזור',
-          fg: Color(0xFF15803D),
+          fg: AppColors.scoreStrong,
           bg: AppColors.tealPale,
           icon: IconsaxPlusLinear.trend_down,
         );
       case 'above_market':
         return const _BadgeStyle(
           label: 'מעל מחיר השוק',
-          fg: Color(0xFFC2410C),
+          fg: AppColors.scoreMixed,
           bg: AppColors.cloud,
           icon: IconsaxPlusLinear.trend_up,
         );
@@ -147,7 +147,7 @@ class PriceBadge extends StatelessWidget {
         // "fair" (and any unknown-but-present verdict) → neutral, calm blue.
         return const _BadgeStyle(
           label: 'מחיר הוגן לאזור',
-          fg: Color(0xFF1D4ED8),
+          fg: AppColors.scoreGood,
           bg: AppColors.slate100,
           icon: IconsaxPlusLinear.tick_circle,
         );

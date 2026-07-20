@@ -564,8 +564,8 @@ class _AiImproveTile extends StatelessWidget {
             Container(
               width: 38,
               height: 38,
-              decoration: const BoxDecoration(
-                  color: Color(0x224A6CF7), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: AppColors.superLike.withValues(alpha: 0.13), shape: BoxShape.circle),
               child: busy
                   ? Padding(
                       padding: const EdgeInsets.all(9),
@@ -775,8 +775,8 @@ class _PaywallSheet extends StatelessWidget {
               child: Container(
                 width: 56,
                 height: 56,
-                decoration: const BoxDecoration(
-                    color: Color(0x224A6CF7), shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: AppColors.superLike.withValues(alpha: 0.13), shape: BoxShape.circle),
                 child: const Icon(IconsaxPlusBold.magicpen,
                     size: 26, color: AppColors.superLike),
               ),

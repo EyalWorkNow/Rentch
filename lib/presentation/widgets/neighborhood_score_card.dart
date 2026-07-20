@@ -140,9 +140,9 @@ class _HeadlineBadge extends StatelessWidget {
   final int score;
 
   Color get _color {
-    if (score >= 80) return const Color(0xFF15803D); // strong
-    if (score >= 60) return const Color(0xFF1D4ED8); // good
-    if (score >= 40) return const Color(0xFFC2410C); // mixed
+    if (score >= 80) return AppColors.scoreStrong; // strong
+    if (score >= 60) return AppColors.scoreGood; // good
+    if (score >= 40) return AppColors.scoreMixed; // mixed
     return AppColors.slate400; // low
   }
 

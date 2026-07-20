@@ -4174,7 +4174,7 @@ class _MatchInsightCard extends StatelessWidget {
         MatchTier.perfect => (AppColors.green, AppColors.border),
         MatchTier.excellent => (AppColors.primary, AppColors.primaryLight2),
         MatchTier.good => (AppColors.blue, AppColors.border),
-        MatchTier.fair => (AppColors.amberDark, const Color(0xFFFEF3C7)),
+        MatchTier.fair => (AppColors.amberDark, AppColors.warningBg),
         MatchTier.weak => (AppColors.textSecondary, AppColors.slate100),
       };
 

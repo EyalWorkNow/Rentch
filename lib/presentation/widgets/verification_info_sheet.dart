@@ -43,7 +43,7 @@ class _VerificationInfoSheetBody extends StatelessWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
           boxShadow: [
             BoxShadow(
-              color: Color(0x26072946),
+              color: AppColors.navyShadow,
               blurRadius: 30,
               offset: Offset(0, -8),
             ),

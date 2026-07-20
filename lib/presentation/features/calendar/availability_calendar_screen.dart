@@ -32,6 +32,8 @@ class AvailabilityCalendarScreen extends StatefulWidget {
 class _AvailabilityCalendarScreenState
     extends State<AvailabilityCalendarScreen> {
   final _repo = AvailabilityRepository();
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
   List<AvailabilitySlot> _slots = const [];
   bool _loading = true;
   bool _agenda = false; // false = single-day view, true = "all upcoming"
@@ -78,17 +80,7 @@ class _AvailabilityCalendarScreenState
   String _time(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
-  String _dayHeader(DateTime d) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final diff = DateTime(d.year, d.month, d.day).difference(today).inDays;
-    final prefix = diff == 0
-        ? 'היום · '
-        : diff == 1
-            ? 'מחר · '
-            : '';
-    return '$prefix${_heb[d.weekday % 7]}, ${d.day} ${_monthsHeb[d.month]}';
-  }
+
 
   // Full free date selection — any day / month / year within the next year.
   Future<void> _pickAnyDate() async {
@@ -103,7 +95,40 @@ class _AvailabilityCalendarScreenState
       confirmText: 'אישור',
       builder: (ctx, child) => Directionality(
         textDirection: TextDirection.rtl,
-        child: child!,
+        child: Theme(
+          data: Theme.of(ctx).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.black, // Header background & active circle
+              onPrimary: Colors.white, // Header text & active text
+              surface: Colors.white, // Dialog background
+              onSurface: AppColors.navy, // Default text color
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.black, // Action buttons color
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: Colors.white,
+              headerBackgroundColor: Colors.black,
+              headerForegroundColor: Colors.white,
+              dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return Colors.white;
+                }
+                return AppColors.navy;
+              }),
+              dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return Colors.black;
+                }
+                return Colors.transparent;
+              }),
+            ),
+          ),
+          child: child!,
+        ),
       ),
     );
     if (picked == null || !mounted) return;
@@ -114,21 +139,7 @@ class _AvailabilityCalendarScreenState
     });
   }
 
-  void _shiftWeek(int deltaDays) {
-    setState(() {
-      final s = _stripStart;
-      var next = DateTime(s.year, s.month, s.day + deltaDays);
-      if (next.isBefore(_today)) next = _today; // never scroll into the past
-      _stripStart = next;
-    });
-  }
 
-  void _jumpToday() {
-    setState(() {
-      _selectedDay = _today;
-      _stripStart = _today;
-    });
-  }
 
   // A short apartment label for a property id ('' → general availability).
   String _propertyLabel(DatingProvider provider, String propertyId) {
@@ -312,31 +323,82 @@ class _AvailabilityCalendarScreenState
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Watch so a chat-booked viewing (processViewingConfirms) refreshes the
-    // property labels + strip markers live.
     final provider = context.watch<DatingProvider>();
+    final bool isBroker = AppColors.isBrokerAccent;
+    final primaryColor = isBroker ? Colors.black : AppColors.primary;
+    
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.cloud,
           elevation: 0,
-          foregroundColor: AppColors.navy,
-          titleSpacing: 16,
-          title: Row(
-            children: [
-              Icon(IconsaxPlusBold.calendar_1, color: AppColors.primary, size: 26),
-              const SizedBox(width: 10),
-              const Text('היומן שלי',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 21)),
-            ],
+          scrolledUnderElevation: 0,
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.arrow_back, color: AppColors.navy, size: 20),
+            ),
           ),
+          centerTitle: false,
+          title: const Text('היומן שלי',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.navy)),
+          actions: [
+            GestureDetector(
+              onTap: _pickAnyDate,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(left: 16, top: 10, bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(color: AppColors.slate300, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(IconsaxPlusLinear.calendar, size: 16, color: AppColors.navy),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_monthsHeb[_stripStart.month]} ${_stripStart.year}',
+                      style: const TextStyle(
+                        color: AppColors.navy,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_drop_down, size: 18, color: AppColors.navy),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _openNewSlotSheet,
-          backgroundColor: AppColors.primary,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
           icon: const Icon(IconsaxPlusLinear.add, size: 24),
           label: const Text('הוסף זמן פנוי',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
@@ -346,10 +408,33 @@ class _AvailabilityCalendarScreenState
             : Column(
                 children: [
                   _viewToggle(),
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                      decoration: InputDecoration(
+                        hintText: 'חפשו צפיות וחלונות...',
+                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 15),
+                        prefixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary, size: 20),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(100),
+                          borderSide: BorderSide(color: AppColors.slate200, width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(100),
+                          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
                   if (!_agenda) ...[
-                    _dateNavBar(),
                     _weekStrip(provider),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 8),
                     Expanded(child: _dayView(provider)),
                   ] else
                     Expanded(child: _agendaView(provider)),
@@ -459,14 +544,19 @@ class _AvailabilityCalendarScreenState
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(22),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.tealBrand,
-                              AppColors.primary,
-                            ],
-                          ),
+                          color: AppColors.isBrokerAccent
+                              ? Colors.black
+                              : null,
+                          gradient: AppColors.isBrokerAccent
+                              ? null
+                              : LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    AppColors.tealBrand,
+                                    AppColors.primary,
+                                  ],
+                                ),
                           boxShadow: [
                             BoxShadow(
                               color: AppColors.primary.withValues(alpha: 0.35),
@@ -491,112 +581,19 @@ class _AvailabilityCalendarScreenState
     );
   }
 
-  // Month label + free date picker + week navigation, above the strip.
-  Widget _dateNavBar() {
-    final atToday = _sameDay(_stripStart, _today);
-    Widget arrow(IconData icon, VoidCallback? onTap) => GestureDetector(
-          onTap: onTap == null
-              ? null
-              : () {
-                  HapticFeedback.selectionClick();
-                  onTap();
-                },
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: onTap == null ? AppColors.slate50 : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.slate200, width: 1.5),
-            ),
-            child: Icon(icon,
-                size: 20,
-                color: onTap == null ? AppColors.slate300 : AppColors.navy),
-          ),
-        );
 
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
-      child: Row(
-        children: [
-          // ◀ previous week (disabled when already at today)
-          arrow(IconsaxPlusLinear.arrow_right_3, atToday ? null : () => _shiftWeek(-7)),
-          const SizedBox(width: 8),
-          // Month · Year — tap for full free date selection
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                _pickAnyDate();
-              },
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.slate50,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.slate200, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(IconsaxPlusLinear.calendar_search,
-                        size: 20, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                        '${_monthsHeb[_stripStart.month]} ${_stripStart.year}',
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.navy)),
-                    const SizedBox(width: 4),
-                    Icon(IconsaxPlusLinear.arrow_down_1,
-                        size: 16, color: AppColors.slate500),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // ▶ next week
-          arrow(IconsaxPlusLinear.arrow_left_2, () => _shiftWeek(7)),
-          if (!atToday) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: _jumpToday,
-              child: Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Center(
-                  child: Text('היום',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary)),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _weekStrip(DatingProvider provider) {
     final anchor = _stripStart;
     final days = List.generate(
         14, (i) => DateTime(anchor.year, anchor.month, anchor.day + i));
     return Container(
-      color: Colors.white,
+      color: AppColors.cloud,
       child: SizedBox(
-        height: 112,
+        height: 116,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           itemCount: days.length,
           itemBuilder: (_, i) {
             final d = days[i];
@@ -604,40 +601,79 @@ class _AvailabilityCalendarScreenState
             final onDay = _slotsOn(d);
             final booked = onDay.where((s) => !s.isOpen).length;
             final open = onDay.where((s) => s.isOpen).length;
+
+            final String dayName = _heb[d.weekday % 7];
+            final String shortDayName = dayName.length > 2 ? dayName.substring(0, 2) : dayName;
+
             return GestureDetector(
               onTap: () {
                 HapticFeedback.selectionClick();
                 setState(() => _selectedDay = d);
               },
               child: Container(
-                width: 66,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: 62,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                      color: selected ? AppColors.primary : AppColors.slate200,
-                      width: 1.5),
+                    color: selected ? AppColors.primary : AppColors.slate200.withValues(alpha: 0.5),
+                    width: selected ? 2.0 : 1.2,
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : null,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(_heb[d.weekday % 7],
+                    Text(
+                      shortDayName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: selected ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? AppColors.primary : AppColors.slate50,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${d.day}',
                         style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color:
-                                selected ? Colors.white : AppColors.slate500)),
-                    const SizedBox(height: 5),
-                    Text('${d.day}',
-                        style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: selected ? Colors.white : AppColors.navy)),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: selected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     // Marker reflects BOTH booked (coral) and open (primary) so
                     // a fully-booked day never looks empty.
-                    _stripMarker(selected: selected, booked: booked, open: open),
+                    if (booked > 0 || open > 0)
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: selected ? AppColors.primary : AppColors.slate400,
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 5),
                   ],
                 ),
               ),
@@ -648,39 +684,57 @@ class _AvailabilityCalendarScreenState
     );
   }
 
-  Widget _stripMarker(
-      {required bool selected, required int booked, required int open}) {
-    if (booked == 0 && open == 0) {
-      return const SizedBox(height: 8);
-    }
-    Widget dot(Color c) => Container(
-          width: 8,
-          height: 8,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-              color: selected ? Colors.white : c, shape: BoxShape.circle),
-        );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (booked > 0) dot(AppColors.coral),
-        if (open > 0) dot(AppColors.primary),
-      ],
-    );
-  }
+
 
   Widget _dayView(DatingProvider provider) {
-    final slots = _slotsOn(_selectedDay);
+    var slots = _slotsOn(_selectedDay);
+    if (_searchQuery.isNotEmpty) {
+      slots = slots.where((s) {
+        final prop = _propertyLabel(provider, s.propertyId).toLowerCase();
+        final name = s.bookedByName.toLowerCase();
+        final tag = s.tag.toLowerCase();
+        final note = s.note.toLowerCase();
+        return prop.contains(_searchQuery) ||
+            name.contains(_searchQuery) ||
+            tag.contains(_searchQuery) ||
+            note.contains(_searchQuery);
+      }).toList();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          child: Text(_dayHeader(_selectedDay),
-              style: const TextStyle(
-                  fontSize: 20,
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+          child: Row(
+            children: [
+              const Text(
+                'צפיות וחלונות להיום',
+                style: TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.navy)),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.danger, // Rose red count badge
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  '${slots.length < 10 ? '0' : ''}${slots.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         if (slots.isEmpty)
           Expanded(child: _emptyDay())
@@ -689,10 +743,36 @@ class _AvailabilityCalendarScreenState
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
               itemCount: slots.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, i) => _slotCard(provider, slots[i]),
+              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              itemBuilder: (_, i) => _timelineRow(provider, slots[i]),
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _timelineRow(DatingProvider provider, AvailabilitySlot s) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 55,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Text(
+              _time(s.start),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _slotCard(provider, s),
+        ),
       ],
     );
   }
@@ -771,8 +851,22 @@ class _AvailabilityCalendarScreenState
   }
 
   Widget _agendaView(DatingProvider provider) {
-    final upcoming = _slots.where((s) => s.end.isAfter(DateTime.now())).toList()
+    var upcoming = _slots.where((s) => s.end.isAfter(DateTime.now())).toList()
       ..sort((a, b) => a.start.compareTo(b.start));
+
+    if (_searchQuery.isNotEmpty) {
+      upcoming = upcoming.where((s) {
+        final prop = _propertyLabel(provider, s.propertyId).toLowerCase();
+        final name = s.bookedByName.toLowerCase();
+        final tag = s.tag.toLowerCase();
+        final note = s.note.toLowerCase();
+        return prop.contains(_searchQuery) ||
+            name.contains(_searchQuery) ||
+            tag.contains(_searchQuery) ||
+            note.contains(_searchQuery);
+      }).toList();
+    }
+
     if (upcoming.isEmpty) {
       return Center(
         child: Padding(
@@ -793,190 +887,197 @@ class _AvailabilityCalendarScreenState
         ),
       );
     }
-    // Group by calendar day with a sticky-ish header per day.
-    final items = <Widget>[];
-    DateTime? lastDay;
-    for (final s in upcoming) {
-      final day = DateTime(s.start.year, s.start.month, s.start.day);
-      if (lastDay == null || !_sameDay(day, lastDay)) {
-        items.add(Padding(
-          padding: EdgeInsets.fromLTRB(20, items.isEmpty ? 12 : 22, 20, 8),
-          child: Text(_dayHeader(day),
-              style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.navy)),
-        ));
-        lastDay = day;
-      }
-      items.add(Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: _slotCard(provider, s),
-      ));
-    }
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 110),
-      children: items,
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+      itemCount: upcoming.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (_, i) => _timelineRow(provider, upcoming[i]),
     );
   }
 
   Widget _slotCard(DatingProvider provider, AvailabilitySlot s) {
     final booked = !s.isOpen;
-    final accent = booked ? AppColors.coral : AppColors.success;
+    final bool isBroker = AppColors.isBrokerAccent;
+    final primaryColor = isBroker ? Colors.black : AppColors.primary;
+    
     final propLabel = _propertyLabel(provider, s.propertyId);
     final who = s.bookedByName.trim();
+
+    final cardBgColor = booked ? primaryColor : Colors.white;
+    final textTitleColor = booked ? Colors.white : AppColors.textPrimary;
+    final textSubtitleColor = booked ? Colors.white.withValues(alpha: 0.8) : AppColors.textSecondary;
+    final border = booked ? null : Border.all(color: AppColors.slate200, width: 1.2);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.slate200, width: 1.5),
+        color: cardBgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: border,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow.withValues(alpha: booked ? 0.15 : 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Status pill — icon + color band.
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                      booked
-                          ? IconsaxPlusBold.user_tick
-                          : IconsaxPlusBold.clock,
-                      color: accent,
-                      size: 26),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        booked ? (who.isEmpty ? 'צפייה מאושרת' : who) : 'חלון צפייה פנוי',
+                        style: TextStyle(
+                          color: textTitleColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_time(s.start)} - ${_time(s.end)}',
+                      style: TextStyle(
+                        color: textSubtitleColor,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${_time(s.start)} – ${_time(s.end)}',
-                          style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.navy)),
-                      const SizedBox(height: 3),
-                      Text(booked ? 'צפייה מאושרת' : 'פנוי לצפייה',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: accent)),
-                    ],
+                const SizedBox(height: 6),
+                Text(
+                  booked
+                      ? (propLabel.isNotEmpty ? propLabel : 'פניית צפייה מתואמת')
+                      : (propLabel.isNotEmpty ? 'פנוי לצפייה ב$propLabel' : 'שוכרים יכולים לתאם מועד לצפייה'),
+                  style: TextStyle(
+                    color: textSubtitleColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                      booked
-                          ? IconsaxPlusLinear.close_circle
-                          : IconsaxPlusLinear.trash,
-                      color: AppColors.coral,
-                      size: 24),
-                  tooltip: booked ? 'בטל צפייה' : 'הסר חלון',
-                  onPressed: () => _confirmRemove(s),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          // Chips row: property + tag (only when present).
-          if (propLabel.isNotEmpty || s.tag.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  if (propLabel.isNotEmpty)
-                    _chip(IconsaxPlusBold.home_2, propLabel, AppColors.navy),
-                  if (s.tag.isNotEmpty)
-                    _chip(IconsaxPlusBold.tag, s.tag, tagColor(s.tag)),
-                ],
-              ),
-            ),
-          if (s.note.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(s.note.trim(),
-                  style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.35,
-                      color: AppColors.slate600)),
-            ),
-          // Booked person + quick call.
-          if (booked && (who.isNotEmpty || s.bookedByPhone.trim().isNotEmpty))
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.slate100, width: 1.5)),
-              ),
-              child: Row(
-                children: [
-                  Icon(IconsaxPlusLinear.user, size: 20, color: AppColors.slate500),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(who.isEmpty ? 'שוכר/ת' : who,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.navy)),
-                  ),
-                  if (s.bookedByPhone.trim().isNotEmpty)
-                    GestureDetector(
-                      onTap: () => _call(s.bookedByPhone.trim()),
-                      child: Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: AppColors.success,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: const [
-                            Icon(IconsaxPlusBold.call, color: Colors.white, size: 20),
-                            SizedBox(width: 7),
-                            Text('חיוג',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800)),
-                          ],
-                        ),
-                      ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (booked)
+                  Row(
+                    children: [
+                      _avatar(who.isEmpty ? 'ש' : who, Colors.blue),
+                      const SizedBox(width: 4),
+                      _avatar('סוכן', Colors.amber),
+                      const SizedBox(width: 4),
+                      _avatar('לקוח', Colors.teal),
+                    ],
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.slate50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.slate200, width: 0.8),
                     ),
-                ],
-              ),
+                    child: const Row(
+                      children: [
+                        Icon(IconsaxPlusLinear.clock, size: 12, color: AppColors.slate500),
+                        SizedBox(width: 4),
+                        Text(
+                          'זמין להזמנה',
+                          style: TextStyle(color: AppColors.slate500, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                Row(
+                  children: [
+                    if (s.note.trim().isNotEmpty)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          IconsaxPlusLinear.note_1,
+                          color: booked ? Colors.white70 : AppColors.slate500,
+                          size: 20,
+                        ),
+                        tooltip: s.note,
+                        onPressed: () => _toast(s.note),
+                      ),
+                    const SizedBox(width: 8),
+                    if (booked && s.bookedByPhone.trim().isNotEmpty)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          IconsaxPlusLinear.call,
+                          color: booked ? Colors.white : AppColors.success,
+                          size: 20,
+                        ),
+                        tooltip: 'חיוג',
+                        onPressed: () => _call(s.bookedByPhone.trim()),
+                      ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: Icon(
+                        booked ? IconsaxPlusLinear.close_circle : IconsaxPlusLinear.trash,
+                        color: booked ? Colors.white : AppColors.coral,
+                        size: 22,
+                      ),
+                      tooltip: booked ? 'בטל צפייה' : 'הסר חלון',
+                      onPressed: () => _confirmRemove(s),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _chip(IconData icon, String label, Color color) {
+  Widget _avatar(String name, Color fallbackBg) {
+    final initials = name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(10),
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.25),
+        border: Border.all(color: Colors.white, width: 1.5),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w800, color: color)),
-        ],
+      alignment: Alignment.center,
+      child: Text(
+        initials.isEmpty ? 'U' : initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
+
+
 }
 
 // ── New-slot sheet ───────────────────────────────────────────────────────────

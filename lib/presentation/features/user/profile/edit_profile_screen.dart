@@ -1399,7 +1399,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppColors.navy, Color(0xFF0D3D60)],
+                      colors: [AppColors.navy, AppColors.navyMid],
                     ),
                   ),
                   child: Column(
@@ -1422,16 +1422,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
 
           // Gradient overlay (wrapped in IgnorePointer)
-          const IgnorePointer(
+          IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xCC072946),
+                    AppColors.navy.withValues(alpha: 0.80),
                     Colors.transparent,
-                    Color(0xBB072946),
+                    AppColors.navy.withValues(alpha: 0.73),
                   ],
                   stops: [0.0, 0.45, 1.0],
                 ),

@@ -535,7 +535,7 @@ class _Bubble extends StatelessWidget {
         : (message.failed ? AppColors.cloud : AppColors.slate100);
     final fg = fromUser
         ? Colors.white
-        : (message.failed ? const Color(0xFFB91C1C) : AppColors.ink);
+        : (message.failed ? AppColors.dangerDeep : AppColors.ink);
 
     return Align(
       alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,

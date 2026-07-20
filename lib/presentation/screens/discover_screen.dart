@@ -438,7 +438,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                 child: const Text(
                                   'חדש!',
                                   style: TextStyle(
-                                    color: Color(0xFFFCA5A5),
+                                    color: AppColors.dangerSoft,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 9,
                                   ),
@@ -4484,13 +4484,13 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
                         height: 48,
                         decoration: BoxDecoration(
                           color: canSave
-                              ? const Color(0xFF38B6FF)
+                              ? AppColors.sky
                                   .withValues(alpha: 0.85) // Sky Blue / Cyan
                               : Colors.black.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
                             color: canSave
-                                ? const Color(0xFF38B6FF).withValues(alpha: 0.4)
+                                ? AppColors.sky.withValues(alpha: 0.4)
                                 : Colors.white.withValues(alpha: 0.08),
                           ),
                         ),

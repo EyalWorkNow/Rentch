@@ -318,9 +318,9 @@ class _Thumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isBroker = AppColors.primary == const Color(0xFF000000);
+    final isBroker = AppColors.isBrokerAccent;
     final gradientColors = isBroker
-        ? [const Color(0xFF3C3C3C), const Color(0xFF000000)]
+        ? [AppColors.primaryLight, AppColors.primary]
         : [
             AppColors.primaryLight,
             AppColors.primary,

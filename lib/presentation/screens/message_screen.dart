@@ -1680,7 +1680,7 @@ class _MessageBubble extends StatelessWidget {
                       size: 12,
                       color: isPending
                           ? Colors.white.withValues(alpha: 0.5)
-                          : const Color(0xFF38BDF8),
+                          : AppColors.sky,
                     ),
                   ),
                 ],

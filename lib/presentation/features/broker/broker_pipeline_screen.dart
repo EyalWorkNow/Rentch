@@ -524,7 +524,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       case LeadStage.viewing:
         return AppColors.warning;
       case LeadStage.negotiation:
-        return const Color(0xFFE67E22);
+        return AppColors.carrot;
       case LeadStage.closedWon:
         return AppColors.success;
       case LeadStage.closedLost:

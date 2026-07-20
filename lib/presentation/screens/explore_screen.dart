@@ -494,7 +494,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Color _trustColor(int score) {
     if (score >= 80) return AppColors.success;
-    if (score >= 50) return const Color(0xFFE67E22);
+    if (score >= 50) return AppColors.carrot;
     return AppColors.coral;
   }
 }
@@ -1210,7 +1210,7 @@ class _FitBadge extends StatelessWidget {
 /// Fit-score → traffic-light color for the badge (honest, not fabricated).
 Color _fitColor(double score) {
   if (score >= 75) return AppColors.success;
-  if (score >= 50) return const Color(0xFFE67E22);
+  if (score >= 50) return AppColors.carrot;
   return AppColors.coral;
 }
 

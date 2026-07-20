@@ -950,7 +950,7 @@ class _MatchInsightCard extends StatelessWidget {
     if (score >= 70) {
       return (AppColors.blue, AppColors.border);
     }
-    return (AppColors.amberDark, const Color(0xFFFEF3C7));
+    return (AppColors.amberDark, AppColors.warningBg);
   }
 }
 

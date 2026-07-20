@@ -141,14 +141,20 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     final ledger = _ledger;
+    final bool isBroker = AppColors.isBrokerAccent;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnPrimary,
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.navy,
+          elevation: 0,
           title: const Text('מעקב תשלומים'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -161,8 +167,8 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
         floatingActionButton:
             (!_loading && ledger != null && ledger.isNotEmpty)
                 ? FloatingActionButton.extended(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textOnPrimary,
+                    backgroundColor: isBroker ? Colors.black : AppColors.primary,
+                    foregroundColor: Colors.white,
                     onPressed: _addNextMonth,
                     icon: const Icon(Icons.add),
                     label: const Text('חודש נוסף'),
@@ -227,10 +233,10 @@ class _SummaryHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: AppColors.divider, width: 1),
         ),
       ),
       child: Column(
@@ -239,14 +245,15 @@ class _SummaryHeader extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              color: AppColors.textOnPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -286,10 +293,11 @@ class _SummaryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.slate50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.slate200, width: 1),
       ),
       child: Column(
         children: [
@@ -297,7 +305,7 @@ class _SummaryTile extends StatelessWidget {
             label,
             style: const TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -306,8 +314,9 @@ class _SummaryTile extends StatelessWidget {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.2,
             ),
           ),
         ],
@@ -336,15 +345,19 @@ class _MonthRow extends StatelessWidget {
     final statusColor =
         paid ? AppColors.success : (overdue ? AppColors.coral : AppColors.warning);
     return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      shadowColor: AppColors.shadow.withValues(alpha: 0.08),
       elevation: 1,
-      shadowColor: AppColors.shadow,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.slate200, width: 1),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
               Expanded(
@@ -355,8 +368,9 @@ class _MonthRow extends StatelessWidget {
                       monthLabel,
                       style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -364,7 +378,7 @@ class _MonthRow extends StatelessWidget {
                       amountLabel,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 17,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -374,19 +388,28 @@ class _MonthRow extends StatelessWidget {
               const SizedBox(width: 12),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: statusColor, width: 2),
+                  color: statusColor.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.35), width: 1.2),
                 ),
-                child: Text(
-                  paid ? 'שולם ✓' : 'לא שולם',
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (paid) ...[
+                      Icon(Icons.check_circle_rounded, color: statusColor, size: 16),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(
+                      paid ? 'שולם' : 'לא שולם',
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -405,53 +428,69 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isBroker = AppColors.isBrokerAccent;
+    final primaryColor = isBroker ? Colors.black : AppColors.primary;
+    
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.receipt_long,
-              size: 96,
-              color: AppColors.textDisabled,
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: AppColors.slate50,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.slate200,
+                  width: 1.2,
+                ),
+              ),
+              child: const Icon(
+                Icons.receipt_long_outlined,
+                size: 60,
+                color: AppColors.slate400,
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Text(
               title,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.3,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             const Text(
               'עדיין לא עקבת אחרי תשלומים — נתחיל?',
               style: TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 19,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
+              height: 52,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.textOnPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
+                  elevation: 0,
                 ),
                 onPressed: onStart,
                 child: const Text(
                   'התחל מעקב (12 חודשים)',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.1),
                 ),
               ),
             ),
