@@ -1,8 +1,10 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/notification_service.dart';
+import 'package:dating_app/data/models/availability_slot.dart';
 import 'package:dating_app/data/models/broker_viewing.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/availability_repository.dart';
 import 'package:dating_app/data/repositories/broker_viewing_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,6 +28,7 @@ class BrokerViewingsScreen extends StatefulWidget {
 
 class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
   final BrokerViewingRepository _repo = BrokerViewingRepository();
+  final AvailabilityRepository _availabilityRepo = AvailabilityRepository();
   final NotificationService _notifications = NotificationService.instance;
 
   /// Reserved notification id-space so viewing reminders never collide with the
@@ -33,6 +36,10 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
   static const int _reminderIdBase = 3000000;
 
   List<BrokerViewing> _viewings = const [];
+  // The landlord calendar's slots — so a broker viewing that overlaps a slot the
+  // landlord already BOOKED (via the chat flow) is flagged as a conflict. Bridges
+  // the two previously-siloed calendars.
+  List<AvailabilitySlot> _slots = const [];
   bool _loading = true;
 
   @override
@@ -44,11 +51,33 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
 
   Future<void> _load() async {
     final viewings = await _repo.loadAll();
+    final slots = await _availabilityRepo.loadAll();
     if (!mounted) return;
     setState(() {
       _viewings = viewings;
+      _slots = slots;
       _loading = false;
     });
+  }
+
+  /// A scheduled broker viewing that overlaps a BOOKED landlord slot — the
+  /// landlord already has a viewing there, so double-booking that window.
+  static Set<String> _calendarConflictIds(
+      List<BrokerViewing> viewings, List<AvailabilitySlot> slots) {
+    final booked = slots.where((s) => !s.isOpen).toList();
+    if (booked.isEmpty) return const {};
+    final out = <String>{};
+    for (final v in viewings) {
+      if (v.status != ViewingStatus.scheduled) continue;
+      final vEnd = v.dateTime.add(Duration(minutes: v.durationMinutes));
+      for (final s in booked) {
+        if (v.dateTime.isBefore(s.end) && s.start.isBefore(vEnd)) {
+          out.add(v.id);
+          break;
+        }
+      }
+    }
+    return out;
   }
 
   Future<void> _save(BrokerViewing viewing) async {
@@ -86,7 +115,11 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final clashingIds = _clashingIds(_viewings);
+    final clashingIds = {
+      ..._clashingIds(_viewings),
+      // Also flag viewings that collide with the landlord's own booked calendar.
+      ..._calendarConflictIds(_viewings, _slots),
+    };
 
     final upcoming = _viewings
         .where((v) => v.status == ViewingStatus.scheduled)
@@ -104,15 +137,14 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          title: const Text(
-            'תיאום צפיות',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          title: const Text('תיאום צפיות'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primary,
+          backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           onPressed: _openSchedule,
           icon: const Icon(Icons.add),
