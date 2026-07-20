@@ -1,11 +1,17 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// דוח פעילות לבעל הנכס — the broker (מתווך) picks one of their listings and
@@ -23,6 +29,35 @@ class BrokerOwnerReportScreen extends StatefulWidget {
 
 class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
   String? _selectedId;
+  final GlobalKey _reportKey = GlobalKey();
+  bool _capturing = false;
+
+  /// Capture the on-screen report as a PNG and share it — a clean image the
+  /// owner can save/forward, alongside the existing text-share options. Falls
+  /// back silently to the text sheet on any capture error.
+  Future<void> _shareAsImage(BuildContext context, RentalProperty p) async {
+    if (_capturing) return;
+    setState(() => _capturing = true);
+    try {
+      final boundary = _reportKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      final image = await boundary?.toImage(pixelRatio: 3.0);
+      final data = await image?.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) {
+        if (mounted) _sendToOwner(context, p);
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/report_${p.id}.png');
+      await file.writeAsBytes(data.buffer.asUint8List());
+      await Share.shareXFiles([XFile(file.path)],
+          text: 'דוח פעילות — ${p.address}');
+    } catch (_) {
+      if (mounted) _sendToOwner(context, p);
+    } finally {
+      if (mounted) setState(() => _capturing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,18 +69,10 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
-          elevation: 0,
-          centerTitle: false,
-          title: const Text(
-            'דוח פעילות לבעל הנכס',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
+          title: const Text('דוח פעילות לבעל הנכס'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
         ),
         body: properties.isEmpty
@@ -66,16 +93,41 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
                       ),
                       if (selected != null) ...[
                         const SizedBox(height: 24),
-                        _SectionLabel('סיכום פעילות'),
-                        const SizedBox(height: 10),
-                        _MetricsGrid(property: selected),
-                        const SizedBox(height: 20),
-                        _SectionLabel('מה לשלוח לבעל הנכס'),
-                        const SizedBox(height: 10),
-                        _NarrativeCard(text: _narrative(selected)),
+                        // The report content, wrapped so it can be captured to an
+                        // image and shared as a clean one-pager.
+                        RepaintBoundary(
+                          key: _reportKey,
+                          child: Container(
+                            color: AppColors.cloud,
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _SectionLabel('סיכום פעילות · ${selected.address}'),
+                                const SizedBox(height: 10),
+                                _MetricsGrid(property: selected),
+                                const SizedBox(height: 20),
+                                _SectionLabel('מה לשלוח לבעל הנכס'),
+                                const SizedBox(height: 10),
+                                _NarrativeCard(text: _narrative(selected)),
+                              ],
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 24),
-                        _SendButton(
-                          onTap: () => _sendToOwner(context, selected),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _SendButton(
+                                onTap: () => _sendToOwner(context, selected),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _ImageShareButton(
+                              busy: _capturing,
+                              onTap: () => _shareAsImage(context, selected),
+                            ),
+                          ],
                         ),
                       ],
                     ],
@@ -411,7 +463,7 @@ class _SendButton extends StatelessWidget {
         onPressed: onTap,
         icon: const Icon(IconsaxPlusBold.send_2, size: 24),
         label: const Text(
-          'שלח לבעל הנכס',
+          'שלח כטקסט',
           style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
         ),
         style: FilledButton.styleFrom(
@@ -421,6 +473,39 @@ class _SendButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Square button that shares the report as a captured image.
+class _ImageShareButton extends StatelessWidget {
+  const _ImageShareButton({required this.onTap, this.busy = false});
+
+  final VoidCallback onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 60,
+      width: 60,
+      child: FilledButton(
+        onPressed: busy ? null : onTap,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+          foregroundColor: AppColors.primary,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        child: busy
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4))
+            : const Icon(IconsaxPlusBold.gallery_export, size: 26),
       ),
     );
   }
