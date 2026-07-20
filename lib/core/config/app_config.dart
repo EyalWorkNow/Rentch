@@ -164,6 +164,14 @@ class AppConfig {
     defaultValue: 'v1.0',
   );
 
+  // Tenant DATA consent — behavioural analytics / persona-dataset / AI-training.
+  // Versioned like the landlord legal consent; bump to force re-consent before
+  // any cross-user modelling of tenant data (Phase-0 targeting-plan guardrail).
+  static const String tenantConsentVersion = String.fromEnvironment(
+    'RENTCH_TENANT_CONSENT_VERSION',
+    defaultValue: 'v1.0',
+  );
+
   // ── Pagination ────────────────────────────────────────────────────────────────
   static const int propertyPageSize = 150;
 

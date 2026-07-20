@@ -17,6 +17,9 @@ import 'package:dating_app/core/matching/match_models.dart';
 import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/engine/preference_model.dart'
     show OnlineLogisticLearner;
+import 'package:dating_app/core/search/cohort_model.dart';
+import 'package:dating_app/core/services/tenant_consent_service.dart';
+import 'package:dating_app/data/models/tenant_data_consent.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
 import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/core/services/kiri_3d_service.dart';
@@ -582,6 +585,15 @@ class DatingProvider extends ChangeNotifier {
   }
 
   void _exportPersona(DateTime now) {
+    // Phase-0 guardrail: a present-but-restrictive versioned consent record
+    // overrides the caller's legacy export flag and blocks the dataset export.
+    // With NO versioned record yet, we keep the prior behaviour so nothing
+    // regresses before the new consent flow ships.
+    final consent = _tenantConsent;
+    if (consent.hasConsent &&
+        !TenantConsentService.instance.allowsPersonaExport(consent)) {
+      return;
+    }
     final meta = _persona.toEventMetadata(now);
     // 1) Append-only event row (history/analytics) — inherits the events
     //    pipeline's userId / circuit-breaker / fail-soft guards.
@@ -1543,6 +1555,140 @@ class DatingProvider extends ChangeNotifier {
   List<RentalProperty>? _ownerLeadsCache;
   int _ownerLeadsSig = -1;
 
+  // ── Phase-0: server-side two-sided lead ranking (POST /match/leads) ─────────
+  // The STRONG landlord←tenant scorer (scoreLandlordToTenant: tags, deal-breakers,
+  // affordability) lives on the server. We fetch it and prefer it over the weak
+  // local leadFitScore, keyed by (propertyId, tenantId) so it matches the exact
+  // representative liker the deck shows. Fail-soft: empty on any error/unconfigured
+  // → the local heuristic still ranks, so nothing regresses when the endpoint is
+  // unavailable.
+  final Map<String, RankedLead> _serverLeadByKey = {};
+  int _serverLeadsRevision = 0;
+  bool _rankedLeadsLoading = false;
+
+  String _leadKey(String propertyId, String tenantId) =>
+      '$propertyId::$tenantId';
+
+  /// The server's ranked lead for [property]'s representative liker, or null when
+  /// the server ranking hasn't loaded / doesn't cover this exact tenant.
+  RankedLead? _serverLeadFor(RentalProperty property) {
+    if (_serverLeadByKey.isEmpty) return null;
+    final tid = _representativeLikerFor(property)?.tenantId;
+    if (tid == null || tid.isEmpty) return null;
+    return _serverLeadByKey[_leadKey(property.id, tid)];
+  }
+
+  /// One real server-authored reason this candidate fits (tags/afford/deal-break),
+  /// or null. Lets the candidate card show the strong scorer's explanation.
+  String? rankedLeadReasonFor(RentalProperty property) {
+    final l = _serverLeadFor(property);
+    return (l != null && l.reasons.isNotEmpty) ? l.reasons.first : null;
+  }
+
+  /// True when the server two-sided model flagged a hard deal-breaker conflict
+  /// for this candidate (so the UI can mark it honestly).
+  bool rankedLeadExcluded(RentalProperty property) =>
+      _serverLeadFor(property)?.excluded ?? false;
+
+  /// Phase-0: pull the server's two-sided lead ranking and prefer it over the
+  /// local heuristic for the landlord candidate deck. Fail-soft + debounced;
+  /// call it when the landlord opens the candidates surface.
+  Future<void> refreshRankedLeads() async {
+    if (!isLandlord || _rankedLeadsLoading) return;
+    if (!AwsApiClient.instance.isConfigured) return;
+    _rankedLeadsLoading = true;
+    try {
+      final leads = await fetchRankedLeads();
+      if (leads.isEmpty) return;
+      _applyRankedLeads(leads);
+    } finally {
+      _rankedLeadsLoading = false;
+    }
+  }
+
+  void _applyRankedLeads(List<RankedLead> leads) {
+    _serverLeadByKey
+      ..clear()
+      ..addEntries(leads
+          .where((l) => l.tenantId.isNotEmpty && l.propertyId.isNotEmpty)
+          .map((l) => MapEntry(_leadKey(l.propertyId, l.tenantId), l)));
+    _serverLeadsRevision++;
+    _ownerLeadsCache = null; // force a re-sort using the server scores
+    notifyListeners();
+  }
+
+  /// Test seam: inject server ranked leads without a network call.
+  @visibleForTesting
+  void debugApplyRankedLeads(List<RankedLead> leads) => _applyRankedLeads(leads);
+
+  /// Test seam: seed the cross-user incoming likes the deck ranks over.
+  @visibleForTesting
+  void debugSetIncomingLikes(Map<String, List<PropertyLike>> byProperty) {
+    _incomingLikesByProperty = Map.of(byProperty);
+    _ownerLeadsCache = null;
+    notifyListeners();
+  }
+
+  // ── Phase-0: persisted, evolving SOFT cohort membership ─────────────────────
+  // A per-user probability vector over the 14 cohorts that sharpens across
+  // sessions (vs the server's throwaway single-label per request). Persisted in
+  // app_state via [_persist], restored in restoreState. Groundwork for the
+  // eventual server multi-label + look-alike targeting.
+  CohortBelief _cohortBelief = CohortBelief();
+
+  CohortBelief get cohortBelief => _cohortBelief;
+
+  /// The person's current best-guess cohort, or null before any evidence.
+  String? get primaryCohort => _cohortBelief.top;
+
+  /// The top cohorts the person belongs to — their "audience".
+  List<String> get audienceCohorts => _cohortBelief.topK(3);
+
+  /// Fold a query's cohort signals (from `SmartSearch.cohortSignals`) into the
+  /// evolving belief and persist. No-op on empty/evidence-free signals.
+  void observeCohortSignals(Map<String, String> signals) {
+    if (signals.isEmpty) return;
+    final before = _cohortBelief.observations;
+    _cohortBelief.observe(signals);
+    if (_cohortBelief.observations == before) return; // no evidence → nothing changed
+    unawaited(_persist());
+    notifyListeners();
+  }
+
+  // ── Phase-0: versioned tenant DATA consent (guardrail) ──────────────────────
+  // A real, auditable, versioned record (vs the old SharedPreferences boolean)
+  // gating whether behavioural/persona data may be exported for cross-user
+  // modelling. Persisted in app_state; restored in restoreState.
+  TenantDataConsent _tenantConsent = TenantDataConsent.none;
+
+  TenantDataConsent get tenantDataConsent => _tenantConsent;
+
+  /// Current-version consent to fold the persona into the exportable dataset.
+  bool get canExportPersonaData =>
+      TenantConsentService.instance.allowsPersonaExport(_tenantConsent);
+
+  /// A stamped consent exists but on a stale version → the UI should re-ask.
+  bool get tenantConsentNeedsRenewal =>
+      TenantConsentService.instance.needsRenewal(_tenantConsent);
+
+  /// Record the tenant's explicit data-use choice (a decline is still a stamped,
+  /// current-version record with all rights false).
+  void recordTenantDataConsent({
+    required bool behavioralAnalytics,
+    required bool personaDataset,
+    required bool aiTraining,
+    String source = 'app',
+  }) {
+    _tenantConsent = TenantConsentService.instance.grantConsent(
+      source: source,
+      behavioralAnalytics: behavioralAnalytics,
+      personaDataset: personaDataset,
+      aiTraining: aiTraining,
+    );
+    unawaited(_persist());
+    notifyListeners();
+  }
+
   List<RentalProperty> get ownerLeads {
     // Memoize: this getter is read inside Consumer builders, so without a cache it
     // re-ran a full .where()+leadFitScore()+sort() over the whole catalogue on EVERY
@@ -1556,6 +1702,7 @@ class DatingProvider extends ChangeNotifier {
       _matches.length,
       _incomingLikesByProperty.length,
       identityHashCode(_tenantProfile),
+      _serverLeadsRevision, // re-sort when server ranking arrives
     );
     final cached = _ownerLeadsCache;
     if (cached != null && sig == _ownerLeadsSig) return cached;
@@ -1604,12 +1751,43 @@ class DatingProvider extends ChangeNotifier {
   static const double _leadTimingWeight = 25; // move-in timing match
   static const double _leadTrustWeight = 15; // existing trust-score signal
 
-  /// The representative liker for a property lead — the first real tenant who
-  /// liked it (the candidate deck surfaces one liker per property). Null for a
-  /// demo lead that has no incoming like yet.
+  /// The representative liker for a property lead — the BEST-fitting interested
+  /// tenant (Phase-0: was arbitrarily the first). Prefers the server's two-sided
+  /// score when loaded, else a local budget-fit proxy; deterministic tie-break by
+  /// tenantId. Null for a demo lead with no incoming like yet.
   PropertyLike? _representativeLikerFor(RentalProperty property) {
     final likes = _incomingLikesByProperty[property.id];
-    return (likes == null || likes.isEmpty) ? null : likes.first;
+    if (likes == null || likes.isEmpty) return null;
+    if (likes.length == 1) return likes.first;
+    double scoreOf(PropertyLike l) {
+      final sv = _serverLeadByKey[_leadKey(property.id, l.tenantId)];
+      if (sv != null) return sv.score.toDouble();
+      return _leadBudgetFit(l.budgetMax, property) * 100; // local proxy [0,100]
+    }
+
+    var best = likes.first;
+    var bestScore = scoreOf(best);
+    for (final l in likes.skip(1)) {
+      final s = scoreOf(l);
+      if (s > bestScore ||
+          (s == bestScore && l.tenantId.compareTo(best.tenantId) < 0)) {
+        best = l;
+        bestScore = s;
+      }
+    }
+    return best;
+  }
+
+  /// The best-fitting interested tenant for [property] (public; the deck uses it
+  /// so the card and the score describe the SAME candidate).
+  PropertyLike? bestLikerFor(RentalProperty property) =>
+      _representativeLikerFor(property);
+
+  /// How many OTHER tenants are interested in [property] beyond the one shown —
+  /// drives a "+N מתעניינים" affordance so extra likers aren't invisible.
+  int additionalInterestedCount(String propertyId) {
+    final n = _incomingLikesByProperty[propertyId]?.length ?? 0;
+    return n > 1 ? n - 1 : 0;
   }
 
   /// Honest fit score in [0, 100] for the tenant who liked [property]. Scored
@@ -1618,6 +1796,14 @@ class DatingProvider extends ChangeNotifier {
   /// only for demo leads with no incoming like. Drives both the ranking order
   /// and the "התאמה גבוהה" badge — no fabricated trust. Fail-soft.
   double leadFitScore(RentalProperty property) {
+    // Phase-0: prefer the server's two-sided score for this exact liker — it
+    // weighs tags, deal-breakers and affordability, not just budget/timing/trust.
+    // Falls through to the local heuristic when the server ranking is absent.
+    final serverLead = _serverLeadFor(property);
+    if (serverLead != null) {
+      return serverLead.score.clamp(0, 100).toDouble();
+    }
+
     var tenant = _tenantProfile;
     if (isLandlord && tenant?.id == 'tenant-local') {
       tenant = getCachedProfile('tenant-test') ?? tenant;
@@ -5362,6 +5548,16 @@ class DatingProvider extends ChangeNotifier {
       _learner = OnlineLogisticLearner.fromJson(
           Map<String, dynamic>.from(learnerJson));
     }
+    final cohortJson = storedState['cohortBelief'];
+    if (cohortJson is Map) {
+      _cohortBelief =
+          CohortBelief.fromJson(Map<String, dynamic>.from(cohortJson));
+    }
+    final consentJson = storedState['tenantConsent'];
+    if (consentJson is Map) {
+      _tenantConsent =
+          TenantDataConsent.fromJson(Map<String, dynamic>.from(consentJson));
+    }
     _likedPropertyIds = Set<String>.from(
       storedState['likedPropertyIds'] as List<dynamic>? ?? const [],
     );
@@ -5623,6 +5819,8 @@ class DatingProvider extends ChangeNotifier {
       'schema': 'rental_match_v2',
       'tenantProfile': _tenantProfile?.toJson(),
       'learner': _learner.toJson(), // per-user FTRL model (z/n/updates)
+      'cohortBelief': _cohortBelief.toJson(), // evolving soft cohort membership
+      'tenantConsent': _tenantConsent.toJson(), // versioned data-use consent
       'filters': _filters.toJson(),
       'likedPropertyIds': _likedPropertyIds.toList(),
       'passedPropertyIds': _passedPropertyIds.toList(),

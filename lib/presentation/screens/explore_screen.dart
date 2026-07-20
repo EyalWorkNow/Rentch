@@ -39,14 +39,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
   int _currentIndex = 0;
   CandidateFilters _filters = CandidateFilters.empty;
 
+  @override
+  void initState() {
+    super.initState();
+    // Phase-0: pull the server's strong two-sided lead ranking (/match/leads)
+    // so the deck orders + scores candidates by tags/deal-breakers/affordability,
+    // not just the local budget/timing heuristic. Fail-soft — no-op off-network.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<DatingProvider>().refreshRankedLeads();
+    });
+  }
+
   /// The representative liker for a property lead — the first tenant who liked
   /// it. The candidate deck is property-based, so it surfaces one liker per
   /// property; per-liker cards are a future enhancement. Returns null for demo
   /// leads that have no real incoming like yet.
   PropertyLike? _representativeLiker(
       DatingProvider provider, RentalProperty property) {
-    final likes = provider.incomingLikesFor(property.id);
-    return likes.isEmpty ? null : likes.first;
+    // Phase-0: the BEST-fitting interested tenant (server score / budget fit),
+    // not an arbitrary first — so the card + score describe the same candidate.
+    return provider.bestLikerFor(property);
   }
 
   /// Builds the REAL, per-candidate attributes for a lead, sourced from the
@@ -418,6 +430,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                                   provider.leadFitReason(lead),
                                               fitScore:
                                                   provider.leadFitScore(lead),
+                                              additionalInterested: provider
+                                                  .additionalInterestedCount(
+                                                      lead.id),
                                             );
                                           },
                                         ),
@@ -496,6 +511,7 @@ class _LeadCard extends StatefulWidget {
     required this.isHighFit,
     required this.fitReason,
     required this.fitScore,
+    this.additionalInterested = 0,
   });
 
   /// The current user's own profile — used ONLY as a placeholder stand-in for
@@ -516,6 +532,10 @@ class _LeadCard extends StatefulWidget {
 
   /// Honest fit score [0,100] for the compact ring/badge on the photo header.
   final double fitScore;
+
+  /// How many OTHER tenants are interested in this property (beyond the one
+  /// shown) — surfaced as a small "+N מתעניינים" pill so extra leads aren't lost.
+  final int additionalInterested;
 
   // ── Effective display data: liker's real values when present, else the
   //    placeholder profile so demo leads keep rendering. ─────────────────────
@@ -829,7 +849,9 @@ class _LeadCardState extends State<_LeadCard> {
                   right: 14,
                   child: _FitBadge(score: widget.fitScore),
                 ),
-                if (widget.isHighFit || widget.displayVerified)
+                if (widget.isHighFit ||
+                    widget.displayVerified ||
+                    widget.additionalInterested > 0)
                   Positioned(
                     top: hasMultiple ? 24 : 14,
                     left: 14,
@@ -841,6 +863,11 @@ class _LeadCardState extends State<_LeadCard> {
                         if (widget.isHighFit && widget.displayVerified)
                           const SizedBox(height: 6),
                         if (widget.displayVerified) const _VerifiedShield(),
+                        if (widget.additionalInterested > 0) ...[
+                          if (widget.isHighFit || widget.displayVerified)
+                            const SizedBox(height: 6),
+                          _MoreInterestedPill(count: widget.additionalInterested),
+                        ],
                       ],
                     ),
                   ),
@@ -1064,6 +1091,40 @@ class _HighFitPill extends StatelessWidget {
           Text(
             'התאמה גבוהה',
             style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 10.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "+N מתעניינים" pill — signals that more tenants are interested in this
+/// property beyond the one on the card (Phase-0 per-liker awareness).
+class _MoreInterestedPill extends StatelessWidget {
+  const _MoreInterestedPill({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.navy.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(IconsaxPlusBold.people, color: Colors.white, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            '+$count מתעניינים',
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
               fontSize: 10.5,

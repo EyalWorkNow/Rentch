@@ -1725,6 +1725,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       {int limit = 40, SearchQuery? query}) async {
     final q = query ?? _query;
     final signals = _cohortSignals();
+    // Phase-0: fold this query's cohort signals into the evolving per-user
+    // cohort belief (persisted, sharpens across sessions).
+    provider.observeCohortSignals(signals);
     final criteria = PropertySearchCriteria(
       city: q.city,
       minPrice: q.minPrice,

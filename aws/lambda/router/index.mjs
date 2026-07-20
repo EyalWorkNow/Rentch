@@ -5438,6 +5438,19 @@ async function handleMatchLeads(event) {
   return json(200, { leads, count: leads.length });
 }
 
+// CANONICAL two-sided weights — MUST mirror the Dart MatchWeights
+// (lib/core/matching/match_engine.dart:6-31). Kept in sync by
+// test/match_weights_canonical_test.dart. Any change here needs the same change
+// there (and vice-versa) or the drift guard fails.
+const MATCH_W = {
+  budgetHeadroomBonus: 10, // afford ratio >= 1.15
+  budgetOkBonus: 5,        // ratio >= 1.0  (headroom * 0.5)
+  budgetShortPenalty: 18,  // ratio <  1.0
+  requirementBonus: 6,     // landlord requirement the tenant satisfies
+  sharedTagBonus: 6,       // shared non-required preference key (was 4 — drift)
+  conflictPenalty: 28,     // per unmet deal-breaker on the standalone fit
+};
+
 function scoreLandlordToTenant({ budgetMax, price, tenantKeys, tenantDealKeys, landlordKeys, landlordDealKeys }) {
   let fit = 60;
   const reasons = [];
@@ -5445,21 +5458,21 @@ function scoreLandlordToTenant({ budgetMax, price, tenantKeys, tenantDealKeys, l
 
   if (budgetMax > 0 && price > 0) {
     const ratio = budgetMax / price;
-    if (ratio >= 1.15) { fit += 10; reasons.push('תקציב נוח לשכר הדירה'); }
-    else if (ratio >= 1.0) { fit += 5; }
-    else { fit -= 18; conflicts.push('התקציב נמוך משכר הדירה'); }
+    if (ratio >= 1.15) { fit += MATCH_W.budgetHeadroomBonus; reasons.push('תקציב נוח לשכר הדירה'); }
+    else if (ratio >= 1.0) { fit += MATCH_W.budgetOkBonus; }
+    else { fit -= MATCH_W.budgetShortPenalty; conflicts.push('התקציב נמוך משכר הדירה'); }
   }
   for (const k of landlordDealKeys) {
-    if (tenantKeys.has(k)) fit += 6; else conflicts.push(`חסר: ${k}`);
+    if (tenantKeys.has(k)) fit += MATCH_W.requirementBonus; else conflicts.push(`חסר: ${k}`);
   }
   for (const k of tenantDealKeys) {
     if (!landlordKeys.has(k)) conflicts.push(`השוכר דורש: ${k}`);
   }
   const shared = [...tenantKeys].filter((k) => landlordKeys.has(k));
-  fit += shared.length * 4;
+  fit += shared.length * MATCH_W.sharedTagBonus;
   for (const k of shared) reasons.push(k);
 
-  fit -= conflicts.length * 28;
+  fit -= conflicts.length * MATCH_W.conflictPenalty;
   return { score: Math.max(0, Math.min(100, Math.round(fit))), reasons, conflicts };
 }
 

@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
+import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/property_likes_repository.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
 import 'package:dating_app/presentation/features/assistant/erik_chat_screen.dart';
@@ -540,6 +542,158 @@ void main() {
     // check is satisfied.
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 2));
+    provider.dispose();
+  });
+
+  // Phase-0: the landlord lead ranking must PREFER the server's two-sided score
+  // (/match/leads) for the exact representative liker, and fall back to the local
+  // heuristic when the server doesn't cover that tenant.
+  test('leadFitScore prefers the server ranked-lead score, keyed by tenant',
+      () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final owned = _property(id: 'p1', ownerUserId: 'owner-1');
+    final storage = _MemoryLocalStorageService()
+      ..state = {
+        'schema': 'rental_match_v2',
+        'tenantProfile': const TenantProfile(
+          id: 'owner-1',
+          name: 'Owner',
+          bio: '',
+          photoUrls: <String>[],
+          budgetMax: 6000,
+          desiredRooms: 3,
+          moveInWindow: 'flexible',
+          importantDetails: <String>[],
+        ).toJson(),
+        'customProperties': [owned.toJson()],
+        'userRole': 'landlord',
+        'hasActiveSession': true,
+        'roleExplicitlyChosen': true,
+      };
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(const []),
+      localStorageService: storage,
+    );
+    await provider.initialize();
+
+    // A real cross-user like from tenant 't-9' → the deck's representative liker.
+    provider.debugSetIncomingLikes({
+      'p1': const [
+        PropertyLike(
+            propertyId: 'p1',
+            tenantId: 't-9',
+            tenantName: 'דן',
+            budgetMax: 8000),
+      ],
+    });
+    expect(provider.ownerLeads.map((p) => p.id), contains('p1'),
+        reason: 'precondition: the liked property is a lead');
+    final localScore = provider.leadFitScore(owned);
+
+    // Server score for the SAME tenant → must win.
+    provider.debugApplyRankedLeads(const [
+      RankedLead(
+          tenantId: 't-9',
+          tenantName: 'דן',
+          propertyId: 'p1',
+          propertyTitle: '',
+          score: 88,
+          excluded: false,
+          reasons: ['בעל הדירה מחפש בדיוק שוכר כמוך'],
+          conflicts: []),
+    ]);
+    expect(provider.leadFitScore(owned), 88.0,
+        reason: 'the server two-sided score must be preferred');
+    expect(provider.rankedLeadReasonFor(owned),
+        'בעל הדירה מחפש בדיוק שוכר כמוך');
+
+    // Server score for a DIFFERENT tenant → key mismatch → fall back to local.
+    provider.debugApplyRankedLeads(const [
+      RankedLead(
+          tenantId: 'someone-else',
+          tenantName: 'x',
+          propertyId: 'p1',
+          propertyTitle: '',
+          score: 5,
+          excluded: true,
+          reasons: [],
+          conflicts: []),
+    ]);
+    expect(provider.leadFitScore(owned), localScore,
+        reason: 'a non-matching tenant key must not override the local score');
+    expect(provider.rankedLeadReasonFor(owned), isNull);
+
+    provider.dispose();
+  });
+
+  // Phase-0: when several tenants like the same property, the deck must surface
+  // the BEST-fitting one — by server score when present, else budget fit — not
+  // an arbitrary first, and expose how many others are interested.
+  test('bestLikerFor picks the strongest candidate; counts the rest', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final owned = _property(id: 'p1', ownerUserId: 'owner-1', price: 6000);
+    final storage = _MemoryLocalStorageService()
+      ..state = {
+        'schema': 'rental_match_v2',
+        'tenantProfile': const TenantProfile(
+          id: 'owner-1',
+          name: 'Owner',
+          bio: '',
+          photoUrls: <String>[],
+          budgetMax: 6000,
+          desiredRooms: 3,
+          moveInWindow: 'flexible',
+          importantDetails: <String>[],
+        ).toJson(),
+        'customProperties': [owned.toJson()],
+        'userRole': 'landlord',
+        'hasActiveSession': true,
+        'roleExplicitlyChosen': true,
+      };
+    final provider = DatingProvider(
+      rentalDataService: _FakeRentalDataService(const []),
+      localStorageService: storage,
+    );
+    await provider.initialize();
+
+    // Two interested tenants: t-low can barely afford, t-high has headroom.
+    provider.debugSetIncomingLikes({
+      'p1': const [
+        PropertyLike(
+            propertyId: 'p1', tenantId: 't-low', tenantName: 'א', budgetMax: 4000),
+        PropertyLike(
+            propertyId: 'p1', tenantId: 't-high', tenantName: 'ב', budgetMax: 9000),
+      ],
+    });
+    expect(provider.additionalInterestedCount('p1'), 1);
+    // No server data → local budget fit → the affording tenant wins.
+    expect(provider.bestLikerFor(owned)?.tenantId, 't-high');
+
+    // Server says t-low is actually the best fit (tags/deal-breakers) → it wins.
+    provider.debugApplyRankedLeads(const [
+      RankedLead(
+          tenantId: 't-low',
+          tenantName: 'א',
+          propertyId: 'p1',
+          propertyTitle: '',
+          score: 95,
+          excluded: false,
+          reasons: [],
+          conflicts: []),
+      RankedLead(
+          tenantId: 't-high',
+          tenantName: 'ב',
+          propertyId: 'p1',
+          propertyTitle: '',
+          score: 40,
+          excluded: false,
+          reasons: [],
+          conflicts: []),
+    ]);
+    expect(provider.bestLikerFor(owned)?.tenantId, 't-low',
+        reason: 'server two-sided score should override the local proxy');
+    expect(provider.leadFitScore(owned), 95.0);
+
     provider.dispose();
   });
 
