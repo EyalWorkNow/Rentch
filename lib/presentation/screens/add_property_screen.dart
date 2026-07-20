@@ -4458,7 +4458,7 @@ class _FormCard extends StatelessWidget {
 /// cities/streets dataset. Suggestions are advisory only — whatever the landlord
 /// types is kept in [ctrl], so free text that matches nothing is still allowed
 /// (nobody is blocked from submitting).
-class _AutocompleteField extends StatelessWidget {
+class _AutocompleteField extends StatefulWidget {
   const _AutocompleteField({
     required this.ctrl,
     required this.label,
@@ -4476,36 +4476,49 @@ class _AutocompleteField extends StatelessWidget {
   final ValueChanged<String>? onSelected;
 
   @override
+  State<_AutocompleteField> createState() => _AutocompleteFieldState();
+}
+
+class _AutocompleteFieldState extends State<_AutocompleteField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Autocomplete<String>(
-      // Seed Autocomplete's internal controller with whatever is already in our
-      // shared controller (e.g. GPS auto-fill or an Erik draft).
-      initialValue: TextEditingValue(text: ctrl.text),
+    return RawAutocomplete<String>(
+      // Drive the field from the SHARED controller directly (not Autocomplete's
+      // private one). This is what makes GPS auto-fill / an Erik draft actually
+      // appear in the box: writing `ctrl.text` now updates the visible field,
+      // and typing flows straight back out — no stale internal controller.
+      textEditingController: widget.ctrl,
+      focusNode: _focusNode,
       optionsBuilder: (TextEditingValue value) {
         final query = value.text.trim();
         if (query.isEmpty) return const Iterable<String>.empty();
-        return optionsBuilder(query);
+        return widget.optionsBuilder(query);
       },
       onSelected: (selection) {
-        ctrl.text = selection;
-        onSelected?.call(selection);
+        widget.ctrl.text = selection;
+        widget.onSelected?.call(selection);
       },
       fieldViewBuilder:
           (context, textController, focusNode, onFieldSubmitted) {
         return TextField(
           controller: textController,
           focusNode: focusNode,
-          enabled: enabled,
-          // Mirror every keystroke into the shared controller so free text the
-          // user never "selected" from the list is still saved.
-          onChanged: (v) => ctrl.text = v,
+          enabled: widget.enabled,
           onSubmitted: (_) => onFieldSubmitted(),
           style: const TextStyle(color: AppColors.navy, fontSize: 14),
           decoration: InputDecoration(
-            labelText: label,
+            labelText: widget.label,
             labelStyle:
                 const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            prefixIcon: Icon(icon, size: 16, color: AppColors.primary),
+            prefixIcon: Icon(widget.icon, size: 16, color: AppColors.primary),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           ),

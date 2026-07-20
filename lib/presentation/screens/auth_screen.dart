@@ -2300,7 +2300,7 @@ class _EulaSheet extends StatelessWidget {
                   child: FilledButton(
                     onPressed: onAccept,
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.black,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 0,
@@ -2496,7 +2496,7 @@ class _AnimatedSuccessSheetState extends State<_AnimatedSuccessSheet>
                     child: FilledButton(
                       onPressed: widget.onContinue,
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.black,
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
