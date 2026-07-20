@@ -901,6 +901,10 @@ class _PropertyManageCard extends StatelessWidget {
                                     label: 'חוזה: $_contractStatusLabel',
                                   ),
                                 ],
+                                // Phase-3: look-alike target audience (renders
+                                // only when the server has scored an audience).
+                                const SizedBox(width: 6),
+                                _AudienceChip(propertyId: property.id),
                               ],
                             ),
                           ),
@@ -977,6 +981,43 @@ class _PropertyManageCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Phase-3: look-alike TARGET-AUDIENCE chip. Fetches how many tenants in the
+/// population best-fit this listing (by embedding similarity) and shows a small
+/// glass tag — only when > 0 (dormant until user vectors exist → renders
+/// nothing, so no empty clutter today). Fail-soft, one call per card.
+class _AudienceChip extends StatefulWidget {
+  const _AudienceChip({required this.propertyId});
+  final String propertyId;
+
+  @override
+  State<_AudienceChip> createState() => _AudienceChipState();
+}
+
+class _AudienceChipState extends State<_AudienceChip> {
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final r = await context
+          .read<DatingProvider>()
+          .fetchListingAudience(widget.propertyId);
+      if (mounted && r.count > 0) setState(() => _count = r.count);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_count <= 0) return const SizedBox.shrink();
+    return _GlassTag(
+      icon: Icons.track_changes_rounded,
+      label: '$_count קהל יעד',
     );
   }
 }
