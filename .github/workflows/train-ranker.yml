@@ -8,14 +8,21 @@ name: train-ranker
 # repo without the secrets set the job runs the offline selfcheck and then skips
 # the pull/train/upload cleanly (green, no error). Wire the secrets below to arm.
 #
-# Secrets to set (Settings → Secrets and variables → Actions):
-#   ML_EXPORT_URL     — full https URL of GET /ml/export on the router Lambda
-#   ML_EXPORT_TOKEN   — admin bearer token (the notif-admin uid's token)
-#   RANK_MODEL_BUCKET — S3 bucket name for the artifact
-#   RANK_MODEL_KEY    — S3 key, e.g. models/ranker/model.json (must match the
-#                       scorer's RANK_MODEL_S3)
-#   AWS_ROLE_ARN      — IAM role to assume via OIDC (s3:PutObject on the key)
+# AUTH: we pull the training rows by INVOKING the router Lambda directly with a
+# forged admin authorizer context (the same trick ml/activate.sh uses locally) —
+# NOT a curl through API Gateway. This avoids a Firebase ID token, which expires
+# in ~1h and can't back a daily cron. All auth is the assumed AWS OIDC role.
+#
+# Secrets/vars to set (Settings → Secrets and variables → Actions):
+#   AWS_ROLE_ARN      — IAM role to assume via OIDC. Needs:
+#                         lambda:InvokeFunction on the router  (pull the export)
+#                         s3:PutObject on RANK_MODEL_BUCKET/KEY (upload the model)
 #   AWS_REGION        — e.g. us-east-1
+#   RANK_MODEL_BUCKET — S3 bucket for the artifact (the router's S3_BUCKET env)
+#   RANK_MODEL_KEY    — S3 key, e.g. models/rank_model.json (MUST equal the
+#                       scorer's RANK_MODEL_S3 key)
+#   RANK_FN           — (optional) router function name; default rentch-router
+#   RANK_ADMIN_UID    — (optional) notif-admin uid; default matches the Lambda
 
 on:
   schedule:
@@ -42,28 +49,9 @@ jobs:
       - name: Offline selfcheck (always runs — proves the pipeline works)
         run: bash ml/selfcheck.sh
 
-      # ── Pull the real labeled rows from GET /ml/export ──────────────────────
-      # Guarded: if the export secrets are absent we skip training entirely and
-      # the job still succeeds (dormant / pre-launch).
-      - name: Pull training export
-        id: pull
-        env:
-          ML_EXPORT_URL: ${{ secrets.ML_EXPORT_URL }}
-          ML_EXPORT_TOKEN: ${{ secrets.ML_EXPORT_TOKEN }}
-        run: |
-          if [ -z "$ML_EXPORT_URL" ] || [ -z "$ML_EXPORT_TOKEN" ]; then
-            echo "ML_EXPORT_URL / ML_EXPORT_TOKEN not set — skipping real training."
-            echo "have_data=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          curl -fsS "$ML_EXPORT_URL" \
-            -H "Authorization: Bearer $ML_EXPORT_TOKEN" -o rows.json
-          echo "have_data=true" >> "$GITHUB_OUTPUT"
-
-      # Decide up front whether an S3 upload is even possible (secrets present).
-      # Referencing secrets in `if:` is unreliable, so we hoist them into an
-      # output here and gate later steps on it.
-      - name: Check upload config
+      # Gate all real work on the AWS role being configured. Referencing secrets
+      # in `if:` is unreliable, so hoist presence into an output.
+      - name: Check config
         id: cfg
         env:
           AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
@@ -71,43 +59,59 @@ jobs:
           RANK_MODEL_KEY: ${{ secrets.RANK_MODEL_KEY }}
         run: |
           if [ -n "$AWS_ROLE_ARN" ] && [ -n "$RANK_MODEL_BUCKET" ] && [ -n "$RANK_MODEL_KEY" ]; then
-            echo "can_upload=true" >> "$GITHUB_OUTPUT"
+            echo "armed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "AWS_ROLE_ARN / RANK_MODEL_BUCKET / RANK_MODEL_KEY not all set — upload will be skipped."
-            echo "can_upload=false" >> "$GITHUB_OUTPUT"
+            echo "AWS_ROLE_ARN / RANK_MODEL_BUCKET / RANK_MODEL_KEY not all set — dormant (selfcheck only)."
+            echo "armed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Train on real data. The cold-start guard inside train.py decides
-      # whether a model is actually emitted (< 200 rows or one class → no file). ─
+      - name: Configure AWS credentials (OIDC)
+        if: steps.cfg.outputs.armed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # ── Pull the real labeled rows by invoking GET /ml/export on the router,
+      # forging the admin authorizer context (uid). Writes rows.json. ──────────
+      - name: Pull training export (lambda invoke)
+        id: pull
+        if: steps.cfg.outputs.armed == 'true'
+        env:
+          RANK_FN: ${{ secrets.RANK_FN }}
+          RANK_ADMIN_UID: ${{ secrets.RANK_ADMIN_UID }}
+        run: |
+          FN="${RANK_FN:-rentch-router}"
+          # Resolve the admin uid from the Lambda's own env (fallback to default).
+          UID_ENV="$(aws lambda get-function-configuration --function-name "$FN" \
+            --query 'Environment.Variables.NOTIF_ADMIN_UID' --output text 2>/dev/null || true)"
+          ADMIN="${RANK_ADMIN_UID:-}"
+          [ -z "$ADMIN" ] && ADMIN="$UID_ENV"
+          { [ -z "$ADMIN" ] || [ "$ADMIN" = "None" ]; } && ADMIN='dR46Nv6L3mN1cyzXwxrubHpdqZi2'
+          printf '{"httpMethod":"GET","path":"/ml/export","requestContext":{"authorizer":{"uid":"%s"}}}' "$ADMIN" > evt.json
+          aws lambda invoke --function-name "$FN" --payload fileb://evt.json out.json >/dev/null
+          python -c "import json;b=json.loads(json.load(open('out.json'))['body']);r=b.get('rows',[]);open('rows.json','w').write(json.dumps(r));print('rows:',len(r))"
+          echo "have_data=true" >> "$GITHUB_OUTPUT"
+
+      # ── Train. The cold-start guard inside train.py decides whether a model is
+      # actually emitted (< 200 rows or a single class → no file, no upload). ───
       - name: Train
         if: steps.pull.outputs.have_data == 'true'
         run: |
           python ml/train.py --input rows.json --output model.json \
             --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-      # ── Upload to S3 only if a model was actually produced AND the bucket
-      # secret is set. Missing model (cold-start) or missing bucket → skip. ─────
-      - name: Configure AWS credentials
-        if: steps.pull.outputs.have_data == 'true' && steps.cfg.outputs.can_upload == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Upload model.json to S3
-        if: steps.pull.outputs.have_data == 'true' && steps.cfg.outputs.can_upload == 'true'
+        if: steps.pull.outputs.have_data == 'true'
         env:
           RANK_MODEL_BUCKET: ${{ secrets.RANK_MODEL_BUCKET }}
           RANK_MODEL_KEY: ${{ secrets.RANK_MODEL_KEY }}
         run: |
           if [ ! -s model.json ]; then
-            echo "No model.json (cold-start guard tripped) — nothing to upload."
-            exit 0
-          fi
-          if [ -z "$RANK_MODEL_BUCKET" ] || [ -z "$RANK_MODEL_KEY" ]; then
-            echo "RANK_MODEL_BUCKET / RANK_MODEL_KEY not set — skipping upload."
+            echo "No model.json (cold-start guard tripped: < 200 rows or one class) — nothing to upload."
             exit 0
           fi
           aws s3 cp model.json "s3://$RANK_MODEL_BUCKET/$RANK_MODEL_KEY"
-          aws s3 cp model.meta.json "s3://$RANK_MODEL_BUCKET/${RANK_MODEL_KEY%.json}.meta.json" || true
-          echo "Uploaded to s3://$RANK_MODEL_BUCKET/$RANK_MODEL_KEY"
+          aws s3 cp model.json.meta.json "s3://$RANK_MODEL_BUCKET/${RANK_MODEL_KEY%.json}.meta.json" || true
+          echo "Uploaded → s3://$RANK_MODEL_BUCKET/$RANK_MODEL_KEY"
+          echo "NOTE: set the Lambda env RANK_MODEL_S3=$RANK_MODEL_BUCKET/$RANK_MODEL_KEY once (ml/activate.sh or console) so the scorer serves it."
