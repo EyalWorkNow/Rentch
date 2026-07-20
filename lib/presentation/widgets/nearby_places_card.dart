@@ -14,7 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// (the card hides). Each place lists name · type · distance and offers to open
 /// a Google search. Data from [IsraelGeoIndex] (data.gov.il + OSM).
 class NearbyPlacesCard extends StatefulWidget {
-  const NearbyPlacesCard({
+  NearbyPlacesCard({
     super.key,
     required this.lat,
     required this.lon,

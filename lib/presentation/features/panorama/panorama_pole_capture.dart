@@ -313,7 +313,7 @@ class _PanoramaPoleCaptureScreenState extends State<PanoramaPoleCaptureScreen> {
 
 // A big up/down arrow + centre reticle to coach which way to point the phone.
 class _PoleGuide extends StatelessWidget {
-  const _PoleGuide({required this.pointDown});
+  _PoleGuide({required this.pointDown});
   final bool pointDown;
 
   @override

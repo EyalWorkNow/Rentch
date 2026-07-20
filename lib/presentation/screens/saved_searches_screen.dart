@@ -169,7 +169,7 @@ class _SavedSearchesScreenState extends State<SavedSearchesScreen> {
 }
 
 class _SavedSearchCard extends StatelessWidget {
-  const _SavedSearchCard({
+  _SavedSearchCard({
     required this.search,
     required this.onToggle,
     required this.onDelete,
@@ -300,7 +300,7 @@ class _SavedSearchCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onTestAlert});
+  _EmptyState({required this.onTestAlert});
 
   final VoidCallback onTestAlert;
 

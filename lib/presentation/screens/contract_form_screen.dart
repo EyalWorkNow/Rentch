@@ -296,7 +296,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                     ),
                     child: Row(
                       children: [
-                        const RentlyCalendarIcon(),
+                        RentlyCalendarIcon(),
                         const SizedBox(width: 12),
                         const Text('תאריך כניסה',
                             style: TextStyle(
@@ -458,7 +458,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
 }
 
 class RentlyCalendarIcon extends StatelessWidget {
-  const RentlyCalendarIcon({super.key});
+  RentlyCalendarIcon({super.key});
   @override
   Widget build(BuildContext context) =>
       Icon(IconsaxPlusLinear.calendar_1, size: 18, color: AppColors.primary);
@@ -467,7 +467,7 @@ class RentlyCalendarIcon extends StatelessWidget {
 // ─── Standard template badge ──────────────────────────────────────────────────
 
 class _StandardTemplateBadge extends StatelessWidget {
-  const _StandardTemplateBadge({required this.active});
+  _StandardTemplateBadge({required this.active});
   final bool active;
 
   @override
@@ -526,7 +526,7 @@ class _StandardTemplateBadge extends StatelessWidget {
 // ─── AI improve tile (paid) ───────────────────────────────────────────────────
 
 class _AiImproveTile extends StatelessWidget {
-  const _AiImproveTile({
+  _AiImproveTile({
     required this.active,
     required this.paid,
     required this.busy,
@@ -749,7 +749,7 @@ class _DisclaimerNote extends StatelessWidget {
 // ─── Paywall sheet (stub) ─────────────────────────────────────────────────────
 
 class _PaywallSheet extends StatelessWidget {
-  const _PaywallSheet({required this.priceShekel});
+  _PaywallSheet({required this.priceShekel});
   final int priceShekel;
 
   @override

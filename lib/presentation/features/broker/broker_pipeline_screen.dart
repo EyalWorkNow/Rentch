@@ -535,7 +535,7 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
 
 /// Bottom sheet that collects a new lead. Returns a [BrokerLead] on save.
 class _AddLeadSheet extends StatefulWidget {
-  const _AddLeadSheet({required this.properties});
+  _AddLeadSheet({required this.properties});
 
   final List<RentalProperty> properties;
 

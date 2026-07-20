@@ -142,7 +142,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     // fixed so a single real turn = one full 360° ring). SECONDARY = import a
     // panorama the landlord already shot in the phone's native camera mode.
     final choice = await Navigator.of(context).push<_CaptureChoice>(
-      MaterialPageRoute(builder: (_) => const _PanoramaGuideScreen()),
+      MaterialPageRoute(builder: (_) => _PanoramaGuideScreen()),
     );
     if (choice == null || !mounted) return;
 
@@ -1106,7 +1106,7 @@ class _Instructions extends StatelessWidget {
 }
 
 class _NodeTile extends StatelessWidget {
-  const _NodeTile({
+  _NodeTile({
     super.key,
     required this.index,
     required this.node,
@@ -1327,7 +1327,7 @@ class _NodeTile extends StatelessWidget {
 
 /// A pill in the node's version picker (מקור / משופר ✨ …).
 class _VersionChip extends StatelessWidget {
-  const _VersionChip({
+  _VersionChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -1401,7 +1401,7 @@ enum _CaptureChoice { photo, sweep, arranged, gallery, ai }
 /// pops [_CaptureChoice.gallery] → import a panorama already shot in the phone's
 /// native camera. Large clear text, one obvious primary action; no false promises.
 class _PanoramaGuideScreen extends StatelessWidget {
-  const _PanoramaGuideScreen();
+  _PanoramaGuideScreen();
 
   @override
   Widget build(BuildContext context) {
@@ -1451,7 +1451,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                           color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 22),
-                    const _GuideStep(
+                    _GuideStep(
                       number: '1',
                       icon: IconsaxPlusBold.camera,
                       title: 'צלמו את החדר',
@@ -1459,7 +1459,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                           'עומדים במרכז החדר ומצלמים כמה תמונות רחבות — קיר-קיר, עד '
                           'שכיסיתם את כל הזוויות. ככל שיש יותר תמונות, ה-360° מדויק יותר.',
                     ),
-                    const _GuideStep(
+                    _GuideStep(
                       number: '2',
                       icon: IconsaxPlusBold.magic_star,
                       title: 'צרו 360° עם AI',
@@ -1467,7 +1467,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                           'לוחצים על הכפתור ✨ למטה, בוחרים את התמונות שצילמתם — '
                           'וה-AI מרכיב מהן סיור 360° מלא תוך דקה-שתיים.',
                     ),
-                    const _GuideStep(
+                    _GuideStep(
                       number: '3',
                       icon: IconsaxPlusBold.tick_circle,
                       title: 'בוחרים גרסה',
@@ -1573,7 +1573,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
 }
 
 class _GuideStep extends StatelessWidget {
-  const _GuideStep({
+  _GuideStep({
     required this.number,
     required this.icon,
     required this.title,

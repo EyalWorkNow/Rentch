@@ -2205,7 +2205,7 @@ class _RegisterFlowState extends State<_RegisterFlow> {
 // ─── Eula Sheet ───────────────────────────────────────────────────────────────
 
 class _EulaSheet extends StatelessWidget {
-  const _EulaSheet({required this.onAccept, required this.onDecline});
+  _EulaSheet({required this.onAccept, required this.onDecline});
   final VoidCallback onAccept;
   final VoidCallback onDecline;
 
@@ -2340,7 +2340,7 @@ class _DomeClipper extends CustomClipper<Path> {
 }
 
 class _AnimatedSuccessSheet extends StatefulWidget {
-  const _AnimatedSuccessSheet({required this.onContinue});
+  _AnimatedSuccessSheet({required this.onContinue});
   final VoidCallback onContinue;
 
   @override
@@ -3717,7 +3717,7 @@ class _InteractiveRoleButton extends StatefulWidget {
   final VoidCallback onTap;
   final bool isPrimary;
 
-  const _InteractiveRoleButton({
+  _InteractiveRoleButton({
     required this.label,
     required this.icon,
     required this.onTap,

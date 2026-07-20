@@ -71,7 +71,7 @@ class _VerificationInfoSheetBody extends StatelessWidget {
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         _VerifiedHeader(),
                         SizedBox(height: 20),
                         _RedFlagsSection(),
@@ -93,7 +93,7 @@ class _VerificationInfoSheetBody extends StatelessWidget {
 }
 
 class _VerifiedHeader extends StatelessWidget {
-  const _VerifiedHeader();
+  _VerifiedHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -294,7 +294,7 @@ class _RedFlagCard extends StatelessWidget {
 }
 
 class _ReportNote extends StatelessWidget {
-  const _ReportNote();
+  _ReportNote();
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +344,7 @@ class _ReportNote extends StatelessWidget {
 }
 
 class _GotItButton extends StatelessWidget {
-  const _GotItButton();
+  _GotItButton();
 
   @override
   Widget build(BuildContext context) {

@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
 class NeighborhoodScoreCard extends StatelessWidget {
-  const NeighborhoodScoreCard({super.key, required this.enrichment});
+  NeighborhoodScoreCard({super.key, required this.enrichment});
 
   /// Raw enrichment map; may be null/partial/absent. Never assumed well-formed.
   final Map<String, dynamic>? enrichment;

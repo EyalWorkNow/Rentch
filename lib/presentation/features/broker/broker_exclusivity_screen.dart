@@ -296,7 +296,7 @@ class _BrokerExclusivityScreenState extends State<BrokerExclusivityScreen> {
 }
 
 class _ExclusivityEditor extends StatefulWidget {
-  const _ExclusivityEditor({this.existing});
+  _ExclusivityEditor({this.existing});
 
   final BrokerExclusivity? existing;
 

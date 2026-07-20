@@ -1547,7 +1547,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 // ─── Form section card ────────────────────────────────────────────────────────
 
 class _FormSection extends StatelessWidget {
-  const _FormSection({
+  _FormSection({
     required this.title,
     required this.icon,
     required this.child,
@@ -1717,7 +1717,7 @@ class _PhotoManagerSheetState extends State<_PhotoManagerSheet> {
 }
 
 class _PhotoCell extends StatelessWidget {
-  const _PhotoCell({
+  _PhotoCell({
     super.key,
     required this.entry,
     required this.isMain,
@@ -1832,7 +1832,7 @@ class _PhotoCell extends StatelessWidget {
 }
 
 class _AddPhotoCell extends StatelessWidget {
-  const _AddPhotoCell({super.key, required this.onTap});
+  _AddPhotoCell({super.key, required this.onTap});
   final VoidCallback onTap;
 
   @override
@@ -1876,7 +1876,7 @@ class _AddPhotoCell extends StatelessWidget {
 // ─── Photo display widget (handles local path + network URL) ─────────────────
 
 class _ProfilePhotoWidget extends StatelessWidget {
-  const _ProfilePhotoWidget({required this.url});
+  _ProfilePhotoWidget({required this.url});
   final String url;
 
   @override
@@ -1912,7 +1912,7 @@ class _ProfilePhotoWidget extends StatelessWidget {
 // ─── Source picker button ─────────────────────────────────────────────────────
 
 class _SourceButton extends StatelessWidget {
-  const _SourceButton({
+  _SourceButton({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -1963,7 +1963,7 @@ class _SourceButton extends StatelessWidget {
 // ─── Yes/No selector row (RTL) ────────────────────────────────────────────────
 
 class _YesNoRow extends StatelessWidget {
-  const _YesNoRow({
+  _YesNoRow({
     required this.label,
     required this.value,
     required this.onChanged,
@@ -2105,7 +2105,7 @@ class _AgeStepper extends StatelessWidget {
 // ─── Detail tag chip ──────────────────────────────────────────────────────────
 
 class _DetailTag extends StatelessWidget {
-  const _DetailTag({
+  _DetailTag({
     required this.label,
     required this.onRemove,
     this.isDealBreaker = false,
@@ -2173,7 +2173,7 @@ class _DetailTag extends StatelessWidget {
 // ─── Searchable tag picker bottom sheet ───────────────────────────────────────
 
 class _TagPickerSheet extends StatefulWidget {
-  const _TagPickerSheet({
+  _TagPickerSheet({
     required this.isLandlord,
     required this.selected,
     required this.dealBreakers,

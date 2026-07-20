@@ -13,7 +13,7 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 
 class ProfileCard extends StatefulWidget {
-  const ProfileCard({
+  ProfileCard({
     super.key,
     required this.property,
     this.horizontalOffsetPercentage = 0,
@@ -332,7 +332,7 @@ class _ProfileCardState extends State<ProfileCard> {
                                   GestureDetector(
                                     onTap: () =>
                                         VerificationInfoSheet.show(context),
-                                    child: const _VerifiedListingBadge(),
+                                    child: _VerifiedListingBadge(),
                                   ),
                                   const SizedBox(width: 6),
                                 ],
@@ -465,7 +465,7 @@ class _CardImage extends StatelessWidget {
 }
 
 class _ImageFallback extends StatelessWidget {
-  const _ImageFallback({required this.city});
+  _ImageFallback({required this.city});
   final String city;
 
   @override
@@ -530,7 +530,7 @@ class _ImageDots extends StatelessWidget {
 }
 
 class _AgencyBadge extends StatelessWidget {
-  const _AgencyBadge({required this.agencyListing});
+  _AgencyBadge({required this.agencyListing});
   final bool agencyListing;
 
   @override
@@ -567,7 +567,7 @@ class _AgencyBadge extends StatelessWidget {
 }
 
 class _VerifiedListingBadge extends StatelessWidget {
-  const _VerifiedListingBadge();
+  _VerifiedListingBadge();
 
   @override
   Widget build(BuildContext context) {
@@ -652,7 +652,7 @@ class _SwipeBadge extends StatelessWidget {
 }
 
 class _StatPill extends StatelessWidget {
-  const _StatPill({
+  _StatPill({
     required this.icon,
     required this.label,
     this.highlight = false,
@@ -724,7 +724,7 @@ class _ImageProgressBars extends StatelessWidget {
 }
 
 class _FeatureTag extends StatelessWidget {
-  const _FeatureTag({required this.label});
+  _FeatureTag({required this.label});
   final String label;
 
   @override

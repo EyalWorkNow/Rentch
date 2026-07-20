@@ -83,7 +83,7 @@ class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
           ),
         ),
         body: properties.isEmpty
-            ? const _EmptyState()
+            ? _EmptyState()
             : SafeArea(
                 top: false,
                 child: SingleChildScrollView(
@@ -132,7 +132,7 @@ class _BrokerBrochureScreenState extends State<BrokerBrochureScreen> {
 }
 
 class _ChooserStrip extends StatelessWidget {
-  const _ChooserStrip({
+  _ChooserStrip({
     required this.properties,
     required this.selectedId,
     required this.onSelect,
@@ -520,7 +520,7 @@ class _ShareButton extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  _EmptyState();
 
   @override
   Widget build(BuildContext context) {

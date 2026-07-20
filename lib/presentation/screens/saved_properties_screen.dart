@@ -36,7 +36,7 @@ class SavedPropertiesScreen extends StatelessWidget {
           elevation: 0,
         ),
         body: saved.isEmpty
-            ? const _EmptyState()
+            ? _EmptyState()
             : Column(
                 children: [
                   if (canCompare) _CompareButton(),
@@ -97,7 +97,7 @@ class _CompareButton extends StatelessWidget {
 
 /// Compact card: photo, where/address, price, optional match-%, unsave heart.
 class _SavedCard extends StatelessWidget {
-  const _SavedCard({required this.property, required this.provider});
+  _SavedCard({required this.property, required this.provider});
 
   final RentalProperty property;
   final DatingProvider provider;
@@ -229,7 +229,7 @@ class _MatchBadge extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  _EmptyState();
 
   @override
   Widget build(BuildContext context) {

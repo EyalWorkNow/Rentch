@@ -254,7 +254,7 @@ class _PropertyShareSheet extends StatelessWidget {
 }
 
 class _PropertyPreviewCard extends StatelessWidget {
-  const _PropertyPreviewCard({required this.property});
+  _PropertyPreviewCard({required this.property});
 
   final RentalProperty property;
 
@@ -355,7 +355,7 @@ class _PropertyMetaPill extends StatelessWidget {
 }
 
 class _ShareActionCard extends StatelessWidget {
-  const _ShareActionCard({
+  _ShareActionCard({
     required this.icon,
     required this.label,
     required this.subtitle,

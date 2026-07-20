@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// and key gestures. Shown ONCE: gated behind the [_seenKey] SharedPreferences
 /// flag. Includes a Skip and a final "let's go" CTA.
 class AppIntro extends StatefulWidget {
-  const AppIntro({super.key, required this.onDone});
+  AppIntro({super.key, required this.onDone});
 
   /// Called once the user finishes or skips the intro (after the flag is set).
   final VoidCallback onDone;

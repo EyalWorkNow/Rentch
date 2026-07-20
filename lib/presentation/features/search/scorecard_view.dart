@@ -496,7 +496,7 @@ const Map<String, IconData> _geoIcon = {
 bool isGeoTag(String t) => _geoIcon.keys.any(t.startsWith);
 
 class _GeoTag extends StatelessWidget {
-  const _GeoTag(this.raw);
+  _GeoTag(this.raw);
   final String raw;
 
   @override

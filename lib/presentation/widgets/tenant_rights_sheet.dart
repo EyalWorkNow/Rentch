@@ -34,7 +34,7 @@ class TenantRightsSheet {
 }
 
 class _TenantRightsBody extends StatelessWidget {
-  const _TenantRightsBody({
+  _TenantRightsBody({
     required this.monthlyRent,
     required this.termMonths,
   });
@@ -112,7 +112,7 @@ class _TenantRightsBody extends StatelessWidget {
                               '3 חודשי שכירות.',
                     ),
                     const SizedBox(height: 12),
-                    const _RightCard(
+                    _RightCard(
                       icon: Icons.handshake_rounded,
                       title: 'דמי תיווך — רק אם חתמתם',
                       body: 'דמי תיווך (חודש שכירות + מע״מ 18%) מגיעים למתווך '
@@ -120,7 +120,7 @@ class _TenantRightsBody extends StatelessWidget {
                           'לשלם תיווך. שאלו תמיד מי מייצג מי.',
                     ),
                     const SizedBox(height: 12),
-                    const _RightCard(
+                    _RightCard(
                       icon: Icons.remove_red_eye_rounded,
                       title: 'אל תשלמו לפני שראיתם את הדירה',
                       body: 'לעולם אל תעבירו פיקדון, מקדמה או דמי תיווך לפני '
@@ -128,7 +128,7 @@ class _TenantRightsBody extends StatelessWidget {
                           'בקשה לתשלום מראש "כדי לשמור" את הדירה היא דגל אדום.',
                     ),
                     const SizedBox(height: 12),
-                    const _RightCard(
+                    _RightCard(
                       icon: Icons.home_repair_service_rounded,
                       title: 'דירה ראויה למגורים',
                       body: 'על בעל הדירה למסור דירה במצב ראוי למגורים ולתקן '
@@ -180,7 +180,7 @@ class _TenantRightsBody extends StatelessWidget {
 }
 
 class _RightCard extends StatelessWidget {
-  const _RightCard({
+  _RightCard({
     required this.icon,
     required this.title,
     required this.body,

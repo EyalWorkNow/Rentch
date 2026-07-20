@@ -2,7 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class ProfileCompletionBar extends StatelessWidget {
-  const ProfileCompletionBar({
+  ProfileCompletionBar({
     super.key,
     required this.percent,
     required this.hint,

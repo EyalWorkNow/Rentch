@@ -285,7 +285,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
 }
 
 class _RoomCard extends StatelessWidget {
-  const _RoomCard({
+  _RoomCard({
     required this.room,
     required this.onPreview,
     required this.onRemove,
@@ -1107,7 +1107,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
 }
 
 class _CircleAction extends StatelessWidget {
-  const _CircleAction({
+  _CircleAction({
     required this.icon,
     required this.onTap,
     this.enabled = true,
@@ -1594,7 +1594,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
 
 /// One large, finger-friendly action button.
 class _BigButton extends StatelessWidget {
-  const _BigButton({
+  _BigButton({
     required this.label,
     required this.icon,
     required this.onTap,
@@ -1649,7 +1649,7 @@ class _BigButton extends StatelessWidget {
 }
 
 class _OptionCard extends StatelessWidget {
-  const _OptionCard({
+  _OptionCard({
     required this.title,
     required this.subtitle,
     required this.icon,

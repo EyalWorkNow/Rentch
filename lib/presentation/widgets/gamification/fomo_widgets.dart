@@ -287,7 +287,7 @@ class HotPropertyBadge extends StatelessWidget {
 // ─── New Property Badge ───────────────────────────────────────────────────────
 
 class NewPropertyBadge extends StatelessWidget {
-  const NewPropertyBadge({super.key});
+  NewPropertyBadge({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -461,7 +461,7 @@ class FomoCardOverlay extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (isNew) ...[
-                const NewPropertyBadge(),
+                NewPropertyBadge(),
                 const SizedBox(height: 6),
               ],
               if (likes > 0) ...[

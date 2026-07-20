@@ -75,7 +75,7 @@ class TermTooltip extends StatelessWidget {
 }
 
 class _HintBadge extends StatelessWidget {
-  const _HintBadge();
+  _HintBadge();
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +102,7 @@ class _HintBadge extends StatelessWidget {
 }
 
 class _TermDefinitionSheet extends StatelessWidget {
-  const _TermDefinitionSheet({required this.term, required this.definition});
+  _TermDefinitionSheet({required this.term, required this.definition});
 
   final String term;
   final String definition;

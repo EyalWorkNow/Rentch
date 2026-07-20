@@ -19,7 +19,7 @@ import 'package:flutter/services.dart';
 /// if (ok) { /* proceed */ }
 /// ```
 class SwipeToConfirmSheet extends StatefulWidget {
-  const SwipeToConfirmSheet({
+  SwipeToConfirmSheet({
     super.key,
     required this.title,
     this.message,

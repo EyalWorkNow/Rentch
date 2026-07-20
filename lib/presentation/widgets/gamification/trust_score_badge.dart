@@ -5,7 +5,7 @@ import 'package:dating_app/core/services/gamification_service.dart';
 import 'package:flutter/material.dart';
 
 class TrustScoreBadge extends StatelessWidget {
-  const TrustScoreBadge({super.key, required this.score});
+  TrustScoreBadge({super.key, required this.score});
 
   final int score;
 

@@ -76,7 +76,7 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
           ),
         ),
         body: properties.isEmpty
-            ? const _EmptyState()
+            ? _EmptyState()
             : SafeArea(
                 top: false,
                 child: SingleChildScrollView(
@@ -255,7 +255,7 @@ class _PropertyPicker extends StatelessWidget {
 }
 
 class _PropertyTile extends StatelessWidget {
-  const _PropertyTile({
+  _PropertyTile({
     required this.property,
     required this.selected,
     required this.onTap,
@@ -370,7 +370,7 @@ class _MetricsGrid extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.metric});
+  _MetricCard({required this.metric});
 
   final _Metric metric;
 
@@ -421,7 +421,7 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _NarrativeCard extends StatelessWidget {
-  const _NarrativeCard({required this.text});
+  _NarrativeCard({required this.text});
 
   final String text;
 
@@ -451,7 +451,7 @@ class _NarrativeCard extends StatelessWidget {
 }
 
 class _SendButton extends StatelessWidget {
-  const _SendButton({required this.onTap});
+  _SendButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -480,7 +480,7 @@ class _SendButton extends StatelessWidget {
 
 /// Square button that shares the report as a captured image.
 class _ImageShareButton extends StatelessWidget {
-  const _ImageShareButton({required this.onTap, this.busy = false});
+  _ImageShareButton({required this.onTap, this.busy = false});
 
   final VoidCallback onTap;
   final bool busy;
@@ -617,7 +617,7 @@ Future<void> _shareVia(
 }
 
 class _SheetAction extends StatelessWidget {
-  const _SheetAction({
+  _SheetAction({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -677,7 +677,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  _EmptyState();
 
   @override
   Widget build(BuildContext context) {

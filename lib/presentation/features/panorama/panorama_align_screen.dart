@@ -287,7 +287,7 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
           ),
           body: Column(
             children: [
-              const _Guidance(),
+              _Guidance(),
               Expanded(
                 child: _bands.isEmpty
                     ? _EmptyState(onAdd: _busy ? null : _addPano)
@@ -390,7 +390,7 @@ class _PanoramaAlignScreenState extends State<PanoramaAlignScreen> {
 // ── Guidance banner ───────────────────────────────────────────────────────────
 
 class _Guidance extends StatelessWidget {
-  const _Guidance();
+  _Guidance();
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +421,7 @@ class _Guidance extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
+  _EmptyState({required this.onAdd});
   final VoidCallback? onAdd;
 
   @override
@@ -493,7 +493,7 @@ class _SectionLabel extends StatelessWidget {
 /// width, overlaps visible. A simple side-by-side of the imported thumbnails on
 /// the track — the SERVER does the quality stitch.
 class _PreviewStrip extends StatelessWidget {
-  const _PreviewStrip({required this.bands});
+  _PreviewStrip({required this.bands});
   final List<_PanoBand> bands;
 
   @override
@@ -674,7 +674,7 @@ class _Track extends StatelessWidget {
 // ── Per-pano tile (row selector + reorder + remove) ──────────────────────────
 
 class _BandTile extends StatelessWidget {
-  const _BandTile({
+  _BandTile({
     super.key,
     required this.index,
     required this.band,
@@ -788,7 +788,7 @@ class _BandTile extends StatelessWidget {
 }
 
 class _RowChip extends StatelessWidget {
-  const _RowChip(
+  _RowChip(
       {required this.label, required this.selected, required this.onTap});
   final String label;
   final bool selected;
@@ -819,7 +819,7 @@ class _RowChip extends StatelessWidget {
 // ── Stitch / progress overlay ────────────────────────────────────────────────
 
 class _StitchOverlay extends StatelessWidget {
-  const _StitchOverlay({
+  _StitchOverlay({
     required this.message,
     required this.error,
     required this.onRetry,
@@ -894,7 +894,7 @@ class _StitchOverlay extends StatelessWidget {
 // Trim the left/right edges of a source pano so overlap or a bad edge is removed
 // and it meets the neighbouring pano cleanly. Returns (cropLeft, cropRight).
 class _CropEditor extends StatefulWidget {
-  const _CropEditor(
+  _CropEditor(
       {required this.path, required this.cropLeft, required this.cropRight});
   final String path;
   final double cropLeft, cropRight;

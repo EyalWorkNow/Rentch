@@ -306,7 +306,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     DatingProvider provider,
   ) {
     if (properties.isEmpty) {
-      return const _NoMorePropertiesState();
+      return _NoMorePropertiesState();
     }
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(16, 128, 16, 140),
@@ -595,7 +595,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                                             );
                                           },
                                         )
-                                      : const _NoMorePropertiesState(),
+                                      : _NoMorePropertiesState(),
                                 ),
 
                                 // Floating centered action buttons row — only
@@ -845,7 +845,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 }
 
 class MatchCelebrationOverlay extends StatefulWidget {
-  const MatchCelebrationOverlay({super.key, required this.property});
+  MatchCelebrationOverlay({super.key, required this.property});
   final RentalProperty property;
 
   @override
@@ -1192,7 +1192,7 @@ class _GlassPillBadge extends StatelessWidget {
 /// it animates (~1s) into the full-width search bar — the circle elongates and
 /// widens leftward until it reaches full size. Closing reverses the same way.
 class _AnimatedNlSearch extends StatefulWidget {
-  const _AnimatedNlSearch({
+  _AnimatedNlSearch({
     required this.open,
     required this.controller,
     required this.busy,
@@ -1606,13 +1606,13 @@ class _HeaderMenuButtonState extends State<_HeaderMenuButton>
                     label: 'התראות',
                     badge: _unread),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 1,
                 child: _HeaderMenuRow(
                     icon: Icons.bookmark_border_rounded,
                     label: 'חיפושים שמורים'),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 2,
                 child: _HeaderMenuRow(
                     icon: Icons.favorite_border_rounded,
@@ -1650,7 +1650,7 @@ class _HeaderMenuButtonState extends State<_HeaderMenuButton>
 }
 
 class _HeaderMenuRow extends StatelessWidget {
-  const _HeaderMenuRow(
+  _HeaderMenuRow(
       {required this.icon, required this.label, this.badge = 0});
   final IconData icon;
   final String label;
@@ -1700,7 +1700,7 @@ class _HeaderMenuRow extends StatelessWidget {
 }
 
 class _SaveSearchButton extends StatelessWidget {
-  const _SaveSearchButton({required this.onTap});
+  _SaveSearchButton({required this.onTap});
   final VoidCallback onTap;
 
   @override
@@ -1740,7 +1740,7 @@ class _SaveSearchButton extends StatelessWidget {
 // ─── Filters Sheet ────────────────────────────────────────────────────────────
 
 class _FiltersSheet extends StatefulWidget {
-  const _FiltersSheet({required this.provider});
+  _FiltersSheet({required this.provider});
   final DatingProvider provider;
 
   @override
@@ -3102,7 +3102,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                         _FilterSection(
                           title: 'מצב הנכס',
                           icon: IconsaxPlusLinear.shield_tick,
-                          action: const _PriorityLegend(),
+                          action: _PriorityLegend(),
                         ),
                         const SizedBox(height: 12),
                         Wrap(
@@ -3344,7 +3344,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
 }
 
 class _FilterSection extends StatelessWidget {
-  const _FilterSection(
+  _FilterSection(
       {required this.title, this.icon, this.action, this.badge});
   final String title;
   final IconData? icon;
@@ -3403,7 +3403,7 @@ class _FilterSection extends StatelessWidget {
 }
 
 class _PriorityLegend extends StatelessWidget {
-  const _PriorityLegend();
+  _PriorityLegend();
 
   @override
   Widget build(BuildContext context) {
@@ -3477,7 +3477,7 @@ class _LegendChip extends StatelessWidget {
 /// so single tap can mean "preferred" and a quick second tap can upgrade it to
 /// "required".
 class _PriorityFilterChip extends StatelessWidget {
-  const _PriorityFilterChip({
+  _PriorityFilterChip({
     required this.label,
     required this.state,
     required this.icon,
@@ -3557,7 +3557,7 @@ class _PriorityFilterChip extends StatelessWidget {
 }
 
 class _SliderField extends StatelessWidget {
-  const _SliderField({
+  _SliderField({
     required this.label,
     required this.value,
     required this.min,
@@ -3648,7 +3648,7 @@ class _SliderField extends StatelessWidget {
 }
 
 class _RangeSliderField extends StatelessWidget {
-  const _RangeSliderField({
+  _RangeSliderField({
     required this.label,
     required this.values,
     required this.min,
@@ -3743,7 +3743,7 @@ class _RangeSliderField extends StatelessWidget {
 }
 
 class _AreaLassoScreen extends StatefulWidget {
-  const _AreaLassoScreen({
+  _AreaLassoScreen({
     required this.initialArea,
     required this.initialPolygon,
     required this.previewMarkers,
@@ -4533,7 +4533,7 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
 // ─── Thumbnail ───────────────────────────────────────────────────────────────
 
 class _PropertyThumb extends StatelessWidget {
-  const _PropertyThumb({required this.media});
+  _PropertyThumb({required this.media});
 
   final PropertyMedia? media;
 
@@ -4558,7 +4558,7 @@ class _PropertyThumb extends StatelessWidget {
 }
 
 class _PropertyPreviewCard extends StatelessWidget {
-  const _PropertyPreviewCard({
+  _PropertyPreviewCard({
     required this.property,
     required this.isSelected,
     required this.onTap,
@@ -4869,7 +4869,7 @@ class _UndoButton extends StatelessWidget {
 }
 
 class _NoMorePropertiesState extends StatelessWidget {
-  const _NoMorePropertiesState();
+  _NoMorePropertiesState();
 
   @override
   Widget build(BuildContext context) {
@@ -4984,7 +4984,7 @@ class _NoMorePropertiesState extends StatelessWidget {
 }
 
 class _QuickActionBtn extends StatelessWidget {
-  const _QuickActionBtn({
+  _QuickActionBtn({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -5224,7 +5224,7 @@ class _LocationSuggestion {
 }
 
 class _LocationSuggestionTile extends StatelessWidget {
-  const _LocationSuggestionTile({
+  _LocationSuggestionTile({
     required this.suggestion,
     required this.isSelected,
     required this.onTap,
@@ -5563,7 +5563,7 @@ class _CustomRangeSliderThumbShape extends RangeSliderThumbShape {
 }
 
 class _TransactionCard extends StatelessWidget {
-  const _TransactionCard({
+  _TransactionCard({
     required this.label,
     required this.price,
     required this.isSelected,
@@ -5677,7 +5677,7 @@ class _TransactionCard extends StatelessWidget {
 }
 
 class _PriceHistogram extends StatelessWidget {
-  const _PriceHistogram({
+  _PriceHistogram({
     required this.minBudget,
     required this.maxBudget,
     required this.sliderMin,
@@ -5790,7 +5790,7 @@ class _PriceInputCard extends StatelessWidget {
 }
 
 class _CircleSelectorButton extends StatelessWidget {
-  const _CircleSelectorButton({
+  _CircleSelectorButton({
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -5840,7 +5840,7 @@ class _CircleSelectorButton extends StatelessWidget {
 }
 
 class _PropertyTypeCard extends StatelessWidget {
-  const _PropertyTypeCard({
+  _PropertyTypeCard({
     required this.label,
     required this.state,
     required this.icon,
@@ -5952,7 +5952,7 @@ class _PropertyTypeCard extends StatelessWidget {
 }
 
 class _FeatureTag extends StatelessWidget {
-  const _FeatureTag({
+  _FeatureTag({
     required this.label,
     required this.state,
     required this.onClear,
@@ -6028,7 +6028,7 @@ class _TrianglePainter extends CustomPainter {
 }
 
 class _PillSelector extends StatefulWidget {
-  const _PillSelector({
+  _PillSelector({
     required this.selectedTab,
     required this.onTabChanged,
     required this.onMapTap,
@@ -6270,7 +6270,7 @@ class _PillSelectorState extends State<_PillSelector> {
 }
 
 class _SlidingSelectorThumb extends StatelessWidget {
-  const _SlidingSelectorThumb({
+  _SlidingSelectorThumb({
     required this.energy,
     required this.isDiscoverSelected,
   });

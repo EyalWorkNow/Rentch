@@ -49,7 +49,7 @@ class _AskMessage {
 }
 
 class _AskRentlyBody extends StatefulWidget {
-  const _AskRentlyBody({required this.property, required this.listingTitle});
+  _AskRentlyBody({required this.property, required this.listingTitle});
   final RentalProperty property;
   final String listingTitle;
 
@@ -495,7 +495,7 @@ String? answerFromListing(String q, RentalProperty p) {
 }
 
 class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip({required this.label, required this.onTap});
+  _SuggestionChip({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
 
@@ -524,7 +524,7 @@ class _SuggestionChip extends StatelessWidget {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message});
+  _Bubble({required this.message});
   final _AskMessage message;
 
   @override

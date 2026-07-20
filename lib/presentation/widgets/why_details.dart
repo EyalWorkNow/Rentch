@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 ///
 /// [dark] switches the palette for the voice screen's dark background.
 class WhyDetails extends StatefulWidget {
-  const WhyDetails({super.key, required this.scored, this.dark = false});
+  WhyDetails({super.key, required this.scored, this.dark = false});
   final ScoredProperty scored;
   final bool dark;
 

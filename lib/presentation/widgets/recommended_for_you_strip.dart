@@ -10,7 +10,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 /// Lives directly under the search field; renders nothing when there are no
 /// recommendations so the search area collapses cleanly.
 class RecommendedForYouStrip extends StatelessWidget {
-  const RecommendedForYouStrip({
+  RecommendedForYouStrip({
     super.key,
     required this.properties,
     required this.onTap,
@@ -69,7 +69,7 @@ class RecommendedForYouStrip extends StatelessWidget {
 }
 
 class _CompactCard extends StatelessWidget {
-  const _CompactCard({required this.property, required this.onTap});
+  _CompactCard({required this.property, required this.onTap});
 
   final RentalProperty property;
   final VoidCallback onTap;

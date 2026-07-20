@@ -39,7 +39,7 @@ class SpeedMode {
 /// A two-segment slider — **🎯 מותאם אישית ↔ ⚡ מהיר** — styled IDENTICALLY to the
 /// discover "גלה" pill selector (glass pill, sliding gradient thumb, iconsax icons).
 class SpeedModeSlider extends StatelessWidget {
-  const SpeedModeSlider({
+  SpeedModeSlider({
     super.key,
     required this.immediate,
     required this.onChanged,
@@ -126,7 +126,7 @@ class SpeedModeSlider extends StatelessWidget {
                       width: half,
                       top: 0,
                       bottom: 0,
-                      child: const _SpeedThumb(),
+                      child: _SpeedThumb(),
                     ),
                     Row(
                       children: [
@@ -224,7 +224,7 @@ class SpeedModeSlider extends StatelessWidget {
 }
 
 class _SpeedThumb extends StatelessWidget {
-  const _SpeedThumb();
+  _SpeedThumb();
 
   @override
   Widget build(BuildContext context) {

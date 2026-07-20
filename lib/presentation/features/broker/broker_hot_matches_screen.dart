@@ -152,7 +152,7 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _hot.isEmpty
-                ? const _EmptyState()
+                ? _EmptyState()
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView.separated(
@@ -172,7 +172,7 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
 }
 
 class _HotMatchCard extends StatelessWidget {
-  const _HotMatchCard({
+  _HotMatchCard({
     required this.hot,
     required this.onOpen,
     required this.onDismiss,
@@ -266,7 +266,7 @@ class _HotMatchCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  _EmptyState();
 
   @override
   Widget build(BuildContext context) {

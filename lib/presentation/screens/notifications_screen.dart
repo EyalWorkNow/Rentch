@@ -421,7 +421,7 @@ class _NotificationTile extends StatelessWidget {
 // ─── Empty / error state ────────────────────────────────────────────────────
 
 class _StateMessage extends StatelessWidget {
-  const _StateMessage({
+  _StateMessage({
     required this.icon,
     required this.title,
     required this.subtitle,

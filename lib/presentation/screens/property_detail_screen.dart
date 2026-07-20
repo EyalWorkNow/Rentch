@@ -514,7 +514,7 @@ class _ListingEnrichmentBlockState extends State<_ListingEnrichmentBlock> {
 
 /// The "שאל את Rently" entry card — opens the per-listing Q&A chat sheet.
 class _AskRentlyEntry extends StatelessWidget {
-  const _AskRentlyEntry({required this.property, this.title = ''});
+  _AskRentlyEntry({required this.property, this.title = ''});
 
   final RentalProperty property;
   final String title;
@@ -595,7 +595,7 @@ class _AskRentlyEntry extends StatelessWidget {
 // ─── Image Gallery ────────────────────────────────────────────────────────────
 
 class _ImageGallery extends StatelessWidget {
-  const _ImageGallery({
+  _ImageGallery({
     required this.property,
     required this.controller,
     required this.currentPage,
@@ -1532,7 +1532,7 @@ class _MediaTourCard extends StatelessWidget {
 /// background. Sets expectations (a few minutes, can leave) and reassures the
 /// owner the scan wasn't lost — it surfaces here as a viewer once ready.
 class _Scan3dProcessingCard extends StatefulWidget {
-  const _Scan3dProcessingCard({
+  _Scan3dProcessingCard({
     required this.surface,
     required this.onSurface,
     required this.muted,
@@ -1958,7 +1958,7 @@ class _StatusCapsule extends StatelessWidget {
 }
 
 class _CarouselDots extends StatelessWidget {
-  const _CarouselDots({required this.count, required this.current});
+  _CarouselDots({required this.count, required this.current});
   final int count;
   final int current;
 
@@ -1992,7 +1992,7 @@ class _CarouselDots extends StatelessWidget {
 }
 
 class _ImageFallback extends StatelessWidget {
-  const _ImageFallback({required this.city});
+  _ImageFallback({required this.city});
   final String city;
 
   @override
@@ -2083,7 +2083,7 @@ Future<void> openPropertyTour(
 // ─── Owner Card ───────────────────────────────────────────────────────────────
 
 class _OwnerCard extends StatelessWidget {
-  const _OwnerCard({required this.property});
+  _OwnerCard({required this.property});
   final RentalProperty property;
 
   @override
@@ -2375,7 +2375,7 @@ class _OwnerCard extends StatelessWidget {
 /// "בקש לשלוח הודעה" — lets a tenant with no mutual like reach out to the owner.
 /// The request lands in the owner's dedicated messages section.
 class _MessageRequestButton extends StatelessWidget {
-  const _MessageRequestButton({required this.property});
+  _MessageRequestButton({required this.property});
   final RentalProperty property;
 
   Future<void> _open(BuildContext context, DatingProvider provider) async {
@@ -2488,7 +2488,7 @@ class _MessageRequestButton extends StatelessWidget {
 }
 
 class _OwnerProfileSheet extends StatelessWidget {
-  const _OwnerProfileSheet({required this.property, required this.reviews});
+  _OwnerProfileSheet({required this.property, required this.reviews});
   final RentalProperty property;
   final List<AppReview> reviews;
 
@@ -2603,7 +2603,7 @@ class _OwnerProfileSheet extends StatelessWidget {
 // ─── Content widgets ──────────────────────────────────────────────────────────
 
 class _SectionCardShell extends StatelessWidget {
-  const _SectionCardShell({
+  _SectionCardShell({
     required this.title,
     required this.icon,
     required this.child,
@@ -2666,7 +2666,7 @@ IconData _getFeatureIcon(String feature) {
 }
 
 class _FeatureWrap extends StatelessWidget {
-  const _FeatureWrap({required this.features});
+  _FeatureWrap({required this.features});
   final List<String> features;
 
   @override
@@ -2713,7 +2713,7 @@ class _FeatureWrap extends StatelessWidget {
 }
 
 class _MapSection extends StatefulWidget {
-  const _MapSection({required this.property});
+  _MapSection({required this.property});
   final RentalProperty property;
 
   @override
@@ -2842,7 +2842,7 @@ class _MapSectionState extends State<_MapSection> {
 }
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({
+  _BottomBar({
     required this.property,
     required this.hasVirtualTour,
     required this.onLike,
@@ -2952,7 +2952,7 @@ class _BottomBar extends StatelessWidget {
 }
 
 class _TourUnavailableSheet extends StatelessWidget {
-  const _TourUnavailableSheet({required this.property});
+  _TourUnavailableSheet({required this.property});
 
   final RentalProperty property;
 
@@ -3227,7 +3227,7 @@ class _VirtualTourScreen extends StatelessWidget {
 }
 
 class _InteractiveTourScreen extends StatelessWidget {
-  const _InteractiveTourScreen({required this.property, required this.tour});
+  _InteractiveTourScreen({required this.property, required this.tour});
 
   final RentalProperty property;
   final PropertyVirtualTour tour;
@@ -3517,7 +3517,7 @@ class _DarkMetricChip extends StatelessWidget {
 /// entry point. Pure read-only; never blocks. When income is null it shows a
 /// gentle prompt to add it (deep-links nowhere — the profile editor owns that).
 class _AffordabilityStrip extends StatelessWidget {
-  const _AffordabilityStrip({
+  _AffordabilityStrip({
     required this.property,
     required this.monthlyIncome,
   });
@@ -3660,7 +3660,7 @@ class _AffordabilityStrip extends StatelessWidget {
 }
 
 class _PropertySignalStrip extends StatelessWidget {
-  const _PropertySignalStrip({required this.property});
+  _PropertySignalStrip({required this.property});
 
   final RentalProperty property;
 
@@ -4074,7 +4074,7 @@ class _HorizontalReviewsList extends StatelessWidget {
 /// "?" icon on the trailing side that, when tapped, reveals the existing
 /// [_MatchInsightCard] scorecard as its body.
 class _MatchInsightDropdown extends StatefulWidget {
-  const _MatchInsightDropdown({required this.property});
+  _MatchInsightDropdown({required this.property});
   final RentalProperty property;
 
   @override
@@ -4167,7 +4167,7 @@ class _MatchInsightDropdownState extends State<_MatchInsightDropdown> {
 }
 
 class _MatchInsightCard extends StatelessWidget {
-  const _MatchInsightCard({required this.property});
+  _MatchInsightCard({required this.property});
   final RentalProperty property;
 
   (Color, Color) _tierColors(MatchTier tier) => switch (tier) {

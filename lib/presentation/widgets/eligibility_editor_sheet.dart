@@ -143,7 +143,7 @@ Future<List<EligibilityRule>?> showEligibilityEditor(
 }
 
 class _EligibilityEditorSheet extends StatefulWidget {
-  const _EligibilityEditorSheet({required this.initial});
+  _EligibilityEditorSheet({required this.initial});
   final EligibilityConfig initial;
 
   @override
@@ -638,7 +638,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
 }
 
 class _StepperButton extends StatelessWidget {
-  const _StepperButton(
+  _StepperButton(
       {required this.icon, required this.enabled, required this.onTap});
   final IconData icon;
   final bool enabled;
@@ -665,7 +665,7 @@ class _StepperButton extends StatelessWidget {
 }
 
 class _SelectChip extends StatelessWidget {
-  const _SelectChip(
+  _SelectChip(
       {required this.label, required this.selected, required this.onTap});
   final String label;
   final bool selected;
@@ -713,7 +713,7 @@ class _SelectChip extends StatelessWidget {
 /// a master switch (binds [EligibilityConfig.enabled]) + a button that opens the
 /// editor, plus a compact summary of the active rules and an honesty hint.
 class EligibilityEntryCard extends StatelessWidget {
-  const EligibilityEntryCard({
+  EligibilityEntryCard({
     super.key,
     required this.config,
     required this.onEnabledChanged,

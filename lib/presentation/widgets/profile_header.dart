@@ -4,7 +4,7 @@ import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 
 class ProfileHeader extends StatelessWidget {
-  const ProfileHeader({
+  ProfileHeader({
     super.key,
     required this.profile,
     required this.onEditPressed,

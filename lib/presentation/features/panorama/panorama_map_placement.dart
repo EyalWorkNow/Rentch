@@ -197,7 +197,7 @@ class _PanoramaMapPlacementScreenState
 }
 
 class _Dot extends StatelessWidget {
-  const _Dot(
+  _Dot(
       {required this.x,
       required this.y,
       required this.label,

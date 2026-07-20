@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 ///
 /// Two starter chips pre-fill common, reassuring phrasings.
 class IntroNoteComposer extends StatefulWidget {
-  const IntroNoteComposer({
+  IntroNoteComposer({
     super.key,
     this.controller,
     this.onChanged,

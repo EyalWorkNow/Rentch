@@ -479,7 +479,7 @@ class _BrokerViewingsScreenState extends State<BrokerViewingsScreen> {
 
 /// Bottom sheet collecting a new viewing. Returns a [BrokerViewing] on save.
 class _ScheduleViewingSheet extends StatefulWidget {
-  const _ScheduleViewingSheet({required this.properties});
+  _ScheduleViewingSheet({required this.properties});
 
   final List<RentalProperty> properties;
 

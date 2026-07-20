@@ -15,7 +15,7 @@ import 'package:provider/provider.dart';
 /// address/price, info chips, and the expandable data-grounded "why this one"
 /// (ScorecardView). Shared by the chat AND the voice conversation.
 class AssistantPropertyCard extends StatelessWidget {
-  const AssistantPropertyCard({
+  AssistantPropertyCard({
     super.key,
     required this.scored,
     required this.onTap,
@@ -291,7 +291,7 @@ List<Widget> _geoWhy(List<String> tags) {
 }
 
 class _GeoTag extends StatelessWidget {
-  const _GeoTag(this.raw);
+  _GeoTag(this.raw);
   final String raw;
 
   @override

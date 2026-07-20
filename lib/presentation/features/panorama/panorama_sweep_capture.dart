@@ -954,7 +954,7 @@ class _RingPainter extends CustomPainter {
 
 // Per-row capture progress as a dot strip — green = done, current is wide.
 class _RowDots extends StatelessWidget {
-  const _RowDots(
+  _RowDots(
       {required this.rowIndex, required this.done, required this.rows});
   final int rowIndex;
   final int done;

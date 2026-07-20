@@ -340,7 +340,7 @@ class _BrokerCommissionScreenState extends State<BrokerCommissionScreen> {
 }
 
 class _DealEditor extends StatefulWidget {
-  const _DealEditor({this.existing});
+  _DealEditor({this.existing});
 
   final BrokerDeal? existing;
 

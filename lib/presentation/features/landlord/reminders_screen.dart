@@ -67,7 +67,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _AddReminderSheet(),
+      builder: (_) => _AddReminderSheet(),
     );
     if (result == null) return;
 
@@ -274,7 +274,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
 /// The landlord's manually-added reminders, read from the OS pending queue so the
 /// list survives app restarts.
 class _ManualRemindersList extends StatefulWidget {
-  const _ManualRemindersList({required this.notifications});
+  _ManualRemindersList({required this.notifications});
   final NotificationService notifications;
 
   @override
@@ -378,7 +378,7 @@ class _PendingRow {
 
 /// Bottom sheet that captures a manual reminder: free text + a date/time.
 class _AddReminderSheet extends StatefulWidget {
-  const _AddReminderSheet();
+  _AddReminderSheet();
 
   @override
   State<_AddReminderSheet> createState() => _AddReminderSheetState();

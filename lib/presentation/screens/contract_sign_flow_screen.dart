@@ -40,7 +40,7 @@ class ContractSignFlowScreen extends StatelessWidget {
         builder: (context, provider, _) {
           final contract = _find(provider);
           if (contract == null) {
-            return const _EmptyState();
+            return _EmptyState();
           }
           final isLandlord = provider.isLandlord;
           final myRole = isLandlord ? 'landlord' : 'tenant';
@@ -75,7 +75,7 @@ class ContractSignFlowScreen extends StatelessWidget {
                       isYou: !isLandlord,
                     ),
                     const SizedBox(height: 16),
-                    const _SecurityNote(),
+                    _SecurityNote(),
                   ],
                 ),
               ),
@@ -96,7 +96,7 @@ class ContractSignFlowScreen extends StatelessWidget {
 // ─── Progress / status strip ──────────────────────────────────────────────────
 
 class _ProgressStrip extends StatelessWidget {
-  const _ProgressStrip({required this.contract, required this.myRole});
+  _ProgressStrip({required this.contract, required this.myRole});
   final RentalContract contract;
   final String myRole;
 
@@ -329,7 +329,7 @@ class _TermsCard extends StatelessWidget {
 // ─── Party row ────────────────────────────────────────────────────────────────
 
 class _PartyRow extends StatelessWidget {
-  const _PartyRow({
+  _PartyRow({
     required this.label,
     required this.name,
     required this.signature,
@@ -441,7 +441,7 @@ class _PartyRow extends StatelessWidget {
 // ─── Bottom action bar ────────────────────────────────────────────────────────
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({
+  _BottomBar({
     required this.contract,
     required this.canSign,
     required this.isLandlord,
@@ -638,7 +638,7 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _SecurityNote extends StatelessWidget {
-  const _SecurityNote();
+  _SecurityNote();
   @override
   Widget build(BuildContext context) => Row(
         children: [
@@ -658,7 +658,7 @@ class _SecurityNote extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  _EmptyState();
   @override
   Widget build(BuildContext context) {
     return Center(

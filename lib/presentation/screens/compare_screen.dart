@@ -319,7 +319,7 @@ class _CompareBody extends StatelessWidget {
 // ── header: which flats, with photos ────────────────────────────────────────
 
 class _HeaderStrip extends StatelessWidget {
-  const _HeaderStrip({required this.analysis});
+  _HeaderStrip({required this.analysis});
   final _Analysis analysis;
 
   @override
@@ -387,7 +387,7 @@ class _HeaderStrip extends StatelessWidget {
 // ── the bottom line: which to pick, and why (honest) ────────────────────────
 
 class _BottomLineCard extends StatelessWidget {
-  const _BottomLineCard({required this.analysis});
+  _BottomLineCard({required this.analysis});
   final _Analysis analysis;
 
   @override
@@ -556,7 +556,7 @@ class _BottomLineCard extends StatelessWidget {
 // ── the true monthly cost reveal (rentals) ──────────────────────────────────
 
 class _TrueCostCard extends StatelessWidget {
-  const _TrueCostCard({required this.analysis});
+  _TrueCostCard({required this.analysis});
   final _Analysis analysis;
 
   @override
@@ -956,7 +956,7 @@ String _thousands(int n) {
 // ── section shell ───────────────────────────────────────────────────────────
 
 class _Section extends StatelessWidget {
-  const _Section({required this.icon, required this.title, required this.child});
+  _Section({required this.icon, required this.title, required this.child});
   final IconData icon;
   final String title;
   final Widget child;
@@ -1083,7 +1083,7 @@ class _CompareRow {
 }
 
 class _DataRow extends StatelessWidget {
-  const _DataRow({
+  _DataRow({
     required this.row,
     required this.properties,
     required this.shaded,
@@ -1174,7 +1174,7 @@ class _LabelCell extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.savedCount});
+  _EmptyState({required this.savedCount});
   final int savedCount;
 
   @override
@@ -1206,7 +1206,7 @@ class _EmptyState extends StatelessWidget {
 
 /// Searchable catalog list → returns the tapped property to add to the compare.
 class _ComparePickerSheet extends StatefulWidget {
-  const _ComparePickerSheet({required this.properties});
+  _ComparePickerSheet({required this.properties});
   final List<RentalProperty> properties;
   @override
   State<_ComparePickerSheet> createState() => _ComparePickerSheetState();

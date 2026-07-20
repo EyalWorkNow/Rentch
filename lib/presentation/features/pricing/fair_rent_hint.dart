@@ -14,7 +14,7 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 /// It is intentionally rent-only and self-hiding: for a sale, or whenever the
 /// model has no anchor for the city/size, it renders nothing (an empty box).
 class FairRentHint extends StatelessWidget {
-  const FairRentHint({
+  FairRentHint({
     super.key,
     required this.city,
     required this.sizeM2,

@@ -379,7 +379,7 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
 
 // On-floor navigation arrow (Street-View style): a forward chevron + label.
 class _GroundArrow extends StatelessWidget {
-  const _GroundArrow({required this.label, required this.onTap});
+  _GroundArrow({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
 
@@ -449,7 +449,7 @@ class _Compass extends StatelessWidget {
 }
 
 class _CircleButton extends StatelessWidget {
-  const _CircleButton(
+  _CircleButton(
       {required this.icon, required this.onTap, this.active = false});
   final IconData icon;
   final VoidCallback onTap;

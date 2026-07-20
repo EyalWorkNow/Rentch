@@ -90,7 +90,7 @@ class _TaxHelperScreenState extends State<TaxHelperScreen> {
 // ─── Rent input ────────────────────────────────────────────────────────────
 
 class _RentField extends StatelessWidget {
-  const _RentField({required this.controller, required this.onChanged});
+  _RentField({required this.controller, required this.onChanged});
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
@@ -197,7 +197,7 @@ class _VerdictCard extends StatelessWidget {
 // ─── "מה זה אומר?" expander ──────────────────────────────────────────────────
 
 class _WhatDoesItMean extends StatelessWidget {
-  const _WhatDoesItMean({required this.result});
+  _WhatDoesItMean({required this.result});
 
   final RentalTaxResult result;
 

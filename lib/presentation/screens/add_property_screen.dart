@@ -590,7 +590,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const _ScaniversePickerSheet(),
+      builder: (_) => _ScaniversePickerSheet(),
     );
     if (scan == null || !mounted) return;
     setState(() {
@@ -1336,7 +1336,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
 class _StepIndicator extends StatelessWidget {
-  const _StepIndicator(
+  _StepIndicator(
       {required this.step, required this.total, required this.labels});
   final int step;
   final int total;
@@ -1423,7 +1423,7 @@ class _StepIndicator extends StatelessWidget {
 // ─── Wizard Nav Bar ───────────────────────────────────────────────────────────
 
 class _WizardNavBar extends StatelessWidget {
-  const _WizardNavBar({
+  _WizardNavBar({
     required this.step,
     required this.total,
     required this.isLoading,
@@ -1514,7 +1514,7 @@ class _WizardNavBar extends StatelessWidget {
 // ─── Edit Property Footer ─────────────────────────────────────────────────────
 
 class _EditPropertyFooter extends StatelessWidget {
-  const _EditPropertyFooter({
+  _EditPropertyFooter({
     required this.step,
     required this.total,
     required this.isLoading,
@@ -1680,7 +1680,7 @@ class _EditPropertyFooter extends StatelessWidget {
 // ─── Step 1: Location ─────────────────────────────────────────────────────────
 
 class _StepLocation extends StatefulWidget {
-  const _StepLocation({
+  _StepLocation({
     required this.cityCtrl,
     required this.neighborhoodCtrl,
     required this.streetCtrl,
@@ -1942,7 +1942,7 @@ class _StepLocationState extends State<_StepLocation> {
 // ─── Rent / Sale toggle ───────────────────────────────────────────────────────
 
 class _TransactionTypeToggle extends StatelessWidget {
-  const _TransactionTypeToggle({
+  _TransactionTypeToggle({
     required this.value,
     required this.onChanged,
   });
@@ -2200,7 +2200,7 @@ class _StepDetails extends StatelessWidget {
 // ─── Step 3: Features ─────────────────────────────────────────────────────────
 
 class _StepFeatures extends StatelessWidget {
-  const _StepFeatures({
+  _StepFeatures({
     required this.allFeatures,
     required this.selectedFeatures,
     required this.onToggle,
@@ -2438,7 +2438,7 @@ class _StepFeatures extends StatelessWidget {
 // ─── Step 4: Audience (F1/F2) ─────────────────────────────────────────────────
 
 class _StepAudience extends StatelessWidget {
-  const _StepAudience({
+  _StepAudience({
     required this.noteCtrl,
     required this.selectedCohorts,
     required this.onToggleCohort,
@@ -2713,7 +2713,7 @@ class _StepAudience extends StatelessWidget {
 
 // A cohort selection pill — same idiom as the feature pills in _StepFeatures.
 class _AudienceChip extends StatelessWidget {
-  const _AudienceChip({
+  _AudienceChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -2763,7 +2763,7 @@ class _AudienceChip extends StatelessWidget {
 // One model-suggested cohort: Hebrew label + confidence + reason, tappable to
 // add it into the landlord's declared picks.
 class _SuggestedAudienceRow extends StatelessWidget {
-  const _SuggestedAudienceRow({
+  _SuggestedAudienceRow({
     required this.suggestion,
     required this.onAdd,
   });
@@ -3116,7 +3116,7 @@ class _StepPhotos extends StatelessWidget {
               ),
               if (wantsVerifiedListing) ...[
                 const SizedBox(height: 16),
-                const _VerifiedMediaLockNotice(),
+                _VerifiedMediaLockNotice(),
               ] else ...[
                 const SizedBox(height: 18),
                 GridView.builder(
@@ -3203,7 +3203,7 @@ class _StepPhotos extends StatelessWidget {
             onEligibilityEnabledChanged != null &&
             onEditEligibility != null) ...[
           const SizedBox(height: 20),
-          const _SectionHint(
+          _SectionHint(
             icon: IconsaxPlusLinear.filter_search,
             title: 'קריטריונים לשוכר',
             subtitle: 'הגדר/י מי רואה את הדירה לפי תנאי סף',
@@ -3221,7 +3221,7 @@ class _StepPhotos extends StatelessWidget {
 }
 
 class _VerifiedListingPanel extends StatelessWidget {
-  const _VerifiedListingPanel({
+  _VerifiedListingPanel({
     required this.wantsVerifiedListing,
     required this.verificationVideoUrl,
     required this.verificationCapturedAt,
@@ -3347,7 +3347,7 @@ class _VerifiedListingPanel extends StatelessWidget {
 }
 
 class _VerificationVideoPreview extends StatelessWidget {
-  const _VerificationVideoPreview({
+  _VerificationVideoPreview({
     required this.videoUrl,
     required this.capturedAt,
     required this.isCapturing,
@@ -3458,7 +3458,7 @@ class _VerificationVideoPreview extends StatelessWidget {
 }
 
 class _VerifiedMediaLockNotice extends StatelessWidget {
-  const _VerifiedMediaLockNotice();
+  _VerifiedMediaLockNotice();
 
   @override
   Widget build(BuildContext context) {
@@ -3594,7 +3594,7 @@ class _PropertyRightsPanel extends StatelessWidget {
 }
 
 class _MediaGridItem extends StatelessWidget {
-  const _MediaGridItem({
+  _MediaGridItem({
     required this.index,
     required this.draft,
     required this.onRemove,
@@ -3728,7 +3728,7 @@ class _MediaGridItem extends StatelessWidget {
 }
 
 class _PickerOptionButton extends StatelessWidget {
-  const _PickerOptionButton({
+  _PickerOptionButton({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -3921,7 +3921,7 @@ class _Scan3dPanel extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: const [
+          children: [
             _ScanTip(
               icon: Icons.wb_sunny_rounded,
               label: 'אור חזק',
@@ -4030,7 +4030,7 @@ class _RoomScanEntry extends StatelessWidget {
 }
 
 class _ScanTip extends StatelessWidget {
-  const _ScanTip({required this.icon, required this.label});
+  _ScanTip({required this.icon, required this.label});
   final IconData icon;
   final String label;
 
@@ -4063,7 +4063,7 @@ class _ScanTip extends StatelessWidget {
 }
 
 class _ScanActions extends StatelessWidget {
-  const _ScanActions({
+  _ScanActions({
     required this.isSubmitting,
     required this.onPickFromCamera,
     required this.onPickFromGallery,
@@ -4262,7 +4262,7 @@ class _ScanActions extends StatelessWidget {
 }
 
 class _ScanStatusCard extends StatelessWidget {
-  const _ScanStatusCard({
+  _ScanStatusCard({
     required this.tour,
     required this.isSubmitting,
     required this.isBackendConfigured,
@@ -4391,7 +4391,7 @@ class _ScanStatusCard extends StatelessWidget {
 // ─── Shared widgets ───────────────────────────────────────────────────────────
 
 class _SectionHint extends StatelessWidget {
-  const _SectionHint(
+  _SectionHint(
       {required this.icon, required this.title, required this.subtitle});
   final IconData icon;
   final String title;
@@ -4459,7 +4459,7 @@ class _FormCard extends StatelessWidget {
 /// types is kept in [ctrl], so free text that matches nothing is still allowed
 /// (nobody is blocked from submitting).
 class _AutocompleteField extends StatefulWidget {
-  const _AutocompleteField({
+  _AutocompleteField({
     required this.ctrl,
     required this.label,
     required this.icon,
@@ -4568,7 +4568,7 @@ class _AutocompleteFieldState extends State<_AutocompleteField> {
 /// of free typing). Range: basement, ground floor, then 1…50. Writes the chosen
 /// label straight into [ctrl] (kept as a string, same as before).
 class _FloorDropdown extends StatelessWidget {
-  const _FloorDropdown({required this.ctrl});
+  _FloorDropdown({required this.ctrl});
 
   final TextEditingController ctrl;
 
@@ -4620,7 +4620,7 @@ class _FloorDropdown extends StatelessWidget {
 }
 
 class _Field extends StatelessWidget {
-  const _Field({
+  _Field({
     required this.ctrl,
     required this.label,
     required this.icon,
@@ -4656,7 +4656,7 @@ class _Field extends StatelessWidget {
 /// Read-only "entry date" field that opens a real date picker instead of asking
 /// an (older) landlord to type a date by hand. Stores a clean dd/MM/yyyy string.
 class _EntryDatePicker extends StatelessWidget {
-  const _EntryDatePicker({required this.ctrl});
+  _EntryDatePicker({required this.ctrl});
   final TextEditingController ctrl;
 
   Future<void> _pick(BuildContext context) async {
@@ -4730,7 +4730,7 @@ class _EntryDatePicker extends StatelessWidget {
 /// typed freely (precise amounts the slider's coarse steps can't reach). The
 /// typed value is clamped to [min, max].
 class _SliderWithEntry extends StatefulWidget {
-  const _SliderWithEntry({
+  _SliderWithEntry({
     required this.label,
     required this.value,
     required this.min,
@@ -4893,7 +4893,7 @@ class _SliderWithEntryState extends State<_SliderWithEntry> {
 /// templates + an optional accent colour, stored per-listing. Each listing can
 /// look different without touching user-level broker branding.
 class _DesignTemplatePicker extends StatelessWidget {
-  const _DesignTemplatePicker({
+  _DesignTemplatePicker({
     required this.selectedTemplate,
     required this.accent,
     required this.onTemplateChanged,
@@ -5028,7 +5028,7 @@ class _DesignTemplatePicker extends StatelessWidget {
 }
 
 class _TemplateChip extends StatelessWidget {
-  const _TemplateChip({
+  _TemplateChip({
     required this.label,
     required this.colors,
     required this.selected,
@@ -5139,7 +5139,7 @@ class _TemplateChip extends StatelessWidget {
 }
 
 class _AccentDot extends StatelessWidget {
-  const _AccentDot({
+  _AccentDot({
     required this.value,
     required this.selected,
     required this.onTap,
@@ -5203,7 +5203,7 @@ class _AccentDot extends StatelessWidget {
 }
 
 class _DropdownRow extends StatelessWidget {
-  const _DropdownRow({
+  _DropdownRow({
     required this.label,
     required this.value,
     required this.options,
@@ -5781,7 +5781,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const _ScaniversePickerSheet(),
+      builder: (_) => _ScaniversePickerSheet(),
     );
     if (scan == null || !mounted) return;
     setState(() {
@@ -6381,7 +6381,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 // ─── Scaniverse Scan Picker ───────────────────────────────────────────────────
 
 class _ScaniversePickerSheet extends StatefulWidget {
-  const _ScaniversePickerSheet();
+  _ScaniversePickerSheet();
 
   @override
   State<_ScaniversePickerSheet> createState() => _ScaniversePickerSheetState();
@@ -6569,7 +6569,7 @@ class _ScaniversePickerSheetState extends State<_ScaniversePickerSheet> {
 }
 
 class _ScanTile extends StatelessWidget {
-  const _ScanTile({required this.scan, required this.onTap});
+  _ScanTile({required this.scan, required this.onTap});
   final ScaniverseScan scan;
   final VoidCallback onTap;
 
@@ -6842,7 +6842,7 @@ Future<bool?> showScanCaptureGuide(BuildContext context) {
 
 // ─── DIY 360° panorama-tour entry (Step Photos) ──────────────────────────────
 class _Panorama360Tile extends StatelessWidget {
-  const _Panorama360Tile({required this.count, required this.onTap});
+  _Panorama360Tile({required this.count, required this.onTap});
   final int count;
   final VoidCallback onTap;
 

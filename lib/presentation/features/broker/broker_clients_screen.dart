@@ -178,7 +178,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _clients.isEmpty
-                ? const _EmptyState()
+                ? _EmptyState()
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView(
@@ -210,7 +210,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
 /// A tappable strip that opens the full hot-matches screen, showing the LIVE
 /// count of strong listing↔client pairings across the broker's clients.
 class _HotMatchesStrip extends StatelessWidget {
-  const _HotMatchesStrip({required this.clients, required this.properties});
+  _HotMatchesStrip({required this.clients, required this.properties});
 
   final List<BrokerClient> clients;
   final List<RentalProperty> properties;
@@ -298,7 +298,7 @@ class _HotMatchesStrip extends StatelessWidget {
 }
 
 class _ClientCard extends StatelessWidget {
-  const _ClientCard({
+  _ClientCard({
     required this.client,
     required this.matchCount,
     required this.onTap,
@@ -480,7 +480,7 @@ class _ClientMatchesScreen extends StatelessWidget {
 }
 
 class _MatchRow extends StatelessWidget {
-  const _MatchRow({required this.match});
+  _MatchRow({required this.match});
 
   final BrokerMatch match;
 
@@ -573,7 +573,7 @@ class _MatchRow extends StatelessWidget {
 
 /// The add / edit client form, as an RTL bottom sheet. Big inputs, simple.
 class _ClientFormSheet extends StatefulWidget {
-  const _ClientFormSheet({this.client});
+  _ClientFormSheet({this.client});
 
   final BrokerClient? client;
 
@@ -773,7 +773,7 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
 }
 
 class _SegmentedType extends StatelessWidget {
-  const _SegmentedType({required this.value, required this.onChanged});
+  _SegmentedType({required this.value, required this.onChanged});
 
   final String value;
   final ValueChanged<String> onChanged;
@@ -819,7 +819,7 @@ class _SegmentedType extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  _EmptyState();
 
   @override
   Widget build(BuildContext context) {
@@ -864,7 +864,7 @@ String _money(int v) {
 
 /// Searchable multi-select of phone contacts → returns the chosen ones.
 class _ContactPickerSheet extends StatefulWidget {
-  const _ContactPickerSheet({required this.contacts});
+  _ContactPickerSheet({required this.contacts});
   final List<Contact> contacts;
   @override
   State<_ContactPickerSheet> createState() => _ContactPickerSheetState();

@@ -2185,7 +2185,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
                 itemCount: _messages.length + (_busy ? 1 : 0),
                 itemBuilder: (_, i) {
-                  if (i >= _messages.length) return const _Typing();
+                  if (i >= _messages.length) return _Typing();
                   final isLast = i == _messages.length - 1;
                   final bubble = _bubble(_messages[i]);
                   return isLast ? _FadeSlideIn(child: bubble) : bubble;
@@ -2528,7 +2528,7 @@ class _AnimatedChipState extends State<_AnimatedChip>
 }
 
 class _AssistantPropertyCard extends StatelessWidget {
-  const _AssistantPropertyCard(
+  _AssistantPropertyCard(
       {required this.scored, required this.onTap, this.nearbyProfile});
   final ScoredProperty scored;
   final VoidCallback onTap;
@@ -2812,7 +2812,7 @@ class _FadeSlideIn extends StatelessWidget {
 }
 
 class _Typing extends StatefulWidget {
-  const _Typing();
+  _Typing();
   @override
   State<_Typing> createState() => _TypingState();
 }
