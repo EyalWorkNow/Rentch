@@ -1,0 +1,71 @@
+name: backfill-embeddings
+
+# Idempotent DAILY backfill of listing embeddings (gemini-embedding-001). Skips
+# rows already embedded and embeds the rest up to the Gemini free-tier DAILY
+# quota (~hundreds/day), so a partially-embedded catalogue finishes over a few
+# days on its own. Reuses the train-ranker OIDC role and pulls GEMINI_API_KEY
+# from the Lambda env at runtime — NO extra GitHub secret needed.
+#
+# Safe-unconfigured: with AWS_ROLE_ARN unset it skips cleanly (green no-op).
+# Requires the role to allow dynamodb:Scan + dynamodb:UpdateItem on
+# rentch-properties and lambda:GetFunctionConfiguration on the router.
+
+on:
+  schedule:
+    - cron: "17 5 * * *"   # daily 05:17 UTC (offset from train-ranker's 04:17)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check config
+        id: cfg
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          if [ -n "$AWS_ROLE_ARN" ]; then
+            echo "armed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "AWS_ROLE_ARN not set — dormant (no-op)."
+            echo "armed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.cfg.outputs.armed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install aws-sdk deps for the script
+        if: steps.cfg.outputs.armed == 'true'
+        run: cd scripts && npm install --no-save @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+
+      - name: Backfill (idempotent; embeds up to the daily Gemini quota)
+        if: steps.cfg.outputs.armed == 'true'
+        env:
+          RANK_FN: ${{ secrets.RANK_FN }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          FN="${RANK_FN:-rentch-router}"
+          KEY="$(aws lambda get-function-configuration --function-name "$FN" \
+            --query 'Environment.Variables.GEMINI_API_KEY' --output text)"
+          if [ -z "$KEY" ] || [ "$KEY" = "None" ]; then
+            echo "GEMINI_API_KEY not set on the Lambda — nothing to do."
+            exit 0
+          fi
+          GEMINI_API_KEY="$KEY" \
+          TABLE_PREFIX=rentch- \
+          AWS_REGION="${AWS_REGION:-us-east-1}" \
+            node scripts/backfill-embeddings.mjs --rate-ms 250
+          echo "Backfill pass done. If listings remain unembedded, the next daily run finishes them."
