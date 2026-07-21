@@ -1307,6 +1307,12 @@ class TenantProfile {
     this.hasGuarantor,
     this.leaseMonths,
     this.incomeProofReady,
+    this.religiousLifestyle,
+    this.shabbatObservant,
+    this.keepsKosher,
+    this.petType,
+    this.hostsGuests,
+    this.playsInstrument,
   });
 
   final String id;
@@ -1392,6 +1398,35 @@ class TenantProfile {
   /// Whether the tenant has income proof ready. Optional — null = unspecified.
   final bool? incomeProofReady;
 
+  // ── Lifestyle / religious compatibility (Israeli-market deal-breakers) ──────
+  // Real reasons landlords & roommates pass on an otherwise-fine tenant. All
+  // optional; null = "didn't say" and is NEVER used to exclude (see the matcher).
+
+  /// Self-described lifestyle — one of: 'chiloni' (חילוני/secular), 'masorti'
+  /// (מסורתי/traditional), 'dati' (דתי/religious), 'charedi' (חרדי). Drives
+  /// lifestyle-fit with the listing's household/neighbourhood character.
+  final String? religiousLifestyle;
+
+  /// Shomer Shabbat — keeps the Sabbath (no cooking/electricity Fri eve→Sat
+  /// night). Matters for shared flats, building character, Shabbat elevator.
+  final bool? shabbatObservant;
+
+  /// Keeps a kosher kitchen (שומר כשרות). The #1 shared-apartment trust issue.
+  final bool? keepsKosher;
+
+  /// Pet detail — one of: 'none', 'cat', 'dog_small', 'dog_large', 'other'.
+  /// Complements [hasPets] with the signal landlords actually fear: a large/
+  /// barking dog (noise + neighbour complaints + wear). null = unspecified.
+  final String? petType;
+
+  /// Hosts guests / gatherings often (אירוח תכוף). Noise + wear signal that
+  /// sinks deals in quiet buildings. null = unspecified.
+  final bool? hostsGuests;
+
+  /// Plays a musical instrument at home (כלי נגינה) — a common noise concern.
+  /// null = unspecified.
+  final bool? playsInstrument;
+
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
   TenantProfile copyWith({
@@ -1421,6 +1456,12 @@ class TenantProfile {
     bool? hasGuarantor,
     int? leaseMonths,
     bool? incomeProofReady,
+    String? religiousLifestyle,
+    bool? shabbatObservant,
+    bool? keepsKosher,
+    String? petType,
+    bool? hostsGuests,
+    bool? playsInstrument,
   }) {
     return TenantProfile(
       id: id ?? this.id,
@@ -1449,6 +1490,12 @@ class TenantProfile {
       hasGuarantor: hasGuarantor ?? this.hasGuarantor,
       leaseMonths: leaseMonths ?? this.leaseMonths,
       incomeProofReady: incomeProofReady ?? this.incomeProofReady,
+      religiousLifestyle: religiousLifestyle ?? this.religiousLifestyle,
+      shabbatObservant: shabbatObservant ?? this.shabbatObservant,
+      keepsKosher: keepsKosher ?? this.keepsKosher,
+      petType: petType ?? this.petType,
+      hostsGuests: hostsGuests ?? this.hostsGuests,
+      playsInstrument: playsInstrument ?? this.playsInstrument,
     );
   }
 
@@ -1491,6 +1538,17 @@ class TenantProfile {
       hasGuarantor: _optionalBool(json['hasGuarantor']),
       leaseMonths: _optionalInt(json['leaseMonths']),
       incomeProofReady: _optionalBool(json['incomeProofReady']),
+      religiousLifestyle:
+          (json['religiousLifestyle'] as String?)?.trim().isEmpty ?? true
+              ? null
+              : (json['religiousLifestyle'] as String).trim(),
+      shabbatObservant: _optionalBool(json['shabbatObservant']),
+      keepsKosher: _optionalBool(json['keepsKosher']),
+      petType: (json['petType'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (json['petType'] as String).trim(),
+      hostsGuests: _optionalBool(json['hostsGuests']),
+      playsInstrument: _optionalBool(json['playsInstrument']),
     );
   }
 
@@ -1524,6 +1582,12 @@ class TenantProfile {
       if (hasGuarantor != null) 'hasGuarantor': hasGuarantor,
       if (leaseMonths != null) 'leaseMonths': leaseMonths,
       if (incomeProofReady != null) 'incomeProofReady': incomeProofReady,
+      if (religiousLifestyle != null) 'religiousLifestyle': religiousLifestyle,
+      if (shabbatObservant != null) 'shabbatObservant': shabbatObservant,
+      if (keepsKosher != null) 'keepsKosher': keepsKosher,
+      if (petType != null) 'petType': petType,
+      if (hostsGuests != null) 'hostsGuests': hostsGuests,
+      if (playsInstrument != null) 'playsInstrument': playsInstrument,
     };
   }
 }

@@ -124,6 +124,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
       hasGuarantor: liker?.hasGuarantor,
       leaseMonths: liker?.leaseMonths,
       incomeProofReady: liker?.incomeProofReady,
+      religiousLifestyle: liker?.religiousLifestyle,
+      shabbatObservant: liker?.shabbatObservant,
+      keepsKosher: liker?.keepsKosher,
+      petType: liker?.petType,
+      hostsGuests: liker?.hostsGuests,
+      playsInstrument: liker?.playsInstrument,
     );
   }
 

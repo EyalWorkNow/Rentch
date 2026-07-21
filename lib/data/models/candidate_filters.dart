@@ -46,6 +46,12 @@ class CandidateFilters {
     this.hasGuarantor,
     this.minLeaseMonths,
     this.incomeProofReady,
+    this.religiousLifestyle = const <String>{},
+    this.shabbatObservant,
+    this.keepsKosher,
+    this.petTypes = const <String>{},
+    this.hostsGuests,
+    this.playsInstrument,
   });
 
   /// Candidate's declared budget floor / ceiling (₪ per month). null = inactive.
@@ -112,6 +118,32 @@ class CandidateFilters {
   /// When true, keep only candidates whose income proof is ready. null =
   /// inactive. Unknown passes.
   final bool? incomeProofReady;
+
+  // ── Lifestyle / religious deal-breakers (Israeli market) ────────────────────
+  /// Acceptable tenant lifestyles: chiloni / masorti / dati / charedi. Empty =
+  /// inactive. A candidate whose lifestyle isn't in the set is excluded (unknown
+  /// passes). Set-membership, like [household]/[lifeStage].
+  final Set<String> religiousLifestyle;
+
+  /// Require Shomer-Shabbat (true) or specifically NOT (false). null = inactive.
+  final bool? shabbatObservant;
+
+  /// Require a kosher-keeping tenant (true) or specifically not (false). null =
+  /// inactive. The key shared-apartment compatibility signal.
+  final bool? keepsKosher;
+
+  /// Acceptable pet types: none / cat / dog_small / dog_large / other. Empty =
+  /// inactive. Lets a landlord allow a cat but exclude a large dog, instead of a
+  /// blunt yes/no. Unknown pet detail passes.
+  final Set<String> petTypes;
+
+  /// Constrain frequent hosting/gatherings (false ⇒ only quiet tenants). null =
+  /// inactive. Unknown passes.
+  final bool? hostsGuests;
+
+  /// Constrain instrument-playing (false ⇒ exclude players). null = inactive.
+  /// Unknown passes.
+  final bool? playsInstrument;
 
   /// A like at or under this age (days) counts as "recent" for [recentOnly].
   static const int recentLikeMaxDays = 7;
@@ -187,6 +219,12 @@ class CandidateFilters {
     if (hasGuarantor != null) n++;
     if (minLeaseMonths != null) n++;
     if (incomeProofReady != null) n++;
+    if (religiousLifestyle.isNotEmpty) n++;
+    if (shabbatObservant != null) n++;
+    if (keepsKosher != null) n++;
+    if (petTypes.isNotEmpty) n++;
+    if (hostsGuests != null) n++;
+    if (playsInstrument != null) n++;
     return n;
   }
 
@@ -288,6 +326,35 @@ class CandidateFilters {
       return false;
     }
 
+    if (religiousLifestyle.isNotEmpty &&
+        c.religiousLifestyle != null &&
+        !religiousLifestyle.contains(c.religiousLifestyle)) {
+      return false;
+    }
+    if (shabbatObservant != null &&
+        c.shabbatObservant != null &&
+        c.shabbatObservant != shabbatObservant) {
+      return false;
+    }
+    if (keepsKosher != null &&
+        c.keepsKosher != null &&
+        c.keepsKosher != keepsKosher) {
+      return false;
+    }
+    if (petTypes.isNotEmpty && c.petType != null && !petTypes.contains(c.petType)) {
+      return false;
+    }
+    if (hostsGuests != null &&
+        c.hostsGuests != null &&
+        c.hostsGuests != hostsGuests) {
+      return false;
+    }
+    if (playsInstrument != null &&
+        c.playsInstrument != null &&
+        c.playsInstrument != playsInstrument) {
+      return false;
+    }
+
     return true;
   }
 
@@ -317,6 +384,12 @@ class CandidateFilters {
     bool? hasGuarantor,
     int? minLeaseMonths,
     bool? incomeProofReady,
+    Set<String>? religiousLifestyle,
+    bool? shabbatObservant,
+    bool? keepsKosher,
+    Set<String>? petTypes,
+    bool? hostsGuests,
+    bool? playsInstrument,
     // Explicit clears — copyWith can't null-out a field via the params above.
     bool clearBudgetMin = false,
     bool clearBudgetMax = false,
@@ -338,6 +411,10 @@ class CandidateFilters {
     bool clearHasGuarantor = false,
     bool clearMinLeaseMonths = false,
     bool clearIncomeProofReady = false,
+    bool clearShabbatObservant = false,
+    bool clearKeepsKosher = false,
+    bool clearHostsGuests = false,
+    bool clearPlaysInstrument = false,
   }) {
     return CandidateFilters(
       budgetMin: clearBudgetMin ? null : (budgetMin ?? this.budgetMin),
@@ -374,6 +451,17 @@ class CandidateFilters {
       incomeProofReady: clearIncomeProofReady
           ? null
           : (incomeProofReady ?? this.incomeProofReady),
+      religiousLifestyle: religiousLifestyle ?? this.religiousLifestyle,
+      shabbatObservant: clearShabbatObservant
+          ? null
+          : (shabbatObservant ?? this.shabbatObservant),
+      keepsKosher: clearKeepsKosher ? null : (keepsKosher ?? this.keepsKosher),
+      petTypes: petTypes ?? this.petTypes,
+      hostsGuests:
+          clearHostsGuests ? null : (hostsGuests ?? this.hostsGuests),
+      playsInstrument: clearPlaysInstrument
+          ? null
+          : (playsInstrument ?? this.playsInstrument),
     );
   }
 
@@ -392,6 +480,29 @@ class CandidateFilters {
     // Unknown attribute (budget) never excludes.
     assert(const CandidateFilters(budgetMin: 5000).matches(attrs));
     assert(const CandidateFilters(minFitScore: 70).activeCount == 1);
+
+    // Lifestyle / religious deal-breakers.
+    const shabbatTenant = CandidateAttributes(
+      fitScore: 80,
+      shabbatObservant: true,
+      keepsKosher: true,
+      religiousLifestyle: 'dati',
+      petType: 'dog_large',
+    );
+    // A landlord requiring Shomer-Shabbat keeps an observant tenant, drops a non.
+    assert(const CandidateFilters(shabbatObservant: true).matches(shabbatTenant));
+    assert(!const CandidateFilters(shabbatObservant: false)
+        .matches(shabbatTenant));
+    // Lifestyle set-membership.
+    assert(const CandidateFilters(religiousLifestyle: {'dati', 'masorti'})
+        .matches(shabbatTenant));
+    assert(!const CandidateFilters(religiousLifestyle: {'chiloni'})
+        .matches(shabbatTenant));
+    // Pet-type: allow cats + small dogs excludes a large dog.
+    assert(!const CandidateFilters(petTypes: {'none', 'cat', 'dog_small'})
+        .matches(shabbatTenant));
+    // Unknown lifestyle never excludes.
+    assert(const CandidateFilters(shabbatObservant: true).matches(attrs));
   }
 }
 
@@ -422,6 +533,12 @@ class CandidateAttributes {
     this.hasGuarantor,
     this.leaseMonths,
     this.incomeProofReady,
+    this.religiousLifestyle,
+    this.shabbatObservant,
+    this.keepsKosher,
+    this.petType,
+    this.hostsGuests,
+    this.playsInstrument,
   });
 
   /// Honest fit score in [0, 100] (always known — computed from real signals).
@@ -476,4 +593,23 @@ class CandidateAttributes {
 
   /// Whether the candidate's income proof is ready, if known.
   final bool? incomeProofReady;
+
+  // ── Lifestyle / religious signals (Israeli-market deal-breakers) ────────────
+  /// Candidate lifestyle: chiloni / masorti / dati / charedi, if known.
+  final String? religiousLifestyle;
+
+  /// Whether the candidate keeps Shabbat, if known.
+  final bool? shabbatObservant;
+
+  /// Whether the candidate keeps kosher, if known.
+  final bool? keepsKosher;
+
+  /// Candidate pet detail: none / cat / dog_small / dog_large / other, if known.
+  final String? petType;
+
+  /// Whether the candidate hosts frequently, if known.
+  final bool? hostsGuests;
+
+  /// Whether the candidate plays an instrument at home, if known.
+  final bool? playsInstrument;
 }

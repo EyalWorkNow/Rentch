@@ -70,6 +70,8 @@ class ReauthRequiredException implements Exception {
 }
 
 class DatingProvider extends ChangeNotifier {
+  void rebuildTheme() => notifyListeners();
+
   DatingProvider({
     RentalDataService? rentalDataService,
     LocalStorageService? localStorageService,
@@ -3460,6 +3462,12 @@ class DatingProvider extends ChangeNotifier {
           hasGuarantor: tp?.hasGuarantor,
           leaseMonths: tp?.leaseMonths,
           incomeProofReady: tp?.incomeProofReady,
+          religiousLifestyle: tp?.religiousLifestyle,
+          shabbatObservant: tp?.shabbatObservant,
+          keepsKosher: tp?.keepsKosher,
+          petType: tp?.petType,
+          hostsGuests: tp?.hostsGuests,
+          playsInstrument: tp?.playsInstrument,
           workLat: tp?.workLat,
           workLon: tp?.workLon,
           // No explicit tenant "verified" flag exists; derive it from the app's

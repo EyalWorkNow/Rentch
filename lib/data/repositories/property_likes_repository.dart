@@ -33,6 +33,12 @@ class PropertyLike {
     this.incomeProofReady,
     this.workLat,
     this.workLon,
+    this.religiousLifestyle,
+    this.shabbatObservant,
+    this.keepsKosher,
+    this.petType,
+    this.hostsGuests,
+    this.playsInstrument,
   });
 
   final String propertyId;
@@ -79,6 +85,14 @@ class PropertyLike {
   /// (מרחק ממקום העבודה) can measure distance to each liked property.
   final double? workLat;
   final double? workLon;
+
+  // Lifestyle / religious deal-breaker snapshot (Israeli market).
+  final String? religiousLifestyle;
+  final bool? shabbatObservant;
+  final bool? keepsKosher;
+  final String? petType;
+  final bool? hostsGuests;
+  final bool? playsInstrument;
 
   bool get hasIntro =>
       introMessage.isNotEmpty ||
@@ -147,6 +161,12 @@ class PropertyLike {
       incomeProofReady: _bool(row['incomeProofReady']),
       workLat: _double(row['workLat']),
       workLon: _double(row['workLon']),
+      religiousLifestyle: _str(row['religiousLifestyle']),
+      shabbatObservant: _bool(row['shabbatObservant']),
+      keepsKosher: _bool(row['keepsKosher']),
+      petType: _str(row['petType']),
+      hostsGuests: _bool(row['hostsGuests']),
+      playsInstrument: _bool(row['playsInstrument']),
     );
   }
 }
@@ -209,6 +229,12 @@ class PropertyLikesRepository {
     bool? incomeProofReady,
     double? workLat,
     double? workLon,
+    String? religiousLifestyle,
+    bool? shabbatObservant,
+    bool? keepsKosher,
+    String? petType,
+    bool? hostsGuests,
+    bool? playsInstrument,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
     try {
@@ -243,6 +269,12 @@ class PropertyLikesRepository {
           incomeProofReady: incomeProofReady,
           workLat: workLat,
           workLon: workLon,
+          religiousLifestyle: religiousLifestyle,
+          shabbatObservant: shabbatObservant,
+          keepsKosher: keepsKosher,
+          petType: petType,
+          hostsGuests: hostsGuests,
+          playsInstrument: playsInstrument,
         ),
       );
     } catch (e) {
@@ -284,6 +316,12 @@ class PropertyLikesRepository {
     bool? incomeProofReady,
     double? workLat,
     double? workLon,
+    String? religiousLifestyle,
+    bool? shabbatObservant,
+    bool? keepsKosher,
+    String? petType,
+    bool? hostsGuests,
+    bool? playsInstrument,
   }) {
     final note = introMessage.trim();
     final clampedNote = note.length > introMessageMaxLength
@@ -325,6 +363,13 @@ class PropertyLikesRepository {
       if (incomeProofReady != null) 'incomeProofReady': incomeProofReady,
       if (workLat != null) 'workLat': workLat,
       if (workLon != null) 'workLon': workLon,
+      if (religiousLifestyle != null && religiousLifestyle.trim().isNotEmpty)
+        'religiousLifestyle': religiousLifestyle.trim(),
+      if (shabbatObservant != null) 'shabbatObservant': shabbatObservant,
+      if (keepsKosher != null) 'keepsKosher': keepsKosher,
+      if (petType != null && petType.trim().isNotEmpty) 'petType': petType.trim(),
+      if (hostsGuests != null) 'hostsGuests': hostsGuests,
+      if (playsInstrument != null) 'playsInstrument': playsInstrument,
       'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
     };
   }
