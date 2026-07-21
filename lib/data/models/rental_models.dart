@@ -1592,6 +1592,25 @@ class TenantProfile {
   }
 }
 
+/// Religious-lifestyle keys ↔ Hebrew labels — a LOCKED contract shared by the
+/// tenant profile capture and the landlord candidate filter (Israeli market).
+const Map<String, String> kLifestyleLabels = <String, String>{
+  'chiloni': 'חילוני/ת',
+  'masorti': 'מסורתי/ת',
+  'dati': 'דתי/ה',
+  'charedi': 'חרדי/ת',
+};
+
+/// Pet-type keys ↔ Hebrew labels (shared tenant/landlord contract). Refines the
+/// blunt has-pet flag with the signal landlords fear (a big/barking dog).
+const Map<String, String> kPetTypeLabels = <String, String>{
+  'none': 'אין',
+  'cat': 'חתול',
+  'dog_small': 'כלב קטן',
+  'dog_large': 'כלב גדול',
+  'other': 'אחר',
+};
+
 /// Canonical move-in buckets — a LOCKED contract shared by the tenant settings
 /// UI, the landlord-side UI, and the backend matching gate (`moveInBucket`).
 /// `$1` is the stored token; `$2` is the Hebrew label shown to the user. Order

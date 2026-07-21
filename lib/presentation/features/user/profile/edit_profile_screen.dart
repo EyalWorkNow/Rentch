@@ -124,6 +124,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool? _hasGuarantor;
   int? _leaseMonths;
   bool? _incomeProofReady;
+  // Lifestyle / religious deal-breakers (Israeli market).
+  String? _religiousLifestyle;
+  bool? _shabbatObservant;
+  bool? _keepsKosher;
+  String? _petType;
+  bool? _hostsGuests;
+  bool? _playsInstrument;
   late List<String> _details;
   late List<String> _dealBreakers;
   late List<_PhotoEntry> _photos;
@@ -177,6 +184,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _hasGuarantor = p.hasGuarantor;
     _leaseMonths = p.leaseMonths;
     _incomeProofReady = p.incomeProofReady;
+    _religiousLifestyle = kLifestyleLabels.containsKey(p.religiousLifestyle)
+        ? p.religiousLifestyle
+        : null;
+    _shabbatObservant = p.shabbatObservant;
+    _keepsKosher = p.keepsKosher;
+    _petType = kPetTypeLabels.containsKey(p.petType) ? p.petType : null;
+    _hostsGuests = p.hostsGuests;
+    _playsInstrument = p.playsInstrument;
     _details = List<String>.from(p.importantDetails);
     _dealBreakers = List<String>.from(p.dealBreakers);
     _photos = p.photoUrls.map(_PhotoEntry.remote).toList();
@@ -413,6 +428,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       hasGuarantor: _hasGuarantor,
       leaseMonths: _leaseMonths,
       incomeProofReady: _incomeProofReady,
+      religiousLifestyle: _religiousLifestyle,
+      shabbatObservant: _shabbatObservant,
+      keepsKosher: _keepsKosher,
+      petType: _petType,
+      hostsGuests: _hostsGuests,
+      playsInstrument: _playsInstrument,
     );
 
     if (!mounted) return;
@@ -1080,6 +1101,104 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
                               setState(() => _incomeProofReady = v);
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Lifestyle / religious fit (Israeli-market
+                          // deal-breakers) — help landlords & roommates match.
+                          const Text('אורח חיים',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.navy)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final e in kLifestyleLabels.entries)
+                                _ChoiceChipTag(
+                                  label: e.value,
+                                  selected: _religiousLifestyle == e.key,
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _religiousLifestyle =
+                                        _religiousLifestyle == e.key
+                                            ? null
+                                            : e.key);
+                                  },
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          _YesNoRow(
+                            label: 'שומר/ת שבת?',
+                            value: _shabbatObservant,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _shabbatObservant = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          _YesNoRow(
+                            label: 'שומר/ת כשרות?',
+                            value: _keepsKosher,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _keepsKosher = v);
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Pet type — refines "יש חיה?" with the signal
+                          // landlords fear (a big/barking dog vs a cat).
+                          const Text('חיית מחמד',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.navy)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final e in kPetTypeLabels.entries)
+                                _ChoiceChipTag(
+                                  label: e.value,
+                                  selected: _petType == e.key,
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() {
+                                      _petType =
+                                          _petType == e.key ? null : e.key;
+                                      // Keep the yes/no pet flag consistent.
+                                      _hasPets = _petType == null
+                                          ? _hasPets
+                                          : _petType != 'none';
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          _YesNoRow(
+                            label: 'מארח/ת אורחים הרבה?',
+                            value: _hostsGuests,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _hostsGuests = v);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          _YesNoRow(
+                            label: 'מנגן/ת בכלי נגינה בבית?',
+                            value: _playsInstrument,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _playsInstrument = v);
                             },
                           ),
                           const SizedBox(height: 20),
@@ -2103,6 +2222,49 @@ class _AgeStepper extends StatelessWidget {
 }
 
 // ─── Detail tag chip ──────────────────────────────────────────────────────────
+
+/// A single-select pill (tap to select, tap again to clear). Non-const so it
+/// re-tints with the account accent.
+class _ChoiceChipTag extends StatelessWidget {
+  _ChoiceChipTag({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary
+              : AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary
+                : AppColors.primary.withValues(alpha: 0.30),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: selected ? Colors.white : AppColors.navy,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _DetailTag extends StatelessWidget {
   _DetailTag({

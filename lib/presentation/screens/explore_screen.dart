@@ -2094,6 +2094,104 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
                       ),
                       const SizedBox(height: 20),
 
+                      // ── Religious lifestyle fit (חילוני…חרדי) ──────────────
+                      _sectionTitle('אורח חיים', IconsaxPlusLinear.candle),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final e in _kLifestyleLabels.entries)
+                            _QuickChip(
+                              label: e.value,
+                              selected:
+                                  _draft.religiousLifestyle.contains(e.key),
+                              onTap: () =>
+                                  _toggleSet('religiousLifestyle', e.key),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── Religious deal-breakers (Shabbat / kosher) ─────────
+                      _sectionTitle('שמירת מסורת', IconsaxPlusLinear.moon),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _QuickChip(
+                            label: 'שומר/ת שבת',
+                            icon: IconsaxPlusLinear.moon,
+                            selected: _draft.shabbatObservant == true,
+                            onTap: () => setState(() {
+                              _draft = _draft.shabbatObservant == true
+                                  ? _draft.copyWith(clearShabbatObservant: true)
+                                  : _draft.copyWith(shabbatObservant: true);
+                            }),
+                          ),
+                          _QuickChip(
+                            label: 'שומר/ת כשרות',
+                            icon: IconsaxPlusLinear.reserve,
+                            selected: _draft.keepsKosher == true,
+                            onTap: () => setState(() {
+                              _draft = _draft.keepsKosher == true
+                                  ? _draft.copyWith(clearKeepsKosher: true)
+                                  : _draft.copyWith(keepsKosher: true);
+                            }),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── Pet policy (allow-list — permit a cat, exclude a big dog)
+                      _sectionTitle('חיות מחמד', IconsaxPlusLinear.pet),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final e in _kPetTypeLabels.entries)
+                            _QuickChip(
+                              label: e.value,
+                              selected: _draft.petTypes.contains(e.key),
+                              onTap: () => _toggleSet('petTypes', e.key),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── Noise deal-breakers (hosting / instrument) ─────────
+                      _sectionTitle('רעש ושקט', IconsaxPlusLinear.volume_low),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _QuickChip(
+                            label: 'לא מארח/ת הרבה',
+                            icon: IconsaxPlusLinear.profile_2user,
+                            selected: _draft.hostsGuests == false,
+                            onTap: () => setState(() {
+                              _draft = _draft.hostsGuests == false
+                                  ? _draft.copyWith(clearHostsGuests: true)
+                                  : _draft.copyWith(hostsGuests: false);
+                            }),
+                          ),
+                          _QuickChip(
+                            label: 'ללא כלי נגינה',
+                            icon: IconsaxPlusLinear.music,
+                            selected: _draft.playsInstrument == false,
+                            onTap: () => setState(() {
+                              _draft = _draft.playsInstrument == false
+                                  ? _draft.copyWith(clearPlaysInstrument: true)
+                                  : _draft.copyWith(playsInstrument: false);
+                            }),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
                       // ── Affordability: income-to-rent ratio ────────────────
                       _sectionTitle('יחס הכנסה/שכ"ד',
                           IconsaxPlusLinear.chart_success),
@@ -2326,8 +2424,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
   /// Toggles membership of [key] in the [field] set ('occupation' | 'household')
   /// and stores the updated set on the draft.
   void _toggleSet(String field, String key) {
-    final current =
-        field == 'occupation' ? _draft.occupation : _draft.household;
+    final current = switch (field) {
+      'occupation' => _draft.occupation,
+      'religiousLifestyle' => _draft.religiousLifestyle,
+      'petTypes' => _draft.petTypes,
+      _ => _draft.household,
+    };
     final next = Set<String>.from(current);
     if (next.contains(key)) {
       next.remove(key);
@@ -2335,9 +2437,12 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
       next.add(key);
     }
     setState(() {
-      _draft = field == 'occupation'
-          ? _draft.copyWith(occupation: next)
-          : _draft.copyWith(household: next);
+      _draft = switch (field) {
+        'occupation' => _draft.copyWith(occupation: next),
+        'religiousLifestyle' => _draft.copyWith(religiousLifestyle: next),
+        'petTypes' => _draft.copyWith(petTypes: next),
+        _ => _draft.copyWith(household: next),
+      };
     });
   }
 
@@ -2395,6 +2500,11 @@ const Map<String, String> _kHouseholdLabels = <String, String>{
   'couple': 'זוג',
   'student': 'סטודנט/ית',
 };
+
+// kLifestyleLabels / kPetTypeLabels live in rental_models.dart (shared with the
+// tenant profile capture). Local aliases keep the sheet code terse.
+const Map<String, String> _kLifestyleLabels = kLifestyleLabels;
+const Map<String, String> _kPetTypeLabels = kPetTypeLabels;
 
 String _occupationLabel(String key) => _kOccupationLabels[key] ?? key;
 
