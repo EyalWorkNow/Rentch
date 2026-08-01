@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Hosted-payment-page WebView. Loads the checkout [url] returned by
@@ -35,7 +38,14 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
 
   late final WebViewController _controller;
   bool _loading = true;
+  bool _error = false; // page failed to load / timed out
   bool _handled = false; // guard against a double pop from url-change + request
+  Timer? _watchdog; // fails the load gracefully if the page never finishes
+
+  // If the hosted page hasn't finished loading within this window, show an error
+  // instead of spinning forever. Only guards the INITIAL load — once the page is
+  // up, the user can take as long as they need to fill the form.
+  static const Duration _loadTimeout = Duration(seconds: 30);
 
   @override
   void initState() {
@@ -49,6 +59,14 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
             _finish(request.url);
             return NavigationDecision.prevent;
           }
+          // Non-web schemes (bit://, tel:, mailto:, intent://, itms-apps://…)
+          // can't load in a WebView — hand them to the OS (e.g. Bit opens the
+          // Bit app). Prevent the WebView from trying and erroring.
+          final scheme = Uri.tryParse(request.url)?.scheme.toLowerCase() ?? '';
+          if (scheme.isNotEmpty && scheme != 'http' && scheme != 'https') {
+            _launchExternal(request.url);
+            return NavigationDecision.prevent;
+          }
           return NavigationDecision.navigate;
         },
         onUrlChange: (change) {
@@ -56,13 +74,72 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
           if (url != null && _isReturnUrl(url)) _finish(url);
         },
         onPageStarted: (_) {
-          if (mounted) setState(() => _loading = true);
+          if (!mounted) return;
+          setState(() {
+            _loading = true;
+            _error = false;
+          });
+          _armWatchdog();
         },
         onPageFinished: (_) {
+          _watchdog?.cancel();
           if (mounted) setState(() => _loading = false);
+        },
+        onWebResourceError: (err) {
+          // Ignore sub-resource failures (a stray beacon/asset) — only a
+          // main-frame failure means the checkout page itself didn't load.
+          if (err.isForMainFrame == false) return;
+          _failLoad();
+        },
+        onHttpError: (err) {
+          if (err.response?.statusCode != null &&
+              err.response!.statusCode >= 400) {
+            _failLoad();
+          }
         },
       ))
       ..loadRequest(Uri.parse(_safeUrl(widget.url)));
+    _armWatchdog();
+  }
+
+  void _armWatchdog() {
+    _watchdog?.cancel();
+    _watchdog = Timer(_loadTimeout, () {
+      if (mounted && _loading && !_handled) _failLoad();
+    });
+  }
+
+  void _failLoad() {
+    _watchdog?.cancel();
+    if (!mounted || _handled) return;
+    setState(() {
+      _loading = false;
+      _error = true;
+    });
+  }
+
+  void _retry() {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    _controller.loadRequest(Uri.parse(_safeUrl(widget.url)));
+    _armWatchdog();
+  }
+
+  Future<void> _launchExternal(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {/* app not installed / can't handle — leave the page as-is */}
+  }
+
+  @override
+  void dispose() {
+    _watchdog?.cancel();
+    super.dispose();
   }
 
   // Guard against a malformed checkout URL from the backend (Uri.parse throws;
@@ -156,7 +233,10 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
               child: Stack(
                 children: [
                   WebViewWidget(controller: _controller),
-                  if (_loading) _loadingOverlay(),
+                  if (_error)
+                    _errorOverlay()
+                  else if (_loading)
+                    _loadingOverlay(),
                 ],
               ),
             ),
@@ -259,6 +339,79 @@ class _CheckoutWebViewScreenState extends State<CheckoutWebViewScreen> {
               fontSize: 13.5,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Shown when the hosted page fails to load or times out — instead of an
+  // endless spinner, the user gets a clear message with retry / go-back.
+  Widget _errorOverlay() {
+    return Container(
+      color: Colors.white,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(IconsaxPlusBold.wifi_square,
+                color: Color(0xFFEF4444), size: 30),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'דף התשלום לא נטען',
+            style: TextStyle(
+                color: _navy, fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'ייתכן שיש בעיית רשת או שאמצעי התשלום אינו זמין כרגע. אפשר לנסות שוב או לחזור ולבחור אמצעי אחר.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: _slate,
+                fontSize: 13.5,
+                height: 1.5,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton(
+                onPressed: _close,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _navy,
+                  side: const BorderSide(color: AppColors.divider),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 13),
+                ),
+                child: const Text('חזרה',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: _retry,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _indigo,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 13),
+                ),
+                child: const Text('נסו שוב',
+                    style: TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ],
           ),
         ],
       ),

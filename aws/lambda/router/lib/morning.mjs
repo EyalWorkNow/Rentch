@@ -180,9 +180,13 @@ export async function upsertClient({ name, email, taxId }) {
 // ── hosted payment page (first payment; saves a token for recurring) ─────────
 // Returns { url } — the client opens it in a WebView. `plan` is our plan object.
 // Grow "Digital Payments" method groups: 100 card, 110 PayPal, 120 Bit,
-// 150 Google Pay, 160 Apple Pay. Accept a client-chosen group only if it's in
-// the allowed set; otherwise fall back to the terminal default (env).
-const ALLOWED_PAYMENT_GROUPS = new Set([100, 110, 120, 150, 160]);
+// 150 Google Pay, 160 Apple Pay. Only CARD (100) and BIT (120) are enabled —
+// Apple/Google Pay can't complete inside the app's in-app WebView (no PassKit
+// entitlement / native bridge) and aren't enrolled on the terminal, so they'd
+// leave the hosted page hanging. Any other/wallet group falls back to the
+// terminal default (card). Re-add 150/160 here only once wallets are truly
+// supported end-to-end (terminal enrollment + native wallet integration).
+const ALLOWED_PAYMENT_GROUPS = new Set([100, 120]);
 function resolveGroup(group) {
   const g = Number(group);
   return ALLOWED_PAYMENT_GROUPS.has(g) ? g : cfg().paymentGroup;

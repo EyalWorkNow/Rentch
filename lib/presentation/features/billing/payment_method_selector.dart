@@ -25,16 +25,26 @@ class _Method {
   final Color? accent;
 }
 
-/// The methods available on this platform. Card + Bit everywhere; Apple Pay on
-/// iOS only, Google Pay on Android only.
+/// Apple Pay / Google Pay are DISABLED. They cannot complete inside the app's
+/// in-app WebView: web Apple Pay needs the `com.apple.developer.in-app-payments`
+/// merchant entitlement + a native PassKit bridge (neither exists), and the Grow
+/// terminal was never enrolled for Apple/Google Pay — so choosing them left the
+/// hosted page spinning forever. Re-enable ONLY after: (1) the wallet methods are
+/// enrolled/approved on the Grow terminal, AND (2) a native wallet integration
+/// (PassKit / Google Pay SDK) — or an external-browser handoff — replaces the
+/// in-app WebView for those methods.
+const bool _walletsEnabled = false;
+
+/// The methods available on this platform. Card + Bit render inside the hosted
+/// Grow page; wallets are gated off (see [_walletsEnabled]).
 List<_Method> _availableMethods() {
   final isIOS = !kIsWeb && Platform.isIOS;
   final isAndroid = !kIsWeb && Platform.isAndroid;
   return [
-    if (isIOS)
+    if (_walletsEnabled && isIOS)
       const _Method(PaymentGroup.applePay, 'Apple Pay', Icons.apple,
           accent: Colors.black),
-    if (isAndroid)
+    if (_walletsEnabled && isAndroid)
       const _Method(PaymentGroup.googlePay, 'Google Pay', IconsaxPlusBold.wallet_money),
     const _Method(PaymentGroup.bit, 'ביט', IconsaxPlusBold.mobile),
     const _Method(PaymentGroup.card, 'כרטיס אשראי', IconsaxPlusBold.card),

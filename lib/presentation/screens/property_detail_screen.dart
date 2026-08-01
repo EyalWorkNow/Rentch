@@ -502,20 +502,27 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     if (group == null || !mounted) return;
 
     final name = provider.tenantProfile?.name;
-    final url = await AwsApiClient.instance.createOneOffCheckout(
-      amountAgorot: amountAgorot,
-      product: product,
-      propertyId: p.id,
-      group: group,
-      name: name,
-    );
+    String? url;
+    try {
+      url = await AwsApiClient.instance.createOneOffCheckout(
+        amountAgorot: amountAgorot,
+        product: product,
+        propertyId: p.id,
+        group: group,
+        name: name,
+      );
+    } catch (_) {
+      url = null; // a 4xx/5xx throws — treat as "couldn't open", don't get stuck
+    }
     if (!mounted) return;
-    if (url == null) {
+    final checkoutUrl = url;
+    if (checkoutUrl == null) {
       snack('פתיחת התשלום נכשלה. נסו שוב.');
       return;
     }
     final paid = await Navigator.of(context).push<bool>(MaterialPageRoute(
-      builder: (_) => CheckoutWebViewScreen(url: url, amountLabel: amountLabel),
+      builder: (_) =>
+          CheckoutWebViewScreen(url: checkoutUrl, amountLabel: amountLabel),
     ));
     if (paid != true || !mounted) return;
 
