@@ -190,34 +190,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final currentProfile = provider.tenantProfile;
-        final tenant = (provider.isLandlord && currentProfile != null)
-            ? (provider.getCachedProfile('tenant-test') ??
-                TenantProfile(
-                  id: 'tenant-test',
-                  name: 'נועה לוי',
-                  bio: 'סטודנטית למדעי המחשב באוניברסיטת תל אביב ומפתחת תוכנה במשרה חלקית. מחפשת דירה שקטה ונעימה.',
-                  age: 24,
-                  monthlyIncome: 14500,
-                  hasCar: false,
-                  hasPets: false,
-                  wfh: true,
-                  household: 'יחיד',
-                  numChildren: 0,
-                  photoUrls: const [
-                    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
-                  ],
-                  budgetMax: 11200,
-                  desiredRooms: 2.5,
-                  moveInWindow: 'כניסה תוך 30 יום',
-                  importantDetails: const [
-                    'אישור הכנסה מוכן',
-                    'שוכרת כבר 5 שנים רצוף',
-                    'זמינה לסיור גם בערב',
-                    'מחפשת חוזה לשנה לפחות',
-                    'ללא חיות מחמד',
-                    'ללא עישון',
-                  ],
-                ))
+        // No FABRICATED person: when the viewer is a landlord, the card is driven
+        // by the real interested tenant (the liker snapshot). This base carries
+        // only a neutral generic label ("מועמד/ת") and NO fake bio/income/photo —
+        // so a lead that lacks a real liker shows an honest generic candidate
+        // instead of the old made-up "נועה לוי, ₪14,500".
+        final tenant = provider.isLandlord
+            ? const TenantProfile(
+                id: '',
+                name: 'מועמד/ת',
+                bio: '',
+                photoUrls: [],
+                budgetMax: 0,
+                desiredRooms: 0,
+                moveInWindow: '',
+                importantDetails: [],
+              )
             : currentProfile;
         final allLeads = provider.ownerLeads;
         final leads = _applyFilters(provider, allLeads);

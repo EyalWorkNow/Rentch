@@ -1444,9 +1444,20 @@ class RecommendationEngine {
     final q = _normCity(city);
     if (q.isEmpty) return false;
     final pc = _normCity(p.city);
-    if (pc == q || pc.contains(q) || q.contains(pc)) return true;
+    if (_cityNameMatch(pc, q)) return true;
     final nb = _normCity(p.neighborhood);
-    return nb.isNotEmpty && (nb == q || nb.contains(q));
+    // Neighborhood/moshav recorded on the listing: exact or whole-word prefix.
+    return nb.isNotEmpty && _cityNameMatch(nb, q);
+  }
+
+  /// Whole-word prefix match on normalized names: exact, or one is a leading
+  /// whole word of the other ("תל אביב" ⊂ "תל אביב יפו"). Rejects mid/suffix
+  /// containment across a word boundary so "יבנה" ≠ "גן יבנה".
+  static bool _cityNameMatch(String a, String b) {
+    if (a == b) return true;
+    final shorter = a.length <= b.length ? a : b;
+    final longer = a.length <= b.length ? b : a;
+    return longer.startsWith('$shorter ');
   }
 
   // The central region (גוש דן + inner ring) — what "מרכז" means when no specific

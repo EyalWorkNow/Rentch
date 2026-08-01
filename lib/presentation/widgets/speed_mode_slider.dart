@@ -116,8 +116,11 @@ class SpeedModeSlider extends StatelessWidget {
               padding: const EdgeInsets.all(pad),
               child: Directionality(
                 textDirection: TextDirection.ltr,
+                // Clip the sliding thumb's glow to the pill (Android/Impeller
+                // doesn't contain child shadows via an ancestor ClipRRect over a
+                // BackdropFilter — same fix as the discover _PillSelector).
                 child: Stack(
-                  clipBehavior: Clip.none,
+                  clipBehavior: Clip.hardEdge,
                   children: [
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 300),
@@ -188,9 +191,12 @@ class SpeedModeSlider extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOutCubic,
           scale: selected ? 1.03 : 1,
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
+          // Inset so the label+icon stay INSIDE the coloured thumb on Android too.
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -216,6 +222,7 @@ class SpeedModeSlider extends StatelessWidget {
                 ],
               ),
             ),
+          ),
           ),
         ),
       ),

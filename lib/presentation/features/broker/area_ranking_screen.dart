@@ -63,15 +63,11 @@ class _AreaRankingScreenState extends State<AreaRankingScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
-          elevation: 0,
-          centerTitle: true,
-          title: const Text('דרג אזורים בעיר',
-              style: TextStyle(
-                  color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text('דרג אזורים בעיר'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
           actions: [
             if (_ranked.isNotEmpty)
               IconButton(

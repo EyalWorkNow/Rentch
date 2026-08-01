@@ -1,14 +1,17 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/constants/brand_palette.dart';
 import 'package:dating_app/core/services/google_auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/features/billing/subscription_screen.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
@@ -330,7 +333,26 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         // Real, working notifications bell — far-left next to
                         // the title (RTL: end of the row).
-                        const NotificationBell(),
+                        NotificationBell(
+                          onDeepLink: (n) {
+                            final provider = context.read<DatingProvider>();
+                            switch (n.type) {
+                              case 'message':
+                              case 'match':
+                              case 'like':
+                              case 'property_like':
+                                provider.setTabIndex(1);
+                                provider.markMatchesSeen();
+                              case 'tour':
+                              case 'tour_ready':
+                              case 'review':
+                              case 'saved_search':
+                                provider.setTabIndex(provider.isLandlord ? 2 : 1);
+                              default:
+                                break;
+                            }
+                          },
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -1787,6 +1809,17 @@ class _LandlordProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const _SettingsDivider(),
+            _ProfileMenuItem(
+              icon: IconsaxPlusLinear.card,
+              label: 'המנוי שלי',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  settings: const RouteSettings(name: 'SubscriptionScreen'),
+                  builder: (_) => const SubscriptionScreen(),
+                ),
+              ),
+            ),
           ],
           if (provider.isBroker) ...[
             const _SettingsDivider(),
@@ -1817,18 +1850,10 @@ class _LandlordProfileScreen extends StatelessWidget {
                         subtitle: 'קבל עדכונים בזמן אמת על מכשירך',
                         isSwitch: true,
                       ),
-                      const _SubPageSettingItem(
-                        icon: IconsaxPlusLinear.sms,
-                        title: 'התראות אימייל',
-                        subtitle: 'קבל סיכומים שבועיים ועדכוני מערכת',
-                        isSwitch: true,
-                      ),
-                      const _SubPageSettingItem(
-                        icon: IconsaxPlusLinear.user_add,
-                        title: 'פניות שוכרים',
-                        subtitle: 'התראות על התאמות ולידים חדשים',
-                        isSwitch: true,
-                      ),
+                      // (Removed the "email notifications" and "tenant-inquiries"
+                      // toggles — the app has no email system and nothing consumed
+                      // those prefs, so they were inert switches. The "התראות בנייד"
+                      // toggle above is the real FCM push control.)
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.trash,
                         title: 'מחיקת חשבון',
@@ -1842,38 +1867,10 @@ class _LandlordProfileScreen extends StatelessWidget {
               );
             },
           ),
-          const _SettingsDivider(),
-          _ProfileMenuItem(
-            icon: IconsaxPlusLinear.security_safe,
-            label: 'אבטחת חשבון',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const _SettingsSubPage(
-                    title: 'אבטחת חשבון',
-                    items: [
-                      _SubPageSettingItem(
-                        icon: IconsaxPlusLinear.key,
-                        title: 'שינוי סיסמה',
-                        subtitle: 'עדכן את סיסמת הכניסה לחשבון',
-                      ),
-                      _SubPageSettingItem(
-                        icon: IconsaxPlusLinear.finger_scan,
-                        title: 'זיהוי ביומטרי',
-                        subtitle: 'התחברות מהירה באמצעות טביעת אצבע או פנים',
-                        isSwitch: true,
-                      ),
-                      _SubPageSettingItem(
-                        icon: IconsaxPlusLinear.monitor_mobbile,
-                        title: 'מכשירים מחוברים',
-                        subtitle: 'נהל את המכשירים המחוברים לחשבונך',
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+          // (Removed the "אבטחת חשבון" sub-page — all three items were fake/dead:
+          // no password-change flow (social login), no local_auth / biometric
+          // integration, and no connected-devices management. Better to omit than
+          // to show a security screen that does nothing.)
           const _SettingsDivider(),
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.info_circle,
@@ -3110,6 +3107,12 @@ class _SettingsSubPage extends StatefulWidget {
 class _SettingsSubPageState extends State<_SettingsSubPage> {
   late Map<String, bool> _switchStates;
 
+  // The mobile-notifications toggle is a REAL, consent-driven control: it starts
+  // from the actual OS permission (never pre-enabled) and turning it on triggers
+  // the system permission prompt (App Review 4.5.4).
+  static const _kNotifTitle = 'התראות בנייד';
+  bool _notifBusy = false; // guards against a rapid re-toggle racing an in-flight request
+
   @override
   void initState() {
     super.initState();
@@ -3117,6 +3120,82 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
       for (final item in widget.items)
         if (item.isSwitch) item.title: item.initialSwitchValue
     };
+    _loadNotifStatus();
+    _loadPersistedSwitches();
+  }
+
+  static String _prefKey(String title) => 'setting_switch_$title';
+
+  // Non-notification switches (email/tenant-inquiry/biometric) persist their
+  // state so a toggle isn't lost on reopen. (The notification toggle is driven
+  // by the real OS permission via _loadNotifStatus instead.)
+  Future<void> _loadPersistedSwitches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final updates = <String, bool>{};
+      for (final item in widget.items) {
+        if (!item.isSwitch || item.title == _kNotifTitle) continue;
+        final v = prefs.getBool(_prefKey(item.title));
+        if (v != null) updates[item.title] = v;
+      }
+      if (updates.isNotEmpty && mounted) {
+        setState(() => _switchStates.addAll(updates));
+      }
+    } catch (_) {/* fail-soft */}
+  }
+
+  Future<void> _persistSwitch(String title, bool val) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKey(title), val);
+    } catch (_) {/* fail-soft */}
+  }
+
+  bool get _hasNotifToggle =>
+      widget.items.any((i) => i.isSwitch && i.title == _kNotifTitle);
+
+  Future<void> _loadNotifStatus() async {
+    if (!_hasNotifToggle) return;
+    try {
+      final s = await FirebaseMessaging.instance.getNotificationSettings();
+      final on = s.authorizationStatus == AuthorizationStatus.authorized ||
+          s.authorizationStatus == AuthorizationStatus.provisional;
+      if (mounted) setState(() => _switchStates[_kNotifTitle] = on);
+    } catch (_) {/* fail-soft: leave OFF */}
+  }
+
+  Future<void> _onNotifToggle(bool val) async {
+    if (_notifBusy) return; // ignore taps while a request is in flight
+    if (!val) {
+      // Notifications can't be revoked programmatically — reflect OFF and point
+      // the user to iOS Settings.
+      if (mounted) setState(() => _switchStates[_kNotifTitle] = false);
+      _hintOpenSettings('כדי לכבות התראות, עברו להגדרות המכשיר → Rently → התראות.');
+      return;
+    }
+    _notifBusy = true;
+    try {
+      final s = await FirebaseMessaging.instance.requestPermission(
+        alert: true, badge: true, sound: true,
+      );
+      final on = s.authorizationStatus == AuthorizationStatus.authorized ||
+          s.authorizationStatus == AuthorizationStatus.provisional;
+      if (mounted) setState(() => _switchStates[_kNotifTitle] = on);
+      if (!on) {
+        _hintOpenSettings('התראות חסומות. אפשר להפעיל דרך הגדרות המכשיר → Rently → התראות.');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _switchStates[_kNotifTitle] = false);
+    } finally {
+      _notifBusy = false;
+    }
+  }
+
+  void _hintOpenSettings(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg, textAlign: TextAlign.right)),
+    );
   }
 
   @override
@@ -3247,9 +3326,14 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                                   value: _switchStates[item.title] ?? false,
                                   activeColor: AppColors.primary,
                                   onChanged: (val) {
-                                    setState(() {
-                                      _switchStates[item.title] = val;
-                                    });
+                                    if (item.title == _kNotifTitle) {
+                                      _onNotifToggle(val);
+                                    } else {
+                                      setState(() {
+                                        _switchStates[item.title] = val;
+                                      });
+                                      _persistSwitch(item.title, val);
+                                    }
                                   },
                                 )
                               else
@@ -3268,12 +3352,99 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                   }),
                 ),
               ),
+              const SizedBox(height: 24),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'צבע ערכת נושא ראשי',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 8,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: _themeColors.length,
+                  itemBuilder: (context, idx) {
+                    final color = _themeColors[idx];
+                    final isSelected = (AppColors.customPrimary ?? const Color(0xFF059669)) == color;
+                    return Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            AppColors.customPrimary = color;
+                          });
+                          context.read<DatingProvider>().rebuildTheme();
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? Colors.black : Colors.transparent,
+                              width: isSelected ? 2.0 : 0.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: isSelected
+                              ? const Icon(Icons.check, color: Colors.white, size: 14)
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  static const List<Color> _themeColors = [
+    Color(0xFF13BEC9), // Vibrant Teal
+    Color(0xFF10B981), // Mint Green
+    Color(0xFF059669), // Emerald Green
+    Color(0xFF2563EB), // Royal Blue
+    Color(0xFFFF5A67), // Coral Red
+    Color(0xFFEC4899), // Rose Pink
+    Color(0xFF0F172A), // Dark Slate
+    Color(0xFF84CC16), // Lime Green
+  ];
 }
 
 class _SubPageSettingItem {
@@ -3282,7 +3453,7 @@ class _SubPageSettingItem {
     required this.title,
     this.subtitle,
     this.isSwitch = false,
-    this.initialSwitchValue = true,
+    this.initialSwitchValue = false, // never pre-enable a toggle (App Review 4.5.4)
     this.onTap,
     this.color,
   });

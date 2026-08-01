@@ -83,6 +83,15 @@ class GamificationService {
     return true;
   }
 
+  /// Give back a consumed super-like (e.g. the user undid the swipe). No-op if
+  /// none were used today.
+  static Future<void> refundSuperLike() async {
+    final prefs = await SharedPreferences.getInstance();
+    _resetIfNewDay(prefs);
+    final used = prefs.getInt(_superLikeCountKey) ?? 0;
+    if (used > 0) await prefs.setInt(_superLikeCountKey, used - 1);
+  }
+
   static Duration timeUntilSuperLikeReset() {
     final now = DateTime.now();
     final midnight = DateTime(now.year, now.month, now.day + 1);

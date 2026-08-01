@@ -121,12 +121,21 @@ class RentalDataService {
     final cacheKey = '$areaId:${cursor ?? offset}';
     final cached = AppCache.instance.propertyPages.get(cacheKey);
     if (cached != null) {
+      final rows = (cached['rows'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      final nextCursor = cached['nextCursor'] as String?;
       return PropertyPage(
-        items: cached
+        items: rows
             .map((row) => _propertyFromRow(row))
             .where((p) => p.id.trim().isNotEmpty)
             .toList(),
-        hasMore: false,
+        // Preserve pagination across a cache hit — otherwise re-requesting a
+        // cached page reported hasMore:false and lost the cursor, terminating the
+        // catalogue load early.
+        hasMore: cached['hasMore'] == true &&
+            nextCursor != null &&
+            nextCursor.isNotEmpty,
+        nextCursor: nextCursor,
       );
     }
 
@@ -160,8 +169,6 @@ class RentalDataService {
           .map((row) => Map<String, dynamic>.from(row))
           .toList();
 
-      AppCache.instance.propertyPages.put(cacheKey, rawRows);
-
       final items = rawRows
           .map((row) => _propertyFromRow(row))
           .where((p) => p.id.trim().isNotEmpty)
@@ -171,6 +178,13 @@ class RentalDataService {
       final hasMore = payload['hasMore'] == true &&
           nextCursor != null &&
           nextCursor.isNotEmpty;
+
+      // Cache the WHOLE page (rows + pagination) so a hit reconstructs it exactly.
+      AppCache.instance.propertyPages.put(cacheKey, {
+        'rows': rawRows,
+        'hasMore': hasMore,
+        'nextCursor': nextCursor,
+      });
 
       return PropertyPage(
         items: items,

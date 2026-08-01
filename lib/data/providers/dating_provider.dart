@@ -18,6 +18,8 @@ import 'package:dating_app/core/search/engine/recommendation_orchestrator.dart';
 import 'package:dating_app/core/search/engine/preference_model.dart'
     show OnlineLogisticLearner;
 import 'package:dating_app/core/search/cohort_model.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart'
+    show nearbyKindToDimension;
 import 'package:dating_app/core/services/tenant_consent_service.dart';
 import 'package:dating_app/data/models/tenant_data_consent.dart';
 import 'package:dating_app/core/search/smart_search.dart' show SearchQuery, ScoredProperty;
@@ -31,6 +33,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/data/models/subscription.dart';
 import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:dating_app/data/models/user_signals.dart';
 import 'package:dating_app/data/models/persona_profile.dart';
@@ -134,6 +137,10 @@ class DatingProvider extends ChangeNotifier {
   // picker / guest-entry code sets it, the entire entry flow is structurally
   // incapable of turning broker-black.
   bool _isInsideApp = false;
+  // Last-known landlord subscription snapshot (paywall gate + billing screen).
+  // Persisted with the rest of the state so the publish gate keeps working
+  // offline; refreshed from the backend when a landlord session binds.
+  Subscription? _subscription;
   TenantProfile? _tenantProfile;
   final Map<String, TenantProfile> _cachedProfiles = {};
   final Set<String> _loadingProfileIds = {};
@@ -481,12 +488,21 @@ class DatingProvider extends ChangeNotifier {
   List<RentalProperty> get _allProperties {
     final cached = _allPropertiesCache;
     if (cached != null) return cached;
-    return _allPropertiesCache = [
-      ..._baseProperties.map(_propertyWithSignalOverride),
-      ..._customProperties
-          .where(_isDiscoverableCustomProperty)
-          .map(_propertyWithSignalOverride),
-    ];
+    // Dedup by id — the current user's own ACTIVE listings live in BOTH
+    // _baseProperties (public status=active fetch) and _customProperties (owner
+    // fetch). A plain concat double-counted them (twice in search/CMA/market
+    // stats, +1 in filtered counts). The custom copy is the fresher/owner one,
+    // so it wins.
+    final byId = <String, RentalProperty>{};
+    for (final p in _baseProperties.map(_propertyWithSignalOverride)) {
+      byId[p.id] = p;
+    }
+    for (final p in _customProperties
+        .where(_isDiscoverableCustomProperty)
+        .map(_propertyWithSignalOverride)) {
+      byId[p.id] = p; // custom overrides the base copy of the same listing
+    }
+    return _allPropertiesCache = byId.values.toList();
   }
 
   // Full real catalog (base + landlord-added) for the AI search assistant to
@@ -558,6 +574,30 @@ class DatingProvider extends ChangeNotifier {
   bool get isLandlord => _userRole == 'landlord' || _userRole == 'broker';
   bool get isBroker => _userRole == 'broker';
   String get userRole => _userRole;
+
+  // ── Subscription / paywall ─────────────────────────────────────────────────
+
+  /// The last-known landlord subscription snapshot (null until first fetched).
+  Subscription? get subscription => _subscription;
+
+  /// True when the landlord is entitled to publish beyond the free limit.
+  bool get isSubscribed => _subscription?.entitled ?? false;
+
+  /// Fetches the subscription snapshot, stores it, and notifies. Fail-soft:
+  /// never throws (keeps the cached snapshot on error).
+  Future<void> refreshSubscription() async {
+    try {
+      final sub = await AwsApiClient.instance.getSubscription();
+      if (sub == null) return;
+      _subscription = sub;
+      unawaited(_persist());
+      notifyListeners();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('DatingProvider.refreshSubscription: $error');
+      }
+    }
+  }
 
   /// True once the user is actually inside the in-app experience (HomeScreen
   /// mounted). The sole gate for broker-black theming.
@@ -708,19 +748,38 @@ class DatingProvider extends ChangeNotifier {
         _pfvCache.remove(k);
       }
     }
+    // BOOST: a paid "הקפצה" floats a listing to the top of the feed until its
+    // boostedUntil passes. Three stable bands (each preserves the engine's rank
+    // order within it): Ultra (×5) first, then regular (×2), then everyone else —
+    // so an Ultra boost out-reaches a regular one.
+    final ultra = <dynamic>[];
+    final boosted = <dynamic>[];
+    final rest = <dynamic>[];
+    for (final r in recs) {
+      if (r.property.isUltraBoosted) {
+        ultra.add(r);
+      } else if (r.property.isBoosted) {
+        boosted.add(r);
+      } else {
+        rest.add(r);
+      }
+    }
+    final ordered = (ultra.isEmpty && boosted.isEmpty)
+        ? recs
+        : [...ultra, ...boosted, ...rest];
     // Calibration: log the engine's OWN prediction for every result it surfaces,
     // so a later swipe/contact outcome (joined by propertyId+sessionId) tells us
     // how well the hand-tuned fit% actually predicts behaviour. Fire-and-forget.
-    for (var i = 0; i < recs.length; i++) {
+    for (var i = 0; i < ordered.length; i++) {
       AppEvents.instance.service.logRankedImpression(
-        propertyId: recs[i].property.id,
-        fitPct: recs[i].fitPct,
+        propertyId: ordered[i].property.id,
+        fitPct: ordered[i].fitPct,
         rank: i,
-        dims: recs[i].dimensionBreakdown,
+        dims: ordered[i].dimensionBreakdown,
       );
     }
     return [
-      for (final r in recs)
+      for (final r in ordered)
         ScoredProperty(
           r.property,
           r.fitScore / 100.0,
@@ -913,6 +972,7 @@ class DatingProvider extends ChangeNotifier {
       count++;
     }
     if (_filters.sortBy != SearchSortOption.bestMatch) count++;
+    if (_filters.preferredNearby.isNotEmpty) count++;
     if (_filters.city.trim().isNotEmpty) count++;
     if (_filters.transactionType != TransactionTypeFilter.any) count++;
     if (_filters.areaId != 'all_israel' || _filters.hasCustomArea) count++;
@@ -1193,7 +1253,18 @@ class DatingProvider extends ChangeNotifier {
     final a = _normCity(propertyCity);
     final b = _normCity(filterCity);
     if (a.isEmpty || b.isEmpty) return true; // unknown → don't exclude
-    return a == b || a.contains(b) || b.contains(a);
+    return _cityNameMatch(a, b);
+  }
+
+  /// Whole-word prefix match on already-normalized city names. Accepts an exact
+  /// match or one being a leading whole word of the other ("תל אביב" ⊂
+  /// "תל אביב יפו"), but rejects mid/suffix containment across a word boundary
+  /// so "יבנה" no longer matches "גן יבנה" (a different municipality).
+  static bool _cityNameMatch(String a, String b) {
+    if (a == b) return true;
+    final shorter = a.length <= b.length ? a : b;
+    final longer = a.length <= b.length ? b : a;
+    return longer.startsWith('$shorter ');
   }
 
   bool _passesStructuralFilters(
@@ -2127,10 +2198,19 @@ class DatingProvider extends ChangeNotifier {
         final likes = await _propertyLikesRepository.likesForProperty(id);
         return MapEntry(id, likes);
       }));
-      _incomingLikesByProperty = {
-        for (final e in entries)
-          if (e.value.isNotEmpty) e.key: e.value,
-      };
+      // Merge, not replace: a null result means the fetch failed for that
+      // property — keep its prior likes rather than dropping the tenants.
+      final next = <String, List<PropertyLike>>{};
+      for (final e in entries) {
+        final likes = e.value;
+        if (likes == null) {
+          final prior = _incomingLikesByProperty[e.key];
+          if (prior != null && prior.isNotEmpty) next[e.key] = prior;
+        } else if (likes.isNotEmpty) {
+          next[e.key] = likes;
+        }
+      }
+      _incomingLikesByProperty = next;
       notifyListeners();
     } catch (_) {/* best-effort */}
   }
@@ -2243,7 +2323,20 @@ class DatingProvider extends ChangeNotifier {
       _seedInitialState();
       _hasActiveSession = false;
     } else {
-      _hydrateFromState(storedState);
+      // Fail-soft: the app-state blob is remote-synced and may come from another
+      // device / older schema / a truncated write. A throwing fromJson deep inside
+      // _hydrateFromState must NOT wedge startup (initialize() is fire-and-forget,
+      // so an unhandled throw would leave _isLoading true → permanent spinner).
+      // On any corruption, reseed — same as a missing blob.
+      try {
+        _hydrateFromState(storedState);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('DatingProvider.initialize: corrupt cached state, reseeding: $e');
+        }
+        _seedInitialState();
+        _hasActiveSession = false;
+      }
     }
 
     _useRemoteCatalogDefaults();
@@ -2844,6 +2937,10 @@ class DatingProvider extends ChangeNotifier {
 
     // Now that the landlord's own properties are loaded, pull who liked them.
     unawaited(refreshIncomingLikes());
+
+    // Refresh the subscription snapshot so the publish paywall gate is accurate
+    // for this landlord. Fail-soft (refreshSubscription never throws).
+    if (isLandlord) unawaited(refreshSubscription());
   }
 
   void _retagCurrentLandlordProperties({
@@ -2945,6 +3042,11 @@ class DatingProvider extends ChangeNotifier {
     if (existing == null || !_belongsToCurrentLandlord(existing)) return;
     _customProperties =
         _customProperties.where((p) => p.id != propertyId).toList();
+    // Also drop the copy that lives in the PUBLIC base catalog — otherwise the
+    // already-materialized _baseProperties snapshot keeps showing the removed
+    // listing in this device's search/map/deck until a relaunch.
+    _baseProperties =
+        _baseProperties.where((p) => p.id != propertyId).toList();
     _invalidateCatalogCache();
     // Drop it from the browse/search cache immediately so seekers stop seeing it.
     AppCache.instance.propertyPages.clear();
@@ -2955,6 +3057,25 @@ class DatingProvider extends ChangeNotifier {
         ownerUserId: existing.ownerUserId,
         status: PropertyRecordStatus.removed));
     notifyListeners();
+  }
+
+  // Stamp a boost window on a listing IN MEMORY right after a successful server
+  // boost, so it floats to the top of the feed this session (isBoosted reads
+  // boostedUntil) without waiting for a full server refetch.
+  void applyLocalBoost(String propertyId, DateTime boostedUntil,
+      {PropertyBoostTier tier = PropertyBoostTier.regular}) {
+    var changed = false;
+    List<RentalProperty> stamp(List<RentalProperty> list) => list.map((p) {
+          if (p.id != propertyId) return p;
+          changed = true;
+          return p.copyWith(boostedUntil: boostedUntil, boostTier: tier);
+        }).toList();
+    _customProperties = stamp(_customProperties);
+    _baseProperties = stamp(_baseProperties);
+    if (changed) {
+      _invalidateCatalogCache();
+      notifyListeners();
+    }
   }
 
   Future<void> attachPropertyVirtualTour({
@@ -3565,6 +3686,8 @@ class DatingProvider extends ChangeNotifier {
       ]);
       final views = counts[0];
       final likes = counts[1];
+      // null = fetch failed → don't clobber the real persisted counts with 0.
+      if (views == null || likes == null) return;
       final current = _signalsFor(propertyId).normalizedForToday(DateTime.now());
       _setPropertySignals(
         propertyId,
@@ -3641,6 +3764,12 @@ class DatingProvider extends ChangeNotifier {
     if (last.liked) {
       _likedPropertyIds.remove(last.propertyId);
       _removePropertyLike(last.propertyId);
+      // Undoing a super-like gives the quota back.
+      if (last.superLike) {
+        await GamificationService.refundSuperLike();
+        _remainingSuperLikes =
+            await GamificationService.getRemainingSuperlikes();
+      }
     } else {
       _passedPropertyIds.remove(last.propertyId);
     }
@@ -3693,8 +3822,9 @@ class DatingProvider extends ChangeNotifier {
         direction == CardSwiperDirection.top) {
       final isNewLike = _likedPropertyIds.add(property.id);
       if (isNewLike) _recordPropertyLike(property.id);
-      _swipeHistory.add(_SwipeRecord(propertyId: property.id, liked: true));
       final isSuperLike = direction == CardSwiperDirection.top;
+      _swipeHistory.add(_SwipeRecord(
+          propertyId: property.id, liked: true, superLike: isSuperLike));
       final eventType =
           isSuperLike ? UserEventType.superLike : UserEventType.swipeRight;
       AppEvents.instance.log(eventType, propertyId: property.id);
@@ -4764,6 +4894,10 @@ class DatingProvider extends ChangeNotifier {
       requiredFeatures: f.requiredFeatures,
       transactionType: type,
       propertyType: f.propertyTypes.isNotEmpty ? f.propertyTypes.first : null,
+      // Boost the ranking dimensions for the nearby-place categories the seeker
+      // marked important (vets/parking map to null → display-only, skipped).
+      preferredNearbyDims:
+          f.preferredNearby.map(nearbyKindToDimension).whereType<String>().toSet(),
     );
   }
 
@@ -5760,6 +5894,19 @@ class DatingProvider extends ChangeNotifier {
           PersonaProfile.fromJson(Map<String, dynamic>.from(personaJson));
       if (restored.version >= _persona.version) _persona = restored;
     }
+    final subscriptionJson = storedState['subscription'];
+    if (subscriptionJson is Map) {
+      // Guarded: a malformed/foreign-shaped subscription blob (the app-state is
+      // remote-synced) must never throw and wedge the whole restore. On any
+      // error we just skip the cached subscription — refreshSubscription() will
+      // repopulate it from the server.
+      try {
+        _subscription =
+            Subscription.fromJson(Map<String, dynamic>.from(subscriptionJson));
+      } catch (_) {
+        _subscription = null;
+      }
+    }
     _pendingMatchPropertyId = null;
     _invalidateCatalogCache();
   }
@@ -5961,6 +6108,7 @@ class DatingProvider extends ChangeNotifier {
       'autoLikeEnabled': _autoLikeEnabled,
       'userSignals': _userSignals.toJson(),
       'personaProfile': _persona.toJson(),
+      'subscription': _subscription?.toJson(),
     };
 
     await _localStorageService.saveAppState(snapshot, syncRemote: false);
@@ -6093,9 +6241,11 @@ class _MarketStats {
 }
 
 class _SwipeRecord {
-  const _SwipeRecord({required this.propertyId, required this.liked});
+  const _SwipeRecord(
+      {required this.propertyId, required this.liked, this.superLike = false});
   final String propertyId;
   final bool liked;
+  final bool superLike;
 }
 
 class _PropertyDetailSession {

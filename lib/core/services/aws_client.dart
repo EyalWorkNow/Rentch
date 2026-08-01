@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dating_app/core/config/app_config.dart';
 import 'package:dating_app/data/models/app_notification.dart';
+import 'package:dating_app/data/models/subscription.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -459,6 +460,155 @@ class AwsApiClient {
       if (kDebugMode) debugPrint('AwsApiClient.updateProfileFields: $error');
       return 0;
     }
+  }
+
+  // ── Billing / subscription ────────────────────────────────────────────────
+
+  /// Reads the landlord's subscription snapshot (`GET /billing/subscription`).
+  /// Fail-soft: returns null when the backend is unconfigured.
+  Future<Subscription?> getSubscription() async {
+    if (!isConfigured) return null;
+    final res = await get('/billing/subscription');
+    if (res.isEmpty) return null;
+    return Subscription.fromJson(res);
+  }
+
+  /// Opens a checkout session (`POST /billing/checkout`) for [plan]
+  /// ('monthly'|'annual'), returning the hosted payment-page url to load in a
+  /// WebView. [email]/[name] pre-fill the invoice when known.
+  Future<({String url, String plan, int? priceAgorot})?> createCheckout({
+    required String plan,
+    String? email,
+    String? name,
+    String? coupon,
+    int? group, // payment method: 100 card, 120 Bit, 150 Google Pay, 160 Apple Pay
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/billing/checkout', {
+      'plan': plan,
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      if (coupon != null && coupon.trim().isNotEmpty) 'coupon': coupon.trim(),
+      if (group != null) 'group': group,
+    });
+    final url = res['url'] as String?;
+    if (url == null || url.isEmpty) return null;
+    return (
+      url: url,
+      plan: (res['plan'] as String?) ?? plan,
+      priceAgorot: (res['priceAgorot'] as num?)?.toInt(),
+    );
+  }
+
+  /// Creates a ONE-OFF hosted payment (e.g. the 50₪ AI-contract unlock) via
+  /// `POST /billing/checkout-oneoff`. Returns the checkout URL, or null on
+  /// failure/unconfigured. Not a subscription — no recurring token is saved.
+  Future<String?> createOneOffCheckout({
+    required int amountAgorot,
+    String? description,
+    String? product,
+    String? propertyId, // for a paid boost: which listing to boost
+    String? email,
+    String? name,
+    int? group,
+  }) async {
+    if (!isConfigured) return null;
+    final res = await post('/billing/checkout-oneoff', {
+      'amountAgorot': amountAgorot,
+      if (description != null) 'description': description,
+      if (product != null) 'product': product,
+      if (propertyId != null && propertyId.trim().isNotEmpty) 'propertyId': propertyId.trim(),
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      if (group != null) 'group': group,
+    });
+    final url = res['url'] as String?;
+    return (url == null || url.isEmpty) ? null : url;
+  }
+
+  /// Verify-on-return for a PAID one-off boost (`POST /billing/confirm-oneoff`).
+  /// The server confirms the ₪10/₪50 payment with Morning, then stamps the boost
+  /// tier on the property. Returns the outcome so the UI can float the listing.
+  Future<({bool ok, DateTime? boostedUntil, String? tier})> confirmOneOffBoost({
+    required String product,
+    required String propertyId,
+  }) async {
+    if (!isConfigured) return (ok: false, boostedUntil: null, tier: null);
+    try {
+      final res = await post('/billing/confirm-oneoff', {
+        'product': product,
+        'propertyId': propertyId,
+      });
+      return (
+        ok: res['ok'] == true,
+        boostedUntil: DateTime.tryParse((res['boostedUntil'] ?? '').toString()),
+        tier: res['tier'] as String?,
+      );
+    } catch (_) {
+      return (ok: false, boostedUntil: null, tier: null);
+    }
+  }
+
+  /// Verify-on-return: confirms a just-completed hosted payment. The server
+  /// checks Morning for the paid receipt and activates the subscription — so
+  /// activation is reliable even if the IPN never arrives. Returns true when the
+  /// user is entitled afterwards.
+  Future<bool> confirmSubscription() async {
+    if (!isConfigured) return false;
+    try {
+      final res = await post('/billing/confirm', const {});
+      final ent = res['entitlement'];
+      if (ent is Map && ent['entitled'] == true) return true;
+      return res['confirmed'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Boosts a listing (`POST /billing/boost`). Server-gated by entitlement +
+  /// monthly quota. Returns the outcome so the UI can react (open the paywall on
+  /// `not_entitled`, show "quota used" on `quota_exceeded`).
+  Future<({bool ok, String? error, int? remaining, bool unlimited, DateTime? boostedUntil})>
+      boostProperty(String propertyId) async {
+    if (!isConfigured) {
+      return (ok: false, error: 'not_configured', remaining: null, unlimited: false, boostedUntil: null);
+    }
+    try {
+      final res = await post('/billing/boost', {'propertyId': propertyId});
+      return (
+        ok: res['ok'] == true,
+        error: res['ok'] == true ? null : res['error']?.toString(),
+        remaining: (res['remaining'] as num?)?.toInt(),
+        unlimited: res['unlimited'] == true,
+        boostedUntil: DateTime.tryParse((res['boostedUntil'] ?? '').toString()),
+      );
+    } on AwsApiException catch (e) {
+      final err = e.statusCode == 402
+          ? 'not_entitled'
+          : (e.statusCode == 409 ? 'quota_exceeded' : 'error');
+      return (ok: false, error: err, remaining: null, unlimited: false, boostedUntil: null);
+    } catch (_) {
+      return (ok: false, error: 'network', remaining: null, unlimited: false, boostedUntil: null);
+    }
+  }
+
+  /// Schedules cancellation at period end (`POST /billing/cancel`). Access stays
+  /// active until [Subscription.currentPeriodEnd].
+  Future<void> cancelSubscription() => post('/billing/cancel', const {});
+
+  /// Undoes a scheduled cancellation (`POST /billing/resume`).
+  Future<void> resumeSubscription() => post('/billing/resume', const {});
+
+  /// Lists the landlord's tax invoices (`GET /billing/invoices` → `{items:[…]}`).
+  /// Fail-soft: returns empty when unconfigured.
+  Future<List<Invoice>> getInvoices() async {
+    if (!isConfigured) return const [];
+    final res = await get('/billing/invoices');
+    final raw = (res['items'] as List?) ?? const [];
+    return raw
+        .whereType<Map>()
+        .map((m) => Invoice.fromJson(Map<String, dynamic>.from(m)))
+        .toList(growable: false);
   }
 
   // ── Admin broadcast console ───────────────────────────────────────────────

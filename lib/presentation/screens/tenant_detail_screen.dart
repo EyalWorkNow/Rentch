@@ -901,37 +901,59 @@ class _MatchInsightCard extends StatelessWidget {
     );
   }
 
+  // Real budget/rooms fit against THIS property (not fabricated claims).
+  bool get _budgetFits =>
+      tenant.budgetMax > 0 && tenant.budgetMax >= property.price;
+  bool get _roomsFit =>
+      tenant.desiredRooms > 0 &&
+      (tenant.desiredRooms - property.rooms).abs() <= 0.5;
+
   List<(IconData, String)> _buildReasons() {
     final reasons = <(IconData, String)>[];
     final roomsText = tenant.desiredRooms
         .toStringAsFixed(tenant.desiredRooms % 1 == 0 ? 0 : 1);
-    reasons.add((
-      IconsaxPlusLinear.money_recive,
-      'תקציב עד ₪${tenant.budgetMax} מתאים לדמי השכירות',
-    ));
-    reasons.add((
-      IconsaxPlusLinear.home_2,
-      'מחפש $roomsText חדרים — תואם לנכס שלך',
-    ));
-    reasons.add((
-      IconsaxPlusLinear.calendar_1,
-      'זמין לכניסה: ${tenant.moveInWindow}',
-    ));
+    // Budget — state the real relationship to THIS property's rent.
+    if (tenant.budgetMax > 0) {
+      reasons.add((
+        IconsaxPlusLinear.money_recive,
+        _budgetFits
+            ? 'תקציב עד ₪${tenant.budgetMax} — מכסה את דמי השכירות (₪${property.price})'
+            : 'תקציב עד ₪${tenant.budgetMax} — מתחת לדמי השכירות (₪${property.price})',
+      ));
+    }
+    // Rooms — real comparison to the property.
+    if (tenant.desiredRooms > 0) {
+      reasons.add((
+        IconsaxPlusLinear.home_2,
+        _roomsFit
+            ? 'מחפש $roomsText חדרים — תואם לנכס (${property.roomsLabel})'
+            : 'מחפש $roomsText חדרים — הנכס ${property.roomsLabel} חדרים',
+      ));
+    }
+    if (tenant.moveInWindow.isNotEmpty) {
+      reasons.add((
+        IconsaxPlusLinear.calendar_1,
+        'זמין לכניסה: ${tenant.moveInWindow}',
+      ));
+    }
     if (tenant.importantDetails.isNotEmpty) {
       reasons.add((
         IconsaxPlusLinear.flash_1,
-        'תואם בהעדפות: ${tenant.importantDetails.take(2).join(', ')}',
+        'ציין: ${tenant.importantDetails.take(2).join(', ')}',
       ));
     }
     return reasons.take(4).toList();
   }
 
+  // A REAL fit score: the two hard rental constraints (budget covers rent,
+  // rooms match) drive it, plus a small bump for a fuller, no-deal-breaker
+  // profile. So a tenant whose budget is under the rent no longer scores high.
   int _score() {
-    var s = 70;
-    if (tenant.importantDetails.isNotEmpty) s += 8;
-    if (tenant.bio.isNotEmpty) s += 6;
-    if (tenant.dealBreakers.isEmpty) s += 6;
-    if (tenant.photoUrls.isNotEmpty) s += 4;
+    var s = 40;
+    if (_budgetFits) s += 30;
+    if (_roomsFit) s += 20;
+    if (tenant.dealBreakers.isEmpty) s += 5;
+    if (tenant.bio.isNotEmpty || tenant.importantDetails.isNotEmpty) s += 5;
     return s.clamp(0, 99);
   }
 

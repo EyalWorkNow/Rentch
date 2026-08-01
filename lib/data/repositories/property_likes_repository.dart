@@ -407,26 +407,29 @@ class PropertyLikesRepository {
     }
   }
 
-  Future<int> viewCount(String propertyId) => _count('/property_views', propertyId);
-  Future<int> likeCount(String propertyId) => _count('/property_likes', propertyId);
+  /// Returns null on error (vs 0 for a real empty count) so callers don't
+  /// clobber real persisted counts with a 0 on a transient failure.
+  Future<int?> viewCount(String propertyId) => _count('/property_views', propertyId);
+  Future<int?> likeCount(String propertyId) => _count('/property_likes', propertyId);
 
-  Future<int> _count(String path, String propertyId) async {
+  Future<int?> _count(String path, String propertyId) async {
     if (!isConfigured || propertyId.isEmpty) return 0;
     try {
       final res = await _api.get('$path/count', query: {'propertyId': propertyId});
       final c = res['count'];
       return c is num ? c.toInt() : 0;
     } catch (e) {
-      // ponytail: callers can't tell error-from-empty here — a 401/404/500
-      // returns 0 just like a real zero count. Log the real error distinctly so
-      // failures are observable. Upgrade path: surface an error state to callers.
-      debugPrint('PropertyLikesRepository._count($path) error (returning 0): $e');
-      return 0;
+      // Signal error as null (not 0) so callers skip the update instead of
+      // persisting a fake zero over the real count.
+      debugPrint('PropertyLikesRepository._count($path) error (returning null): $e');
+      return null;
     }
   }
 
-  /// All tenants who liked [propertyId].
-  Future<List<PropertyLike>> likesForProperty(String propertyId) async {
+  /// All tenants who liked [propertyId]. Returns null on error (vs [] for a
+  /// real "no likes yet") so callers don't drop the property on a transient
+  /// failure.
+  Future<List<PropertyLike>?> likesForProperty(String propertyId) async {
     if (!isConfigured || propertyId.isEmpty) return const [];
     try {
       final res = await _api.get(_path, query: {'propertyId': propertyId});
@@ -438,11 +441,9 @@ class PropertyLikesRepository {
           .where((l) => l.tenantId.isNotEmpty)
           .toList();
     } catch (e) {
-      // ponytail: callers can't tell error-from-empty here — a 401/404/500
-      // returns [] just like "no likes yet". Log the real error distinctly so
-      // failures are observable. Upgrade path: surface an error state to callers.
-      debugPrint('PropertyLikesRepository.likesForProperty error (returning []): $e');
-      return const [];
+      // Signal error as null (not []) so callers keep prior data.
+      debugPrint('PropertyLikesRepository.likesForProperty error (returning null): $e');
+      return null;
     }
   }
 }

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/search/nearby_relevance.dart' show NearbyKind;
 import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/behavior_insights_service.dart';
@@ -320,9 +321,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       itemBuilder: (context, index) {
         final p = properties[index];
         final media = p.primaryMedia;
-        final isGuest = provider.isGuestMode;
-        final isFirst = isGuest && index == 0;
-        final isSecond = isGuest && index == 1;
         return GestureDetector(
           onTap: () {
             Navigator.of(context).push(
@@ -405,59 +403,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (isFirst) ...[
-                          Row(
-                            children: [
-                              _GlassPillBadge(
-                                icon: IconsaxPlusLinear.eye,
-                                label: '245',
-                              ),
-                              const SizedBox(width: 4),
-                              _GlassPillBadge(
-                                icon: IconsaxPlusLinear.heart,
-                                label: '84',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                        ] else if (isSecond) ...[
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color:
-                                      AppColors.red.withOpacity(0.25),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                      color: AppColors.red
-                                          .withOpacity(0.4),
-                                      width: 0.8),
-                                ),
-                                child: const Text(
-                                  'חדש!',
-                                  style: TextStyle(
-                                    color: AppColors.dangerSoft,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 9,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              _GlassPillBadge(
-                                icon: IconsaxPlusLinear.heart,
-                                label: '47',
-                              ),
-                              const SizedBox(width: 4),
-                              _GlassPillBadge(
-                                icon: IconsaxPlusLinear.people,
-                                label: '3',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                        ],
+                        // Real engagement badges from the listing's own market
+                        // signals — each hidden at 0, so no fabricated numbers.
+                        ..._realSignalBadges(p),
                         Text(
                           p.priceLabel,
                           style: const TextStyle(
@@ -669,8 +617,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               // Floating header containing selector and filters button
               Positioned(
                 top: MediaQuery.paddingOf(context).top + 8,
-                left: 16,
-                right: 16,
+                left: 12,
+                right: 12,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -678,14 +626,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       const _HeaderMenuButton()
                     else
                       const SizedBox(width: 42),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Align(
                         alignment: Alignment.center,
                         child: _buildPillSelector(),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     _buildFiltersButton(context, provider),
                   ],
                 ),
@@ -865,24 +813,24 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1300),
     );
     _scale = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.65, curve: Curves.elasticOut),
+      curve: const Interval(0.0, 0.7, curve: Curves.elasticOut),
     );
     _fade = CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
     );
     _heartScale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.25), weight: 15),
-      TweenSequenceItem(tween: Tween(begin: 1.25, end: 1.0), weight: 15),
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.18), weight: 15),
-      TweenSequenceItem(tween: Tween(begin: 1.18, end: 1.0), weight: 55),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.22), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.22, end: 1.0), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.12), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 1.12, end: 1.0), weight: 20),
     ]).animate(CurvedAnimation(
       parent: _ctrl,
-      curve: const Interval(0.65, 1.0, curve: Curves.easeInOut),
+      curve: const Interval(0.5, 1.0, curve: Curves.easeInOut),
     ));
     _ctrl.forward();
   }
@@ -896,31 +844,44 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
   @override
   Widget build(BuildContext context) {
     final p = widget.property;
-    final media = p.primaryMedia;
+    final propertyMedia = p.primaryMedia;
+    final provider = context.watch<DatingProvider>();
+    final tenantProfile = provider.tenantProfile;
+
+    // Tenant Avatar / Photo
+    final String? tenantPhoto = (tenantProfile?.photoUrls.isNotEmpty == true)
+        ? tenantProfile!.photoUrls.first
+        : null;
+
+    final String tenantName = tenantProfile?.name ?? 'שוכר';
 
     return Material(
       color: Colors.transparent,
       child: Stack(
         children: [
-          // Glassmorphism background blur
+          // 1. Dark Blur Background
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: PlatformFx.blurSigma(18), sigmaY: PlatformFx.blurSigma(18)),
+              filter: ImageFilter.blur(
+                sigmaX: PlatformFx.blurSigma(22),
+                sigmaY: PlatformFx.blurSigma(22),
+              ),
               child: Container(
-                color: Colors.black.withOpacity(0.76),
+                color: const Color(0xFF090D16).withOpacity(0.85),
               ),
             ),
           ),
 
-          // Radial celebration glow
+          // 2. Ambient Purple & Blue Glow
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   center: Alignment.center,
-                  radius: 1.0,
+                  radius: 0.85,
                   colors: [
-                    AppColors.primary.withOpacity(0.24),
+                    const Color(0xFF7C3AED).withOpacity(0.28),
+                    const Color(0xFF3B82F6).withOpacity(0.12),
                     Colors.transparent,
                   ],
                 ),
@@ -932,179 +893,258 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
             child: FadeTransition(
               opacity: _fade,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ScaleTransition(
-                    scale: _scale,
-                    child: Column(
-                      children: [
-                        // Animated heartbeat container
-                        ScaleTransition(
-                          scale: _heartScale,
-                          child: Container(
-                            width: 104,
-                            height: 104,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.15),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary,
-                                width: 3,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.35),
-                                  blurRadius: 24,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: RentlyIcon(
-                                IconsaxPlusBold.heart,
-                                color: AppColors.primary,
-                                size: 52,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'זה מאצ׳!',
-                          style: TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -1.5,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black38,
-                                offset: Offset(0, 3),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'נוצרה התאמה עם\n${p.address}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w600,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Polaroid-style tilted property image card
-                  if (media != null)
-                    ScaleTransition(
-                      scale: _scale,
-                      child: Transform.rotate(
-                        angle: -0.04, // slight rotation for stylish look
-                        child: Container(
+                  // Top Row: Close 'X' Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.4),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
+                            color: Colors.white.withOpacity(0.14),
+                            shape: BoxShape.circle,
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: SizedBox(
-                              width: 240,
-                              height: 160,
-                              child: _MatchPropertyImage(media: media),
-                            ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 22,
                           ),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 44),
+                  ),
 
-                  // Custom Action Buttons
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Column(
-                      children: [
-                        // Open Chat Gradient Button
-                        Container(
-                          width: double.infinity,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            gradient: LinearGradient(
-                              colors: [AppColors.primary, AppColors.primaryLight],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withOpacity(0.4),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const RentlyIcon(
-                              IconsaxPlusLinear.message,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'פתח צ׳אט',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        // Keep Searching text/glass button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 10),
+
+                          // Header: "IT'S A MATCH!"
+                          ScaleTransition(
+                            scale: _scale,
                             child: const Text(
-                              'המשך לחפש',
+                              "IT'S A MATCH!",
                               style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white70,
+                                fontSize: 38,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 2.2,
+                                height: 1.1,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black45,
+                                    offset: Offset(0, 4),
+                                    blurRadius: 12,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                        ),
-                      ],
+
+                          const SizedBox(height: 28),
+
+                          // Dual Overlapping Polaroid Cards + Dashed Arc + Floating Heart Badge
+                          ScaleTransition(
+                            scale: _scale,
+                            child: SizedBox(
+                              height: 270,
+                              width: double.infinity,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Dashed Curved Path
+                                  Positioned.fill(
+                                    child: CustomPaint(
+                                      painter: _DashedArcPainter(),
+                                    ),
+                                  ),
+
+                                  // Left Polaroid Card (Tenant Profile)
+                                  Positioned(
+                                    left: MediaQuery.of(context).size.width * 0.12,
+                                    child: Transform.rotate(
+                                      angle: -0.13, // ~ -7.5 degrees
+                                      child: _MatchPolaroidCard(
+                                        photoUrl: tenantPhoto,
+                                        title: tenantName,
+                                        fallbackIcon: Icons.person_rounded,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Right Polaroid Card (Apartment Property)
+                                  Positioned(
+                                    right: MediaQuery.of(context).size.width * 0.12,
+                                    child: Transform.rotate(
+                                      angle: 0.13, // ~ +7.5 degrees
+                                      child: _MatchPolaroidCard(
+                                        media: propertyMedia,
+                                        title: p.address.isNotEmpty ? p.address : 'דירה להשכרה',
+                                        fallbackIcon: Icons.apartment_rounded,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Center Floating Glowing Heart Circle Badge
+                                  ScaleTransition(
+                                    scale: _heartScale,
+                                    child: Container(
+                                      width: 72,
+                                      height: 72,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF8B5CF6),
+                                            Color(0xFF6366F1),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 3.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF8B5CF6).withOpacity(0.55),
+                                            blurRadius: 24,
+                                            spreadRadius: 3,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.favorite_rounded,
+                                          color: Colors.white,
+                                          size: 34,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          // Subtitle Copy tailored to Rently
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'צעד אחד קטן לדירה החדשה שלך',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'נמצאה התאמה מושלמת לדירה ב${p.address}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    color: Color(0xFF94A3B8),
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 36),
+
+                          // Action Buttons
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Column(
+                              children: [
+                                // Write Message / Open Chat Pill Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(30),
+                                      onTap: () => Navigator.of(context).pop(),
+                                      child: Ink(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(30),
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              Color(0xFF8B5CF6),
+                                              Color(0xFF6366F1),
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFF8B5CF6).withOpacity(0.4),
+                                              blurRadius: 20,
+                                              offset: const Offset(0, 5),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Center(
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                IconsaxPlusBold.message,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                              SizedBox(width: 10),
+                                              Text(
+                                                'כתיבת הודעה למשכיר',
+                                                style: TextStyle(
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                  letterSpacing: -0.2,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                // Keep Browsing Button
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text(
+                                    'המשך לדפדף',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -1115,6 +1155,162 @@ class _MatchCelebrationOverlayState extends State<MatchCelebrationOverlay>
       ),
     );
   }
+}
+
+class _MatchPolaroidCard extends StatelessWidget {
+  const _MatchPolaroidCard({
+    this.photoUrl,
+    this.media,
+    required this.title,
+    required this.fallbackIcon,
+  });
+
+  final String? photoUrl;
+  final PropertyMedia? media;
+  final String title;
+  final IconData fallbackIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 155,
+      height: 215,
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.45),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: _buildImage(),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF1E293B),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImage() {
+    if (photoUrl != null && photoUrl!.isNotEmpty) {
+      return Image.network(
+        photoUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+    }
+    if (media != null) {
+      return SafeMedia(
+        media: media!,
+        fallback: _fallback(),
+        fit: BoxFit.cover,
+      );
+    }
+    return _fallback();
+  }
+
+  Widget _fallback() => Container(
+        color: const Color(0xFF0F172A),
+        child: Center(
+          child: Icon(
+            fallbackIcon,
+            color: Colors.white54,
+            size: 36,
+          ),
+        ),
+      );
+}
+
+class _DashedArcPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.45)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    // Arc curving over left card towards bottom right
+    path.moveTo(size.width * 0.12, size.height * 0.28);
+    path.cubicTo(
+      size.width * 0.25, size.height * 0.05,
+      size.width * 0.65, size.height * 0.08,
+      size.width * 0.85, size.height * 0.35,
+    );
+    path.cubicTo(
+      size.width * 0.95, size.height * 0.55,
+      size.width * 0.88, size.height * 0.82,
+      size.width * 0.78, size.height * 0.88,
+    );
+
+    // Draw dashed path
+    const dashWidth = 6.0;
+    const dashSpace = 5.0;
+    for (final PathMetric metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final double len = (distance + dashWidth < metric.length)
+            ? dashWidth
+            : metric.length - distance;
+        canvas.drawPath(metric.extractPath(distance, distance + len), paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+
+    // Draw Arrow Head at the end of the arc
+    final metrics = path.computeMetrics().toList();
+    if (metrics.isNotEmpty) {
+      final endMetric = metrics.last;
+      final tangent = endMetric.getTangentForOffset(endMetric.length * 0.98);
+      if (tangent != null) {
+        final arrowPaint = Paint()
+          ..color = Colors.white.withOpacity(0.65)
+          ..style = PaintingStyle.fill;
+        final arrowPath = Path();
+        final tip = tangent.position;
+        final angle = tangent.angle;
+        arrowPath.moveTo(tip.dx, tip.dy);
+        arrowPath.lineTo(
+          tip.dx - 10 * math.cos(angle - 0.45),
+          tip.dy - 10 * math.sin(angle - 0.45),
+        );
+        arrowPath.lineTo(
+          tip.dx - 10 * math.cos(angle + 0.45),
+          tip.dy - 10 * math.sin(angle + 0.45),
+        );
+        arrowPath.close();
+        canvas.drawPath(arrowPath, arrowPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _MatchPropertyImage extends StatelessWidget {
@@ -1145,6 +1341,50 @@ class _MatchPropertyImage extends StatelessWidget {
           ),
         ),
       );
+}
+
+// Real engagement badges for a grid card, built from the listing's own market
+// signals. Each badge appears only when its value is > 0, and "חדש!" only when
+// the listing was created in the last 7 days — no fabricated numbers.
+List<Widget> _realSignalBadges(RentalProperty p) {
+  final s = p.marketSignals;
+  final isNew = p.createdAt != null &&
+      DateTime.now().difference(p.createdAt!).inDays < 7;
+  final badges = <Widget>[
+    if (isNew)
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.red.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.red.withOpacity(0.4), width: 0.8),
+        ),
+        child: const Text('חדש!',
+            style: TextStyle(
+                color: AppColors.dangerSoft,
+                fontWeight: FontWeight.w900,
+                fontSize: 9)),
+      ),
+    if (s.views > 0)
+      _GlassPillBadge(icon: IconsaxPlusLinear.eye, label: '${s.views}'),
+    if (s.likes > 0)
+      _GlassPillBadge(icon: IconsaxPlusLinear.heart, label: '${s.likes}'),
+    if (s.liveViewers > 0)
+      _GlassPillBadge(
+          icon: IconsaxPlusLinear.people, label: '${s.liveViewers}'),
+  ];
+  if (badges.isEmpty) return const [];
+  return [
+    Row(
+      children: [
+        for (var i = 0; i < badges.length; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          badges[i],
+        ],
+      ],
+    ),
+    const SizedBox(height: 6),
+  ];
 }
 
 class _GlassPillBadge extends StatelessWidget {
@@ -3242,6 +3482,39 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                               },
                             );
                           }).toList(),
+                        ),
+                        const SizedBox(height: 20),
+                        // ── מקומות בסביבה ──
+                        _FilterSection(
+                          title: 'מקומות בסביבה שחשובים לי',
+                          icon: IconsaxPlusLinear.location,
+                          badge: f.preferredNearby.isNotEmpty
+                              ? '${f.preferredNearby.length}'
+                              : null,
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.only(right: 2, top: 2, bottom: 10),
+                          child: Text(
+                            'מה שתבחרו יופיע ראשון בעמוד הדירה וישפיע על הדירוג',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final opt in _nearbyPrefOptions)
+                              _NearbyKindChip(
+                                label: opt.$2,
+                                icon: opt.$3,
+                                selected: f.preferredNearby.contains(opt.$1),
+                                onTap: () => _setDraftFilters(
+                                  f.toggleNearby(opt.$1),
+                                  provider,
+                                ),
+                              ),
+                          ],
                         ),
                       ],
                     ),
@@ -6065,7 +6338,7 @@ class _PillSelectorState extends State<_PillSelector> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final fallbackWidth = MediaQuery.sizeOf(context).width - 128;
+        final fallbackWidth = MediaQuery.sizeOf(context).width - 124;
         final maxWidth =
             constraints.hasBoundedWidth ? constraints.maxWidth : fallbackWidth;
         final width = math.max(0.0, math.min(340.0, maxWidth));
@@ -6122,8 +6395,13 @@ class _PillSelectorState extends State<_PillSelector> {
                     padding: const EdgeInsets.all(pad),
                     child: Directionality(
                       textDirection: TextDirection.ltr,
+                      // Clip the sliding thumb's glow to the pill. An ancestor
+                      // ClipRRect over a BackdropFilter does NOT contain child
+                      // shadows on Android/Impeller, so the thumb glow leaked
+                      // outside the component; clipping the Stack itself fixes it
+                      // on both platforms (parent ClipRRect still rounds it).
                       child: Stack(
-                        clipBehavior: Clip.none,
+                        clipBehavior: Clip.hardEdge,
                         children: [
                           AnimatedPositioned(
                             duration: const Duration(milliseconds: 300),
@@ -6202,37 +6480,44 @@ class _PillSelectorState extends State<_PillSelector> {
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOutCubic,
           scale: pressed ? 0.93 : (isSelected ? 1.03 : 1),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedScale(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutBack,
-                    scale: isSelected ? 1.14 : 1,
-                    child: Icon(
-                      icon,
-                      size: 17,
-                      color: isSelected ? Colors.white : inactiveColor,
-                      shadows: isSelected ? selectedShadow : null,
+          child: Padding(
+            // Inset so the icon+text always stay INSIDE the coloured thumb — the
+            // selected scale + the wider Android Hebrew rendering otherwise
+            // spilled them past the thumb's edges ("יוצא מהקומפוננטה הצבעונית").
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedScale(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutBack,
+                      scale: isSelected ? 1.14 : 1,
+                      child: Icon(
+                        icon,
+                        size: 16,
+                        color: isSelected ? Colors.white : inactiveColor,
+                        shadows: isSelected ? selectedShadow : null,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 7),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1,
-                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w800,
-                      color: isSelected ? Colors.white : inactiveColor,
-                      shadows: isSelected ? selectedShadow : null,
+                    const SizedBox(width: 5),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1,
+                        fontWeight:
+                            isSelected ? FontWeight.w900 : FontWeight.w800,
+                        color: isSelected ? Colors.white : inactiveColor,
+                        shadows: isSelected ? selectedShadow : null,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -6356,3 +6641,81 @@ class _SlidingSelectorThumb extends StatelessWidget {
   }
 }
 
+
+/// Curated nearby-place categories offered in the search filter (short labels +
+/// the same icons the property card uses). The seeker's picks are surfaced first
+/// on the property page AND boost the matching ranking dimensions.
+const List<(NearbyKind, String, IconData)> _nearbyPrefOptions = [
+  (NearbyKind.schools, 'בתי ספר', IconsaxPlusLinear.teacher),
+  (NearbyKind.kindergartens, 'גנים', IconsaxPlusLinear.emoji_happy),
+  (NearbyKind.playgrounds, 'גני שעשועים', IconsaxPlusLinear.game),
+  (NearbyKind.parks, 'פארקים', IconsaxPlusLinear.tree),
+  (NearbyKind.supermarkets, 'סופרים', IconsaxPlusLinear.shopping_cart),
+  (NearbyKind.clinics, 'קופות חולים', IconsaxPlusLinear.hospital),
+  (NearbyKind.pharmacies, 'בתי מרקחת', IconsaxPlusLinear.health),
+  (NearbyKind.hospitals, 'בתי חולים', IconsaxPlusLinear.heart),
+  (NearbyKind.transit, 'תחבורה ציבורית', IconsaxPlusLinear.bus),
+  (NearbyKind.gyms, 'חדרי כושר', IconsaxPlusLinear.weight),
+  (NearbyKind.pools, 'בריכות', IconsaxPlusLinear.drop),
+  (NearbyKind.dining, 'מסעדות ובתי קפה', IconsaxPlusLinear.reserve),
+  (NearbyKind.nightlife, 'בילוי', IconsaxPlusLinear.cup),
+  (NearbyKind.culture, 'תרבות', IconsaxPlusLinear.gallery),
+  (NearbyKind.synagogues, 'בתי כנסת', IconsaxPlusLinear.buildings),
+  (NearbyKind.dogParks, 'גינות כלבים', IconsaxPlusLinear.pet),
+  (NearbyKind.coworking, 'חללי עבודה', IconsaxPlusLinear.briefcase),
+  (NearbyKind.parking, 'חניונים', IconsaxPlusLinear.car),
+];
+
+/// A binary (important / not) selectable chip for a nearby-place category.
+class _NearbyKindChip extends StatelessWidget {
+  const _NearbyKindChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppColors.primary;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? accent.withValues(alpha: 0.12) : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? accent : AppColors.borderLight,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: selected ? accent : AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected ? accent : AppColors.textPrimary,
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.check_rounded, size: 15, color: accent),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -103,20 +103,23 @@ class BrokerToolsScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.navy,
           elevation: 0,
           centerTitle: true,
           title: const Text(
             'כלי הסוכן',
             style: TextStyle(
-              color: Colors.white,
+              color: AppColors.navy,
               fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
           ),
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: const IconThemeData(color: AppColors.navy),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
         ),
         body: SafeArea(
           top: false,
@@ -129,17 +132,16 @@ class BrokerToolsScreen extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
+                    color: AppColors.slate50,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.18)),
+                    border: Border.all(color: AppColors.slate200),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(IconsaxPlusLinear.briefcase,
-                          color: AppColors.primary, size: 24),
-                      const SizedBox(width: 12),
-                      const Expanded(
+                          color: Colors.black, size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
                         child: Text(
                           'כל מה שצריך לניהול העסק שלך במקום אחד — לקוחות, '
                           'לידים, צפיות, עמלות ועוד. הקש על כלי כדי להתחיל.',
@@ -212,10 +214,10 @@ class _BrokerToolTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+          border: Border.all(color: AppColors.slate200, width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: AppColors.shadow.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -228,10 +230,11 @@ class _BrokerToolTile extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: tool.color.withValues(alpha: 0.12),
+                color: AppColors.slate50,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.slate200, width: 1.2),
               ),
-              child: Icon(tool.icon, color: tool.color, size: 28),
+              child: Icon(tool.icon, color: Colors.black, size: 26),
             ),
             const Spacer(),
             Text(

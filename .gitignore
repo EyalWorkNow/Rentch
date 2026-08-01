@@ -77,3 +77,4 @@ aws/lambda/*/node_modules/
 # local aws-sdk for scripts/backfill (installed on demand)
 scripts/node_modules/
 scripts/package-lock.json
+aws/lambda/billing-cron/function.zip

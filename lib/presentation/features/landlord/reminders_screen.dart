@@ -3,6 +3,7 @@ import 'package:dating_app/core/services/notification_service.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 /// Gentle, large-text reminders hub for landlords (older audience).
@@ -299,8 +300,46 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
 
   Future<void> _delete(int id) async {
     await widget.notifications.cancel(id);
+    if (!mounted) return; // guard: user may have popped mid-await
     setState(_reload);
   }
+
+  // Re-open the sheet pre-filled, then reschedule (cancel old → schedule new).
+  Future<void> _edit(_PendingRow row) async {
+    final result = await showModalBottomSheet<_ManualReminder>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddReminderSheet(initialText: row.text),
+    );
+    if (result == null || !mounted) return;
+    await widget.notifications.cancel(row.id);
+    await widget.notifications.scheduleReminder(
+      id: result.id,
+      title: 'תזכורת',
+      body: result.text,
+      when: result.when,
+    );
+    if (!mounted) return;
+    setState(_reload);
+  }
+
+  // Archive = cancel the scheduled alert but KEEP the text in a local archive
+  // (SharedPreferences), so it's not lost and can be restored/reviewed.
+  Future<void> _archive(_PendingRow row) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_archiveKey) ?? <String>[];
+    list.add(row.text);
+    await prefs.setStringList(_archiveKey, list);
+    await widget.notifications.cancel(row.id);
+    if (!mounted) return;
+    setState(_reload);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('התזכורת הועברה לארכיון')),
+    );
+  }
+
+  static const String _archiveKey = 'reminders_archive_v1';
 
   @override
   Widget build(BuildContext context) {
@@ -355,10 +394,43 @@ class _ManualRemindersListState extends State<_ManualRemindersList> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => _delete(r.id),
-                      icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                      tooltip: 'מחק',
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert,
+                          color: AppColors.textSecondary),
+                      tooltip: 'פעולות',
+                      onSelected: (v) {
+                        if (v == 'edit') _edit(r);
+                        if (v == 'archive') _archive(r);
+                        if (v == 'delete') _delete(r.id);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(children: [
+                            Icon(Icons.edit_outlined, size: 20),
+                            SizedBox(width: 10),
+                            Text('עריכה'),
+                          ]),
+                        ),
+                        PopupMenuItem(
+                          value: 'archive',
+                          child: Row(children: [
+                            Icon(Icons.archive_outlined, size: 20),
+                            SizedBox(width: 10),
+                            Text('העברה לארכיון'),
+                          ]),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(children: [
+                            Icon(Icons.delete_outline,
+                                size: 20, color: AppColors.coral),
+                            SizedBox(width: 10),
+                            Text('מחיקה',
+                                style: TextStyle(color: AppColors.coral)),
+                          ]),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -378,17 +450,19 @@ class _PendingRow {
 
 /// Bottom sheet that captures a manual reminder: free text + a date/time.
 class _AddReminderSheet extends StatefulWidget {
-  _AddReminderSheet();
+  _AddReminderSheet({this.initialText, this.initialWhen});
+  final String? initialText;
+  final DateTime? initialWhen;
 
   @override
   State<_AddReminderSheet> createState() => _AddReminderSheetState();
 }
 
 class _AddReminderSheetState extends State<_AddReminderSheet> {
-  final TextEditingController _text = TextEditingController(
-    text: 'לגבות שכר דירה',
+  late final TextEditingController _text = TextEditingController(
+    text: widget.initialText ?? 'לגבות שכר דירה',
   );
-  DateTime _when = _defaultWhen();
+  late DateTime _when = widget.initialWhen ?? _defaultWhen();
 
   /// Default to the 10th of next month at 9:00 — the common rent-due cadence.
   static DateTime _defaultWhen() {
@@ -417,6 +491,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
       context: context,
       initialTime: TimeOfDay(hour: _when.hour, minute: _when.minute),
     );
+    if (!mounted) return;
     setState(() {
       _when = DateTime(
         date.year,

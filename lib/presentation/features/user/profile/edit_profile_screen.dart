@@ -219,6 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (file == null) return;
 
     final localPath = await _storageService.saveImageLocally(file);
+    if (!mounted) return;
     final entry = _PhotoEntry.local(localPath);
     setState(() => _photos.add(entry));
 

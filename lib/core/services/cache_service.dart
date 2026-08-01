@@ -67,9 +67,11 @@ class AppCache {
   AppCache._();
   static final AppCache instance = AppCache._();
 
-  /// Property list pages, keyed by `"$areaId:$offset"`.
+  /// Property list pages, keyed by `"$areaId:$offset"`. Stores the whole page —
+  /// `{rows, hasMore, nextCursor}` — not just the rows, so a cache hit preserves
+  /// pagination instead of collapsing it to hasMore:false.
   /// 5-minute TTL covers a typical browse session without serving stale data.
-  final propertyPages = LruCache<String, List<Map<String, dynamic>>>(
+  final propertyPages = LruCache<String, Map<String, dynamic>>(
     maxSize: 60,
     ttl: const Duration(minutes: 5),
   );

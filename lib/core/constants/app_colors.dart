@@ -112,7 +112,7 @@ class AppColors {
   static const Color carrot = Color(0xFFE67E22); // warm highlight (streaks/FOMO)
 
   // Neighbourhood/price SCORE tiers — a fixed traffic-scale, brand-independent.
-  static const Color scoreStrong = successDeep; // ≥80
+  static const Color scoreStrong = successDeep; // ≥807
   static const Color scoreGood = infoDeep;       // 60–79
   static const Color scoreMixed = warningDeep;   // 40–59
 
@@ -157,11 +157,11 @@ class AppColors {
   // FIXED brand-teal consts (kept const for identity/entry screens that must
   // stay teal). For anything that should FOLLOW the accent, use primary /
   // primaryLight / primaryDark / primaryLight2 directly — not these.
-  static const Color tealBrand = Color(0xFF059669);
-  static const Color tealBright = Color(0xFF34D399);
-  static const Color tealDark = Color(0xFF047857);
-  static const Color tealLight = Color(0xFF10B981);
-  static const Color tealPale = Color(0xFFECFDF5);
+  static const Color tealBrand = Color(0xFF2563EB);
+  static const Color tealBright = Color(0xFF60A5FA);
+  static const Color tealDark = Color(0xFF1D4ED8);
+  static const Color tealLight = Color(0xFF3B82F6);
+  static const Color tealPale = Color(0xFFEFF6FF);
   static const Color violet = Color(0xFF8B5CF6);
   static const Color yellowPale = Color(0xFFFEF08A);
 }

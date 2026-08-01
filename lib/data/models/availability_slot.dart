@@ -46,9 +46,16 @@ class AvailabilitySlot {
   bool get isUpcoming => start.isAfter(DateTime.now());
 
   /// Two slots overlap iff each starts before the other ends. Used to stop the
-  /// landlord double-booking the same window.
+  /// landlord double-booking the same window. Windows tagged to DIFFERENT
+  /// apartments are separate offerings and may share a time — only same-property
+  /// (or untagged) windows clash.
   bool clashesWith(AvailabilitySlot other) {
     if (other.id == id) return false;
+    if (propertyId.isNotEmpty &&
+        other.propertyId.isNotEmpty &&
+        propertyId != other.propertyId) {
+      return false;
+    }
     return start.isBefore(other.end) && other.start.isBefore(end);
   }
 

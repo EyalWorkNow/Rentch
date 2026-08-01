@@ -126,11 +126,32 @@ class ChatProvider extends ChangeNotifier {
       if (!_disposed && created != null) {
         _messages = _messages.map((m) => m.id == tempId ? created : m).toList();
         _pendingTempId = null;
+      } else if (!_disposed && created == null) {
+        // Send failed — flag the optimistic bubble so it isn't shown as
+        // delivered, and stop waiting for a remote echo that won't come.
+        _messages = _messages
+            .map((m) => m.id == tempId ? m.copyWith(failed: true) : m)
+            .toList();
+        _pendingTempId = null;
       }
     }
 
     if (_disposed) return;
     _isSending = false;
+    _safeNotify();
+  }
+
+  // ── Deleting ─────────────────────────────────────────────────────────────────
+
+  void deleteMessage(String messageId) {
+    _messages.removeWhere((m) => m.id == messageId);
+    _safeNotify();
+  }
+
+  /// Clears the visible conversation history (local). Used by the chat-info
+  /// screen's "מחיקת היסטוריית השיחה" action.
+  void clearMessages() {
+    _messages = [];
     _safeNotify();
   }
 

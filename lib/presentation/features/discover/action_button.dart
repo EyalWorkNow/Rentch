@@ -163,7 +163,8 @@ class _ActionButtonState extends State<_ActionButton>
   @override
   Widget build(BuildContext context) {
     final bool isDark3d = widget.iconColor == AppColors.navy;
-    final actualIconColor = isDark3d ? Colors.white : widget.iconColor;
+    final bool isBlack = widget.iconColor == const Color(0xFF000000) || widget.iconColor == Colors.black;
+    final actualIconColor = (isDark3d || isBlack) ? Colors.white : widget.iconColor;
 
     return Tooltip(
       message: widget.tooltip,

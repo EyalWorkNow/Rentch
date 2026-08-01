@@ -23,12 +23,22 @@ class NearbyPlacesCard extends StatefulWidget {
     this.relevantOnly = false,
     this.carousel = false,
     this.maxChips = 5,
+    this.showAllKinds = false,
+    this.preferredKinds = const <NearbyKind>{},
   });
 
   final double lat;
   final double lon;
   final String city;
   final NearbyProfile profile;
+
+  /// When true (property detail), expose EVERY nearby kind that has data — not
+  /// just the persona-relevant subset — persona-relevant first, then the rest.
+  final bool showAllKinds;
+
+  /// The seeker's explicitly-chosen important categories (from the search
+  /// filter). These are surfaced FIRST, ahead of persona ordering.
+  final Set<NearbyKind> preferredKinds;
 
   /// When true (the chat "למה זו" preview), show ONLY the sections relevant to the
   /// seeker's query. When false (the property detail screen), show ALL kinds with
@@ -79,13 +89,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       IsraelGeoIndex.loadLifestylePois(),
     ]);
     if (!mounted) return;
-    // Chat preview → only what's relevant to the seeker (until they ask for more);
-    // detail screen → ALL kinds with data (full reference), persona-relevant first.
-    // Spec-primary (curated 504-scenario mapping) with heuristic fallback.
-    final sections = personalizedNearbySections(
-      widget.profile,
-      coreOnly: widget.relevantOnly && !_expandedAll,
-    );
+    final sections = _resolveSections();
     final out = <(NearbySection, List<NearbyPlace>)>[];
     var scanned = 0;
     for (final s in sections) {
@@ -103,6 +107,44 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       _selected = _selected.clamp(0, out.isEmpty ? 0 : out.length - 1);
       _loaded = true;
     });
+  }
+
+  // Decide which nearby sections to render, in order:
+  //   1) the seeker's explicitly-preferred categories (from the search filter),
+  //   2) persona/spec-relevant sections,
+  //   3) (showAllKinds) every remaining kind, so the detail page is a full
+  //      browsable reference. Secular seekers never get synagogues/worship.
+  List<NearbySection> _resolveSections() {
+    // Spec-primary (curated 504-scenario mapping) with heuristic fallback.
+    final base = personalizedNearbySections(
+      widget.profile,
+      coreOnly: widget.relevantOnly && !_expandedAll,
+    );
+    if (!widget.showAllKinds && widget.preferredKinds.isEmpty) return base;
+
+    final have = base.map((s) => s.kind).toSet();
+    bool suppressed(NearbyKind k) => widget.profile.secular &&
+        (k == NearbyKind.synagogues || k == NearbyKind.worship);
+
+    final all = <NearbySection>[...base];
+    if (widget.showAllKinds) {
+      for (final k in NearbyKind.values) {
+        if (have.contains(k) || suppressed(k)) continue;
+        all.add(NearbySection(k, priority: 0));
+        have.add(k);
+      }
+    }
+    if (widget.preferredKinds.isEmpty) return all;
+
+    // Move preferred categories to the front (adding any not already present).
+    final pref = <NearbySection>[];
+    for (final k in widget.preferredKinds) {
+      if (suppressed(k)) continue;
+      final match = all.where((s) => s.kind == k);
+      pref.add(match.isNotEmpty ? match.first : NearbySection(k, priority: 0));
+    }
+    final rest = all.where((s) => !widget.preferredKinds.contains(s.kind));
+    return [...pref, ...rest];
   }
 
   // Chat preview: widen from relevant-only to every nearby kind, on demand.

@@ -105,8 +105,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     return ErikState.idle;
   }
 
-  /// True whenever a voice conversation is going (hands-free or mic on).
-  bool get _callActive => _conversationMode || _listening;
 
   /// The short status line under the orb, derived from the real state.
   String get _statusLine {
@@ -816,22 +814,14 @@ class _AssistantScreenState extends State<AssistantScreen>
   }
 
   Widget _voiceOrb() {
-    final active = _callActive;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _toggleConversation,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeOut,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: _kAccent.withValues(alpha: active ? 0.34 : 0.16),
-              blurRadius: active ? 72 : 44,
-              spreadRadius: active ? 8 : 2,
-            ),
-          ],
         ),
         child: ValueListenableBuilder<double>(
           valueListenable: _soundLevelNotifier,

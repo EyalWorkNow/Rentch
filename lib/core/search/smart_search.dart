@@ -154,11 +154,13 @@ class SearchQuery {
     List<String>? excludeAreas,
     this.areaDir,
     this.areaDirExclude = false,
+    Set<String>? preferredNearbyDims,
   })  : amenities = amenities ?? <String>{},
         intents = intents ?? <String>{},
         weights = weights ?? const <String, double>{},
         requiredFeatures = requiredFeatures ?? const <String>{},
-        excludeAreas = excludeAreas ?? const <String>[];
+        excludeAreas = excludeAreas ?? const <String>[],
+        preferredNearbyDims = preferredNearbyDims ?? const <String>{};
 
   final String? city;
   final String? neighborhood;
@@ -202,6 +204,11 @@ class SearchQuery {
   /// Places (cities/neighborhoods) the user asked to AVOID ("לא רמת גן", "חוץ
   /// מפלורנטין"). Soft: listings there are strongly down-ranked, not hard-dropped.
   final List<String> excludeAreas;
+
+  /// Ranking dimensions to BOOST because the seeker explicitly picked those
+  /// nearby-place categories in the filter (mapped via nearbyKindToDimension).
+  /// Sharpened in PreferenceModelBuilder.build without zeroing other priors.
+  final Set<String> preferredNearbyDims;
 
   /// A sub-city DIRECTION the seeker cares about — one of
   /// 'דרום'/'צפון'/'מרכז'/'מזרח'/'מערב' — resolved against the city centroid +
@@ -306,12 +313,18 @@ class SearchQuery {
 
 class ScoredProperty {
   ScoredProperty(this.property, this.score, this.tags, this.trainKm, this.exact,
-      [this.scorecard]);
+      [this.scorecard, this.fallbackNote]);
   final RentalProperty property;
   final double score;
   final List<String> tags;
   final double? trainKm;
   final bool exact;
+
+  /// Non-null only on a relaxed BACKFILL result — a flat kept to fill out a thin
+  /// shortlist even though it slightly misses the ask (just outside the town
+  /// radius, or a little over budget). Carries the honest reason to badge on the
+  /// card, e.g. "כ-8 ק״מ מחדרה" / "מעט מעל התקציב". Strict matches leave it null.
+  final String? fallbackNote;
 
   /// Full data-grounded reasoning (engine breakdown + raw stats + persona +
   /// LLM explanation). Null on legacy/non-engine paths; the transparency UI
@@ -787,6 +800,18 @@ class SmartSearch {
                 r'עם כלב|יש לי כלב|יש לי חתול|pet.?friendly|dog.?friendly')
             .hasMatch(text)) {
       required.add('petsAllowed');
+    }
+    // CAR: someone who explicitly says they have a car NEEDS parking — make it a
+    // hard gate so only listings with parking are shown (unless they also say
+    // they're car-free, in which case the negative wins).
+    if (RegExp(r'יש לי רכב|יש לי אוטו|יש לי מכונית|יש לי גם רכב|אני עם רכב|'
+                r'באתי עם רכב|עם הרכב|צריך חניה לרכב|יש לי ג׳יפ|i have a car|'
+                r'with a car|own a car|got a car')
+            .hasMatch(text) &&
+        !RegExp(r'אין לי רכב|בלי רכב|ללא רכב|no car|car.?free')
+            .hasMatch(text)) {
+      required.add('parking');
+      amenities.add('feat_parking'); // also weight it, not only gate
     }
     // Explicit "חייב/חובה/מוכרח/הכרחי/חשוב שיהיה + <feature>" → a must-have. The
     // "חשוב שיהיה / חשוב לי ש / צריך שיהיה" phrasings are strong enough to gate.

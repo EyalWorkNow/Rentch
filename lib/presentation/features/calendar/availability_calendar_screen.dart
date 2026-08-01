@@ -336,8 +336,12 @@ class _AvailabilityCalendarScreenState
     
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: AppColors.cloud,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          textTheme: Theme.of(context).textTheme.apply(fontFamily: 'sf hebrew rounded'),
+        ),
+        child: Scaffold(
+          backgroundColor: AppColors.cloud,
         appBar: AppBar(
           backgroundColor: AppColors.cloud,
           elevation: 0,
@@ -346,16 +350,17 @@ class _AvailabilityCalendarScreenState
             onTap: () => Navigator.of(context).pop(),
             child: Container(
               margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
               ),
-              child: const Icon(Icons.arrow_back, color: AppColors.navy, size: 20),
+              child: const Icon(Icons.arrow_forward, color: AppColors.navy, size: 20),
             ),
           ),
-          centerTitle: false,
+          centerTitle: true,
           title: const Text('היומן שלי',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.navy)),
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.navy, fontFamily: 'sf hebrew rounded')),
           actions: [
             GestureDetector(
               onTap: _pickAnyDate,
@@ -417,13 +422,13 @@ class _AvailabilityCalendarScreenState
                       decoration: InputDecoration(
                         hintText: 'חפשו צפיות וחלונות...',
                         hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 15),
-                        prefixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary, size: 20),
+                        suffixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary, size: 20),
                         filled: true,
                         fillColor: Colors.white,
                         contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(100),
-                          borderSide: BorderSide(color: AppColors.slate200, width: 1),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(100),
@@ -440,6 +445,7 @@ class _AvailabilityCalendarScreenState
                     Expanded(child: _agendaView(provider)),
                 ],
               ),
+        ),
       ),
     );
   }
@@ -458,8 +464,8 @@ class _AvailabilityCalendarScreenState
             final w = c.maxWidth;
             final inner = (w - pad * 2).clamp(0.0, double.infinity);
             final segW = inner / 2;
-            // Visual order (LTR): [יום, כל הקרובים]. Thumb right when agenda.
-            final thumbLeft = pad + (_agenda ? segW : 0);
+            // Visual order (RTL): [יום, כל הקרובים].
+            final thumbRight = pad + (_agenda ? segW : 0);
 
             Widget seg(String label, IconData icon, bool agenda) {
               final selected = _agenda == agenda;
@@ -510,60 +516,26 @@ class _AvailabilityCalendarScreenState
 
             return DecoratedBox(
               decoration: BoxDecoration(
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(26),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.96),
-                    AppColors.slate50,
-                    AppColors.slate100,
-                  ],
-                ),
                 border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.8), width: 1.4),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.navy.withValues(alpha: 0.08),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                    color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
               ),
               child: Directionality(
-                textDirection: TextDirection.ltr,
+                textDirection: TextDirection.rtl,
                 child: Stack(
                   children: [
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeOutCubic,
-                      left: thumbLeft,
+                      right: thumbRight,
                       width: segW,
                       top: pad,
                       bottom: pad,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(22),
-                          color: AppColors.isBrokerAccent
-                              ? Colors.black
-                              : null,
-                          gradient: AppColors.isBrokerAccent
-                              ? null
-                              : LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    AppColors.primary,
-                                    AppColors.primary,
-                                  ],
-                                ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.35),
-                              blurRadius: 12,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -662,14 +634,19 @@ class _AvailabilityCalendarScreenState
                     ),
                     const SizedBox(height: 6),
                     // Marker reflects BOTH booked (coral) and open (primary) so
-                    // a fully-booked day never looks empty.
+                    // a fully-booked day never looks empty and reads differently
+                    // from a day with only open windows.
                     if (booked > 0 || open > 0)
                       Container(
                         width: 5,
                         height: 5,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: selected ? AppColors.primary : AppColors.slate400,
+                          color: selected
+                              ? Colors.white
+                              : (booked > 0
+                                  ? AppColors.coral
+                                  : AppColors.primary),
                         ),
                       )
                     else

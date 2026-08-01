@@ -57,6 +57,7 @@ class AreaProfile {
     required this.parkAccess,
     required this.pfv,
     required this.investment,
+    this.demographicsAvailable = false,
   });
 
   final double lat, lon;
@@ -68,6 +69,11 @@ class AreaProfile {
   final double nightlife, employment, futureValue, health, parkAccess;
   final PropertyFeatureVector pfv;
   final InvestmentLens investment;
+
+  /// True only when a REAL CBS statistical area backs the demographic shares.
+  /// When false, [youngShare]/[childShare]/[seniorShare] are neutral 0.5
+  /// placeholders (dataset not loaded) and must NOT be shown as precise %.
+  final bool demographicsAvailable;
 }
 
 class PersonaFit {
@@ -189,6 +195,8 @@ class AreaIntelligence {
       youngShare: g('demo_young', 0.5),
       childShare: g('demo_child', 0.5),
       seniorShare: g('demo_senior', 0.5),
+      // Real demographics require a matched CBS statistical area.
+      demographicsAvailable: sa != null,
       nightlife: g('nightlife'),
       employment: g('employment_access'),
       futureValue: g('future_value'),

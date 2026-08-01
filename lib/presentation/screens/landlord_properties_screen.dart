@@ -6,6 +6,8 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
@@ -437,6 +439,91 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
     );
   }
 
+  // Boost ("הקפצת מודעה"): gated by an active subscription + monthly quota.
+  // No subscription → open the paywall. Otherwise confirm, call the server, and
+  // reflect the result (server is authoritative on entitlement/quota).
+  Future<void> _handleBoost(RentalProperty property) async {
+    final provider = context.read<DatingProvider>();
+    final sub = provider.subscription;
+    void snack(String msg, {bool ok = false}) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg),
+        backgroundColor:
+            ok ? const Color(0xFF22C55E) : const Color(0xFFFF5A67),
+      ));
+    }
+
+    // Not entitled → send them to the paywall.
+    if (sub == null || !sub.entitled) {
+      await Navigator.of(context).push(MaterialPageRoute(
+        settings: const RouteSettings(name: 'PaywallScreen'),
+        builder: (_) => const PaywallScreen(reason: 'boost'),
+      ));
+      if (mounted) await provider.refreshSubscription();
+      return;
+    }
+    // Entitled but out of boosts this month.
+    if (!sub.canBoost) {
+      snack('ניצלת את מכסת ההקפצות החודשית. מתחדשת בתחילת החודש.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: const Text('להקפיץ את המודעה?',
+              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+          content: Text(
+            'המודעה תופיע בראש הפיד לשוכרים למשך 7 ימים.'
+            '${sub.boostUnlimited ? '' : ' נותרו ${sub.boostRemaining ?? 0} הקפצות החודש.'}',
+            style: const TextStyle(color: Color(0xFF64748B), height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('ביטול', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('הקפצה',
+                  style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.w900)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    final r = await AwsApiClient.instance.boostProperty(property.id);
+    if (!mounted) return;
+    if (r.ok) {
+      provider.applyLocalBoost(property.id,
+          r.boostedUntil ?? DateTime.now().add(const Duration(days: 7)));
+      await provider.refreshSubscription();
+      snack(
+        r.unlimited
+            ? 'המודעה הוקפצה! 🚀'
+            : 'המודעה הוקפצה! נותרו ${r.remaining ?? 0} הקפצות החודש.',
+        ok: true,
+      );
+    } else if (r.error == 'not_entitled') {
+      await Navigator.of(context).push(MaterialPageRoute(
+        settings: const RouteSettings(name: 'PaywallScreen'),
+        builder: (_) => const PaywallScreen(reason: 'boost'),
+      ));
+      if (mounted) await provider.refreshSubscription();
+    } else if (r.error == 'quota_exceeded') {
+      snack('ניצלת את מכסת ההקפצות החודשית.');
+    } else {
+      snack('לא הצלחנו להקפיץ כרגע. נסו שוב.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
@@ -771,6 +858,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                                             existing: contract,
                                             matches: propertyMatches,
                                           ),
+                                          onBoost: () => _handleBoost(property),
                                         ),
                                       );
                                     },
@@ -799,6 +887,7 @@ class _PropertyManageCard extends StatelessWidget {
     required this.onEdit,
     required this.onOpen,
     required this.onContract,
+    required this.onBoost,
   });
 
   final RentalProperty property;
@@ -806,6 +895,7 @@ class _PropertyManageCard extends StatelessWidget {
   final ContractStatus? contractStatus;
   final VoidCallback onRemove;
   final VoidCallback onEdit;
+  final VoidCallback onBoost;
 
   /// Tapping anywhere on the card opens the property (detail/preview).
   final VoidCallback onOpen;
@@ -829,12 +919,20 @@ class _PropertyManageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final boostFrame = property.isUltraBoosted
+        ? AppColors.amber
+        : (property.isBoosted ? AppColors.primary : null);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
+        border: boostFrame != null
+            ? Border.all(color: boostFrame, width: 2.5)
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: boostFrame != null
+                ? boostFrame.withValues(alpha: 0.4)
+                : Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -885,6 +983,21 @@ class _PropertyManageCard extends StatelessWidget {
                             scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
+                                if (property.isUltraBoosted) ...[
+                                  const _GlassTag(
+                                    icon: Icons.workspace_premium_rounded,
+                                    label: 'Ultra',
+                                    gold: true,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ] else if (property.isBoosted) ...[
+                                  const _GlassTag(
+                                    icon: Icons.bolt_rounded,
+                                    label: 'מקודם',
+                                    accent: true,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
                                 _GlassTag(
                                   icon: Icons.king_bed_outlined,
                                   label: '${property.roomsLabel} חד׳',
@@ -962,7 +1075,12 @@ class _PropertyManageCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Actions: Contract + Edit (eye removed — card tap opens).
+                        // Actions: Boost + Contract + Edit (eye removed — card tap opens).
+                        _GlassAction(
+                          icon: IconsaxPlusLinear.flash_1,
+                          onTap: onBoost,
+                        ),
+                        const SizedBox(width: 8),
                         _GlassAction(
                           icon: IconsaxPlusLinear.document_text,
                           onTap: onContract,
@@ -1144,13 +1262,25 @@ class _GlassTag extends StatelessWidget {
   const _GlassTag({
     required this.icon,
     required this.label,
+    this.gold = false,
+    this.accent = false,
   });
 
   final IconData icon;
   final String label;
+  final bool gold; // Ultra boost — gold fill
+  final bool accent; // regular boost — brand accent fill
 
   @override
   Widget build(BuildContext context) {
+    final fill = gold
+        ? AppColors.amberDark.withValues(alpha: 0.85)
+        : (accent
+            ? AppColors.primary.withValues(alpha: 0.85)
+            : Colors.black.withValues(alpha: 0.25));
+    final borderCol = (gold || accent)
+        ? Colors.white.withValues(alpha: 0.45)
+        : Colors.white.withValues(alpha: 0.20);
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -1158,10 +1288,10 @@ class _GlassTag extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.25),
+            color: fill,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.20),
+              color: borderCol,
               width: 1.5,
             ),
           ),

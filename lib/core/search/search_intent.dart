@@ -111,7 +111,9 @@ class SearchIntent {
         r'\bsolo\b|\bsingle\b|living alone|on my own|by myself|young professional',
         caseSensitive: false),
     couple: RegExp(
-        r'זוג|זוגי|בן ?ה?זוג|בת ?ה?זוג|בני ?ה?זוג|בזוגיות|נשואים טריים|'
+        // Guard bare "זוג" against "זוג נעליים/גרביים/מגפיים…" (a PAIR of X),
+        // matching the guard in NearbyProfile.fromText.
+        r'זוג(?!\s*(נעל|גרב|מגפ|כפכף|גורב))|זוגי|בן ?ה?זוג|בת ?ה?זוג|בני ?ה?זוג|בזוגיות|נשואים טריים|'
         r'couple|partner|spouse|two of us|newlywed',
         caseSensitive: false),
     wfh: RegExp(

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dating_app/core/search/nearby_relevance.dart' show NearbyKind;
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/scanned_room.dart';
 import 'package:latlong2/latlong.dart';
@@ -26,6 +27,22 @@ enum MoveInFilter {
 }
 
 enum PropertyTransactionType { rent, sale }
+
+/// Boost tier for a promoted listing. `regular` = ×2 exposure (subscription
+/// quota or ₪10 one-off), `ultra` = ×5 exposure + gold frame (₪50 one-off).
+enum PropertyBoostTier { none, regular, ultra }
+
+PropertyBoostTier _parseBoostTier(Object? value) {
+  switch (value?.toString().trim().toLowerCase()) {
+    case 'ultra':
+      return PropertyBoostTier.ultra;
+    case 'regular':
+    case 'boost':
+      return PropertyBoostTier.regular;
+    default:
+      return PropertyBoostTier.none;
+  }
+}
 
 enum TransactionTypeFilter { any, rent, sale }
 
@@ -855,6 +872,8 @@ class RentalProperty {
     this.designTemplate = '',
     this.designAccent = 0,
     this.createdAt,
+    this.boostedUntil,
+    this.boostTier = PropertyBoostTier.none,
     this.panoramaTour,
     List<String>? audienceCohorts,
     this.audienceNote,
@@ -929,6 +948,17 @@ class RentalProperty {
   final String designTemplate;
   final int designAccent;
   final DateTime? createdAt;
+
+  /// Paid "הקפצה" (boost): while this is in the future the listing floats to the
+  /// top of the tenant feed. Set server-side by POST /billing/boost.
+  final DateTime? boostedUntil;
+  bool get isBoosted =>
+      boostedUntil != null && boostedUntil!.isAfter(DateTime.now());
+
+  /// Which boost tier is (or was) applied. Only meaningful while [isBoosted].
+  final PropertyBoostTier boostTier;
+  bool get isUltraBoosted =>
+      isBoosted && boostTier == PropertyBoostTier.ultra;
 
   /// Optional DIY 360° walkthrough (Street-View-style panorama nodes). Distinct
   /// from [virtualTour]/[model3d] (heavy backend 3D reconstruction).
@@ -1057,6 +1087,8 @@ class RentalProperty {
     String? designTemplate,
     int? designAccent,
     DateTime? createdAt,
+    DateTime? boostedUntil,
+    PropertyBoostTier? boostTier,
     PropertyPanoramaTour? panoramaTour,
     List<String>? audienceCohorts,
     String? audienceNote,
@@ -1101,6 +1133,8 @@ class RentalProperty {
       designTemplate: designTemplate ?? this.designTemplate,
       designAccent: designAccent ?? this.designAccent,
       createdAt: createdAt ?? this.createdAt,
+      boostedUntil: boostedUntil ?? this.boostedUntil,
+      boostTier: boostTier ?? this.boostTier,
       panoramaTour: panoramaTour ?? this.panoramaTour,
       audienceCohorts: audienceCohorts ?? this.audienceCohorts,
       audienceNote: audienceNote ?? this.audienceNote,
@@ -1151,35 +1185,51 @@ class RentalProperty {
             ? _decodeStringListValue(json['features'])
             : featureFlags.enabledLabels;
     final parsedPrice = _optionalInt(json['price']) ?? 0;
-    final parsedEntryDate = json['entryDate'] as String? ?? '';
+    final parsedEntryDate = json['entryDate']?.toString() ?? '';
     final parsedTransactionType =
         _parseTransactionType(json['transactionType']);
     final parsedVirtualTour = _parseVirtualTour(json['virtualTour']);
     final parsedModel3d = _parseModel3d(json['model3d']);
 
+    // Record status (write path stores `status`; model exposes `isActive`). A
+    // de-listed row (removed/paused/rented/draft) must NOT read back as active —
+    // otherwise deep-links and search show apartments that were taken down. Fall
+    // back to the legacy `isActive` bool, then to true.
+    final rawStatus = json['status']?.toString().trim().toLowerCase();
+    final resolvedActive = (rawStatus != null && rawStatus.isNotEmpty)
+        ? !(rawStatus == 'removed' ||
+            rawStatus == 'paused' ||
+            rawStatus == 'rented' ||
+            rawStatus == 'draft')
+        : (_optionalBool(json['isActive']) ?? true);
+
     return RentalProperty(
-      id: json['id'] as String,
+      // Tolerant scalar parsing: DynamoDB commonly returns numbers as strings and
+      // ids under `propertyId`. A hard `as` cast on ANY of these threw and the
+      // call sites swallow it → the ENTIRE listing silently vanished from the DB
+      // fetch. Every field below now coerces instead of throwing.
+      id: (json['id'] ?? json['propertyId'])?.toString() ?? '',
       sourceUrl: json['sourceUrl']?.toString() ?? json['url']?.toString() ?? '',
       ownerUserId: json['ownerUserId']?.toString() ??
           json['ownerId']?.toString() ??
           json['landlordUserId']?.toString() ??
           '',
       price: parsedPrice,
-      rooms: (json['rooms'] as num).toDouble(),
-      sizeM2: json['sizeM2'] as int,
-      floor: json['floor'] as String? ?? '',
-      totalFloors: json['totalFloors'] as String? ?? '',
-      city: json['city'] as String,
+      rooms: _optionalDouble(json['rooms']) ?? 0,
+      sizeM2: _optionalInt(json['sizeM2']) ?? 0,
+      floor: json['floor']?.toString() ?? '',
+      totalFloors: json['totalFloors']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
       neighborhood: json['neighborhood'] as String? ?? '',
       street: json['street'] as String? ?? '',
-      streetNumber: json['streetNumber'] as int? ?? -1,
-      lat: (json['lat'] as num).toDouble(),
-      lon: (json['lon'] as num).toDouble(),
-      propertyType: json['propertyType'] as String,
-      entryDate: json['entryDate'] as String? ?? '',
+      streetNumber: _optionalInt(json['streetNumber']) ?? -1,
+      lat: _optionalDouble(json['lat'] ?? json['latitude']) ?? 0,
+      lon: _optionalDouble(json['lon'] ?? json['longitude']) ?? 0,
+      propertyType: json['propertyType']?.toString() ?? '',
+      entryDate: json['entryDate']?.toString() ?? '',
       condition: json['condition'] as String? ?? '',
       ownerName: json['ownerName'] as String? ?? 'בעל הנכס',
-      agencyListing: json['agencyListing'] as bool? ?? false,
+      agencyListing: _asBoolFlag(json['agencyListing']),
       features: resolvedFeatures,
       publishChannels: _decodeStringListValue(json['publishChannels']),
       featureFlags: featureFlags,
@@ -1197,7 +1247,7 @@ class RentalProperty {
       marketSignals: _parseMarketSignals(json['marketSignals']) ??
           const PropertyMarketSignals(),
       verification: _parsePropertyVerification(json),
-      isActive: json['isActive'] as bool? ?? true,
+      isActive: resolvedActive,
       designTemplate: json['designTemplate']?.toString() ?? '',
       designAccent: _optionalInt(json['designAccent']) ?? 0,
       createdAt: _optionalDate(
@@ -1207,6 +1257,8 @@ class RentalProperty {
                 json[r'$createdAt'],
           ) ??
           _generateDeterministicMockDate(json['id']?.toString() ?? ''),
+      boostedUntil: _optionalDate(json['boostedUntil']),
+      boostTier: _parseBoostTier(json['boostTier']),
       panoramaTour: PropertyPanoramaTour.fromJsonOrNull(json['panoramaTour']),
       audienceCohorts: _decodeStringListValue(json['audienceCohorts']),
       audienceNote: json['audienceNote']?.toString(),
@@ -1266,6 +1318,11 @@ class RentalProperty {
       'designTemplate': designTemplate,
       'designAccent': designAccent,
       'createdAt': createdAt?.toUtc().toIso8601String(),
+      // Preserve the boost window across local persist (toJson→fromJson) so a
+      // boosted listing keeps floating to the top of a cache-served feed.
+      if (boostedUntil != null)
+        'boostedUntil': boostedUntil!.toUtc().toIso8601String(),
+      if (boostTier != PropertyBoostTier.none) 'boostTier': boostTier.name,
       if (panoramaTour != null) 'panoramaTour': panoramaTour!.toJson(),
       'audienceCohorts': audienceCohorts,
       'audienceNote': audienceNote,
@@ -1807,6 +1864,7 @@ class SearchFilters {
     this.city = '',
     this.transactionType = TransactionTypeFilter.any,
     this.strictMaxBudget = false,
+    this.preferredNearby = const <NearbyKind>{},
   });
 
   final String query;
@@ -1858,6 +1916,18 @@ class SearchFilters {
   /// explicit typed "עד X" search). Transient — deliberately not persisted, so a
   /// slider budget keeps the soft near-miss behaviour the deck is built around.
   final bool strictMaxBudget;
+
+  /// Nearby-place categories the seeker explicitly marked as important (from the
+  /// filter). Surfaced first on the property page AND boosts the matching
+  /// ranking dimensions. Empty = no explicit preference (persona still applies).
+  final Set<NearbyKind> preferredNearby;
+
+  /// Toggle a nearby-category preference on/off (used by the filter sheet).
+  SearchFilters toggleNearby(NearbyKind kind) {
+    final next = Set<NearbyKind>.of(preferredNearby);
+    next.contains(kind) ? next.remove(kind) : next.add(kind);
+    return copyWith(preferredNearby: next);
+  }
 
   bool get hasQuery => query.trim().isNotEmpty;
   bool get hasCustomArea => splitCustomAreaPolygons(customAreaPolygon)
@@ -2002,6 +2072,7 @@ class SearchFilters {
     String? city,
     TransactionTypeFilter? transactionType,
     bool? strictMaxBudget,
+    Set<NearbyKind>? preferredNearby,
   }) {
     return SearchFilters(
       query: query ?? this.query,
@@ -2037,6 +2108,7 @@ class SearchFilters {
       city: city ?? this.city,
       transactionType: transactionType ?? this.transactionType,
       strictMaxBudget: strictMaxBudget ?? this.strictMaxBudget,
+      preferredNearby: preferredNearby ?? this.preferredNearby,
     );
   }
 
@@ -2115,6 +2187,10 @@ class SearchFilters {
       transactionType: TransactionTypeFilter.values.byName(
         json['transactionType'] as String? ?? TransactionTypeFilter.any.name,
       ),
+      preferredNearby: {
+        for (final v in (json['preferredNearby'] as List<dynamic>? ?? const []))
+          ...NearbyKind.values.where((k) => k.name == v), // skips unknown names
+      },
     );
   }
 
@@ -2152,6 +2228,7 @@ class SearchFilters {
           .toList(),
       'city': city,
       'transactionType': transactionType.name,
+      'preferredNearby': preferredNearby.map((k) => k.name).toList(),
     };
   }
 }
@@ -2229,12 +2306,25 @@ class ChatMessage {
     required this.sender,
     required this.text,
     required this.createdAt,
+    this.failed = false,
   });
 
   final String id;
   final String sender;
   final String text;
   final DateTime createdAt;
+
+  /// True for an optimistic message whose backend send failed — the UI shows a
+  /// "not sent" marker instead of pretending it was delivered.
+  final bool failed;
+
+  ChatMessage copyWith({bool? failed}) => ChatMessage(
+        id: id,
+        sender: sender,
+        text: text,
+        createdAt: createdAt,
+        failed: failed ?? this.failed,
+      );
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
@@ -3027,7 +3117,21 @@ bool? _optionalBool(Object? value) {
 DateTime? _optionalDate(Object? value) {
   if (value == null) return null;
   if (value is DateTime) return value;
-  return DateTime.tryParse(value.toString());
+  // Epoch numbers (DynamoDB's natural time representation). Heuristic: a value
+  // ≥ 10^12 is already in milliseconds, otherwise it's seconds. Without this,
+  // an epoch createdAt/boostedUntil parsed to null → wrong freshness ranking and
+  // silently-dropped boost windows.
+  if (value is num) {
+    final n = value.toInt();
+    return DateTime.fromMillisecondsSinceEpoch(n >= 1000000000000 ? n : n * 1000);
+  }
+  final s = value.toString().trim();
+  final asEpoch = int.tryParse(s);
+  if (asEpoch != null) {
+    return DateTime.fromMillisecondsSinceEpoch(
+        asEpoch >= 1000000000000 ? asEpoch : asEpoch * 1000);
+  }
+  return DateTime.tryParse(s);
 }
 
 DateTime _generateDeterministicMockDate(String id) {

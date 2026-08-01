@@ -54,6 +54,14 @@ import {
 } from './lib/model_scorer.mjs';
 import { userEmbeddingFrom, cosine01 } from './lib/user_embedding.mjs';
 import { variantFor } from './lib/ab.mjs';
+// Landlord subscription paywall — the shared, unit-tested engine + its DynamoDB
+// store adapter. All lifecycle logic lives in the engine; the router only wires
+// it to DynamoDB (ddb) + Morning + HTTP (see the billing section below).
+import { createEngine } from './lib/subscription_engine.mjs';
+import { createDdbStore } from './lib/ddb_store.mjs';
+// Morning (Green Invoice) / Grow API client — hosted payment, token charge,
+// document creation, webhook verification.
+import * as morning from './lib/morning.mjs';
 // Ranking A/B: control (variant 0) always sees the pure linear score; treatment
 // (variant 1) gets the model blend WHEN a model is loaded. With no model both
 // variants are identical (pure linear) — the experiment is a no-op until then.
@@ -211,6 +219,16 @@ const TABLES = {
 // the scheduled tour-notifier Lambda can push "your 3D tour is ready" to every
 // device a landlord owns. Created out-of-band (see deploy checklist).
 const DEVICE_TOKENS_TABLE = `${TABLE_PREFIX}device-tokens`;
+
+// Landlord subscriptions — one row per landlord, pk id = Firebase uid. Owner-
+// scoped: only reachable via the dedicated /billing/* routes (NEVER the generic
+// table handler), so it isn't in TABLES. Created out-of-band by
+// aws/billing-setup.sh. Holds status/plan/period/token/card/dunning fields.
+const SUBSCRIPTIONS_TABLE = `${TABLE_PREFIX}subscriptions`;
+// Issued invoices (Morning documents), pk id = invoiceId, GSI ownerUserId-
+// issuedAt so a landlord can list their own. Also out-of-band.
+const INVOICES_TABLE = `${TABLE_PREFIX}invoices`;
+const INVOICES_OWNER_INDEX = 'ownerUserId-issuedAt';
 
 // Notification inbox — one row per delivered notification, keyed by
 // userId (pk) + createdAt (sk, ms-epoch Number, newest = largest). Stores the
@@ -1463,6 +1481,18 @@ export const handler = async (event) => {
     // facts and returns an improved, tailored Hebrew draft (Gemini, key stays
     // server-side). The paywall (50₪) is enforced client-side as a stub; this
     // endpoint stays auth-gated and strictly grounded.
+    // ── Landlord subscription billing (Morning/Green Invoice + Grow) ─────────
+    // JWT-gated app routes: /billing/subscription, /billing/checkout.
+    if (segments[0] === 'billing') {
+      return await handleBilling(event, segments, method);
+    }
+    // NO-AUTH provider callbacks, isolated on their own path so they never touch
+    // the JWT /billing proxy: POST /hooks/morning (IPN, HMAC-verified) and
+    // GET /hooks/return (post-payment redirect page).
+    if (segments[0] === 'hooks') {
+      return await handleHooks(event, segments, method);
+    }
+
     if (segments[0] === 'contract' && segments[1] === 'improve' && method === 'POST') {
       return await handleContractImprove(event);
     }
@@ -1562,6 +1592,16 @@ export const handler = async (event) => {
             return json(200, { items: [], hasMore: false, lastKey: null });
           }
         }
+        // IDOR guard: a per-owner listing query (?ownerUserId=…) exposes that
+        // landlord's FULL portfolio incl. draft/removed rows. Only the owner
+        // themselves may read it — otherwise anyone could enumerate a
+        // competitor's unpublished listings. (The public feed uses ?status=…,
+        // never ?ownerUserId=…, so this doesn't touch tenant browsing.)
+        if (tableKey === 'properties' && query.ownerUserId) {
+          if (!callerUid || String(query.ownerUserId) !== String(callerUid)) {
+            return json(200, { items: [], hasMore: false, lastKey: null });
+          }
+        }
         {
           const listed = await listItems(table, query);
           // Attach server-side ranking signals to each property so the client can
@@ -1601,8 +1641,16 @@ export const handler = async (event) => {
               TableName: table.name, Key: { id: writeId },
             }));
             isNewListing = !existing.Item;
-          } catch { /* lookup failed → fail CLOSED (treat as existing) so a transient error can't re-enrich/re-alert an edit */ isNewListing = false; }
+          } catch { /* lookup failed → treat as existing/edit: fail CLOSED for enrichment (don't re-enrich/re-alert an edit) AND fail OPEN for the paywall (never block a legit edit or 500 a publish — the Phase-3 cron reconciles any listing that slips through) */ isNewListing = false; }
           if (isNewListing) {
+            // PAYWALL: a landlord may keep 3 active properties free; the 4th
+            // needs an active subscription. Authoritative server-side gate (the
+            // client hint can be bypassed, this cannot). Gated on a CONFIRMED
+            // new listing only — on a lookup error above we deliberately skip
+            // this (fail open) rather than risk blocking an edit. Runs BEFORE
+            // the costly enrichment so a blocked publish wastes nothing.
+            const gate = await enforcePropertyQuota(callerUid);
+            if (gate) return gate; // 402 subscription_required
             // Budget enrichment so a slow connector/Gemini fetch can't stall the
             // publish (the client blocks on this response). Fail-soft on timeout.
             await Promise.race([
@@ -1839,6 +1887,14 @@ async function listItems(table, query) {
     params.FilterExpression = '#k = :v';
     params.ExpressionAttributeNames = { '#k': filterKey };
     params.ExpressionAttributeValues = { ':v': castFilter(filterVal) };
+  } else if (table.name === TABLES.properties.name) {
+    // Defense-in-depth: an UNFILTERED properties scan (no status, no owner) must
+    // not leak removed/paused/draft listings to a tenant. Default to only rows
+    // that are active or have no status at all. (The app always sends
+    // ?status=active, so this only guards a stray unfiltered caller.)
+    params.FilterExpression = '#s = :active OR attribute_not_exists(#s)';
+    params.ExpressionAttributeNames = { '#s': 'status' };
+    params.ExpressionAttributeValues = { ':active': 'active' };
   }
   const out = await ddb.send(new ScanCommand(params));
   return json(200, pageBody(out));
@@ -2651,9 +2707,23 @@ async function handleSearchKnn(event) {
   }
 }
 
+// Internal-only fields the client never consumes. The 768-float `embedding`
+// vector especially: it bloats every list response ~10× AND is what pushes a
+// property Scan past the 1MB page limit at ~140 rows, silently truncating the
+// catalogue. Stripping it is safe (no client reads it) and lets more rows fit
+// per page. (ownerUserId is KEPT — the client uses it for dedup/ownership.)
+const _STRIP_LIST_FIELDS = ['embedding', 'embeddingDim', 'embeddingModel'];
+function stripInternal(item) {
+  if (!item || typeof item !== 'object') return item;
+  for (const k of _STRIP_LIST_FIELDS) {
+    if (k in item) delete item[k];
+  }
+  return item;
+}
+
 function pageBody(out) {
   return {
-    items: out.Items || [],
+    items: (out.Items || []).map(stripInternal),
     hasMore: !!out.LastEvaluatedKey,
     lastKey: out.LastEvaluatedKey
       ? encodeURIComponent(JSON.stringify(out.LastEvaluatedKey))
@@ -2676,6 +2746,229 @@ async function putItem(table, id, body) {
   coerceGsiKeyTypes(table, item);
   await ddb.send(new PutCommand({ TableName: table.name, Item: item }));
   return json(200, item);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Landlord subscription billing — the router's thin adapter over the shared,
+// unit-tested subscription engine (lib/subscription_engine.mjs). All lifecycle
+// logic lives in the engine; here we only wire it to DynamoDB + Morning + HTTP.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const billingStore = createDdbStore({
+  ddb,
+  tables: {
+    subscriptions: SUBSCRIPTIONS_TABLE,
+    invoices: INVOICES_TABLE,
+    invoicesOwnerIndex: INVOICES_OWNER_INDEX,
+    properties: TABLES.properties.name,
+    propertiesOwnerIndex: TABLES.properties.ownerIndex,
+  },
+});
+const billingProvider = {
+  upsertClient: (o) => morning.upsertClient(o),
+  createPaymentForm: (o) => morning.createPaymentForm(o),
+  createPaymentFormOneOff: (o) => morning.createPaymentFormOneOff(o),
+  chargeToken: (o) => morning.chargeToken(o),
+  findRecentPaidDocument: (o) => morning.findRecentPaidDocument(o),
+  findCardToken: (o) => morning.findCardToken(o),
+};
+const billingEngine = createEngine({
+  store: billingStore,
+  provider: billingProvider,
+  now: () => Date.now(),
+  log: (...a) => console.error('billing:', ...a),
+});
+
+// Build the provider return/notify URLs. Prefer explicit env; else derive the
+// public API base from the incoming request (Host + stage).
+function billingUrls(event) {
+  const host = event.headers?.Host || event.headers?.host || '';
+  const stage = event.requestContext?.stage || 'prod';
+  const apiBase = process.env.MORNING_API_PUBLIC_BASE
+    || (host ? `https://${host}/${stage}` : '');
+  const returnBase = process.env.MORNING_RETURN_BASE || apiBase;
+  return {
+    notifyUrl: process.env.MORNING_NOTIFY_URL || `${apiBase}/hooks/morning`,
+    successUrl: `${returnBase}/hooks/return?status=success`,
+    failureUrl: `${returnBase}/hooks/return?status=failure`,
+  };
+}
+
+// Server-side paywall gate for a NEW listing. Enforces ONLY when
+// BILLING_ENFORCE=1 (deploy dormant, activate after the grandfather backfill).
+// Returns a 402 response object when blocked, else null (allow).
+async function enforcePropertyQuota(uid) {
+  if (process.env.BILLING_ENFORCE !== '1') return null;
+  const block = await billingEngine.enforceQuota(uid);
+  if (!block) return null;
+  return json(402, {
+    ...block,
+    message: 'מכסת הדירות החינמית מוצתה — נדרש מנוי כדי לפרסם דירה נוספת.',
+  });
+}
+
+// GET  /billing/subscription · POST /billing/checkout · POST /billing/cancel ·
+// POST /billing/resume · GET /billing/invoices  (all JWT-gated).
+async function handleBilling(event, segments, method) {
+  const uid = callerUidOf(event);
+  const action = segments[1];
+  if (!uid) return json(401, { message: 'Unauthorized' });
+
+  if (action === 'subscription' && method === 'GET') {
+    return json(200, await billingEngine.getEntitlement(uid));
+  }
+
+  if (action === 'checkout' && method === 'POST') {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    try {
+      const r = await billingEngine.checkout(uid, {
+        plan: body.plan, email: body.email, name: body.name, coupon: body.coupon,
+        group: body.group, // chosen payment method (card/Bit/Apple/Google)
+        ...billingUrls(event),
+      });
+      if (r.error === 'bad_plan') return json(400, { error: 'bad_plan', message: 'מסלול לא תקין.' });
+      return json(200, { url: r.url, plan: r.plan, coupon: r.coupon ?? null, priceAgorot: r.priceAgorot ?? null });
+    } catch (e) {
+      console.error('checkout failed:', e?.status, e?.message, JSON.stringify(e?.data || {}));
+      return json(502, { error: 'checkout_failed', message: 'יצירת התשלום נכשלה, נסה שוב.' });
+    }
+  }
+
+  // One-off payment (e.g. the 50₪ AI-contract unlock). Body: {amountAgorot, description?, product?}
+  if (action === 'checkout-oneoff' && method === 'POST') {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    try {
+      const r = await billingEngine.checkoutOneOff(uid, {
+        // NOTE: no client amount — the server prices the product (anti-tamper).
+        description: body.description,
+        product: body.product,
+        propertyId: body.propertyId, // for a paid boost: which listing to boost
+        group: body.group,           // chosen payment method
+        email: body.email,
+        name: body.name,
+        ...billingUrls(event),
+      });
+      if (r.error === 'bad_product') return json(400, { error: 'bad_product', message: 'מוצר לא תקין.' });
+      if (r.error === 'bad_amount') return json(400, { error: 'bad_amount', message: 'סכום לא תקין.' });
+      if (r.error === 'missing_property') return json(400, { error: 'missing_property', message: 'חסר מזהה נכס.' });
+      return json(200, { url: r.url });
+    } catch (e) {
+      console.error('checkout-oneoff failed:', e?.status, e?.message, JSON.stringify(e?.data || {}));
+      return json(502, { error: 'checkout_failed', message: 'יצירת התשלום נכשלה, נסה שוב.' });
+    }
+  }
+
+  // Verify-on-return: the app calls this when the hosted page redirects back
+  // with success. Confirms the payment via Morning and activates — reliable
+  // even if the IPN never arrives.
+  if (action === 'confirm' && method === 'POST') {
+    try {
+      const r = await billingEngine.confirm(uid);
+      return json(200, { ...r, entitlement: await billingEngine.getEntitlement(uid) });
+    } catch (e) {
+      console.error('confirm failed:', e?.status, e?.message);
+      return json(200, { confirmed: false, reason: 'error', entitlement: await billingEngine.getEntitlement(uid) });
+    }
+  }
+
+  // Verify-on-return for a PAID one-off boost. Body: {product, propertyId}.
+  // Confirms the ₪10/₪50 payment via Morning, then stamps the boost tier.
+  if (action === 'confirm-oneoff' && method === 'POST') {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    try {
+      const r = await billingEngine.confirmOneOff(uid, { product: body.product, propertyId: body.propertyId });
+      return json(200, r);
+    } catch (e) {
+      console.error('confirm-oneoff failed:', e?.status, e?.message);
+      return json(200, { ok: false, reason: 'error' });
+    }
+  }
+
+  // Boost a listing ("הקפצת מודעה"). Body: {propertyId}. Entitlement + quota gated.
+  if (action === 'boost' && method === 'POST') {
+    let body = {};
+    try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+    const r = await billingEngine.boost(uid, body.propertyId);
+    if (r.error === 'not_entitled') return json(402, { error: 'not_entitled', message: 'נדרש מנוי פעיל כדי להקפיץ מודעה.' });
+    if (r.error === 'quota_exceeded') return json(409, { error: 'quota_exceeded', message: 'ניצלת את מכסת ההקפצות החודשית.', quota: r.quota, used: r.used });
+    if (r.error === 'not_owner') return json(404, { error: 'not_owner', message: 'הנכס לא נמצא.' });
+    if (r.error) return json(400, { error: r.error, message: 'בקשה לא תקינה.' });
+    return json(200, r);
+  }
+
+  if (action === 'cancel' && method === 'POST') {
+    const r = await billingEngine.cancel(uid);
+    if (r.error) return json(404, { error: 'no_subscription', message: 'אין מנוי פעיל לביטול.' });
+    return json(200, await billingEngine.getEntitlement(uid));
+  }
+
+  if (action === 'resume' && method === 'POST') {
+    const r = await billingEngine.resume(uid);
+    if (r.error) return json(404, { error: 'no_subscription', message: 'אין מנוי לחידוש.' });
+    return json(200, await billingEngine.getEntitlement(uid));
+  }
+
+  if (action === 'invoices' && method === 'GET') {
+    return json(200, { items: await billingEngine.listInvoices(uid) });
+  }
+
+  return json(404, { message: 'Not found' });
+}
+
+// NO-AUTH provider callbacks (API Gateway resource with AuthorizationType NONE).
+//   GET  /hooks/return  — post-payment redirect fallback page.
+//   POST /hooks/morning — Green Invoice/Grow IPN → verify + engine.applyPayment.
+async function handleHooks(event, segments, method) {
+  const action = segments[1];
+
+  if (action === 'return' && method === 'GET') {
+    const okStatus = event.queryStringParameters?.status === 'success';
+    return html(200, `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Rently</title>
+<style>body{font-family:-apple-system,Arial,sans-serif;background:#f4f6fa;color:#0b2540;display:grid;place-items:center;height:100vh;margin:0;text-align:center}
+.c{background:#fff;padding:32px 28px;border-radius:18px;box-shadow:0 10px 30px rgba(11,37,64,.1);max-width:340px}
+.i{font-size:44px}h1{font-size:20px;margin:12px 0 6px}p{color:#5b7a99;margin:0}</style></head>
+<body><div class="c"><div class="i">${okStatus ? '✅' : '⚠️'}</div>
+<h1>${okStatus ? 'התשלום התקבל' : 'התשלום לא הושלם'}</h1>
+<p>אפשר לחזור לאפליקציית Rently.</p></div></body></html>`);
+  }
+
+  if (action === 'morning' && method === 'POST') {
+    const rawBody = event.isBase64Encoded && event.body
+      ? Buffer.from(event.body, 'base64').toString('utf8')
+      : (event.body || '');
+    // DIAGNOSTIC CAPTURE: log the full raw IPN so the first real payment reveals
+    // the exact Meshulam/Green-Invoice format to finalise verify/parse.
+    console.log('IPN_CAPTURE headers:', JSON.stringify(event.headers || {}));
+    console.log('IPN_CAPTURE body:', rawBody);
+    if (!morning.verifyWebhook(event.headers || {}, rawBody)) {
+      console.warn('billing webhook: signature verification failed (see IPN_CAPTURE above)');
+      return json(401, { message: 'bad signature' });
+    }
+    let payload = {};
+    try { payload = rawBody ? JSON.parse(rawBody) : {}; } catch { payload = {}; }
+    const ev = morning.parseWebhook(payload);
+    try {
+      // A one-off boost IPN carries product+propertyId in `custom`; route it to
+      // the boost apply path (applyPayment only handles subscriptions).
+      const r = ev.oneOff
+        ? await billingEngine.applyOneOffBoost({
+            uid: ev.subscriptionId, product: ev.product, propertyId: ev.propertyId,
+            amountAgorot: ev.amountAgorot, transactionId: ev.transactionId,
+            docId: ev.docId, docUrl: ev.docUrl, success: ev.success,
+          })
+        : await billingEngine.applyPayment(ev);
+      return json(200, { ok: true, ...r });
+    } catch (e) {
+      console.error('webhook apply failed:', e?.message || e);
+      return json(500, { message: 'activation error' });
+    }
+  }
+
+  return json(404, { message: 'Not found' });
 }
 
 // Persona upsert with a monotonic-version guard: the write is applied only when

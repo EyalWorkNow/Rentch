@@ -987,6 +987,12 @@ class PreferenceModelBuilder {
     if (intents.contains(SearchIntent.youngPop)) {
       sharpen('young_area', 0.93, 10.0);
     }
+    // EXPLICIT nearby-category picks from the search filter — the seeker directly
+    // chose these categories as important, so weight their dimensions high (on
+    // top of any persona/intent signal). Empty by default → zero behaviour change.
+    for (final dim in query.preferredNearbyDims) {
+      sharpen(dim, 0.95, 14.0);
+    }
     // Pet owner (requested pet-friendly) → a ground/low floor is easier with a
     // dog, so give accessibility a mild boost on top of the amenity match.
     if (requested.contains('petsAllowed')) {
@@ -1361,6 +1367,12 @@ class PreferenceModelBuilder {
       // safety: higher is always better, with a gentle floor so a single
       // low-safety area isn't fatal.
       'safety': const SigmoidThresholdUtility(0.35, 4.5),
+      // KNOWN LIMITATION: the budget VALUE is the true monthly cost (rent +
+      // arnona + vaad) while this ceiling is the stated RENT ceiling, so a rental
+      // whose rent sits exactly at budget reads slightly "over". A flat overhead
+      // inflation was tried but shifts ranking goldens broadly; a correct fix
+      // needs a size-aware per-listing ceiling + golden re-baselining. Left as-is
+      // (soft down-weight only; the hard budget gate correctly uses rent).
       'budget': BudgetUtility(maxBudget, elasticity,
           minBudget: (minBudget ?? 0).toDouble()),
       'value': const LinearUtility(),
@@ -1377,7 +1389,13 @@ class PreferenceModelBuilder {
           // cheap central studio can no longer top a big flat here.
           : (intents.contains(SearchIntent.roommates) && desiredRoomsLo == null)
               ? const SigmoidThresholdUtility(3.0, 2.0)
-              : RangeUtility(roomsLo, roomsHi, slackBelow: 1.0, slackAbove: 2.0),
+              // Open-ended "לפחות N חדרים" (min set, no max): N-or-more all
+              // satisfy — a 7-room must not score 0 against "at least 4". Only
+              // decays BELOW the floor.
+              : (query.minRooms != null && query.maxRooms == null)
+                  ? RangeUtility(roomsLo, 99.0, slackBelow: 1.0)
+                  : RangeUtility(roomsLo, roomsHi,
+                      slackBelow: 1.0, slackAbove: 2.0),
       'amenities': const LinearUtility(), // input already a satisfaction
       'transit': query.nearTrain
           ? const SigmoidThresholdUtility(0.3, 7.0)

@@ -21,10 +21,10 @@ class BrandPalette {
 
   /// Default teal identity (tenants + private landlords).
   static const BrandPalette teal = BrandPalette(
-    primary: Color(0xFF13BEC9),
-    primaryDark: Color(0xFF0D96A0),
-    primaryLight: Color(0xFF5AD4DC),
-    primaryLight2: Color(0xFFE6F9FB),
+    primary: Color(0xFF2563EB),
+    primaryDark: Color(0xFF1D4ED8),
+    primaryLight: Color(0xFF60A5FA),
+    primaryLight2: Color(0xFFEFF6FF),
     accountLabel: '',
   );
 

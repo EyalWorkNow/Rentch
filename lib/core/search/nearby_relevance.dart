@@ -38,6 +38,47 @@ enum NearbyKind {
   parking, // חניונים
 }
 
+/// Maps a nearby category to the ranking DIMENSION it should boost when the
+/// seeker explicitly marks it important in the search filter. Returns null for
+/// categories that have no scoring dimension today (display-only, e.g. vets /
+/// parking). All returned names exist in `kScoringDimensions`.
+String? nearbyKindToDimension(NearbyKind k) {
+  switch (k) {
+    case NearbyKind.schools:
+      return 'schools';
+    case NearbyKind.kindergartens:
+    case NearbyKind.playgrounds:
+      return 'school_young';
+    case NearbyKind.clinics:
+    case NearbyKind.pharmacies:
+    case NearbyKind.hospitals:
+      return 'health';
+    case NearbyKind.supermarkets:
+      return 'convenience';
+    case NearbyKind.parks:
+    case NearbyKind.dogParks:
+    case NearbyKind.gyms:
+    case NearbyKind.pools:
+      return 'park';
+    case NearbyKind.synagogues:
+    case NearbyKind.worship:
+      return 'religious_area';
+    case NearbyKind.transit:
+    case NearbyKind.bikeShare:
+      return 'transit';
+    case NearbyKind.nightlife:
+    case NearbyKind.dining:
+      return 'nightlife';
+    case NearbyKind.culture:
+      return 'university';
+    case NearbyKind.coworking:
+      return 'employment';
+    case NearbyKind.vets:
+    case NearbyKind.parking:
+      return null; // display-only (no ranking dimension yet)
+  }
+}
+
 /// One relevant section for a given persona: what to show, filtered/ordered.
 class NearbySection {
   const NearbySection(this.kind, {this.hmo = '', this.priority = 0});

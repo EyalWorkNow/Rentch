@@ -4,6 +4,9 @@
   "description": "Rently API router Lambda (single-function REST router).",
   "type": "module",
   "private": true,
+  "scripts": {
+    "test": "node lib/billing.selfcheck.mjs && node lib/morning.selfcheck.mjs && node lib/subscription_engine.selfcheck.mjs && node lib/eligibility.selfcheck.mjs"
+  },
   "dependencies": {
     "adm-zip": "^0.5.16"
   }

@@ -1,8 +1,12 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/contract_repository.dart';
+import 'package:dating_app/presentation/features/billing/checkout_webview_screen.dart';
+import 'package:dating_app/presentation/features/billing/payment_method_selector.dart';
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -34,8 +38,8 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
   /// Which lease body the landlord is using. Starts on the standard template.
   ContractTemplateKind _template = ContractTemplateKind.standard;
 
-  /// Paywall stub for the AI feature. Flipped to true once the (mock) 50₪
-  /// payment "completes". TODO(payment): wire to a real processor.
+  /// True once the ₪50 AI one-off payment completes via the real Morning
+  /// checkout (`createOneOffCheckout` + `CheckoutWebViewScreen` in `_showPaywall`).
   bool _aiPaid = false;
   bool _aiBusy = false;
 
@@ -110,10 +114,11 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     await _runAiImprove();
   }
 
-  /// Paywall stub. A real processor is intentionally NOT wired here.
-  /// TODO(payment): replace this confirm-sheet with a real charge of 50₪.
-  Future<bool?> _showPaywall() {
-    return showModalBottomSheet<bool>(
+  /// Shows the intro sheet, then — on confirm — creates a REAL one-off 50₪
+  /// Morning payment and collects it in the hosted checkout WebView. Returns
+  /// true only when the hosted page reports a successful payment.
+  Future<bool?> _showPaywall() async {
+    final confirm = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
@@ -122,6 +127,45 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
       ),
       builder: (ctx) => _PaywallSheet(priceShekel: _aiPriceShekel),
     );
+    if (confirm != true || !mounted) return false;
+
+    // Choose a payment method (card / Bit / Apple Pay / Google Pay).
+    final group = await showPaymentMethodSheet(context,
+        amountLabel: '₪$_aiPriceShekel', subtitle: 'שיפור חוזה עם AI');
+    if (group == null || !mounted) return false;
+
+    final provider = context.read<DatingProvider>();
+    final email = FirebaseAuth.instance.currentUser?.email;
+    final name = provider.tenantProfile?.name;
+    String? url;
+    try {
+      url = await AwsApiClient.instance.createOneOffCheckout(
+        amountAgorot: _aiPriceShekel * 100,
+        description: 'שיפור חוזה עם AI — Rently',
+        product: 'contract',
+        email: email,
+        name: name,
+        group: group,
+      );
+    } catch (_) {
+      url = null;
+    }
+    if (!mounted) return false;
+    if (url == null) {
+      _err('התשלום אינו זמין כרגע. נסו שוב מאוחר יותר.');
+      return false;
+    }
+    final checkoutUrl = url; // promote to non-null for the closure
+    final paid = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'CheckoutWebViewScreen'),
+        builder: (_) => CheckoutWebViewScreen(
+          url: checkoutUrl,
+          amountLabel: '₪$_aiPriceShekel',
+        ),
+      ),
+    );
+    return paid == true;
   }
 
   Future<void> _runAiImprove() async {
@@ -827,11 +871,11 @@ class _PaywallSheet extends StatelessWidget {
             SizedBox(
               height: 52,
               child: FilledButton.icon(
-                // TODO(payment): trigger a real 50₪ charge here; only on a
-                // confirmed receipt should this pop true.
+                // Confirms intent; the real 50₪ charge happens next in the
+                // hosted checkout WebView (see _showPaywall).
                 onPressed: () => Navigator.of(context).pop(true),
                 icon: const Icon(IconsaxPlusLinear.card, size: 18),
-                label: Text('שלם $priceShekel ₪ והפעל'),
+                label: Text('המשך לתשלום $priceShekel ₪'),
               ),
             ),
             const SizedBox(height: 8),

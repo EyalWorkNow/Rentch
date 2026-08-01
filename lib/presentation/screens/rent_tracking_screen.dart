@@ -138,6 +138,55 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
     setState(() => _ledger = updated);
   }
 
+  // Add / edit a free-text note on a month (e.g. "שילם במזומן", "הבטיח ל-15").
+  Future<void> _editNote(int index) async {
+    final current = _ledger;
+    if (current == null) return;
+    final entry = current.entries[index];
+    final ctrl = TextEditingController(text: entry.note ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('הערה לחודש'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'למשל: שולם במזומן / הבטיח לשלם ב-15',
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('ביטול')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                child: const Text('שמירה')),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (result == null || !mounted) return;
+    final updated = RentLedger(
+      propertyId: current.propertyId,
+      entries: [
+        for (var i = 0; i < current.entries.length; i++)
+          if (i == index)
+            current.entries[i]
+                .copyWith(note: result.isEmpty ? null : result, clearNote: result.isEmpty)
+          else
+            current.entries[i],
+      ],
+    );
+    await _repo.save(updated);
+    if (!mounted) return;
+    setState(() => _ledger = updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     final ledger = _ledger;
@@ -205,7 +254,9 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
                 amountLabel: _shekel(entry.amount),
                 paid: entry.paid,
                 overdue: entry.isOverdue(),
+                note: entry.note,
                 onTap: () => _togglePaid(realIndex),
+                onEditNote: () => _editNote(realIndex),
               );
             },
           ),
@@ -332,6 +383,8 @@ class _MonthRow extends StatelessWidget {
     required this.paid,
     required this.overdue,
     required this.onTap,
+    this.note,
+    this.onEditNote,
   });
 
   final String monthLabel;
@@ -339,11 +392,14 @@ class _MonthRow extends StatelessWidget {
   final bool paid;
   final bool overdue;
   final VoidCallback onTap;
+  final String? note;
+  final VoidCallback? onEditNote;
 
   @override
   Widget build(BuildContext context) {
     final statusColor =
         paid ? AppColors.success : (overdue ? AppColors.coral : AppColors.warning);
+    final hasNote = (note ?? '').trim().isNotEmpty;
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -358,7 +414,10 @@ class _MonthRow extends StatelessWidget {
             border: Border.all(color: AppColors.slate200, width: 1),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+          Row(
             children: [
               Expanded(
                 child: Column(
@@ -412,6 +471,45 @@ class _MonthRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onEditNote != null) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  onPressed: onEditNote,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    hasNote
+                        ? Icons.sticky_note_2
+                        : Icons.note_add_outlined,
+                    color: hasNote ? AppColors.primary : AppColors.textSecondary,
+                    size: 22,
+                  ),
+                  tooltip: 'הערה',
+                ),
+              ],
+            ],
+          ),
+          if (hasNote) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: onEditNote,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.slate50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  note!.trim(),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13.5,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ),
+          ],
             ],
           ),
         ),
@@ -499,4 +597,232 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Payment-tracking hub: pick a property first, seeing each one's CURRENT status
+/// (paid / due / overdue), when rent is due, and a note preview — then tap to
+/// open that property's full ledger.
+class PaymentTrackingHubScreen extends StatefulWidget {
+  const PaymentTrackingHubScreen({
+    super.key,
+    required this.properties,
+    this.repository,
+  });
+
+  /// (id, title, monthly rent ₪) for each of the landlord's properties.
+  final List<({String id, String title, int rent})> properties;
+  final RentLedgerRepository? repository;
+
+  @override
+  State<PaymentTrackingHubScreen> createState() =>
+      _PaymentTrackingHubScreenState();
+}
+
+class _PaymentTrackingHubScreenState extends State<PaymentTrackingHubScreen> {
+  late final RentLedgerRepository _repo =
+      widget.repository ?? RentLedgerRepository();
+  late Future<List<_HubRow>> _future = _load();
+
+  Future<List<_HubRow>> _load() async {
+    final rows = <_HubRow>[];
+    for (final p in widget.properties) {
+      final ledger = await _repo.load(p.id);
+      final cur = ledger.currentEntry();
+      final overdue = ledger.overdueEntries().length;
+      rows.add(_HubRow(
+        id: p.id,
+        title: p.title,
+        rent: p.rent,
+        paidThisMonth: cur?.paid ?? false,
+        hasCurrentEntry: cur != null,
+        overdueCount: overdue,
+        note: cur?.note,
+      ));
+    }
+    return rows;
+  }
+
+  Future<void> _open(_HubRow r) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => RentTrackingScreen(
+        propertyId: r.id,
+        propertyTitle: r.title,
+        monthlyRent: r.rent,
+      ),
+    ));
+    if (mounted) setState(() => _future = _load()); // refresh after edits
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.navy,
+          elevation: 0,
+          title: const Text('מעקב תשלומים',
+              style: TextStyle(fontWeight: FontWeight.w900)),
+        ),
+        body: FutureBuilder<List<_HubRow>>(
+          future: _future,
+          builder: (context, snap) {
+            if (!snap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final rows = snap.data!;
+            if (rows.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('אין דירות למעקב. הוסיפו דירה כדי להתחיל.',
+                      style: TextStyle(
+                          fontSize: 16, color: AppColors.textSecondary)),
+                ),
+              );
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: rows.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) => _HubCard(row: rows[i], onTap: () => _open(rows[i])),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HubRow {
+  const _HubRow({
+    required this.id,
+    required this.title,
+    required this.rent,
+    required this.paidThisMonth,
+    required this.hasCurrentEntry,
+    required this.overdueCount,
+    this.note,
+  });
+  final String id;
+  final String title;
+  final int rent;
+  final bool paidThisMonth;
+  final bool hasCurrentEntry;
+  final int overdueCount;
+  final String? note;
+}
+
+class _HubCard extends StatelessWidget {
+  const _HubCard({required this.row, required this.onTap});
+  final _HubRow row;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Status + when-due, derived from the real ledger.
+    final (label, color) = row.overdueCount > 0
+        ? ('${row.overdueCount} חודשים בפיגור', AppColors.coral)
+        : row.paidThisMonth
+            ? ('שולם החודש', const Color(0xFF22C55E))
+            : ('ממתין לתשלום החודש', AppColors.warning);
+    final now = DateTime.now();
+    final dueLabel = row.paidThisMonth
+        ? 'החיוב הבא: 1 ב${_monthName(now.month % 12 + 1)}'
+        : 'לתשלום עד סוף ${_monthName(now.month)}';
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(row.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.navy)),
+                  ),
+                  const Icon(Icons.chevron_left_rounded,
+                      color: AppColors.textSecondary),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text('₪${row.rent} לחודש',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(label,
+                        style: TextStyle(
+                            color: color,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(dueLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+              if ((row.note ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(children: [
+                  const Icon(Icons.sticky_note_2_outlined,
+                      size: 15, color: AppColors.textSecondary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(row.note!.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textSecondary)),
+                  ),
+                ]),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _monthName(int m) => const [
+        'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי',
+        'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+      ][(m - 1) % 12];
 }

@@ -159,9 +159,16 @@ class _ProfileCardState extends State<ProfileCard> {
           duration: const Duration(milliseconds: 100),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
+            // Boosted listings get a colored frame — gold for Ultra (×5), the
+            // brand accent for a regular boost (×2) — so a promoted apartment
+            // stands out in the feed.
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.16),
-              width: 1.5,
+              color: p.isUltraBoosted
+                  ? AppColors.amber
+                  : (p.isBoosted
+                      ? AppColors.primary.withValues(alpha: 0.9)
+                      : Colors.white.withValues(alpha: 0.16)),
+              width: (p.isUltraBoosted || p.isBoosted) ? 2.5 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
@@ -170,12 +177,25 @@ class _ProfileCardState extends State<ProfileCard> {
                 spreadRadius: spreadRadius,
                 offset: shadowOffset,
               ),
-              // Outward glass glow/reflection
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.08),
-                blurRadius: 8,
-                spreadRadius: -1,
-              ),
+              // Boosted glow (gold / accent) or the default glass reflection.
+              if (p.isUltraBoosted)
+                BoxShadow(
+                  color: AppColors.amber.withValues(alpha: 0.45),
+                  blurRadius: 18,
+                  spreadRadius: 0,
+                )
+              else if (p.isBoosted)
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  spreadRadius: 0,
+                )
+              else
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  spreadRadius: -1,
+                ),
             ],
           ),
           child: ClipRRect(
@@ -324,6 +344,13 @@ class _ProfileCardState extends State<ProfileCard> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                if (p.isUltraBoosted) ...[
+                                  const _BoostBadge(ultra: true),
+                                  const SizedBox(width: 6),
+                                ] else if (p.isBoosted) ...[
+                                  const _BoostBadge(ultra: false),
+                                  const SizedBox(width: 6),
+                                ],
                                 if (isSale) ...[
                                   const _SaleBadge(),
                                   const SizedBox(width: 6),
@@ -777,6 +804,43 @@ class _MatchScoreBadge extends StatelessWidget {
               color: color,
               fontSize: 11,
               fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "מקודם" / "Ultra" pill for a boosted listing. Gold for Ultra (×5), brand
+/// accent for a regular boost (×2).
+class _BoostBadge extends StatelessWidget {
+  const _BoostBadge({required this.ultra});
+  final bool ultra;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ultra ? AppColors.amberDark : AppColors.primary;
+    final bg = ultra ? const Color(0xFFFFF7E0) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RentlyIcon(ultra ? IconsaxPlusBold.crown_1 : IconsaxPlusBold.flash_1,
+              size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            ultra ? 'Ultra' : 'מקודם',
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],

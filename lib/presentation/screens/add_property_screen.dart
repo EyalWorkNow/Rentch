@@ -6,6 +6,7 @@ import 'package:dating_app/core/security/rate_limiter.dart';
 import 'package:dating_app/core/security/security_config.dart';
 import 'package:dating_app/core/services/audience_service.dart';
 import 'package:dating_app/core/services/israel_locations.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/legal_consent_service.dart';
 import 'package:dating_app/core/services/property_3d_scan_service.dart';
 import 'package:dating_app/core/services/scaniverse_asset_import_service.dart';
@@ -14,6 +15,7 @@ import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/features/pricing/fair_rent_hint.dart';
 import 'package:dating_app/presentation/features/scan3d/room_scan_flow.dart';
@@ -1093,7 +1095,39 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         }
       }
 
-      await context.read<DatingProvider>().addLandlordProperty(property);
+      // PAYWALL GATE: free up to 3 ACTIVE properties; the 4th needs a
+      // subscription. The remote publish is fire-and-forget, so the server's 402
+      // can't surface here — the client gate must be authoritative. Only the
+      // 4th+ listing can be blocked, so when at/over the free limit we refresh
+      // the server entitlement at the boundary (the cached flag may be stale)
+      // and gate on the fresh answer. Fail-soft: a refresh error leaves the
+      // cached flag (which defaults to allow) — the nightly cron reconciles.
+      final provider = context.read<DatingProvider>();
+      final activeCount =
+          provider.myProperties.where((p) => p.isActive).length;
+      // Gate on the SERVER's free limit (default 3), not a hardcoded constant,
+      // so a restricted tier (freeLimit < 3) is honored.
+      final freeLimit = provider.subscription?.freeLimit ?? 3;
+      if (activeCount >= freeLimit) {
+        await provider.refreshSubscription();
+        if (!mounted) return;
+        // At/over the free tier we FAIL CLOSED: require a SERVER-confirmed
+        // entitlement to publish. `canPublishConfirmed` trusts only the backend
+        // flag / active subscription — never the cached `activeProperties`
+        // arithmetic, which can be stale-low after a failed refresh and would
+        // otherwise leak free listings. Null/false → paywall.
+        final canAdd = provider.subscription?.canPublishConfirmed ?? false;
+        if (!canAdd) {
+          setState(() => _isSaving = false);
+          await Navigator.of(context).push(MaterialPageRoute(
+            settings: const RouteSettings(name: 'PaywallScreen'),
+            builder: (_) => const PaywallScreen(reason: 'limit'),
+          ));
+          return; // don't publish — user must subscribe first
+        }
+      }
+
+      await provider.addLandlordProperty(property);
 
       if (!mounted) return;
       // Auto-score the listing (our engine, verified signals) and show it back.
@@ -1107,6 +1141,20 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
+      // A publish that exceeds the free limit comes back as HTTP 402 — open the
+      // paywall instead of showing a generic error.
+      if (e is AwsApiException && e.statusCode == 402) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: Duration(milliseconds: 3000),
+          content: Text('הגעת למכסת הדירות החינמיות. נדרש מנוי לפרסום דירה נוספת.'),
+          backgroundColor: AppColors.coral,
+        ));
+        await Navigator.of(context).push(MaterialPageRoute(
+          settings: const RouteSettings(name: 'PaywallScreen'),
+          builder: (_) => const PaywallScreen(reason: 'limit'),
+        ));
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(milliseconds: 3000),
         content: Text('שגיאה בשמירת הנכס. נסה שוב.'),

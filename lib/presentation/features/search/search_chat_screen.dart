@@ -70,6 +70,9 @@ class _ChatMsg {
   final bool isConsent;
   final bool locationRequest; // אתי asking to share GPS → renders a location button
   bool expanded = false; // "show more" toggle for result lists
+  int widenLevel = 0; // how many times "הצג עוד" progressively relaxed the query
+  bool widening = false; // a widen fetch is in flight
+  bool noMore = false; // last widen returned nothing new → hide the button
 }
 
 class _SearchChatScreenState extends State<SearchChatScreen> {
@@ -131,6 +134,10 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _messages.add(_greetingMsg());
     _loadConsent();
     _seedFromPersona();
+    // Start pulling the FULL catalogue now (idempotent, ~10 extra pages) while
+    // the user reads the greeting / types — otherwise search would rank over only
+    // the first 150 loaded rows and miss listings on page 2+.
+    unawaited(context.read<DatingProvider>().ensureFullCatalogLoaded());
     SpeedMode.immediate.addListener(_onSpeedModeChanged);
   }
 
@@ -370,9 +377,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _scrollToEnd();
   }
 
+  // Collapsed result count before "show more". At least 5 so the seeker gets a
+  // real shortlist to compare, not 1–2 flats. The pool itself is up to 10
+  // (.take(10) in the search paths), which expand then reveals in full.
+  static const int _kCollapsedResults = 5;
+
   Widget _resultList(_ChatMsg m) {
     final total = m.scored.length;
-    final show = m.expanded ? total : (total > 3 ? 3 : total);
+    final show =
+        m.expanded ? total : (total > _kCollapsedResults ? _kCollapsedResults : total);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       for (int i = 0; i < show; i++)
         Padding(
@@ -400,11 +413,14 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             ],
           ),
         ),
-      if (!m.expanded && total > 3)
+      // "הצג עוד דירות" is ALWAYS available (until a widen genuinely returns
+      // nothing new): first tap reveals the current pool, later taps progressively
+      // relax the query and fetch ≥20 more nearby listings.
+      if (!m.noMore)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: GestureDetector(
-            onTap: () => setState(() => m.expanded = true),
+            onTap: m.widening ? null : () => _showMore(m),
             child: Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -413,20 +429,93 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                 borderRadius: BorderRadius.circular(99),
                 border: Border.all(color: AppColors.borderLight),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('הצג עוד ${total - 3} דירות',
-                    style: TextStyle(
-                        color: AppColors.primaryDark,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
-                const SizedBox(width: 4),
-                Icon(IconsaxPlusLinear.arrow_down_1,
-                    size: 18, color: AppColors.primaryDark),
-              ]),
+              child: m.widening
+                  ? Row(mainAxisSize: MainAxisSize.min, children: [
+                      const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      const SizedBox(width: 8),
+                      Text('מחפש עוד דירות…',
+                          style: TextStyle(
+                              color: AppColors.primaryDark,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13)),
+                    ])
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(_showMoreLabel(m),
+                          style: TextStyle(
+                              color: AppColors.primaryDark,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13)),
+                      const SizedBox(width: 4),
+                      Icon(IconsaxPlusLinear.arrow_down_1,
+                          size: 18, color: AppColors.primaryDark),
+                    ]),
             ),
           ),
         ),
     ]);
+  }
+
+  String _showMoreLabel(_ChatMsg m) {
+    // Before expanding, offer the hidden pool count; after, it's a widen fetch.
+    if (!m.expanded && m.scored.length > _kCollapsedResults) {
+      return 'הצג עוד ${m.scored.length - _kCollapsedResults} דירות';
+    }
+    return 'הצג עוד דירות';
+  }
+
+  Future<void> _showMore(_ChatMsg m) async {
+    // First tap reveals the already-fetched pool; subsequent taps widen + fetch.
+    if (!m.expanded && m.scored.length > _kCollapsedResults) {
+      setState(() => m.expanded = true);
+      return;
+    }
+    await _widenAndAppend(m);
+  }
+
+  // Progressively relaxes the seeker's SOFT constraints (budget / rooms) each tap
+  // while KEEPING the location and any HARD needs (parking, pets, mamad…), then
+  // appends ≥20 fresh, still-relevant listings — so the seeker can always keep
+  // scrolling for more without ever hitting a dead end.
+  Future<void> _widenAndAppend(_ChatMsg m) async {
+    if (m.widening) return;
+    setState(() => m.widening = true);
+    final provider = context.read<DatingProvider>();
+    m.widenLevel++;
+    final relaxed = _relaxQuery(_query, m.widenLevel);
+    final shownIds = m.scored.map((s) => s.property.id).toSet();
+    final more = provider
+        .recommendForTenant(provider.allProperties, relaxed, limit: 120)
+        .where((s) => !shownIds.contains(s.property.id))
+        .take(20)
+        .toList();
+    if (!mounted) return;
+    setState(() {
+      m.expanded = true;
+      if (more.isEmpty) {
+        // Nothing new even after widening → stop offering the button honestly.
+        m.noMore = true;
+      } else {
+        m.scored = [...m.scored, ...more];
+      }
+      m.widening = false;
+    });
+    _scrollToEnd();
+  }
+
+  // "More, but not too far": +15% budget and ±0.5 rooms per widen level. City and
+  // requiredFeatures (hard gates) are intentionally preserved.
+  SearchQuery _relaxQuery(SearchQuery q, int level) {
+    final budgetFactor = 1 + 0.15 * level;
+    return q.copyWith(
+      maxPrice: q.maxPrice != null ? (q.maxPrice! * budgetFactor).round() : null,
+      minRooms: q.minRooms != null
+          ? (q.minRooms! - 0.5 * level).clamp(1.0, 20.0).toDouble()
+          : null,
+      maxRooms: q.maxRooms != null ? q.maxRooms! + 0.5 * level : null,
+    );
   }
 
   Future<void> _loadConsent() async {
@@ -981,6 +1070,12 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   /// reply, then quietly swap in the richer set. Skipped in immediate mode.
   Future<void> _upgradeSearch(String text, DatingProvider provider,
       _ChatMsg resultsMsg, _ChatMsg? howChoseMsg, _ChatMsg? replyMsg) async {
+    // Guarantee the FULL catalogue is loaded before the (complete) re-rank swaps
+    // in — the instant results ranked over whatever was loaded, this covers the
+    // rest. Idempotent + fast if initState already finished loading.
+    try {
+      await provider.ensureFullCatalogLoaded();
+    } catch (_) {}
     try {
       await _ettiEnrich(text);
     } catch (_) {}
@@ -1233,11 +1328,15 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             text: _howIChoseFallback(results),
           );
           _messages.add(howChoseMsg!);
+          final exactCount = results.where((r) => r.exact).length;
           resultsMsg = _ChatMsg(
             role: 'assistant',
-            text: anyExact
-                ? 'מצאתי ${results.length} דירות שמתאימות לך 🎯'
-                : 'אלה הכי קרובות למה שחיפשת 👇',
+            text: !anyExact
+                ? 'אלה הכי קרובות למה שחיפשת 👇'
+                : exactCount == results.length
+                    ? 'מצאתי $exactCount דירות שמתאימות לך 🎯'
+                    : 'מצאתי $exactCount שמתאימות בול, והוספתי עוד קרובות '
+                        'כדי שיהיה ממה לבחור 👇',
             scored: results,
             chips: _refinePromptChips(),
           );
@@ -1797,40 +1896,60 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
   //   • BUDGET — a flat far over the stated ceiling isn't a "match".
   // Each check only prunes when something still remains (never invents empties),
   // and the honest "nothing here, but nearby…" flow catches a full wipe.
+  // Splits the ranked candidates into strict matches (in-area AND in-budget) and
+  // a labeled "nearby" backfill (just outside the town radius, or a little over
+  // budget) used only to flesh out a thin shortlist. Anything grossly off — >2×
+  // the town radius, or >35% over budget — is still dropped so אתי never presents
+  // a flat 50km away or way over budget as if it fit.
   List<ScoredProperty> _verifyResults(List<ScoredProperty> results) {
     if (results.isEmpty) return results;
-    var out = results;
 
-    // Geo — drop flats grossly far from the requested town's real GovData centre.
     final city = _query.city?.trim();
-    if (city != null && city.isNotEmpty) {
-      final loc = GovData.instance.localityByName(city);
-      if (loc != null) {
-        final maxKm =
-            _query.intents.contains(SearchIntent.cityArea) ? 20.0 : 15.0;
-        final near = out
-            .where((r) =>
-                Geolocator.distanceBetween(
-                        r.property.lat, r.property.lon, loc.lat, loc.lon) /
-                    1000 <=
-                maxKm)
-            .toList();
-        if (near.isNotEmpty) out = near;
+    final loc = (city != null && city.isNotEmpty)
+        ? GovData.instance.localityByName(city)
+        : null;
+    final strictKm =
+        _query.intents.contains(SearchIntent.cityArea) ? 20.0 : 15.0;
+    final wideKm = strictKm * 2; // still "nearby", just clearly labeled
+    final cap = _query.maxPrice ?? 0;
+
+    final strict = <ScoredProperty>[];
+    final nearby = <ScoredProperty>[]; // relaxed, rank-ordered, note-tagged
+
+    for (final r in results) {
+      final km = loc == null
+          ? 0.0
+          : Geolocator.distanceBetween(
+                  r.property.lat, r.property.lon, loc.lat, loc.lon) /
+              1000;
+      final price = r.property.price;
+      final geoFar = loc != null && km > strictKm;
+      final geoWayFar = loc != null && km > wideKm;
+      final over = cap > 0 && price > 0 && price > cap;
+      final wayOver = cap > 0 && price > 0 && price > cap * 1.35;
+
+      // Grossly off — never surface (honest "nothing exact" instead).
+      if (geoWayFar || wayOver) continue;
+
+      if (!geoFar && !over) {
+        strict.add(r);
+        continue;
       }
+      final notes = <String>[
+        if (geoFar) 'כ-${km.round()} ק״מ מ$city',
+        if (over) 'מעט מעל התקציב',
+      ];
+      nearby.add(ScoredProperty(r.property, r.score, r.tags, r.trainKm, false,
+          r.scorecard, notes.join(' · ')));
     }
 
-    // Budget — a flat >35% over the stated ceiling is NOT a match (a small
-    // overshoot is fine — the engine discloses it as a trade-off). This is
-    // STRICT: if nothing is within reach, we return empty so אתי honestly says
-    // "nothing in budget — raise it?" instead of presenting way-over-budget flats.
-    final cap = _query.maxPrice;
-    if (cap != null && cap > 0) {
-      out = out
-          .where((r) => r.property.price <= 0 || r.property.price <= cap * 1.35)
-          .toList();
-    }
-
-    return out;
+    // Enough strict matches → show only those. Otherwise top up with the closest
+    // labeled fallbacks so the seeker always gets a real shortlist to compare.
+    if (strict.length >= _kCollapsedResults) return strict;
+    return [
+      ...strict,
+      ...nearby.take((_kCollapsedResults - strict.length).clamp(0, nearby.length))
+    ];
   }
 
   // Anti-hallucination: when NOTHING matches the exact request, look within [km]
@@ -2660,6 +2779,33 @@ class _AssistantPropertyCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Relaxed-backfill badge: this flat is nearby / a touch over
+                  // budget, not an exact match — say so plainly on the card.
+                  if (scored.fallbackNote != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningBg,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(IconsaxPlusLinear.location,
+                            size: 14, color: AppColors.warningDeep),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(scored.fallbackNote!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.warningDeep)),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

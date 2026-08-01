@@ -113,6 +113,9 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
     final toAdd = <BrokerClient>[];
     for (var i = 0; i < selected.length; i++) {
       final c = selected[i];
+      // A selected contact may have no phone (email-only/company) — skip it
+      // instead of crashing on an empty-list .first.
+      if (c.phones.isEmpty) continue;
       final phone = c.phones.first.number;
       final digits = phone.replaceAll(RegExp(r'\D'), '');
       if (digits.isNotEmpty && existing.contains(digits)) continue;

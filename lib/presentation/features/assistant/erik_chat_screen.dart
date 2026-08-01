@@ -276,12 +276,13 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
           ? await _picker.pickVideo(source: source)
           : await _picker.pickImage(source: source, imageQuality: 85);
       if (file == null) {
-        setState(() => _picking = false);
+        if (mounted) setState(() => _picking = false);
         return;
       }
       final localPath =
           await _storage.saveImageLocally(file, folderName: 'erik_property');
       final remoteUrl = await _storage.uploadToCloud(localPath);
+      if (!mounted) return;
       final path = remoteUrl ?? localPath;
       // Just add the photo and let the draft card update live (it shows the new
       // count + keeps its publish button) — no chat spam, the card stays put so

@@ -19,7 +19,13 @@ import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
+import 'package:dating_app/presentation/screens/chat_partner_profile_screen.dart';
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:dating_app/core/chat/chat_media.dart';
+import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/presentation/screens/contract_form_screen.dart';
 import 'package:dating_app/presentation/screens/contract_sign_flow_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
@@ -68,19 +74,23 @@ class _ChatThemeSpec {
   final Gradient? backgroundGradient;
   final bool glassChrome;
 
-  static final standard = _ChatThemeSpec(
-    backgroundColor: _bg,
-    appBarColor: _surface,
-    composerColor: _surface,
-    inputColor: Colors.white,
-    borderColor: _border,
-    outgoingColor: _outgoing,
-    incomingColor: _incoming,
-    primaryText: AppColors.navy,
-    secondaryText: AppColors.textSecondary,
-    iconSurface: AppColors.slate100,
-    accent: AppColors.primary,
-  );
+  // A GETTER, not a `static final`: re-reads the live design tokens on every
+  // access so the chat follows a runtime theme/accent swap. (As a `static final`
+  // it was computed once at class-load and froze the accent, so the chat never
+  // updated when the brand accent changed.)
+  static _ChatThemeSpec get standard => _ChatThemeSpec(
+        backgroundColor: _bg,
+        appBarColor: _surface,
+        composerColor: _surface,
+        inputColor: Colors.white,
+        borderColor: _border,
+        outgoingColor: _outgoing,
+        incomingColor: _incoming,
+        primaryText: AppColors.navy,
+        secondaryText: AppColors.textSecondary,
+        iconSurface: AppColors.slate100,
+        accent: AppColors.primary,
+      );
 
   factory _ChatThemeSpec.forBranding(BrokerBrandingConfig branding) {
     return switch (branding.chatTemplate) {
@@ -198,6 +208,15 @@ class _MessageScreenState extends State<MessageScreen> {
   bool _chatInitialized = false;
   bool _actionsOpen = false;
 
+  // ── Media (image upload + voice note recording) ───────────────────────────
+  bool _uploadingMedia = false;
+  final AudioRecorder _voiceRecorder = AudioRecorder();
+  bool _isRecording = false;
+  String? _voicePath;
+  DateTime? _voiceStart;
+  Timer? _voiceTimer;
+  Duration _voiceElapsed = Duration.zero;
+
   // ── Viewing scheduling ────────────────────────────────────────────────────
   final AvailabilityRepository _availabilityRepo = AvailabilityRepository();
 
@@ -243,6 +262,8 @@ class _MessageScreenState extends State<MessageScreen> {
 
   @override
   void dispose() {
+    _voiceTimer?.cancel();
+    _voiceRecorder.dispose();
     _chatProvider?.removeListener(_onChatUpdate);
     _chatProvider?.dispose();
     _msgCtrl.dispose();
@@ -299,19 +320,17 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _pickAndSendMedia(
       DatingProvider provider, String senderName) async {
     try {
+      // Downscale on pick: a chat photo doesn't need full camera resolution.
+      // A 4–8 MB original becomes ~200–400 KB → the upload is near-instant
+      // instead of "taking forever".
       final file = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80,
+        imageQuality: 70,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (file == null || !mounted) return;
-      // SEC: never store local device paths in messages — they expose the
-      // file system to the other party and are useless cross-device.
-      await provider.sendMessage(
-        matchId: widget.matchId,
-        sender: senderName,
-        text: '📷 [תמונה]',
-      );
-      _scrollToBottom();
+      await _uploadAndSendImage(provider, senderName, file.path);
     } catch (_) {
       if (mounted) _snack('לא ניתן לגשת לגלריה', error: true);
     }
@@ -319,20 +338,125 @@ class _MessageScreenState extends State<MessageScreen> {
 
   Future<void> _pickAndSendFile(
       DatingProvider provider, String senderName) async {
+    // No file_picker dependency in the app — "attach" also picks from the photo
+    // library, but via the CAMERA-or-gallery choice for images.
     try {
-      final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
       if (file == null || !mounted) return;
-      // SEC: send only the file name, never the full local path.
-      final safeName = file.name.split('/').last.split('\\').last;
+      await _uploadAndSendImage(provider, senderName, file.path);
+    } catch (_) {
+      if (mounted) _snack('לא ניתן לפתוח את המצלמה', error: true);
+    }
+  }
+
+  // Uploads a picked image to S3 and sends it as a real image message. Shows a
+  // transient "uploading" indicator; on failure nothing is sent (no broken msg).
+  Future<void> _uploadAndSendImage(
+      DatingProvider provider, String senderName, String localPath) async {
+    setState(() => _uploadingMedia = true);
+    try {
+      final url = await AwsApiClient.instance
+          .uploadFile(localPath, folder: 'chat/images');
+      if (!mounted) return;
+      if (url == null || url.isEmpty) {
+        _snack('העלאת התמונה נכשלה', error: true);
+        return;
+      }
       await provider.sendMessage(
         matchId: widget.matchId,
         sender: senderName,
-        text: '📎 [$safeName]',
+        text: ChatMediaCodec.encodeImage(url),
       );
       _scrollToBottom();
     } catch (_) {
-      if (mounted) _snack('לא ניתן לגשת לקבצים', error: true);
+      if (mounted) _snack('העלאת התמונה נכשלה', error: true);
+    } finally {
+      if (mounted) setState(() => _uploadingMedia = false);
     }
+  }
+
+  // ── Voice notes ────────────────────────────────────────────────────────────
+  Future<void> _startVoiceRecording() async {
+    try {
+      if (!await _voiceRecorder.hasPermission()) {
+        if (mounted) _snack('נדרשת הרשאת מיקרופון', error: true);
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _voiceRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc, numChannels: 1),
+        path: path,
+      );
+      _voicePath = path;
+      _voiceStart = DateTime.now();
+      _voiceElapsed = Duration.zero;
+      _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() => _voiceElapsed =
+            DateTime.now().difference(_voiceStart ?? DateTime.now()));
+      });
+      setState(() => _isRecording = true);
+    } catch (_) {
+      if (mounted) _snack('לא ניתן להתחיל הקלטה', error: true);
+    }
+  }
+
+  Future<void> _cancelVoiceRecording() async {
+    _voiceTimer?.cancel();
+    try {
+      await _voiceRecorder.stop();
+    } catch (_) {}
+    _voicePath = null;
+    if (mounted) setState(() => _isRecording = false);
+  }
+
+  Future<void> _stopAndSendVoice(
+      DatingProvider provider, String senderName) async {
+    _voiceTimer?.cancel();
+    final elapsed = _voiceElapsed;
+    setState(() => _isRecording = false);
+    String? path;
+    try {
+      path = await _voiceRecorder.stop();
+    } catch (_) {}
+    path ??= _voicePath;
+    _voicePath = null;
+    // Ignore accidental sub-second taps.
+    if (path == null || elapsed.inMilliseconds < 800) return;
+
+    setState(() => _uploadingMedia = true);
+    try {
+      final url =
+          await AwsApiClient.instance.uploadFile(path, folder: 'chat/voice');
+      if (!mounted) return;
+      if (url == null || url.isEmpty) {
+        _snack('שליחת ההקלטה נכשלה', error: true);
+        return;
+      }
+      await provider.sendMessage(
+        matchId: widget.matchId,
+        sender: senderName,
+        text: ChatMediaCodec.encodeAudio(url, elapsed.inMilliseconds),
+      );
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) _snack('שליחת ההקלטה נכשלה', error: true);
+    } finally {
+      if (mounted) setState(() => _uploadingMedia = false);
+    }
+  }
+
+  String _fmtDuration(Duration d) {
+    final m = d.inMinutes.remainder(60).toString();
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   // ── Block user ────────────────────────────────────────────────────────────
@@ -625,6 +749,55 @@ class _MessageScreenState extends State<MessageScreen> {
   // opens this specific chat (SCHED-4). It is idempotent and fail-soft, so the
   // per-thread trigger below and the merged-screen trigger both call it safely.
 
+  void _openPartnerProfile(
+    BuildContext context,
+    DatingProvider provider,
+    RentalProperty property,
+    String myName,
+    List<ChatMessage> messages,
+    bool isConnected,
+  ) {
+    // Real partner name: the sender of the newest INCOMING message (sender != me).
+    // Landlords have no stored tenant identity, so this is the only real source;
+    // tenants use the property's real owner name.
+    String? incomingSender;
+    for (final m in messages.reversed) {
+      if (m.sender.trim().isNotEmpty && m.sender != myName) {
+        incomingSender = m.sender;
+        break;
+      }
+    }
+    final partnerName = provider.isLandlord
+        ? (incomingSender ?? 'מועמד/ת להשכרה')
+        : (property.ownerName.isNotEmpty ? property.ownerName : 'בעל הדירה');
+    // Avatar: tenant sees the property's photo (the chat is about that flat);
+    // a landlord has no real tenant photo → fall back to an icon (empty string).
+    final partnerAvatar = provider.isLandlord
+        ? ''
+        : (property.imageUrls.isNotEmpty ? property.imageUrls.first : '');
+    final partnerSubtitle = provider.isLandlord
+        ? 'מועמד/ת · ${property.city}'
+        : 'בעל הדירה · ${property.city}';
+
+    Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatPartnerProfileScreen(
+          partnerName: partnerName,
+          partnerAvatarUrl: partnerAvatar,
+          partnerSubtitle: partnerSubtitle,
+          property: property,
+          messageCount: messages.length,
+          isLandlord: provider.isLandlord,
+        ),
+      ),
+    ).then((result) {
+      // The chat-info screen returns 'clear_history' when the user confirms
+      // clearing the conversation.
+      if (result == 'clear_history') _chatProvider?.clearMessages();
+    });
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -659,8 +832,6 @@ class _MessageScreenState extends State<MessageScreen> {
             ? _ChatThemeSpec.forBranding(provider.brokerBranding)
             : _ChatThemeSpec.standard;
 
-        // Landlord: turn any tenant confirmations into calendar bookings +
-        // reminders. Global + idempotent, so running it each rebuild is safe.
         if (provider.isLandlord) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) provider.processViewingConfirms();
@@ -668,18 +839,94 @@ class _MessageScreenState extends State<MessageScreen> {
         }
 
         return Scaffold(
-          backgroundColor: chatTheme.backgroundColor,
+          backgroundColor: Colors.white,
           resizeToAvoidBottomInset: true,
 
           // ── AppBar ──────────────────────────────────────────────────────
           appBar: AppBar(
-            backgroundColor: chatTheme.appBarColor,
+            backgroundColor: Colors.white,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
-            scrolledUnderElevation: 0.5,
-            shadowColor: chatTheme.borderColor,
-            iconTheme: IconThemeData(color: chatTheme.primaryText),
-            titleSpacing: 0,
+            scrolledUnderElevation: 0,
+            automaticallyImplyLeading: false,
+            iconTheme: const IconThemeData(color: AppColors.navy),
+            titleSpacing: 12,
+            leadingWidth: 120,
+
+            // Right side in RTL (Back button and Partner Avatar Picture)
+            leading: Padding(
+              padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
+              child: Row(
+                children: [
+                  ScaleBounce(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.primary,
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _openPartnerProfile(
+                      context,
+                      provider,
+                      property,
+                      tenantName,
+                      messages,
+                      isConnected,
+                    ),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: SafeImage(
+                          source: provider.isLandlord
+                              ? (provider.tenantProfile?.photoUrls.isNotEmpty == true
+                                  ? provider.tenantProfile!.photoUrls.first
+                                  : '')
+                              : (property.imageUrls.isNotEmpty
+                                  ? property.imageUrls.first
+                                  : ''),
+                          fit: BoxFit.cover,
+                          fallback: Container(
+                            color: const Color(0xFFF1F5F9),
+                            child: const Center(
+                              child: Icon(
+                                Icons.person_rounded,
+                                size: 24,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Center (Address & Price subtitle)
             title: GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -689,128 +936,63 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                 );
               },
-              child: Row(children: [
-                // Property thumbnail
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: chatTheme.borderColor),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SafeImage(
-                      source: imageUrl,
-                      fallback: Container(
-                        color: chatTheme.iconSurface,
-                        child: RentlyIcon(IconsaxPlusLinear.building,
-                            color: chatTheme.accent, size: 18),
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${property.address}${property.neighborhood.isNotEmpty ? ', ${property.neighborhood}' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.1,
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(property.address,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: chatTheme.primaryText,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${property.priceLabel} · ${property.city}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: chatTheme.secondaryText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-                // Connection dot
-                if (isRemote)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: PulseWidget(
-                      scaleUpTo: 1.35,
-                      duration: const Duration(milliseconds: 1500),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color:
-                              isConnected ? AppColors.success : AppColors.warning,
-                        ),
-                      ),
-                    ),
-                  ),
-              ]),
-            ),
-            // Actions menu icon + block popup
-            actions: [
-              IconButton(
-                icon: RentlyIcon(IconsaxPlusLinear.more_circle,
-                    color: chatTheme.primaryText, size: 22),
-                tooltip: 'פעולות',
-                onPressed: () =>
-                    _showActions(provider, match, property, tenantName),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert,
-                    color: chatTheme.primaryText, size: 22),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                onSelected: (val) {
-                  if (val == 'block') {
-                    _showBlockConfirm(provider, property.ownerName);
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem<String>(
-                    value: 'block',
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.coral.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.block_rounded,
-                              size: 16, color: AppColors.coral),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'חסום משתמש זה',
-                          style: TextStyle(
-                            color: AppColors.coral,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '${property.priceLabel} · ${property.city}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 4),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: chatTheme.borderColor),
             ),
+
+            // Left side in RTL (Blue-bordered 3-dots action button)
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: ScaleBounce(
+                  onTap: () =>
+                      _showActions(provider, match, property, tenantName),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(
+                        color: AppColors.primary,
+                        width: 1.8,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // ── Body ────────────────────────────────────────────────────────
@@ -845,28 +1027,10 @@ class _MessageScreenState extends State<MessageScreen> {
                     ),
                   ),
 
-                  if (isSending)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TypingIndicatorDots(color: chatTheme.secondaryText),
-                            const SizedBox(width: 8),
-                            Text(
-                              'הצד השני מקליד...',
-                              style: TextStyle(
-                                color: chatTheme.secondaryText,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  // NOTE: no "הצד השני מקליד…" indicator — `isSending` reflects OUR
+                  // own outgoing message being persisted, not a real peer-typing
+                  // signal (the backend has none), so showing it would fabricate
+                  // the other person typing on every send.
 
                   // Input bar
                   _MessageInput(
@@ -877,6 +1041,11 @@ class _MessageScreenState extends State<MessageScreen> {
                     onSend: () => _handleSend(provider, tenantName),
                     onActions: () =>
                         _showActions(provider, match, property, tenantName),
+                    isRecording: _isRecording,
+                    recordLabel: _fmtDuration(_voiceElapsed),
+                    onStartVoice: _startVoiceRecording,
+                    onStopVoice: () => _stopAndSendVoice(provider, tenantName),
+                    onCancelVoice: _cancelVoiceRecording,
                   ),
                 ],
               ),
@@ -1014,7 +1183,7 @@ class _ChatBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.backgroundColor,
+        color: Colors.white,
         gradient: theme.backgroundGradient,
       ),
       child: child,
@@ -1577,115 +1746,157 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isTenant ? theme.accent : _incoming;
-    final textColor = isTenant ? Colors.white : AppColors.navy;
+    // New design spec colors:
+    // Outgoing (Mine) = Vibrant Blue (0xFF256BFD)
+    // Incoming (Partner) = Soft Grey (0xFFF4F6F8)
+    final bubbleColor = isTenant ? AppColors.primary : const Color(0xFFF4F6F8);
+    final textColor = isTenant ? Colors.white : const Color(0xFF1E293B);
     final metaColor = isTenant
         ? Colors.white.withValues(alpha: 0.75)
-        : AppColors.textSecondary;
+        : const Color(0xFF94A3B8);
 
-    // Detect media messages (📷 / 📎 prefix) for richer bubble rendering.
-    // Legacy __img__: paths are treated as plain text (no file path exposure).
-    final isImg = message.text == '📷 [תמונה]';
-    final isFile =
-        message.text.startsWith('📎 [') && message.text.endsWith(']');
-    final isMedia = isImg || isFile;
+    // Real media: an image or a voice note encoded in the message text.
+    final media = ChatMediaCodec.parse(message.text);
+    final isImg = media?.kind == ChatMediaKind.image;
 
     Widget messageContent;
-    if (isImg) {
-      messageContent = _MediaBubbleContent(
-        icon: Icons.image_rounded,
-        label: 'תמונה',
-        color: isTenant ? Colors.white : AppColors.primary,
+    if (media?.kind == ChatMediaKind.image) {
+      // A single sent photo — one real image, tap to open full-screen. (NOT the
+      // old stacked "+N" gallery, which faked multiple photos for one image.)
+      messageContent = GestureDetector(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => _FullScreenImage(url: media!.url),
+        )),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: SafeImage(
+              source: media!.url,
+              fit: BoxFit.cover,
+              fallback: Container(
+                height: 180,
+                width: 180,
+                color: Colors.black12,
+                child: const Center(
+                    child: Icon(Icons.image_rounded, color: Colors.white54)),
+              ),
+            ),
+          ),
+        ),
       );
-    } else if (isFile) {
-      final label = message.text.substring(4, message.text.length - 1);
-      messageContent = _MediaBubbleContent(
-        icon: Icons.attach_file_rounded,
-        label: label.isNotEmpty ? label : 'קובץ',
-        color: isTenant ? Colors.white : AppColors.primary,
+    } else if (media?.kind == ChatMediaKind.audio) {
+      messageContent = _VoiceNoteBubble(
+        url: media!.url,
+        duration: media.duration ?? Duration.zero,
+        isMine: isTenant,
       );
     } else {
       messageContent = Text(
         message.text,
         style: TextStyle(
-          fontSize: 14.5,
+          fontSize: 15,
           color: textColor,
-          height: 1.48,
+          height: 1.4,
           fontWeight: FontWeight.w500,
         ),
       );
     }
+
+    final timeStr = '(${_formatTime(message.createdAt)})';
 
     final bubble = AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
       opacity: isPending ? 0.6 : 1.0,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * (isMedia ? 0.62 : 0.74),
+          maxWidth: MediaQuery.sizeOf(context).width * (isImg ? 0.85 : 0.78),
         ),
         margin: EdgeInsets.only(
           top: showAvatar || isTenant ? 8 : 3,
           bottom: 3,
         ),
-        padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: BorderRadius.only(
-            topRight: const Radius.circular(20),
-            topLeft: const Radius.circular(20),
-            bottomRight:
-                isTenant ? const Radius.circular(6) : const Radius.circular(20),
-            bottomLeft:
-                isTenant ? const Radius.circular(20) : const Radius.circular(6),
-          ),
-          border: isTenant ? null : Border.all(color: _border),
-        ),
+        padding: isImg
+            ? const EdgeInsets.all(4)
+            : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: isImg
+            ? null
+            : BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(20),
+                  topRight: const Radius.circular(20),
+                  bottomRight: isTenant
+                      ? const Radius.circular(4)
+                      : const Radius.circular(20),
+                  bottomLeft: isTenant
+                      ? const Radius.circular(20)
+                      : const Radius.circular(4),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isTenant
+                        ? AppColors.primary.withValues(alpha: 0.15)
+                        : Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
         child: Column(
           crossAxisAlignment:
               isTenant ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            if (!isTenant && showAvatar) ...[
+            if (!isTenant && showAvatar && !isImg) ...[
               Text(
                 message.sender,
                 style: TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w800,
-                  fontSize: 11,
+                  fontSize: 11.5,
                 ),
               ),
               const SizedBox(height: 4),
             ],
             messageContent,
-            const SizedBox(height: 5),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  _formatTime(message.createdAt),
-                  style: TextStyle(
-                    color: metaColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (isTenant) ...[
-                  const SizedBox(width: 3),
-                  AnimatedScale(
-                    scale: isPending ? 1.0 : 1.25,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.elasticOut,
-                    child: Icon(
-                      isPending ? Icons.done_rounded : Icons.done_all_rounded,
-                      size: 12,
-                      color: isPending
-                          ? Colors.white.withValues(alpha: 0.5)
-                          : AppColors.sky,
+            if (!isImg) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    timeStr,
+                    style: TextStyle(
+                      color: metaColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (isTenant && message.failed) ...[
+                    const SizedBox(width: 4),
+                    const Text(
+                      'לא נשלח',
+                      style: TextStyle(
+                        color: Color(0xFFFFE0E0),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    const Icon(Icons.error_outline_rounded,
+                        size: 13, color: Color(0xFFFFE0E0)),
+                  ] else if (isTenant) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      isPending ? Icons.done_rounded : Icons.done_all_rounded,
+                      size: 13,
+                      color: isPending ? Colors.white60 : Colors.white,
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1790,25 +2001,40 @@ class _DateDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(children: [
-        const Expanded(child: Divider(color: _border, thickness: 1)),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: _border),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Divider(
+              color: Color(0xFFE8EEF8),
+              thickness: 1,
+            ),
           ),
-          child: Text(_formatDay(date),
-              style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700)),
-        ),
-        const Expanded(child: Divider(color: _border, thickness: 1)),
-      ]),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F6FE),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              _formatDay(date),
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          const Expanded(
+            child: Divider(
+              color: Color(0xFFE8EEF8),
+              thickness: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1823,206 +2049,201 @@ class _MessageInput extends StatelessWidget {
     required this.onSend,
     required this.onActions,
     required this.theme,
+    required this.isRecording,
+    required this.recordLabel,
+    required this.onStartVoice,
+    required this.onStopVoice,
+    required this.onCancelVoice,
   });
 
   final _ChatThemeSpec theme;
-
   final TextEditingController controller;
   final bool isSending;
   final bool actionsOpen;
   final VoidCallback onSend;
   final VoidCallback onActions;
+  final bool isRecording;
+  final String recordLabel;
+  final VoidCallback onStartVoice;
+  final VoidCallback onStopVoice;
+  final VoidCallback onCancelVoice;
 
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        border: const Border(top: BorderSide(color: _border)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.fromLTRB(14, 10, 14, 8 + bottom),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Send on the right in RTL layouts.
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, child) {
-              final hasText = value.text.trim().isNotEmpty;
-              final isVisible = hasText || isSending;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOut,
-                width: isVisible ? 58.0 : 0.0,
-                child: AnimatedScale(
-                  duration: const Duration(milliseconds: 200),
-                  scale: isVisible ? 1.0 : 0.0,
-                  curve: Curves.easeOutBack,
-                  child: isVisible
-                      ? Padding(
-                          padding: const EdgeInsets.only(left: 10),
-                          child: _SendBtn(isSending: isSending, onTap: onSend),
-                        )
-                      : const SizedBox.shrink(),
+    // While recording, the whole bar becomes a recording strip: cancel · timer ·
+    // send. Keeps the transport simple and unmistakable.
+    if (isRecording) {
+      return Container(
+        color: Colors.white,
+        padding: EdgeInsets.fromLTRB(16, 10, 16, 12 + bottom),
+        child: Row(
+          children: [
+            ScaleBounce(
+              onTap: onCancelVoice,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFFDECEC),
                 ),
-              );
-            },
-          ),
-          Expanded(
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 118),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.slate200),
+                child: const Icon(Icons.delete_outline_rounded,
+                    size: 22, color: AppColors.coral),
               ),
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 5,
-                textAlign: TextAlign.right,
+            ),
+            const SizedBox(width: 12),
+            const _RecordingDot(),
+            const SizedBox(width: 8),
+            Text(recordLabel,
                 style: const TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
+                    color: AppColors.navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700)),
+            const Spacer(),
+            const Text('החלק לביטול · שלח',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+            const SizedBox(width: 12),
+            ScaleBounce(
+              onTap: onStopVoice,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary,
                 ),
-                decoration: InputDecoration(
-                  hintText: 'כתיבת הודעה...',
-                  hintStyle: TextStyle(
-                    color: AppColors.textSecondary.withValues(alpha: 0.7),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                child: const Icon(Icons.send_rounded,
+                    size: 22, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 12 + bottom),
+      child: Row(
+        children: [
+          // 1. Send Button (Solid Vibrant Blue)
+          ScaleBounce(
+            onTap: onSend,
+            scaleDownTo: 0.90,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary, // Vibrant primary blue from mockup
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
+                ],
+              ),
+              child: isSending
+                  ? const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(
+                      IconsaxPlusBold.send_1,
+                      size: 22,
+                      color: Colors.white,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // 2. Microphone (Voice Note) Button — tap to start recording.
+          ScaleBounce(
+            onTap: onStartVoice,
+            scaleDownTo: 0.90,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFF7F9FC),
+              ),
+              child: const Icon(
+                IconsaxPlusLinear.microphone,
+                size: 22,
+                color: Color(0xFF8E9BAE),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          // Plus on the left in RTL layouts.
-          AnimatedRotation(
-            turns: actionsOpen ? 0.125 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutBack,
-            child: _IconBtn(
-              icon: Icons.add_rounded,
-              color: AppColors.navy,
-              bg: AppColors.slate100,
-              onTap: onActions,
+
+          // 3. Extended Capsule Text Input Field ("כתיבת הודעה...")
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F9FC),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: TextField(
+                controller: controller,
+                minLines: 1,
+                maxLines: 4,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: AppColors.navy,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'כתיבת הודעה...',
+                  hintStyle: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                ),
+                onSubmitted: (_) => onSend(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // 4. Plus Button (+) - Action attachments menu
+          ScaleBounce(
+            onTap: onActions,
+            scaleDownTo: 0.90,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFF5F7FA),
+              ),
+              child: AnimatedRotation(
+                turns: actionsOpen ? 0.125 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                child: const Icon(
+                  Icons.add_rounded,
+                  size: 26,
+                  color: Color(0xFF8E9BAE),
+                ),
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _IconBtn extends StatelessWidget {
-  const _IconBtn({
-    required this.icon,
-    required this.color,
-    required this.bg,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color color;
-  final Color bg;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleBounce(
-      onTap: onTap,
-      scaleDownTo: 0.88,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Icon(icon, size: 20, color: color),
-      ),
-    );
-  }
-}
-
-class _SendBtn extends StatelessWidget {
-  _SendBtn({required this.isSending, required this.onTap});
-
-  final bool isSending;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final btn = AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: 48,
-      height: 44,
-      decoration: BoxDecoration(
-        gradient: isSending
-            ? LinearGradient(
-                colors: [
-                  AppColors.primary.withValues(alpha: 0.45),
-                  AppColors.primary.withValues(alpha: 0.3),
-                ],
-              )
-            : LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: isSending
-            ? const []
-            : [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.26),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-      ),
-      child: Center(
-        child: isSending
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const RentlyIcon(
-                IconsaxPlusLinear.send_1,
-                color: Colors.white,
-                size: 18,
-              ),
-      ),
-    );
-
-    if (isSending) {
-      return btn;
-    }
-
-    return ScaleBounce(
-      onTap: onTap,
-      scaleDownTo: 0.88,
-      child: btn,
     );
   }
 }
@@ -2621,12 +2842,168 @@ class _SlotPickRow extends StatelessWidget {
   }
 }
 
+// ─── Photo Stack Gallery Widget ───────────────────────────────────────────────
+
+class _PhotoStackGalleryWidget extends StatelessWidget {
+  const _PhotoStackGalleryWidget({
+    required this.images,
+    this.totalCount = 4,
+  });
+
+  final List<String> images;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final img1 = images.isNotEmpty ? images[0] : '';
+    final img2 = images.length > 1 ? images[1] : img1;
+    final img3 = images.length > 2 ? images[2] : img1;
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10),
+        height: 190,
+        width: 280,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 1. Left Photo (Tilted -0.12 rad, shifted left)
+            Transform.translate(
+              offset: const Offset(-42, 6),
+              child: Transform.rotate(
+                angle: -0.12,
+                child: Container(
+                  width: 125,
+                  height: 155,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 10,
+                        offset: const Offset(-4, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SafeImage(
+                      source: img2,
+                      fit: BoxFit.cover,
+                      fallback: Container(color: const Color(0xFFCBD5E1)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 2. Right Photo (Tilted +0.12 rad, shifted right)
+            Transform.translate(
+              offset: const Offset(42, 6),
+              child: Transform.rotate(
+                angle: 0.12,
+                child: Container(
+                  width: 125,
+                  height: 155,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 10,
+                        offset: const Offset(4, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SafeImage(
+                      source: img3,
+                      fit: BoxFit.cover,
+                      fallback: Container(color: const Color(0xFFCBD5E1)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. Center Photo (Foreground, straight, blue border)
+            Container(
+              width: 140,
+              height: 175,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.primary, width: 2.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: SafeImage(
+                      source: img1,
+                      fit: BoxFit.cover,
+                      fallback: Container(color: const Color(0xFF94A3B8)),
+                    ),
+                  ),
+
+                  // "+4 🖼️" Overlay Badge at lower center
+                  Positioned(
+                    bottom: 10,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xDC1E293B),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '+$totalCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              IconsaxPlusLinear.gallery,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Proposal / confirm chat cards ────────────────────────────────────────────
 
-/// In-chat card rendering a landlord's proposal of viewing times. Tenants (the
-/// recipient) get an "אשר" button per option; the landlord (sender) sees each as
-/// read-only. Once one option is confirmed, it shows "מאושר ✓" and the rest are
-/// disabled.
+/// In-chat card rendering a landlord's proposal of viewing times.
 class _SlotProposalCard extends StatelessWidget {
   _SlotProposalCard({
     required this.proposal,
@@ -2634,6 +3011,7 @@ class _SlotProposalCard extends StatelessWidget {
     required this.createdAt,
     required this.confirmedSlotIds,
     required this.onConfirm,
+    this.ownerName = 'רונה',
   });
 
   final SlotProposal proposal;
@@ -2641,86 +3019,152 @@ class _SlotProposalCard extends StatelessWidget {
   final DateTime createdAt;
   final Set<String> confirmedSlotIds;
   final void Function(SlotOption option)? onConfirm;
+  final String ownerName;
 
   @override
   Widget build(BuildContext context) {
     final anyConfirmed =
         proposal.options.any((o) => confirmedSlotIds.contains(o.slotId));
+    final firstOption =
+        proposal.options.isNotEmpty ? proposal.options.first : null;
+    final timeLabel = firstOption != null
+        ? '${_formatTime(firstOption.start)}-${_formatTime(firstOption.start.add(Duration(minutes: firstOption.durationMinutes)))}'
+        : '10:25-11:25';
+    final dateLabel = firstOption != null
+        ? _formatSlotDate(firstOption.start)
+        : 'נובמבר 2026';
 
-    final card = Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-      ),
-      margin: const EdgeInsets.only(top: 8, bottom: 3),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight2,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(IconsaxPlusLinear.calendar_add,
-                    color: AppColors.primary, size: 17),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text('מועדים מוצעים לצפייה',
-                    style: TextStyle(
-                        color: AppColors.navy,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w900)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...proposal.options.map((o) {
-            final confirmed = confirmedSlotIds.contains(o.slotId);
-            return _SlotOptionRow(
-              option: o,
-              confirmed: confirmed,
-              // Disable other options once one is chosen.
-              dimmed: anyConfirmed && !confirmed,
-              canConfirm: onConfirm != null && !anyConfirmed,
-              onConfirm:
-                  onConfirm == null ? null : () => onConfirm!(o),
-            );
-          }),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _formatTime(createdAt),
-              style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600),
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F6FE),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: const Color(0xFFD0E2FF), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Card Title
+            Text(
+              'הוזמנת לפגישת סיור בדירה של ${ownerName.isNotEmpty ? ownerName : 'רונה'}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1D61ED),
+              ),
+            ),
+            const SizedBox(height: 14),
 
-    return Align(
-      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: card,
+            // Row of 3 Chips
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                // 1. Date Pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: const Color(0xFF3B82F6), width: 1.2),
+                  ),
+                  child: Text(
+                    dateLabel,
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 2. Time Pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: const Color(0xFF3B82F6), width: 1.2),
+                  ),
+                  child: Text(
+                    timeLabel,
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 3. Solid Blue Action Button (אישור)
+                ScaleBounce(
+                  onTap: () {
+                    if (onConfirm != null &&
+                        firstOption != null &&
+                        !anyConfirmed) {
+                      onConfirm!(firstOption);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: anyConfirmed
+                          ? AppColors.success
+                          : AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          anyConfirmed
+                              ? Icons.check_circle_rounded
+                              : IconsaxPlusBold.calendar_add,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          anyConfirmed ? 'מאושר' : 'אישור',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2936,3 +3380,198 @@ String _formatDay(DateTime v) {
 
 bool _isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
+
+// ─── A pulsing red dot shown while a voice note is recording ──────────────────
+class _RecordingDot extends StatefulWidget {
+  const _RecordingDot();
+  @override
+  State<_RecordingDot> createState() => _RecordingDotState();
+}
+
+class _RecordingDotState extends State<_RecordingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.35, end: 1.0).animate(_c),
+      child: Container(
+        width: 12,
+        height: 12,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.coral,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── A playable voice-note bubble (real audio via audioplayers) ───────────────
+class _VoiceNoteBubble extends StatefulWidget {
+  const _VoiceNoteBubble({
+    required this.url,
+    required this.duration,
+    required this.isMine,
+  });
+
+  final String url;
+  final Duration duration;
+  final bool isMine;
+
+  @override
+  State<_VoiceNoteBubble> createState() => _VoiceNoteBubbleState();
+}
+
+class _VoiceNoteBubbleState extends State<_VoiceNoteBubble> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _playing = false;
+  Duration _pos = Duration.zero;
+  late final List<StreamSubscription<dynamic>> _subs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _subs.add(_player.onPlayerStateChanged.listen((s) {
+      if (!mounted) return;
+      setState(() => _playing = s == PlayerState.playing);
+    }));
+    _subs.add(_player.onPositionChanged.listen((p) {
+      if (!mounted) return;
+      setState(() => _pos = p);
+    }));
+    _subs.add(_player.onPlayerComplete.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _playing = false;
+        _pos = Duration.zero;
+      });
+    }));
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playing) {
+      await _player.pause();
+    } else {
+      await _player.play(UrlSource(widget.url));
+    }
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.isMine ? Colors.white : AppColors.primary;
+    final track = widget.isMine
+        ? Colors.white.withValues(alpha: 0.35)
+        : AppColors.primary.withValues(alpha: 0.2);
+    final total = widget.duration.inMilliseconds == 0
+        ? 1.0
+        : widget.duration.inMilliseconds.toDouble();
+    final progress = (_pos.inMilliseconds / total).clamp(0.0, 1.0);
+    final label = _playing || _pos.inMilliseconds > 0
+        ? _fmt(_pos)
+        : _fmt(widget.duration);
+
+    return SizedBox(
+      width: 180,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: _toggle,
+            child: Icon(
+              _playing
+                  ? Icons.pause_circle_filled_rounded
+                  : Icons.play_circle_fill_rounded,
+              size: 34,
+              color: fg,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 4,
+                    backgroundColor: track,
+                    valueColor: AlwaysStoppedAnimation(fg),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.mic_rounded, size: 13, color: fg),
+                    const SizedBox(width: 4),
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: fg)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Full-screen image viewer for a tapped photo message ──────────────────────
+class _FullScreenImage extends StatelessWidget {
+  const _FullScreenImage({required this.url});
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: SafeImage(
+            source: url,
+            fit: BoxFit.contain,
+            fallback: const Icon(Icons.broken_image_rounded,
+                color: Colors.white54, size: 64),
+          ),
+        ),
+      ),
+    );
+  }
+}

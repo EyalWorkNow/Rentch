@@ -40,11 +40,14 @@ class LandlordDashboardScreen extends StatelessWidget {
         final photoUrl = profile?.photoUrl ?? '';
         final properties = provider.myProperties;
         
-        // Calculate Expected Monthly Revenue
-        final double expectedRevenue = properties.fold<double>(
-          0.0,
-          (sum, property) => sum + property.price,
-        );
+        // Calculate Expected Monthly Revenue — only ACTIVE RENTALS count as
+        // ongoing monthly income. Sale listings hold a one-time asking price in
+        // the same field, and paused/rented units aren't earning a new rent.
+        final double expectedRevenue = properties
+            .where((p) =>
+                p.isActive &&
+                p.transactionType == PropertyTransactionType.rent)
+            .fold<double>(0.0, (sum, property) => sum + property.price);
 
         if (provider.isLoading) {
           return Scaffold(
@@ -78,7 +81,9 @@ class LandlordDashboardScreen extends StatelessWidget {
                 FadeSlideEntrance(
                   delay: const Duration(milliseconds: 80),
                   child: _SystemPerformanceGrid(
-                    propertiesCount: properties.length,
+                    // Card unit is "פעילים" (active) — count only active listings,
+                    // not paused/rented/draft ones.
+                    propertiesCount: properties.where((p) => p.isActive).length,
                     expectedRevenue: expectedRevenue,
                     conversionRate: stats.conversionRate,
                     pendingCount: stats.pendingCount,
@@ -102,8 +107,20 @@ class LandlordDashboardScreen extends StatelessWidget {
                 FadeSlideEntrance(
                   delay: const Duration(milliseconds: 160),
                   child: _OccupancyArcMeter(
-                    matchesCount: stats.matchesCount,
-                    propertiesCount: properties.length,
+                    // How many ACTIVE properties have at least one match —
+                    // the label reads "נכסים עם התאמה / מתוך N נכסים פעילים",
+                    // so both numerator and denominator are per-property (not
+                    // total match count).
+                    propertiesWithMatch: () {
+                      final matchedIds =
+                          provider.matches.map((m) => m.propertyId).toSet();
+                      return properties
+                          .where((p) =>
+                              p.isActive && matchedIds.contains(p.id))
+                          .length;
+                    }(),
+                    propertiesCount:
+                        properties.where((p) => p.isActive).length,
                     expectedRevenue: expectedRevenue,
                   ),
                 ),
@@ -217,7 +234,26 @@ class _DashboardHeader extends StatelessWidget {
           children: [
             // Real, working notifications bell (opens the inbox). Shown only
             // here on the agent/landlord dashboard — replaces the old fake icon.
-            const NotificationBell(),
+            NotificationBell(
+              onDeepLink: (n) {
+                final provider = context.read<DatingProvider>();
+                switch (n.type) {
+                  case 'message':
+                  case 'match':
+                  case 'like':
+                  case 'property_like':
+                    provider.setTabIndex(1); // merged candidates + messages
+                    provider.markMatchesSeen();
+                  case 'tour':
+                  case 'tour_ready':
+                  case 'review':
+                  case 'saved_search':
+                    provider.setTabIndex(2); // my properties
+                  default:
+                    break;
+                }
+              },
+            ),
             const SizedBox(width: 10),
             // Personal assistant ("עוזר אישי") — replaces the avatar. A clear
             // icon + tag opens Erik, the voice/text assistant built for older
@@ -576,12 +612,12 @@ class _LargeProgressCard extends StatelessWidget {
 
 class _OccupancyArcMeter extends StatefulWidget {
   _OccupancyArcMeter({
-    required this.matchesCount,
+    required this.propertiesWithMatch,
     required this.propertiesCount,
     required this.expectedRevenue,
   });
 
-  final int matchesCount;
+  final int propertiesWithMatch;
   final int propertiesCount;
   final double expectedRevenue;
 
@@ -611,7 +647,8 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
   Widget build(BuildContext context) {
     final double occupancyRate = widget.propertiesCount == 0
         ? 0.0
-        : (widget.matchesCount / widget.propertiesCount).clamp(0.0, 1.0);
+        : (widget.propertiesWithMatch / widget.propertiesCount)
+            .clamp(0.0, 1.0);
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: occupancyRate),
@@ -747,7 +784,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                   Expanded(
                     child: _ArcStatChip(
                       label: 'עם התאמה',
-                      value: '${widget.matchesCount}',
+                      value: '${widget.propertiesWithMatch}',
                       color: AppColors.primary,
                     ),
                   ),
@@ -755,7 +792,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                   Expanded(
                     child: _ArcStatChip(
                       label: 'ממתינים',
-                      value: '${(widget.propertiesCount - widget.matchesCount).clamp(0, widget.propertiesCount)}',
+                      value: '${(widget.propertiesCount - widget.propertiesWithMatch).clamp(0, widget.propertiesCount)}',
                       color: AppColors.border,
                       textColor: AppColors.textSecondary,
                     ),
@@ -916,63 +953,29 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
     [18, 24, 31, 27, 36, 42, 38, 29, 44, 37, 51, 46],
   ];
 
-  /// Distribute [total] across [count] bars such that bar at [peakIndex]
-  /// is the largest. Uses a deterministic seed so values are stable across rebuilds.
-  List<int> _distribute(int total, int count, int peakIndex, int seed) {
-    if (total == 0) return List.filled(count, 0);
-    // Build weights biased toward peakIndex using seed for stability
-    final weights = List<double>.generate(count, (i) {
-      final dist = (i - peakIndex).abs();
-      // Deterministic variation based on seed
-      final variation = ((seed * (i + 1) * 7) % 5) / 10.0; // 0.0 to 0.4
-      return (1.0 / (dist + 1)) + variation;
-    });
-    final sumW = weights.fold<double>(0.0, (s, w) => s + w);
-    final result = List<int>.filled(count, 0);
-    int assigned = 0;
-    for (var i = 0; i < count; i++) {
-      result[i] = ((weights[i] / sumW) * total).round();
-      assigned += result[i];
-    }
-    // Fix rounding drift on peak bar
-    result[peakIndex] += total - assigned;
-    if (result[peakIndex] < 0) result[peakIndex] = 0;
-    return result;
-  }
-
+  // HONEST chart: the app stores no per-day/week/month interest history — only a
+  // lifetime like total and today's likes. So we plot the REAL value we know
+  // (today's likes) in the current bucket and leave the rest at 0, rather than
+  // fabricating a distribution across days that never happened.
   List<int> _buildRealData(int period) {
     final now = DateTime.now();
     final properties = widget.properties;
-
-    // Total lifetime likes across all landlord properties
-    final totalLikes = properties.fold<int>(0, (s, p) => s + p.marketSignals.likes);
-    // Today's likes (using the model's built-in helper)
     final todayLikes = properties.fold<int>(
-      0, (s, p) => s + p.marketSignals.likesTodayFor(now));
-
-    // Seed derived from property IDs for stable random look
-    final seed = properties.isEmpty
-        ? 42
-        : properties.map((p) => p.id.hashCode).fold<int>(0, (a, b) => a ^ b).abs();
+        0, (s, p) => s + p.marketSignals.likesTodayFor(now));
 
     switch (period) {
-      case 0: // Weekly: 7 days, today = weekday index (Sun=0)
-        final todayIndex = now.weekday % 7; // DateTime.monday=1..sunday=7 -> 0=Sun
-        final remaining = (totalLikes - todayLikes).clamp(0, totalLikes);
-        final base = _distribute(remaining, 7, todayIndex, seed);
-        base[todayIndex] = (base[todayIndex] + todayLikes).clamp(0, 9999);
-        return base;
-
-      case 1: // Monthly: 4 weeks, this week = index 0 (most recent)
-        final base = _distribute(totalLikes, 4, 0, seed);
-        // Ensure this week is at least todayLikes
-        if (base[0] < todayLikes) base[0] = todayLikes;
-        return base;
-
-      case 2: // Yearly: 12 months, current month = index based on month
-        final monthIndex = now.month - 1; // 0-based
-        return _distribute(totalLikes, 12, monthIndex, seed);
-
+      case 0: // Weekly: 7 days — today only.
+        final bars = List<int>.filled(7, 0);
+        bars[now.weekday % 7] = todayLikes;
+        return bars;
+      case 1: // Monthly: 4 weeks — this (most recent) week only.
+        final bars = List<int>.filled(4, 0);
+        bars[0] = todayLikes;
+        return bars;
+      case 2: // Yearly: 12 months — this month only.
+        final bars = List<int>.filled(12, 0);
+        bars[now.month - 1] = todayLikes;
+        return bars;
       default:
         return [];
     }
@@ -1053,7 +1056,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
-                      'הערכה לפי הפעילות',
+                      'לייקים היום',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 10,
@@ -1511,15 +1514,16 @@ class _LandlordToolsSection extends StatelessWidget {
           title: 'מעקב תשלומים',
           subtitle: firstProperty == null
               ? 'הוסיפו דירה כדי לעקוב אחרי תשלומי השכירות'
-              : 'לראות מי שילם שכר דירה ומי עדיין חייב',
+              : 'בחרו דירה כדי לראות סטטוס, מועד תשלום והערות',
           onTap: firstProperty == null
               ? null
               : () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => RentTrackingScreen(
-                        propertyId: firstProperty.id,
-                        propertyTitle: firstProperty.address,
-                        monthlyRent: firstProperty.price,
+                      builder: (_) => PaymentTrackingHubScreen(
+                        properties: [
+                          for (final p in properties)
+                            (id: p.id, title: p.address, rent: p.price),
+                        ],
                       ),
                     ),
                   ),
@@ -1728,7 +1732,11 @@ class _CalendarCardState extends State<_CalendarCard>
         ? 'היום'
         : diff == 1
             ? 'מחר'
-            : 'יום ${_daysHeb[d.weekday % 7]}';
+            // Within a week the weekday name is unambiguous; beyond that add the
+            // date so "יום שלישי" 9 days out isn't confused with this Tuesday.
+            : diff < 7
+                ? 'יום ${_daysHeb[d.weekday % 7]}'
+                : 'יום ${_daysHeb[d.weekday % 7]} ${d.day}/${d.month}';
     final hh = d.hour.toString().padLeft(2, '0');
     final mm = d.minute.toString().padLeft(2, '0');
     return '$day · $hh:$mm';

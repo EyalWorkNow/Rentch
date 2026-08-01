@@ -23,6 +23,7 @@ class _ClassicTemplate extends StatelessWidget {
     required this.monthlyIncome,
     required this.onBackTap,
     required this.onShareTap,
+    required this.onBoost,
     required this.onLike,
     required this.onTour,
     required this.onEdit,
@@ -41,6 +42,7 @@ class _ClassicTemplate extends StatelessWidget {
   final int? monthlyIncome;
   final VoidCallback onBackTap;
   final VoidCallback onShareTap;
+  final VoidCallback onBoost;
   final VoidCallback onLike;
   final VoidCallback onTour;
   final VoidCallback onEdit;
@@ -373,37 +375,79 @@ class _ClassicTemplate extends StatelessWidget {
             ],
           ),
 
-          // Floating share button at bottom left
+          // Floating action at bottom-left: BOOST for the landlord (their own
+          // listing), SHARE for everyone else.
           Positioned(
             bottom: MediaQuery.of(context).padding.bottom + 85,
             left: 20,
-            child: ScaleBounce(
-              onTap: onShareTap,
-              scaleDownTo: 0.88,
-              child: Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.slate200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+            child: isLandlordPreview
+                // Boost — premium indigo pill (matches the PRO brand accent).
+                ? ScaleBounce(
+                    onTap: onBoost,
+                    scaleDownTo: 0.9,
+                    child: Container(
+                      height: 54,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5B61F6), Color(0xFF4F46E5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4F46E5).withValues(alpha: 0.38),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RentlyIcon(IconsaxPlusBold.flash_1,
+                              color: Colors.white, size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            'הקפצה',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-                child: const Center(
-                  child: RentlyIcon(
-                    IconsaxPlusLinear.export_2,
-                    color: Colors.black,
-                    size: 24,
+                  )
+                : ScaleBounce(
+                    onTap: onShareTap,
+                    scaleDownTo: 0.88,
+                    child: Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.slate200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: RentlyIcon(
+                          IconsaxPlusLinear.export_2,
+                          color: Colors.black,
+                          size: 24,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
 
           // Bottom action bar

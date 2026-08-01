@@ -13,8 +13,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 class PlatformFx {
   static bool get isAndroid => !kIsWeb && Platform.isAndroid;
 
-  /// A blur sigma reduced on Android (~45% lighter, with a small floor so it still
-  /// reads as frosted); unchanged on iOS and other platforms.
+  /// Blur sigma. Kept at near-parity with iOS (0.9) so the frosted-glass design
+  /// looks the SAME on Android — the app is glass-heavy and a lighter blur read
+  /// as a different design. The tiny 10% trim is an imperceptible safety margin
+  /// for Android/Impeller over animating content; iOS is untouched.
   static double blurSigma(double base) =>
-      isAndroid ? (base * 0.55).clamp(2.0, base) : base;
+      isAndroid ? (base * 0.9).clamp(2.0, base) : base;
 }

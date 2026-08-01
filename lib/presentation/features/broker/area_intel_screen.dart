@@ -267,15 +267,11 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          surfaceTintColor: AppColors.primary,
-          elevation: 0,
-          centerTitle: true,
-          title: const Text('אינטליגנציית אזור',
-              style: TextStyle(
-                  color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text('אינטליגנציית אזור'),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(color: AppColors.divider, height: 1, thickness: 1),
+          ),
         ),
         body: SafeArea(
           top: false,
@@ -685,11 +681,27 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
     );
   }
 
-  Widget _demographics(AreaProfile p) => Row(children: [
-        _demoStat('👶 ילדים (0-19)', p.childShare),
-        _demoStat('🧑 עובדים (20-64)', p.youngShare),
-        _demoStat('🌿 65+', p.seniorShare),
+  Widget _demographics(AreaProfile p) {
+    // Without a matched CBS statistical area the shares are neutral placeholders
+    // (all ~50%) — show an honest "not available" instead of fake precise %.
+    if (!p.demographicsAvailable) {
+      return Row(children: [
+        Expanded(
+          child: Text('נתוני דמוגרפיה אינם זמינים לאזור זה',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.textSecondary)),
+        ),
       ]);
+    }
+    return Row(children: [
+      _demoStat('👶 ילדים (0-19)', p.childShare),
+      _demoStat('🧑 עובדים (20-64)', p.youngShare),
+      _demoStat('🌿 65+', p.seniorShare),
+    ]);
+  }
 
   Widget _demoStat(String label, double share) => Expanded(
         child: Column(children: [

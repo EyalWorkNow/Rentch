@@ -185,10 +185,19 @@ void main() async {
     debugPrint('Scaniverse initialization skipped: $error');
   }
 
+  // Draw edge-to-edge so the system nav bar (esp. Samsung One UI's 3-button /
+  // gesture bar) becomes a transparent overlay and MediaQuery.viewPadding.bottom
+  // reports its real height — otherwise it stays 0 and the floating app navbar
+  // renders UNDER the Samsung bar (looked hidden). contrastEnforced:false stops
+  // Android drawing a scrim behind the now-transparent bar.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
   runApp(const RentlyApp());
@@ -256,15 +265,30 @@ class RentlyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: _buildTheme(),
             builder: (context, child) {
-              return Directionality(
-                textDirection: TextDirection.rtl,
-                // Tap anywhere outside a field to dismiss the keyboard — app-wide,
-                // so it works on every page. translucent → real buttons/fields
-                // still get their taps; only "empty" taps unfocus.
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                  child: IpadFrame(child: child ?? const SizedBox.shrink()),
+              // Cross-platform rendering parity (Android ↔ iOS):
+              // 1) Clamp text scaling so a large Android system font-size can't
+              //    inflate the tightly-designed buttons/text (iOS default = 1.0).
+              // 2) Distribute line leading EVENLY so SF Hebrew Rounded's tall
+              //    metrics sit the same vertically on Android as on iOS — this is
+              //    what made buttons look taller / mis-aligned on Android.
+              return MediaQuery.withClampedTextScaling(
+                minScaleFactor: 1.0,
+                maxScaleFactor: 1.15,
+                child: DefaultTextHeightBehavior(
+                  textHeightBehavior: const TextHeightBehavior(
+                    leadingDistribution: TextLeadingDistribution.even,
+                  ),
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    // Tap anywhere outside a field to dismiss the keyboard — app-wide,
+                    // so it works on every page. translucent → real buttons/fields
+                    // still get their taps; only "empty" taps unfocus.
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                      child: IpadFrame(child: child ?? const SizedBox.shrink()),
+                    ),
+                  ),
                 ),
               );
             },

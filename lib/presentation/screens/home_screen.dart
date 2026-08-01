@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
 import 'package:dating_app/presentation/features/onboarding/app_intro.dart';
 import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
@@ -51,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Gated by the seen_intro_v1 flag inside AppIntro, so it only appears on a
     // genuine first launch and never blocks returning users.
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
-    _ettiPeekTimer = Timer(const Duration(seconds: 3), () {
+    _ettiPeekTimer = Timer(const Duration(seconds: 10), () {
       if (mounted) setState(() => _ettiPeek = false);
     });
   }
@@ -65,18 +67,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _maybeShowIntro() async {
     if (_introChecked || !mounted) return;
     _introChecked = true;
-    if (await AppIntro.hasBeenSeen()) return;
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        opaque: true,
-        pageBuilder: (_, __, ___) => AppIntro(
-          onDone: () => Navigator.of(context).maybePop(),
+    if (!await AppIntro.hasBeenSeen()) {
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          opaque: true,
+          pageBuilder: (_, __, ___) => AppIntro(
+            onDone: () => Navigator.of(context).maybePop(),
+          ),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
         ),
-        transitionsBuilder: (_, animation, __, child) =>
-            FadeTransition(opacity: animation, child: child),
-      ),
-    );
+      );
+    }
+    if (mounted) {
+      await PaywallScreen.maybeShowOnFirstLaunch(context);
+    }
   }
 
   void _showMatchOverlay(BuildContext context, RentalProperty property) {
@@ -198,12 +204,16 @@ class _HomeScreenState extends State<HomeScreen> {
               canvasColor: Colors.transparent,
             ),
             child: SafeArea(
-              bottom: false,
+              // Android: let SafeArea consume the REAL system-nav inset — works
+              // for 3-button, gesture AND Samsung One UI, whatever its height —
+              // so the floating bar always clears it (manual viewPadding math with
+              // a hard cap was clipping Samsung's taller bar). iOS: keep
+              // bottom:false for the tight 12px home-indicator float.
+              bottom: Platform.isAndroid,
               child: Padding(
-                // Hug the bottom — a tight float above the home indicator. (Was 31;
-                // the extra breathing room read as an empty "footer" strip below
-                // the bar, which added nothing.)
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: Platform.isAndroid ? 10 : 12,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -231,7 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             curve: Curves.easeOutCubic,
-                            padding: EdgeInsets.all(safeIndex != 0 ? 9.0 : 8.0),
+                            padding: EdgeInsets.all(
+                                (safeIndex != 0 ? 9.0 : 8.0) *
+                                    (Platform.isAndroid ? 0.85 : 1.0)),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
@@ -257,9 +269,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                     index == 1 && unseenCount > 0;
                                 final isCompact = items.length >= 5;
                                 final isNotDiscover = safeIndex != 0;
-                                final double circleSize = isCompact
+                                final double baseCircle = isCompact
                                     ? (isNotDiscover ? 58.3 : 53.0)
                                     : (isNotDiscover ? 66.0 : 60.0);
+                                // Android: a touch smaller than iOS (iOS unchanged).
+                                final double circleSize = Platform.isAndroid
+                                    ? baseCircle * 0.9
+                                    : baseCircle;
 
                                 return ScaleBounce(
                                   key: Key('nav_tab_$index'),

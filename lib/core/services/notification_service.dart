@@ -55,8 +55,8 @@ class NotificationService {
   /// Reserved id-space for viewing (apartment-tour) reminders. A DELIBERATELY
   /// SMALL 19-bit mask (see [viewingReminderId]) caps the span at 512k so the
   /// band 4_000_000..4_524_287 stays disjoint from the lease band (1M + key*2,
-  /// up to ~9.4M with a 22-bit key) and the saved-search band (2M + key) — a
-  /// wider mask here would let viewing ids collide with those (SCHED-5).
+  /// ≤ 1_524_286 with the 18-bit `_stableKey`) and the saved-search band
+  /// (2M + key, ≤ 2_262_143) — every band now fits inside its own 1M slot.
   static const int viewingReminderBase = 4000000;
 
   /// Stable, non-negative notification id for a viewing reminder keyed by
@@ -418,7 +418,12 @@ class NotificationService {
   int _stableKey(String s) {
     var h = 0;
     for (final unit in s.codeUnits) {
-      h = (h * 31 + unit) & 0x3FFFFF; // ≤ ~4.1M, * 2 + base stays in int range
+      // 18-bit mask (≤262_143). Lease ids are base + key*2, so this caps the
+      // lease band at 1M..1_524_286 (< the 2M saved-search base) and the
+      // saved-search band at 2M..2_262_143 (< the 4M viewing base). A wider mask
+      // (the old 0x3FFFFF) let lease ids run to ~9.4M and silently overwrite
+      // saved-search / viewing / exclusivity / lead reminders (SCHED-5).
+      h = (h * 31 + unit) & 0x3FFFF;
     }
     return h;
   }
