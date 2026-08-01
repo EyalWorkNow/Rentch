@@ -2702,6 +2702,14 @@ class DatingProvider extends ChangeNotifier {
     // if the user was previously an in-app broker (black). Without this reset a
     // logged-out broker would briefly see black accents on the entry screens.
     _isInsideApp = false;
+    // Clear cross-account matching state so the next user who signs in on this
+    // device never sees the previous landlord's incoming likes / ranked leads.
+    // (_seedInitialState resets accepted/rejected/matches, but not these.)
+    _incomingLikesByProperty = {};
+    _serverLeadByKey.clear();
+    _lastIncomingLikesRefresh = null;
+    _swipeHistory.clear();
+    _ownerLeadsCache = null;
     _seedInitialState();
     await _persist();
     // Clear circuit breakers and rate-limit buckets on logout.
@@ -4103,12 +4111,18 @@ class DatingProvider extends ChangeNotifier {
 
     for (final property in leads) {
       _ownerAcceptedPropertyIds.add(property.id);
-      _createMatch(property, tenantUserId: _firstLikerOf(property.id));
+      _createMatch(property, tenantUserId: _acceptedTenantOf(property));
     }
   }
 
-  /// The tenant uid that should own the chat thread when the landlord accepts a
-  /// lead — the first real liker, so the thread connects to that tenant.
+  /// The tenant uid the chat thread should connect to when the landlord accepts
+  /// a lead. This MUST be the candidate the landlord actually saw on the card —
+  /// the best-fit "representative" liker (same one scored/shown) — not an
+  /// arbitrary first liker, or the landlord would end up matched with a
+  /// different tenant than the one they chose.
+  String? _acceptedTenantOf(RentalProperty property) =>
+      _representativeLikerFor(property)?.tenantId ?? _firstLikerOf(property.id);
+
   String? _firstLikerOf(String propertyId) {
     final likers = _incomingLikesByProperty[propertyId];
     return (likers != null && likers.isNotEmpty) ? likers.first.tenantId : null;
@@ -4133,7 +4147,7 @@ class DatingProvider extends ChangeNotifier {
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       _ownerAcceptedPropertyIds.add(property.id);
-      _createMatch(property, tenantUserId: _firstLikerOf(property.id));
+      _createMatch(property, tenantUserId: _acceptedTenantOf(property));
     } else {
       return false;
     }
@@ -6011,44 +6025,55 @@ class DatingProvider extends ChangeNotifier {
     } catch (_) {/* fail-soft */}
   }
 
-  // Tenant → backend: fetch matches created by landlords who accepted this user, so
-  // the chat appears in their conversations even though the match was made on
-  // another device. Merges any not already present locally.
+  // Backend → local: restore matches this user is part of, so a match made on
+  // another device (or before a logout) reappears as a real match, not a
+  // pending like. A person is on BOTH sides of matching — tenant (they liked a
+  // property) AND landlord (they accepted a tenant) — so we query BOTH indexes:
+  //   tenantUid  → matches where this user is the tenant
+  //   landlordUid→ matches where this user accepted a candidate  ← the fix for
+  //                "approved a tenant, logged out, and it reverted to pending".
   Future<void> _loadMatchesFromBackend() async {
     final uid = _firebaseAuthOrNull?.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
-    try {
-      final resp =
-          await AwsApiClient.instance.get('/matches', query: {'tenantUid': uid});
-      final items = resp['items'];
-      if (items is! List) return;
-      var added = false;
-      for (final it in items) {
-        if (it is! Map) continue;
-        final matchId = (it['id'] ?? '').toString();
-        final propertyId = (it['propertyId'] ?? '').toString();
-        if (matchId.isEmpty || propertyId.isEmpty) continue;
-        if (_matches.any((m) => m.id == matchId)) continue;
-        _matches = [
-          ..._matches,
-          RentalMatch(
-            id: matchId,
-            propertyId: propertyId,
-            createdAt: DateTime.tryParse((it['createdAt'] ?? '').toString()) ??
-                DateTime.now(),
-            contractSent: false,
-            ownerSigned: false,
-            tenantSigned: false,
-            messages: const [],
-          ),
-        ];
-        added = true;
-      }
-      if (added) {
-        await _persist();
-        notifyListeners();
-      }
-    } catch (_) {/* fail-soft */}
+    var added = false;
+    for (final keyField in const ['tenantUid', 'landlordUid']) {
+      try {
+        final resp = await AwsApiClient.instance
+            .get('/matches', query: {keyField: uid});
+        final items = resp['items'];
+        if (items is! List) continue;
+        for (final it in items) {
+          if (it is! Map) continue;
+          final matchId = (it['id'] ?? '').toString();
+          final propertyId = (it['propertyId'] ?? '').toString();
+          if (matchId.isEmpty || propertyId.isEmpty) continue;
+          if (_matches.any((m) => m.id == matchId)) continue;
+          _matches = [
+            ..._matches,
+            RentalMatch(
+              id: matchId,
+              propertyId: propertyId,
+              createdAt:
+                  DateTime.tryParse((it['createdAt'] ?? '').toString()) ??
+                      DateTime.now(),
+              contractSent: false,
+              ownerSigned: false,
+              tenantSigned: false,
+              messages: const [],
+            ),
+          ];
+          // A restored landlord match means this property's incoming like was
+          // already accepted — mark it so ownerLeads shows it as matched, not
+          // pending, even though the local accepted-set was wiped on logout.
+          _ownerAcceptedPropertyIds.add(propertyId);
+          added = true;
+        }
+      } catch (_) {/* fail-soft; try the other index */}
+    }
+    if (added) {
+      await _persist();
+      notifyListeners();
+    }
   }
 
   /// A tenant with no mutual like asks to message the owner. Creates (or appends

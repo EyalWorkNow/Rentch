@@ -320,17 +320,20 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _pickAndSendMedia(
       DatingProvider provider, String senderName) async {
     try {
-      // Downscale on pick: a chat photo doesn't need full camera resolution.
-      // A 4–8 MB original becomes ~200–400 KB → the upload is near-instant
-      // instead of "taking forever".
-      final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+      // Multi-select: the user can pick several photos at once and they all
+      // send. Downscale on pick — a chat photo doesn't need full camera
+      // resolution; a 4–8 MB original becomes ~200–400 KB so the upload is fast.
+      final files = await ImagePicker().pickMultiImage(
         imageQuality: 70,
         maxWidth: 1600,
         maxHeight: 1600,
       );
-      if (file == null || !mounted) return;
-      await _uploadAndSendImage(provider, senderName, file.path);
+      if (files.isEmpty || !mounted) return;
+      // Fire each optimistically — every bubble shows instantly and its upload
+      // runs in the background, in parallel.
+      for (final f in files) {
+        unawaited(_sendImageOptimistic(provider, senderName, f.path));
+      }
     } catch (_) {
       if (mounted) _snack('לא ניתן לגשת לגלריה', error: true);
     }
@@ -348,7 +351,7 @@ class _MessageScreenState extends State<MessageScreen> {
         maxHeight: 1600,
       );
       if (file == null || !mounted) return;
-      await _uploadAndSendImage(provider, senderName, file.path);
+      await _sendImageOptimistic(provider, senderName, file.path);
     } catch (_) {
       if (mounted) _snack('לא ניתן לפתוח את המצלמה', error: true);
     }
@@ -374,7 +377,31 @@ class _MessageScreenState extends State<MessageScreen> {
     return 'העלאת ה$noun נכשלה. נסו שוב.';
   }
 
-  Future<void> _uploadAndSendImage(
+  // Optimistic image send: the bubble shows INSTANTLY with the local file, then
+  // the S3 upload runs in the background and the bubble swaps to the remote URL
+  // (or is flagged "not sent" on failure). No blocking spinner, no lost photo.
+  Future<void> _sendImageOptimistic(
+      DatingProvider provider, String senderName, String localPath) async {
+    final cp = _chatProvider;
+    if (cp == null) {
+      await _uploadAndSendImageBlocking(provider, senderName, localPath);
+      return;
+    }
+    final tempId = cp.addOptimisticMedia(ChatMediaCodec.encodeImage(localPath));
+    _scrollToBottom();
+    String? url;
+    try {
+      url = await AwsApiClient.instance
+          .uploadFile(localPath, folder: 'chat/images');
+    } catch (_) {/* handled below via null url */}
+    final ok = url != null && url.isNotEmpty;
+    await cp.resolveMedia(
+        tempId, ok ? ChatMediaCodec.encodeImage(url!) : null);
+    if (mounted && !ok) _snack(_uploadFailMessage('תמונה'), error: true);
+  }
+
+  // Fallback for the (rare) case with no realtime chat provider — blocking send.
+  Future<void> _uploadAndSendImageBlocking(
       DatingProvider provider, String senderName, String localPath) async {
     setState(() => _uploadingMedia = true);
     try {
@@ -452,29 +479,47 @@ class _MessageScreenState extends State<MessageScreen> {
       return;
     }
 
-    setState(() => _uploadingMedia = true);
-    try {
-      final url = await AwsApiClient.instance.uploadFile(
-        path,
-        folder: 'chat/voice',
-        contentType: 'audio/mp4', // aacLc in an .m4a container
-      );
-      if (!mounted) return;
-      if (url == null || url.isEmpty) {
-        _snack(_uploadFailMessage('הקלטה'), error: true);
-        return;
+    final cp = _chatProvider;
+    final ms = elapsed.inMilliseconds;
+    if (cp == null) {
+      // Fallback (no realtime chat): blocking send.
+      setState(() => _uploadingMedia = true);
+      try {
+        final url = await AwsApiClient.instance.uploadFile(path,
+            folder: 'chat/voice', contentType: 'audio/mp4');
+        if (!mounted) return;
+        if (url == null || url.isEmpty) {
+          _snack(_uploadFailMessage('הקלטה'), error: true);
+          return;
+        }
+        await provider.sendMessage(
+          matchId: widget.matchId,
+          sender: senderName,
+          text: ChatMediaCodec.encodeAudio(url, ms),
+        );
+        _scrollToBottom();
+      } catch (_) {
+        if (mounted) _snack('שליחת ההקלטה נכשלה', error: true);
+      } finally {
+        if (mounted) setState(() => _uploadingMedia = false);
       }
-      await provider.sendMessage(
-        matchId: widget.matchId,
-        sender: senderName,
-        text: ChatMediaCodec.encodeAudio(url, elapsed.inMilliseconds),
-      );
-      _scrollToBottom();
-    } catch (_) {
-      if (mounted) _snack('שליחת ההקלטה נכשלה', error: true);
-    } finally {
-      if (mounted) setState(() => _uploadingMedia = false);
+      return;
     }
+
+    // Optimistic: the voice bubble shows instantly (plays the local file) while
+    // the upload runs in the background, then swaps to the remote URL.
+    final tempId =
+        cp.addOptimisticMedia(ChatMediaCodec.encodeAudio(path, ms));
+    _scrollToBottom();
+    String? url;
+    try {
+      url = await AwsApiClient.instance.uploadFile(path,
+          folder: 'chat/voice', contentType: 'audio/mp4');
+    } catch (_) {/* handled below via null url */}
+    final ok = url != null && url.isNotEmpty;
+    await cp.resolveMedia(
+        tempId, ok ? ChatMediaCodec.encodeAudio(url!, ms) : null);
+    if (mounted && !ok) _snack(_uploadFailMessage('הקלטה'), error: true);
   }
 
   String _fmtDuration(Duration d) {
@@ -3564,7 +3609,13 @@ class _VoiceNoteBubbleState extends State<_VoiceNoteBubble> {
           iOS: AudioContextIOS(category: AVAudioSessionCategory.playback),
         ));
       } catch (_) {/* context best-effort */}
-      await _player.play(UrlSource(widget.url));
+      // A just-recorded voice note plays from its local file until the upload
+      // finishes and the URL swaps to an https S3 link.
+      final u = widget.url;
+      final isLocal = u.startsWith('/') || u.startsWith('file://');
+      await _player.play(isLocal
+          ? DeviceFileSource(u.replaceFirst('file://', ''))
+          : UrlSource(u));
     }
   }
 

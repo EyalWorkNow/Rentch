@@ -2377,10 +2377,10 @@ class ChatMessage {
   /// "not sent" marker instead of pretending it was delivered.
   final bool failed;
 
-  ChatMessage copyWith({bool? failed}) => ChatMessage(
+  ChatMessage copyWith({bool? failed, String? text}) => ChatMessage(
         id: id,
         sender: sender,
-        text: text,
+        text: text ?? this.text,
         createdAt: createdAt,
         failed: failed ?? this.failed,
       );

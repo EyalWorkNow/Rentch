@@ -141,6 +141,62 @@ class ChatProvider extends ChangeNotifier {
     _safeNotify();
   }
 
+  // ── Media (optimistic) ───────────────────────────────────────────────────────
+
+  /// Adds a media message INSTANTLY with its local file path encoded, before the
+  /// S3 upload finishes, so sending an image/voice note feels immediate. Returns
+  /// the temp id to finalize once the upload completes. Not sent to the backend
+  /// yet — the recipient must get the remote URL, never a local path.
+  String addOptimisticMedia(String encodedLocal) {
+    final tempId = 'temp_${DateTime.now().microsecondsSinceEpoch}';
+    _messages = [
+      ..._messages,
+      ChatMessage(
+        id: tempId,
+        sender: senderName,
+        text: encodedLocal,
+        createdAt: DateTime.now(),
+      ),
+    ];
+    _safeNotify();
+    return tempId;
+  }
+
+  /// Finalizes an optimistic media message once its upload finishes. Success →
+  /// pass the remote-URL-encoded text: the local bubble instantly swaps to the
+  /// remote URL and the message is sent to the backend so the other side gets
+  /// it. Failure → pass null: the bubble is flagged failed (kept, not lost).
+  Future<void> resolveMedia(String tempId, String? encodedRemote) async {
+    if (_disposed) return;
+    if (encodedRemote == null) {
+      _messages = _messages
+          .map((m) => m.id == tempId ? m.copyWith(failed: true) : m)
+          .toList();
+      _safeNotify();
+      return;
+    }
+    // Swap local path → remote URL immediately (sender keeps seeing the image).
+    _messages = _messages
+        .map((m) => m.id == tempId ? m.copyWith(text: encodedRemote) : m)
+        .toList();
+    _safeNotify();
+    if (_service.isConfigured) {
+      final created = await _service.sendMessage(
+        matchId: matchId,
+        senderId: senderId,
+        senderName: senderName,
+        text: encodedRemote,
+      );
+      if (_disposed) return;
+      _messages = _messages
+          .map((m) => m.id == tempId
+              ? (created ?? m.copyWith(failed: true))
+              : m)
+          .toList();
+      _safeNotify();
+    }
+  }
+
   // ── Deleting ─────────────────────────────────────────────────────────────────
 
   void deleteMessage(String messageId) {
