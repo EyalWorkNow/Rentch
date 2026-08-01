@@ -1578,41 +1578,41 @@ class _SendContractCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = !sent && onTap != null;
-    final accent = enabled ? AppColors.primary : AppColors.textSecondary;
+    final accent = const Color(0xFF256BFD);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Ink(
           decoration: BoxDecoration(
-            gradient: enabled
-                ? LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      AppColors.primary.withValues(alpha: 0.14),
-                      AppColors.primaryLight2,
-                    ],
-                  )
-                : null,
-            color: enabled ? null : AppColors.cloud,
-            borderRadius: BorderRadius.circular(18),
+            color: enabled ? Colors.white : AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: enabled
-                  ? AppColors.primary.withValues(alpha: 0.30)
+                  ? accent.withValues(alpha: 0.25)
                   : AppColors.borderLight,
+              width: 1.5,
             ),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : null,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: enabled ? accent : AppColors.border,
+                  color: enabled ? accent.withValues(alpha: 0.12) : AppColors.border,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -1620,7 +1620,7 @@ class _SendContractCard extends StatelessWidget {
                       ? IconsaxPlusLinear.tick_circle
                       : IconsaxPlusLinear.document_text,
                   size: 24,
-                  color: enabled ? Colors.white : AppColors.textSecondary,
+                  color: enabled ? accent : AppColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 14),
@@ -2567,38 +2567,41 @@ class _ProposeTimesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = const Color(0xFF256BFD);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: Ink(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [
-                AppColors.primary.withValues(alpha: 0.14),
-                AppColors.primaryLight2,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(18),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.30),
+              color: accent.withValues(alpha: 0.25),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )
+            ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(IconsaxPlusLinear.calendar_add,
-                    size: 24, color: Colors.white),
+                child: Icon(IconsaxPlusLinear.calendar_add,
+                    size: 24, color: accent),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -2626,7 +2629,7 @@ class _ProposeTimesCard extends StatelessWidget {
                 ),
               ),
               Icon(Icons.keyboard_arrow_left_rounded,
-                  size: 24, color: AppColors.primary),
+                  size: 24, color: accent),
             ],
           ),
         ),
