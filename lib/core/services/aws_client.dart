@@ -27,6 +27,11 @@ class AwsApiClient {
 
   final _http = http.Client();
 
+  /// The reason the LAST [uploadFile] failed (null on success). Lets the UI show
+  /// a specific message ("sign in", "no connection", server code) instead of a
+  /// generic failure, and reveals the cause in release where debugPrint is dead.
+  String? lastUploadError;
+
   bool get isConfigured => AppConfig.awsApiGatewayUrl.trim().isNotEmpty;
 
   // SCALE: coalesce identical concurrent GETs (many widgets asking for the same
@@ -119,10 +124,23 @@ class AwsApiClient {
     String folder = 'uploads',
     String? fileName,
   }) async {
-    if (!isConfigured || !AppConfig.canUseCloudStorage) return null;
+    lastUploadError = null;
+    if (!isConfigured || !AppConfig.canUseCloudStorage) {
+      lastUploadError = 'not_configured';
+      return null;
+    }
+    // Uploads require a signed-in user — a guest has no Firebase token, so the
+    // presign call would 401. Fail early with a clear reason.
+    if (FirebaseAuth.instance.currentUser == null) {
+      lastUploadError = 'not_authenticated';
+      return null;
+    }
     try {
       final file = File(localPath);
-      if (!file.existsSync()) return null;
+      if (!file.existsSync()) {
+        lastUploadError = 'file_missing';
+        return null;
+      }
 
       final ext = localPath.split('.').last.toLowerCase();
       final normalizedName = _sanitizeFileName(fileName);
@@ -139,7 +157,10 @@ class AwsApiClient {
       });
       final uploadUrl = presignResult['uploadUrl'] as String?;
       final publicUrl = presignResult['publicUrl'] as String?;
-      if (uploadUrl == null || publicUrl == null) return null;
+      if (uploadUrl == null || publicUrl == null) {
+        lastUploadError = 'presign_no_url';
+        return null;
+      }
 
       // 2. STREAM the file straight to S3 (presigned URL needs no auth headers).
       //    Streaming via dart:io avoids loading large videos fully into memory
@@ -158,13 +179,30 @@ class AwsApiClient {
             .timeout(_uploadTimeoutFor(fileSize));
         final s3Response =
             await request.close().timeout(const Duration(seconds: 90));
+        if (s3Response.statusCode >= 300) {
+          // Capture S3's error body (e.g. SignatureDoesNotMatch / AccessDenied)
+          // so the actual reason is known even in a release build.
+          String body = '';
+          try {
+            body = await s3Response.transform(utf8.decoder).join();
+          } catch (_) {}
+          final snippet =
+              body.length > 300 ? body.substring(0, 300) : body;
+          lastUploadError = 's3_${s3Response.statusCode}: $snippet';
+          return null;
+        }
         await s3Response.drain<void>();
-        if (s3Response.statusCode >= 300) return null;
         return publicUrl;
       } finally {
         httpClient.close();
       }
+    } on AwsApiException catch (e) {
+      // presign failed at the gateway (401/403 = auth, 5xx = server).
+      lastUploadError = 'http_${e.statusCode ?? '?'}';
+      if (kDebugMode) debugPrint('AwsApiClient.uploadFile presign error: $e');
+      return null;
     } catch (e) {
+      lastUploadError = 'exception: $e';
       if (kDebugMode) debugPrint('AwsApiClient.uploadFile error: $e');
       return null;
     }
@@ -717,6 +755,13 @@ class AwsApiClient {
       'mp4' => 'video/mp4',
       'mov' => 'video/quicktime',
       'm4v' => 'video/x-m4v',
+      // Audio (voice notes) — without these the file uploads as octet-stream,
+      // which some players (notably Android) refuse to play.
+      'm4a' || 'aac' => 'audio/mp4',
+      'mp3' => 'audio/mpeg',
+      'wav' => 'audio/wav',
+      'ogg' || 'oga' => 'audio/ogg',
+      'caf' => 'audio/x-caf',
       'glb' => 'model/gltf-binary',
       'gltf' => 'model/gltf+json',
       'obj' => 'text/plain',

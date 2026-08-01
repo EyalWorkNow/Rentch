@@ -59,7 +59,9 @@ class _BrokerHotMatchesScreenState extends State<BrokerHotMatchesScreen> {
     final seen = prefs.getStringList(_seenKey)?.toSet() ?? <String>{};
     if (!mounted) return;
 
-    final properties = context.read<DatingProvider>().myProperties;
+    // Match clients against the whole loaded market (own + feed), not only the
+    // broker's own listings.
+    final properties = context.read<DatingProvider>().allProperties;
     final hot = _computeHot(clients, properties, seen);
 
     setState(() {
@@ -207,7 +209,7 @@ class _HotMatchCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'נכס חדש מתאים ל${hot.client.name}',
+                      'התאמה ל${hot.client.name}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

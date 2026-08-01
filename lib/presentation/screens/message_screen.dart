@@ -356,6 +356,24 @@ class _MessageScreenState extends State<MessageScreen> {
 
   // Uploads a picked image to S3 and sends it as a real image message. Shows a
   // transient "uploading" indicator; on failure nothing is sent (no broken msg).
+  // Turns AwsApiClient.lastUploadError into a specific Hebrew message so a failed
+  // upload says WHY (sign in / no connection / server) instead of a generic line.
+  String _uploadFailMessage(String noun) {
+    final e = AwsApiClient.instance.lastUploadError ?? '';
+    if (e == 'not_authenticated' ||
+        e.startsWith('http_401') ||
+        e.startsWith('http_403')) {
+      return 'יש להתחבר לחשבון כדי לשלוח $noun';
+    }
+    if (e.contains('Socket') ||
+        e.contains('timeout') ||
+        e.contains('Network') ||
+        e.contains('Connection')) {
+      return 'אין חיבור לרשת. נסו שוב.';
+    }
+    return 'העלאת ה$noun נכשלה. נסו שוב.';
+  }
+
   Future<void> _uploadAndSendImage(
       DatingProvider provider, String senderName, String localPath) async {
     setState(() => _uploadingMedia = true);
@@ -364,7 +382,7 @@ class _MessageScreenState extends State<MessageScreen> {
           .uploadFile(localPath, folder: 'chat/images');
       if (!mounted) return;
       if (url == null || url.isEmpty) {
-        _snack('העלאת התמונה נכשלה', error: true);
+        _snack(_uploadFailMessage('תמונה'), error: true);
         return;
       }
       await provider.sendMessage(
@@ -374,7 +392,7 @@ class _MessageScreenState extends State<MessageScreen> {
       );
       _scrollToBottom();
     } catch (_) {
-      if (mounted) _snack('העלאת התמונה נכשלה', error: true);
+      if (mounted) _snack(_uploadFailMessage('תמונה'), error: true);
     } finally {
       if (mounted) setState(() => _uploadingMedia = false);
     }
@@ -428,16 +446,22 @@ class _MessageScreenState extends State<MessageScreen> {
     } catch (_) {}
     path ??= _voicePath;
     _voicePath = null;
-    // Ignore accidental sub-second taps.
-    if (path == null || elapsed.inMilliseconds < 800) return;
+    // Ignore accidental sub-second taps — but tell the user why nothing sent.
+    if (path == null || elapsed.inMilliseconds < 800) {
+      if (path != null) _snack('ההקלטה קצרה מדי');
+      return;
+    }
 
     setState(() => _uploadingMedia = true);
     try {
-      final url =
-          await AwsApiClient.instance.uploadFile(path, folder: 'chat/voice');
+      final url = await AwsApiClient.instance.uploadFile(
+        path,
+        folder: 'chat/voice',
+        contentType: 'audio/mp4', // aacLc in an .m4a container
+      );
       if (!mounted) return;
       if (url == null || url.isEmpty) {
-        _snack('שליחת ההקלטה נכשלה', error: true);
+        _snack(_uploadFailMessage('הקלטה'), error: true);
         return;
       }
       await provider.sendMessage(
@@ -770,14 +794,27 @@ class _MessageScreenState extends State<MessageScreen> {
     final partnerName = provider.isLandlord
         ? (incomingSender ?? 'מועמד/ת להשכרה')
         : (property.ownerName.isNotEmpty ? property.ownerName : 'בעל הדירה');
-    // Avatar: tenant sees the property's photo (the chat is about that flat);
-    // a landlord has no real tenant photo → fall back to an icon (empty string).
-    final partnerAvatar = provider.isLandlord
-        ? ''
-        : (property.imageUrls.isNotEmpty ? property.imageUrls.first : '');
+    // Avatar: we have no real photo of the PERSON (landlord or tenant), so pass
+    // none — the profile shows an initials circle. (Never borrow the apartment
+    // photo as the person's avatar; that's the flat, not them.)
+    const partnerAvatar = '';
     final partnerSubtitle = provider.isLandlord
         ? 'מועמד/ת · ${property.city}'
         : 'בעל הדירה · ${property.city}';
+
+    // Media actually SHARED in this conversation (images + voice notes), so the
+    // profile page can surface it WhatsApp-style — the genuinely useful content.
+    final sharedImages = <String>[];
+    var sharedVoiceCount = 0;
+    for (final m in messages) {
+      final media = ChatMediaCodec.parse(m.text);
+      if (media == null) continue;
+      if (media.kind == ChatMediaKind.image) {
+        sharedImages.add(media.url);
+      } else if (media.kind == ChatMediaKind.audio) {
+        sharedVoiceCount++;
+      }
+    }
 
     Navigator.push<String>(
       context,
@@ -789,6 +826,8 @@ class _MessageScreenState extends State<MessageScreen> {
           property: property,
           messageCount: messages.length,
           isLandlord: provider.isLandlord,
+          sharedImageUrls: sharedImages,
+          sharedVoiceCount: sharedVoiceCount,
         ),
       ),
     ).then((result) {
@@ -861,8 +900,8 @@ class _MessageScreenState extends State<MessageScreen> {
                   ScaleBounce(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      width: 42,
-                      height: 42,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white,
@@ -872,9 +911,9 @@ class _MessageScreenState extends State<MessageScreen> {
                         ),
                       ),
                       child: Icon(
-                        Icons.chevron_right_rounded,
+                        Icons.keyboard_arrow_right_rounded,
                         color: AppColors.primary,
-                        size: 26,
+                        size: 24,
                       ),
                     ),
                   ),
@@ -889,8 +928,8 @@ class _MessageScreenState extends State<MessageScreen> {
                       isConnected,
                     ),
                     child: Container(
-                      width: 48,
-                      height: 48,
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
@@ -974,20 +1013,20 @@ class _MessageScreenState extends State<MessageScreen> {
                   onTap: () =>
                       _showActions(provider, match, property, tenantName),
                   child: Container(
-                    width: 42,
-                    height: 42,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
                       border: Border.all(
                         color: AppColors.primary,
-                        width: 1.8,
+                        width: 1.5,
                       ),
                     ),
                     child: Icon(
                       Icons.more_vert_rounded,
                       color: AppColors.primary,
-                      size: 22,
+                      size: 20,
                     ),
                   ),
                 ),
@@ -1074,6 +1113,15 @@ class _MessageScreenState extends State<MessageScreen> {
       if (r is SlotConfirmMessage) confirmedSlotIds.add(r.confirm.slotId);
     }
 
+    final isConnected = _chatProvider?.realtimeConnected ?? false;
+    final partnerAvatarUrl = provider.isLandlord
+        ? (provider.tenantProfile?.photoUrls.isNotEmpty == true
+            ? provider.tenantProfile!.photoUrls.first
+            : '')
+        : (property.imageUrls.isNotEmpty
+            ? property.imageUrls.first
+            : '');
+
     return Stack(
       children: [
         ListView.builder(
@@ -1117,6 +1165,15 @@ class _MessageScreenState extends State<MessageScreen> {
                 showAvatar: showAvatar,
                 isPending: isPending,
                 theme: theme,
+                partnerAvatarUrl: partnerAvatarUrl,
+                onTapAvatar: () => _openPartnerProfile(
+                  context,
+                  provider,
+                  property,
+                  tenantName,
+                  messages,
+                  isConnected,
+                ),
               );
             }
 
@@ -1736,6 +1793,8 @@ class _MessageBubble extends StatelessWidget {
     required this.showAvatar,
     required this.isPending,
     required this.theme,
+    required this.partnerAvatarUrl,
+    this.onTapAvatar,
   });
 
   final _ChatThemeSpec theme;
@@ -1743,6 +1802,8 @@ class _MessageBubble extends StatelessWidget {
   final bool isTenant;
   final bool showAvatar;
   final bool isPending;
+  final String partnerAvatarUrl;
+  final VoidCallback? onTapAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -1910,7 +1971,11 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isTenant) ...[
-            _SenderAvatar(show: showAvatar),
+            _SenderAvatar(
+              show: showAvatar,
+              imageUrl: partnerAvatarUrl,
+              onTap: onTapAvatar,
+            ),
             const SizedBox(width: 6),
           ],
           BubbleEntrance(
@@ -1966,25 +2031,42 @@ class _MediaBubbleContent extends StatelessWidget {
 }
 
 class _SenderAvatar extends StatelessWidget {
-  _SenderAvatar({required this.show});
+  _SenderAvatar({required this.show, required this.imageUrl, this.onTap});
   final bool show;
+  final String imageUrl;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    if (!show) return const SizedBox(width: 28);
-    return PulseRing(
-      ringColor: AppColors.primary,
-      maxRadius: 4.0,
-      active: true,
+    if (!show) return const SizedBox(width: 32);
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        width: 28,
-        height: 28,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
-          color: AppColors.primaryLight2,
           shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            width: 1.0,
+          ),
         ),
-        child: RentlyIcon(IconsaxPlusLinear.building,
-            color: AppColors.primary, size: 12),
+        child: ClipOval(
+          child: SafeImage(
+            source: imageUrl,
+            fit: BoxFit.cover,
+            fallback: Container(
+              color: const Color(0xFFF1F5F9),
+              child: const Center(
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2102,7 +2184,7 @@ class _MessageInput extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w700)),
             const Spacer(),
-            const Text('החלק לביטול · שלח',
+            const Text('בטל · שלח',
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
             const SizedBox(width: 12),
             ScaleBounce(
@@ -3471,6 +3553,14 @@ class _VoiceNoteBubbleState extends State<_VoiceNoteBubble> {
     if (_playing) {
       await _player.pause();
     } else {
+      // audioplayers defaults iOS to `playAndRecord`, which routes to the quiet
+      // earpiece — and the `record` session may still be active. Force a
+      // playback session so voice notes come out the loudspeaker.
+      try {
+        await _player.setAudioContext(AudioContext(
+          iOS: AudioContextIOS(category: AVAudioSessionCategory.playback),
+        ));
+      } catch (_) {/* context best-effort */}
       await _player.play(UrlSource(widget.url));
     }
   }

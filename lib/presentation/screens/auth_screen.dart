@@ -120,10 +120,41 @@ class _AuthScreenState extends State<AuthScreen>
   Future<void> _onLandlordCta() async {
     final picked = await _promptLandlordOrAgent(context);
     if (!mounted || picked == null) return;
-    setState(() {
-      _pendingRole = picked;
-      _currentView = AuthView.register;
-    });
+    setState(() => _pendingRole = picked);
+    await _showLoginPopup();
+  }
+
+  // Tenant path: clear any stale landlord role, then open the login popup.
+  Future<void> _onTenantCta() async {
+    setState(() => _pendingRole = null);
+    await _showLoginPopup();
+  }
+
+  // Login popup: Google / Apple sign-in + a "register here" link. The chosen
+  // role is already in _pendingRole (null = tenant), which the sign-in handlers
+  // and the register flow both honour.
+  Future<void> _showLoginPopup() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _LoginPopupSheet(
+        googleLoading: _googleLoading,
+        appleLoading: _appleLoading,
+        onGoogle: () {
+          Navigator.of(ctx).pop();
+          _loginWithGoogleForWelcome();
+        },
+        onApple: () {
+          Navigator.of(ctx).pop();
+          _loginWithAppleForWelcome();
+        },
+        onRegister: () {
+          Navigator.of(ctx).pop();
+          if (mounted) setState(() => _currentView = AuthView.register);
+        },
+      ),
+    );
   }
 
   // Wide/tablet register tab account-type selector. Same landlord/broker dialog
@@ -324,13 +355,9 @@ class _AuthScreenState extends State<AuthScreen>
       case AuthView.welcome:
         return _WelcomePortal(
           key: const ValueKey('welcome_portal'),
-          // Taking the tenant path ("מחפש דירה") must clear any landlord/broker
-          // role left over from a prior "בעל דירה" tap, otherwise the stale
-          // _pendingRole would register/log this user in as a landlord.
-          onLogin: () => setState(() {
-            _pendingRole = null;
-            _currentView = AuthView.login;
-          }),
+          // Taking the tenant path ("מחפש דירה") clears any landlord/broker role
+          // left over from a prior "בעל דירה" tap, then opens the login popup.
+          onLogin: _onTenantCta,
           onGoogleLogin: _loginWithGoogleForWelcome,
           onAppleLogin: _loginWithAppleForWelcome,
           onGuestLogin: _onGuestEnter,
@@ -795,6 +822,95 @@ class _SimpleTabBar extends StatelessWidget {
 }
 
 // ─── Social Sign-in Row ───────────────────────────────────────────────────────
+
+/// Login popup shown when a role ("מחפש דירה" / "בעל דירה") is tapped: Google +
+/// Apple sign-in and a "register here" link into the normal signup.
+class _LoginPopupSheet extends StatelessWidget {
+  const _LoginPopupSheet({
+    required this.googleLoading,
+    required this.appleLoading,
+    required this.onGoogle,
+    required this.onApple,
+    required this.onRegister,
+  });
+
+  final bool googleLoading;
+  final bool appleLoading;
+  final VoidCallback onGoogle;
+  final VoidCallback onApple;
+  final VoidCallback onRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            24, 12, 24, 20 + MediaQuery.of(context).padding.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: AppColors.slate200,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('התחברות לחשבון',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.navy)),
+            const SizedBox(height: 6),
+            const Text('התחברו כדי להמשיך',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary)),
+            const SizedBox(height: 20),
+            _SocialRow(
+              googleLoading: googleLoading,
+              appleLoading: appleLoading,
+              onGoogle: onGoogle,
+              onApple: onApple,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('אין לך חשבון? ',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary)),
+                GestureDetector(
+                  onTap: onRegister,
+                  child: Text('להרשמה',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SocialRow extends StatelessWidget {
   const _SocialRow({
@@ -2926,6 +3042,25 @@ class _NavButtons extends StatelessWidget {
       children: [
         Row(
           children: [
+            if (onPrev != null) ...[
+              SizedBox(
+                height: 54,
+                child: OutlinedButton(
+                  onPressed: loading ? null : onPrev,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    side: BorderSide(color: AppColors.borderLight),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(27)),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  child: const Text('חזרה',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               child: _PillButton(
                 label: nextLabel,

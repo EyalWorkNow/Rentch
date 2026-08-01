@@ -5,7 +5,7 @@ import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
+import 'package:dating_app/presentation/widgets/gamification/profile_completion_sheet.dart';
 import 'package:dating_app/presentation/features/onboarding/app_intro.dart';
 import 'package:dating_app/presentation/features/search/search_chat_screen.dart';
 import 'package:dating_app/presentation/screens/discover_screen.dart';
@@ -80,8 +80,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+    // Tenant profile-completion nudge — pops once per launch when < 100%.
+    // (The old first-launch subscription paywall was removed — landlords no
+    // longer have a subscription; monetization is boost-only + broker upgrade.)
     if (mounted) {
-      await PaywallScreen.maybeShowOnFirstLaunch(context);
+      await ProfileCompletionSheet.maybeShow(context);
     }
   }
 

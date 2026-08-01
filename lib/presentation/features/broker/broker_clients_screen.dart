@@ -50,8 +50,11 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
     });
   }
 
-  List<RentalProperty> get _myProperties =>
-      context.read<DatingProvider>().myProperties;
+  // Match a client against the whole loaded MARKET (own listings + the feed
+  // catalog), not just the broker's own listings — a buyer's agent wants the
+  // best flats across the market, not only the 3 they uploaded.
+  List<RentalProperty> get _marketPool =>
+      context.read<DatingProvider>().allProperties;
 
   Future<void> _addOrEdit([BrokerClient? existing]) async {
     final result = await showModalBottomSheet<BrokerClient>(
@@ -136,7 +139,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
   }
 
   void _openMatches(BrokerClient client) {
-    final matches = _matcher.rank(client, _myProperties);
+    final matches = _matcher.rank(client, _marketPool);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _ClientMatchesScreen(client: client, matches: matches),
@@ -147,7 +150,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
   @override
   Widget build(BuildContext context) {
     // Rebuild on listing changes so the "X נכסים מתאימים" counts stay live.
-    final properties = context.watch<DatingProvider>().myProperties;
+    final properties = context.watch<DatingProvider>().allProperties;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(

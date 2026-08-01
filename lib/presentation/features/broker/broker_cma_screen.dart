@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/property_search_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -74,7 +75,46 @@ CmaPriceRange? cmaRange(List<num> prices) {
 }
 
 class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
+  final PropertySearchRepository _searchRepo = PropertySearchRepository();
+
   String? _subjectId;
+
+  // Comps fetched from the market for the selected subject's city. Null until a
+  // subject is chosen; the in-memory ≤150 feed catalog is NOT a real comp pool,
+  // so we query the backend for the city and filter that.
+  List<RentalProperty>? _cityMarket; // raw city listings from the backend
+  bool _loadingComps = false;
+  String? _loadedForSubjectId; // guards against refetching the same subject
+
+  Future<void> _loadCompsFor(RentalProperty subject) async {
+    if (_loadedForSubjectId == subject.id && _cityMarket != null) return;
+    setState(() {
+      _loadingComps = true;
+      _loadedForSubjectId = subject.id;
+      _cityMarket = null;
+    });
+    List<RentalProperty> market = const [];
+    try {
+      if (_searchRepo.isConfigured && subject.city.trim().isNotEmpty) {
+        market = await _searchRepo.search(
+          PropertySearchCriteria(city: subject.city.trim()),
+          limit: 200,
+        );
+      }
+    } catch (_) {
+      market = const [];
+    }
+    if (!mounted || _loadedForSubjectId != subject.id) return;
+    // Fall back to the in-memory catalog if the city query returned nothing
+    // (offline / unconfigured), so we never regress below the old behavior.
+    if (market.isEmpty) {
+      market = context.read<DatingProvider>().allProperties;
+    }
+    setState(() {
+      _cityMarket = market;
+      _loadingComps = false;
+    });
+  }
 
   /// Comps = market listings genuinely comparable to the subject: same
   /// transaction type, same city, rooms within ±1, SAME property type (a villa
@@ -137,8 +177,7 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                 children: [
                   _picker(mine, subject),
                   const SizedBox(height: 16),
-                  if (subject != null)
-                    _analysis(subject, _comparablesFor(subject, provider.allProperties)),
+                  if (subject != null) _subjectSection(subject),
                 ],
               ),
       ),
@@ -174,6 +213,21 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
         ),
       ),
     );
+  }
+
+  Widget _subjectSection(RentalProperty subject) {
+    // Kick off the city-market fetch for this subject (once) after the frame.
+    if (_loadedForSubjectId != subject.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadCompsFor(subject));
+    }
+    if (_loadingComps || _cityMarket == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final comps = _comparablesFor(subject, _cityMarket!);
+    return _analysis(subject, comps);
   }
 
   Widget _analysis(RentalProperty subject, List<RentalProperty> comps) {
@@ -252,9 +306,15 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary)),
           const SizedBox(height: 16),
+          _cbsAnchor(subject),
           if (range == null)
-            const Text('אין מספיק נתוני שוק לחישוב טווח מומלץ.',
-                style: TextStyle(fontSize: 15, color: AppColors.textSecondary))
+            Text(
+              subject.priceBadge?.hasData == true
+                  ? 'מעט נכסים דומים בשוק — ההערכה מבוססת על מדד CBS לאזור.'
+                  : 'אין מספיק נתוני שוק לחישוב טווח מומלץ.',
+              style: const TextStyle(
+                  fontSize: 15, color: AppColors.textSecondary),
+            )
           else ...[
             const Text('טווח מחיר מומלץ (25–75 אחוזון)',
                 style: TextStyle(
@@ -283,6 +343,73 @@ class _BrokerCmaScreenState extends State<BrokerCmaScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: positionColor)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Real CBS/nadlan market anchor (₪/m² median for the area + implied fair
+  // price + above/below-market badge). Renders nothing when unavailable.
+  Widget _cbsAnchor(RentalProperty subject) {
+    final badge = subject.priceBadge;
+    if (badge == null || !badge.hasData) return const SizedBox.shrink();
+    final ppm = badge.medianPpm!;
+    final fair = subject.sizeM2 > 0 ? ppm * subject.sizeM2 : 0;
+    final delta = badge.deltaPct;
+    Color c = AppColors.primaryDark;
+    if (delta != null) {
+      if (delta > 5) {
+        c = AppColors.warning; // priced above market
+      } else if (delta < -5) {
+        c = AppColors.success; // priced below market
+      }
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight2,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primaryLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('מדד שוק (CBS · נדל"ן)',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          Text('${_money(ppm.toDouble())} למ״ר · חציון האזור',
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary)),
+          if (fair > 0) ...[
+            const SizedBox(height: 2),
+            Text('מחיר הוגן משוער לנכס: ${_money(fair.toDouble())}',
+                style: const TextStyle(
+                    fontSize: 14, color: AppColors.textSecondary)),
+          ],
+          if (badge.badge != null && badge.badge!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: c.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                delta != null
+                    ? '${badge.badge} (${delta > 0 ? '+' : ''}${delta.toStringAsFixed(0)}%)'
+                    : badge.badge!,
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w800, color: c),
+              ),
             ),
           ],
         ],

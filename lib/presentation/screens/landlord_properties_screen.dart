@@ -6,8 +6,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/core/services/aws_client.dart';
-import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
+import 'package:dating_app/presentation/features/billing/boost_flow.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart'
     show AddPropertyScreen, EditPropertyScreen;
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
@@ -442,87 +441,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
   // Boost ("הקפצת מודעה"): gated by an active subscription + monthly quota.
   // No subscription → open the paywall. Otherwise confirm, call the server, and
   // reflect the result (server is authoritative on entitlement/quota).
-  Future<void> _handleBoost(RentalProperty property) async {
-    final provider = context.read<DatingProvider>();
-    final sub = provider.subscription;
-    void snack(String msg, {bool ok = false}) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(msg),
-        backgroundColor:
-            ok ? const Color(0xFF22C55E) : const Color(0xFFFF5A67),
-      ));
-    }
-
-    // Not entitled → send them to the paywall.
-    if (sub == null || !sub.entitled) {
-      await Navigator.of(context).push(MaterialPageRoute(
-        settings: const RouteSettings(name: 'PaywallScreen'),
-        builder: (_) => const PaywallScreen(reason: 'boost'),
-      ));
-      if (mounted) await provider.refreshSubscription();
-      return;
-    }
-    // Entitled but out of boosts this month.
-    if (!sub.canBoost) {
-      snack('ניצלת את מכסת ההקפצות החודשית. מתחדשת בתחילת החודש.');
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-          title: const Text('להקפיץ את המודעה?',
-              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-          content: Text(
-            'המודעה תופיע בראש הפיד לשוכרים למשך 7 ימים.'
-            '${sub.boostUnlimited ? '' : ' נותרו ${sub.boostRemaining ?? 0} הקפצות החודש.'}',
-            style: const TextStyle(color: Color(0xFF64748B), height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('ביטול', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('הקפצה',
-                  style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.w900)),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
-
-    final r = await AwsApiClient.instance.boostProperty(property.id);
-    if (!mounted) return;
-    if (r.ok) {
-      provider.applyLocalBoost(property.id,
-          r.boostedUntil ?? DateTime.now().add(const Duration(days: 7)));
-      await provider.refreshSubscription();
-      snack(
-        r.unlimited
-            ? 'המודעה הוקפצה! 🚀'
-            : 'המודעה הוקפצה! נותרו ${r.remaining ?? 0} הקפצות החודש.',
-        ok: true,
-      );
-    } else if (r.error == 'not_entitled') {
-      await Navigator.of(context).push(MaterialPageRoute(
-        settings: const RouteSettings(name: 'PaywallScreen'),
-        builder: (_) => const PaywallScreen(reason: 'boost'),
-      ));
-      if (mounted) await provider.refreshSubscription();
-    } else if (r.error == 'quota_exceeded') {
-      snack('ניצלת את מכסת ההקפצות החודשית.');
-    } else {
-      snack('לא הצלחנו להקפיץ כרגע. נסו שוב.');
-    }
-  }
+  Future<void> _handleBoost(RentalProperty property) =>
+      showBoostFlow(context, property);
 
   @override
   Widget build(BuildContext context) {

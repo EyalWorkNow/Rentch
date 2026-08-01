@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
+import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 
 /// The entry flow (onboarding/auth) is ALWAYS the source teal brand, never the
 /// broker-black accent — so it uses this fixed compile-time token rather than
@@ -166,6 +167,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_page > 0)
+                Positioned(
+                  top: 12,
+                  right: 16,
+                  child: SafeArea(
+                    child: ScaleBounce(
+                      onTap: () {
+                        _pageController.previousPage(
+                          duration: const Duration(milliseconds: 360),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.black.withValues(alpha: 0.2),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.keyboard_arrow_right_rounded,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
                     ),

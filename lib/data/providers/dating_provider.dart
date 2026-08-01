@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -2374,6 +2375,7 @@ class DatingProvider extends ChangeNotifier {
       // devices — the #1 gap every agent flagged.
       if (isBroker) {
         unawaited(BrokerCloudSync.instance.pullAllToLocal());
+        unawaited(_pullBrokerBranding());
       }
     }
 
@@ -2573,9 +2575,40 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> updateBrokerBranding(BrokerBrandingConfig branding) async {
     if (!isBroker) return;
-    _brokerBranding = branding;
+    var config = branding;
+    // A locally-picked logo is a device-only file path that gets stripped on
+    // remote sync — upload it to S3 so `logoPath` is an https URL that follows
+    // the broker across devices.
+    final logo = config.logoPath.trim();
+    if (logo.isNotEmpty && !logo.startsWith('http')) {
+      try {
+        final url = await AwsApiClient.instance
+            .uploadFile(logo, folder: 'broker/logos');
+        if (url != null && url.isNotEmpty) {
+          config = config.copyWith(logoPath: url);
+        }
+      } catch (_) {/* keep the local path as a fallback */}
+    }
+    _brokerBranding = config;
     await _persist();
     notifyListeners();
+    // Cross-device sync (uid-scoped) — fire-and-forget, mirrors the other
+    // broker tools' cloud backup.
+    unawaited(BrokerCloudSync.instance
+        .push('broker_branding', jsonEncode(config.toJson())));
+  }
+
+  // Restore the broker's branding from the cloud on login (survives a new
+  // device). Kept separate from pullAllToLocal because branding lives in
+  // provider state, not a SharedPreferences key.
+  Future<void> _pullBrokerBranding() async {
+    final raw = await BrokerCloudSync.instance.pull('broker_branding');
+    if (raw == null || raw.isEmpty) return;
+    try {
+      _brokerBranding = BrokerBrandingConfig.fromJson(jsonDecode(raw));
+      await _persist();
+      notifyListeners();
+    } catch (_) {/* keep local branding on a bad blob */}
   }
 
   Future<void> _refreshRemoteCatalogAfterAuth() async {

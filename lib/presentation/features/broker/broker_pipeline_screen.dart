@@ -55,15 +55,29 @@ class _BrokerPipelineScreenState extends State<BrokerPipelineScreen> {
       ),
     );
     if (ok != true) return;
+    // Pre-fill the deal amount from the linked listing's price so the broker
+    // doesn't re-type it (they can still adjust in the commission tracker).
+    double dealAmount = 0;
+    final pid = lead.propertyId.trim();
+    if (pid.isNotEmpty && mounted) {
+      for (final p in context.read<DatingProvider>().allProperties) {
+        if (p.id == pid) {
+          dealAmount = p.price.toDouble();
+          break;
+        }
+      }
+    }
     await _dealRepo.save(BrokerDeal(
       id: 'deal_${DateTime.now().microsecondsSinceEpoch}',
       propertyTitle: lead.propertyTitle,
       clientName: lead.clientName,
-      dealAmount: 0,
+      dealAmount: dealAmount,
     ));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('נוצרה עסקה במעקב העמלות — השלם שם את הסכום'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(dealAmount > 0
+            ? 'נוצרה עסקה במעקב העמלות — בדוק את הסכום והוסף אחוז עמלה'
+            : 'נוצרה עסקה במעקב העמלות — השלם שם את הסכום'),
       ));
     }
   }

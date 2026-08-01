@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.7+1420
+version: 1.0.7+1421
 
 environment:
   sdk: ^3.6.1
@@ -73,6 +73,9 @@ dependencies:
   flutter_pcm_sound: ^3.1.6
   panorama_viewer: ^2.0.7
   webview_flutter: ^4.14.0
+  # Persistent (disk) image cache so listing thumbnails load instantly after the
+  # first fetch instead of re-downloading from external CDNs every time.
+  cached_network_image: ^3.4.1
   camera: ^0.12.0+1
   image: ^4.3.0 # silent frame encode for the 360 sweep (YUV/BGRA → JPEG)
   sensors_plus: ^6.0.0 # gyro: capture a frame per N° of real rotation, not per timer

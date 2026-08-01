@@ -552,6 +552,38 @@ class PropertyPricePoint {
   }
 }
 
+/// Real CBS/nadlan market anchor computed server-side on listing create
+/// (`aws/lambda/router/lib/nadlan_cbs.mjs` → `{medianPpm, deltaPct, badge}`).
+/// medianPpm = median ₪/m² for the area; deltaPct = this listing vs that median;
+/// badge = a short Hebrew verdict ("מעל השוק"/"מחיר שוק"/"מתחת לשוק").
+class MarketPriceBadge {
+  const MarketPriceBadge({this.medianPpm, this.deltaPct, this.badge});
+
+  final int? medianPpm;
+  final double? deltaPct;
+  final String? badge;
+
+  bool get hasData => medianPpm != null && medianPpm! > 0;
+
+  static MarketPriceBadge? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final m = Map<String, dynamic>.from(raw);
+    final ppm = _optionalInt(m['medianPpm']);
+    final delta = _optionalDouble(m['deltaPct']);
+    final badge = m['badge']?.toString();
+    if (ppm == null && delta == null && (badge == null || badge.isEmpty)) {
+      return null;
+    }
+    return MarketPriceBadge(medianPpm: ppm, deltaPct: delta, badge: badge);
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (medianPpm != null) 'medianPpm': medianPpm,
+        if (deltaPct != null) 'deltaPct': deltaPct,
+        if (badge != null && badge!.isNotEmpty) 'badge': badge,
+      };
+}
+
 class PropertyMarketSignals {
   const PropertyMarketSignals({
     this.views = 0,
@@ -874,6 +906,7 @@ class RentalProperty {
     this.createdAt,
     this.boostedUntil,
     this.boostTier = PropertyBoostTier.none,
+    this.priceBadge,
     this.panoramaTour,
     List<String>? audienceCohorts,
     this.audienceNote,
@@ -957,6 +990,11 @@ class RentalProperty {
 
   /// Which boost tier is (or was) applied. Only meaningful while [isBoosted].
   final PropertyBoostTier boostTier;
+
+  /// Real CBS/nadlan market anchor for this listing's area (₪/m² median +
+  /// above/below-market delta), computed server-side on create. Null when the
+  /// backend couldn't resolve it. Powers the CMA's market anchor.
+  final MarketPriceBadge? priceBadge;
   bool get isUltraBoosted =>
       isBoosted && boostTier == PropertyBoostTier.ultra;
 
@@ -1089,6 +1127,7 @@ class RentalProperty {
     DateTime? createdAt,
     DateTime? boostedUntil,
     PropertyBoostTier? boostTier,
+    MarketPriceBadge? priceBadge,
     PropertyPanoramaTour? panoramaTour,
     List<String>? audienceCohorts,
     String? audienceNote,
@@ -1135,6 +1174,7 @@ class RentalProperty {
       createdAt: createdAt ?? this.createdAt,
       boostedUntil: boostedUntil ?? this.boostedUntil,
       boostTier: boostTier ?? this.boostTier,
+      priceBadge: priceBadge ?? this.priceBadge,
       panoramaTour: panoramaTour ?? this.panoramaTour,
       audienceCohorts: audienceCohorts ?? this.audienceCohorts,
       audienceNote: audienceNote ?? this.audienceNote,
@@ -1259,6 +1299,7 @@ class RentalProperty {
           _generateDeterministicMockDate(json['id']?.toString() ?? ''),
       boostedUntil: _optionalDate(json['boostedUntil']),
       boostTier: _parseBoostTier(json['boostTier']),
+      priceBadge: MarketPriceBadge.fromJson(json['priceBadge']),
       panoramaTour: PropertyPanoramaTour.fromJsonOrNull(json['panoramaTour']),
       audienceCohorts: _decodeStringListValue(json['audienceCohorts']),
       audienceNote: json['audienceNote']?.toString(),
@@ -1323,6 +1364,7 @@ class RentalProperty {
       if (boostedUntil != null)
         'boostedUntil': boostedUntil!.toUtc().toIso8601String(),
       if (boostTier != PropertyBoostTier.none) 'boostTier': boostTier.name,
+      if (priceBadge != null) 'priceBadge': priceBadge!.toJson(),
       if (panoramaTour != null) 'panoramaTour': panoramaTour!.toJson(),
       'audienceCohorts': audienceCohorts,
       'audienceNote': audienceNote,
@@ -1370,6 +1412,7 @@ class TenantProfile {
     this.petType,
     this.hostsGuests,
     this.playsInstrument,
+    this.urgency,
   });
 
   final String id;
@@ -1484,6 +1527,11 @@ class TenantProfile {
   /// null = unspecified.
   final bool? playsInstrument;
 
+  /// How urgent the search is — a canonical token from [kUrgencyOptions]
+  /// ('now' | 'soon' | 'browsing'), or null when unspecified. Back-compat:
+  /// old stored profiles load fine without it.
+  final String? urgency;
+
   String get photoUrl => photoUrls.isEmpty ? '' : photoUrls.first;
 
   TenantProfile copyWith({
@@ -1519,6 +1567,7 @@ class TenantProfile {
     String? petType,
     bool? hostsGuests,
     bool? playsInstrument,
+    String? urgency,
   }) {
     return TenantProfile(
       id: id ?? this.id,
@@ -1553,6 +1602,7 @@ class TenantProfile {
       petType: petType ?? this.petType,
       hostsGuests: hostsGuests ?? this.hostsGuests,
       playsInstrument: playsInstrument ?? this.playsInstrument,
+      urgency: urgency ?? this.urgency,
     );
   }
 
@@ -1606,6 +1656,7 @@ class TenantProfile {
           : (json['petType'] as String).trim(),
       hostsGuests: _optionalBool(json['hostsGuests']),
       playsInstrument: _optionalBool(json['playsInstrument']),
+      urgency: json['urgency'] as String?,
     );
   }
 
@@ -1645,6 +1696,7 @@ class TenantProfile {
       if (petType != null) 'petType': petType,
       if (hostsGuests != null) 'hostsGuests': hostsGuests,
       if (playsInstrument != null) 'playsInstrument': playsInstrument,
+      if (urgency != null) 'urgency': urgency,
     };
   }
 }
@@ -1677,6 +1729,13 @@ const List<(String, String)> kMoveInBuckets = [
   ('month', 'עד חודש'),
   ('quarter', 'עד 3 חודשים'),
   ('flexible', 'גמיש'),
+];
+
+/// How urgent the tenant's search is — (canonical token, Hebrew label).
+const List<(String, String)> kUrgencyOptions = [
+  ('now', 'מחפש/ת לעכשיו'),
+  ('soon', 'לא דחוף'),
+  ('browsing', 'רק מתעניין/ת'),
 ];
 
 /// Normalizes ANY move-in value into one of the four canonical tokens:

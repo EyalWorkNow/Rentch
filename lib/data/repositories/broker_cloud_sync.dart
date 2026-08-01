@@ -18,6 +18,12 @@ class BrokerCloudSync {
   BrokerCloudSync._();
   static final BrokerCloudSync instance = BrokerCloudSync._();
 
+  /// Last cloud-push outcome so a tool can reassure the broker their data is
+  /// backed up: null = not attempted yet, true = synced ✓, false = local-only
+  /// (offline / backend unreachable). Reactive so a footer can listen.
+  final ValueNotifier<bool?> lastPushOk = ValueNotifier<bool?>(null);
+  DateTime? lastPushAt;
+
   /// Every broker-tool SharedPreferences key (MUST match each repository's
   /// `_key`), so we can pull them all on login.
   static const List<String> keys = [
@@ -50,7 +56,10 @@ class BrokerCloudSync {
         'data': rawJson,
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       });
+      lastPushAt = DateTime.now();
+      lastPushOk.value = true;
     } catch (e) {
+      lastPushOk.value = false;
       if (kDebugMode) debugPrint('BrokerCloudSync.push($name) failed: $e');
     }
   }

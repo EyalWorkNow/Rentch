@@ -4224,58 +4224,57 @@ class _AreaLassoScreenState extends State<_AreaLassoScreen>
               ),
               // Markers Layer: Circular Image Thumbnails inspired by mockup
               MarkerLayer(
+                // Lightweight PRICE PINS (no per-marker network image) so the map
+                // paints instantly — the photo shows in the bottom card once a
+                // pin is selected. (Photo-bubble markers previously downloaded up
+                // to 70 CDN images on every open, with no disk cache → very slow.)
                 markers: _markers.map(
                   (property) {
                     final isSelected = property.id == _selectedProperty?.id;
+                    final bg = isSelected ? AppColors.blue : Colors.white;
+                    final fg = isSelected ? Colors.white : AppColors.navy;
                     return Marker(
                       point: property.point,
-                      width: isSelected ? 66 : 46,
-                      height: isSelected ? 74 : 54,
+                      width: isSelected ? 96 : 84,
+                      height: isSelected ? 46 : 40,
                       child: GestureDetector(
                         onTap: () => _selectProperty(property),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: isSelected ? 60 : 40,
-                              height: isSelected ? 60 : 40,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
+                                color: bg,
+                                borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
                                   color: isSelected
                                       ? AppColors.blue
                                       : Colors.white,
-                                  width: isSelected ? 3.0 : 2.0,
+                                  width: 2.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.16),
+                                    color: Colors.black.withValues(alpha: 0.18),
                                     blurRadius: isSelected ? 8 : 4,
                                     offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),
-                              child: ClipOval(
-                                child: SafeMedia(
-                                  media: property.primaryMedia,
-                                  fallback: Container(
-                                    color: AppColors.primaryLight2,
-                                    child: RentlyIcon(
-                                      IconsaxPlusLinear.building,
-                                      size: isSelected ? 22 : 14,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  fit: BoxFit.cover,
+                              child: Text(
+                                _pinPriceLabel(property),
+                                style: TextStyle(
+                                  color: fg,
+                                  fontSize: isSelected ? 14 : 12.5,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ),
-                            if (isSelected)
-                              CustomPaint(
-                                size: const Size(10, 6),
-                                painter: _TrianglePainter(
-                                    color: AppColors.blue),
-                              ),
+                            CustomPaint(
+                              size: const Size(10, 6),
+                              painter: _TrianglePainter(color: bg),
+                            ),
                           ],
                         ),
                       ),
@@ -6277,6 +6276,22 @@ class _FeatureTag extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Compact price for a map pin: rentals as "₪5,400", sales as "₪2.0M".
+String _pinPriceLabel(RentalProperty p) {
+  final v = p.price;
+  if (v >= 100000) {
+    final m = v / 1000000;
+    return '₪${m.toStringAsFixed(v % 1000000 == 0 ? 0 : 1)}M';
+  }
+  final s = v.toString();
+  final b = StringBuffer('₪');
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+    b.write(s[i]);
+  }
+  return b.toString();
 }
 
 class _TrianglePainter extends CustomPainter {

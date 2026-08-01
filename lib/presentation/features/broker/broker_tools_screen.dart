@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/data/repositories/broker_cloud_sync.dart';
 import 'package:dating_app/presentation/features/broker/area_intel_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_brochure_screen.dart';
 import 'package:dating_app/presentation/features/broker/broker_clients_screen.dart';
@@ -157,6 +158,7 @@ class BrokerToolsScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              _SyncStatusBar(),
               Expanded(
                 child: GridView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -259,6 +261,46 @@ class _BrokerToolTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A subtle bar telling the broker whether their tools' data is backed up to the
+/// cloud (✓) or currently local-only — so they trust their book is safe.
+class _SyncStatusBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool?>(
+      valueListenable: BrokerCloudSync.instance.lastPushOk,
+      builder: (context, ok, _) {
+        // Unknown yet (no push this session) → stay quiet.
+        if (ok == null) return const SizedBox.shrink();
+        final synced = ok == true;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                synced
+                    ? IconsaxPlusLinear.cloud_add
+                    : IconsaxPlusLinear.cloud_cross,
+                size: 15,
+                color: synced ? AppColors.success : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                synced ? 'הנתונים מגובים בענן' : 'מקומי בלבד — אין חיבור לענן',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: synced ? AppColors.success : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

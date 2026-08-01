@@ -109,6 +109,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late int _budget;
   late double _rooms;
   late String _moveIn;
+  String? _urgency; // 'now' | 'soon' | 'browsing' | null
   String? _occupation;
   // Eligibility attributes the per-listing gate can filter on. Null = unset.
   int? _numChildren;
@@ -161,6 +162,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _budget = p.budgetMax;
     _rooms = p.desiredRooms;
     _moveIn = moveInBucketOf(p.moveInWindow);
+    _urgency = p.urgency;
     // Pre-fill occupation from the saved profile; only keep it if it's a known
     // vocabulary key (guards against stale/legacy values).
     _occupation = _occupationOptions.any((o) => o.$1 == p.occupation)
@@ -435,6 +437,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       petType: _petType,
       hostsGuests: _hostsGuests,
       playsInstrument: _playsInstrument,
+      urgency: _urgency,
     );
 
     if (!mounted) return;
@@ -809,6 +812,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   ),
                                   child: Text(
                                     bucket.$2,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.navy,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 22),
+
+                          // Urgency label
+                          const Text(
+                            'רמת דחיפות',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Urgency chips (tap again to clear)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: kUrgencyOptions.map((opt) {
+                              final selected = opt.$1 == _urgency;
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() =>
+                                      _urgency = selected ? null : opt.$1);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.background,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.primary
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    opt.$2,
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,

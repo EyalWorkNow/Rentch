@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:flutter/material.dart';
 
@@ -101,17 +102,27 @@ class _SafeImageState extends State<SafeImage> {
       );
     }
 
-    // Remote URLs: Flutter's [Image.network] keeps an in-memory cache per
-    // session (so re-scrolling the deck doesn't re-fetch) and the test binding
-    // handles it gracefully. We attach browser-like headers because several
-    // image CDNs backing the catalog (Yad2, Unsplash) can reject a non-browser
-    // request, which would otherwise collapse every photo to its placeholder.
-    return Image.network(
-      cleaned,
+    // Remote URLs: a DISK-backed cache (cached_network_image) so a thumbnail is
+    // fetched from the external CDN once and then loads instantly on every later
+    // open (the map, the deck, detail) — the previous Image.network kept only an
+    // in-memory cache, so photos re-downloaded from slow CDNs each session.
+    // [ResizeImage] preserves the decode-to-display-size win (cacheWidth). We
+    // attach browser-like headers because several CDNs (Yad2, Unsplash) reject a
+    // non-browser request, which would otherwise collapse every photo to its
+    // placeholder.
+    // Under `flutter test` there's no platform temp dir, so the disk cache's
+    // path_provider call throws — use the plain in-memory NetworkImage there.
+    final ImageProvider netProvider =
+        Platform.environment.containsKey('FLUTTER_TEST')
+            ? NetworkImage(cleaned, headers: _imageRequestHeaders(cleaned))
+            : CachedNetworkImageProvider(cleaned,
+                headers: _imageRequestHeaders(cleaned));
+    final ImageProvider provider =
+        ResizeImage.resizeIfNeeded(cacheW, null, netProvider);
+    return Image(
+      image: provider,
       fit: fit,
       alignment: alignment,
-      cacheWidth: cacheW,
-      headers: _imageRequestHeaders(cleaned),
       // Hold the previously-decoded frame until the new one is ready (no blank
       // flash when tapping between the card's photos). Pairs with the neighbor
       // precache in ProfileCard so the swap is instant.

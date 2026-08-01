@@ -15,7 +15,6 @@ import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/data/models/rental_models.dart';
-import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/features/pricing/fair_rent_hint.dart';
 import 'package:dating_app/presentation/features/scan3d/room_scan_flow.dart';
@@ -894,6 +893,105 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     });
   }
 
+  // A regular landlord may publish this many active listings for free; beyond
+  // it they upgrade to a broker (סוכן נדל"ן) account for unlimited.
+  static const int _landlordFreeLimit = 3;
+
+  /// Offers the broker-account upgrade when a landlord hits the free cap.
+  /// Returns true if they switched to a broker account (→ unlimited publishing).
+  Future<bool> _promptBrokerUpgrade() async {
+    final go = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+              22, 14, 22, 18 + MediaQuery.of(ctx).padding.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.slate200,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(IconsaxPlusBold.briefcase,
+                      color: AppColors.primary, size: 24),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Text('הגעת ל-3 דירות',
+                      style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.slate900)),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              const Text(
+                'פרסום של יותר מ-3 דירות זמין בחשבון סוכן נדל"ן — ניהול דירות '
+                'ולקוחות ללא הגבלה, כלים מתקדמים ומיתוג אישי. אפשר לעבור עכשיו '
+                'בחינם.',
+                style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 52,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(26)),
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('מעבר לחשבון סוכן נדל"ן',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('אולי מאוחר יותר',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (go != true || !mounted) return false;
+    await context.read<DatingProvider>().setUserRole('broker', explicit: true);
+    return true;
+  }
+
   Future<void> _save() async {
     // SEC-rate: prevent property spam
     if (!RateLimiter.instance.allowPropertyAdd()) {
@@ -1105,26 +1203,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       final provider = context.read<DatingProvider>();
       final activeCount =
           provider.myProperties.where((p) => p.isActive).length;
-      // Gate on the SERVER's free limit (default 3), not a hardcoded constant,
-      // so a restricted tier (freeLimit < 3) is honored.
-      final freeLimit = provider.subscription?.freeLimit ?? 3;
-      if (activeCount >= freeLimit) {
-        await provider.refreshSubscription();
-        if (!mounted) return;
-        // At/over the free tier we FAIL CLOSED: require a SERVER-confirmed
-        // entitlement to publish. `canPublishConfirmed` trusts only the backend
-        // flag / active subscription — never the cached `activeProperties`
-        // arithmetic, which can be stale-low after a failed refresh and would
-        // otherwise leak free listings. Null/false → paywall.
-        final canAdd = provider.subscription?.canPublishConfirmed ?? false;
-        if (!canAdd) {
-          setState(() => _isSaving = false);
-          await Navigator.of(context).push(MaterialPageRoute(
-            settings: const RouteSettings(name: 'PaywallScreen'),
-            builder: (_) => const PaywallScreen(reason: 'limit'),
-          ));
-          return; // don't publish — user must subscribe first
-        }
+      // A BROKER (סוכן נדל"ן) publishes unlimited. A regular landlord is capped
+      // at 3 active listings — beyond that we offer the broker-account upgrade
+      // (no subscription anymore). If they don't upgrade, we don't publish.
+      if (!provider.isBroker && activeCount >= _landlordFreeLimit) {
+        setState(() => _isSaving = false);
+        final upgraded = await _promptBrokerUpgrade();
+        if (!upgraded || !mounted) return;
+        setState(() => _isSaving = true);
       }
 
       await provider.addLandlordProperty(property);
@@ -1141,18 +1227,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      // A publish that exceeds the free limit comes back as HTTP 402 — open the
-      // paywall instead of showing a generic error.
+      // A publish over the landlord cap comes back as HTTP 402 — offer the
+      // broker-account upgrade instead of a generic error.
       if (e is AwsApiException && e.statusCode == 402) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: Duration(milliseconds: 3000),
-          content: Text('הגעת למכסת הדירות החינמיות. נדרש מנוי לפרסום דירה נוספת.'),
-          backgroundColor: AppColors.coral,
-        ));
-        await Navigator.of(context).push(MaterialPageRoute(
-          settings: const RouteSettings(name: 'PaywallScreen'),
-          builder: (_) => const PaywallScreen(reason: 'limit'),
-        ));
+        await _promptBrokerUpgrade();
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

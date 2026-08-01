@@ -11,7 +11,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/presentation/features/billing/subscription_screen.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
@@ -1806,17 +1805,6 @@ class _LandlordProfileScreen extends StatelessWidget {
                     ownerName: profile.name,
                     isSelf: true,
                   ),
-                ),
-              ),
-            ),
-            const _SettingsDivider(),
-            _ProfileMenuItem(
-              icon: IconsaxPlusLinear.card,
-              label: 'המנוי שלי',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  settings: const RouteSettings(name: 'SubscriptionScreen'),
-                  builder: (_) => const SubscriptionScreen(),
                 ),
               ),
             ),

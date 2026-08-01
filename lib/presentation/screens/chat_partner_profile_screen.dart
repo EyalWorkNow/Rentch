@@ -23,6 +23,8 @@ class ChatPartnerProfileScreen extends StatefulWidget {
     this.property,
     this.messageCount = 0,
     this.isLandlord = false,
+    this.sharedImageUrls = const [],
+    this.sharedVoiceCount = 0,
   });
 
   final String partnerName;
@@ -32,19 +34,50 @@ class ChatPartnerProfileScreen extends StatefulWidget {
   final int messageCount;
   final bool isLandlord;
 
+  /// Media actually shared in this conversation (not the apartment's photos).
+  final List<String> sharedImageUrls;
+  final int sharedVoiceCount;
+
   @override
   State<ChatPartnerProfileScreen> createState() =>
       _ChatPartnerProfileScreenState();
 }
 
 class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
-  // Real media count for the linked property (images + videos), used by the
-  // stats card and the gallery overflow badge.
-  int get _photoCount {
-    final p = widget.property;
-    if (p == null) return 0;
-    final fromMedia = p.media.length;
-    return fromMedia > 0 ? fromMedia : p.imageUrls.length;
+  // Initials for the person's avatar placeholder (e.g. "יואב כהן" → "יכ").
+  String get _initials {
+    final parts = widget.partnerName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1);
+    return parts.first.substring(0, 1) + parts[1].substring(0, 1);
+  }
+
+  // Full-screen viewer for a shared chat image.
+  void _openImage(String url) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            child: SafeImage(
+              source: url,
+              fit: BoxFit.contain,
+              fallback: const Icon(Icons.broken_image_rounded,
+                  color: Colors.white38, size: 60),
+            ),
+          ),
+        ),
+      ),
+    ));
   }
 
   void _openProperty() {
@@ -84,13 +117,10 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
     const cardBgColor = Color(0xFF191F28);
     const cardBorderColor = Color(0xFF262E3B);
 
-    final displayAvatar = widget.partnerAvatarUrl.isNotEmpty
-        ? widget.partnerAvatarUrl
-        : (widget.property?.imageUrls.isNotEmpty == true
-            ? widget.property!.imageUrls.first
-            : '');
-
-    final samplePhotos = (widget.property?.imageUrls ?? []).take(4).toList();
+    // The PERSON's avatar — only a real partner photo (usually none for a
+    // landlord). We do NOT borrow the apartment photo here: this is a person, not
+    // the flat. Empty → an initials circle (see the header below).
+    final displayAvatar = widget.partnerAvatarUrl;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -198,20 +228,35 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                                     ],
                                   ),
                                   child: ClipOval(
-                                    child: SafeImage(
-                                      source: displayAvatar,
-                                      fit: BoxFit.cover,
-                                      fallback: Container(
-                                        color: AppColors.navy,
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.person_rounded,
-                                            size: 52,
-                                            color: Colors.white70,
+                                    child: displayAvatar.isEmpty
+                                        ? Container(
+                                            color: AppColors.navy,
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              _initials,
+                                              style: const TextStyle(
+                                                fontSize: 38,
+                                                fontWeight: FontWeight.w800,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : SafeImage(
+                                            source: displayAvatar,
+                                            fit: BoxFit.cover,
+                                            fallback: Container(
+                                              color: AppColors.navy,
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                _initials,
+                                                style: const TextStyle(
+                                                  fontSize: 38,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                    ),
                                   ),
                                 ),
 
@@ -249,7 +294,10 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                       ),
                       const SizedBox(height: 28),
 
-                      // ── 3 Stat Summary Cards Row (REAL data) ────────────
+                      // ── Context facts about the PERSON / conversation ─────
+                      // (Apartment-specific numbers like rooms/photos live in the
+                      // clearly-labeled apartment section below — not here, where
+                      // they'd read as the person's stats.)
                       Row(
                         children: [
                           Expanded(
@@ -264,7 +312,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                           Expanded(
                             child: _StatCard(
                               label: 'תמונות',
-                              value: _photoCount.toString(),
+                              value: widget.sharedImageUrls.length.toString(),
                               bgColor: cardBgColor,
                               borderColor: cardBorderColor,
                             ),
@@ -272,12 +320,8 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _StatCard(
-                              label: 'חדרים',
-                              value: widget.property != null
-                                  ? widget.property!.rooms
-                                      .toString()
-                                      .replaceAll('.0', '')
-                                  : '—',
+                              label: 'הקלטות',
+                              value: widget.sharedVoiceCount.toString(),
                               bgColor: cardBgColor,
                               borderColor: cardBorderColor,
                             ),
@@ -286,7 +330,7 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // ── Media and Photos Gallery Section ─────────────────
+                      // ── Media shared IN this conversation ─────────────────
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
@@ -298,91 +342,77 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Gallery Title Header Row → opens the property.
-                            GestureDetector(
-                              onTap: _openProperty,
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'מדיה ותמונות',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                    size: 22,
-                                  ),
-                                ],
+                            const Text(
+                              'מדיה בשיחה',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 14),
-
-                            // Photo thumbnails row
-                            Row(
-                              children: List.generate(4, (index) {
-                                final isLast = index == 3;
-                                final imgSource = index < samplePhotos.length
-                                    ? samplePhotos[index]
-                                    : displayAvatar;
-
-                                return Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(
-                                      left: index < 3 ? 8.0 : 0.0,
+                            if (widget.sharedImageUrls.isEmpty &&
+                                widget.sharedVoiceCount == 0)
+                              Text(
+                                'עדיין לא שותפו תמונות או הקלטות בשיחה.',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                ),
+                              )
+                            else ...[
+                              if (widget.sharedImageUrls.isNotEmpty)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (var i = 0;
+                                        i < widget.sharedImageUrls.length &&
+                                            i < 8;
+                                        i++)
+                                      _SharedThumb(
+                                        url: widget.sharedImageUrls[i],
+                                        // Last visible tile shows the remainder.
+                                        overflow: (i == 7 &&
+                                                widget.sharedImageUrls.length >
+                                                    8)
+                                            ? widget.sharedImageUrls.length - 8
+                                            : 0,
+                                        onTap: () => _openImage(
+                                            widget.sharedImageUrls[i]),
+                                      ),
+                                  ],
+                                ),
+                              if (widget.sharedVoiceCount > 0) ...[
+                                if (widget.sharedImageUrls.isNotEmpty)
+                                  const SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary
+                                            .withValues(alpha: 0.18),
+                                        borderRadius: BorderRadius.circular(11),
+                                      ),
+                                      child: const Icon(Icons.mic_rounded,
+                                          size: 20, color: Colors.white),
                                     ),
-                                    child: AspectRatio(
-                                      aspectRatio: 1.0,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(14),
-                                        child: Stack(
-                                          fit: StackFit.expand,
-                                          children: [
-                                            SafeImage(
-                                              source: imgSource,
-                                              fit: BoxFit.cover,
-                                              fallback: Container(
-                                                color: Colors.white10,
-                                                child: const Icon(
-                                                  Icons.image_rounded,
-                                                  color: Colors.white38,
-                                                ),
-                                              ),
-                                            ),
-
-                                            // Real overflow badge on the 4th tile.
-                                            if (isLast && _photoCount > 4)
-                                              GestureDetector(
-                                                onTap: _openProperty,
-                                                child: Container(
-                                                  color: Colors.black
-                                                      .withValues(alpha: 0.6),
-                                                  child: Center(
-                                                    child: Text(
-                                                      '+${_photoCount - 4}',
-                                                      style: const TextStyle(
-                                                        fontSize: 18,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: Colors.white,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      '${widget.sharedVoiceCount} הקלטות קוליות',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                  ),
-                                );
-                              }),
-                            ),
+                                  ],
+                                ),
+                              ],
+                            ],
                           ],
                         ),
                       ),
@@ -608,6 +638,59 @@ class _ChatPartnerProfileScreenState extends State<ChatPartnerProfileScreen> {
 }
 
 // ─── Stat Card Widget ────────────────────────────────────────────────────────
+/// A square thumbnail for an image shared in the conversation. The last visible
+/// tile can show a "+N more" overflow badge.
+class _SharedThumb extends StatelessWidget {
+  const _SharedThumb({
+    required this.url,
+    required this.onTap,
+    this.overflow = 0,
+  });
+
+  final String url;
+  final VoidCallback onTap;
+  final int overflow;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 72,
+          height: 72,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              SafeImage(
+                source: url,
+                fit: BoxFit.cover,
+                fallback: Container(
+                  color: Colors.white10,
+                  child: const Icon(Icons.image_rounded, color: Colors.white38),
+                ),
+              ),
+              if (overflow > 0)
+                Container(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '+$overflow',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.label,
