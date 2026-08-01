@@ -16,6 +16,12 @@ class PaymentGroup {
   static const int applePay = 160;
 }
 
+/// Web wallets (Apple Pay / Google Pay) can't run inside the in-app WebView —
+/// they need the system browser (Path A: external-browser handoff). Card + Bit
+/// render fine in the in-app WebView.
+bool isWalletGroup(int group) =>
+    group == PaymentGroup.applePay || group == PaymentGroup.googlePay;
+
 /// A single selectable payment method.
 class _Method {
   const _Method(this.group, this.label, this.icon, {this.accent});

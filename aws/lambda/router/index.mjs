@@ -2926,14 +2926,21 @@ async function handleHooks(event, segments, method) {
 
   if (action === 'return' && method === 'GET') {
     const okStatus = event.queryStringParameters?.status === 'success';
+    // Deep-link back into the app (Path A: external-browser wallet checkout).
+    // The in-app WebView never renders this page — it intercepts /hooks/return
+    // by URL — so this only fires for the system-browser (Apple/Google Pay) flow.
+    const appLink = `rently://billing/return?status=${okStatus ? 'success' : 'failure'}`;
     return html(200, `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Rently</title>
 <style>body{font-family:-apple-system,Arial,sans-serif;background:#f4f6fa;color:#0b2540;display:grid;place-items:center;height:100vh;margin:0;text-align:center}
 .c{background:#fff;padding:32px 28px;border-radius:18px;box-shadow:0 10px 30px rgba(11,37,64,.1);max-width:340px}
-.i{font-size:44px}h1{font-size:20px;margin:12px 0 6px}p{color:#5b7a99;margin:0}</style></head>
+.i{font-size:44px}h1{font-size:20px;margin:12px 0 6px}p{color:#5b7a99;margin:0 0 18px}
+a.b{display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:800;padding:13px 22px;border-radius:14px}</style>
+<script>setTimeout(function(){location.href=${JSON.stringify(appLink)}},400);</script></head>
 <body><div class="c"><div class="i">${okStatus ? '✅' : '⚠️'}</div>
 <h1>${okStatus ? 'התשלום התקבל' : 'התשלום לא הושלם'}</h1>
-<p>אפשר לחזור לאפליקציית Rently.</p></div></body></html>`);
+<p>מעבירים אתכם חזרה לאפליקציה…</p>
+<a class="b" href="${appLink}">חזרה לאפליקציית Rently</a></div></body></html>`);
   }
 
   if (action === 'morning' && method === 'POST') {

@@ -1,7 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
-import 'package:dating_app/presentation/features/billing/checkout_webview_screen.dart';
+import 'package:dating_app/presentation/features/billing/checkout_launcher.dart';
 import 'package:dating_app/presentation/features/billing/payment_method_selector.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -106,13 +106,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
       }
       // Prefer the server's authoritative charged amount (reflects any coupon).
       final chargedAgorot = checkout.priceAgorot ?? _selectedAgorot;
-      final result = await Navigator.of(context).push<bool>(MaterialPageRoute(
-        settings: const RouteSettings(name: 'CheckoutWebViewScreen'),
-        builder: (_) => CheckoutWebViewScreen(
-          url: checkout.url,
-          amountLabel: '${_shekel(chargedAgorot ~/ 100)}$_periodLabel',
-        ),
-      ));
+      final result = await openHostedCheckout(
+        context,
+        url: checkout.url,
+        group: group,
+        amountLabel: '${_shekel(chargedAgorot ~/ 100)}$_periodLabel',
+      );
       if (!mounted) return;
       if (result == true) {
         await _pollUntilEntitled(provider);

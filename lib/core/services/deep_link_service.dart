@@ -27,7 +27,24 @@ class DeepLinkService {
 
   void dispose() => _sub?.cancel();
 
+  // ── billing return (Path A: external-browser wallet checkout) ───────────────
+  // Grow's return page deep-links back to `rently://billing/return?status=…`
+  // after an Apple/Google Pay payment in the system browser. The external
+  // checkout screen registers here to auto-complete when the app foregrounds.
+  static final Set<void Function(bool success)> _billingListeners = {};
+  static void addBillingReturnListener(void Function(bool) l) =>
+      _billingListeners.add(l);
+  static void removeBillingReturnListener(void Function(bool) l) =>
+      _billingListeners.remove(l);
+
   void _handle(Uri uri) {
+    if (uri.scheme == 'rently' && uri.host == 'billing') {
+      final ok = uri.queryParameters['status'] == 'success';
+      for (final l in _billingListeners.toList()) {
+        l(ok);
+      }
+      return;
+    }
     final id = propertyIdFrom(uri);
     if (id != null) _openProperty(id);
   }

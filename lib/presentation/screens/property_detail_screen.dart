@@ -9,7 +9,7 @@ import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/presentation/features/billing/paywall_screen.dart';
-import 'package:dating_app/presentation/features/billing/checkout_webview_screen.dart';
+import 'package:dating_app/presentation/features/billing/checkout_launcher.dart';
 import 'package:dating_app/presentation/features/billing/payment_method_selector.dart';
 import 'package:dating_app/core/services/behavior_insights_service.dart';
 import 'package:dating_app/core/services/event_service.dart';
@@ -520,10 +520,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       snack('פתיחת התשלום נכשלה. נסו שוב.');
       return;
     }
-    final paid = await Navigator.of(context).push<bool>(MaterialPageRoute(
-      builder: (_) =>
-          CheckoutWebViewScreen(url: checkoutUrl, amountLabel: amountLabel),
-    ));
+    final paid = await openHostedCheckout(
+      context,
+      url: checkoutUrl,
+      group: group,
+      amountLabel: amountLabel,
+    );
     if (paid != true || !mounted) return;
 
     final r = await AwsApiClient.instance
