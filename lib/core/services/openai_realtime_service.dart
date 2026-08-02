@@ -48,6 +48,7 @@ class OpenAiRealtimeService {
   bool _playerReady = false;
   bool _disposed = false;
   bool _greeted = false;
+  Timer? _watchdog;
 
   // ── Callbacks (names mirror AssistantLiveService for a drop-in swap) ──────────
   void Function(LiveStatus status)? onStatus;
@@ -96,6 +97,15 @@ class OpenAiRealtimeService {
         onDone: _onWsDone,
         cancelOnError: true,
       );
+      // Watchdog: if the socket opens but session.created never arrives (a
+      // handshake/protocol stall), don't hang on "connecting" forever — fail so
+      // the screen falls back to the turn-based voice.
+      _watchdog = Timer(const Duration(seconds: 12), () {
+        if (!_connected && !_disposed) {
+          if (kDebugMode) debugPrint('Realtime: no session in 12s → fail');
+          _fail('החיבור לשיחה החיה איטי מדי. נסה שוב.');
+        }
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('Realtime connect failed: $e');
       _fail('לא הצלחתי להתחיל שיחה חיה.');
@@ -104,6 +114,8 @@ class OpenAiRealtimeService {
 
   Future<void> disconnect() async {
     _connected = false;
+    _watchdog?.cancel();
+    _watchdog = null;
     await _micSub?.cancel();
     _micSub = null;
     try {
@@ -190,6 +202,7 @@ class OpenAiRealtimeService {
       case 'session.updated':
         if (!_connected) {
           _connected = true;
+          _watchdog?.cancel();
           await _startPlayer();
           await _startMic();
           _setStatus(LiveStatus.listening);
@@ -344,10 +357,15 @@ class OpenAiRealtimeService {
   }
 
   void _onWsDone() {
-    if (_connected) {
-      _connected = false;
-      if (!_disposed) _setStatus(LiveStatus.closed);
+    if (!_connected) {
+      // The server closed the socket BEFORE session.created — i.e. the handshake
+      // (auth / protocol) was rejected. Treat it as a connect failure so the
+      // screen falls back instead of hanging on "connecting" forever.
+      if (!_disposed) _fail('לא הצלחתי להתחיל שיחה חיה.');
+      return;
     }
+    _connected = false;
+    if (!_disposed) _setStatus(LiveStatus.closed);
   }
 
   void _fail(String message) {
