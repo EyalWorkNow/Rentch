@@ -592,6 +592,9 @@ class _LeadCard extends StatefulWidget {
   // with an explicit verified flag shows the shield chip.
   bool get displayVerified => _hasLiker && (liker!.verified ?? false);
 
+  /// The candidate's interest intent (from their urgency token), or null.
+  String? get displayUrgency => _hasLiker ? liker!.urgency : tenant.urgency;
+
   @override
   State<_LeadCard> createState() => _LeadCardState();
 }
@@ -639,9 +642,29 @@ class _LeadCardState extends State<_LeadCard> {
     );
   }
 
+  // Candidate interest intent → a plain-language status the landlord can filter
+  // by: actively looking vs checking options vs just browsing.
+  static String? _intentLabel(String? token) {
+    switch (token) {
+      case 'now':
+        return 'מתעניין פעיל';
+      case 'soon':
+        return 'בודק אופציות';
+      case 'browsing':
+        return 'צופה בלבד';
+      default:
+        return null;
+    }
+  }
+
   /// The REAL, per-liker attribute facts — only non-null values are surfaced.
   List<_Fact> _buildFacts() {
     final facts = <_Fact>[];
+    // Interest intent first — it's the signal the landlord triages leads by.
+    final intent = _intentLabel(widget.displayUrgency);
+    if (intent != null) {
+      facts.add(_Fact(IconsaxPlusLinear.flash, 'התעניינות', intent));
+    }
     final budget = widget.displayBudget;
     if (budget != null) {
       facts.add(_Fact(IconsaxPlusLinear.wallet_money, 'תקציב', _fmt(budget)));
@@ -1405,7 +1428,7 @@ class _FiltersIconButton extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              'מסננים',
+              'סנן העדפות מועמדים',
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
@@ -1685,7 +1708,7 @@ class _CandidateFilterSheetState extends State<_CandidateFilterSheet> {
               Row(
                 children: [
                   const Text(
-                    'מסננים',
+                    'סנן העדפות מועמדים',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,

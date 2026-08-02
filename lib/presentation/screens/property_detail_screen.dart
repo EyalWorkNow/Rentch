@@ -37,6 +37,8 @@ import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart' show EditPropertyScreen;
 import 'package:dating_app/presentation/screens/owner_listings_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_psv_tour.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
@@ -138,6 +140,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   /// engagement before delegating to the real handler. Classifies by the
   /// property's available media so 360/3D/video are tracked distinctly.
   void _openTourTracked(RentalProperty p) {
+    // Landlord viewing their own listing with no tour yet → this button UPLOADS
+    // a 360 tour (captures + saves), rather than the tenant-facing "request".
+    if (widget.isLandlordPreview &&
+        !p.hasPanoramaTour &&
+        !p.hasReadyVirtualTour) {
+      _captureAndSaveTour(p);
+      return;
+    }
     if (!widget.isLandlordPreview) {
       final tourStart = DateTime.now();
       if (p.hasPanoramaTour) {
@@ -156,6 +166,26 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       });
     }
     openPropertyTour(context, p);
+  }
+
+  // Landlord uploads a 360 tour for their listing: reuse the same capture flow
+  // the add-property form uses, then persist the result onto the property.
+  Future<void> _captureAndSaveTour(RentalProperty p) async {
+    final tour = await Navigator.of(context).push<PropertyPanoramaTour>(
+      MaterialPageRoute(
+        builder: (_) => PanoramaCaptureScreen(initial: p.panoramaTour),
+      ),
+    );
+    if (tour == null || tour.isEmpty || !mounted) return;
+    await context
+        .read<DatingProvider>()
+        .updateLandlordProperty(p.copyWith(panoramaTour: tour));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('הסיור נשמר לנכס ✓'),
+        duration: Duration(milliseconds: 2200),
+      ));
+    }
   }
 
   /// Records the in-app contact (like → match/chat) as a funnel + timing
@@ -2923,7 +2953,9 @@ class _BottomBar extends StatelessWidget {
                               ? 'סיור תלת־ממדי'
                               : isProcessing
                                   ? 'סריקה בהכנה'
-                                  : 'בקש סיור תלת־ממדי',
+                                  : (isLandlordPreview
+                                      ? 'העלה סיור 360°'
+                                      : 'בקש סיור תלת־ממדי'),
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         style: FilledButton.styleFrom(

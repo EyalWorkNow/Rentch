@@ -2,7 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// ───────────────────────────────────────────────────────────────────────────
-/// Erik design system — the single source of truth for the "אריק" assistant.
+/// Erik design system — the single source of truth for the "עזרא" assistant.
 ///
 /// This is a deliberately small, cohesive token layer so the whole feature
 /// (text chat + the premium voice-call) feels like one designed object. Spacing,

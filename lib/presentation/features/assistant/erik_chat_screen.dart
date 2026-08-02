@@ -18,7 +18,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// "אריק" — the landlord's personal assistant, as a full CHAT surface designed
+/// "עזרא" — the landlord's personal assistant, as a full CHAT surface designed
 /// to look EXACTLY like the tenant assistant אתי: the same light `cloud`
 /// canvas, white/teal message bubbles (18/4-tail radius), typing indicator,
 /// staggered quick-reply chips, and floating rounded input bar. The heavy
@@ -61,10 +61,10 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
 
   String get _storeKey => 'erik_transcript_$_uid';
 
-  static const _botName = 'אריק';
+  static const _botName = 'עזרא';
 
   static const _greeting =
-      'שלום, נעים מאוד. קוראים לי אריק ואני כאן כדי לעזור לך.\n'
+      'שלום, נעים מאוד. קוראים לי עזרא ואני כאן כדי לעזור לך.\n'
       'אפשר לספר לי על דירה שתרצה להשכיר ואבנה לך מודעה, לעזור לנסח תיאור, '
       'לתמחר, או פשוט לענות על שאלות. מה שנוח לך — לכתוב או לדבר.';
 
@@ -535,7 +535,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
               onPressed: () {
                 HapticFeedback.selectionClick();
                 setState(() => _speakReplies = !_speakReplies);
-                _snack(_speakReplies ? 'אריק יקריא את התשובות' : 'הקראה כבויה');
+                _snack(_speakReplies ? 'עזרא יקריא את התשובות' : 'הקראה כבויה');
               },
             ),
             IconButton(

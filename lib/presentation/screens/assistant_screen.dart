@@ -39,7 +39,7 @@ Color get _kUserSurface => ErikTokens.userSurface; // solid accent (user bubble)
 Color get _kAccent => ErikTokens.accent; // teal / black per role
 Color get _kAccent2 => ErikTokens.accentGlow; // luminous accent for glow
 
-/// "אריק" — a premium, VOICE-FIRST concierge for landlords, rebuilt around a
+/// "עזרא" — a premium, VOICE-FIRST concierge for landlords, rebuilt around a
 /// single glowing orb (Siri / ChatGPT-voice style). One big living orb in the
 /// centre is the whole interface: tap it to start talking; a short status line
 /// and live waveform sit under it; Erik's latest reply appears as minimal text;
@@ -86,7 +86,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   late final Animation<Offset> _uploadPanelOffset;
 
   static const _greeting =
-      'שלום, נעים מאוד. קוראים לי אריק ואני כאן כדי לעזור לך.\n'
+      'שלום, נעים מאוד. קוראים לי עזרא ואני כאן כדי לעזור לך.\n'
       'ספר לי בבקשה בכמה מילים על הדירה שאתה רוצה להשכיר — איפה היא, כמה חדרים, '
       'וכל מה שבא לך לספר. מתוך מה שתספר אני כבר אבין הרבה, ואשאל רק על מה שחסר.\n'
       'אפשר לדבר איתי או לכתוב, איך שנוח לך.';
@@ -109,10 +109,10 @@ class _AssistantScreenState extends State<AssistantScreen>
   /// The short status line under the orb, derived from the real state.
   String get _statusLine {
     if (_thinking) return 'חושב...';
-    if (_speaking) return 'אריק מדבר...';
+    if (_speaking) return 'עזרא מדבר...';
     if (_listening) return 'מקשיב לך...';
     if (_conversationMode) return 'מקשיב לך...';
-    return 'שלום, אני אריק';
+    return 'שלום, אני עזרא';
   }
 
   /// Erik's latest reply text (minimal) — the last committed assistant turn.
@@ -170,7 +170,7 @@ class _AssistantScreenState extends State<AssistantScreen>
       curve: Curves.easeOutBack,
     ));
 
-    _service.ttsVoice = 'onyx'; // אריק — a natural male voice (אתי stays 'coral')
+    _service.ttsVoice = 'onyx'; // עזרא — a natural male voice (אתי stays 'coral')
     _loadTranscript();
 
     // Hands-free by default: the voice conversation starts on its own so the
@@ -738,7 +738,7 @@ class _AssistantScreenState extends State<AssistantScreen>
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('אריק',
+                  Text('עזרא',
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 17,
@@ -1210,7 +1210,7 @@ class _AssistantScreenState extends State<AssistantScreen>
                     _OptionTile(
                       icon: IconsaxPlusBold.house_2,
                       label: 'פרסם את טיוטת הדירה',
-                      subtitle: 'אריק כבר בנה טיוטה — אפשר לפרסם',
+                      subtitle: 'עזרא כבר בנה טיוטה — אפשר לפרסם',
                       onTap: () {
                         Navigator.pop(ctx);
                         _showDraftSheet(_draft!);
@@ -1234,8 +1234,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                         : IconsaxPlusBold.volume_high,
                     label: _voiceReplies ? 'השתק קול' : 'הפעל קול',
                     subtitle: _voiceReplies
-                        ? 'אריק לא ידבר בקול'
-                        : 'אריק ידבר את תשובותיו בקול',
+                        ? 'עזרא לא ידבר בקול'
+                        : 'עזרא ידבר את תשובותיו בקול',
                     onTap: () async {
                       Navigator.pop(ctx);
                       if (_voiceReplies) await _service.stopSpeaking();

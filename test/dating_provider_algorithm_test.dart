@@ -727,7 +727,7 @@ void main() {
 
     expect(tester.takeException(), isNull,
         reason: 'the chat surface must lay out without a crash');
-    expect(find.text('אריק · העוזר האישי'), findsOneWidget,
+    expect(find.text('עזרא · העוזר האישי'), findsOneWidget,
         reason: 'the identity header must render');
     expect(find.text('אני רוצה לפרסם דירה חדשה'), findsOneWidget,
         reason: 'starter chips must render on the welcome state');

@@ -53,7 +53,7 @@ class ErikOrbStage extends StatelessWidget {
   /// True while a voice conversation is active (live OR hands-free / mic on).
   final bool callActive;
 
-  /// Short status line under the orb ("מקשיב לך…", "חושב…", "אריק מדבר…", …).
+  /// Short status line under the orb ("מקשיב לך…", "חושב…", "עזרא מדבר…", …).
   final String statusLine;
 
   /// Erik's latest short reply (surfaced as minimal text, not a full log).
@@ -210,7 +210,7 @@ class ErikOrbStage extends StatelessWidget {
         ? 'מתחבר...'
         : live
             ? 'מקשיב — דבר חופשי'
-            : 'אריק · מוכן לשיחה';
+            : 'עזרא · מוכן לשיחה';
     final dotColor = live ? ErikTokens.online : ErikTokens.muted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -251,7 +251,7 @@ class ErikOrbStage extends StatelessWidget {
             : state == ErikState.thinking
                 ? '...'
                 : state == ErikState.speaking
-                    ? 'אריק עונה לך...'
+                    ? 'עזרא עונה לך...'
                     : 'אני מקשיב — דבר חופשי על הדירה.';
 
     return SingleChildScrollView(
@@ -381,7 +381,7 @@ class ErikTextComposer extends StatelessWidget {
                 Row(
                   children: [
                     const Text(
-                      'כתוב לאריק',
+                      'כתוב לעזרא',
                       style: TextStyle(
                         color: ErikTokens.ink,
                         fontSize: 16,

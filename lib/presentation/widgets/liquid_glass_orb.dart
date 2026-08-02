@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 /// Shared liquid-glass orb — the AI presence for both אתי (tenant search) and
-/// אריק (landlord). A frosted glass dome with heavy-blurred colour balls beneath
+/// עזרא (landlord). A frosted glass dome with heavy-blurred colour balls beneath
 /// it (refraction / dispersion / frost / depth via `shaders/liquid_glass.frag`).
 /// Self-contained: loads the shader, drives its own clock, clips to the circle.
 ///

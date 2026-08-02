@@ -39,6 +39,7 @@ class PropertyLike {
     this.petType,
     this.hostsGuests,
     this.playsInstrument,
+    this.urgency,
   });
 
   final String propertyId;
@@ -93,6 +94,11 @@ class PropertyLike {
   final String? petType;
   final bool? hostsGuests;
   final bool? playsInstrument;
+
+  /// The tenant's search urgency at like-time (kUrgencyOptions token:
+  /// now/soon/browsing) → lets the landlord see intent: actively looking vs just
+  /// browsing. Null for old likes / when the tenant didn't set it.
+  final String? urgency;
 
   bool get hasIntro =>
       introMessage.isNotEmpty ||
@@ -167,6 +173,7 @@ class PropertyLike {
       petType: _str(row['petType']),
       hostsGuests: _bool(row['hostsGuests']),
       playsInstrument: _bool(row['playsInstrument']),
+      urgency: _str(row['urgency']),
     );
   }
 }
@@ -235,6 +242,7 @@ class PropertyLikesRepository {
     String? petType,
     bool? hostsGuests,
     bool? playsInstrument,
+    String? urgency,
   }) async {
     if (!isConfigured || propertyId.isEmpty || tenantId.isEmpty) return;
     try {
@@ -275,6 +283,7 @@ class PropertyLikesRepository {
           petType: petType,
           hostsGuests: hostsGuests,
           playsInstrument: playsInstrument,
+          urgency: urgency,
         ),
       );
     } catch (e) {
@@ -322,6 +331,7 @@ class PropertyLikesRepository {
     String? petType,
     bool? hostsGuests,
     bool? playsInstrument,
+    String? urgency,
   }) {
     final note = introMessage.trim();
     final clampedNote = note.length > introMessageMaxLength
@@ -370,6 +380,7 @@ class PropertyLikesRepository {
       if (petType != null && petType.trim().isNotEmpty) 'petType': petType.trim(),
       if (hostsGuests != null) 'hostsGuests': hostsGuests,
       if (playsInstrument != null) 'playsInstrument': playsInstrument,
+      if (urgency != null && urgency.trim().isNotEmpty) 'urgency': urgency.trim(),
       'createdAt': (at ?? DateTime.now()).toUtc().toIso8601String(),
     };
   }

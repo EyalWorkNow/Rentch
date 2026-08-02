@@ -237,7 +237,7 @@ class AssistantService {
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer();
 
-  /// OpenAI TTS voice — 'coral' (warm female) for אתי, 'onyx' (male) for אריק.
+  /// OpenAI TTS voice — 'coral' (warm female) for אתי, 'onyx' (male) for עזרא.
   String ttsVoice = 'coral';
 
   bool _speechReady = false;
@@ -444,10 +444,12 @@ class AssistantService {
     }
     _onSpeechStatus = onStatus;
     await _speech.listen(
-      // Hands-free turn-taking: auto-finalise after ~2s of silence — the user
-      // asked for at most a 2s gap before אתי responds. listenFor caps one turn.
-      pauseFor: const Duration(seconds: 2),
-      listenFor: const Duration(seconds: 45),
+      // Hands-free turn-taking: LISTEN more, talk less — wait ~3.5s of silence
+      // before finalising so the assistant doesn't cut the user off mid-thought
+      // (older landlords speak in slower, pausier sentences). listenFor caps one
+      // turn.
+      pauseFor: const Duration(milliseconds: 3500),
+      listenFor: const Duration(seconds: 60),
       listenOptions: stt.SpeechListenOptions(
         localeId: 'he_IL',
         partialResults: true,

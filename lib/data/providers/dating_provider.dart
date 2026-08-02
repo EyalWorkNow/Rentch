@@ -2609,7 +2609,10 @@ class DatingProvider extends ChangeNotifier {
     _isGuestMode = false;
     _hasActiveSession = true;
     if (explicit) _roleExplicitlyChosen = true;
-    await _refreshRemoteCatalogAfterAuth();
+    // Don't block the login → home transition on a full catalog re-fetch. The
+    // startup already loaded the feed; refresh it in the BACKGROUND (it calls
+    // notifyListeners when it lands) so sign-in feels instant.
+    unawaited(_refreshRemoteCatalogAfterAuth());
     await _persist();
     AppEvents.instance.log(UserEventType.roleChanged, metadata: {'role': role});
     notifyListeners();
@@ -2659,7 +2662,9 @@ class DatingProvider extends ChangeNotifier {
 
     _isRefreshingRemoteCatalog = true;
     try {
-      await _firebaseAuthOrNull?.currentUser?.getIdToken(true);
+      // Sign-in just minted a fresh token — use it (getIdToken() returns the
+      // cached one), don't force a redundant network refresh that delays login.
+      await _firebaseAuthOrNull?.currentUser?.getIdToken();
       AppCache.instance.propertyPages.clear();
 
       final firstPage = await _rentalDataService.loadFirstPage(
@@ -3672,6 +3677,7 @@ class DatingProvider extends ChangeNotifier {
           petType: tp?.petType,
           hostsGuests: tp?.hostsGuests,
           playsInstrument: tp?.playsInstrument,
+          urgency: tp?.urgency,
           workLat: tp?.workLat,
           workLon: tp?.workLon,
           // No explicit tenant "verified" flag exists; derive it from the app's
