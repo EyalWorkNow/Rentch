@@ -63,7 +63,7 @@ class _AppIntroState extends State<AppIntro> {
           icon: IconsaxPlusBold.building,
           title: 'גלה דירות בהחלקה',
           body:
-              'דפדפו בין דירות שמתאימות לכם. החליקו ימינה כדי לאהוב, שמאלה כדי לדלג — בדיוק כמו שאתם מכירים.',
+              'החליקו ימינה 👍 כדי לשמור דירה שאהבתם, שמאלה 👎 כדי לדלג. אפשר גם לחפש דרך אתי (חיפוש חכם), בגלריה או במפה.',
           accent: AppColors.primary,
         ),
         _IntroPage(

@@ -104,6 +104,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onTabTap(int index, DatingProvider provider) {
     HapticFeedback.selectionClick();
     provider.setTabIndex(index);
+    // Tapping the apartment-search tab always lands on the swipe deck (not the
+    // grid/map the user may have left it on).
+    if (index == 0) {
+      provider.requestDiscoverSwipes();
+    }
     // Merged "לקוחות" tab (landlord) and "התאמות" tab (tenant) both live at
     // index 1, so opening index 1 marks conversations seen for either role.
     if (index == 1) {
@@ -270,6 +275,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 final isEtti = item.isAssistant;
                                 final showBadge =
                                     index == 1 && unseenCount > 0;
+                                // Profile tab: a progress ring around the circle
+                                // showing how complete the tenant's profile is.
+                                final profilePct = provider.profileCompletion;
+                                final showCompletionRing = index == 3 &&
+                                    !isLandlord &&
+                                    profilePct > 0 &&
+                                    profilePct < 100;
                                 final isCompact = items.length >= 5;
                                 final isNotDiscover = safeIndex != 0;
                                 final double baseCircle = isCompact
@@ -284,7 +296,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   key: Key('nav_tab_$index'),
                                   onTap: () => _onTabTap(index, provider),
                                   scaleDownTo: 0.90,
-                                  child: AnimatedContainer(
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                  AnimatedContainer(
                                     duration: const Duration(milliseconds: 250),
                                     curve: Curves.easeOutCubic,
                                     width: circleSize,
@@ -398,6 +414,53 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                   ),
+                                  // Profile-completion ring hugging the circle.
+                                  if (showCompletionRing)
+                                    IgnorePointer(
+                                      child: SizedBox(
+                                        width: circleSize + 6,
+                                        height: circleSize + 6,
+                                        child: CircularProgressIndicator(
+                                          value: profilePct / 100.0,
+                                          strokeWidth: 2.6,
+                                          backgroundColor:
+                                              AppColors.ink.withValues(alpha: 0.25),
+                                          valueColor:
+                                              const AlwaysStoppedAnimation(
+                                                  AppColors.superLike),
+                                        ),
+                                      ),
+                                    ),
+                                  // Small "AI" marker on אתי's tab.
+                                  if (isEtti)
+                                    Positioned(
+                                      top: -2,
+                                      right: -2,
+                                      child: IgnorePointer(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                                color: Colors.white, width: 1.2),
+                                          ),
+                                          child: const Text(
+                                            'AI',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    ],
+                                  ),
                                 );
                               }),
                             ),
@@ -418,9 +481,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
 const _tenantItems = [
   _NavItem(
-    label: 'גלה דירות',
-    icon: IconsaxPlusLinear.building,
-    activeIcon: IconsaxPlusLinear.building,
+    label: 'חיפוש דירה',
+    icon: IconsaxPlusLinear.search_normal,
+    activeIcon: IconsaxPlusLinear.search_normal,
   ),
   _NavItem(
     label: 'התאמות',

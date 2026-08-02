@@ -14,6 +14,7 @@
 // sub-scores, it renders nothing (SizedBox.shrink) so the screen degrades cleanly.
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/govdata/gov_sources.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 
@@ -31,6 +32,29 @@ class NeighborhoodScoreCard extends StatelessWidget {
     'transit': 'תחבורה',
     'green': 'ירוק',
   };
+
+  /// Each sub-score → its honest data source, so the breakdown can show WHERE the
+  /// figure came from. Reuses the shared GovSources registry where a matching
+  /// gov dimension exists.
+  static GovSource? _sourceFor(String key) {
+    switch (key) {
+      case 'safety':
+        return GovSources.forDimension('safety');
+      case 'schools':
+        return GovSources.forDimension('schools');
+      case 'transit':
+        return GovSources.forDimension('transit');
+      case 'walkability':
+        return GovSources.forDimension('convenience');
+      case 'green':
+        return const GovSource(
+          agency: 'OpenStreetMap / data.gov.il',
+          dataset: 'פארקים ושטחים ירוקים',
+        );
+      default:
+        return null;
+    }
+  }
 
   static Map<String, dynamic>? _scoreMap(Map<String, dynamic>? raw) {
     if (raw == null) return null;
@@ -80,57 +104,269 @@ class NeighborhoodScoreCard extends StatelessWidget {
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showBreakdown(context, headlineInt, topSubs),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.slate200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(IconsaxPlusLinear.location,
-                    size: 20, color: AppColors.primary),
-                const SizedBox(width: 8),
-                const Text(
-                  'ציון השכונה',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.ink,
-                  ),
+          child: Ink(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.slate200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-                const Spacer(),
-                if (headlineInt != null) _HeadlineBadge(score: headlineInt),
               ],
             ),
-            if (chips.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final c in chips)
-                    _SubScoreChip(
-                      label: _subLabels[c.key] ?? c.key,
-                      value: c.value,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(IconsaxPlusLinear.location,
+                        size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'ציון השכונה',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.ink,
+                      ),
                     ),
+                    const Spacer(),
+                    if (headlineInt != null) _HeadlineBadge(score: headlineInt),
+                  ],
+                ),
+                if (chips.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in chips)
+                        _SubScoreChip(
+                          label: _subLabels[c.key] ?? c.key,
+                          value: c.value,
+                        ),
+                    ],
+                  ),
                 ],
-              ),
-            ],
-          ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(IconsaxPlusLinear.info_circle,
+                        size: 14, color: AppColors.primary),
+                    const SizedBox(width: 5),
+                    Text(
+                      'הצג פירוט ומקורות',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(Icons.keyboard_arrow_left_rounded,
+                        size: 18, color: AppColors.primary),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  void _showBreakdown(
+      BuildContext context, int? headline, List<MapEntry<String, int>> subs) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _NeighborhoodBreakdownSheet(
+        headline: headline,
+        subs: subs,
+        labels: _subLabels,
+        sourceFor: _sourceFor,
+      ),
+    );
+  }
+}
+
+/// The tap-through breakdown: every sub-score as a labeled bar + the honest data
+/// source behind it, so "ציון השכונה" is transparent instead of a mystery number.
+class _NeighborhoodBreakdownSheet extends StatelessWidget {
+  const _NeighborhoodBreakdownSheet({
+    required this.headline,
+    required this.subs,
+    required this.labels,
+    required this.sourceFor,
+  });
+
+  final int? headline;
+  final List<MapEntry<String, int>> subs;
+  final Map<String, String> labels;
+  final GovSource? Function(String key) sourceFor;
+
+  Color _barColor(int v) {
+    if (v >= 80) return AppColors.scoreStrong;
+    if (v >= 60) return AppColors.scoreGood;
+    if (v >= 40) return AppColors.scoreMixed;
+    return AppColors.slate400;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Sources actually cited (deduped by label) for the footer.
+    final sources = <String>[];
+    for (final s in subs) {
+      final src = sourceFor(s.key)?.label;
+      if (src != null && !sources.contains(src)) sources.add(src);
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate200,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(IconsaxPlusLinear.location,
+                        size: 22, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    const Text('ציון השכונה',
+                        style: TextStyle(
+                            fontSize: 19, fontWeight: FontWeight.w900)),
+                    const Spacer(),
+                    if (headline != null) _HeadlineBadge(score: headline!),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'הציון הכולל הוא ממוצע משוקלל של הפרמטרים הבאים, המחושבים מנתונים ציבוריים ונקודות עניין באזור.',
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 18),
+                if (subs.isEmpty)
+                  Text('אין עדיין פירוט זמין לאזור זה.',
+                      style: TextStyle(color: AppColors.textSecondary))
+                else
+                  for (final s in subs) ...[
+                    _BreakdownRow(
+                      label: labels[s.key] ?? s.key,
+                      value: s.value,
+                      color: _barColor(s.value),
+                      source: sourceFor(s.key)?.dataset,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                if (sources.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  const Divider(color: AppColors.divider, height: 1),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(IconsaxPlusLinear.document_text,
+                          size: 16, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      const Text('מקורות הנתונים',
+                          style: TextStyle(
+                              fontSize: 13.5, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  for (final src in sources)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text('• $src',
+                          style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12.5,
+                              height: 1.4)),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  const _BreakdownRow({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.source,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+  final String? source;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 14.5, fontWeight: FontWeight.w800)),
+            const Spacer(),
+            Text('$value',
+                style: TextStyle(
+                    fontSize: 14.5, fontWeight: FontWeight.w900, color: color)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: value / 100.0,
+            minHeight: 7,
+            backgroundColor: AppColors.slate100,
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+        if (source != null) ...[
+          const SizedBox(height: 5),
+          Text(source!,
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+        ],
+      ],
     );
   }
 }

@@ -3736,7 +3736,7 @@ class _WelcomePortal extends StatelessWidget {
                     // Landlord Button (Obsidian Glassmorphism + Luxury Badge)
                     Expanded(
                       child: _InteractiveRoleButton(
-                        label: 'בעל דירה',
+                        label: 'מפרסם דירה',
                         icon: IconsaxPlusLinear.building,
                         isPrimary: false,
                         onTap: onLandlordCta,

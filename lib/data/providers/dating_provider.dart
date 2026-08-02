@@ -4147,6 +4147,15 @@ class DatingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Bumped when the user taps the apartment-search tab, so DiscoverScreen resets
+  /// to the swipe deck (instead of whatever view — grid/map — it was left on).
+  int _discoverSwipesSignal = 0;
+  int get discoverSwipesSignal => _discoverSwipesSignal;
+  void requestDiscoverSwipes() {
+    _discoverSwipesSignal++;
+    notifyListeners();
+  }
+
   void _processAutoLikes() {
     final leads = ownerLeads;
     if (leads.isEmpty) return;

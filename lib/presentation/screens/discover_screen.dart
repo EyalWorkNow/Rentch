@@ -49,6 +49,7 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen>
     with WidgetsBindingObserver {
   DiscoverTab _selectedTab = DiscoverTab.forYou;
+  int _lastSwipesSignal = 0;
 
   // ── Natural-language search (the hero bar) ────────────────────────────────
   // Reuses the existing extract→search pipeline: server Gemini extract +
@@ -456,6 +457,18 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         final properties = provider.filteredProperties;
         // Stable deck the swiper advances (rebuilt only on structural changes).
         final deck = _deckFor(provider);
+
+        // Tapping the navbar search tab bumps this signal → snap back to the
+        // swipe deck from whatever view (grid/map) the user left it on.
+        final swipesSignal = provider.discoverSwipesSignal;
+        if (swipesSignal != _lastSwipesSignal) {
+          _lastSwipesSignal = swipesSignal;
+          if (_selectedTab != DiscoverTab.forYou) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() => _selectedTab = DiscoverTab.forYou);
+            });
+          }
+        }
 
         return Scaffold(
           appBar: null,
@@ -6437,8 +6450,8 @@ class _PillSelectorState extends State<_PillSelector> {
                                 width: discW,
                                 child: _segment(
                                   tab: DiscoverTab.discover,
-                                  icon: IconsaxPlusLinear.location,
-                                  label: 'גלה',
+                                  icon: IconsaxPlusLinear.gallery,
+                                  label: 'גלריה',
                                   isSelected: isDiscover,
                                 ),
                               ),

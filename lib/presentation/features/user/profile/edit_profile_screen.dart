@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/core/services/assistant_service.dart';
+import 'package:dating_app/core/search/smart_search.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
@@ -101,6 +103,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   final _storageService = StorageService();
   final _picker = ImagePicker();
+  final AssistantService _assistant = AssistantService();
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bioCtrl;
@@ -486,6 +489,153 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  // ─── Voice fill ─────────────────────────────────────────────────────────────
+
+  // The user speaks freely about themselves; on-device speech-to-text produces a
+  // transcript, and SmartSearch (the same on-device parser אתי uses) pulls out
+  // budget/rooms while the full text becomes their bio. No fields are overwritten
+  // silently without the user seeing the result — the sheet shows the transcript
+  // live and the applied fields land in the visible form.
+  Future<void> _startVoiceFill() async {
+    final ok = await _assistant.initSpeech();
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('לא ניתן לגשת למיקרופון להקלטה'),
+      ));
+      return;
+    }
+    var transcript = '';
+    var listening = true;
+    var started = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) {
+          Future<void> finish() async {
+            if (!listening) return;
+            listening = false;
+            await _assistant.stopListening();
+            if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+            if (transcript.trim().isNotEmpty) _applyVoiceFill(transcript);
+          }
+
+          // Kick off listening exactly once.
+          if (!started) {
+            started = true;
+            _assistant.startListening(
+              onResult: (text, isFinal) {
+                transcript = text;
+                if (sheetCtx.mounted) setSheet(() {});
+                if (isFinal) finish();
+              },
+              onStatus: (s) {
+                if ((s == 'done' || s == 'notListening') && listening) finish();
+              },
+            );
+          }
+
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(IconsaxPlusBold.microphone_2,
+                          color: AppColors.primary, size: 34),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('ספרו לי על עצמכם',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'למשל: "אני זוג צעיר, תקציב עד 6000, מחפשים 3 חדרים".',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(minHeight: 60),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        transcript.isEmpty ? 'מקשיב…' : transcript,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: transcript.isEmpty
+                              ? AppColors.textSecondary
+                              : AppColors.navy,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: finish,
+                        child: const Text('סיימתי',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _applyVoiceFill(String transcript) {
+    final q = SmartSearch.parse(transcript);
+    final filled = <String>[];
+    setState(() {
+      // Bio: their own words (append if they already wrote something).
+      final existing = _bioCtrl.text.trim();
+      _bioCtrl.text =
+          existing.isEmpty ? transcript.trim() : '$existing\n${transcript.trim()}';
+      filled.add('תיאור');
+      if (q.maxPrice != null && q.maxPrice! > 0) {
+        _budget = q.maxPrice!;
+        filled.add('תקציב');
+      }
+      final rooms = q.minRooms ?? q.maxRooms;
+      if (rooms != null && rooms > 0) {
+        _rooms = rooms;
+        filled.add('חדרים');
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('מולא אוטומטית: ${filled.join(" · ")}'),
+      duration: const Duration(milliseconds: 2200),
+    ));
+  }
+
   // ─── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -564,6 +714,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 8),
+
+                    // Voice fill — the tenant speaks about themselves and the AI
+                    // fills the fields (budget/rooms/bio). Tenant profile only.
+                    if (!isLandlord) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                        child: _VoiceFillButton(onTap: _startVoiceFill),
+                      ),
+                    ],
 
                     // 1. Personal details
                     _FormSection(
@@ -2643,6 +2802,63 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "מילוי קולי" — a tappable banner that offers to fill the profile by voice.
+class _VoiceFillButton extends StatelessWidget {
+  const _VoiceFillButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(IconsaxPlusBold.microphone_2,
+                    color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('מילוי מהיר בהקלטה',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14.5)),
+                    SizedBox(height: 2),
+                    Text('ספרו על עצמכם ואמלא את הפרטים אוטומטית',
+                        style: TextStyle(
+                            color: AppColors.textSecondary, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_left_rounded,
+                  color: AppColors.primary),
+            ],
+          ),
         ),
       ),
     );

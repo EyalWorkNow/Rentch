@@ -29,27 +29,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late final PageController _pageController;
   int _page = 0;
 
+  // One focused screen — the whole product in a single coherent message instead
+  // of three separate intro slides.
   static const _slides = [
     _OnboardingSlide(
       imageUrl:
           'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=85',
-      title: 'למצוא נכס שמתאים באמת',
+      title: 'הדירה שלך מחכה כאן',
       body:
-          'חיפוש חכם לפי תקציב, אזור, מאפיינים וסגנון חיים, כדי להגיע מהר לדירות שרלוונטיות לך.',
-    ),
-    _OnboardingSlide(
-      imageUrl:
-          'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85',
-      title: 'לפרסם דירה בצורה פשוטה',
-      body:
-          'בעלי נכסים יכולים להעלות דירה, לנהל פרטים ותמונות, ולקבל מועמדים שמתאימים למה שהם מחפשים.',
-    ),
-    _OnboardingSlide(
-      imageUrl:
-          'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=85',
-      title: 'לנהל התאמות ושיחות במקום אחד',
-      body:
-          'מעקב אחר התאמות, הודעות, ביקורות ושלבים חשובים בתהליך, בלי לקפוץ בין אפליקציות.',
+          'חיפוש חכם לפי מה שבאמת חשוב לך — תקציב, אזור וסגנון חיים. פרסום דירה בכמה נגיעות, וכל ההתאמות והשיחות במקום אחד.',
     ),
   ];
 
@@ -232,11 +220,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      _PageDots(
-                        count: _slides.length,
-                        activeIndex: _page,
-                      ),
-                      const SizedBox(height: 32),
+                      if (_slides.length > 1) ...[
+                        _PageDots(
+                          count: _slides.length,
+                          activeIndex: _page,
+                        ),
+                        const SizedBox(height: 32),
+                      ] else
+                        const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(999),
                         child: BackdropFilter(

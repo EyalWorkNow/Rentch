@@ -18,6 +18,7 @@ import 'package:dating_app/core/services/event_service.dart';
 import 'package:dating_app/core/services/recommendation_explainer.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/repositories/property_search_repository.dart';
+import 'package:dating_app/data/repositories/search_history_repository.dart';
 import 'package:dating_app/core/search/etti_plan.dart';
 import 'package:dating_app/core/search/search_intent.dart';
 import 'package:dating_app/core/services/aws_client.dart';
@@ -80,6 +81,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
 
   final _service = AssistantService();
   final _repo = PropertySearchRepository();
+  final _history = SearchHistoryRepository();
   final _input = TextEditingController();
   final _scroll = ScrollController();
 
@@ -168,6 +170,79 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
             'במילים שלך, ואני אדאג לשאר. 🙂',
         chips: _starterChips,
       );
+
+  // "חיפושים אחרונים" — a compact sheet of the user's recent queries. Tapping
+  // one starts a fresh conversation seeded with that query so it re-runs.
+  Future<void> _showSearchHistory() async {
+    final items = await _history.load();
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('אין עדיין חיפושים קודמים'),
+        duration: Duration(milliseconds: 1800),
+      ));
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(
+                  children: [
+                    const Icon(IconsaxPlusLinear.clock, size: 20),
+                    const SizedBox(width: 8),
+                    const Text('חיפושים אחרונים',
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        await _history.clear();
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      child: Text('נקה',
+                          style: TextStyle(color: AppColors.textSecondary)),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: AppColors.divider),
+                  itemBuilder: (_, i) => ListTile(
+                    leading: Icon(IconsaxPlusLinear.search_normal_1,
+                        size: 20, color: AppColors.primary),
+                    title: Text(items[i],
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _resetConversation();
+                      _send(items[i]);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   void _resetConversation() {
     setState(() {
@@ -1125,6 +1200,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       _input.clear();
       _busy = true;
     });
+    // Remember this query so it can be offered under "חיפושים אחרונים".
+    unawaited(_history.add(text));
     _scrollToEnd();
 
     // If the user referred to their own area ("אזור שלי" / "פה"), אתי will RAISE a
@@ -2251,7 +2328,7 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$_botName · העוזרת החכמה',
+                Text(_botName,
                     style: TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.bold,
@@ -2263,14 +2340,24 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
                       decoration: const BoxDecoration(
                           color: AppColors.success, shape: BoxShape.circle)),
                   const SizedBox(width: 5),
-                  Text('כאן בשבילך',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11)),
+                  Flexible(
+                    child: Text('תבדוק אותי אם אני באמת עוזרת חכמה',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: AppColors.textSecondary, fontSize: 11)),
+                  ),
                 ]),
               ],
             ),
           ]),
           actions: [
+            IconButton(
+              tooltip: 'חיפושים אחרונים',
+              icon: Icon(IconsaxPlusLinear.clock,
+                  color: AppColors.textSecondary, size: 22),
+              onPressed: _showSearchHistory,
+            ),
             IconButton(
               tooltip: 'שיחה חדשה',
               icon: Icon(IconsaxPlusLinear.refresh_2,
