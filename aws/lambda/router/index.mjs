@@ -1020,7 +1020,12 @@ function keysFor(tags, map) {
 //
 // Only fields verified to exist in the data model are stamped, to avoid breaking
 // GSI filters: properties.ownerUserId, messages.senderId, users.id (== uid).
-const OWNED_TABLES = new Set(['properties', 'messages', 'users', 'persona']);
+const OWNED_TABLES = new Set([
+  'properties', 'messages', 'users', 'persona',
+  // Likes/matches carry tenant PII and drive push — writes must be authenticated
+  // and identity-stamped so a caller can't forge a lead or spoof a match.
+  'property_likes', 'matches',
+]);
 
 function callerUidOf(event) {
   return event.requestContext?.authorizer?.uid || null;
@@ -1047,6 +1052,9 @@ function stampOwner(tableKey, body, uid) {
   if (tableKey === 'properties') body.ownerUserId = uid;
   else if (tableKey === 'messages') body.senderId = uid;
   else if (tableKey === 'users') body.id = uid;
+  // The liker IS the caller; the landlord accepting IS the caller.
+  else if (tableKey === 'property_likes') body.tenantId = uid;
+  else if (tableKey === 'matches') body.landlordUid = uid;
 }
 
 const json = (status, body) => ({
@@ -1571,7 +1579,28 @@ export const handler = async (event) => {
           }
           return await countItems(table, query);
         }
-        if (id) return await getOne(table, id);
+        if (id) {
+          // Likes/matches have GUESSABLE ids (like_<pid>_<tenant>,
+          // match-<pid>~<tenant>). getOne would otherwise hand the full row —
+          // tenant income/age/work-coords for a like, the match graph for a
+          // match — to anyone who can construct the id. Gate to members; return
+          // 404 (not 403) so existence itself isn't confirmed.
+          if (tableKey === 'matches') {
+            if (!(await isThreadMember(id, callerUid))) return json(404, {});
+          }
+          if (tableKey === 'property_likes') {
+            const r = await ddb.send(
+              new GetCommand({ TableName: table.name, Key: { id } }));
+            const it = r.Item;
+            if (!it) return json(404, {});
+            const ok = !!callerUid && (
+              it.tenantId === callerUid ||
+              (it.ownerUserId && it.ownerUserId === callerUid) ||
+              (await isOwnerOf(it.propertyId, callerUid)));
+            return ok ? json(200, it) : json(404, {});
+          }
+          return await getOne(table, id);
+        }
         // Chat history is private: only the property owner (landlord) or someone
         // who has already posted in the thread may read it. Non-members get an
         // empty thread (not an error) so the UI degrades gracefully and a new
@@ -1589,6 +1618,19 @@ export const handler = async (event) => {
           const pid = query.propertyId;
           if (!pid) return json(400, { message: 'propertyId required' });
           if (!callerUid || !(await isOwnerOf(pid, callerUid))) {
+            return json(200, { items: [], hasMore: false, lastKey: null });
+          }
+        }
+        // The match list is private: a caller may only read matches where they
+        // are a party (?tenantUid=me or ?landlordUid=me). Without this, either
+        // filter enumerates the entire two-sided match graph for any uid.
+        if (tableKey === 'matches') {
+          const t = query.tenantUid;
+          const l = query.landlordUid;
+          const mine =
+            (t && callerUid && String(t) === String(callerUid)) ||
+            (l && callerUid && String(l) === String(callerUid));
+          if (!mine) {
             return json(200, { items: [], hasMore: false, lastKey: null });
           }
         }
@@ -1626,6 +1668,13 @@ export const handler = async (event) => {
         }
       case 'POST': {
         stampOwner(tableKey, body, callerUid);
+        // A match is the landlord accepting a liker → the caller must own the
+        // property. Block a definite ownership mismatch (spoofed match / forged
+        // "you have a match" push to a victim).
+        if (tableKey === 'matches' && callerUid && body.propertyId &&
+            !(await ownsOrUnknown(body.propertyId, callerUid))) {
+          return json(403, { message: 'Forbidden' });
+        }
         const writeId = (tableKey === 'users' || tableKey === 'persona')
           ? callerUid
           : (body.id || body.propertyId || body.userId);
@@ -1733,6 +1782,23 @@ async function isOwnerOf(propertyId, uid) {
   } catch (e) {
     console.error('isThreadMember property lookup failed:', e);
     return false;
+  }
+}
+
+// Best-effort ownership check for match creation: block a DEFINITE mismatch
+// (property exists and is owned by someone else) but allow when the property
+// row can't be found/read, so legit flows (e.g. demo/seeded listings) aren't
+// blocked by a lookup miss.
+async function ownsOrUnknown(propertyId, uid) {
+  try {
+    const prop = await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name,
+      Key: { id: propertyId },
+    }));
+    if (!prop.Item) return true;
+    return prop.Item.ownerUserId === uid;
+  } catch {
+    return true;
   }
 }
 

@@ -1833,6 +1833,9 @@ class DatingProvider extends ChangeNotifier {
       _ownerRejectedPropertyIds.length,
       _matches.length,
       _incomingLikesByProperty.length,
+      // Total likers, not just how many properties have likes — otherwise a
+      // SECOND liker arriving on an existing lead wouldn't bust the cache.
+      _incomingLikesByProperty.values.fold<int>(0, (a, b) => a + b.length),
       identityHashCode(_tenantProfile),
       _serverLeadsRevision, // re-sort when server ranking arrives
     );
@@ -1840,14 +1843,18 @@ class DatingProvider extends ChangeNotifier {
     if (cached != null && sig == _ownerLeadsSig) return cached;
 
     final leads = _allProperties.where((property) {
-      final hasIncoming =
-          _incomingLikesByProperty[property.id]?.isNotEmpty ?? false;
-      return _belongsToCurrentLandlord(property) &&
-          // A real tenant liked it (cross-user) OR a locally-seeded demo like.
-          (hasIncoming || _likedPropertyIds.contains(property.id)) &&
-          !_ownerAcceptedPropertyIds.contains(property.id) &&
-          !_ownerRejectedPropertyIds.contains(property.id) &&
-          !_matches.any((match) => match.propertyId == property.id);
+      if (!_belongsToCurrentLandlord(property)) return false;
+      // Real cross-user likes: a lead while ANY liker is still un-actioned.
+      if (_openLikersFor(property).isNotEmpty) return true;
+      // Locally-seeded demo like (no cross-user liker): property-level, as
+      // before — actioned via the empty-tenant key.
+      if (_likedPropertyIds.contains(property.id)) {
+        final demoKey = _ownerActionKey(property.id, '');
+        return !_ownerAcceptedPropertyIds.contains(demoKey) &&
+            !_ownerRejectedPropertyIds.contains(demoKey) &&
+            !_matches.any((match) => match.propertyId == property.id);
+      }
+      return false;
     }).toList();
 
     // Surface the best-fit candidate first. Each lead is a property the
@@ -1883,13 +1890,48 @@ class DatingProvider extends ChangeNotifier {
   static const double _leadTimingWeight = 25; // move-in timing match
   static const double _leadTrustWeight = 15; // existing trust-score signal
 
+  /// Accept/reject is keyed per (property, tenant), NOT per property, so a
+  /// second interested tenant stays actionable and rejecting one candidate never
+  /// blocks the property for future likers. Demo leads (no cross-user liker) use
+  /// an empty tenant → a property-level key.
+  String _ownerActionKey(String propertyId, String tenantId) =>
+      '$propertyId|$tenantId';
+
+  /// Tenant uids that already have a match on [propertyId] — parsed from the
+  /// matchId "match-<propertyId>~<tenantUid>" (RentalMatch carries no uid field).
+  Set<String> _matchedTenantsFor(String propertyId) {
+    final out = <String>{};
+    for (final m in _matches) {
+      if (m.propertyId != propertyId) continue;
+      final sep = m.id.lastIndexOf('~');
+      if (sep >= 0) out.add(m.id.substring(sep + 1));
+    }
+    return out;
+  }
+
+  /// The likers of [property] the landlord hasn't acted on yet — not accepted,
+  /// not rejected, not already matched. This is what keeps a property a live
+  /// lead while ANY interested tenant is still open.
+  List<PropertyLike> _openLikersFor(RentalProperty property) {
+    final likes = _incomingLikesByProperty[property.id];
+    if (likes == null || likes.isEmpty) return const [];
+    final matched = _matchedTenantsFor(property.id);
+    return likes.where((l) {
+      final k = _ownerActionKey(property.id, l.tenantId);
+      return !_ownerAcceptedPropertyIds.contains(k) &&
+          !_ownerRejectedPropertyIds.contains(k) &&
+          !matched.contains(l.tenantId);
+    }).toList();
+  }
+
   /// The representative liker for a property lead — the BEST-fitting interested
   /// tenant (Phase-0: was arbitrarily the first). Prefers the server's two-sided
   /// score when loaded, else a local budget-fit proxy; deterministic tie-break by
-  /// tenantId. Null for a demo lead with no incoming like yet.
+  /// tenantId. Considers only OPEN likers, so after accepting/rejecting one the
+  /// next candidate surfaces. Null for a demo lead with no incoming like yet.
   PropertyLike? _representativeLikerFor(RentalProperty property) {
-    final likes = _incomingLikesByProperty[property.id];
-    if (likes == null || likes.isEmpty) return null;
+    final likes = _openLikersFor(property);
+    if (likes.isEmpty) return null;
     if (likes.length == 1) return likes.first;
     double scoreOf(PropertyLike l) {
       final sv = _serverLeadByKey[_leadKey(property.id, l.tenantId)];
@@ -3895,7 +3937,7 @@ class DatingProvider extends ChangeNotifier {
       if (_isGuestMode && _isGuestDemoProperty(property)) {
         final acceptsDemo = isSuperLike || _autoLikeEnabled;
         if (acceptsDemo) {
-          _ownerAcceptedPropertyIds.add(property.id);
+          _ownerAcceptedPropertyIds.add(_ownerActionKey(property.id, ''));
           _createMatch(property);
         }
       }
@@ -4110,8 +4152,9 @@ class DatingProvider extends ChangeNotifier {
     if (leads.isEmpty) return;
 
     for (final property in leads) {
-      _ownerAcceptedPropertyIds.add(property.id);
-      _createMatch(property, tenantUserId: _acceptedTenantOf(property));
+      final tenantId = _acceptedTenantOf(property) ?? '';
+      _ownerAcceptedPropertyIds.add(_ownerActionKey(property.id, tenantId));
+      _createMatch(property, tenantUserId: tenantId.isEmpty ? null : tenantId);
     }
   }
 
@@ -4142,12 +4185,16 @@ class DatingProvider extends ChangeNotifier {
     if (previousIndex < 0 || previousIndex >= leads.length) return false;
 
     final property = leads[previousIndex];
+    // Key the decision to the SPECIFIC candidate shown (not the whole property),
+    // so other likers on the same property stay actionable.
+    final tenantId = _acceptedTenantOf(property) ?? '';
+    final key = _ownerActionKey(property.id, tenantId);
     if (direction == CardSwiperDirection.left) {
-      _ownerRejectedPropertyIds.add(property.id);
+      _ownerRejectedPropertyIds.add(key);
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
-      _ownerAcceptedPropertyIds.add(property.id);
-      _createMatch(property, tenantUserId: _acceptedTenantOf(property));
+      _ownerAcceptedPropertyIds.add(key);
+      _createMatch(property, tenantUserId: tenantId.isEmpty ? null : tenantId);
     } else {
       return false;
     }
@@ -5708,10 +5755,11 @@ class DatingProvider extends ChangeNotifier {
       'demo-prop-4',
     };
     _passedPropertyIds = <String>{savedProperty.id};
+    // Demo accepts use the empty-tenant (property-level) key format.
     _ownerAcceptedPropertyIds = <String>{
-      'demo-prop-1',
-      'demo-prop-2',
-      'demo-prop-3',
+      'demo-prop-1|',
+      'demo-prop-2|',
+      'demo-prop-3|',
     };
     _ownerRejectedPropertyIds = <String>{};
     _matches = [
