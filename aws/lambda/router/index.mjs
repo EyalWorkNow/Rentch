@@ -6813,15 +6813,12 @@ async function createRealtimeSession(event) {
     return json(503, { message: 'Live voice assistant not configured.' });
   }
 
-  const instructions = [
-    'את "אתי", סוכנת נדל״ן ישראלית — חמה, אנושית, נעימה מאוד ומקצועית מאוד.',
-    'דברי עברית טבעית וזורמת, במשפטים קצרים כמו בשיחת טלפון אמיתית.',
-    'המטרה: להבין מה השוכר צריך כדי שהאפליקציה תדרג לו דירות מול נתוני אמת. לאורך השיחה כסי בעדינות: גיל/שלב חיים, איפה הוא גר היום, איזה אזור/עיר הוא מחפש, מה הכי חשוב לו (must-have), מה הוא אוהב (ים/פארקים/בתי קפה/קהילה), תקציב, ומספר חדרים ואורח חיים (משפחה/סטודנט/זוג, דתי/חילוני, חיות מחמד, חניה, מעלית).',
-    'שאלה אחת בכל פעם — הקשיבי, חדדי, ואל תציפי בשאלות. אל תשאלי כמו טופס; כסי את הדברים טבעי, מהחסר הקריטי ביותר קודם.',
-    'ברגע שיש מספיק פרטים קראי לפונקציה search_listings כדי להציג דירות אמיתיות, ואז הציגי אותן בקצרה בקול.',
-    'אם המשתמש אומר "פה"/"כאן" בלי לציין עיר — בקשי אישור לאתר את המיקום שלו.',
-    'היי אמינה: אל תמציאי דירות — הציגי רק מה שחוזר מ-search_listings.',
-  ].join(' ');
+  // Two personas share the Realtime pipeline: אתי (tenant search) and עזרא
+  // (landlord publish). The client passes mode='landlord' for עזרא.
+  const reqBody = (() => {
+    try { return event.body ? JSON.parse(event.body) : {}; } catch { return {}; }
+  })();
+  const isLandlord = reqBody.mode === 'landlord' || reqBody.mode === 'erik';
 
   const search_listings = {
     type: 'function',
@@ -6849,6 +6846,53 @@ async function createRealtimeSession(event) {
     },
   };
 
+  // עזרא's create_property tool — mirrors the chat tool (incl. transactionType so
+  // sale listings aren't forced into the rental flow).
+  const create_property = {
+    type: 'function',
+    name: 'create_property',
+    description:
+      'יוצר טיוטת מודעת דירה (להשכרה או למכירה לפי transactionType) לאחר שנאספו עיר, מספר חדרים ומחיר, והמשתמש אישר. אל תמציא פרטים.',
+    parameters: {
+      type: 'object',
+      properties: {
+        transactionType: { type: 'string', enum: ['rent', 'sale'], description: 'rent=להשכרה, sale=למכירה' },
+        city: { type: 'string', description: 'עיר' },
+        neighborhood: { type: 'string', description: 'שכונה (אופציונלי)' },
+        street: { type: 'string', description: 'רחוב' },
+        streetNumber: { type: 'string', description: 'מספר בית' },
+        rooms: { type: 'number', description: 'מספר חדרים' },
+        price: { type: 'integer', description: 'מחיר: שכר חודשי (rent) או מחיר כולל (sale)' },
+        sizeM2: { type: 'integer', description: 'גודל במ"ר' },
+        floor: { type: 'integer', description: 'קומה' },
+        condition: { type: 'string', description: 'מצב הדירה' },
+        entryDate: { type: 'string', description: 'תאריך כניסה' },
+        description: { type: 'string', description: 'תיאור קצר' },
+      },
+      required: ['city', 'rooms', 'price'],
+    },
+  };
+
+  const instructions = isLandlord
+    ? [
+        'אתה "עזרא", עוזר אישי ישראלי לבעלי דירות — חם, אנושי, סבלני ומקצועי מאוד, כמו סוכן נדל"ן ותיק.',
+        'דבר עברית טבעית וזורמת במשפטים קצרים, כמו בשיחת טלפון. הקהל הוא בעלי דירות מבוגרים — בלי ז\'רגון ובלי אנגלית.',
+        'המטרה: לעזור לפרסם דירה במהירות. זהה מוקדם אם זו השכרה או מכירה (transactionType). אם לא ברור — שאל במפורש. במכירה המחיר הוא מחיר כולל, בהשכרה שכר חודשי.',
+        'הקשב הרבה, דבר מעט. שאל שאלה אחת מדויקת בכל פעם רק על מה שחסר (עיר, חדרים, מחיר הם החובה; רחוב/קומה/מצב משפרים אך לא חוסמים). אל תחפור ואל תשאל כמו טופס.',
+        'ברגע שיש עיר, חדרים ומחיר — חזור עליהם במשפט קצר, ואם המשתמש אישר קרא מיד ל-create_property עם transactionType. אחרי הפרסום ההוספה של תמונות נעשית באפליקציה.',
+      ].join(' ')
+    : [
+        'את "אתי", סוכנת נדל״ן ישראלית — חמה, אנושית, נעימה מאוד ומקצועית מאוד.',
+        'דברי עברית טבעית וזורמת, במשפטים קצרים כמו בשיחת טלפון אמיתית.',
+        'המטרה: להבין מה השוכר צריך כדי שהאפליקציה תדרג לו דירות מול נתוני אמת. לאורך השיחה כסי בעדינות: גיל/שלב חיים, איפה הוא גר היום, איזה אזור/עיר הוא מחפש, מה הכי חשוב לו (must-have), מה הוא אוהב (ים/פארקים/בתי קפה/קהילה), תקציב, ומספר חדרים ואורח חיים (משפחה/סטודנט/זוג, דתי/חילוני, חיות מחמד, חניה, מעלית).',
+        'שאלה אחת בכל פעם — הקשיבי, חדדי, ואל תציפי בשאלות. אל תשאלי כמו טופס; כסי את הדברים טבעי, מהחסר הקריטי ביותר קודם.',
+        'ברגע שיש מספיק פרטים קראי לפונקציה search_listings כדי להציג דירות אמיתיות, ואז הציגי אותן בקצרה בקול.',
+        'אם המשתמש אומר "פה"/"כאן" בלי לציין עיר — בקשי אישור לאתר את המיקום שלו.',
+        'היי אמינה: אל תמציאי דירות — הציגי רק מה שחוזר מ-search_listings.',
+      ].join(' ');
+
+  const tools = isLandlord ? [create_property, search_listings] : [search_listings];
+
   // New Realtime GA API (POST /v1/realtime/client_secrets): the session config is
   // nested under `session`, audio/voice moved under `audio.output.voice`, and the
   // ephemeral token comes back at top-level `value` (ek_...). The old flat
@@ -6865,7 +6909,7 @@ async function createRealtimeSession(event) {
         },
         output: { voice: OPENAI_REALTIME_VOICE },
       },
-      tools: [search_listings],
+      tools,
       tool_choice: 'auto',
     },
   };

@@ -7,6 +7,7 @@ import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/presentation/features/assistant/erik_live_voice_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/assistant_screen.dart';
@@ -548,6 +549,17 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
             ),
           ]),
           actions: [
+            IconButton(
+              tooltip: 'שיחה קולית חיה',
+              icon: Icon(IconsaxPlusBold.microphone_2,
+                  color: AppColors.primary, size: 24),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const ErikLiveVoiceScreen(),
+                ));
+              },
+            ),
             IconButton(
               tooltip: _speakReplies ? 'הקראה פעילה' : 'הקראה כבויה',
               icon: Icon(

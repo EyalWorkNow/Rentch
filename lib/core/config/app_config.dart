@@ -31,13 +31,14 @@ class AppConfig {
     defaultValue: true,
   );
 
-  /// אתי's LIVE speech-to-speech voice over Gemini Live (real-time, sub-second,
-  /// bypasses the us-east-1 turn-based STT→LLM→TTS chain). OFF by default — the
-  /// turn-based flow stays the default until this is validated on a real device;
-  /// enable with --dart-define=ATI_LIVE_VOICE=true.
+  /// אתי's LIVE speech-to-speech voice over the OpenAI Realtime API (real-time,
+  /// sub-second, bypasses the turn-based STT→LLM→TTS chain). ON by default now
+  /// that the Realtime session is live-verified; on any connect failure the code
+  /// falls back to the turn-based voice, so this is safe. Force off with
+  /// --dart-define=ATI_LIVE_VOICE=false.
   static const bool atiLiveVoice = bool.fromEnvironment(
     'ATI_LIVE_VOICE',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   // ── AWS API Gateway ──────────────────────────────────────────────────────────
