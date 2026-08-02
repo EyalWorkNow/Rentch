@@ -290,6 +290,9 @@ class DatingProvider extends ChangeNotifier {
   Set<String> _ownerAcceptedPropertyIds = <String>{};
   Set<String> _ownerRejectedPropertyIds = <String>{};
   List<RentalMatch> _matches = const [];
+  // Matches the user explicitly unmatched — suppressed so a backend reload can't
+  // bring the conversation back. Persisted.
+  Set<String> _unmatchedIds = <String>{};
   String? _pendingMatchPropertyId;
   final List<_SwipeRecord> _swipeHistory = [];
   // When the current top card became visible — for swipe latency-to-decision.
@@ -5932,6 +5935,9 @@ class DatingProvider extends ChangeNotifier {
         .map((item) =>
             RentalMatch.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
+    _unmatchedIds = (storedState['unmatchedIds'] as List<dynamic>? ?? const [])
+        .map((e) => e.toString())
+        .toSet();
     _tenantReviews =
         (storedState['tenantReviews'] as List<dynamic>? ?? const [])
             .map((item) =>
@@ -6094,6 +6100,21 @@ class DatingProvider extends ChangeNotifier {
   /// appears WITHOUT a relaunch. Safe to call repeatedly (deduped by match id).
   Future<void> refreshMatchesFromBackend() => _loadMatchesFromBackend();
 
+  /// Unmatch: remove the conversation locally, remember it so a backend reload
+  /// can't resurrect it, and delete the server row (fire-and-forget) so it's
+  /// gone for the other party too on their next refresh.
+  Future<void> unmatch(String matchId) async {
+    if (matchId.isEmpty) return;
+    _matches = _matches.where((m) => m.id != matchId).toList();
+    _unmatchedIds.add(matchId);
+    _invalidateCatalogCache();
+    await _persist();
+    notifyListeners();
+    try {
+      await AwsApiClient.instance.delete('/matches/$matchId');
+    } catch (_) {/* local removal + suppress-set still holds */}
+  }
+
   // Backend → local: restore matches this user is part of, so a match made on
   // another device (or before a logout) reappears as a real match, not a
   // pending like. A person is on BOTH sides of matching — tenant (they liked a
@@ -6116,6 +6137,7 @@ class DatingProvider extends ChangeNotifier {
           final matchId = (it['id'] ?? '').toString();
           final propertyId = (it['propertyId'] ?? '').toString();
           if (matchId.isEmpty || propertyId.isEmpty) continue;
+          if (_unmatchedIds.contains(matchId)) continue; // stays unmatched
           if (_matches.any((m) => m.id == matchId)) continue;
           _matches = [
             ..._matches,
@@ -6215,6 +6237,7 @@ class DatingProvider extends ChangeNotifier {
       'ownerAcceptedPropertyIds': _ownerAcceptedPropertyIds.toList(),
       'ownerRejectedPropertyIds': _ownerRejectedPropertyIds.toList(),
       'matches': _matches.map((m) => m.toJson()).toList(),
+      'unmatchedIds': _unmatchedIds.toList(),
       'tenantReviews': _tenantReviews.map((r) => r.toJson()).toList(),
       'propertyReviews': _propertyReviews.map(
         (key, value) => MapEntry(key, value.map((r) => r.toJson()).toList()),

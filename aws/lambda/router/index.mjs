@@ -407,7 +407,18 @@ async function sendPushToUser(userId, { title, body, data } = {}) {
           token: deviceToken,
           notification: { title: title || '', body: body || '' },
           data: dataStr,
-          apns: { payload: { aps: { sound: 'default' } } },
+          // Explicit iOS alert + high-priority immediate delivery (don't rely on
+          // FCM's implicit fill): a backgrounded/closed app renders the banner.
+          apns: {
+            headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+            payload: {
+              aps: {
+                alert: { title: title || '', body: body || '' },
+                sound: 'default',
+                badge: 1,
+              },
+            },
+          },
           android: {
             priority: 'high',
             // Pin the channel explicitly (matches the app's rently_default channel)

@@ -1,7 +1,9 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/repositories/match_labels_repository.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
+import 'package:flutter/services.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
 import 'package:dating_app/presentation/widgets/property_share_sheet.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -29,6 +31,18 @@ const _kFilterOld = 'old';
 const _kFilterTomorrow = 'tomorrow';
 
 const _kNewMatchWindow = Duration(days: 7);
+
+// Palette for private conversation tags (ARGB ints).
+const List<int> _tagColors = [
+  0xFF2563EB, // blue
+  0xFF16A34A, // green
+  0xFFDC2626, // red
+  0xFFEA580C, // orange
+  0xFF9333EA, // purple
+  0xFF0891B2, // teal
+  0xFFCA8A04, // amber
+  0xFF64748B, // slate
+];
 
 DateTime _lastActivity(RentalMatch match) {
   if (match.messages.isEmpty) return match.createdAt;
@@ -60,6 +74,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
   bool _showRequests = false;
   final _searchCtrl = TextEditingController();
 
+  // Private, on-device conversation labels (only this user sees them).
+  final _labelsRepo = MatchLabelsRepository();
+  Map<String, MatchLabel> _labels = {};
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +87,207 @@ class _MatchesScreenState extends State<MatchesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<DatingProvider>().refreshMatchesFromBackend();
     });
+    _loadLabels();
+  }
+
+  Future<void> _loadLabels() async {
+    final all = await _labelsRepo.loadAll();
+    if (mounted) setState(() => _labels = all);
+  }
+
+  // Long-press on a conversation → private tag + unmatch.
+  void _showCardActions(RentalMatch match, RentalProperty property) {
+    HapticFeedback.selectionClick();
+    final existing = _labels[match.id];
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(IconsaxPlusLinear.tag,
+                    color: AppColors.primary),
+                title: Text(existing == null ? 'הוסף תגית פרטית' : 'ערוך תגית'),
+                subtitle: const Text('רק אתה רואה אותה — לא נחשפת למועמד'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showTagEditor(match.id);
+                },
+              ),
+              if (existing != null)
+                ListTile(
+                  leading: Icon(IconsaxPlusLinear.tag_cross,
+                      color: AppColors.textSecondary),
+                  title: const Text('הסר תגית'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _labelsRepo.remove(match.id);
+                    if (mounted) setState(() => _labels.remove(match.id));
+                  },
+                ),
+              ListTile(
+                leading: Icon(IconsaxPlusLinear.close_circle,
+                    color: AppColors.coral),
+                title: const Text('בטל התאמה',
+                    style: TextStyle(color: AppColors.coral)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmUnmatch(match);
+                },
+              ),
+              const SizedBox(height: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmUnmatch(RentalMatch match) {
+    showDialog<void>(
+      context: context,
+      builder: (dctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('לבטל את ההתאמה?'),
+          content: const Text(
+              'השיחה תוסר משני הצדדים ולא ניתן לשחזר אותה.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dctx),
+                child: const Text('חזרה')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+              onPressed: () async {
+                Navigator.pop(dctx);
+                await context.read<DatingProvider>().unmatch(match.id);
+                await _labelsRepo.remove(match.id);
+                if (mounted) setState(() => _labels.remove(match.id));
+              },
+              child: const Text('בטל התאמה'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTagEditor(String matchId) {
+    final existing = _labels[matchId];
+    final ctrl = TextEditingController(text: existing?.text ?? '');
+    var color = existing?.color ?? _tagColors.first;
+    const colors = _tagColors;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: StatefulBuilder(
+          builder: (ctx, setSheet) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('תגית פרטית',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text('רק אתה רואה — המועמד לא נחשף לזה.',
+                        style: TextStyle(
+                            color: AppColors.textSecondary, fontSize: 13)),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: ctrl,
+                      textDirection: TextDirection.rtl,
+                      maxLength: 24,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'למשל: רציני מאוד / לבדוק ערבים',
+                        filled: true,
+                        fillColor: AppColors.background,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        for (final c in colors)
+                          GestureDetector(
+                            onTap: () => setSheet(() => color = c),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: Color(c),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: color == c
+                                      ? AppColors.navy
+                                      : Colors.transparent,
+                                  width: 3,
+                                ),
+                              ),
+                              child: color == c
+                                  ? const Icon(Icons.check,
+                                      color: Colors.white, size: 18)
+                                  : null,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 14)),
+                        onPressed: () async {
+                          final text = ctrl.text.trim();
+                          if (text.isEmpty) {
+                            Navigator.pop(ctx);
+                            return;
+                          }
+                          final label = MatchLabel(text: text, color: color);
+                          await _labelsRepo.set(matchId, label);
+                          if (mounted) {
+                            setState(() => _labels[matchId] = label);
+                          }
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('שמור תגית',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -240,6 +459,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                             child: _MatchCard(
                                               match: pair.match,
                                               property: pair.property,
+                                              label: _labels[pair.match.id],
+                                              onLongPress: () => _showCardActions(
+                                                  pair.match, pair.property),
                                               onTap: () =>
                                                   Navigator.of(context).push(
                                                 MaterialPageRoute(
@@ -268,6 +490,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                           child: _MatchCard(
                                             match: pair.match,
                                             property: pair.property,
+                                            label: _labels[pair.match.id],
+                                            onLongPress: () => _showCardActions(
+                                                pair.match, pair.property),
                                             onTap: () =>
                                                 Navigator.of(context).push(
                                               MaterialPageRoute(
@@ -712,11 +937,17 @@ class _MatchCard extends StatefulWidget {
     required this.match,
     required this.property,
     required this.onTap,
+    this.onLongPress,
+    this.label,
   });
 
   final RentalMatch match;
   final RentalProperty property;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  /// Private on-device tag (only this user sees it).
+  final MatchLabel? label;
 
   @override
   State<_MatchCard> createState() => _MatchCardState();
@@ -761,7 +992,9 @@ class _MatchCardState extends State<_MatchCard> {
         tenantName.isNotEmpty &&
         lastMessage.sender == tenantName;
 
-    return ScaleBounce(
+    return GestureDetector(
+      onLongPress: widget.onLongPress,
+      child: ScaleBounce(
       onTap: widget.onTap,
       scaleDownTo: 0.97,
       child: Container(
@@ -829,6 +1062,39 @@ class _MatchCardState extends State<_MatchCard> {
                           ),
                         ),
                       ),
+                      // Private tag (only this user sees it).
+                      if (widget.label != null)
+                        Positioned(
+                          bottom: 10,
+                          left: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Color(widget.label!.color),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2)),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(IconsaxPlusBold.tag,
+                                    color: Colors.white, size: 12),
+                                const SizedBox(width: 4),
+                                Text(widget.label!.text,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                        ),
                       Positioned(
                         top: 10,
                         left: 10,
@@ -975,6 +1241,7 @@ class _MatchCardState extends State<_MatchCard> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

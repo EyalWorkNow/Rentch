@@ -15,7 +15,7 @@ import 'package:dating_app/presentation/screens/landlord_properties_screen.dart'
 import 'package:dating_app/presentation/screens/matches_screen.dart';
 import 'package:dating_app/presentation/screens/profile_screen.dart';
 import 'package:dating_app/presentation/widgets/rently_icon.dart';
-import 'package:dating_app/presentation/widgets/nav_assistant_orb.dart';
+
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -35,11 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool? _cachedIsLandlord;
   bool _introChecked = false;
 
-  // "דבר עם אתי" CTA: on every app entry the nav circle shows Etti's face for 2s,
-  // then reverts to the icon — a gentle nudge toward the assistant.
-  bool _ettiPeek = true;
-  Timer? _ettiPeekTimer;
-
   // The candidate deck + conversations are now merged into a single "לקוחות"
   // tab (LeadsInboxScreen) at index 1, so both the old swipes/matches deep-links
   // point there.
@@ -53,14 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // Gated by the seen_intro_v1 flag inside AppIntro, so it only appears on a
     // genuine first launch and never blocks returning users.
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowIntro());
-    _ettiPeekTimer = Timer(const Duration(seconds: 10), () {
-      if (mounted) setState(() => _ettiPeek = false);
-    });
   }
 
   @override
   void dispose() {
-    _ettiPeekTimer?.cancel();
     super.dispose();
   }
 
@@ -337,43 +328,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                           // (permanent on her page); an AI icon
                                           // otherwise. The photo RISES in with a
                                           // springy micro-animation.
-                                          _EttiCircleContent(
-                                            showPhoto: isEtti &&
-                                                (_ettiPeek || isSelected),
-                                            size: circleSize,
-                                            photo: ClipOval(
-                                              child: Image.asset(
-                                                'assets/images/eti.jpg',
-                                                width: circleSize * 0.9,
-                                                height: circleSize * 0.9,
-                                                fit: BoxFit.cover,
-                                              ),
+                                          AnimatedScale(
+                                            scale: isSelected ? 1.12 : 1.0,
+                                            duration: const Duration(milliseconds: 300),
+                                            curve: Curves.elasticOut,
+                                            child: RentlyIcon(
+                                              isSelected ? item.activeIcon : item.icon,
+                                              color: Colors.white,
+                                              size: isCompact
+                                                  ? (isNotDiscover ? 26.0 : 24.0)
+                                                  : (isNotDiscover ? 31.0 : 28.0),
                                             ),
-                                            fallback: isEtti
-                                                // The voice-assistant orb — always
-                                                // alive, colours drifting.
-                                                ? NavAssistantOrb(
-                                                    size: circleSize * 0.98)
-                                                : AnimatedScale(
-                                                    scale:
-                                                        isSelected ? 1.12 : 1.0,
-                                                    duration: const Duration(
-                                                        milliseconds: 300),
-                                                    curve: Curves.elasticOut,
-                                                    child: RentlyIcon(
-                                                      isSelected
-                                                          ? item.activeIcon
-                                                          : item.icon,
-                                                      color: Colors.white,
-                                                      size: isCompact
-                                                          ? (isNotDiscover
-                                                              ? 26.0
-                                                              : 24.0)
-                                                          : (isNotDiscover
-                                                              ? 31.0
-                                                              : 28.0),
-                                                    ),
-                                                  ),
                                           ),
                                           if (showBadge)
                                             Positioned(
@@ -431,29 +396,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ),
                                     ),
-                                  // AI marker on אתי's tab — a small magic-star
-                                  // sparkle (not text, not a wand).
-                                  if (isEtti)
-                                    Positioned(
-                                      top: -3,
-                                      right: -3,
-                                      child: IgnorePointer(
-                                        child: Container(
-                                          padding: const EdgeInsets.all(2.5),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                                color: Colors.white, width: 1.2),
-                                          ),
-                                          child: const Icon(
-                                            IconsaxPlusBold.magic_star,
-                                            color: Colors.white,
-                                            size: 10,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
                                     ],
                                   ),
                                 );
@@ -487,8 +429,8 @@ const _tenantItems = [
   ),
   _NavItem(
     label: 'דבר עם אתי',
-    icon: IconsaxPlusLinear.search_normal_1,
-    activeIcon: IconsaxPlusLinear.search_normal_1,
+    icon: IconsaxPlusLinear.magic_star,
+    activeIcon: IconsaxPlusBold.magic_star,
     isAssistant: true,
   ),
   _NavItem(
