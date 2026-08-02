@@ -172,8 +172,10 @@ class _PanoramaSweepCaptureScreenState
       // is best-effort: some devices reject one mode but the rest still help.
       await _lockCamera(ctrl);
       await ctrl.startImageStream(_onFrame);
-      _gyro = gyroscopeEventStream().listen(_onGyro);
-      _accel = accelerometerEventStream().listen(_onAccel);
+      // onError so a device with a missing/erroring gyro degrades to the timer
+      // fallback instead of throwing an unhandled zone error.
+      _gyro = gyroscopeEventStream().listen(_onGyro, onError: (_) {});
+      _accel = accelerometerEventStream().listen(_onAccel, onError: (_) {});
       setState(() => _cam = ctrl);
     } catch (e) {
       debugPrint('panorama camera init failed: $e');
@@ -278,9 +280,11 @@ class _PanoramaSweepCaptureScreenState
           'pose/frame misalignment: ${_poses.length} poses vs ${_frames.length} frames');
       _lastCaptureYaw = _yawDeg;
       _lastSampleMs = _clock.elapsedMilliseconds;
-      _lastFrameNotifier.value = file.path; // show the user the frame just captured
-      HapticFeedback.lightImpact();
       if (mounted) {
+        // Guard the notifier write too — a frame mid-await when dispose() fires
+        // could otherwise set a disposed ValueNotifier and throw.
+        _lastFrameNotifier.value = file.path; // show the frame just captured
+        HapticFeedback.lightImpact();
         setState(() {
           _rowDone++;
           _flash = true;
@@ -320,6 +324,7 @@ class _PanoramaSweepCaptureScreenState
   // result. Needs a few frames to register a 360 cylinder; below that we coach
   // the user to keep turning rather than ship a broken stitch.
   Future<void> _finish() async {
+    if (_stitching) return; // guard against a double-tap launching two jobs
     _running = false;
     if (_frames.length < 6) {
       // Reuse the error overlay (with its "נסה שוב" that returns to capture) to
@@ -369,8 +374,16 @@ class _PanoramaSweepCaptureScreenState
       for (var i = 0; i < frames.length; i++) {
         if (!mounted) return;
         setState(() => _stitchMsg = 'מעלים תמונות... ${i + 1}/${frames.length}');
-        final ok = await AwsApiClient.instance
-            .uploadToPresignedUrl(job.uploadUrls[i], frames[i]);
+        // Retry a transient blip so one flaky frame doesn't discard the whole
+        // capture (the loop is sequential — a single false previously aborted).
+        var ok = false;
+        for (var attempt = 0; attempt < 3 && !ok; attempt++) {
+          if (attempt > 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 600));
+          }
+          ok = await AwsApiClient.instance
+              .uploadToPresignedUrl(job.uploadUrls[i], frames[i]);
+        }
         if (!ok) {
           _failStitch('ההעלאה נכשלה באמצע. בדוק את החיבור ונסה שוב.');
           return;

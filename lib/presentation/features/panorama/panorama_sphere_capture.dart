@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
@@ -410,15 +411,22 @@ class _PanoramaSphereCaptureScreenState
         frameCount: _shotPaths.length,
         poses: poses,
       );
-      if (job == null) {
+      if (job == null || job.uploadUrls.length < _shotPaths.length) {
         _failBuild('לא הצלחנו להתחיל את העיבוד. בדקו את החיבור לאינטרנט.');
         return;
       }
       if (!mounted) return;
       setState(() => _buildMsg = 'מעלים את התמונות...');
       for (var i = 0; i < _shotPaths.length; i++) {
-        final ok = await AwsApiClient.instance
-            .uploadToPresignedUrl(job.uploadUrls[i], _shotPaths[i]);
+        // Retry a transient blip so one flaky frame doesn't discard the capture.
+        var ok = false;
+        for (var attempt = 0; attempt < 3 && !ok; attempt++) {
+          if (attempt > 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 600));
+          }
+          ok = await AwsApiClient.instance
+              .uploadToPresignedUrl(job.uploadUrls[i], _shotPaths[i]);
+        }
         if (!ok) {
           _failBuild('ההעלאה נכשלה. בדקו את החיבור ונסו שוב.');
           return;
@@ -500,6 +508,14 @@ class _PanoramaSphereCaptureScreenState
     _accel?.cancel();
     _frame.dispose();
     _cam?.dispose();
+    // Clean up the captured full-res JPEGs (up to 16 targets × 3 brackets) so a
+    // session that isn't uploaded doesn't leak temp files (sweep already does).
+    for (final p in _shotPaths) {
+      try {
+        final f = File(p);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+    }
     super.dispose();
   }
 

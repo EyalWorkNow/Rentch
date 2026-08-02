@@ -3864,11 +3864,10 @@ async function createPanorama(event) {
     // Variant mode: generate a lighting/tidy alternative FROM an existing full
     // 360 already in our bucket — reference it by key, no re-upload, no slots.
     if (body.srcUrl) {
-      let srcKey = null;
-      try {
-        const p = new URL(body.srcUrl).pathname.replace(/^\/+/, '');
-        if (p) srcKey = decodeURIComponent(p);
-      } catch { /* fall through to the upload path */ }
+      // Use keyFromS3Url so a path-style URL's bucket prefix is stripped AND the
+      // key is validated (isSafeStorageKey) — the raw pathname let a caller point
+      // srcKey at an arbitrary/other-bucket object.
+      const srcKey = keyFromS3Url(body.srcUrl);
       if (srcKey) {
         await putPanoMeta(jobId, {
           jobId, propertyId, inputKeys: [srcKey], resultKey, captureMode: 'ai',
@@ -3904,14 +3903,9 @@ async function createPanorama(event) {
     const resultKey = `panoramas/results/${jobId}.jpg`;
     // An existing pano (already in our bucket) is used in place — no re-upload.
     // Otherwise presign one upload for the source pano.
-    let srcKey = null;
     let uploadUrls = [];
-    if (body.srcUrl) {
-      try {
-        const p = new URL(body.srcUrl).pathname.replace(/^\/+/, '');
-        if (p) srcKey = decodeURIComponent(p);
-      } catch { /* fall through to upload */ }
-    }
+    // keyFromS3Url strips the bucket prefix + validates the key (isSafeStorageKey).
+    let srcKey = body.srcUrl ? keyFromS3Url(body.srcUrl) : null;
     if (!srcKey) {
       srcKey = `panoramas/jobs/${jobId}/src.jpg`;
       uploadUrls = [await getSignedUrl(
@@ -4078,7 +4072,9 @@ function validatePoses(raw, frameCount) {
     const hfov = Number(p.hfov);
     const vfov = Number(p.vfov);
     if (![yaw, pitch, hfov, vfov].every(Number.isFinite)) return null;
-    if (hfov <= 0 || vfov <= 0) return null;
+    // Reject non-physical FOVs: at/above 180° the projector's tan(fov/2) blows up
+    // (→∞) or sign-flips, mirroring/collapsing the frame into garbage.
+    if (hfov <= 0 || vfov <= 0 || hfov >= 180 || vfov >= 180) return null;
     out.push({ yaw, pitch, hfov, vfov });
   }
   return out;
