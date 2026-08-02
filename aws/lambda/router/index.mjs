@@ -4221,12 +4221,15 @@ async function runAiGenerate(jobId) {
     // (the slow high-quality call can hit an 'upstream connect error'), retry
     // once at default quality (faster + more reliable) so the job still succeeds.
     let out = null, lastErr = 'unknown';
-    for (const quality of ['high', '']) {
+    // COST: single default-quality attempt (variants are lighting shifts — 'high'
+    // isn't needed and doubled the price), plus ONE retry only on a TRANSIENT 5xx.
+    // A fatal 4xx (bad request / content policy) must not trigger a second paid
+    // image generation.
+    for (let attempt = 0; attempt < 2 && !out; attempt++) {
       try {
         const form = new FormData();
         form.append('model', 'gpt-image-2');
         form.append('size', '1536x1024');
-        if (quality) form.append('quality', quality);
         form.append('prompt', promptForVariant(meta.variant));
         for (const bytes of imgs) {
           form.append('image[]', new Blob([bytes], { type: 'image/jpeg' }), 'pano.jpg');
@@ -4237,14 +4240,17 @@ async function runAiGenerate(jobId) {
           body: form,
         });
         const text = await r.text();
-        if (!r.ok) { lastErr = `HTTP ${r.status}: ${text.slice(0, 140)}`; continue; }
+        if (!r.ok) {
+          lastErr = `HTTP ${r.status}: ${text.slice(0, 140)}`;
+          if (r.status < 500) break; // fatal → no retry, no double charge
+          continue;                  // transient 5xx → one retry
+        }
         let j;
         try { j = JSON.parse(text); }
         catch { lastErr = 'non-JSON: ' + text.slice(0, 140); continue; }
         const b64 = j?.data?.[0]?.b64_json;
-        if (!b64) { lastErr = 'no image: ' + text.slice(0, 140); continue; }
+        if (!b64) { lastErr = 'no image: ' + text.slice(0, 140); break; }
         out = Buffer.from(b64, 'base64');
-        break;
       } catch (e) {
         lastErr = String(e && e.message ? e.message : e);
       }
@@ -6389,7 +6395,9 @@ const GROUNDING_RULE =
 // search_listings against the real DB and feeds results back; create_property is
 // terminal (returned as a draft for the app to publish). Capped at MAX_HOPS so a
 // misbehaving model can't loop forever. Returns { reply, propertyDraft, listings }.
-const MAX_TOOL_HOPS = 5;
+// COST: 3 hops covers the real publish/search flows (each hop re-sends the long
+// system prompt as billed input); 5 was rarely reached and just added spend.
+const MAX_TOOL_HOPS = 3;
 async function runAssistantToolLoop(systemText, contents, tools, uid = null) {
   const convo = contents.slice();
   let propertyDraft = null;
@@ -7042,11 +7050,8 @@ async function handleAssistantLiveToken(event) {
   }
 }
 
-// Gemini natural voice for Erik's reply. Returns base64 PCM (L16 mono) + the
-// sample rate; the client wraps it in a WAV header and plays it.
-const TTS_MODEL = process.env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
-// "Kore" is the verified-working warm voice for Hebrew on this API key.
-const TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Kore';
+// (Removed dead GEMINI TTS_MODEL/TTS_VOICE constants — TTS runs on OpenAI
+// (OPENAI_TTS_MODEL); these were declared but never called.)
 
 async function handleAssistantTts(event) {
   const uid = callerUidOf(event);

@@ -40,7 +40,14 @@ class RealtimeChatService {
   static const int _maxReconnectAttempts = 8;
   static const Duration _reconnectBase = Duration(milliseconds: 500);
   static const Duration _reconnectCap = Duration(minutes: 2);
-  static const Duration _pollInterval = Duration(seconds: 3);
+  // COST: adaptive fallback polling — fast while the conversation is active,
+  // backing off to slow when idle, so a user stuck on the fallback (WS down)
+  // doesn't hit REST every 3s forever (~1,200 req/hr → ~180).
+  static const Duration _pollFast = Duration(seconds: 3);
+  static const Duration _pollSlow = Duration(seconds: 20);
+  static const int _idleBackoffAfter = 3; // slow polls after N with nothing new
+  int _idlePolls = 0;
+  String? _lastNewestId;
   static final _rng = math.Random.secure();
 
   bool get isConfigured => _collectionId.isNotEmpty;
@@ -142,7 +149,8 @@ class RealtimeChatService {
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
+    _idlePolls = 0;
+    _pollTimer = Timer(_pollFast, _poll);
   }
 
   Future<void> _poll() async {
@@ -150,6 +158,10 @@ class RealtimeChatService {
     if (matchId == null || _controller.isClosed) return;
     try {
       final msgs = await fetchMessages(matchId);
+      // Activity = the newest message id changed since last poll → stay fast.
+      final newest = msgs.isNotEmpty ? msgs.last.id : _lastNewestId;
+      _idlePolls = (newest == _lastNewestId) ? _idlePolls + 1 : 0;
+      _lastNewestId = newest;
       for (final msg in msgs) {
         if (!_controller.isClosed) {
           _controller.add(msg);
@@ -157,7 +169,13 @@ class RealtimeChatService {
         }
       }
     } catch (e) {
+      _idlePolls++;
       if (kDebugMode) debugPrint('RealtimeChatService._poll error: $e');
+    }
+    // Reschedule adaptively: fast while active, slow when idle.
+    if (!_controller.isClosed && _watchedMatchId == matchId) {
+      _pollTimer =
+          Timer(_idlePolls >= _idleBackoffAfter ? _pollSlow : _pollFast, _poll);
     }
   }
 
