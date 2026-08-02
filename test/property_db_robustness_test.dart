@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +64,28 @@ void main() {
       final p = RentalProperty.fromJson({'id': 'd', 'isActive': 1, 'agencyListing': 0});
       expect(p.isActive, isTrue);
       expect(p.agencyListing, isFalse);
+    });
+
+    test('panoramaTour stored as a JSON STRING still parses (not dropped)', () {
+      // The backend persists the tour as jsonEncode(toJson()) → a String. A
+      // remote fetch must decode it, or the 360 vanishes off-device.
+      final tourJson = jsonEncode({
+        'nodes': [
+          {'id': 'n1', 'imageUrl': 'https://x/pano1.jpg', 'haov': 360, 'vaov': 180},
+        ],
+      });
+      final p = RentalProperty.fromJson({'id': 'e', 'panoramaTour': tourJson});
+      expect(p.hasPanoramaTour, isTrue, reason: 'string-encoded tour must survive');
+      expect(p.panoramaTour?.nodes.length, 1);
+    });
+
+    test('virtualTour stored as a JSON STRING still parses (not dropped)', () {
+      final vtJson = jsonEncode({
+        'id': 'vt1', 'status': 'ready', 'viewerUrl': 'https://x/tour',
+      });
+      final p = RentalProperty.fromJson({'id': 'f', 'virtualTour': vtJson});
+      expect(p.hasReadyVirtualTour, isTrue,
+          reason: 'string-encoded virtual tour must survive');
     });
   });
 }

@@ -412,7 +412,11 @@ class AwsApiClient {
       status: (data['status'] as String?) ?? 'pending',
       imageUrl: (data['imageUrl'] as String?) ?? '',
       haov: (data['haov'] as num?)?.toDouble() ?? 360,
-      vaov: (data['vaov'] as num?)?.toDouble() ?? 60,
+      // Default to a FULL sphere (180), consistent with the haov=360 default —
+      // the common case is a full stitched pano that omitted vaov. Defaulting to
+      // 60 mislabeled full spheres as a narrow band (stretched render + a bogus
+      // auto-enhance). The server sends the real value for genuine partials.
+      vaov: (data['vaov'] as num?)?.toDouble() ?? 180,
       error: (data['error'] as String?) ?? '',
     );
   }

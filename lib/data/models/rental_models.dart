@@ -3001,6 +3001,11 @@ PropertyVirtualTour? _parseVirtualTour(Object? value) {
         ? null
         : tour;
   }
+  // Backend stores it as a JSON string → decode so a remote fetch/deep-link
+  // doesn't drop the tour to null (matches _parseModel3d below).
+  if (value is String && value.trim().isNotEmpty) {
+    return _parseVirtualTour(_decodeJsonSafely(value));
+  }
   return null;
 }
 

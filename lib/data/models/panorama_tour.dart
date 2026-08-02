@@ -14,6 +14,8 @@
 //   PropertyPanoramaTour — the ordered set of nodes for a property.
 // ════════════════════════════════════════════════════════════════════════════
 
+import 'dart:convert';
+
 class PanoramaHotspot {
   const PanoramaHotspot({
     required this.targetNodeId,
@@ -268,9 +270,12 @@ class PanoramaNode {
         if (y != null) 'y': y,
         if (haov != 360) 'haov': haov,
         if (vaov != 180) 'vaov': vaov,
-        // Only persist versions when there's a real choice (>1) — a single
-        // render is already captured by imageUrl/haov/vaov.
-        if (versions.length > 1) ...{
+        // Persist versions when there's a real choice (>1) OR a single version
+        // still carries curation metadata (a source label like 'AI ✨' or a
+        // hidden flag) — otherwise that labeling silently reverts to 'מקור' on
+        // reload.
+        if (versions.length > 1 ||
+            versions.any((v) => v.source.isNotEmpty || v.hidden)) ...{
           'versions': versions.map((v) => v.toJson()).toList(),
           'activeVersion': activeVersion,
         },
@@ -301,6 +306,19 @@ class PropertyPanoramaTour {
   /// nulls so it can sit alongside other optional property fields.
   static PropertyPanoramaTour? fromJsonOrNull(Object? raw) {
     if (raw == null) return null;
+    // The backend stores the tour as a JSON *string* (jsonEncode(toJson())), so a
+    // remote fetch/deep-link arrives here as a String, not a Map. Without this
+    // decode the whole tour silently drops to null and the 360 vanishes off the
+    // device that captured it.
+    if (raw is String) {
+      final s = raw.trim();
+      if (s.isEmpty) return null;
+      try {
+        return fromJsonOrNull(jsonDecode(s));
+      } catch (_) {
+        return null;
+      }
+    }
     List<dynamic>? list;
     if (raw is Map && raw['nodes'] is List) {
       list = raw['nodes'] as List<dynamic>;

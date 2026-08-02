@@ -4305,9 +4305,21 @@ async function enhancePanorama(jobId, event) {
   return json(200, { data: { jobId, status: 'processing' } });
 }
 
+// A stitch/AI worker is invoked async (Event); if it's OOM/timeout-killed no
+// Python exception fires, so no terminal 'failed' is ever written and the client
+// would poll 'processing' forever. Past this age we report a terminal 'failed'
+// so the client stops spinning and can retry. (Mirrors SCAN3D_MAX_AGE_MS.)
+const PANO_MAX_AGE_MS = 15 * 60 * 1000;
+
 async function getPanorama(jobId) {
   const meta = await getPanoMeta(jobId);
   if (!meta) return json(404, { message: 'Panorama job not found' });
+  const nonTerminal = meta.status !== 'ready' && meta.status !== 'failed';
+  if (nonTerminal && meta.createdAt &&
+      Date.now() - meta.createdAt > PANO_MAX_AGE_MS) {
+    return json(200, { data: { ...panoData(meta), status: 'failed',
+      error: meta.error || 'timeout' } });
+  }
   return json(200, { data: panoData(meta) });
 }
 
@@ -4317,7 +4329,8 @@ function panoData(meta) {
     status: meta.status || 'pending',
     imageUrl: meta.imageUrl || '',
     haov: meta.haov ?? 360,
-    vaov: meta.vaov ?? 60,
+    // Full-sphere default (matches haov=360); 60 mislabeled full spheres narrow.
+    vaov: meta.vaov ?? 180,
     error: meta.error || '',
   };
 }
