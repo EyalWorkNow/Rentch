@@ -155,8 +155,6 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         await _composeFromPanoramas();
       case _CaptureChoice.gallery:
         await _importFromGallery();
-      case _CaptureChoice.ai:
-        await _generateWithAi();
     }
   }
 
@@ -295,80 +293,6 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         contentType: 'image/jpeg',
         haov: fov.haov,
         vaov: fov.vaov);
-  }
-
-  // AI 360: the landlord picks up to 6 room photos; the server runs gpt-image-2
-  // to merge them into ONE seamless equirectangular 360. MORE photos (each wall)
-  // = far less the model has to invent, so accuracy rises with coverage. Takes
-  // ~1–3 min (async on the server); we show a progress dialog and poll. The node
-  // is labelled with ✨ so it reads honestly as AI-generated.
-  Future<void> _generateWithAi() async {
-    final picks = await _picker.pickMultiImage(imageQuality: 92);
-    if (picks.isEmpty || !mounted) return;
-    final imgs = picks.take(6).toList(); // gpt-image-2 path takes up to 6 images
-    if (mounted && picks.length < 3) {
-      _toast('טיפ: בחרו 2–3 פנורמות של אותו החדר (או תמונות של כל קיר) — ה-AI מרכיב מהן 360° מדויק.');
-    }
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
-    if (label == null || !mounted) return;
-
-    final msg = ValueNotifier<String>('מכינים…');
-    _showAiProgress(msg);
-    var dialogOpen = true;
-    void close() {
-      if (dialogOpen && mounted) {
-        dialogOpen = false;
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    }
-
-    try {
-      final job = await AwsApiClient.instance.createAiPanoramaJob(
-        propertyId: 'draft_${DateTime.now().millisecondsSinceEpoch}',
-        imageCount: imgs.length,
-      );
-      if (job == null) {
-        close();
-        _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
-        return;
-      }
-      msg.value = 'מעלים תמונות…';
-      for (var i = 0; i < imgs.length; i++) {
-        final ok = await AwsApiClient.instance
-            .uploadToPresignedUrl(job.uploadUrls[i], imgs[i].path);
-        if (!ok) {
-          close();
-          _toast('ההעלאה נכשלה. בדקו את החיבור ונסו שוב.');
-          return;
-        }
-      }
-      msg.value = 'ה-AI יוצר את ה-360° באיכות גבוהה… (1–3 דקות)';
-      await AwsApiClient.instance.startAiPanoramaGenerate(job.jobId);
-
-      // Poll up to ~5 min (gpt-image-2 quality:high takes ~2.5min + upload/queue).
-      for (var i = 0; i < 150; i++) {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        if (!mounted) return;
-        final st = await AwsApiClient.instance.getPanorama(job.jobId);
-        if (st == null) continue;
-        if (st.status == 'ready' && st.imageUrl.isNotEmpty) {
-          close();
-          await _addNode(
-              url: st.imageUrl, label: '$label ✨', haov: st.haov, vaov: st.vaov);
-          return;
-        }
-        if (st.status == 'failed') {
-          close();
-          _toast('היצירה נכשלה. נסו תמונה אחרת, ברורה ורחבה.');
-          return;
-        }
-      }
-      close();
-      _toast('העיבוד לוקח יותר מדי זמן. נסו שוב מאוחר יותר.');
-    } catch (e) {
-      close();
-      _toast('משהו השתבש. בדקו את החיבור ונסו שוב.');
-    }
   }
 
   void _showAiProgress(ValueNotifier<String> msg) {
@@ -1389,7 +1313,7 @@ class _VersionChip extends StatelessWidget {
 /// [photo] = guided 10-photo 360° capture (PRIMARY default), [sweep] = the
 /// frame-by-frame guided sweep (advanced), [arranged] = compose from native
 /// panos, [gallery] = import a native pano.
-enum _CaptureChoice { photo, sweep, arranged, gallery, ai }
+enum _CaptureChoice { photo, sweep, arranged, gallery }
 
 /// Full-screen, big-text guide shown BEFORE capture. In-app-capture-first for an
 /// older, non-technical user: the in-app guided sweep now lands one full 360°
@@ -1432,7 +1356,7 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'צלמו את החדר — וה-AI יהפוך ל-360° מלא',
+                      'הוסיפו סיור 360° אמיתי לדירה',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontWeight: FontWeight.w900,
@@ -1441,9 +1365,9 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'הדרך הכי פשוטה: מצלמים כמה תמונות רגילות של החדר (כל קיר) — '
-                      'וה-AI מרכיב מהן סיור 360° מלא ומדויק. יש לכם כבר פנורמה 360°? '
-                      'פשוט העלו אותה מהגלריה.',
+                      'יש לכם פנורמת 360°? העלו אותה מהגלריה. אין? צלמו פנורמה '
+                      'רגילה במצב הפנורמה של המצלמה (אפשר כמה חדרים) — ונחבר אותן '
+                      'לסיור אחד. ה-AI ילטש ויסגור את התקרה והרצפה על הסיור האמיתי.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 16,
@@ -1454,26 +1378,26 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     _GuideStep(
                       number: '1',
                       icon: IconsaxPlusBold.camera,
-                      title: 'צלמו את החדר',
+                      title: 'צלמו פנורמה',
                       body:
-                          'עומדים במרכז החדר ומצלמים כמה תמונות רחבות — קיר-קיר, עד '
-                          'שכיסיתם את כל הזוויות. ככל שיש יותר תמונות, ה-360° מדויק יותר.',
+                          'פתחו את מצב הפנורמה (Panorama) של המצלמה וסובבו לאט '
+                          'סיבוב מלא בחדר. אפשר לצלם פנורמה לכל חדר.',
                     ),
                     _GuideStep(
                       number: '2',
-                      icon: IconsaxPlusBold.magic_star,
-                      title: 'צרו 360° עם AI',
+                      icon: IconsaxPlusBold.gallery,
+                      title: 'העלו וחברו',
                       body:
-                          'לוחצים על הכפתור ✨ למטה, בוחרים את התמונות שצילמתם — '
-                          'וה-AI מרכיב מהן סיור 360° מלא תוך דקה-שתיים.',
+                          'העלו את הפנורמות מהגלריה — אם יש כמה, הן יתחברו לסיור '
+                          'אחד שאפשר להסתובב בו בין החדרים.',
                     ),
                     _GuideStep(
                       number: '3',
-                      icon: IconsaxPlusBold.tick_circle,
-                      title: 'בוחרים גרסה',
+                      icon: IconsaxPlusBold.magic_star,
+                      title: 'AI מלטש (אופציונלי)',
                       body:
-                          'אפשר לבחור בין הגרסה המקורית לגרסה מסודרת ונקייה — '
-                          'ולהחליף ביניהן בכל רגע. זהו, הסיור מוכן.',
+                          'על הסיור האמיתי אפשר להפעיל AI שישלים תקרה ורצפה, ינקה '
+                          'ויציע גרסת תאורה — בלי להמציא חדרים.',
                       isLast: true,
                     ),
                   ],
@@ -1546,25 +1470,12 @@ class _PanoramaGuideScreen extends StatelessWidget {
                 ),
               ]),
             ),
-            // AI path: turn 1–2 ordinary room photos into a 360 with gpt-image-2.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: BorderSide(color: AppColors.primary, width: 1.4),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () => Navigator.of(context).pop(_CaptureChoice.ai),
-                  icon: const Text('✨', style: TextStyle(fontSize: 18)),
-                  label: const Text('צור 360° מפנורמות/תמונות (AI)',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                ),
-              ),
-            ),
+            // NOTE: the "generate a 360 from flat photos with AI" path was
+            // removed — gpt-image-2 can't produce a faithful, seamless 360 and
+            // invented/repainted rooms (the landlord's main complaint). AI now
+            // only ENHANCES a REAL captured/uploaded panorama (pole-fill, cleanup,
+            // lighting variants) — offered per-node after a real 360 exists.
+            const SizedBox(height: 6),
           ],
         ),
       ),
