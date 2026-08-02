@@ -99,6 +99,10 @@ class RealtimeChatService {
       _reconnectAttempt = 0;
       ws.add(jsonEncode({'action': 'subscribe', 'matchId': matchId}));
       if (kDebugMode) debugPrint('RealtimeChatService: WS connected for $matchId');
+      // Catch up: on a fresh connect / RECONNECT after an outage, pull recent
+      // messages once so anything delivered while the socket was down isn't
+      // missed (the provider de-dups by id). Cheap, one-shot.
+      unawaited(_catchUp(matchId));
 
       _wsSub = ws.listen(
         (data) => _onWsData(data, matchId),
@@ -145,7 +149,7 @@ class RealtimeChatService {
     final matchId = _watchedMatchId;
     if (matchId == null || _controller.isClosed) return;
     try {
-      final msgs = await fetchMessages(matchId, afterId: _lastSeenId);
+      final msgs = await fetchMessages(matchId);
       for (final msg in msgs) {
         if (!_controller.isClosed) {
           _controller.add(msg);
@@ -157,6 +161,20 @@ class RealtimeChatService {
     }
   }
 
+  // One-shot catch-up after a (re)connect: pull recent messages so any delivered
+  // during the socket outage are recovered (provider de-dups by id).
+  Future<void> _catchUp(String matchId) async {
+    if (_controller.isClosed || _watchedMatchId != matchId) return;
+    try {
+      final msgs = await fetchMessages(matchId);
+      for (final msg in msgs) {
+        if (!_controller.isClosed && _watchedMatchId == matchId) {
+          _controller.add(msg);
+        }
+      }
+    } catch (_) {/* fail-soft */}
+  }
+
   // ── Send (REST) ────────────────────────────────────────────────────────────
 
   Future<ChatMessage?> sendMessage({
@@ -164,11 +182,14 @@ class RealtimeChatService {
     required String senderId,
     required String senderName,
     required String text,
+    String? id,
   }) async {
     if (!isConfigured) return null;
     try {
       final now = DateTime.now().toUtc();
-      final rowId = 'msg_${now.microsecondsSinceEpoch}';
+      // Reuse the caller's id (= the optimistic bubble id) so the WS echo of this
+      // message de-dups by id instead of fragile temp/name matching.
+      final rowId = id ?? 'msg_${now.microsecondsSinceEpoch}';
       await RetryPolicy.transient.execute(() => tables.createRow(
             databaseId: appwriteDatabaseId,
             tableId: _collectionId,
@@ -193,25 +214,31 @@ class RealtimeChatService {
   Future<List<ChatMessage>> fetchMessages(
     String matchId, {
     int limit = 100,
-    String? afterId,
   }) async {
     if (!isConfigured) return const [];
     try {
       final queries = <String>[
         Query.equal('matchId', matchId),
-        Query.orderAsc('createdAt'),
+        // Fetch the NEWEST messages (descending), not the oldest. A thread past
+        // `limit` messages must show the RECENT conversation — the old asc+limit
+        // returned messages 1..100 and hid everything after. New messages always
+        // land in this newest-N window, so the polling fallback delivers them too
+        // (the provider de-dups by id). NB: the old `cursorAfter` was silently
+        // ignored by the router (after≠lastKey) — removed to avoid the footgun.
+        Query.orderDesc('createdAt'),
         Query.limit(limit),
-        if (afterId != null) Query.cursorAfter(afterId),
       ];
       final result = await RetryPolicy.transient.execute(() => tables.listRows(
             databaseId: appwriteDatabaseId,
             tableId: _collectionId,
             queries: queries,
           ));
-      return result.rows
+      final msgs = result.rows
           .map((row) => _rowToMessage(row.data))
           .whereType<ChatMessage>()
           .toList();
+      // Reverse back to chronological (ascending) for display.
+      return msgs.reversed.toList();
     } catch (e) {
       if (kDebugMode) debugPrint('RealtimeChatService.fetchMessages error: $e');
       return const [];

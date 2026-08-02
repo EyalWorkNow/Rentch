@@ -1675,6 +1675,19 @@ export const handler = async (event) => {
             !(await ownsOrUnknown(body.propertyId, callerUid))) {
           return json(403, { message: 'Forbidden' });
         }
+        // A message write must be by a MEMBER of the thread. Without this any
+        // authenticated user could inject a message into any matchId (the stream
+        // then delivers + pushes it to the real participants), and on a legacy
+        // thread that single post also passes the read gate → history leak.
+        if (tableKey === 'messages') {
+          if (!callerUid || !(await isThreadMember(body.matchId, callerUid))) {
+            return json(403, { message: 'Forbidden' });
+          }
+          // Server-authoritative timestamp so cross-device clock skew can't
+          // reorder messages (createdAt is the GSI sort key). The client value
+          // is only used for its own optimistic bubble until the echo returns.
+          body.createdAt = new Date().toISOString();
+        }
         const writeId = (tableKey === 'users' || tableKey === 'persona')
           ? callerUid
           : (body.id || body.propertyId || body.userId);

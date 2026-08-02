@@ -46,7 +46,6 @@ class ChatProvider extends ChangeNotifier {
   bool _isSending = false;
   bool _realtimeConnected = false;
   bool _disposed = false;
-  String? _pendingTempId;
 
   StreamSubscription<ChatMessage>? _sub;
 
@@ -101,13 +100,14 @@ class ChatProvider extends ChangeNotifier {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
 
-    // Optimistic add so the sender sees their message instantly.
-    final tempId = 'temp_${DateTime.now().microsecondsSinceEpoch}';
-    _pendingTempId = tempId;
+    // Use the SERVER row id as the optimistic bubble id up front, so the async WS
+    // echo of this message (same id) de-dups by id — no fragile temp/name
+    // matching, correct for rapid successive sends.
+    final id = 'msg_${DateTime.now().microsecondsSinceEpoch}';
     _messages = [
       ..._messages,
       ChatMessage(
-        id: tempId,
+        id: id,
         sender: senderName,
         text: trimmed,
         createdAt: DateTime.now(),
@@ -122,17 +122,15 @@ class ChatProvider extends ChangeNotifier {
         senderId: senderId,
         senderName: senderName,
         text: trimmed,
+        id: id,
       );
-      if (!_disposed && created != null) {
-        _messages = _messages.map((m) => m.id == tempId ? created : m).toList();
-        _pendingTempId = null;
-      } else if (!_disposed && created == null) {
-        // Send failed — flag the optimistic bubble so it isn't shown as
-        // delivered, and stop waiting for a remote echo that won't come.
+      if (!_disposed) {
+        // Success → adopt the server row (same id, server timestamp); failure →
+        // flag the bubble "not sent" (kept for retry, never lost).
         _messages = _messages
-            .map((m) => m.id == tempId ? m.copyWith(failed: true) : m)
+            .map((m) =>
+                m.id == id ? (created ?? m.copyWith(failed: true)) : m)
             .toList();
-        _pendingTempId = null;
       }
     }
 
@@ -148,7 +146,9 @@ class ChatProvider extends ChangeNotifier {
   /// the temp id to finalize once the upload completes. Not sent to the backend
   /// yet — the recipient must get the remote URL, never a local path.
   String addOptimisticMedia(String encodedLocal) {
-    final tempId = 'temp_${DateTime.now().microsecondsSinceEpoch}';
+    // Same-id-as-server scheme (see sendMessage) so the media message's WS echo
+    // de-dups by id and can't produce a duplicate bubble.
+    final tempId = 'msg_${DateTime.now().microsecondsSinceEpoch}';
     _messages = [
       ..._messages,
       ChatMessage(
@@ -186,6 +186,7 @@ class ChatProvider extends ChangeNotifier {
         senderId: senderId,
         senderName: senderName,
         text: encodedRemote,
+        id: tempId,
       );
       if (_disposed) return;
       _messages = _messages
@@ -215,15 +216,9 @@ class ChatProvider extends ChangeNotifier {
 
   void _onRemoteMessage(ChatMessage msg) {
     if (_disposed) return;
-    if (_pendingTempId != null &&
-        msg.sender == senderName &&
-        _messages.any((m) => m.id == _pendingTempId)) {
-      _messages =
-          _messages.map((m) => m.id == _pendingTempId ? msg : m).toList();
-      _pendingTempId = null;
-      _safeNotify();
-      return;
-    }
+    // Optimistic sends already carry the server id (see sendMessage), so a pure
+    // id de-dup handles our own echoes AND at-least-once duplicates — no
+    // temp/name reconciliation needed.
     if (_messages.any((m) => m.id == msg.id)) return;
     _messages = [..._messages, msg];
     _safeNotify();

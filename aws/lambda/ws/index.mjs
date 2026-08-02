@@ -53,8 +53,10 @@ async function isThreadMember(matchId, uid) {
     }));
     return (msgs.Items || []).some((m) => m.senderId === uid);
   } catch (e) {
-    console.error('ws isThreadMember error (failing open):', e);
-    return true;
+    // Fail CLOSED (matches the REST router). A transient DB error must not let a
+    // non-member attach to a thread and receive its live message stream.
+    console.error('ws isThreadMember error (failing closed):', e);
+    return false;
   }
 }
 

@@ -246,8 +246,15 @@ class _MessageScreenState extends State<MessageScreen> {
 
   void _onChatUpdate() {
     if (!mounted) return;
+    // Only auto-scroll if the user is already near the bottom — otherwise an
+    // incoming message while they're reading older history would yank them down.
+    final atBottom = !_scrollCtrl.hasClients ||
+        (_scrollCtrl.position.maxScrollExtent - _scrollCtrl.position.pixels) <
+            240;
     setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    if (atBottom) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
   }
 
   void _scrollToBottom() {

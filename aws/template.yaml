@@ -504,10 +504,15 @@ Resources:
       DeploymentId: !Ref Deployment
       StageName: prod
       MethodSettings:
+        # Account-safe ceiling for the whole REST API. This MUST match the live
+        # prod stage (already raised to 5000/10000 out-of-band); the old 25/50
+        # would cap the entire API — chat + feed + likes — at ~75 concurrent
+        # users, and a CloudFormation deploy of the old value would silently
+        # revert prod to that outage. Keep in sync with the deployed stage.
         - ResourcePath: '/*'
           HttpMethod: '*'
-          ThrottlingBurstLimit: 50
-          ThrottlingRateLimit: 25
+          ThrottlingBurstLimit: 10000
+          ThrottlingRateLimit: 5000
 
   # ?? WebSocket API (real-time chat) ??????????????????????????????????????????
   WsRole:
