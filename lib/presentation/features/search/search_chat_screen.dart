@@ -680,7 +680,9 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
       await Navigator.of(context).push(MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => AtiLiveVoiceScreen(
-          onConnectFailed: _openTurnBasedVoice,
+          // On connect failure, REPLACE the live screen with the turn-based one
+          // in a single transition (no pop-then-push flicker).
+          onConnectFailed: () => _openTurnBasedVoice(replace: true),
           onSearch: (args) async {
             final r = await _handleRealtimeSearch(args);
             return (count: r.results.length, summary: r.summary);
@@ -694,8 +696,8 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
     _scrollToEnd();
   }
 
-  Future<void> _openTurnBasedVoice() async {
-    await Navigator.of(context).push(MaterialPageRoute(
+  Future<void> _openTurnBasedVoice({bool replace = false}) async {
+    final route = MaterialPageRoute<void>(
       fullscreenDialog: true,
       builder: (_) => AtiVoiceScreen(
         service: _service,
@@ -705,7 +707,13 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
         criteria: const [], // fresh — no stale tags
         resultCount: 0,
       ),
-    ));
+    );
+    // replace = coming from the failed live screen → swap it out in one motion.
+    if (replace) {
+      await Navigator.of(context).pushReplacement(route);
+    } else {
+      await Navigator.of(context).push(route);
+    }
   }
 
   // Runs a `search_listings` tool-call from the live voice agent: builds the query
@@ -2324,31 +2332,35 @@ class _SearchChatScreenState extends State<SearchChatScreen> {
               child: Image.asset('assets/images/eti.jpg', fit: BoxFit.cover),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_botName,
-                    style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16)),
-                Row(children: [
-                  Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                          color: AppColors.success, shape: BoxShape.circle)),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text('תבדוק אותי אם אני באמת עוזרת חכמה',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 11)),
-                  ),
-                ]),
-              ],
+            // Expanded so the header has a bounded width — otherwise the long
+            // subtitle overflows the AppBar (the "broken header").
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_botName,
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16)),
+                  Row(children: [
+                    Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                            color: AppColors.success, shape: BoxShape.circle)),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text('תבדוק אותי אם אני באמת עוזרת חכמה',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 11)),
+                    ),
+                  ]),
+                ],
+              ),
             ),
           ]),
           actions: [

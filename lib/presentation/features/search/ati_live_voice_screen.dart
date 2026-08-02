@@ -82,11 +82,11 @@ class _AtiLiveVoiceScreenState extends State<AtiLiveVoiceScreen> {
       ..onError = (msg) {
         if (_failed) return;
         _failed = true;
-        // Connect/stream failure → hand back to the turn-based flow.
-        if (mounted) {
-          Navigator.of(context).maybePop();
-          widget.onConnectFailed();
-        }
+        // Connect/stream failure → hand back to the turn-based flow. Do NOT pop
+        // here — onConnectFailed does a single pushReplacement, so the user sees
+        // ONE transition, not this screen sliding down and the fallback sliding
+        // back up (the "rises and falls in 2 steps").
+        if (mounted) widget.onConnectFailed();
       };
     _live.connect();
   }

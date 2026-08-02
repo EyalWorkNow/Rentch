@@ -431,30 +431,25 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                       ),
                                     ),
-                                  // Small "AI" marker on אתי's tab.
+                                  // AI marker on אתי's tab — a small magic-star
+                                  // sparkle (not text, not a wand).
                                   if (isEtti)
                                     Positioned(
-                                      top: -2,
-                                      right: -2,
+                                      top: -3,
+                                      right: -3,
                                       child: IgnorePointer(
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 5, vertical: 2),
+                                          padding: const EdgeInsets.all(2.5),
                                           decoration: BoxDecoration(
                                             color: AppColors.primary,
-                                            borderRadius:
-                                                BorderRadius.circular(8),
+                                            shape: BoxShape.circle,
                                             border: Border.all(
                                                 color: Colors.white, width: 1.2),
                                           ),
-                                          child: const Text(
-                                            'AI',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.3,
-                                            ),
+                                          child: const Icon(
+                                            IconsaxPlusBold.magic_star,
+                                            color: Colors.white,
+                                            size: 10,
                                           ),
                                         ),
                                       ),
