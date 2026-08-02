@@ -1,0 +1,1 @@
+{ "name": "rentch-img-resize", "version": "1.0.0", "type": "module", "dependencies": { "jimp": "0.22.12" } }
