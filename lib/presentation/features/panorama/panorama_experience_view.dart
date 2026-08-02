@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:flutter/material.dart';
+import 'package:dating_app/core/config/media_cdn.dart';
 import 'package:flutter/rendering.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:panorama_viewer/panorama_viewer.dart';
@@ -101,7 +102,7 @@ class _PanoramaExperienceViewState extends State<PanoramaExperienceView>
           : n.imageUrl;
       return FileImage(File(path));
     }
-    return NetworkImage(n.imageUrl);
+    return NetworkImage(MediaCdn.url(n.imageUrl));
   }
 
   static double _norm(double deg) {

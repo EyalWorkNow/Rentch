@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dating_app/data/models/panorama_tour.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_experience_view.dart';
 import 'package:flutter/material.dart';
+import 'package:dating_app/core/config/media_cdn.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -153,8 +154,9 @@ class _PanoramaWebTourViewState extends State<PanoramaWebTourView> {
             n.imageUrl.startsWith('file://') ? n.imageUrl.substring(7) : n.imageUrl;
         return await File(p).readAsBytes();
       }
-      final res =
-          await http.get(Uri.parse(n.imageUrl)).timeout(const Duration(seconds: 40));
+      final res = await http
+          .get(Uri.parse(MediaCdn.url(n.imageUrl)))
+          .timeout(const Duration(seconds: 40));
       if (res.statusCode >= 200 && res.statusCode < 300) return res.bodyBytes;
     } catch (_) {}
     return null;

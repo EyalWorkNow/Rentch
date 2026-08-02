@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dating_app/core/config/media_cdn.dart';
 import 'package:dating_app/core/security/input_sanitizer.dart';
 import 'package:flutter/material.dart';
 
@@ -112,11 +113,14 @@ class _SafeImageState extends State<SafeImage> {
     // placeholder.
     // Under `flutter test` there's no platform temp dir, so the disk cache's
     // path_provider call throws — use the plain in-memory NetworkImage there.
+    // Serve our S3 media from the CloudFront edge (cached, faster, ~90% less
+    // egress); external URLs / local files pass through unchanged.
+    final remote = MediaCdn.url(cleaned);
     final ImageProvider netProvider =
         Platform.environment.containsKey('FLUTTER_TEST')
-            ? NetworkImage(cleaned, headers: _imageRequestHeaders(cleaned))
-            : CachedNetworkImageProvider(cleaned,
-                headers: _imageRequestHeaders(cleaned));
+            ? NetworkImage(remote, headers: _imageRequestHeaders(remote))
+            : CachedNetworkImageProvider(remote,
+                headers: _imageRequestHeaders(remote));
     final ImageProvider provider =
         ResizeImage.resizeIfNeeded(cacheW, null, netProvider);
     return Image(
