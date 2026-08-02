@@ -505,6 +505,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ));
       return;
     }
+    final isLandlord = context.read<DatingProvider>().isLandlord;
+    final example = isLandlord
+        ? 'למשל: "קוראים לי דוד, אני משכיר דירת 3 חדרים משופצת בתל אביב, כניסה מיידית".'
+        : 'למשל: "אני זוג צעיר, תקציב עד 6000, מחפשים 3 חדרים".';
     var transcript = '';
     var listening = true;
     var started = false;
@@ -564,7 +568,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             fontSize: 18, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 6),
                     Text(
-                      'למשל: "אני זוג צעיר, תקציב עד 6000, מחפשים 3 חדרים".',
+                      example,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: AppColors.textSecondary, fontSize: 13),
@@ -612,6 +616,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _applyVoiceFill(String transcript) {
+    final isLandlord = context.read<DatingProvider>().isLandlord;
     final q = SmartSearch.parse(transcript);
     final filled = <String>[];
     setState(() {
@@ -620,14 +625,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _bioCtrl.text =
           existing.isEmpty ? transcript.trim() : '$existing\n${transcript.trim()}';
       filled.add('תיאור');
-      if (q.maxPrice != null && q.maxPrice! > 0) {
-        _budget = q.maxPrice!;
-        filled.add('תקציב');
-      }
-      final rooms = q.minRooms ?? q.maxRooms;
-      if (rooms != null && rooms > 0) {
-        _rooms = rooms;
-        filled.add('חדרים');
+      // Budget/rooms are tenant search fields — only fill them for a tenant.
+      if (!isLandlord) {
+        if (q.maxPrice != null && q.maxPrice! > 0) {
+          _budget = q.maxPrice!;
+          filled.add('תקציב');
+        }
+        final rooms = q.minRooms ?? q.maxRooms;
+        if (rooms != null && rooms > 0) {
+          _rooms = rooms;
+          filled.add('חדרים');
+        }
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -715,14 +723,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // Voice fill — the tenant speaks about themselves and the AI
-                    // fills the fields (budget/rooms/bio). Tenant profile only.
-                    if (!isLandlord) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                        child: _VoiceFillButton(onTap: _startVoiceFill),
-                      ),
-                    ],
+                    // Voice fill — the user speaks about themselves and the AI
+                    // fills the profile (tenant: budget/rooms/bio; landlord: bio).
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      child: _VoiceFillButton(onTap: _startVoiceFill),
+                    ),
 
                     // 1. Personal details
                     _FormSection(

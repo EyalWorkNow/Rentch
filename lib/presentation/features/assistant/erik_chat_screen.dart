@@ -6,6 +6,8 @@ import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/assistant_screen.dart';
 import 'package:dating_app/presentation/widgets/scale_bounce.dart';
@@ -41,6 +43,8 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
 
   final List<_ErikMsg> _messages = [];
   final List<String> _photoUrls = [];
+  // A 360 tour captured in-chat, attached to the listing on publish.
+  PropertyPanoramaTour? _panoramaTour;
   Map<String, dynamic>? _draft;
 
   bool _busy = false; // waiting on Erik
@@ -338,11 +342,26 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                   () => _pickMedia(ImageSource.gallery)),
               _mediaTile(IconsaxPlusBold.video, 'סרטון מהגלריה',
                   () => _pickMedia(ImageSource.gallery, video: true)),
+              _mediaTile(IconsaxPlusBold.rotate_left, 'סיור 360°', _capture360),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // Capture a 360 tour right from the assistant — reuses the full capture flow
+  // and holds the result until publish, when it's attached to the listing.
+  Future<void> _capture360() async {
+    Navigator.of(context).maybePop(); // close the media sheet
+    final tour = await Navigator.of(context).push<PropertyPanoramaTour>(
+      MaterialPageRoute(
+        builder: (_) => PanoramaCaptureScreen(initial: _panoramaTour),
+      ),
+    );
+    if (tour == null || tour.isEmpty || !mounted) return;
+    setState(() => _panoramaTour = tour);
+    _snack('סיור 360° נוסף ✓');
   }
 
   Widget _mediaTile(IconData icon, String label, VoidCallback onTap) {
@@ -386,11 +405,15 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
     try {
       final provider = context.read<DatingProvider>();
       final ownerName = provider.tenantProfile?.name ?? '';
-      final property = await buildPropertyFromErikDraft(
+      var property = await buildPropertyFromErikDraft(
         draft,
         ownerName: ownerName,
         photoUrls: _photoUrls,
       );
+      // Attach a 360 tour captured in-chat, if any.
+      if (_panoramaTour != null && !_panoramaTour!.isEmpty) {
+        property = property.copyWith(panoramaTour: _panoramaTour);
+      }
       await provider.addLandlordProperty(property);
       if (!mounted) return;
       final addr = [
@@ -401,6 +424,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
       setState(() {
         _draft = null;
         _photoUrls.clear();
+        _panoramaTour = null;
         _publishing = false;
         for (final m in _messages) {
           m.draft = null; // clear the pending card so it can't publish twice

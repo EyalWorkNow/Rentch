@@ -55,7 +55,12 @@ Future<RentalProperty> buildPropertyFromErikDraft(
     }
   } catch (_) {}
 
-  const transactionType = PropertyTransactionType.rent;
+  // Honor the transaction type the assistant captured — a "sale" listing must
+  // NOT be published as a rental. Defaults to rent when unspecified.
+  final txStr = str(draft['transactionType']).toLowerCase().trim();
+  final transactionType = (txStr == 'sale' || txStr == 'למכירה')
+      ? PropertyTransactionType.sale
+      : PropertyTransactionType.rent;
   final priceHistory = price > 0
       ? [
           PropertyPricePoint(
