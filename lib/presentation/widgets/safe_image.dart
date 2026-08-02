@@ -113,9 +113,12 @@ class _SafeImageState extends State<SafeImage> {
     // placeholder.
     // Under `flutter test` there's no platform temp dir, so the disk cache's
     // path_provider call throws — use the plain in-memory NetworkImage there.
-    // Serve our S3 media from the CloudFront edge (cached, faster, ~90% less
-    // egress); external URLs / local files pass through unchanged.
-    final remote = MediaCdn.url(cleaned);
+    // Serve our S3 media as a RIGHT-SIZED thumbnail from the thumbnail CDN — the
+    // image is resized on-the-fly to the on-screen width (~10-20x smaller than
+    // the full-res original) and edge-cached. External URLs / local files pass
+    // through unchanged. cacheW is the decode/display width; 1600 covers a
+    // full-screen phone view when the box is unsizable.
+    final remote = MediaCdn.thumb(cleaned, cacheW ?? 1600);
     final ImageProvider netProvider =
         Platform.environment.containsKey('FLUTTER_TEST')
             ? NetworkImage(remote, headers: _imageRequestHeaders(remote))
