@@ -6088,6 +6088,12 @@ class DatingProvider extends ChangeNotifier {
     } catch (_) {/* fail-soft */}
   }
 
+  /// Public re-pull of the user's matches — call it in-session (app resume, an
+  /// incoming match/message push, opening the matches tab) so a match created
+  /// while the app was open/backgrounded (e.g. a landlord accepted a like)
+  /// appears WITHOUT a relaunch. Safe to call repeatedly (deduped by match id).
+  Future<void> refreshMatchesFromBackend() => _loadMatchesFromBackend();
+
   // Backend → local: restore matches this user is part of, so a match made on
   // another device (or before a logout) reappears as a real match, not a
   // pending like. A person is on BOTH sides of matching — tenant (they liked a

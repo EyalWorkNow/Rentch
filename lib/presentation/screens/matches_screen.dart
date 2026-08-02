@@ -61,6 +61,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
   final _searchCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Pull the latest matches when the tab opens so a conversation created while
+    // the user was elsewhere in the app (e.g. a landlord just accepted their
+    // like) shows up without a relaunch.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<DatingProvider>().refreshMatchesFromBackend();
+    });
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();

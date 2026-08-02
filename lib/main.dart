@@ -168,6 +168,16 @@ void main() async {
         final title = (n?.title ?? message.data['title'] ?? '').toString();
         final body = (n?.body ?? message.data['body'] ?? '').toString();
         NotificationService.instance.showForegroundPush(title, body);
+        // A match/message push means a new conversation exists server-side —
+        // re-pull matches so it appears in the list now, not on next relaunch.
+        final type = (message.data['type'] ?? '').toString();
+        if (type == 'match' || type == 'message') {
+          try {
+            appNavigatorKey.currentContext
+                ?.read<DatingProvider>()
+                .refreshMatchesFromBackend();
+          } catch (_) {/* provider not ready yet — resume hook will catch it */}
+        }
       };
       await PushNotificationService.instance.initialize();
       FirebaseAuth.instance.authStateChanges().listen((user) {
@@ -597,6 +607,10 @@ class _SessionLifecycleTrackerState extends State<_SessionLifecycleTracker>
       // comes back to the foreground. Fail-soft inside the service.
       final provider = context.read<DatingProvider>();
       HomeWidgetService.sync(provider);
+      // Re-pull matches: a landlord may have accepted a like (or a message may
+      // have arrived) while we were backgrounded — otherwise the new conversation
+      // wouldn't appear until a full relaunch.
+      unawaited(provider.refreshMatchesFromBackend());
       // Restart the insights window's periodic flush (stopped on pause).
       BehaviorInsights.instance.start();
     }
