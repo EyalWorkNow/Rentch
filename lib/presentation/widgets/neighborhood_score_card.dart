@@ -29,8 +29,10 @@ class NeighborhoodScoreCard extends StatelessWidget {
     'safety': 'בטיחות',
     'walkability': 'הליכתיות',
     'schools': 'בתי״ס',
+    'kindergarten': 'גני ילדים',
     'transit': 'תחבורה',
     'green': 'ירוק',
+    'quiet': 'שקט',
   };
 
   /// Each sub-score → its honest data source, so the breakdown can show WHERE the

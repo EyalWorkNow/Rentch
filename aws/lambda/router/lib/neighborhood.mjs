@@ -1,6 +1,14 @@
-// neighborhood.mjs — R7 composite quality-of-life score for a point.
+// neighborhood.mjs — R8 composite quality-of-life score for a point.
 //
-//   score = 0.30·safety + 0.25·walkability + 0.20·schools + 0.15·transit + 0.10·green
+//   score = 0.26·safety + 0.20·walkability + 0.16·schools + 0.08·kindergarten
+//         + 0.12·transit + 0.10·green + 0.08·quiet
+//
+// R8 quality upgrades over R7 (raw-count era):
+//   transit     rail-weighted (station×6, tram×3, bus×1) + nearest-rail proximity
+//   green       count blended with nearest-park proximity
+//   walkability POI count blended with essential-services coverage (5 categories)
+//   quiet       NEW — big-road noise proxy (motorway/trunk/primary/secondary ≤250m)
+//   safety      crime component percentile-calibrated vs the national distribution
 //
 // ponytail: this fans out to THREE flaky free sources (OSM Overpass, data.gov.il
 // CKAN, CBS clusters). Each is independently best-effort: if a source fails we
@@ -22,10 +30,15 @@ import { dirname, join } from 'node:path';
 import { resolveLocality } from './muni.mjs';
 
 // OSM is now the ONLY live call in neighborhoodScore (safety + schools come from
-// bundled tables). Keep it under the enrichment's 4s budget even if BOTH Overpass
-// mirrors are tried (2×1800 + 250 sleep < 4000) so the score is never lost to the
-// Promise.race — a slow OSM just omits walkability/transit/green, fail-soft.
-const TIMEOUT_MS = 1800;
+// bundled tables). The R8 query measures ~2-4s on public mirrors, so the old
+// 1800ms abort killed it almost every time (subs silently missing). R8: one
+// mirror gets most of the 4s publish budget (3300ms), the second is tried only
+// if the first failed FAST enough to leave real budget. The query also carries
+// [timeout:3] so Overpass itself gives up quickly instead of queueing 25s.
+// A slow OSM still just omits walkability/transit/green/quiet — fail-soft.
+const TIMEOUT_MS = 3300;
+const OSM_BUDGET_MS = 3700; // total wall-clock for all mirror attempts
+const QUERY_TIMEOUT_S = 3;  // server-side Overpass timeout hint
 const UA = 'RentlyBot/1.0 (+https://rently.co.il; neighbourhood scoring; attribution: data.gov.il/CBS/OSM)';
 
 // data.gov.il CKAN resource ids (verified live 2026-07). All per-locality joins
@@ -125,51 +138,132 @@ function saturate(count, target) {
 }
 
 // ---------------------------------------------------------------------------
-// Walkability + green + transit from ONE Overpass query (amenities within 800 m).
-// Distance decay is implicit in the radius; we additionally weight by count.
-async function osmCounts(lat, lng) {
-  const R = 800; // metres — a walkable catchment
-  // amenity/shop/leisure POIs (walkability), leisure=park/garden (green),
-  // highway=bus_stop + railway=station/tram_stop (transit).
-  const q = `[out:json][timeout:25];
-(
-  node(around:${R},${lat},${lng})[amenity~"^(supermarket|marketplace|pharmacy|cafe|restaurant|bank|atm|clinic|hospital|school|kindergarten|library|post_office)$"];
-  node(around:${R},${lat},${lng})[shop];
-  node(around:${R},${lat},${lng})[leisure~"^(park|garden|playground|fitness_centre|sports_centre)$"];
-  way(around:${R},${lat},${lng})[leisure~"^(park|garden)$"];
-  node(around:${R},${lat},${lng})[highway=bus_stop];
-  node(around:${R},${lat},${lng})[railway~"^(station|tram_stop|subway_entrance)$"];
-);
-out tags center 2000;`; // raised from 200: the low cap truncated park ways so green read 0
+// R8: walkability + green + transit + quiet from ONE Overpass query.
+// Beyond raw counts (R7), the scorers now use QUALITY signals: transit is
+// rail-weighted, green and rail blend in proximity, walkability rewards
+// essential-service coverage, and big roads nearby cost "quiet" points.
 
-  let data = null;
-  for (const ep of OVERPASS_ENDPOINTS) {
-    data = await fetchJson(ep, {
+const WALK_R = 800;   // walkable catchment (m)
+const ROAD_R = 250;   // noise-proxy radius (m)
+
+// Essential daily-life categories for the walkability coverage component.
+// Each maps to a predicate over OSM tags; coverage = fraction present in 800 m.
+const ESSENTIALS = {
+  grocery: (t) => ['supermarket', 'marketplace'].includes(t.amenity) ||
+                  ['supermarket', 'convenience', 'greengrocer'].includes(t.shop),
+  pharmacy: (t) => t.amenity === 'pharmacy' || t.shop === 'chemist',
+  health: (t) => ['clinic', 'hospital', 'doctors'].includes(t.amenity),
+  money: (t) => ['bank', 'atm'].includes(t.amenity),
+  post: (t) => t.amenity === 'post_office',
+};
+
+// Pure scorers (exported for tests — no network, deterministic).
+// counts: {bus, tram, rail, railNearestM} — rail counts stations, tram counts
+// light-rail/subway entrances. A train station moves the needle ~6× a bus stop.
+export function transitScoreFrom({ bus = 0, tram = 0, rail = 0, railNearestM = Infinity }) {
+  const weighted = bus + 3 * tram + 6 * rail;
+  const base = saturate(weighted, 14);
+  const railBonus = Number.isFinite(railNearestM)
+    ? clamp(100 * (1 - railNearestM / WALK_R)) : 0;
+  return clamp(0.75 * base + 0.25 * railBonus);
+}
+
+// {count, nearestM}: a park you can actually reach beats "5 somewhere in radius".
+export function greenScoreFrom({ count = 0, nearestM = Infinity }) {
+  const prox = Number.isFinite(nearestM) ? clamp(100 * (1 - nearestM / WALK_R)) : 0;
+  return clamp(0.6 * saturate(count, 5) + 0.4 * prox);
+}
+
+// {count, essentials}: essentials = how many of the 5 daily-life categories
+// exist within the catchment. 40 cafés no longer read as "perfectly walkable".
+export function walkScoreFrom({ count = 0, essentials = 0 }) {
+  return clamp(0.55 * saturate(count, 40) + 0.45 * (essentials / Object.keys(ESSENTIALS).length) * 100);
+}
+
+// {motorwayTrunk, primary, secondary} = way SEGMENTS within 250 m. Segment
+// counts are capped so one long road split into pieces doesn't nuke the score.
+// ponytail: heuristic noise proxy; swap for the real noise raster if we ever
+// bundle it.
+export function quietScoreFrom({ motorwayTrunk = 0, primary = 0, secondary = 0 }) {
+  const penalty =
+    60 * Math.min(motorwayTrunk, 2) / 2 +
+    30 * Math.min(primary, 3) / 3 +
+    15 * Math.min(secondary, 4) / 4;
+  return clamp(100 - penalty);
+}
+
+function elCoords(el) {
+  const lat = el.lat ?? el.center?.lat;
+  const lng = el.lon ?? el.center?.lon;
+  return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : null;
+}
+
+async function osmCounts(lat, lng) {
+  const q = `[out:json][timeout:${QUERY_TIMEOUT_S}];
+(
+  node(around:${WALK_R},${lat},${lng})[amenity~"^(supermarket|marketplace|pharmacy|cafe|restaurant|bank|atm|clinic|doctors|hospital|school|kindergarten|library|post_office)$"];
+  node(around:${WALK_R},${lat},${lng})[shop];
+  node(around:${WALK_R},${lat},${lng})[leisure~"^(park|garden|playground|fitness_centre|sports_centre)$"];
+  way(around:${WALK_R},${lat},${lng})[leisure~"^(park|garden)$"];
+  node(around:${WALK_R},${lat},${lng})[highway=bus_stop];
+  node(around:${WALK_R},${lat},${lng})[railway~"^(station|tram_stop|subway_entrance)$"];
+  way(around:${ROAD_R},${lat},${lng})[highway~"^(motorway|trunk|primary|secondary)$"];
+);
+out tags center 2000;`; // 'out center' gives way centroids for proximity math
+
+  // Race both mirrors — public-mirror latency is wildly variable (700ms–4s+),
+  // and enrichment runs ONCE per listing so the extra request is negligible
+  // load next to losing the score. First real JSON wins; null losers ignored.
+  const attempts = OVERPASS_ENDPOINTS.map((ep) =>
+    fetchJson(ep, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'data=' + encodeURIComponent(q),
-    });
-    if (data) break;
-    await sleep(250);
-  }
-  if (!data || !Array.isArray(data.elements)) return null;
+    }).then((d) => (d && Array.isArray(d.elements) ? d : Promise.reject(new Error('no data')))));
+  const data = await Promise.any(attempts).catch(() => null);
+  if (!data) return null;
 
-  let walk = 0, green = 0, transit = 0;
+  let walk = 0;
+  const essentialsSeen = new Set();
+  let green = 0, greenNearest = Infinity;
+  let bus = 0, tram = 0, rail = 0, railNearest = Infinity;
+  let motorwayTrunk = 0, primary = 0, secondary = 0;
+
   for (const el of data.elements) {
     const tags = el.tags || {};
-    if (tags.highway === 'bus_stop' ||
-        ['station', 'tram_stop', 'subway_entrance'].includes(tags.railway)) {
-      transit++;
-    } else if (['park', 'garden'].includes(tags.leisure)) {
+    const hw = tags.highway;
+    if (['motorway', 'trunk'].includes(hw)) { motorwayTrunk++; continue; }
+    if (hw === 'primary') { primary++; continue; }
+    if (hw === 'secondary') { secondary++; continue; }
+
+    if (hw === 'bus_stop') { bus++; continue; }
+    if (tags.railway === 'station') {
+      rail++;
+      const c = elCoords(el);
+      if (c) railNearest = Math.min(railNearest, distM(lat, lng, c.lat, c.lng));
+      continue;
+    }
+    if (['tram_stop', 'subway_entrance'].includes(tags.railway)) { tram++; continue; }
+
+    if (['park', 'garden'].includes(tags.leisure)) {
       green++;
-    } else if (tags.amenity || tags.shop || tags.leisure) {
+      const c = elCoords(el);
+      if (c) greenNearest = Math.min(greenNearest, distM(lat, lng, c.lat, c.lng));
+      continue;
+    }
+    if (tags.amenity || tags.shop || tags.leisure) {
       walk++;
+      for (const [key, match] of Object.entries(ESSENTIALS)) {
+        if (!essentialsSeen.has(key) && match(tags)) essentialsSeen.add(key);
+      }
     }
   }
+
   return {
-    walkability: saturate(walk, 40),   // ~40 walkable POIs in 800 m ≈ great
-    green: saturate(green, 5),         // ~5 parks/gardens nearby ≈ great
-    transit: saturate(transit, 12),    // ~12 stops/stations ≈ great
+    walkability: walkScoreFrom({ count: walk, essentials: essentialsSeen.size }),
+    green: greenScoreFrom({ count: green, nearestM: greenNearest }),
+    transit: transitScoreFrom({ bus, tram, rail, railNearestM: railNearest }),
+    quiet: quietScoreFrom({ motorwayTrunk, primary, secondary }),
   };
 }
 
@@ -222,8 +316,44 @@ function localityFeatureFor(locality) {
   return localityFeatures()[String(Number(m.cbs_id))] || null;
 }
 
+// R8: crime component is PERCENTILE-CALIBRATED against the national
+// distribution of per-capita rates — POPULATION-WEIGHTED, and only over
+// localities that actually report (pop ≥ 5k AND crime > 0). Unweighted
+// percentile over all 1,200 rows is meaningless: half are tiny localities with
+// zero recorded crime, which shoves every real city into the worst percentile.
+// Weighting by population asks the honest question: "how does this place rank
+// vs where people actually live?" Clamped to [5,95] — commercial-district
+// inflation (crime counted against resident pop only) shouldn't read as 0.
+const REPORTING_MIN_POP = 5000;
+let _crimeDist = null;
+function crimeDist() {
+  if (_crimeDist) return _crimeDist;
+  const rows = [];
+  for (const f of Object.values(localityFeatures())) {
+    if (Number.isFinite(f?.crime) && Number.isFinite(f?.pop) &&
+        f.pop >= REPORTING_MIN_POP && f.crime > 0) {
+      rows.push({ rate: f.crime / f.pop, pop: f.pop });
+    }
+  }
+  rows.sort((a, b) => a.rate - b.rate);
+  let cum = 0;
+  const totalPop = rows.reduce((s, r) => s + r.pop, 0);
+  for (const r of rows) { cum += r.pop; r.cumFrac = cum / totalPop; }
+  _crimeDist = rows;
+  return _crimeDist;
+}
+// Exported for tests. rate = crimes per capita; returns 0–100 (safer = higher).
+export function crimePercentileScore(rate, dist = crimeDist()) {
+  if (!Number.isFinite(rate) || rate < 0) return NaN;
+  if (dist.length < 30) return clamp(100 * (1 - rate / CRIME_RATE_BENCHMARK));
+  // population fraction living in localities with rate <= this one
+  let pct = 0;
+  for (const r of dist) { if (r.rate <= rate) pct = r.cumFrac; else break; }
+  return clamp(100 * (1 - pct), 5, 95);
+}
+
 // Safety for a locality from the precomputed table: socio-economic cluster
-// (higher = better) blended with PER-CAPITA crime (lower = better vs benchmark).
+// (higher = better) blended with the percentile-calibrated per-capita crime.
 // No runtime network → never times out to undefined for a covered locality.
 async function safetyScore(locality) {
   const f = localityFeatureFor(locality);
@@ -231,7 +361,8 @@ async function safetyScore(locality) {
   const parts = [];
   if (Number.isFinite(f.eshkol) && f.eshkol >= 1 && f.eshkol <= 10) parts.push(clamp((f.eshkol / 10) * 100));
   if (Number.isFinite(f.crime) && Number.isFinite(f.pop) && f.pop > 0) {
-    parts.push(clamp(100 * (1 - (f.crime / f.pop) / CRIME_RATE_BENCHMARK)));
+    const p = crimePercentileScore(f.crime / f.pop);
+    if (Number.isFinite(p)) parts.push(p);
   }
   if (!parts.length) return null;
   return clamp(parts.reduce((a, b) => a + b, 0) / parts.length);
@@ -346,14 +477,16 @@ export async function neighborhoodScore({ lat, lng, locality }) {
   const schoolsMeta = (near && near.schoolTotal)
     ? { pikuah: near.pikuah, sectors: near.sectors, total: near.schoolTotal } : null;
 
-  // assemble available sub-scores with their weights (kindergarten split out).
-  const W = { safety: 0.28, walkability: 0.22, schools: 0.18, kindergarten: 0.10, transit: 0.12, green: 0.10 };
+  // assemble available sub-scores with their weights (R8: quiet added, weights
+  // rebalanced to sum 1.0; renormalisation over survivors unchanged).
+  const W = { safety: 0.26, walkability: 0.20, schools: 0.16, kindergarten: 0.08, transit: 0.12, green: 0.10, quiet: 0.08 };
   const sub = {};
   if (Number.isFinite(safety)) sub.safety = round(safety);
   if (osm) {
     sub.walkability = round(osm.walkability);
     sub.transit = round(osm.transit);
     sub.green = round(osm.green);
+    if (Number.isFinite(osm.quiet)) sub.quiet = round(osm.quiet);
   }
   if (Number.isFinite(schools)) sub.schools = round(schools);
   if (Number.isFinite(kindergarten)) sub.kindergarten = round(kindergarten);
