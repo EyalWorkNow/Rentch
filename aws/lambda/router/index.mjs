@@ -278,11 +278,16 @@ const FCM_SEND_URL = `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/m
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
-// Load the service account JSON once (next to this file, bundled in the deploy
-// zip). Absent/garbage → fcmSA stays null and all sends become no-ops.
+// Load the service account JSON once. Prefer the FCM_SERVICE_ACCOUNT_JSON env
+// var (a secret lives in Lambda env, and survives code-only deploys that would
+// otherwise drop a bundled file from the zip — the exact failure that silently
+// disabled all push). Fall back to a bundled file next to this module.
+// Absent/garbage → fcmSA stays null and all sends become no-ops.
 let fcmSA = null;
 try {
-  fcmSA = JSON.parse(readFileSync(new URL('./fcm-service-account.json', import.meta.url), 'utf8'));
+  const raw = process.env.FCM_SERVICE_ACCOUNT_JSON
+    || readFileSync(new URL('./fcm-service-account.json', import.meta.url), 'utf8');
+  fcmSA = JSON.parse(raw);
   if (!fcmSA.client_email || !fcmSA.private_key) {
     console.warn('FCM: service account JSON missing client_email/private_key — push disabled');
     fcmSA = null;
@@ -1673,6 +1678,14 @@ export const handler = async (event) => {
             // Per-listing eligibility gate: hide listings whose landlord-defined
             // tenant criteria this caller fails (never the caller's own rows).
             const eligible = await applyEligibilityGate(gated, callerUid);
+            // OPT-OUT (?rank=0): skip the per-listing rank decoration for callers
+            // that rank locally — the website runs the ported on-device
+            // SmartSearch, so the ~15ms/row of server scoring (≈2s on a 136-row
+            // feed) is pure latency there. STRICTLY opt-in: the app never sends
+            // `rank`, so its responses are byte-identical to before. The privacy
+            // and audience/eligibility gates above ALWAYS run — only the scoring
+            // decoration is skipped.
+            if (String(query.rank) === '0') return eligible;
             return await attachRankSignals(eligible, query, cohort, callerUid);
           }
           return listed;
