@@ -961,14 +961,27 @@ class IsraelGeoIndex {
     _GeoPlace('עמק יזרעאל', 32.6470, 35.2960),
   ];
 
-  // Coarse coastline reference points (Mediterranean).
+  // Coastline reference points (Mediterranean), ~10-15km apart from Rosh
+  // Hanikra to the Gaza border, so `coastKm` approximates distance to the
+  // nearest shoreline point rather than to the nearest of a handful of city
+  // beaches (which badly overestimated distance for everywhere in between,
+  // e.g. Hadera/Caesarea/Ashkelon).
   static const List<_GeoPlace> _coast = [
-    _GeoPlace('ת"א חוף', 32.0800, 34.7660),
-    _GeoPlace('הרצליה חוף', 32.1640, 34.7920),
-    _GeoPlace('נתניה חוף', 32.3300, 34.8500),
+    _GeoPlace('ראש הנקרה', 33.0900, 35.1060),
+    _GeoPlace('נהריה חוף', 33.0060, 35.0940),
+    _GeoPlace('עכו חוף', 32.9280, 35.0700),
     _GeoPlace('חיפה חוף', 32.8200, 34.9700),
-    _GeoPlace('אשדוד חוף', 31.7900, 34.6300),
+    _GeoPlace('עתלית', 32.6860, 34.9410),
+    _GeoPlace('קיסריה חוף', 32.5000, 34.8950),
+    _GeoPlace('חדרה חוף', 32.4280, 34.8730),
+    _GeoPlace('נתניה חוף', 32.3300, 34.8500),
+    _GeoPlace('הרצליה חוף', 32.1640, 34.7920),
+    _GeoPlace('ת"א חוף', 32.0800, 34.7660),
     _GeoPlace('בת ים חוף', 32.0150, 34.7350),
+    _GeoPlace('ראשל"צ חוף', 31.9650, 34.7000),
+    _GeoPlace('אשדוד חוף', 31.7900, 34.6300),
+    _GeoPlace('אשקלון חוף', 31.6600, 34.5600),
+    _GeoPlace('זיקים חוף', 31.5600, 34.5000),
   ];
 }
 

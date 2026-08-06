@@ -1070,7 +1070,11 @@ function stampOwner(tableKey, body, uid) {
   else if (tableKey === 'users') body.id = uid;
   // The liker IS the caller; the landlord accepting IS the caller.
   else if (tableKey === 'property_likes') body.tenantId = uid;
-  else if (tableKey === 'matches') body.landlordUid = uid;
+  // 'matches' is NOT stamped here — unlike every other table, the caller
+  // isn't always the same party (a tenant self-creating a request thread
+  // names a landlordUid that ISN'T them). See the POST handler: it stamps
+  // landlordUid = uid itself, but only once it has verified which of the
+  // two creation paths this actually is.
 }
 
 const json = (status, body) => ({
@@ -1692,12 +1696,32 @@ export const handler = async (event) => {
         }
       case 'POST': {
         stampOwner(tableKey, body, callerUid);
-        // A match is the landlord accepting a liker → the caller must own the
-        // property. Block a definite ownership mismatch (spoofed match / forged
-        // "you have a match" push to a victim).
-        if (tableKey === 'matches' && callerUid && body.propertyId &&
-            !(await ownsOrUnknown(body.propertyId, callerUid))) {
-          return json(403, { message: 'Forbidden' });
+        // A match row is created two ways: (1) the landlord accepting a liker
+        // — the caller must own the property; or (2) a tenant self-creating a
+        // one-sided "request to message" thread for THEMSELVES (no mutual
+        // like yet) — the caller must be exactly the tenantUid they're
+        // claiming (no creating threads for someone else), and the
+        // landlordUid they name must be the property's REAL owner (verified,
+        // not fail-open — a tenant is asserting a fact about someone else).
+        // Block anything that's neither: a definite ownership mismatch
+        // (spoofed match / forged "you have a match" push to a victim).
+        if (tableKey === 'matches' && callerUid && body.propertyId) {
+          const ownsProperty = await ownsOrUnknown(body.propertyId, callerUid);
+          const isTenantSelfRequest =
+            !ownsProperty &&
+            body.tenantUid === callerUid &&
+            body.landlordUid &&
+            body.landlordUid !== callerUid &&
+            (await isRealOwnerOf(body.propertyId, body.landlordUid));
+          if (!ownsProperty && !isTenantSelfRequest) {
+            return json(403, { message: 'Forbidden' });
+          }
+          // Landlord path: landlordUid is always the caller, never the
+          // client's word for it. Tenant-self path: landlordUid/tenantUid
+          // were already verified above — pass through as sent.
+          if (ownsProperty) body.landlordUid = callerUid;
+        } else if (tableKey === 'matches' && callerUid) {
+          body.landlordUid = callerUid;
         }
         // A message write must be by a MEMBER of the thread. Without this any
         // authenticated user could inject a message into any matchId (the stream
@@ -1836,6 +1860,23 @@ async function ownsOrUnknown(propertyId, uid) {
     return prop.Item.ownerUserId === uid;
   } catch {
     return true;
+  }
+}
+
+// STRICT counterpart to ownsOrUnknown — no fail-open on a lookup miss. Used to
+// verify a tenant's claimed landlordUid on a self-created match/request row
+// (see the POST /matches gate below): unlike the landlord-approves flow, a
+// tenant is asserting a fact about someone ELSE, so an unverifiable claim
+// must be rejected, not waved through.
+async function isRealOwnerOf(propertyId, uid) {
+  try {
+    const prop = await ddb.send(new GetCommand({
+      TableName: TABLES.properties.name,
+      Key: { id: propertyId },
+    }));
+    return !!prop.Item && prop.Item.ownerUserId === uid;
+  } catch {
+    return false;
   }
 }
 

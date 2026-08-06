@@ -57,10 +57,10 @@ class SearchIntent {
   /// adjacent settlements, so the city gate widens to the neighbouring towns.
   static const cityArea = 'city_area';
 
-  // Distance-from-sea thresholds (km) — a shared, explicit definition of "close".
-  static const double seaCloseKm = 1.5; // "on the sea" / walkable to the beach
-  static const double seaOkKm = 3.0; // still "near the sea"
-  // >seaOkKm ⇒ not near the sea.
+  /// "לא רחוק מהים" ("not far from the sea") means strictly under this — 4km
+  /// is NOT "not far". The single definition; the near-sea gate in
+  /// RecommendationOrchestrator consumes this rather than a local constant.
+  static const double notFarFromSeaKm = 4.0;
 
   static final Map<String, RegExp> _patterns = {
     // NB: "לים" must be a WORD ("קרוב לים"), not a suffix — otherwise "גלגלים"

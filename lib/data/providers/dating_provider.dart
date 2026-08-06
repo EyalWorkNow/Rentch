@@ -2962,7 +2962,6 @@ class DatingProvider extends ChangeNotifier {
     required bool overwriteIdentityFields,
   }) async {
     // Bind the profile to the real Firebase UID so each user's data is isolated.
-    final wasGuestMode = _isGuestMode;
     final previousOwnerUserId = _currentOwnerUserId;
     final uid = _firebaseAuthOrNull?.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
@@ -2991,12 +2990,24 @@ class DatingProvider extends ChangeNotifier {
     }
 
     _isGuestMode = false;
-    if (isLandlord && !wasGuestMode) {
+    if (isLandlord) {
       _retagCurrentLandlordProperties(
         previousOwnerUserId: previousOwnerUserId,
         nextOwnerUserId: _currentOwnerUserId,
       );
     }
+    // Same placeholder-id problem as the property retag above, but for the
+    // TENANT side: a match created (via _createMatch) while this device's
+    // profile.id was still a placeholder gets an id like
+    // match-<propertyId>~guest_tenant, which the real account's uid never
+    // matches — so a landlord who approved a lead from a not-yet-signed-in
+    // tenant leaves that tenant's own app with no visible conversation, ever,
+    // even after the tenant signs in. Retag every local match still keyed to
+    // a placeholder and push the correction to the server.
+    _retagCurrentTenantMatches(
+      previousTenantUid: previousOwnerUserId,
+      nextTenantUid: _currentOwnerUserId,
+    );
 
     // Load the user's own properties from the backend and merge them in, so
     // the landlord sees every listing they ever uploaded — on any device.
@@ -3034,27 +3045,66 @@ class DatingProvider extends ChangeNotifier {
     if (isLandlord) unawaited(refreshSubscription());
   }
 
+  // Known placeholder owner ids _currentOwnerUserId has ever handed out
+  // before a real Firebase uid was bound. A property can be stuck under one
+  // of these from a PAST sign-in even when previousOwnerUserId (this run's
+  // pre-bind value) is already the real uid — e.g. the local device cache
+  // still holds a row from before this retag existed, or from before the
+  // user ever signed in this session. Sweeping all of them (not just
+  // previousOwnerUserId) is what actually heals already-broken data.
+  static const Set<String> _legacyOwnerPlaceholders = {
+    _guestLandlordOwnerId,
+    _localLandlordOwnerId,
+    'tenant-local',
+  };
+
   void _retagCurrentLandlordProperties({
     required String previousOwnerUserId,
     required String nextOwnerUserId,
   }) {
-    if (nextOwnerUserId.trim().isEmpty ||
-        previousOwnerUserId == nextOwnerUserId) {
-      return;
-    }
+    if (nextOwnerUserId.trim().isEmpty) return;
 
-    var changed = false;
+    // Rows saved under a placeholder owner id (guest mode's 'guest_landlord',
+    // or the pre-sign-in 'local_landlord'/'tenant-local' fallbacks in
+    // _currentOwnerUserId) only got fixed HERE, in memory — the DB row kept
+    // the placeholder forever. That made the listing invisible to any query
+    // keyed on the real uid (the website's "my properties", /match/leads,
+    // another device signing into the same account), even though this
+    // device's own local cache looked correct. Push the corrected owner id
+    // back to the server for every row this retags, not just locally.
+    final retagged = <RentalProperty>[];
     _customProperties = _customProperties.map((property) {
       if (_isGuestDemoProperty(property)) return property;
       final ownerUserId = property.ownerUserId.trim();
-      if (ownerUserId.isNotEmpty && ownerUserId != previousOwnerUserId) {
-        return property;
-      }
-      changed = true;
-      return property.copyWith(ownerUserId: nextOwnerUserId);
+      final isStale = ownerUserId.isEmpty ||
+          ownerUserId == previousOwnerUserId ||
+          _legacyOwnerPlaceholders.contains(ownerUserId);
+      if (!isStale || ownerUserId == nextOwnerUserId) return property;
+      final retaggedProperty = property.copyWith(ownerUserId: nextOwnerUserId);
+      retagged.add(retaggedProperty);
+      return retaggedProperty;
     }).toList(growable: false);
 
-    if (changed) _invalidateCatalogCache();
+    if (retagged.isEmpty) return;
+    _invalidateCatalogCache();
+    for (final property in retagged) {
+      unawaited(
+        _propertyRepository
+            .saveProperty(
+              property,
+              ownerUserId: nextOwnerUserId,
+              status: property.isActive
+                  ? PropertyRecordStatus.active
+                  : PropertyRecordStatus.paused,
+            )
+            .then((result) {
+          if (!result.isOk && kDebugMode) {
+            debugPrint(
+                '_retagCurrentLandlordProperties: remote rejected ${property.id} — ${result.userMessage}');
+          }
+        }),
+      );
+    }
   }
 
   Future<void> updateFilters(SearchFilters filters) async {
@@ -6071,16 +6121,23 @@ class DatingProvider extends ChangeNotifier {
 
   // Landlord → backend: persist a mutual match so the tenant can fetch it and the
   // server pushes them "you have a match". Fail-soft (the local match still holds).
+  // [landlordUid] defaults to the CURRENT device's signed-in user (the normal
+  // case: this runs on the landlord's own device) — pass it explicitly when
+  // calling from the tenant's device instead (retagging an old match), where
+  // the current user IS the tenant and the landlord uid has to come from the
+  // property's own ownerUserId.
   Future<void> _syncMatchToBackend({
     required String matchId,
     required String propertyId,
     required String tenantUid,
+    String? landlordUid,
   }) async {
-    final landlordUid = _firebaseAuthOrNull?.currentUser?.uid;
-    if (landlordUid == null ||
-        landlordUid.isEmpty ||
+    final resolvedLandlordUid =
+        landlordUid ?? _firebaseAuthOrNull?.currentUser?.uid;
+    if (resolvedLandlordUid == null ||
+        resolvedLandlordUid.isEmpty ||
         tenantUid.isEmpty ||
-        tenantUid == landlordUid) {
+        tenantUid == resolvedLandlordUid) {
       return;
     }
     try {
@@ -6088,10 +6145,65 @@ class DatingProvider extends ChangeNotifier {
         'id': matchId,
         'propertyId': propertyId,
         'tenantUid': tenantUid,
-        'landlordUid': landlordUid,
+        'landlordUid': resolvedLandlordUid,
         'createdAt': DateTime.now().toUtc().toIso8601String(),
       });
     } catch (_) {/* fail-soft */}
+  }
+
+  /// Mirrors [_retagCurrentLandlordProperties] for the tenant side of a match,
+  /// PLUS closes a second gap: [requestToMessage] (a one-sided "message the
+  /// landlord" thread with no mutual like yet) has always been LOCAL ONLY —
+  /// it never called [_syncMatchToBackend] at all, synced or not. So a tenant
+  /// can have real open conversations in the app that were never pushed to
+  /// the server under ANY uid, placeholder or real, and no website/other-
+  /// device view can ever see them no matter what gets retagged.
+  ///
+  /// So this does two things on every identity bind (sign-in, session
+  /// restore — not just once): re-key any match still on a stale/placeholder
+  /// id (as before), AND unconditionally (re-)push every local match where
+  /// THIS device is the tenant (id suffix == my uid) to the server. The
+  /// second part is a no-op for matches already synced (same POST, same id —
+  /// an upsert) and is what actually fixes an unsynced [requestToMessage]
+  /// thread, which retagging alone can't since its id was never wrong.
+  void _retagCurrentTenantMatches({
+    required String previousTenantUid,
+    required String nextTenantUid,
+  }) {
+    if (nextTenantUid.trim().isEmpty) return;
+    _matches = _matches.map((m) {
+      final tildeAt = m.id.lastIndexOf('~');
+      if (tildeAt < 0) return m;
+      final ownerSuffix = m.id.substring(tildeAt + 1);
+      final isStale = ownerSuffix == previousTenantUid ||
+          _legacyOwnerPlaceholders.contains(ownerSuffix);
+      if (!isStale || ownerSuffix == nextTenantUid) return m;
+      final newId = '${m.id.substring(0, tildeAt)}~$nextTenantUid';
+      if (_matches.any((other) => other.id == newId)) return m;
+      return RentalMatch(
+        id: newId,
+        propertyId: m.propertyId,
+        createdAt: m.createdAt,
+        messages: m.messages,
+        contractSent: m.contractSent,
+        ownerSigned: m.ownerSigned,
+        tenantSigned: m.tenantSigned,
+        isRequest: m.isRequest,
+      );
+    }).toList(growable: false);
+
+    final mine = _matches.where((m) => m.id.endsWith('~$nextTenantUid'));
+    for (final m in mine) {
+      final landlordUid = propertyById(m.propertyId)?.ownerUserId;
+      unawaited(_syncMatchToBackend(
+        matchId: m.id,
+        propertyId: m.propertyId,
+        tenantUid: nextTenantUid,
+        landlordUid: (landlordUid == null || landlordUid.isEmpty)
+            ? null
+            : landlordUid,
+      ));
+    }
   }
 
   /// Public re-pull of the user's matches — call it in-session (app resume, an
@@ -6205,8 +6317,47 @@ class DatingProvider extends ChangeNotifier {
         ),
       ];
     }
+    // This thread has no mutual like, so it's never created by the landlord
+    // side (_createMatch) — without an explicit sync here (both the match row
+    // AND the message text, in order — the message endpoint gates on thread
+    // membership, which the match row establishes) it stays LOCAL ONLY
+    // forever: no website view, no other device, not even the landlord's own
+    // app ever sees it, regardless of which uid it's keyed to. Idempotent
+    // upsert either way, so safe to call again when appending to a thread
+    // that predates this fix and was never synced.
+    unawaited(() async {
+      await _syncMatchToBackend(
+        matchId: matchId,
+        propertyId: property.id,
+        tenantUid: _currentOwnerUserId,
+        landlordUid:
+            property.ownerUserId.isEmpty ? null : property.ownerUserId,
+      );
+      await _syncMessageToBackend(matchId: matchId, id: msg.id, text: msg.text);
+    }());
     await _persist();
     notifyListeners();
+  }
+
+  /// POSTs one chat message to the shared /messages contract. [id] is
+  /// required — the backend's generic write path keys every row by an
+  /// explicit id and never generates one (verified directly against the live
+  /// API: a POST without it 400s "Missing id"). senderId/createdAt are
+  /// stamped server-side from the caller's auth token. Fail-soft: the local
+  /// thread still holds the message either way.
+  Future<void> _syncMessageToBackend({
+    required String matchId,
+    required String id,
+    required String text,
+  }) async {
+    if (text.trim().isEmpty) return;
+    try {
+      await AwsApiClient.instance.post('/messages', {
+        'id': id,
+        'matchId': matchId,
+        'text': text,
+      });
+    } catch (_) {/* fail-soft */}
   }
 
   /// Whether the current user already has a thread/request for this property.

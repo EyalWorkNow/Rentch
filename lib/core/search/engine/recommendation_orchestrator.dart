@@ -724,14 +724,14 @@ class RecommendationEngine {
 
     // Near-sea gate: excludes the clearly-inland (so "קרוב לים" never returns
     // ירושלים), but stays forgiving — "לא רחוק מהים" in a coastal city still
-    // means a few km inland is fine. So the GATE is a generous 5km while the
-    // coast dimension below orders the survivors by exact distance (beachfront
-    // first). Relax entirely if nothing qualifies.
+    // means a few km inland is fine. SearchIntent.notFarFromSeaKm (4km,
+    // exclusive) is the single definition of "not far"; the coast dimension
+    // below orders the survivors by exact distance (beachfront first). Relax
+    // entirely if nothing qualifies.
     if (query.intents.contains(SearchIntent.nearSea)) {
-      const seaGateKm = 5.0;
       final nearSea = candidates.where((p) {
         final km = IsraelGeoIndex.coastKm(p.lat, p.lon);
-        return km != null && km <= seaGateKm;
+        return km != null && km < SearchIntent.notFarFromSeaKm;
       }).toList();
       if (nearSea.isNotEmpty) candidates = nearSea;
     }

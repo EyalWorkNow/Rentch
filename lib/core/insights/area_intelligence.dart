@@ -180,9 +180,10 @@ class AreaIntelligence {
       roughYieldPct: roughYield,
     );
     final railKm = g('rail_km', 99);
-    final coastKm = g('coast_access', -1) > 0
-        ? null // engineered as a kernel; expose the km separately if needed
-        : null;
+    // `coast_access` on pfv is a decayed 0..1 proximity kernel (see
+    // FeatureEngineer._buildLayerFeatures), not invertible back to km — get
+    // the real distance straight from the geo index instead.
+    final coastKm = IsraelGeoIndex.coastKm(lat, lon);
     return AreaProfile(
       lat: lat, lon: lon, city: city,
       sesCluster: sa?.ses ?? 0,
