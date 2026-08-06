@@ -6195,14 +6195,40 @@ class DatingProvider extends ChangeNotifier {
     final mine = _matches.where((m) => m.id.endsWith('~$nextTenantUid'));
     for (final m in mine) {
       final landlordUid = propertyById(m.propertyId)?.ownerUserId;
-      unawaited(_syncMatchToBackend(
-        matchId: m.id,
-        propertyId: m.propertyId,
-        tenantUid: nextTenantUid,
-        landlordUid: (landlordUid == null || landlordUid.isEmpty)
-            ? null
-            : landlordUid,
-      ));
+      unawaited(() async {
+        await _syncMatchToBackend(
+          matchId: m.id,
+          propertyId: m.propertyId,
+          tenantUid: nextTenantUid,
+          landlordUid: (landlordUid == null || landlordUid.isEmpty)
+              ? null
+              : landlordUid,
+        );
+        // Message backfill is scoped to isRequest threads ONLY — those are
+        // the proven-broken, ALWAYS-local-only category (requestToMessage
+        // never synced anything, ever). A regular mutual match's messages
+        // already flow through RealtimeChatService/the WebSocket path, which
+        // was never broken.
+        if (!m.isRequest || m.messages.isEmpty) return;
+        // Re-posting an already-synced message is a same-id upsert (never a
+        // duplicate row) — but the server stamps createdAt itself on every
+        // write (anti-clock-skew), so a repeat post would bump an old
+        // message's timestamp to "now" on every single sign-in forever,
+        // scrambling the thread's real chronological order. So: check ONCE
+        // whether this thread has ever been synced at all, and only backfill
+        // when it truly hasn't — never re-touch an already-synced thread.
+        try {
+          final existing = await AwsApiClient.instance
+              .get('/messages', query: {'matchId': m.id});
+          final items = existing['items'];
+          if (items is List && items.isNotEmpty) return;
+        } catch (_) {
+          return; // can't confirm it's empty — don't risk a timestamp-bump
+        }
+        for (final msg in m.messages) {
+          await _syncMessageToBackend(matchId: m.id, id: msg.id, text: msg.text);
+        }
+      }());
     }
   }
 
