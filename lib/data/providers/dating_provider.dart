@@ -3009,6 +3009,31 @@ class DatingProvider extends ChangeNotifier {
       nextTenantUid: _currentOwnerUserId,
     );
 
+    // Backfill any candidate rejection made before this sync existed (or
+    // before real sign-in) — safe to repeat every time: the server write is
+    // a plain idempotent flag set, not a create, so there's no "already
+    // synced, don't touch it again" concern like the message backfill above.
+    if (isLandlord) {
+      for (final key in _ownerRejectedPropertyIds) {
+        final parts = key.split('|');
+        if (parts.length != 2 || parts[1].isEmpty) continue;
+        unawaited(_syncLeadRejectionToBackend(propertyId: parts[0], tenantId: parts[1]));
+      }
+    }
+
+    // Backfill likes made while this device's profile.id was still a
+    // placeholder (see _syncPropertyLike) — ONLY when the previous id was
+    // actually a placeholder, not on every sign-in, since re-pushing a large
+    // like history every time would be unbounded, wasted network calls.
+    final wasPlaceholder = _legacyOwnerPlaceholders.contains(previousOwnerUserId) ||
+        previousOwnerUserId.startsWith('guest_');
+    if (wasPlaceholder && previousOwnerUserId != _currentOwnerUserId) {
+      final now = DateTime.now();
+      for (final propertyId in _likedPropertyIds) {
+        unawaited(_syncPropertyLike(propertyId, now));
+      }
+    }
+
     // Load the user's own properties from the backend and merge them in, so
     // the landlord sees every listing they ever uploaded — on any device.
     final ownerProps = await _rentalDataService.loadPropertiesByOwner(uid);
@@ -3024,6 +3049,14 @@ class DatingProvider extends ChangeNotifier {
       }
       _customProperties = merged;
       _invalidateCatalogCache();
+    }
+
+    // Pull in saves made on another device (or before toggleSave synced them
+    // at all, pre-fix) — union with the local set, never a destructive
+    // overwrite, so a save made offline on THIS device isn't dropped.
+    final savedRemote = await InteractionService.instance.fetchSaved();
+    if (savedRemote.isNotEmpty) {
+      _savedPropertyIds = {..._savedPropertyIds, ...savedRemote};
     }
 
     await _persist();
@@ -3688,62 +3721,72 @@ class DatingProvider extends ChangeNotifier {
         likedAt: now,
       ),
     );
-    // Cross-user like: write a row the property's landlord can read, so a like
-    // from this device is visible to the owner on theirs. Don't like your own.
-    final property = propertyById(propertyId);
-    if (property != null &&
-        property.ownerUserId.isNotEmpty &&
-        property.ownerUserId != _currentOwnerUserId) {
-      // Snapshot the tenant's REAL attributes into the like so they reach the
-      // landlord's candidate deck (and its filters) cross-device. Fail-soft:
-      // when there's no profile in scope, every extra field stays null and the
-      // payload is identical to an old-style like.
-      final tp = _tenantProfile;
-      unawaited(
-        _propertyLikesRepository.addLike(
-          propertyId: propertyId,
-          ownerUserId: property.ownerUserId,
-          tenantId: _currentAnalyticsUserId,
-          tenantName: tp?.name ?? 'מתעניין/ת',
-          tenantPhotoUrl:
-              tp?.photoUrls.isNotEmpty == true ? tp!.photoUrls.first : '',
-          moveInSnapshot: tp?.moveInWindow ?? '',
-          budgetMax: tp?.budgetMax,
-          rooms: tp?.desiredRooms,
-          occupation: tp?.occupation,
-          numChildren: tp?.numChildren,
-          hasPets: tp?.hasPets,
-          hasCar: tp?.hasCar,
-          wfh: tp?.wfh,
-          household: tp?.household,
-          lifeStage: tp?.lifeStage,
-          monthlyIncome: tp?.monthlyIncome,
-          age: tp?.age,
-          isOleh: tp?.isOleh,
-          smoker: tp?.smoker,
-          hasGuarantor: tp?.hasGuarantor,
-          leaseMonths: tp?.leaseMonths,
-          incomeProofReady: tp?.incomeProofReady,
-          religiousLifestyle: tp?.religiousLifestyle,
-          shabbatObservant: tp?.shabbatObservant,
-          keepsKosher: tp?.keepsKosher,
-          petType: tp?.petType,
-          hostsGuests: tp?.hostsGuests,
-          playsInstrument: tp?.playsInstrument,
-          urgency: tp?.urgency,
-          workLat: tp?.workLat,
-          workLon: tp?.workLon,
-          // No explicit tenant "verified" flag exists; derive it from the app's
-          // real trust signal (photo/bio/budget/etc.), the same score shown in
-          // the profile. Only stamped when there's a profile to score.
-          verified: tp == null
-              ? null
-              : GamificationService.computeTrustScore(tp, const []) >= 70,
-          at: now,
-        ),
-      );
-    }
+    unawaited(_syncPropertyLike(propertyId, now));
     unawaited(refreshPropertySignals(propertyId));
+  }
+
+  /// Cross-user like: writes the row the property's landlord can read, so a
+  /// like from this device is visible to the owner on theirs. Don't like your
+  /// own. Split out from [_recordPropertyLike] so [_bindFirebaseIdentity] can
+  /// re-run just the sync (not the local like-counter bump) to retag a like
+  /// made while this device's profile.id was still a placeholder — same
+  /// problem as properties/matches, but there's no local "pending like"
+  /// record to rewrite in place, so this just re-submits under the real uid
+  /// (a deterministic id per (propertyId, tenantId) — an upsert, never a
+  /// duplicate — the stale placeholder-id row is simply orphaned, not deleted).
+  Future<void> _syncPropertyLike(String propertyId, DateTime at) async {
+    final property = propertyById(propertyId);
+    if (property == null ||
+        property.ownerUserId.isEmpty ||
+        property.ownerUserId == _currentOwnerUserId) {
+      return;
+    }
+    // Snapshot the tenant's REAL attributes into the like so they reach the
+    // landlord's candidate deck (and its filters) cross-device. Fail-soft:
+    // when there's no profile in scope, every extra field stays null and the
+    // payload is identical to an old-style like.
+    final tp = _tenantProfile;
+    await _propertyLikesRepository.addLike(
+      propertyId: propertyId,
+      ownerUserId: property.ownerUserId,
+      tenantId: _currentAnalyticsUserId,
+      tenantName: tp?.name ?? 'מתעניין/ת',
+      tenantPhotoUrl:
+          tp?.photoUrls.isNotEmpty == true ? tp!.photoUrls.first : '',
+      moveInSnapshot: tp?.moveInWindow ?? '',
+      budgetMax: tp?.budgetMax,
+      rooms: tp?.desiredRooms,
+      occupation: tp?.occupation,
+      numChildren: tp?.numChildren,
+      hasPets: tp?.hasPets,
+      hasCar: tp?.hasCar,
+      wfh: tp?.wfh,
+      household: tp?.household,
+      lifeStage: tp?.lifeStage,
+      monthlyIncome: tp?.monthlyIncome,
+      age: tp?.age,
+      isOleh: tp?.isOleh,
+      smoker: tp?.smoker,
+      hasGuarantor: tp?.hasGuarantor,
+      leaseMonths: tp?.leaseMonths,
+      incomeProofReady: tp?.incomeProofReady,
+      religiousLifestyle: tp?.religiousLifestyle,
+      shabbatObservant: tp?.shabbatObservant,
+      keepsKosher: tp?.keepsKosher,
+      petType: tp?.petType,
+      hostsGuests: tp?.hostsGuests,
+      playsInstrument: tp?.playsInstrument,
+      urgency: tp?.urgency,
+      workLat: tp?.workLat,
+      workLon: tp?.workLon,
+      // No explicit tenant "verified" flag exists; derive it from the app's
+      // real trust signal (photo/bio/budget/etc.), the same score shown in
+      // the profile. Only stamped when there's a profile to score.
+      verified: tp == null
+          ? null
+          : GamificationService.computeTrustScore(tp, const []) >= 70,
+      at: at,
+    );
   }
 
   void _removePropertyLike(String propertyId) {
@@ -4259,6 +4302,15 @@ class DatingProvider extends ChangeNotifier {
     final key = _ownerActionKey(property.id, tenantId);
     if (direction == CardSwiperDirection.left) {
       _ownerRejectedPropertyIds.add(key);
+      // Used to be LOCAL ONLY — the same candidate reappeared as pending on
+      // any other device or the website, since the rejection never reached
+      // the server. Fire-and-forget; the local hide above is unchanged.
+      if (tenantId.isNotEmpty) {
+        unawaited(_syncLeadRejectionToBackend(
+          propertyId: property.id,
+          tenantId: tenantId,
+        ));
+      }
     } else if (direction == CardSwiperDirection.right ||
         direction == CardSwiperDirection.top) {
       _ownerAcceptedPropertyIds.add(key);
@@ -4270,6 +4322,21 @@ class DatingProvider extends ChangeNotifier {
     await _persist();
     notifyListeners();
     return true;
+  }
+
+  /// POSTs a landlord's candidate rejection so it's dismissed everywhere (see
+  /// handleOwnerSwipe's left-swipe branch). Fail-soft: the local hide already
+  /// happened regardless.
+  Future<void> _syncLeadRejectionToBackend({
+    required String propertyId,
+    required String tenantId,
+  }) async {
+    try {
+      await AwsApiClient.instance.post('/match/reject', {
+        'propertyId': propertyId,
+        'tenantId': tenantId,
+      });
+    } catch (_) {/* fail-soft */}
   }
 
   void clearPendingMatch() {
@@ -4768,6 +4835,14 @@ class DatingProvider extends ChangeNotifier {
     // local set + persistence above is unchanged; this only adds the event.
     AppEvents.instance.service
         .logSaveToggled(propertyId: propertyId, saved: saved);
+    // This used to be LOCAL ONLY — it looked saved immediately but never
+    // reached the backend, so the list never appeared on another device, the
+    // website, or survived a reinstall. Fire-and-forget, always keyed by the
+    // verified caller uid server-side (never a stale placeholder).
+    unawaited(InteractionService.instance.record(
+      propertyId: propertyId,
+      action: saved ? 'save' : 'unsave',
+    ));
     await _persist();
     notifyListeners();
   }

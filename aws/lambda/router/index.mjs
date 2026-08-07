@@ -1397,6 +1397,16 @@ export const handler = async (event) => {
       return await handleMatchLeads(event);
     }
 
+    // POST /match/reject {propertyId, tenantId} → a landlord dismissing a
+    // candidate. Used to be LOCAL ONLY (a left-swipe never called the
+    // server) — the same candidate reappeared as pending on every other
+    // device/the website, since nothing was ever recorded here. Marks the
+    // underlying property_likes row so handleMatchLeads (below) can filter
+    // it out everywhere. Caller must own the property the like refers to.
+    if (segments[0] === 'match' && segments[1] === 'reject' && method === 'POST') {
+      return await handleMatchReject(event);
+    }
+
     // ── Audience cohort suggestion (landlord targeting) ─────────────────────
     // POST /audience/suggest → given a draft listing + the cohorts the landlord
     // already picked + a free-text note, Gemini proposes ADDITIONAL relevant
@@ -1437,6 +1447,13 @@ export const handler = async (event) => {
     // and recompute its implicit score. → { ok, score }. Fail-soft.
     if (segments[0] === 'interactions' && !segments[1] && method === 'POST') {
       return await handleInteraction(event);
+    }
+    // GET /interactions/saved → the caller's own saved properties (toggleSave
+    // was local-only forever before this — see the 'save'/'unsave' actions
+    // above). Always keyed by the VERIFIED caller uid (never a client-
+    // supplied field), so this can't be spoofed to read someone else's list.
+    if (segments[0] === 'interactions' && segments[1] === 'saved' && method === 'GET') {
+      return await handleGetSavedInteractions(event);
     }
     // POST /reco/cf → item-item co-engagement recommendations. → { items:[...] }.
     if (segments[0] === 'reco' && segments[1] === 'cf' && method === 'POST') {
@@ -1791,6 +1808,18 @@ export const handler = async (event) => {
         return written;
       }
       case 'PUT': {
+        // Unlike DELETE (which already checked this), a PUT to an existing
+        // property id had no ownership check at all — and stampOwner (next
+        // line) unconditionally forces body.ownerUserId to the CALLER, so an
+        // unguarded PUT would silently re-parent another landlord's listing
+        // to the attacker instead of just failing. Same check DELETE uses.
+        if (tableKey === 'properties' && id) {
+          const existing = await ddb.send(
+            new GetCommand({ TableName: table.name, Key: { id } }),
+          );
+          const owner = existing.Item?.ownerUserId;
+          if (owner && owner !== callerUid) return json(403, { message: 'Forbidden' });
+        }
         stampOwner(tableKey, body, callerUid);
         // For users & persona the row id IS the uid — never let a caller PUT to
         // another user's id.
@@ -2434,7 +2463,7 @@ async function handleSearchOutcome(event) {
 // Merge one incoming interaction event into the stored (user,property) row.
 // Pure: MAX for accumulators (dwellMs/photosViewed/scrollDepth), OR for media
 // flags, latest-wins for entrySource/entryRank, and per-action booleans/counter.
-const INTERACTION_ACTIONS = new Set(['view', 'like', 'superlike', 'pass', 'contact', 'bounce']);
+const INTERACTION_ACTIONS = new Set(['view', 'like', 'superlike', 'pass', 'contact', 'bounce', 'save', 'unsave']);
 function mergeInteraction(cur, body) {
   const r = { ...(cur || {}) };
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
@@ -2465,6 +2494,8 @@ function mergeInteraction(cur, body) {
     else if (action === 'pass') r.passed = true;
     else if (action === 'contact') r.contacted = true;
     else if (action === 'bounce') r.bounced = true;
+    else if (action === 'save') r.saved = true;
+    else if (action === 'unsave') r.saved = false;
   }
   return r;
 }
@@ -2505,6 +2536,27 @@ async function handleInteraction(event) {
   } catch (e) {
     console.warn('interactions write failed:', e.message);
     return json(200, { ok: false, score: 0 });   // fail-soft: never 500
+  }
+}
+
+// GET /interactions/saved — the caller's own saved properties. Queries the
+// BASE table (partition key userId, sort key propertyId — no GSI needed) so
+// this is a single cheap query, not a scan.
+async function handleGetSavedInteractions(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  try {
+    const out = await ddb.send(new QueryCommand({
+      TableName: TABLES.interactions.name,
+      KeyConditionExpression: 'userId = :u',
+      FilterExpression: 'saved = :s',
+      ExpressionAttributeValues: { ':u': uid, ':s': true },
+    }));
+    const propertyIds = (out.Items || []).map((it) => it.propertyId);
+    return json(200, { propertyIds });
+  } catch (e) {
+    console.warn('interactions/saved read failed:', e.message);
+    return json(200, { propertyIds: [] }); // fail-soft
   }
 }
 
@@ -3171,6 +3223,13 @@ async function deleteItem(table, tableKey, id, callerUid) {
   // Ownership enforcement: a caller may only delete rows they own.
   //  • users      — the row id IS the uid, so id must equal the caller.
   //  • properties — fetch the row and compare its ownerUserId.
+  //  • matches    — same two-party membership GET already enforces
+  //    (isThreadMember): both matchId and property_likes ids are
+  //    deterministic/guessable (match-<propertyId>~<tenantUid>,
+  //    like_<propertyId>_<tenantId>) — without this, any authenticated
+  //    caller who can construct one could delete two OTHER people's
+  //    conversation or lead just by guessing the id.
+  //  • property_likes — only the tenant who owns the like may delete it.
   // Other tables have no verified owner field; they remain authenticated-only.
   if (tableKey === 'users' || tableKey === 'persona') {
     if (id !== callerUid) return json(403, { message: 'Forbidden' });
@@ -3180,6 +3239,14 @@ async function deleteItem(table, tableKey, id, callerUid) {
     );
     const owner = existing.Item?.ownerUserId;
     if (owner && owner !== callerUid) return json(403, { message: 'Forbidden' });
+  } else if (tableKey === 'matches') {
+    if (!(await isThreadMember(id, callerUid))) return json(403, { message: 'Forbidden' });
+  } else if (tableKey === 'property_likes') {
+    const existing = await ddb.send(
+      new GetCommand({ TableName: table.name, Key: { id } }),
+    );
+    const tenantId = existing.Item?.tenantId;
+    if (tenantId && tenantId !== callerUid) return json(403, { message: 'Forbidden' });
   }
 
   await ddb.send(new DeleteCommand({ TableName: table.name, Key: { id } }));
@@ -6004,6 +6071,33 @@ async function handleMarkRead(event) {
 // POST /match/leads → rank the tenants who liked the caller's properties by the
 // same two-sided model the client uses (landlord→tenant fit: affordability +
 // shared preferences + deal-breaker gates). Landlord-only.
+// POST /match/reject {propertyId, tenantId} — see the route comment above.
+async function handleMatchReject(event) {
+  const uid = callerUidOf(event);
+  if (!uid) return json(401, { message: 'Authentication required.' });
+  let body = {};
+  try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+  const propertyId = (body.propertyId || '').toString();
+  const tenantId = (body.tenantId || '').toString();
+  if (!propertyId || !tenantId) return json(400, { message: 'propertyId and tenantId required' });
+  if (!(await isOwnerOf(propertyId, uid))) return json(403, { message: 'Forbidden' });
+  const id = `like_${propertyId.replace(/[^A-Za-z0-9._-]/g, '_')}_${tenantId.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLES.property_likes.name,
+      Key: { id },
+      UpdateExpression: 'SET rejected = :r',
+      ExpressionAttributeValues: { ':r': true },
+      ConditionExpression: 'attribute_exists(id)',
+    }));
+    return json(200, { ok: true });
+  } catch (e) {
+    if (e.name === 'ConditionalCheckFailedException') return json(404, { message: 'Not found' });
+    console.warn('match/reject failed:', e.message);
+    return json(500, { message: 'reject failed' });
+  }
+}
+
 async function handleMatchLeads(event) {
   const uid = callerUidOf(event);
   if (!uid) return json(401, { message: 'Authentication required.' });
@@ -6054,6 +6148,7 @@ async function handleMatchLeads(event) {
         Limit: MAX_LIKES_PER_PROPERTY,
       }));
       for (const l of out.Items || []) {
+        if (l.rejected) continue; // dismissed via POST /match/reject — never a lead again
         likeRows.push({ like: l, property: p });
         if (likeRows.length >= MAX_LEAD_PAIRS) break;
       }
@@ -6152,9 +6247,29 @@ async function contractCreate(event) {
   catch { return json(400, { message: 'Invalid JSON body.' }); }
   const id = (body.id || '').toString();
   if (!id) return json(400, { message: 'id required' });
+  const propertyId = (body.propertyId || '').toString();
   // The creator must be a party; default the landlord to the caller.
   if (body.landlordUserId !== uid && body.tenantUserId !== uid) {
     body.landlordUserId = uid;
+  }
+  // Verify the OTHER named party is real, the same way the matches gate does
+  // (isRealOwnerOf) — without this, naming yourself as one party lets you
+  // name literally anyone as the other and trigger a forged "you have a
+  // contract to sign" push to them (see contractCreate's notify() below).
+  if (!propertyId) return json(400, { message: 'propertyId required' });
+  if (body.tenantUserId === uid) {
+    // Claiming to be the tenant: the named landlord must be the property's
+    // REAL owner.
+    if (!body.landlordUserId || !(await isRealOwnerOf(propertyId, body.landlordUserId))) {
+      return json(403, { message: 'Forbidden' });
+    }
+  } else {
+    // Claiming to be the landlord (explicitly or by the default above): the
+    // caller must actually own the property before they can name anyone as
+    // the tenant.
+    if (!(await isOwnerOf(propertyId, uid))) {
+      return json(403, { message: 'Forbidden' });
+    }
   }
   const now = new Date().toISOString();
   const item = { ...body, id, createdAt: body.createdAt || now, updatedAt: now };

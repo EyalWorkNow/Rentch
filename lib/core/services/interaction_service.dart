@@ -63,6 +63,21 @@ class InteractionService {
     }
   }
 
+  /// The caller's saved (favorited) property ids, per the server's own record —
+  /// always keyed by the verified caller uid server-side, never spoofable and
+  /// never tagged to a stale local placeholder id. Fail-soft: empty on error.
+  Future<List<String>> fetchSaved() async {
+    if (!AwsApiClient.instance.isConfigured) return const [];
+    try {
+      final res = await AwsApiClient.instance.get('/interactions/saved');
+      final ids = (res['propertyIds'] as List?) ?? const [];
+      return ids.map((e) => e.toString()).where((id) => id.isNotEmpty).toList(growable: false);
+    } catch (error) {
+      if (kDebugMode) debugPrint('InteractionService.fetchSaved: $error');
+      return const [];
+    }
+  }
+
   /// Fetches collaborative-filtering recommendations, returning the propertyIds
   /// in server-ranked order (highest cfScore first). Fail-soft: returns an empty
   /// list when unconfigured or on any error.
