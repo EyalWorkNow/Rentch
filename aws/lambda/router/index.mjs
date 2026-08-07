@@ -6918,21 +6918,62 @@ async function handleEttiExtract(event) {
 // the tenant chat has no tools for → it leaks fake tool-call JSON + spam tokens).
 const TENANT_GROUNDING =
   'אל תמציאי דירות, כתובות, מחירים או פרטים ספציפיים — האפליקציה עצמה מציגה למשתמש '
-  + 'את הדירות האמיתיות שמתאימות. לעולם אל תכתבי JSON, קוד, שמות פונקציות, קריאות '
-  + 'לכלים (כמו search_listings) או טקסט בשפה זרה — אך ורק עברית טבעית, חמה וקצרה.';
+  + 'את הדירות האמיתיות שמתאימות. לעולם אל תכתבי JSON, קוד, שמות פונקציות או קריאות '
+  + 'לכלים (כמו search_listings) — רק טקסט טבעי, חם וקצר, בשפה שהוגדרה למטה.';
 
 // Detect the language of the user's last message so we can HARD-force the reply
 // language — a Hebrew-heavy system prompt otherwise drags every answer to Hebrew.
+// This is a fallback only: handleTenantSearchChat prefers an explicit langCode
+// from the client when present (see Stage 3) — a short message in the "wrong"
+// language for the app's own setting (e.g. a Hebrew neighborhood name typed by
+// an English-app-language user) can otherwise mis-guess.
 function detectLang(text) {
   const t = String(text || '');
   if (/[؀-ۿ]/.test(t)) return 'Arabic (العربية)';
   if (/[Ѐ-ӿ]/.test(t)) return 'Russian (Русский)';
   if (/[֐-׿]/.test(t)) return 'Hebrew (עברית)';
   if (/[a-zA-Z]/.test(t)) {
-    return /\b(je|une?|les?|des|du|bonjour|cherche|pièces?|proche|appartement|quartier|budget)\b/i.test(t)
-      ? 'French (Français)' : 'English';
+    // Keyword lists are deliberately restricted to words that don't double as
+    // ordinary English (dropped "un/une/des/du/budget" — real English text
+    // uses these too, e.g. "a budget of 6000"). Score by hits and take the
+    // highest so one ambiguous word can't outvote an otherwise-English sentence.
+    const frenchHits = (t.match(/\b(bonjour|cherche|pièces?|appartement|quartier|proche)\b/gi) || []).length;
+    const spanishHits = (t.match(/\b(hola|busco|piso|habitaciones?|presupuesto|apartamento|barrio|cerca)\b/gi) || []).length;
+    if (spanishHits > frenchHits && spanishHits > 0) return 'Spanish (Español)';
+    if (frenchHits > spanishHits && frenchHits > 0) return 'French (Français)';
+    return 'English';
   }
   return 'Hebrew (עברית)';
+}
+
+// Localized fallback strings for the two places handleTenantSearchChat can
+// reply without ever reaching the model (empty completion / thrown error) —
+// these used to be hardcoded Hebrew, which broke the "always reply in the
+// user's language" contract for every non-Hebrew user.
+const TENANT_FALLBACKS = {
+  'Hebrew (עברית)': {
+    empty: 'ספר לי עוד קצת על מה שאתה מחפש, ואני כבר אדאג לדייק 🙂',
+    error: 'יש עומס קטן כרגע על העוזר, ננסה שוב בעוד רגע?',
+  },
+  'Arabic (العربية)': {
+    empty: 'أخبرني أكثر عمّا تبحث عنه، وسأدقق البحث فورًا 🙂',
+    error: 'هناك ازدحام بسيط الآن على المساعد، هل نحاول مجددًا بعد قليل؟',
+  },
+  'French (Français)': {
+    empty: "Dis-m'en un peu plus sur ce que tu cherches, et j'affine tout de suite 🙂",
+    error: "Il y a un petit ralentissement en ce moment, on réessaie dans un instant ?",
+  },
+  'Spanish (Español)': {
+    empty: 'Cuéntame un poco más sobre lo que buscas y ahora mismo lo afino 🙂',
+    error: '¿Hay un poco de saturación en el asistente ahora mismo — probamos de nuevo en un momento?',
+  },
+  English: {
+    empty: "Tell me a bit more about what you're looking for, and I'll fine-tune it right away 🙂",
+    error: 'The assistant is a little busy right now — want to try again in a moment?',
+  },
+};
+function tenantFallback(lang, kind) {
+  return (TENANT_FALLBACKS[lang] || TENANT_FALLBACKS['Hebrew (עברית)'])[kind];
 }
 
 async function handleTenantSearchChat(messages, uid = null) {
@@ -6973,12 +7014,12 @@ async function handleTenantSearchChat(messages, uid = null) {
       suggestions = cm[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 5);
       reply = reply.replace(cm[0], '').trim();
     }
-    if (!reply) reply = 'ספר לי עוד קצת על מה שאתה מחפש, ואני כבר אדאג לדייק 🙂';
+    if (!reply) reply = tenantFallback(lang, 'empty');
     return json(200, { reply, suggestions, propertyDraft: null, listings: [] });
   } catch (e) {
     console.warn('tenant assistant error:', e.message);
     return json(200, {
-      reply: 'יש עומס קטן כרגע על העוזר, ננסה שוב בעוד רגע?',
+      reply: tenantFallback(lang, 'error'),
       suggestions: [],
       propertyDraft: null,
     });
