@@ -10,6 +10,7 @@ import 'package:dating_app/core/services/assistant_service.dart';
 import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/assistant/erik_design.dart';
 import 'package:dating_app/presentation/features/assistant/erik_presence.dart';
 import 'package:dating_app/presentation/features/assistant/erik_voice_call.dart';
@@ -85,11 +86,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   late final AnimationController _uploadPanelCtrl;
   late final Animation<Offset> _uploadPanelOffset;
 
-  static const _greeting =
-      'שלום, נעים מאוד. קוראים לי עזרא ואני כאן כדי לעזור לך.\n'
-      'ספר לי בבקשה בכמה מילים על הדירה שאתה רוצה להשכיר — איפה היא, כמה חדרים, '
-      'וכל מה שבא לך לספר. מתוך מה שתספר אני כבר אבין הרבה, ואשאל רק על מה שחסר.\n'
-      'אפשר לדבר איתי או לכתוב, איך שנוח לך.';
+  String get _greeting => AppLocalizations.of(context)!.assistantScreenBe34f590;
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? 'guest';
   String get _storeKey => 'erik_transcript_$_uid';
@@ -108,11 +105,12 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   /// The short status line under the orb, derived from the real state.
   String get _statusLine {
-    if (_thinking) return 'חושב...';
-    if (_speaking) return 'עזרא מדבר...';
-    if (_listening) return 'מקשיב לך...';
-    if (_conversationMode) return 'מקשיב לך...';
-    return 'שלום, אני עזרא';
+    final l10n = AppLocalizations.of(context)!;
+    if (_thinking) return l10n.assistantScreen6f3d21fa;
+    if (_speaking) return l10n.assistantScreen378c0a57;
+    if (_listening) return l10n.assistantScreen01036d5b;
+    if (_conversationMode) return l10n.assistantScreen01036d5b;
+    return l10n.assistantScreenD8834f5a;
   }
 
   /// Erik's latest reply text (minimal) — the last committed assistant turn.
@@ -195,7 +193,7 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   // ── Persistence ──────────────────────────────────────────────────────────────
 
-  AssistantTurn _welcomeTurn() => const AssistantTurn(
+  AssistantTurn _welcomeTurn() => AssistantTurn(
         role: 'assistant',
         text: _greeting,
       );
@@ -288,7 +286,7 @@ class _AssistantScreenState extends State<AssistantScreen>
     } on AssistantException catch (e) {
       _onError(e.message);
     } catch (_) {
-      _onError('משהו השתבש. אפשר לנסות שוב.');
+      _onError(AppLocalizations.of(context)!.assistantScreen63169c60);
     }
   }
 
@@ -368,7 +366,7 @@ class _AssistantScreenState extends State<AssistantScreen>
         _photoUrls.add(mediaPath);
         _turns.add(AssistantTurn(
           role: 'user',
-          text: 'הוספתי תמונה לדירה',
+          text: AppLocalizations.of(context)!.assistantScreen581b78bc,
           mediaUrls: [mediaPath],
         ));
         _pickingPhoto = false;
@@ -378,7 +376,7 @@ class _AssistantScreenState extends State<AssistantScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _pickingPhoto = false);
-      _onError('לא הצלחתי להוסיף את התמונה. אפשר לנסות שוב.');
+      _onError(AppLocalizations.of(context)!.assistantScreenB6db02ff);
     }
   }
 
@@ -402,7 +400,7 @@ class _AssistantScreenState extends State<AssistantScreen>
         _photoUrls.add(mediaPath);
         _turns.add(AssistantTurn(
           role: 'user',
-          text: 'הוספתי סרטון לדירה',
+          text: AppLocalizations.of(context)!.assistantScreen594cce8f,
           mediaUrls: [mediaPath],
         ));
         _pickingPhoto = false;
@@ -412,7 +410,7 @@ class _AssistantScreenState extends State<AssistantScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _pickingPhoto = false);
-      _onError('לא הצלחתי להוסיף את הסרטון. אפשר לנסות שוב.');
+      _onError(AppLocalizations.of(context)!.assistantScreenDf89d62b);
     }
   }
 
@@ -431,10 +429,9 @@ class _AssistantScreenState extends State<AssistantScreen>
     if (draft == null || _publishing) return;
     if (_photoUrls.isEmpty) {
       setState(() {
-        _turns.add(const AssistantTurn(
+        _turns.add(AssistantTurn(
           role: 'assistant',
-          text:
-              'רק רגע — כדי לפרסם צריך לפחות תמונה אחת של הדירה. אפשר לצלם עכשיו או לבחור תמונה מהטלפון.',
+          text: AppLocalizations.of(context)!.assistantScreen5dd972a7,
         ));
       });
       _openUploadPanel();
@@ -456,10 +453,10 @@ class _AssistantScreenState extends State<AssistantScreen>
         property.streetNumber > 0 ? '${property.streetNumber}' : '',
         property.city,
       ].where((e) => e.isNotEmpty).join(' ');
-      final msg =
-          'מצוין! פרסמתי את הדירה שלך${addr.isNotEmpty ? ' ב$addr' : ''}, היא כבר באוויר.\n'
-          'אם תרצה, אפשר להוסיף עוד תמונות בכל רגע מהמסך "הדירות שלי".\n'
-          'אני כאן אם תצטרך עוד משהו.';
+      final l10n = AppLocalizations.of(context)!;
+      final msg = '${addr.isNotEmpty ? l10n.assistantScreen07192f57(addr) : l10n.assistantScreen0ad71611}\n'
+          '${l10n.assistantScreen76c2c7b1}\n'
+          '${l10n.assistantScreen539101b0}';
       setState(() {
         _draft = null;
         _publishing = false;
@@ -472,8 +469,7 @@ class _AssistantScreenState extends State<AssistantScreen>
       if (kDebugMode) debugPrint('Erik publishDraft failed: $e\n$st');
       if (!mounted) return;
       setState(() => _publishing = false);
-      _onError(
-          'סליחה, הייתה בעיה בפרסום. אפשר לנסות שוב, או להוסיף תמונות ידנית.');
+      _onError(AppLocalizations.of(context)!.assistantScreen163e1f70);
     }
   }
 
@@ -686,6 +682,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   // ── Voice UI — styled to match אתי's voice screen exactly ─────────────────
 
   Widget _voiceTopBar() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(6, 1, 6, 0),
       child: Row(
@@ -735,24 +732,24 @@ class _AssistantScreenState extends State<AssistantScreen>
                 ],
               ),
               const SizedBox(width: 10),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('עזרא',
-                      style: TextStyle(
+                  Text(l10n.assistantScreen4dc83a95,
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.3)),
-                  Text('העוזר האישי שלך',
-                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text(l10n.assistantScreen154094c9,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ],
           ),
           const Spacer(),
           IconButton(
-            tooltip: 'אפשרויות',
+            tooltip: l10n.assistantScreenC16b3933,
             icon: const Icon(IconsaxPlusLinear.edit_2,
                 color: Colors.white70, size: 28),
             onPressed: _showOptionsMenu,
@@ -946,6 +943,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   }
 
   Widget _buildUploadPanel() {
+    final l10n = AppLocalizations.of(context)!;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
@@ -981,9 +979,9 @@ class _AssistantScreenState extends State<AssistantScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'הוספת מדיה לדירה',
-                      style: TextStyle(
+                    Text(
+                      l10n.assistantScreenC9b9ffef,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -1013,9 +1011,9 @@ class _AssistantScreenState extends State<AssistantScreen>
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: _kLine),
                     ),
-                    child: const Text(
-                      'טרם הוספת תמונות לדירה זו',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.assistantScreen75705b64,
+                      style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 14,
                           fontWeight: FontWeight.w600),
@@ -1067,7 +1065,7 @@ class _AssistantScreenState extends State<AssistantScreen>
                     Expanded(
                       child: _panelActionBtn(
                         icon: IconsaxPlusBold.camera,
-                        label: 'צלם תמונה',
+                        label: l10n.assistantScreenFeddf7c6,
                         color: _kAccent,
                         onTap: () => _pickPhoto(ImageSource.camera),
                       ),
@@ -1076,7 +1074,7 @@ class _AssistantScreenState extends State<AssistantScreen>
                     Expanded(
                       child: _panelActionBtn(
                         icon: IconsaxPlusBold.gallery,
-                        label: 'גלריה',
+                        label: l10n.assistantScreenEed2fbf3,
                         color: AppColors.superLike,
                         onTap: () => _pickPhoto(ImageSource.gallery),
                       ),
@@ -1085,7 +1083,7 @@ class _AssistantScreenState extends State<AssistantScreen>
                     Expanded(
                       child: _panelActionBtn(
                         icon: IconsaxPlusBold.video_play,
-                        label: 'צלם וידאו',
+                        label: l10n.assistantScreen26b77aa9,
                         color: AppColors.coral,
                         onTap: () => _pickVideo(ImageSource.camera),
                       ),
@@ -1103,10 +1101,10 @@ class _AssistantScreenState extends State<AssistantScreen>
                     ),
                   ),
                   onPressed: _closeUploadPanel,
-                  child: const Text(
-                    'סיימתי, המשך בשיחה',
+                  child: Text(
+                    l10n.assistantScreen4668a8a4,
                     style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                        const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                   ),
                 ),
               ],
@@ -1178,6 +1176,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   }
 
   void _showOptionsMenu() {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1209,8 +1208,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                   if (_draft != null) ...[
                     _OptionTile(
                       icon: IconsaxPlusBold.house_2,
-                      label: 'פרסם את טיוטת הדירה',
-                      subtitle: 'עזרא כבר בנה טיוטה — אפשר לפרסם',
+                      label: l10n.assistantScreenAca7e84c,
+                      subtitle: l10n.assistantScreen13e63c59,
                       onTap: () {
                         Navigator.pop(ctx);
                         _showDraftSheet(_draft!);
@@ -1220,8 +1219,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                   ],
                   _OptionTile(
                     icon: IconsaxPlusBold.gallery_add,
-                    label: 'הוסף תמונות',
-                    subtitle: 'צלם או בחר תמונות לדירה',
+                    label: l10n.assistantScreenC47bc8e5,
+                    subtitle: l10n.assistantScreen4610aeb4,
                     onTap: () {
                       Navigator.pop(ctx);
                       _openUploadPanel();
@@ -1232,10 +1231,12 @@ class _AssistantScreenState extends State<AssistantScreen>
                     icon: _voiceReplies
                         ? IconsaxPlusLinear.volume_slash
                         : IconsaxPlusBold.volume_high,
-                    label: _voiceReplies ? 'השתק קול' : 'הפעל קול',
+                    label: _voiceReplies
+                        ? l10n.assistantScreen384e9c59
+                        : l10n.assistantScreen1b571629,
                     subtitle: _voiceReplies
-                        ? 'עזרא לא ידבר בקול'
-                        : 'עזרא ידבר את תשובותיו בקול',
+                        ? l10n.assistantScreenFa9d4e0e
+                        : l10n.assistantScreenBfb2de50,
                     onTap: () async {
                       Navigator.pop(ctx);
                       if (_voiceReplies) await _service.stopSpeaking();
@@ -1245,8 +1246,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                   const SizedBox(height: 8),
                   _OptionTile(
                     icon: IconsaxPlusLinear.refresh,
-                    label: 'שיחה חדשה',
-                    subtitle: 'מחק היסטוריה והתחל מחדש',
+                    label: l10n.assistantScreen82c40bcf,
+                    subtitle: l10n.assistantScreenAb0463c4,
                     onTap: () {
                       Navigator.pop(ctx);
                       _clearTranscript();
@@ -1286,17 +1287,18 @@ class _DraftSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String v(String k) => (draft[k]?.toString() ?? '').trim();
+    final l10n = AppLocalizations.of(context)!;
     final addr = [v('street'), v('streetNumber'), v('city')]
         .where((e) => e.isNotEmpty)
         .join(' ');
     final lines = <String>[
       if (addr.isNotEmpty) '📍  $addr',
-      if (v('rooms').isNotEmpty) '🚪  ${v('rooms')} חדרים',
-      if (v('floor').isNotEmpty) '🏢  קומה ${v('floor')}',
-      if (v('price').isNotEmpty) '💰  ${v('price')} ₪ לחודש',
-      if (v('sizeM2').isNotEmpty) '📐  ${v('sizeM2')} מ"ר',
+      if (v('rooms').isNotEmpty) l10n.assistantScreen80364adb(v('rooms')),
+      if (v('floor').isNotEmpty) l10n.assistantScreenE910996a(v('floor')),
+      if (v('price').isNotEmpty) l10n.assistantScreen8a8c75e3(v('price')),
+      if (v('sizeM2').isNotEmpty) l10n.assistantScreen5f7c4ea0(v('sizeM2')),
       if (v('condition').isNotEmpty) '✨  ${v('condition')}',
-      if (v('entryDate').isNotEmpty) '📅  כניסה: ${v('entryDate')}',
+      if (v('entryDate').isNotEmpty) l10n.assistantScreenF534575e(v('entryDate')),
     ];
     final hasPhotos = photoCount > 0;
 
@@ -1335,9 +1337,9 @@ class _DraftSheet extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    const Text(
-                      'טיוטת דירה',
-                      style: TextStyle(
+                    Text(
+                      l10n.assistantScreen87975ccc,
+                      style: const TextStyle(
                         color: _kInk,
                         fontSize: 19,
                         fontWeight: FontWeight.w900,
@@ -1376,8 +1378,8 @@ class _DraftSheet extends StatelessWidget {
                   children: [
                     Text(
                       hasPhotos
-                          ? 'נוספו $photoCount תמונות'
-                          : 'צריך לפחות תמונה אחת',
+                          ? l10n.assistantScreenA61a9170(photoCount)
+                          : l10n.assistantScreen2e6b8dd3,
                       style: TextStyle(
                           color: hasPhotos ? _kAccent : AppColors.coral,
                           fontSize: 14,
@@ -1405,9 +1407,9 @@ class _DraftSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(13)),
                   ),
                   icon: const Icon(IconsaxPlusBold.gallery_add, size: 20),
-                  label: const Text('הוסף או ערוך תמונות',
-                      style:
-                          TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  label: Text(l10n.assistantScreen2628dacb,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(height: 10),
                 FilledButton.icon(
@@ -1430,7 +1432,9 @@ class _DraftSheet extends StatelessWidget {
                         )
                       : const Icon(IconsaxPlusBold.tick_circle, size: 20),
                   label: Text(
-                    publishing ? 'מפרסם את הדירה...' : 'כן, פרסם את הדירה',
+                    publishing
+                        ? l10n.assistantScreen89ac1e56
+                        : l10n.assistantScreenF3db670c,
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w900),
                   ),
@@ -1439,9 +1443,9 @@ class _DraftSheet extends StatelessWidget {
                 Center(
                   child: TextButton(
                     onPressed: publishing ? null : onEdit,
-                    child: const Text(
-                      'פתח עריכה מלאה',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.assistantScreenE4c51425,
+                      style: const TextStyle(
                         color: _kMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,

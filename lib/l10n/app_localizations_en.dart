@@ -3432,4 +3432,3178 @@ class AppLocalizationsEn extends AppLocalizations {
   String searchChatScreen615d28b8(Object size) {
     return '$size m²';
   }
+
+  @override
+  String get areaIntelScreen88218ec9 =>
+      'Couldn\'t locate the address. Try picking from the suggestions or entering city + street.';
+
+  @override
+  String get areaIntelScreen91db7436 => 'Public transportation';
+
+  @override
+  String get areaIntelScreenFa8c72dc => 'Schools';
+
+  @override
+  String get areaIntelScreen00a5eaf2 => 'Kindergartens';
+
+  @override
+  String get areaIntelScreen088f0923 => 'Parks and gardens';
+
+  @override
+  String get areaIntelScreen9bd0d581 => 'Cafés and restaurants';
+
+  @override
+  String get areaIntelScreen56721218 => 'Supermarkets and shopping';
+
+  @override
+  String get areaIntelScreen9df69324 => 'Healthcare services';
+
+  @override
+  String get areaIntelScreen82e78f66 => 'Pharmacies';
+
+  @override
+  String get areaIntelScreen22f8b507 => 'Gyms and sports';
+
+  @override
+  String get areaIntelScreen34df4e2b => 'Synagogues and worship';
+
+  @override
+  String get areaIntelScreen39cfcba7 => 'Culture and leisure';
+
+  @override
+  String get areaIntelScreen289b784a => 'Playgrounds';
+
+  @override
+  String areaIntelScreenDcabfe76(Object meters) {
+    return '$meters m';
+  }
+
+  @override
+  String areaIntelScreen0b2db321(Object km) {
+    return '$km km';
+  }
+
+  @override
+  String get areaIntelScreenA8bb0310 => 'Area Intelligence';
+
+  @override
+  String get areaIntelScreen51957dd6 =>
+      'Rank every area in the city by target audience';
+
+  @override
+  String get areaIntelScreen3fb539f2 => 'Investment Lens';
+
+  @override
+  String get areaIntelScreen93a4e30a => 'All data layers for this spot';
+
+  @override
+  String get areaIntelScreenE752c7da => 'What\'s nearby';
+
+  @override
+  String get areaIntelScreen311b60d7 =>
+      'Enter an address to evaluate as an investment — and get every data layer for the area, ';
+
+  @override
+  String get areaIntelScreenFd7780b1 =>
+      'and who it best suits. That way you\'ll know exactly which audience to target and what the area\'s strength is.';
+
+  @override
+  String get areaIntelScreen863d9b56 =>
+      'Address: city + street (e.g. Tel Aviv, Dizengoff 100)';
+
+  @override
+  String get areaIntelScreen0d4d229d => 'Analyze';
+
+  @override
+  String areaIntelScreen65430ae4(Object pct) {
+    return '$pct% match';
+  }
+
+  @override
+  String get areaIntelScreen046ea325 =>
+      'This area is less suited to this audience.';
+
+  @override
+  String get areaIntelScreen4e635cc2 => 'Why it works for this audience:';
+
+  @override
+  String get areaIntelScreen77eb6f43 => 'Investment Score';
+
+  @override
+  String get areaIntelScreenDa192a5e => 'Rental demand (ease of renting)';
+
+  @override
+  String get areaIntelScreen7c498f0a =>
+      'Appreciation potential (planned infrastructure)';
+
+  @override
+  String get areaIntelScreen9e3fdc13 => 'Relative price level in the area';
+
+  @override
+  String get areaIntelScreenB5585865 => 'Estimated gross yield';
+
+  @override
+  String areaIntelScreenA1448f5a(Object value) {
+    return 'The price level is based on the CBS 2013 valuation (₪$value/m²) — a relative index; the yield is a rough estimate only.';
+  }
+
+  @override
+  String get areaIntelScreen9b04c59d =>
+      'Demand and appreciation are from up-to-date data. No valuation data is available for this area.';
+
+  @override
+  String get areaIntelScreen96921b94 => 'Socioeconomic cluster (block)';
+
+  @override
+  String get areaIntelScreen45ddda67 => 'Safety (city level)';
+
+  @override
+  String get areaIntelScreen096a70c8 => 'Centrality';
+
+  @override
+  String get areaIntelScreen984afc87 => 'Educational institutions';
+
+  @override
+  String get areaIntelScreenFae76235 => 'Nightlife and entertainment';
+
+  @override
+  String get areaIntelScreenA70625cf => 'Proximity to employment';
+
+  @override
+  String get areaIntelScreenB005f878 => 'Parks and greenery';
+
+  @override
+  String get areaIntelScreen2008eaf1 => 'Appreciation potential';
+
+  @override
+  String areaIntelScreenE5c70865(Object cluster) {
+    return '$cluster out of 10';
+  }
+
+  @override
+  String get areaIntelScreen459fac16 =>
+      'Demographic data isn\'t available for this area';
+
+  @override
+  String get areaIntelScreen4089ef4b => '👶 Children (0–19)';
+
+  @override
+  String get areaIntelScreen4d2868ec => '🧑 Working age (20–64)';
+
+  @override
+  String areaIntelScreen3fcced86(Object hidden) {
+    return '+$hidden more · Show all';
+  }
+
+  @override
+  String get areaIntelScreen6192614d => 'Show less';
+
+  @override
+  String get searchAssistantScreen2c1f2bbd => 'Tel Aviv';
+
+  @override
+  String get searchAssistantScreen8e0dfe1e => 'Jerusalem';
+
+  @override
+  String get searchAssistantScreen2231ce66 => 'Ramat Gan';
+
+  @override
+  String get searchAssistantScreenEa980134 => 'Givatayim';
+
+  @override
+  String get searchAssistantScreenCa1cc213 => 'Haifa';
+
+  @override
+  String get searchAssistantScreen092b4640 => 'Netanya';
+
+  @override
+  String get searchAssistantScreen982e0598 => 'Herzliya';
+
+  @override
+  String get searchAssistantScreen35529032 => 'Beersheba';
+
+  @override
+  String get searchAssistantScreenA9655ab3 => 'Parking';
+
+  @override
+  String get searchAssistantScreen86425fcf => 'Balcony';
+
+  @override
+  String get searchAssistantScreen8d058056 => 'Elevator';
+
+  @override
+  String get searchAssistantScreenD8e1feaf => 'Furnished';
+
+  @override
+  String get searchAssistantScreenFa8ed531 => 'Safe room';
+
+  @override
+  String get searchAssistantScreen0bd4e294 => 'Renovated';
+
+  @override
+  String get searchAssistantScreen27a4567b => 'Garden';
+
+  @override
+  String get searchAssistantScreen40d07087 => 'Quiet';
+
+  @override
+  String get searchAssistantScreen07199e40 => 'Lively';
+
+  @override
+  String get searchAssistantScreen23625e37 => 'Family-friendly';
+
+  @override
+  String get searchAssistantScreenC7b03503 => 'Student-oriented';
+
+  @override
+  String get searchAssistantScreenE16edce8 => 'Smart Search Assistant';
+
+  @override
+  String get searchAssistantScreen6e04f4e9 => 'Start over';
+
+  @override
+  String get searchAssistantScreen3c34563c =>
+      'Let\'s find you the perfect apartment! Where are you searching, and what\'s your monthly budget?';
+
+  @override
+  String get searchAssistantScreenB2136c90 => 'City';
+
+  @override
+  String get searchAssistantScreen4094ac8d => 'Monthly budget';
+
+  @override
+  String get searchAssistantScreen4ca22f8c => 'Next →';
+
+  @override
+  String get searchAssistantScreen9c507ba2 =>
+      'How much space do you need, and what\'s a must-have?';
+
+  @override
+  String get searchAssistantScreen5c2ad42a => 'Number of rooms (minimum)';
+
+  @override
+  String get searchAssistantScreen49bd69db => 'Must-have amenities';
+
+  @override
+  String get searchAssistantScreenDb600ba2 =>
+      'Almost done! What neighborhood vibe suits you?';
+
+  @override
+  String get searchAssistantScreen4e4d5acc => 'Neighborhood character';
+
+  @override
+  String get searchAssistantScreen892418bd => 'Review →';
+
+  @override
+  String get searchAssistantScreen815a16e3 =>
+      'Great! Here\'s what I gathered. Ready to search?';
+
+  @override
+  String get searchAssistantScreen5f8fb8a5 => 'All';
+
+  @override
+  String get searchAssistantScreen3bb32ddd => 'Budget';
+
+  @override
+  String get searchAssistantScreenB50b3974 => 'Rooms';
+
+  @override
+  String get searchAssistantScreen9ff887ff => 'Amenities';
+
+  @override
+  String get searchAssistantScreen1212caa6 => 'Vibe';
+
+  @override
+  String get searchAssistantScreen5a7196d6 => '🔍 Search now';
+
+  @override
+  String get searchAssistantScreenD742723c =>
+      'Searching for matching apartments...';
+
+  @override
+  String get searchAssistantScreenCf4d2620 => 'No matching apartments found';
+
+  @override
+  String get searchAssistantScreen284a2e22 =>
+      'Try widening the budget or removing some amenities';
+
+  @override
+  String get searchAssistantScreen231c0d9b => 'Change search';
+
+  @override
+  String searchAssistantScreen1b999b46(Object count) {
+    return '$count apartments found';
+  }
+
+  @override
+  String get searchAssistantScreen2b387ae1 => 'New search';
+
+  @override
+  String searchAssistantScreenC6efa96a(Object rooms) {
+    return '$rooms rm';
+  }
+
+  @override
+  String get searchAssistantScreen7de9ac58 => 'Verified';
+
+  @override
+  String get contractDetailScreenF5ee57a7 => 'Rental Contract';
+
+  @override
+  String get contractDetailScreen32d6e691 => 'Document preview';
+
+  @override
+  String get contractDetailScreen62afb8c6 => 'Contract not found';
+
+  @override
+  String get contractDetailScreenC6c7d5f7 => 'Landlord';
+
+  @override
+  String get contractDetailScreen9ad15d69 => 'Tenant';
+
+  @override
+  String contractDetailScreenC426dab3(Object role) {
+    return 'Sign the contract as $role';
+  }
+
+  @override
+  String get contractDetailScreenD346f1e3 =>
+      'The contract has been signed by both parties';
+
+  @override
+  String get contractDetailScreenD657b4d3 => 'The contract was declined';
+
+  @override
+  String get contractDetailScreen2f6e4f0e => 'The contract was cancelled';
+
+  @override
+  String get contractDetailScreen471364ef =>
+      'Waiting for the other party\'s signature';
+
+  @override
+  String get contractDetailScreen2d903955 => 'Waiting for signatures';
+
+  @override
+  String get contractDetailScreen900c3a51 => 'Rental property';
+
+  @override
+  String get contractDetailScreen4dcdda0b => 'Monthly rent';
+
+  @override
+  String get contractDetailScreen6977f9a2 => 'Deposit';
+
+  @override
+  String get contractDetailScreen5c4ffbbc => 'Term';
+
+  @override
+  String contractDetailScreenA68a769b(Object months) {
+    return '$months months';
+  }
+
+  @override
+  String get contractDetailScreen2f6783cd => 'Move-in';
+
+  @override
+  String get contractDetailScreenF600808f => 'End date';
+
+  @override
+  String get contractDetailScreen2ef381ab => 'Additional clauses';
+
+  @override
+  String get contractDetailScreen500341b6 =>
+      'Secure digital signature (Ed25519). The private key stays on the device only; any change to the terms invalidates signatures already made.';
+
+  @override
+  String get contractDetailScreen8c7ea078 => 'Signature saved successfully ✍️';
+
+  @override
+  String get contractDetailScreen8b7b9377 =>
+      'Please sign in the frame before confirming';
+
+  @override
+  String get contractDetailScreenE6dfccf4 => 'Digital signature';
+
+  @override
+  String get contractDetailScreen07debd21 =>
+      'Sign with your finger in the frame below';
+
+  @override
+  String get contractDetailScreenE8b3a3d5 => 'Clear';
+
+  @override
+  String get contractDetailScreen10d96dc9 => 'Signing…';
+
+  @override
+  String get contractDetailScreen9c07f0d2 => 'Confirm signature';
+
+  @override
+  String get contractDetailScreen711b15ac => 'Awaiting signature';
+
+  @override
+  String get contractDetailScreenFbf77ab4 => 'Verifying…';
+
+  @override
+  String contractDetailScreen53a5fab1(Object dateStr) {
+    return 'Signature verified$dateStr';
+  }
+
+  @override
+  String get contractDetailScreen2c47c991 => 'The signature is not valid';
+
+  @override
+  String get contractDetailScreen0db5078d => 'Contract preview';
+
+  @override
+  String get contractDetailScreenA858ff94 => 'Residential Lease Agreement';
+
+  @override
+  String contractDetailScreenC627c4b8(Object date) {
+    return 'Signed digitally · $date';
+  }
+
+  @override
+  String contractDetailScreen9d6224ee(
+      Object landlordName, Object propertyTitle, Object tenantName) {
+    return 'This agreement is made and signed between **$landlordName** (\"the Landlord\") and **$tenantName** (\"the Tenant\"), regarding the rental of the property located at $propertyTitle.';
+  }
+
+  @override
+  String get contractDetailScreenPropTitleFallback => 'as detailed below';
+
+  @override
+  String get contractDetailScreenAece3836 => '1. Rent';
+
+  @override
+  String contractDetailScreen68bb0d6c(Object rent) {
+    return 'The Tenant shall pay the Landlord a monthly rent of ₪$rent, payable in advance by the 10th of each month.';
+  }
+
+  @override
+  String get contractDetailScreen00c967a0 => '2. Deposit';
+
+  @override
+  String contractDetailScreenBa3a4a53(Object deposit) {
+    return 'The Tenant shall place with the Landlord a deposit of ₪$deposit to secure the fulfillment of their obligations.';
+  }
+
+  @override
+  String get contractDetailScreen9502e7c7 => 'No deposit required.';
+
+  @override
+  String get contractDetailScreenA63d0798 => '3. Lease term';
+
+  @override
+  String contractDetailScreen06aba07e(
+      Object endDate, Object months, Object startDate) {
+    return 'The lease term is $months months, from $startDate to $endDate.';
+  }
+
+  @override
+  String get contractDetailScreenD798e5f6 =>
+      '4. Additional clauses & special requests';
+
+  @override
+  String get contractDetailScreen5c629483 => 'Signatures of the parties';
+
+  @override
+  String get contractDetailScreen541e72da => 'The Landlord';
+
+  @override
+  String get contractDetailScreenFd0ec7ac => 'The Tenant';
+
+  @override
+  String get contractDetailScreenA7ee13e0 => 'Signed';
+
+  @override
+  String get contractDetailScreen0e43b875 => 'Pending';
+
+  @override
+  String get askRentlySheet68d09f0e => 'Are pets allowed?';
+
+  @override
+  String get askRentlySheet8147268b => 'Which floor is the apartment on?';
+
+  @override
+  String get askRentlySheetE8be946e => 'Is there public transportation nearby?';
+
+  @override
+  String get askRentlySheet6449ebed => 'Is there parking?';
+
+  @override
+  String get askRentlySheetBd196ab4 => 'When can I move in?';
+
+  @override
+  String get askRentlySheet47f7f61f =>
+      'I don\'t have that information about the apartment. You can send the question directly to the landlord:';
+
+  @override
+  String get askRentlySheetD8ba43e9 => 'Question about the apartment';
+
+  @override
+  String get askRentlySheet700de026 =>
+      'The question was sent to the landlord — it will appear for them under \"Message requests\"';
+
+  @override
+  String get askRentlySheetD92c26c4 => 'Send the question to the landlord';
+
+  @override
+  String get askRentlySheet18b1f617 => 'Ask Rently';
+
+  @override
+  String askRentlySheet6864774c(Object listingTitle) {
+    return 'Questions about $listingTitle';
+  }
+
+  @override
+  String get askRentlySheet3ad32172 => 'Questions about this property';
+
+  @override
+  String get askRentlySheetB728721f => 'Close';
+
+  @override
+  String get askRentlySheet108a7146 =>
+      'You can ask me anything about this apartment — in plain language. Here are a few examples:';
+
+  @override
+  String get askRentlySheet804a20ac => 'Rently is thinking…';
+
+  @override
+  String get askRentlySheet3181ba76 => 'Type a question about the apartment…';
+
+  @override
+  String get availabilityCalendarScreenDae6b270 => 'Sunday';
+
+  @override
+  String get availabilityCalendarScreen47f34119 => 'Monday';
+
+  @override
+  String get availabilityCalendarScreenDb0c22fc => 'Tuesday';
+
+  @override
+  String get availabilityCalendarScreenDa1dae77 => 'Wednesday';
+
+  @override
+  String get availabilityCalendarScreenCe94cfff => 'Thursday';
+
+  @override
+  String get availabilityCalendarScreen7e718908 => 'Friday';
+
+  @override
+  String get availabilityCalendarScreen4203bd7e => 'Saturday';
+
+  @override
+  String get availabilityCalendarScreen89d6e050 => 'January';
+
+  @override
+  String get availabilityCalendarScreenE974ea8b => 'February';
+
+  @override
+  String get availabilityCalendarScreenC0394ea3 => 'March';
+
+  @override
+  String get availabilityCalendarScreenA1ac81be => 'April';
+
+  @override
+  String get availabilityCalendarScreen5fa88202 => 'May';
+
+  @override
+  String get availabilityCalendarScreen4dee19aa => 'June';
+
+  @override
+  String get availabilityCalendarScreenCf58b8a7 => 'July';
+
+  @override
+  String get availabilityCalendarScreen3551b598 => 'August';
+
+  @override
+  String get availabilityCalendarScreenD7106337 => 'September';
+
+  @override
+  String get availabilityCalendarScreen45ded998 => 'October';
+
+  @override
+  String get availabilityCalendarScreen712a2e4f => 'November';
+
+  @override
+  String get availabilityCalendarScreen1774bb5f => 'December';
+
+  @override
+  String get availabilityCalendarScreen782f10b5 => 'Choose a date';
+
+  @override
+  String get availabilityCalendarScreenA7c55a8d => 'Cancel';
+
+  @override
+  String get availabilityCalendarScreenF21acb6a => 'Confirm';
+
+  @override
+  String get availabilityCalendarScreen0162a6e4 => 'Urgent';
+
+  @override
+  String get availabilityCalendarScreenEab14817 => 'Exclusive';
+
+  @override
+  String get availabilityCalendarScreenEa57c7ab => 'By phone';
+
+  @override
+  String get availabilityCalendarScreen9057aef3 => 'Flexible';
+
+  @override
+  String get availabilityCalendarScreen88e6b612 =>
+      'All those windows are already on the calendar';
+
+  @override
+  String get availabilityCalendarScreenB30a89dd => 'No window was added';
+
+  @override
+  String get availabilityCalendarScreen2baedd1e => 'Open window added ✅';
+
+  @override
+  String availabilityCalendarScreen6ef11812(Object added) {
+    return '$added open windows added ✅';
+  }
+
+  @override
+  String get availabilityCalendarScreen9ad15d69 => 'the tenant';
+
+  @override
+  String get availabilityCalendarScreenCdf3b5e1 =>
+      'Cancel the confirmed viewing?';
+
+  @override
+  String availabilityCalendarScreenAf15dd19(Object time, Object who) {
+    return 'The viewing with $who at $time will be removed from the calendar and the reminder will be cancelled.';
+  }
+
+  @override
+  String get availabilityCalendarScreen10a2352b => 'Back';
+
+  @override
+  String get availabilityCalendarScreen32e0e58c => 'Cancel viewing';
+
+  @override
+  String get availabilityCalendarScreen6b138e97 => 'Window removed';
+
+  @override
+  String get availabilityCalendarScreen8fee2105 => 'Viewing cancelled';
+
+  @override
+  String get availabilityCalendarScreen6b96632d => 'Couldn\'t place the call';
+
+  @override
+  String get availabilityCalendarScreenD1b5aeb8 => 'My calendar';
+
+  @override
+  String get availabilityCalendarScreen914d0f2b => 'Add open slot';
+
+  @override
+  String get availabilityCalendarScreen1dcc1ebd =>
+      'Search viewings and windows...';
+
+  @override
+  String get availabilityCalendarScreen459ead47 => 'Day';
+
+  @override
+  String get availabilityCalendarScreen53703118 => 'All upcoming';
+
+  @override
+  String get availabilityCalendarScreen81849937 =>
+      'Today\'s viewings and windows';
+
+  @override
+  String get availabilityCalendarScreenA59492de =>
+      'No open times for this day yet';
+
+  @override
+  String get availabilityCalendarScreenC5f10ba9 =>
+      'Add a quick window, or tap “Add open slot” below';
+
+  @override
+  String get availabilityCalendarScreenD741ca0e => 'Morning';
+
+  @override
+  String get availabilityCalendarScreen300ea530 => 'Noon';
+
+  @override
+  String get availabilityCalendarScreen33c5e69b => 'Evening';
+
+  @override
+  String get availabilityCalendarScreen57660599 =>
+      'No upcoming viewings or windows';
+
+  @override
+  String get availabilityCalendarScreen94eb6af0 => 'Confirmed viewing';
+
+  @override
+  String get availabilityCalendarScreen4958be48 => 'Open viewing window';
+
+  @override
+  String get availabilityCalendarScreenC24d48d2 => 'Scheduled viewing request';
+
+  @override
+  String availabilityCalendarScreen50c4a059(Object propertyLabel) {
+    return 'Open for viewing at $propertyLabel';
+  }
+
+  @override
+  String get availabilityCalendarScreenC90c40a2 =>
+      'Renters can book a viewing time';
+
+  @override
+  String get availabilityCalendarScreenF604bef9 => 'T';
+
+  @override
+  String get availabilityCalendarScreen7bbfbc12 => 'Agent';
+
+  @override
+  String get availabilityCalendarScreen9c2118be => 'Client';
+
+  @override
+  String get availabilityCalendarScreenD16264b7 => 'Available to book';
+
+  @override
+  String get availabilityCalendarScreenD5bc848b => 'Call';
+
+  @override
+  String get availabilityCalendarScreen7d165b83 => 'Remove window';
+
+  @override
+  String get availabilityCalendarScreen9eba4851 =>
+      'Start time of the open window';
+
+  @override
+  String get availabilityCalendarScreenF29f462e => 'New open window';
+
+  @override
+  String get availabilityCalendarScreen96d116f2 => 'Start time';
+
+  @override
+  String get availabilityCalendarScreenE94abfe2 => 'Change';
+
+  @override
+  String get availabilityCalendarScreenFc655797 => 'Duration';
+
+  @override
+  String availabilityCalendarScreenD5c2c3b6(Object minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String availabilityCalendarScreenF2ee1c96(Object hours) {
+    return '$hours hr';
+  }
+
+  @override
+  String get availabilityCalendarScreenE3a2d38d => 'Apartment (optional)';
+
+  @override
+  String get availabilityCalendarScreen2d69e44a => 'All apartments';
+
+  @override
+  String get availabilityCalendarScreen7d46f18c => 'Today only';
+
+  @override
+  String get availabilityCalendarScreen3563f3df => 'All week';
+
+  @override
+  String get availabilityCalendarScreen155f0dee => 'Weekdays (Sun–Thu)';
+
+  @override
+  String get availabilityCalendarScreen404b7e24 => 'Weekend (Fri–Sat)';
+
+  @override
+  String get availabilityCalendarScreen017014f8 => 'Label (optional)';
+
+  @override
+  String get availabilityCalendarScreen82b33733 => 'Note (optional)';
+
+  @override
+  String get availabilityCalendarScreenF4c3f886 =>
+      'e.g. 3rd floor, building code 1234';
+
+  @override
+  String get availabilityCalendarScreenEcfe64b2 => 'Add to calendar';
+
+  @override
+  String get availabilityCalendarScreenRepeatLabel => 'Repeat';
+
+  @override
+  String availabilityCalendarScreenSkippedSuffix(Object skipped) {
+    return '$skipped skipped (overlap)';
+  }
+
+  @override
+  String get eligibilityEditorSheet40d56dee => 'Tech';
+
+  @override
+  String get eligibilityEditorSheet6dfb51f1 => 'Healthcare/medicine';
+
+  @override
+  String get eligibilityEditorSheet19981c32 => 'Education/teaching';
+
+  @override
+  String get eligibilityEditorSheetEbfcd4cb => 'Finance/banking';
+
+  @override
+  String get eligibilityEditorSheet4f8aded7 => 'Law';
+
+  @override
+  String get eligibilityEditorSheet453fe1ed => 'Engineering';
+
+  @override
+  String get eligibilityEditorSheetE1cad55a => 'Self-employed';
+
+  @override
+  String get eligibilityEditorSheetCb481f30 => 'Public sector';
+
+  @override
+  String get eligibilityEditorSheet2834587d => 'Retail/service';
+
+  @override
+  String get eligibilityEditorSheet2157ec10 => 'Academia';
+
+  @override
+  String get eligibilityEditorSheet42ed7e8d => 'Student';
+
+  @override
+  String get eligibilityEditorSheetCdf4bce0 => 'Other';
+
+  @override
+  String get eligibilityEditorSheet926c043f => 'Family';
+
+  @override
+  String get eligibilityEditorSheetB8d9266b => 'Single';
+
+  @override
+  String get eligibilityEditorSheet4df994d0 => 'Couple';
+
+  @override
+  String get eligibilityEditorSheetD663155d => 'Young professional';
+
+  @override
+  String get eligibilityEditorSheet0aa42aa1 => 'Retirees';
+
+  @override
+  String get eligibilityEditorSheetD02986c3 => 'Immediate';
+
+  @override
+  String get eligibilityEditorSheetE9e8cbe3 => 'Within a month';
+
+  @override
+  String get eligibilityEditorSheetDe0def2d => 'Within 3 months';
+
+  @override
+  String get eligibilityEditorSheetB4d5170f =>
+      'Minimum tenant monthly budget ≥';
+
+  @override
+  String get eligibilityEditorSheet976f97ac => 'Maximum number of children';
+
+  @override
+  String get eligibilityEditorSheetE70cb0b4 => 'No pets';
+
+  @override
+  String get eligibilityEditorSheetCb3c47ce => 'Has a car';
+
+  @override
+  String get eligibilityEditorSheet15039c05 => 'Field of work';
+
+  @override
+  String get eligibilityEditorSheetF5203dea => 'Remote worker';
+
+  @override
+  String get eligibilityEditorSheet2b9fb355 => 'Household type';
+
+  @override
+  String get eligibilityEditorSheetD308ff19 => 'Life stage';
+
+  @override
+  String get eligibilityEditorSheet5f3306da => 'New immigrant';
+
+  @override
+  String get eligibilityEditorSheet8f9615bb => 'Minimum age';
+
+  @override
+  String get eligibilityEditorSheetD5777fde => 'Maximum age';
+
+  @override
+  String get eligibilityEditorSheetD83eff6a => 'Accessibility needs';
+
+  @override
+  String get eligibilityEditorSheetC3912164 =>
+      'Requested number of rooms (minimum)';
+
+  @override
+  String get eligibilityEditorSheet29d40b0e => 'Move-in availability';
+
+  @override
+  String get eligibilityEditorSheetC476594d => 'Important';
+
+  @override
+  String get eligibilityEditorSheet0d3d4125 => 'Preferred';
+
+  @override
+  String get eligibilityEditorSheet116f6cc8 => 'Required';
+
+  @override
+  String get eligibilityEditorSheetA1caeddf =>
+      'Only filters out those known not to match';
+
+  @override
+  String get eligibilityEditorSheet44ca4acb => 'Only affects ranking';
+
+  @override
+  String get eligibilityEditorSheet03b2388e =>
+      'Anyone who doesn\'t match or is unknown won\'t see the listing';
+
+  @override
+  String get eligibilityEditorSheet9786995c => 'No criteria defined';
+
+  @override
+  String eligibilityEditorSheetFf6c3b61(Object n) {
+    return '$n criteria';
+  }
+
+  @override
+  String eligibilityEditorSheetE4f4cb81(Object musts, Object n) {
+    return '$n criteria · $musts required';
+  }
+
+  @override
+  String get eligibilityEditorSheet2d483b2c => 'Set precise criteria';
+
+  @override
+  String get eligibilityEditorSheetD3b88de7 =>
+      'Turn on a criterion, set its value and its strictness level.';
+
+  @override
+  String get eligibilityEditorSheetBb9a4c12 =>
+      'A criterion with no value — the tenant must meet it.';
+
+  @override
+  String get eligibilityEditorSheet20d4985f => 'Strictness level';
+
+  @override
+  String get eligibilityEditorSheet7c3236c7 => 'No criteria selected';
+
+  @override
+  String eligibilityEditorSheet7d5e1b03(Object count) {
+    return '$count active criteria';
+  }
+
+  @override
+  String get eligibilityEditorSheetE6932339 => 'Save';
+
+  @override
+  String get eligibilityEditorSheet10ef20bd => 'Filter tenants by criteria';
+
+  @override
+  String get eligibilityEditorSheetCdb2baa7 =>
+      'Show the listing only to tenants who match the criteria';
+
+  @override
+  String get eligibilityEditorSheet7f538947 =>
+      'Criteria beyond budget/occupation rely on information the tenant may not have filled in yet — so a strict block (\"Required\") could greatly reduce the number of viewers.';
+
+  @override
+  String get assistantScreenBe34f590 =>
+      'Hi there, nice to meet you. My name is Ezra and I\'m here to help you.\nTell me in a few words about the apartment you want to rent — where it is, how many rooms, and anything else you\'d like to share. From what you tell me I\'ll already understand a lot, and I\'ll only ask about what\'s missing.\nYou can talk to me or type, whichever is easier for you.';
+
+  @override
+  String get assistantScreen6f3d21fa => 'Thinking...';
+
+  @override
+  String get assistantScreen378c0a57 => 'Ezra is speaking...';
+
+  @override
+  String get assistantScreen01036d5b => 'Listening...';
+
+  @override
+  String get assistantScreenD8834f5a => 'Hi, I\'m Ezra';
+
+  @override
+  String get assistantScreen63169c60 =>
+      'Something went wrong. Please try again.';
+
+  @override
+  String get assistantScreen581b78bc => 'I added a photo to the listing';
+
+  @override
+  String get assistantScreenB6db02ff =>
+      'I couldn\'t add the photo. Please try again.';
+
+  @override
+  String get assistantScreen594cce8f => 'I added a video to the listing';
+
+  @override
+  String get assistantScreenDf89d62b =>
+      'I couldn\'t add the video. Please try again.';
+
+  @override
+  String get assistantScreen5dd972a7 =>
+      'Just a moment — publishing needs at least one photo of the listing. You can take one now or choose one from your phone.';
+
+  @override
+  String assistantScreen07192f57(Object addr) {
+    return 'Great! I\'ve published your listing at $addr — it\'s already live.';
+  }
+
+  @override
+  String get assistantScreen0ad71611 =>
+      'Great! I\'ve published your listing — it\'s already live.';
+
+  @override
+  String get assistantScreen76c2c7b1 =>
+      'Whenever you\'d like, you can add more photos anytime from the \"My Properties\" screen.';
+
+  @override
+  String get assistantScreen539101b0 => 'I\'m here if you need anything else.';
+
+  @override
+  String get assistantScreen163e1f70 =>
+      'Sorry, there was a problem publishing. You can try again, or add photos manually.';
+
+  @override
+  String get assistantScreen4dc83a95 => 'Ezra';
+
+  @override
+  String get assistantScreen154094c9 => 'Your personal assistant';
+
+  @override
+  String get assistantScreenC16b3933 => 'Options';
+
+  @override
+  String get assistantScreenC9b9ffef => 'Add media to the listing';
+
+  @override
+  String get assistantScreen75705b64 =>
+      'You haven\'t added photos to this listing yet';
+
+  @override
+  String get assistantScreenFeddf7c6 => 'Take a photo';
+
+  @override
+  String get assistantScreenEed2fbf3 => 'Gallery';
+
+  @override
+  String get assistantScreen26b77aa9 => 'Record a video';
+
+  @override
+  String get assistantScreen4668a8a4 => 'Done, continue the conversation';
+
+  @override
+  String get assistantScreenAca7e84c => 'Publish the listing draft';
+
+  @override
+  String get assistantScreen13e63c59 =>
+      'Ezra already built a draft — ready to publish';
+
+  @override
+  String get assistantScreenC47bc8e5 => 'Add photos';
+
+  @override
+  String get assistantScreen4610aeb4 => 'Take or choose photos for the listing';
+
+  @override
+  String get assistantScreen384e9c59 => 'Mute voice';
+
+  @override
+  String get assistantScreen1b571629 => 'Enable voice';
+
+  @override
+  String get assistantScreenFa9d4e0e => 'Ezra won\'t speak out loud';
+
+  @override
+  String get assistantScreenBfb2de50 => 'Ezra will speak his answers out loud';
+
+  @override
+  String get assistantScreen82c40bcf => 'New conversation';
+
+  @override
+  String get assistantScreenAb0463c4 => 'Clear history and start over';
+
+  @override
+  String assistantScreen80364adb(Object rooms) {
+    return '🚪  $rooms rooms';
+  }
+
+  @override
+  String assistantScreenE910996a(Object floor) {
+    return '🏢  Floor $floor';
+  }
+
+  @override
+  String assistantScreen8a8c75e3(Object price) {
+    return '💰  $price ₪/month';
+  }
+
+  @override
+  String assistantScreen5f7c4ea0(Object size) {
+    return '📐  $size m²';
+  }
+
+  @override
+  String assistantScreenF534575e(Object date) {
+    return '📅  Move-in: $date';
+  }
+
+  @override
+  String get assistantScreen87975ccc => 'Property draft';
+
+  @override
+  String assistantScreenA61a9170(Object count) {
+    return '$count photos added';
+  }
+
+  @override
+  String get assistantScreen2e6b8dd3 => 'At least one photo needed';
+
+  @override
+  String get assistantScreen2628dacb => 'Add or edit photos';
+
+  @override
+  String get assistantScreen89ac1e56 => 'Publishing the listing...';
+
+  @override
+  String get assistantScreenF3db670c => 'Yes, publish the listing';
+
+  @override
+  String get assistantScreenE4c51425 => 'Open full editor';
+
+  @override
+  String get landlordDashboardScreenC6c7d5f7 => 'Property Owner';
+
+  @override
+  String get landlordDashboardScreen235e6256 => 'Hello, ';
+
+  @override
+  String landlordDashboardScreen9c8fa644(Object pendingCount) {
+    return '$pendingCount candidates waiting for your approval';
+  }
+
+  @override
+  String get landlordDashboardScreen99884c14 =>
+      'All caught up and under control ✓';
+
+  @override
+  String get landlordDashboardScreenCce14f4f => 'Personal Assistant';
+
+  @override
+  String get landlordDashboardScreen80293f4c => 'Summary';
+
+  @override
+  String get landlordDashboardScreen1b17721e => 'Total properties';
+
+  @override
+  String get landlordDashboardScreen17127579 => 'active';
+
+  @override
+  String get landlordDashboardScreen0b71fe76 => 'Expected income';
+
+  @override
+  String get landlordDashboardScreen3ec09dc0 => 'Monthly';
+
+  @override
+  String get landlordDashboardScreen94943464 =>
+      'How many interested applicants you\'ve approved';
+
+  @override
+  String landlordDashboardScreenEd3747d9(Object pendingCount) {
+    return '$pendingCount waiting for your approval';
+  }
+
+  @override
+  String get landlordDashboardScreen8a106a06 => 'No candidates waiting';
+
+  @override
+  String get landlordDashboardScreenEec75f83 => 'Properties with a match';
+
+  @override
+  String landlordDashboardScreenBc2e631f(Object propertiesCount) {
+    return 'Out of $propertiesCount active properties';
+  }
+
+  @override
+  String get landlordDashboardScreenB0164098 => 'With a match';
+
+  @override
+  String get landlordDashboardScreenFa311e7d => 'Pending';
+
+  @override
+  String get landlordDashboardScreen50296d4c => 'Weekly';
+
+  @override
+  String get landlordDashboardScreen8951e6dc => 'Yearly';
+
+  @override
+  String get landlordDashboardScreen43b23f14 => 'this week';
+
+  @override
+  String get landlordDashboardScreenAf52bcd6 => 'this month';
+
+  @override
+  String get landlordDashboardScreenBa6767e5 => 'this year';
+
+  @override
+  String get landlordDashboardScreen270bf5ed => 'S';
+
+  @override
+  String get landlordDashboardScreen8f61d08b => 'M';
+
+  @override
+  String get landlordDashboardScreenAf1c561b => 'T';
+
+  @override
+  String get landlordDashboardScreenC7179c6f => 'W';
+
+  @override
+  String get landlordDashboardScreen5dee9138 => 'T';
+
+  @override
+  String get landlordDashboardScreen93aec056 => 'F';
+
+  @override
+  String get landlordDashboardScreenBda0900b => 'S';
+
+  @override
+  String get landlordDashboardScreenA6b97c1e => 'Wk 1';
+
+  @override
+  String get landlordDashboardScreen9aff6d23 => 'Wk 2';
+
+  @override
+  String get landlordDashboardScreenF960defe => 'Wk 3';
+
+  @override
+  String get landlordDashboardScreen04e8f590 => 'Wk 4';
+
+  @override
+  String get landlordDashboardScreen19035156 => 'Jan';
+
+  @override
+  String get landlordDashboardScreen8cc85ded => 'Feb';
+
+  @override
+  String get landlordDashboardScreenC0394ea3 => 'Mar';
+
+  @override
+  String get landlordDashboardScreenDc6b970f => 'Apr';
+
+  @override
+  String get landlordDashboardScreen5fa88202 => 'May';
+
+  @override
+  String get landlordDashboardScreen477d76d2 => 'Jun';
+
+  @override
+  String get landlordDashboardScreenA1f2e9ed => 'Jul';
+
+  @override
+  String get landlordDashboardScreen574d25b5 => 'Aug';
+
+  @override
+  String get landlordDashboardScreen5a24ce53 => 'Sep';
+
+  @override
+  String get landlordDashboardScreen4d43f4d5 => 'Oct';
+
+  @override
+  String get landlordDashboardScreen6f0a4de2 => 'Nov';
+
+  @override
+  String get landlordDashboardScreenD30ca257 => 'Dec';
+
+  @override
+  String landlordDashboardScreenA21a4640(Object suffix) {
+    return 'Interest in your properties $suffix';
+  }
+
+  @override
+  String get landlordDashboardScreen7203ea03 => 'Likes today';
+
+  @override
+  String get landlordDashboardScreen4ff60e81 => 'Total inquiries';
+
+  @override
+  String landlordDashboardScreenE8a3f079(Object totalInquiries) {
+    return '$totalInquiries inquiries';
+  }
+
+  @override
+  String get landlordDashboardScreen66b405bd => 'Daily average';
+
+  @override
+  String get landlordDashboardScreenAcc6e3d2 => 'Weekly average';
+
+  @override
+  String get landlordDashboardScreenE679dd5d => 'Monthly average';
+
+  @override
+  String get landlordDashboardScreen2074036b => 'Agent tools';
+
+  @override
+  String get landlordDashboardScreen0a134a61 =>
+      'Client book, matches, pipeline, viewings & more';
+
+  @override
+  String get landlordDashboardScreen299b769f => 'Landlord tools';
+
+  @override
+  String get landlordDashboardScreenC7fa5680 =>
+      'Simple help managing your property — no headaches';
+
+  @override
+  String get landlordDashboardScreenA8bb0310 => 'Area Intelligence';
+
+  @override
+  String get landlordDashboardScreen4e175795 =>
+      'Address → all the area\'s data, and who it\'s the best investment fit for';
+
+  @override
+  String get landlordDashboardScreenAaafbb6b => 'Income tax — made easy';
+
+  @override
+  String get landlordDashboardScreenDfd3460d =>
+      'A quick check on whether you owe tax on your rental income';
+
+  @override
+  String get landlordDashboardScreenCa25d18a => 'Reminders';
+
+  @override
+  String get landlordDashboardScreen8b96a6ac =>
+      'So you never miss a lease renewal, payment or insurance';
+
+  @override
+  String get landlordDashboardScreen5308aa0d => 'Payment tracking';
+
+  @override
+  String get landlordDashboardScreen9fd83dca =>
+      'Add a property to start tracking rent payments';
+
+  @override
+  String get landlordDashboardScreen7e05b276 =>
+      'Choose a property to see status, due date and notes';
+
+  @override
+  String get landlordDashboardScreenDae6b270 => 'Sunday';
+
+  @override
+  String get landlordDashboardScreen47f34119 => 'Monday';
+
+  @override
+  String get landlordDashboardScreenDb0c22fc => 'Tuesday';
+
+  @override
+  String get landlordDashboardScreenDa1dae77 => 'Wednesday';
+
+  @override
+  String get landlordDashboardScreenCe94cfff => 'Thursday';
+
+  @override
+  String get landlordDashboardScreen7e718908 => 'Friday';
+
+  @override
+  String get landlordDashboardScreen4203bd7e => 'Saturday';
+
+  @override
+  String get landlordDashboardScreen95d86d7f => 'Today';
+
+  @override
+  String get landlordDashboardScreen840835ac => 'Tomorrow';
+
+  @override
+  String landlordDashboardScreen30744d51(Object weekday) {
+    return '$weekday';
+  }
+
+  @override
+  String landlordDashboardScreen2dd36976(
+      Object day, Object month, Object weekday) {
+    return '$weekday $day/$month';
+  }
+
+  @override
+  String get landlordDashboardScreenD1b5aeb8 => 'My Calendar';
+
+  @override
+  String get landlordDashboardScreen32fb9ba0 => 'Loading...';
+
+  @override
+  String get landlordDashboardScreenF12b53ff => 'Tenant';
+
+  @override
+  String landlordDashboardScreen6db621c3(Object who) {
+    return 'Next viewing · $who';
+  }
+
+  @override
+  String get landlordDashboardScreen7dec25c8 =>
+      'No viewings scheduled · Add available times';
+
+  @override
+  String get compareScreen724ef1bb => 'Compare Apartments';
+
+  @override
+  String get compareScreenBbabc52c => 'Search for an apartment to compare';
+
+  @override
+  String get compareScreen61e90252 => 'Select at least 2 apartments to compare';
+
+  @override
+  String get compareScreen27eebc10 =>
+      'Not enough data for a clear recommendation';
+
+  @override
+  String get compareScreen4ec49abd =>
+      'Some listings are missing price/size or a market anchor. Scroll down for the full comparison.';
+
+  @override
+  String compareScreenFcb21fe2(Object total) {
+    return 'True cost ~₪$total/month ';
+  }
+
+  @override
+  String get compareScreen46bf1369 =>
+      '(including property tax and building fees)';
+
+  @override
+  String compareScreenA8bb36b3(Object caveat) {
+    return 'Note: $caveat';
+  }
+
+  @override
+  String compareScreenC25ab447(Object where) {
+    return 'But the best personal fit for you: $where';
+  }
+
+  @override
+  String compareScreen332e33ea(Object pct) {
+    return ' ($pct%) — if budget is less critical.';
+  }
+
+  @override
+  String get compareScreen2f883e47 => 'The bottom line';
+
+  @override
+  String compareScreen08920749(Object city) {
+    return ' in $city';
+  }
+
+  @override
+  String get compareScreen651fe4ea => 'The price is fair for the size and area';
+
+  @override
+  String compareScreenE97266c1(Object pct, Object where) {
+    return 'About $pct% below market price$where — a good price';
+  }
+
+  @override
+  String get compareScreen2514977c =>
+      'Around market price — the best value in the group';
+
+  @override
+  String compareScreenE036fa5f(Object where) {
+    return 'Right at market price$where';
+  }
+
+  @override
+  String get compareScreen41c2e13a =>
+      'There\'s a more spacious apartment in the comparison';
+
+  @override
+  String compareScreen7cb99b30(Object feature) {
+    return 'No $feature (available in another listing)';
+  }
+
+  @override
+  String get compareScreenD948b41f =>
+      'There\'s a cheaper option in monthly cost';
+
+  @override
+  String get compareScreen5b4d6e83 => 'What it will really cost you';
+
+  @override
+  String get compareScreen3b9ffcf8 =>
+      'The rent isn\'t the real cost — property tax and building fees add up every month.';
+
+  @override
+  String compareScreen35beed96(Object where) {
+    return '$where looks cheapest in rent, ';
+  }
+
+  @override
+  String compareScreenFc7a9430(Object where) {
+    return 'but $where is cheaper in total ';
+  }
+
+  @override
+  String get compareScreen5706cd1b => 'monthly cost.';
+
+  @override
+  String get compareScreenCbde97ef => 'Actually cheapest';
+
+  @override
+  String compareScreenCc3022d2(Object arnona, Object rent) {
+    return 'Rent ₪$rent + property tax ~₪$arnona ';
+  }
+
+  @override
+  String compareScreenAab6709f(Object vaad) {
+    return '+ building fees ~₪$vaad';
+  }
+
+  @override
+  String get compareScreenE1000003 => 'What you give up';
+
+  @override
+  String compareScreenB05c14b6(Object where) {
+    return 'Compared to $where (the recommendation) — what each other option gives you and what you\'d lose:';
+  }
+
+  @override
+  String get compareScreen87ede2ed =>
+      'Very similar to the recommendation — no meaningful difference.';
+
+  @override
+  String compareScreenD46b7e4d(Object d) {
+    return '₪$d cheaper per month';
+  }
+
+  @override
+  String compareScreenF17583c1(Object d) {
+    return '₪$d more expensive per month';
+  }
+
+  @override
+  String compareScreenF1897440(Object d) {
+    return '$d m² bigger';
+  }
+
+  @override
+  String compareScreenE791ef57(Object d) {
+    return '$d m² smaller';
+  }
+
+  @override
+  String compareScreen5d0daead(Object rooms) {
+    return 'More rooms ($rooms)';
+  }
+
+  @override
+  String compareScreenE9e5b9ac(Object rooms) {
+    return 'Fewer rooms ($rooms)';
+  }
+
+  @override
+  String compareScreenAe9d2da6(Object feature) {
+    return 'Has $feature';
+  }
+
+  @override
+  String compareScreenC88245ca(Object feature) {
+    return 'No $feature';
+  }
+
+  @override
+  String compareScreen56d02b30(Object pct) {
+    return 'Better price relative to market (by $pct%)';
+  }
+
+  @override
+  String compareScreen3bce9322(Object pct) {
+    return 'Worse price relative to market (by $pct%)';
+  }
+
+  @override
+  String compareScreen7f897f38(Object mo) {
+    return 'Higher match for you ($mo%)';
+  }
+
+  @override
+  String compareScreen95af2d2f(Object mo) {
+    return 'Lower match ($mo%)';
+  }
+
+  @override
+  String get compareScreenE33e9eb9 => 'All details compared';
+
+  @override
+  String get compareScreenCc097285 => 'Price';
+
+  @override
+  String get compareScreen1e7862a6 => '₪ per m²';
+
+  @override
+  String get compareScreenB50b3974 => 'Rooms';
+
+  @override
+  String get compareScreen16f6bd25 => 'Size';
+
+  @override
+  String compareScreenD8b6113c(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String get compareScreen047e630b => 'Floor';
+
+  @override
+  String get compareScreen8d058056 => 'Elevator';
+
+  @override
+  String get compareScreenA9655ab3 => 'Parking';
+
+  @override
+  String get compareScreen86425fcf => 'Balcony';
+
+  @override
+  String get compareScreenE1cca9ff => 'Safe room (Mamad)';
+
+  @override
+  String get compareScreenFcf022d8 => 'Condition';
+
+  @override
+  String get compareScreen206ee003 => 'Match';
+
+  @override
+  String get compareScreenEf5ba2c7 => 'Select apartments to compare';
+
+  @override
+  String compareScreen0975a98d(Object count, Object max) {
+    return '$count/$max apartments selected';
+  }
+
+  @override
+  String get compareScreen4175f994 => 'Yes';
+
+  @override
+  String get compareScreen21a2d9d6 => 'No';
+
+  @override
+  String get compareScreenF419307d =>
+      'You haven\'t saved any apartments yet.\nSave at least 2 apartments to compare them.';
+
+  @override
+  String get compareScreen8833d8c9 =>
+      'You\'ve saved only one apartment.\nSave another one to compare them.';
+
+  @override
+  String get compareScreenAbca0fe8 => 'Add an apartment to compare';
+
+  @override
+  String get compareScreenDd5b39ef =>
+      'Search by city / neighborhood / address…';
+
+  @override
+  String get compareScreenEf52c1b3 => 'Oops! No matching apartments found';
+
+  @override
+  String compareScreen0c390fdc(Object price, Object rooms) {
+    return '$price · $rooms rooms';
+  }
+
+  @override
+  String get landlordPropertiesScreenContractNeedsMatch =>
+      'A contract opens with a tenant you already have a match with. Get a match for the property first.';
+
+  @override
+  String get landlordPropertiesScreenSendContractTitle => 'Send the contract?';
+
+  @override
+  String get landlordPropertiesScreenSendContractMessage =>
+      'Are you sure you want to send the contract?';
+
+  @override
+  String get landlordPropertiesScreenContractSourceTitle =>
+      'How would you like to create the contract?';
+
+  @override
+  String get landlordPropertiesScreenUseOurContract => 'Use our contract';
+
+  @override
+  String get landlordPropertiesScreenOurContractSubtitle =>
+      'A standard contract from Rently\'s lawyers';
+
+  @override
+  String get landlordPropertiesScreenCreateOwnContract =>
+      'Create your own contract';
+
+  @override
+  String get landlordPropertiesScreenOwnContractSubtitle =>
+      'Fill in the terms yourself';
+
+  @override
+  String get landlordPropertiesScreenSortDefault => 'Default';
+
+  @override
+  String get landlordPropertiesScreenSortPriceAsc => 'Price: low to high';
+
+  @override
+  String get landlordPropertiesScreenSortPriceDesc => 'Price: high to low';
+
+  @override
+  String get landlordPropertiesScreenSortRooms => 'By rooms';
+
+  @override
+  String get landlordPropertiesScreenFilterAll => 'All';
+
+  @override
+  String get landlordPropertiesScreenFilterHighPriority =>
+      'Marketing priority (up to 6K)';
+
+  @override
+  String get landlordPropertiesScreenFilterLuxury => 'Luxury properties (10K+)';
+
+  @override
+  String get landlordPropertiesScreenFilterImmediate => 'Immediate move-in';
+
+  @override
+  String get landlordPropertiesScreenFilterLarge =>
+      'Large apartments (4+ rooms)';
+
+  @override
+  String get landlordPropertiesScreenFilterAgency => 'Exclusive (agency)';
+
+  @override
+  String get landlordPropertiesScreenFilterPrivate => 'Private (no agent)';
+
+  @override
+  String get landlordPropertiesScreenFilterSortTitle =>
+      'Filter & sort properties';
+
+  @override
+  String get landlordPropertiesScreenReset => 'Reset';
+
+  @override
+  String get landlordPropertiesScreenFilterByTags => 'Filter by tags';
+
+  @override
+  String get landlordPropertiesScreenSortByLabel => 'Sort by';
+
+  @override
+  String get landlordPropertiesScreenAddLabel => 'Add';
+
+  @override
+  String get landlordPropertiesScreenSearchHint => 'Search by address, city...';
+
+  @override
+  String get landlordPropertiesScreenPillLarge => 'Large apartments';
+
+  @override
+  String get landlordPropertiesScreenPillPrivate => 'Private';
+
+  @override
+  String get landlordPropertiesScreenPillAgency => 'Exclusive';
+
+  @override
+  String get landlordPropertiesScreenPillLuxury => 'Luxury';
+
+  @override
+  String get landlordPropertiesScreenPillHighPriority => 'Up to 6K';
+
+  @override
+  String landlordPropertiesScreenResultsCount(Object filtered, Object total) {
+    return '$filtered of $total properties';
+  }
+
+  @override
+  String get landlordPropertiesScreenContractDraft => 'Draft';
+
+  @override
+  String get landlordPropertiesScreenContractSent => 'Sent';
+
+  @override
+  String get landlordPropertiesScreenContractSigned => 'Signed ✓';
+
+  @override
+  String get landlordPropertiesScreenBoostedTag => 'Boosted';
+
+  @override
+  String landlordPropertiesScreenRoomsTag(Object rooms) {
+    return '$rooms rooms';
+  }
+
+  @override
+  String landlordPropertiesScreenSizeTag(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String landlordPropertiesScreenContractLabel(Object status) {
+    return 'Contract: $status';
+  }
+
+  @override
+  String landlordPropertiesScreenAudienceCount(Object count) {
+    return '$count target audience';
+  }
+
+  @override
+  String get landlordPropertiesScreenEmptyTitle =>
+      'You haven\'t added any properties yet';
+
+  @override
+  String get landlordPropertiesScreenEmptyBody =>
+      'Add your first property to start getting likes, candidates, and conversations.';
+
+  @override
+  String get landlordPropertiesScreenNoResultsTitle =>
+      'No properties found with this filter';
+
+  @override
+  String get landlordPropertiesScreenNoResultsBody =>
+      'Try changing your search parameters or clearing the filters.';
+
+  @override
+  String get landlordPropertiesScreenClearFilters => 'Clear filters';
+
+  @override
+  String get contractSignFlowScreenTitle => 'Signing the contract';
+
+  @override
+  String get contractSignFlowScreenPartiesSection => 'Parties & signatures';
+
+  @override
+  String get contractSignFlowScreenLandlord => 'Landlord';
+
+  @override
+  String get contractSignFlowScreenTenantWithThe => 'The tenant';
+
+  @override
+  String get contractSignFlowScreenCancelled => 'The contract was cancelled';
+
+  @override
+  String get contractSignFlowScreenDeclined => 'The contract was declined';
+
+  @override
+  String get contractSignFlowScreenCompletedTitle =>
+      'Completed — signed by both parties';
+
+  @override
+  String get contractSignFlowScreenCompletedBody =>
+      'The contract is valid and digitally signed. You can view it anytime.';
+
+  @override
+  String contractSignFlowScreenWaitingForOther(Object other) {
+    return 'You\'ve signed — waiting for $other to sign';
+  }
+
+  @override
+  String get contractSignFlowScreenWaitingForOtherBody =>
+      'A notification was sent to the other party. As soon as they sign, the contract will be complete.';
+
+  @override
+  String get contractSignFlowScreenLandlordSignedWaitingYou =>
+      'The landlord has signed · waiting for your signature';
+
+  @override
+  String get contractSignFlowScreenReviewToComplete =>
+      'Review the terms and tap \"Sign\" to complete the contract.';
+
+  @override
+  String get contractSignFlowScreenWaitingSignature => 'Waiting for signature';
+
+  @override
+  String get contractSignFlowScreenReviewToStart =>
+      'Review the terms and tap \"Sign\" to get started.';
+
+  @override
+  String get contractSignFlowScreenTenant => 'Tenant';
+
+  @override
+  String get contractSignFlowScreenCompletedShort => 'Completed';
+
+  @override
+  String get contractSignFlowScreenPropertyFallback => 'Rental property';
+
+  @override
+  String get contractSignFlowScreenMonthlyRent => 'Monthly rent';
+
+  @override
+  String get contractSignFlowScreenDeposit => 'Deposit';
+
+  @override
+  String get contractSignFlowScreenDuration => 'Duration';
+
+  @override
+  String contractSignFlowScreenDurationMonths(Object months) {
+    return '$months months';
+  }
+
+  @override
+  String get contractSignFlowScreenMoveIn => 'Move-in';
+
+  @override
+  String get contractSignFlowScreenEndDate => 'End date';
+
+  @override
+  String get contractSignFlowScreenTermsText => 'Contract terms';
+
+  @override
+  String get contractSignFlowScreenThatsYou => 'That\'s you';
+
+  @override
+  String get contractSignFlowScreenSigned => 'Signed';
+
+  @override
+  String contractSignFlowScreenSignedOn(Object date) {
+    return 'Signed · $date';
+  }
+
+  @override
+  String contractSignFlowScreenSignAsLabel(Object role) {
+    return 'Sign as $role';
+  }
+
+  @override
+  String get contractSignFlowScreenContractCompleted =>
+      'The contract is complete';
+
+  @override
+  String get contractSignFlowScreenSignedWaitingOther =>
+      'You\'ve signed · waiting for the other party';
+
+  @override
+  String get contractSignFlowScreenBack => 'Back';
+
+  @override
+  String get contractSignFlowScreenSignatureSaved =>
+      'Signature saved successfully ✍️';
+
+  @override
+  String get contractSignFlowScreenSignBeforeConfirm =>
+      'Please sign in the box before confirming';
+
+  @override
+  String get contractSignFlowScreenDigitalSignature => 'Digital signature';
+
+  @override
+  String get contractSignFlowScreenSignWithFinger =>
+      'Sign with your finger in the box below';
+
+  @override
+  String get contractSignFlowScreenClear => 'Clear';
+
+  @override
+  String get contractSignFlowScreenSigning => 'Signing…';
+
+  @override
+  String get contractSignFlowScreenConfirmSignature => 'Confirm signature';
+
+  @override
+  String get contractSignFlowScreenSecurityNotePart1 =>
+      'Secure digital signature (Ed25519). The private key is stored only on your device; ';
+
+  @override
+  String get contractSignFlowScreenSecurityNotePart2 =>
+      'any change to the terms invalidates signatures already made.';
+
+  @override
+  String get contractSignFlowScreenNotFoundTitle => 'Contract not found';
+
+  @override
+  String get contractSignFlowScreenNotFoundBody =>
+      'Try refreshing the chat. If the landlord hasn\'t sent a contract yet, it will appear here as soon as it\'s sent.';
+
+  @override
+  String get erikChatScreenBotName => 'Ezra';
+
+  @override
+  String get erikChatScreenGreetingIntro =>
+      'Hi, nice to meet you. My name is Ezra and I\'m here to help you.\n';
+
+  @override
+  String get erikChatScreenGreetingBody1 =>
+      'You can tell me about an apartment you\'d like to rent out and I\'ll build you a listing, help write a description, ';
+
+  @override
+  String get erikChatScreenGreetingBody2 =>
+      'set a price, or just answer questions. Whatever\'s easier for you — type or talk.';
+
+  @override
+  String get erikChatScreenStarter1 => 'I want to list a new apartment';
+
+  @override
+  String get erikChatScreenStarter2 =>
+      'Help me write a description for the apartment';
+
+  @override
+  String get erikChatScreenStarter3 =>
+      'What should I photograph in the apartment?';
+
+  @override
+  String get erikChatScreenStarter4 => 'How do I price it correctly?';
+
+  @override
+  String get erikChatScreenAssistantUnavailable =>
+      'The personal assistant isn\'t available right now. Please try again later.';
+
+  @override
+  String get erikChatScreenTransientError =>
+      'Sorry, there was a brief glitch. Please try again.';
+
+  @override
+  String get erikChatScreenVideoAddedBubble => '🎥 Video added';
+
+  @override
+  String get erikChatScreenPhotoAddedBubble => '📷 Photo added';
+
+  @override
+  String get erikChatScreenVideoAddedSnack => 'Video added ✓';
+
+  @override
+  String erikChatScreenPhotoAddedSnack(Object count) {
+    return 'Photo added ✓ ($count)';
+  }
+
+  @override
+  String get erikChatScreenAttachFailed =>
+      'I couldn\'t attach the file. Please try again.';
+
+  @override
+  String get erikChatScreenTakePhoto => 'Take a photo';
+
+  @override
+  String get erikChatScreenChooseFromGallery => 'Choose from gallery';
+
+  @override
+  String get erikChatScreenVideoFromGallery => 'Video from gallery';
+
+  @override
+  String get erikChatScreenTour360 => '360° tour';
+
+  @override
+  String get erikChatScreenTour360Added => '360° tour added ✓';
+
+  @override
+  String get erikChatScreenNeedPhotoToPublish =>
+      'Just a moment — to publish, you need at least one photo of the apartment. You can take one now or choose from your phone.';
+
+  @override
+  String erikChatScreenPublishedSuccessWithAddr(Object addr) {
+    return 'Great! I published your listing at $addr, it\'s already live. 🎉\n';
+  }
+
+  @override
+  String get erikChatScreenPublishedSuccessNoAddr =>
+      'Great! I published your listing, it\'s already live. 🎉\n';
+
+  @override
+  String get erikChatScreenPublishedTip =>
+      'You can add more photos anytime from the \"My Properties\" screen. I\'m here if you need anything else.';
+
+  @override
+  String get erikChatScreenPublishFailed =>
+      'There was a problem publishing. You can try again, or edit it in the full form.';
+
+  @override
+  String erikChatScreenSubtitle(Object botName) {
+    return '$botName · Personal assistant';
+  }
+
+  @override
+  String get erikChatScreenHereForYou => 'Here for you';
+
+  @override
+  String get erikChatScreenLiveVoiceTooltip => 'Live voice call';
+
+  @override
+  String get erikChatScreenReadAloudOn => 'Read-aloud on';
+
+  @override
+  String get erikChatScreenReadAloudOff => 'Read-aloud off';
+
+  @override
+  String get erikChatScreenReadAloudOnSnack =>
+      'Ezra will read the replies aloud';
+
+  @override
+  String get erikChatScreenNewConversation => 'New conversation';
+
+  @override
+  String get erikChatScreenRetry => 'Try again';
+
+  @override
+  String erikChatScreenRoomsSuffix(Object rooms) {
+    return '$rooms rooms';
+  }
+
+  @override
+  String erikChatScreenSizeSuffix(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String erikChatScreenFloorLabel(Object floor) {
+    return 'Floor $floor';
+  }
+
+  @override
+  String erikChatScreenPriceSuffix(Object price) {
+    return '₪$price per month';
+  }
+
+  @override
+  String erikChatScreenEntryLabel(Object entryDate) {
+    return 'Move-in: $entryDate';
+  }
+
+  @override
+  String get erikChatScreenDraftReadyTitle => 'Listing draft ready';
+
+  @override
+  String get erikChatScreenAddPhotos => 'Add photos of the apartment';
+
+  @override
+  String erikChatScreenPhotosCountAddMore(Object count) {
+    return '$count photos · Add more';
+  }
+
+  @override
+  String get erikChatScreenPublishNow => 'Publish now';
+
+  @override
+  String get erikChatScreenEdit => 'Edit';
+
+  @override
+  String get erikChatScreenInputHint => 'Tell me in your own words...';
+
+  @override
+  String get nearbyPlacesCard29364e0f => 'Nearby places';
+
+  @override
+  String get nearbyPlacesCard7e6e0fb1 => 'Previous';
+
+  @override
+  String nearbyPlacesCard4a3e7c17(Object page, Object total) {
+    return 'Page $page of $total';
+  }
+
+  @override
+  String get nearbyPlacesCard5f9edf6e => 'Next';
+
+  @override
+  String get nearbyPlacesCard4745b1e9 => 'See more places nearby';
+
+  @override
+  String nearbyPlacesCard9197afde(Object hidden) {
+    return 'View all (+$hidden)';
+  }
+
+  @override
+  String get nearbyPlacesCard6192614d => 'Show less';
+
+  @override
+  String nearbyPlacesCardC3e59a4e(Object radiusKm) {
+    return ' · $radiusKm km';
+  }
+
+  @override
+  String get nearbyPlacesCardCef7ef5e => 'Nearby schools';
+
+  @override
+  String get nearbyPlacesCardD7b78a1f => 'Nearby kindergartens';
+
+  @override
+  String get nearbyPlacesCard385087d3 => 'Nearby clinics';
+
+  @override
+  String get nearbyPlacesCard19a008ff => 'Nearby supermarkets';
+
+  @override
+  String get nearbyPlacesCardCdc11038 => 'Nearby parks';
+
+  @override
+  String get nearbyPlacesCardEc7edb50 => 'Nearby pharmacies';
+
+  @override
+  String get nearbyPlacesCard71ec0056 => 'Nearby playgrounds';
+
+  @override
+  String get nearbyPlacesCard09b9bc6f => 'Nearby restaurants & cafes';
+
+  @override
+  String get nearbyPlacesCard117e5860 => 'Nearby gyms';
+
+  @override
+  String get nearbyPlacesCardD4ecbfa0 => 'Nearby bars & pubs';
+
+  @override
+  String get nearbyPlacesCard7e72c9af => 'Nearby synagogues';
+
+  @override
+  String get nearbyPlacesCard21a17e0d => 'Nearby cultural venues';
+
+  @override
+  String get nearbyPlacesCard46be343a => 'Nearby hospitals';
+
+  @override
+  String get nearbyPlacesCard07638922 => 'Nearby train & light-rail stations';
+
+  @override
+  String get nearbyPlacesCardBb428196 => 'Nearby mosques & churches';
+
+  @override
+  String get nearbyPlacesCard34ff0c6c => 'Pools & sports centers';
+
+  @override
+  String get nearbyPlacesCard5290646f => 'Nearby dog parks';
+
+  @override
+  String get nearbyPlacesCard6faa1286 => 'Nearby vets';
+
+  @override
+  String get nearbyPlacesCard5b5ddf14 => 'Nearby bike-share stations';
+
+  @override
+  String get nearbyPlacesCard5d4c2d06 => 'Nearby coworking spaces';
+
+  @override
+  String get nearbyPlacesCard0a96eae3 => 'Nearby parking lots';
+
+  @override
+  String get nearbyPlacesCard6278673e => 'Clinic';
+
+  @override
+  String nearbyPlacesCardDcabfe76(Object m) {
+    return '$m m';
+  }
+
+  @override
+  String nearbyPlacesCard0b2db321(Object km) {
+    return '$km km';
+  }
+
+  @override
+  String get nearbyPlacesCard4f9b07b3 => 'Open in Google?';
+
+  @override
+  String nearbyPlacesCardE927ed2c(Object name) {
+    return 'We\'ll search for \"$name\" on Google.';
+  }
+
+  @override
+  String get nearbyPlacesCardA7c55a8d => 'Cancel';
+
+  @override
+  String get nearbyPlacesCard95337767 => 'Search Google';
+
+  @override
+  String get panoramaSweepCaptureE7f7e04b => 'Middle row';
+
+  @override
+  String get panoramaSweepCapture5c22dd54 =>
+      'Hold the phone upright (vertical) and turn a full circle in place';
+
+  @override
+  String get panoramaSweepCapture00ce3275 => 'Top row';
+
+  @override
+  String get panoramaSweepCapture29b0747d =>
+      'Tilt slightly upward (~30°) and turn a full circle again';
+
+  @override
+  String get panoramaSweepCapture8dec33ce => 'Bottom row';
+
+  @override
+  String get panoramaSweepCapture69ed4717 =>
+      'Tilt slightly downward (~30°) and turn a full circle again';
+
+  @override
+  String get panoramaSweepCapture62aa1e63 =>
+      'Couldn\'t open the camera. Check camera permissions.';
+
+  @override
+  String get panoramaSweepCapture6b180872 =>
+      'More photos are needed to build a full turn. Turn a bit more and try again.';
+
+  @override
+  String get panoramaSweepCapture97f6b247 => 'Starting to build the tour...';
+
+  @override
+  String get panoramaSweepCapture51e3560a =>
+      'We couldn\'t start processing. Check your internet connection.';
+
+  @override
+  String panoramaSweepCaptureE691fca8(Object i, Object total) {
+    return 'Uploading photos... $i/$total';
+  }
+
+  @override
+  String get panoramaSweepCapture7c0fe1ba =>
+      'The upload failed midway. Check your connection and try again.';
+
+  @override
+  String get panoramaSweepCapture48d71813 =>
+      'Stitching the photos into a full turn...';
+
+  @override
+  String get panoramaSweepCaptureEc71e067 =>
+      'Processing failed. Try shooting again, slowly and in good light.';
+
+  @override
+  String get panoramaSweepCapture99b858ac =>
+      'Processing failed. Try shooting again.';
+
+  @override
+  String get panoramaSweepCaptureFd1988b1 =>
+      'Processing is taking too long. Try again later.';
+
+  @override
+  String get panoramaSweepCaptureF55e6e9c =>
+      'Something went wrong. Check your connection and try again.';
+
+  @override
+  String get panoramaSweepCapture28a43c6d => 'Closed · out of 360°';
+
+  @override
+  String panoramaSweepCapture1b253920(Object count, Object total) {
+    return '$count/$total frames';
+  }
+
+  @override
+  String get panoramaSweepCapture1dc38c15 => 'We couldn\'t build the tour';
+
+  @override
+  String get panoramaSweepCaptureAa69b001 => 'Building your tour';
+
+  @override
+  String panoramaSweepCapture28da4336(Object msg) {
+    return '$msg\n\nThis may take a few moments — don\'t close this screen.';
+  }
+
+  @override
+  String get panoramaSweepCaptureC5ffac09 => 'Try again';
+
+  @override
+  String get panoramaSweepCapture55247199 => 'Close';
+
+  @override
+  String get panoramaSweepCapture7512612e =>
+      'Turn a step · stop · repeat around';
+
+  @override
+  String get panoramaSweepCapture5b98f935 =>
+      'Hold still for a moment to capture 🐢';
+
+  @override
+  String get panoramaSweepCapture2086feda => 'Nice — hold still for a moment';
+
+  @override
+  String get panoramaSweepCaptureC73a59b7 => 'Turn a small step and continue';
+
+  @override
+  String get panoramaSweepCapture6a487da4 => 'Stop';
+
+  @override
+  String get panoramaSweepCaptureEdd587e1 => 'Continue row';
+
+  @override
+  String panoramaSweepCapture41e2bc7e(Object title) {
+    return 'Start $title';
+  }
+
+  @override
+  String panoramaSweepCapture3ccd2a1c(Object title) {
+    return 'Continue to $title';
+  }
+
+  @override
+  String get panoramaSweepCaptureF600808f => 'Finish';
+
+  @override
+  String get panoramaSweepCaptureC9e2125f => 'Done';
+
+  @override
+  String get panoramaSweepCapture4c53a96e => 'Camera error';
+
+  @override
+  String brokerOwnerReportScreen9e2251dc(Object address) {
+    return 'Activity report — $address';
+  }
+
+  @override
+  String get brokerOwnerReportScreen4af427f3 =>
+      'Activity report for the property owner';
+
+  @override
+  String get brokerOwnerReportScreen5a6b6baa => 'Choose a property';
+
+  @override
+  String brokerOwnerReportScreen80dfca38(Object address) {
+    return 'Activity summary · $address';
+  }
+
+  @override
+  String get brokerOwnerReportScreenD304ce53 =>
+      'What to send the property owner';
+
+  @override
+  String get brokerOwnerReportScreen48227f9c => 'Views';
+
+  @override
+  String get brokerOwnerReportScreenDaa11b47 => 'Interested (likes)';
+
+  @override
+  String get brokerOwnerReportScreen066de4f8 => 'Saves';
+
+  @override
+  String get brokerOwnerReportScreenD535641c => 'Contact requests';
+
+  @override
+  String get brokerOwnerReportScreenA04be780 => 'Property page visits';
+
+  @override
+  String get brokerOwnerReportScreenAc141b12 => 'Last viewed';
+
+  @override
+  String brokerOwnerReportScreen564551f8(Object count) {
+    return 'The property was viewed $count times';
+  }
+
+  @override
+  String brokerOwnerReportScreen958d9393(Object count) {
+    return '$count interested people liked it';
+  }
+
+  @override
+  String brokerOwnerReportScreenFa6a4018(Object count) {
+    return '$count saved it for later';
+  }
+
+  @override
+  String brokerOwnerReportScreen825b0fd8(Object count) {
+    return '$count contact requests were received';
+  }
+
+  @override
+  String get brokerOwnerReportScreenDf3d7596 =>
+      'The property is published and active in the system. No measurable activity has been recorded yet — ';
+
+  @override
+  String get brokerOwnerReportScreen9463334d =>
+      'we\'ll keep tracking it and update you later.';
+
+  @override
+  String brokerOwnerReportScreenF0cf8eae(Object address, Object summary) {
+    return 'Update on \"$address\": $summary. We\'re continuing to promote ';
+  }
+
+  @override
+  String get brokerOwnerReportScreen85a17b3a =>
+      'the property and will be glad to update you on any progress.';
+
+  @override
+  String brokerOwnerReportScreenE707f57e(Object address) {
+    return 'Activity report — $address';
+  }
+
+  @override
+  String brokerOwnerReportScreenDb69622a(Object rooms, Object size) {
+    return '$rooms rooms · $size m²';
+  }
+
+  @override
+  String brokerOwnerReportScreenD973da64(Object rooms) {
+    return '$rooms rooms';
+  }
+
+  @override
+  String get brokerOwnerReportScreenFd67190d => 'Send as text';
+
+  @override
+  String get brokerOwnerReportScreenC87bee7b => 'Send the report';
+
+  @override
+  String get brokerOwnerReportScreenDe13d87a => 'Send via WhatsApp';
+
+  @override
+  String get brokerOwnerReportScreenC23278cd =>
+      'Can\'t open WhatsApp right now';
+
+  @override
+  String get brokerOwnerReportScreen217e3171 => 'Send via SMS';
+
+  @override
+  String get brokerOwnerReportScreen12d7a7d4 => 'Can\'t open SMS right now';
+
+  @override
+  String get brokerOwnerReportScreenB4a9fdcf => 'Copy the report';
+
+  @override
+  String get brokerOwnerReportScreen452f9d1a => 'Report copied';
+
+  @override
+  String get brokerOwnerReportScreenC96fa39c => 'No properties yet';
+
+  @override
+  String get brokerOwnerReportScreen6dc67ee5 =>
+      'Add a property to generate an activity report for the owner.';
+
+  @override
+  String get brokerOwnerReportScreenA170171d => 'Less than an hour ago';
+
+  @override
+  String brokerOwnerReportScreenC46e717b(Object hours) {
+    return '$hours hours ago';
+  }
+
+  @override
+  String get brokerOwnerReportScreenBe285a01 => 'Yesterday';
+
+  @override
+  String brokerOwnerReportScreen0cfbdf39(Object days) {
+    return '$days days ago';
+  }
+
+  @override
+  String get contractFormScreenCa38cedb => 'AI contract improvement';
+
+  @override
+  String get contractFormScreenA7aa0554 => 'AI contract improvement — Rently';
+
+  @override
+  String get contractFormScreen5ff8838c =>
+      'Payment isn\'t available right now. Please try again later.';
+
+  @override
+  String get contractFormScreen0bf10733 =>
+      'The contract can\'t be improved right now. Please try again.';
+
+  @override
+  String get contractFormScreenC2278e7d =>
+      'The contract was improved and tailored with AI ✨';
+
+  @override
+  String get contractFormScreenCbbabf55 => 'Please enter the monthly rent';
+
+  @override
+  String get contractFormScreen8e5a493e =>
+      'The contract can\'t be created right now. Please try again.';
+
+  @override
+  String get contractFormScreen64202d91 => 'New rental contract';
+
+  @override
+  String get contractFormScreenEdb89494 => 'Sending…';
+
+  @override
+  String get contractFormScreenC1c55cf9 => 'Send for signature';
+
+  @override
+  String get contractFormScreen1b58c9a0 => 'Rental terms';
+
+  @override
+  String get contractFormScreen0ae58e28 => 'Monthly rent (₪)';
+
+  @override
+  String get contractFormScreen99d1d056 => 'Deposit / guarantee (₪)';
+
+  @override
+  String get contractFormScreenBdecb11c => 'Rental period';
+
+  @override
+  String contractFormScreenBf1cf58d(Object m) {
+    return '$m months';
+  }
+
+  @override
+  String get contractFormScreenB7cdc163 => 'Move-in date';
+
+  @override
+  String get contractFormScreen67e27f00 => 'Contract wording';
+
+  @override
+  String get contractFormScreen9e1017ad => 'Back to the standard wording';
+
+  @override
+  String get contractFormScreen30664b86 => 'Contract text';
+
+  @override
+  String get contractFormScreen374bbbdf =>
+      'The contract will be signed with an end-to-end secure digital signature. Each side signs on their own device, and any change to the terms will invalidate previous signatures.';
+
+  @override
+  String get contractFormScreenE34604a7 => 'Standard rental contract';
+
+  @override
+  String get contractFormScreenCbfee77a => 'Improve with AI';
+
+  @override
+  String contractFormScreen311875d1(Object price) {
+    return 'Paid feature · ₪$price';
+  }
+
+  @override
+  String get contractFormScreen82a64993 =>
+      'Adapting the contract to the property…';
+
+  @override
+  String get contractFormScreen3750438e =>
+      'Drafts and tailors the contract to the property and terms using AI';
+
+  @override
+  String get contractFormScreenA78d435c => 'Improving the contract with AI';
+
+  @override
+  String get contractFormScreenF4a6089f =>
+      'The AI will rewrite and tailor the contract to your property and terms — clear wording, ';
+
+  @override
+  String get contractFormScreenC0583fa2 =>
+      'organized into sections, based only on your data.';
+
+  @override
+  String get contractFormScreen99b411b6 => 'Paid feature';
+
+  @override
+  String contractFormScreenFa001394(Object price) {
+    return 'Continue to payment ₪$price';
+  }
+
+  @override
+  String get contractFormScreen98c8a5b8 => 'Not now';
+
+  @override
+  String get paywallScreenPerYear => ' / year';
+
+  @override
+  String get paywallScreenPerMonth => ' / month';
+
+  @override
+  String paywallScreenSubscriptionSubtitle(Object plan) {
+    return '$plan subscription — RENTLY PRO';
+  }
+
+  @override
+  String get paywallScreenAnnualLabel => 'Annual';
+
+  @override
+  String get paywallScreenMonthlyLabel => 'Monthly';
+
+  @override
+  String get paywallScreenPaymentError =>
+      'Error opening payment. Please try again.';
+
+  @override
+  String get paywallScreenLoginRequired =>
+      'You need to sign in to purchase a subscription — sign in and try again.';
+
+  @override
+  String paywallScreenPaymentErrorWithCode(Object code) {
+    return 'Error opening payment ($code). Please try again.';
+  }
+
+  @override
+  String get paywallScreenEntitlementPending =>
+      'Payment received — activating your subscription may take a moment. Check again in a few minutes.';
+
+  @override
+  String get paywallScreenHeadline => 'Close rentals faster.';
+
+  @override
+  String get paywallScreenSubheadline =>
+      'RENTLY PRO puts your apartment in the spotlight: more viewers, better-matched tenants, and all your management in one place — until it\'s rented.';
+
+  @override
+  String get paywallScreenPerMonthShort => 'per month';
+
+  @override
+  String get paywallScreenMonthlyBillingNote =>
+      'Billed monthly · Cancel anytime';
+
+  @override
+  String get paywallScreenMonthlyBoostsNote => '2 boosts a month';
+
+  @override
+  String get paywallScreenAnnualPeriodLine => 'per year · ₪37.50/month';
+
+  @override
+  String get paywallScreenAnnualBillingNote => 'Pay for 10 months, get 12';
+
+  @override
+  String get paywallScreenAnnualBoostsNote => '5 boosts a month';
+
+  @override
+  String paywallScreenAnnualRibbon(Object savings) {
+    return 'Best value · Save $savings';
+  }
+
+  @override
+  String get paywallScreenFeatureUnlimitedListings => 'Unlimited listings';
+
+  @override
+  String get paywallScreenFeatureBoosts =>
+      'Boosts that bring more viewers to your listing';
+
+  @override
+  String get paywallScreenFeatureVerifiedBadge =>
+      '\"Verified\" badge — more trust, more inquiries';
+
+  @override
+  String get paywallScreenFeatureSearchPriority =>
+      'Priority placement in tenants\' search results';
+
+  @override
+  String get paywallScreenFeatureCandidateManagement =>
+      'Manage candidates, chat, and schedule tours in one place';
+
+  @override
+  String get paywallScreenFeatureCalendar =>
+      'Automatic availability calendar for scheduling viewings';
+
+  @override
+  String get paywallScreenFeatureMarketInsights =>
+      'Market insights and smart area pricing';
+
+  @override
+  String get paywallScreenAllPlansInclude =>
+      'Everything included in every plan';
+
+  @override
+  String get paywallScreenUltraTeaserTitle => 'Need maximum exposure?';
+
+  @override
+  String get paywallScreenUltraTeaserBody =>
+      'Ultra boost — 5x the exposure, available on any listing from ₪50.';
+
+  @override
+  String paywallScreenAnnualBillingTrial(Object amount) {
+    return 'Billed annually $amount. Cancel anytime.';
+  }
+
+  @override
+  String paywallScreenMonthlyBillingTrial(Object amount) {
+    return 'Renews monthly at $amount. Cancel anytime.';
+  }
+
+  @override
+  String get paywallScreenJoinAnnual => 'Join the annual plan';
+
+  @override
+  String get paywallScreenJoinMonthly => 'Join the monthly plan';
+
+  @override
+  String get paywallScreenSecurePayment =>
+      'Secure payment · Receipt sent by email';
+
+  @override
+  String get paywallScreenCouponHint => 'Coupon code (optional)';
+
+  @override
+  String get paywallScreenFeatureBoostListings =>
+      'Listing boosts to promote your feed placement';
+
+  @override
+  String get paywallScreenFeatureVerifiedAndPriority =>
+      'Verified badge and search priority';
+
+  @override
+  String get paywallScreenFeatureAiFiltering => 'Smart AI tenant filtering';
+
+  @override
+  String get paywallScreenThankYou => 'Thank you!';
+
+  @override
+  String get paywallScreenWelcomePrefix =>
+      'Subscription activated — welcome to';
+
+  @override
+  String get paywallScreenReceiptSent =>
+      'A receipt has been sent to your email';
+
+  @override
+  String get paywallScreenLetsStart => 'Let\'s get started';
+
+  @override
+  String get rentTrackingScreenJanuary => 'January';
+
+  @override
+  String get rentTrackingScreenFebruary => 'February';
+
+  @override
+  String get rentTrackingScreenMarch => 'March';
+
+  @override
+  String get rentTrackingScreenApril => 'April';
+
+  @override
+  String get rentTrackingScreenMay => 'May';
+
+  @override
+  String get rentTrackingScreenJune => 'June';
+
+  @override
+  String get rentTrackingScreenJuly => 'July';
+
+  @override
+  String get rentTrackingScreenAugust => 'August';
+
+  @override
+  String get rentTrackingScreenSeptember => 'September';
+
+  @override
+  String get rentTrackingScreenOctober => 'October';
+
+  @override
+  String get rentTrackingScreenNovember => 'November';
+
+  @override
+  String get rentTrackingScreenDecember => 'December';
+
+  @override
+  String get rentTrackingScreenNoteForMonth => 'Note for the month';
+
+  @override
+  String get rentTrackingScreenNoteHint =>
+      'E.g.: Paid in cash / Promised to pay by the 15th';
+
+  @override
+  String get rentTrackingScreenCancel => 'Cancel';
+
+  @override
+  String get rentTrackingScreenSave => 'Save';
+
+  @override
+  String get rentTrackingScreenTitle => 'Payment tracking';
+
+  @override
+  String get rentTrackingScreenAddMonth => 'Add month';
+
+  @override
+  String get rentTrackingScreenCollectedThisMonth => 'Collected this month';
+
+  @override
+  String get rentTrackingScreenDebt => 'Debt';
+
+  @override
+  String get rentTrackingScreenPaid => 'Paid';
+
+  @override
+  String get rentTrackingScreenUnpaid => 'Unpaid';
+
+  @override
+  String get rentTrackingScreenNote => 'Note';
+
+  @override
+  String get rentTrackingScreenNoTrackingYet =>
+      'You haven\'t tracked payments yet — shall we start?';
+
+  @override
+  String get rentTrackingScreenStartTracking => 'Start tracking (12 months)';
+
+  @override
+  String get rentTrackingScreenNoPropertiesToTrack =>
+      'No properties to track. Add a property to get started.';
+
+  @override
+  String rentTrackingScreenMonthsOverdue(Object count) {
+    return '$count months overdue';
+  }
+
+  @override
+  String get rentTrackingScreenPaidThisMonth => 'Paid this month';
+
+  @override
+  String get rentTrackingScreenAwaitingPaymentThisMonth =>
+      'Awaiting this month\'s payment';
+
+  @override
+  String rentTrackingScreenNextChargeOn(Object month) {
+    return 'Next charge: the 1st of $month';
+  }
+
+  @override
+  String rentTrackingScreenDueByEndOf(Object month) {
+    return 'Due by the end of $month';
+  }
+
+  @override
+  String rentTrackingScreenRentPerMonth(Object rent) {
+    return '$rent/month';
+  }
+
+  @override
+  String matchesScreenMinutesAgo(Object minutes) {
+    return '$minutes min ago';
+  }
+
+  @override
+  String matchesScreenHoursAgo(Object hours) {
+    return '$hours hr ago';
+  }
+
+  @override
+  String get matchesScreenYesterday => 'Yesterday';
+
+  @override
+  String matchesScreenDaysAgo(Object days) {
+    return '$days days ago';
+  }
+
+  @override
+  String get matchesScreenWeekAgo => 'A week ago';
+
+  @override
+  String matchesScreenWeeksAgo(Object weeks) {
+    return '$weeks weeks ago';
+  }
+
+  @override
+  String get matchesScreenAddPrivateTag => 'Add private tag';
+
+  @override
+  String get matchesScreenEditTag => 'Edit tag';
+
+  @override
+  String get matchesScreenOnlyYouSeeTag =>
+      'Only you can see it — it\'s not shown to the candidate';
+
+  @override
+  String get matchesScreenRemoveTag => 'Remove tag';
+
+  @override
+  String get matchesScreenUnmatch => 'Unmatch';
+
+  @override
+  String get matchesScreenConfirmUnmatchTitle => 'Unmatch this conversation?';
+
+  @override
+  String get matchesScreenConfirmUnmatchBody =>
+      'The conversation will be removed for both sides and can\'t be recovered.';
+
+  @override
+  String get matchesScreenGoBack => 'Go back';
+
+  @override
+  String get matchesScreenPrivateTag => 'Private tag';
+
+  @override
+  String get matchesScreenPrivateTagHint =>
+      'Only you can see this — the candidate isn\'t shown it.';
+
+  @override
+  String get matchesScreenTagPlaceholder =>
+      'E.g.: Very serious / Check references';
+
+  @override
+  String get matchesScreenSaveTag => 'Save tag';
+
+  @override
+  String get matchesScreenPaidInquiries => 'Paid inquiries';
+
+  @override
+  String get matchesScreenConversations => 'Conversations';
+
+  @override
+  String get matchesScreenSearchHint => 'Search address, city, or message...';
+
+  @override
+  String get matchesScreenFilterAll => 'All';
+
+  @override
+  String get matchesScreenFilterNew => 'New';
+
+  @override
+  String get matchesScreenFilterOld => 'Old';
+
+  @override
+  String get matchesScreenFilterMatchesTomorrow => 'Scheduled for tomorrow';
+
+  @override
+  String get matchesScreenNoResultsFound => 'No results found';
+
+  @override
+  String get matchesScreenNoResultsForSearch =>
+      'No results for this search — try adjusting the filters.';
+
+  @override
+  String get matchesScreenClearFilter => 'Clear filter';
+
+  @override
+  String get matchesScreenSigned => 'Signed';
+
+  @override
+  String get matchesScreenContractSent => 'Contract sent';
+
+  @override
+  String get matchesScreenOpenConversation => 'Open conversation';
+
+  @override
+  String matchesScreenRoomsCount(Object rooms) {
+    return '$rooms rooms';
+  }
+
+  @override
+  String matchesScreenSquareMeters(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String get matchesScreenElevator => 'Elevator';
+
+  @override
+  String get matchesScreenAirConditioned => 'Air conditioned';
+
+  @override
+  String get matchesScreenNew => 'New';
+
+  @override
+  String get matchesScreenNewConversationReady =>
+      'New conversation ready to start';
+
+  @override
+  String get matchesScreenNoMatchesYet => 'No matches yet';
+
+  @override
+  String get matchesScreenNoMatchesLandlordBody =>
+      'When you approve candidate tenants while swiping, matches will appear here.';
+
+  @override
+  String get matchesScreenNoMatchesTenantBody =>
+      'When you like an apartment and the landlord approves you, the match will appear here.';
+
+  @override
+  String get brokerClientsScreenContactsPermissionNeeded =>
+      'Contacts access is needed to import';
+
+  @override
+  String get brokerClientsScreenNoContactsWithPhoneFound =>
+      'No contacts with a phone number were found';
+
+  @override
+  String brokerClientsScreenContactsImported(Object count) {
+    return '$count contacts imported to the client book';
+  }
+
+  @override
+  String get brokerClientsScreenClientBook => 'Client book';
+
+  @override
+  String get brokerClientsScreenImportFromContacts => 'Import from contacts';
+
+  @override
+  String get brokerClientsScreenNewClient => 'New client';
+
+  @override
+  String get brokerClientsScreenHotMatches => 'Hot matches';
+
+  @override
+  String brokerClientsScreenStrongMatchesWaiting(Object count) {
+    return '$count strong matches waiting';
+  }
+
+  @override
+  String get brokerClientsScreenPropertiesThatFitClients =>
+      'Properties that fit your clients';
+
+  @override
+  String get brokerClientsScreenSale => 'Sale';
+
+  @override
+  String get brokerClientsScreenRent => 'Rent';
+
+  @override
+  String brokerClientsScreenMinRoomsPlus(Object rooms) {
+    return '$rooms+ rooms';
+  }
+
+  @override
+  String brokerClientsScreenBudgetUpTo(Object amount) {
+    return 'Up to $amount';
+  }
+
+  @override
+  String get brokerClientsScreenEdit => 'Edit';
+
+  @override
+  String get brokerClientsScreenDelete => 'Delete';
+
+  @override
+  String brokerClientsScreenMatchingProperties(Object count) {
+    return '$count matching properties';
+  }
+
+  @override
+  String get brokerClientsScreenNoMatchingPropertiesNow =>
+      'No matching properties right now';
+
+  @override
+  String brokerClientsScreenPropertiesForClient(Object name) {
+    return 'Properties for $name';
+  }
+
+  @override
+  String brokerClientsScreenNoMatchingPropertiesForClient(Object name) {
+    return 'There are currently no properties matching $name\'s requirements.';
+  }
+
+  @override
+  String get brokerClientsScreenMatchWillAppearHere =>
+      'As soon as you upload a matching property, it will appear here.';
+
+  @override
+  String brokerClientsScreenPriceRoomsSummary(
+      Object price, Object rooms, Object suffix) {
+    return '$price $suffix · $rooms rooms';
+  }
+
+  @override
+  String get brokerClientsScreenEnterClientName => 'Please enter a client name';
+
+  @override
+  String get brokerClientsScreenEditClient => 'Edit client';
+
+  @override
+  String get brokerClientsScreenClientName => 'Client name';
+
+  @override
+  String get brokerClientsScreenPhone => 'Phone';
+
+  @override
+  String get brokerClientsScreenBudgetFrom => 'Budget from';
+
+  @override
+  String get brokerClientsScreenBudgetTo => 'Budget up to';
+
+  @override
+  String get brokerClientsScreenMinRooms => 'Minimum rooms';
+
+  @override
+  String get brokerClientsScreenAreasCommaSeparated =>
+      'Areas (comma-separated)';
+
+  @override
+  String get brokerClientsScreenMustHaveCommaSeparated =>
+      'Must include (comma-separated)';
+
+  @override
+  String get brokerClientsScreenNotes => 'Notes';
+
+  @override
+  String get brokerClientsScreenSave => 'Save';
+
+  @override
+  String get brokerClientsScreenClientBookEmpty => 'Your client book is empty';
+
+  @override
+  String get brokerClientsScreenEmptyStateBody =>
+      'Add a client with what they\'re looking for, and the app will show you which of your properties fit them.';
+
+  @override
+  String get brokerClientsScreenSelectContactsToImport =>
+      'Select contacts to import';
+
+  @override
+  String brokerClientsScreenSelectedCount(Object count) {
+    return '$count selected';
+  }
+
+  @override
+  String get brokerClientsScreenSearchContact => 'Search contact…';
+
+  @override
+  String brokerClientsScreenImportClients(Object count) {
+    return 'Import $count clients';
+  }
 }

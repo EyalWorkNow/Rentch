@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/finance/monthly_cost.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/core/finance/price_realism.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -62,6 +63,7 @@ class _CompareScreenState extends State<CompareScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<DatingProvider>();
     final pool = _pool(provider);
 
@@ -70,24 +72,26 @@ class _CompareScreenState extends State<CompareScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('השוואת דירות'),
+          title: Text(l10n.compareScreen724ef1bb),
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
           actions: [
             IconButton(
-              tooltip: 'חיפוש דירה להשוואה',
+              tooltip: l10n.compareScreenBbabc52c,
               icon: const Icon(IconsaxPlusLinear.search_normal_1),
               onPressed: () => _openSearch(provider),
             ),
           ],
         ),
-        body: _body(provider, pool),
+        body: _body(context, provider, pool),
       ),
     );
   }
 
-  Widget _body(DatingProvider provider, List<RentalProperty> pool) {
+  Widget _body(
+      BuildContext context, DatingProvider provider, List<RentalProperty> pool) {
+    final l10n = AppLocalizations.of(context)!;
     if (pool.length < 2) return _EmptyState(savedCount: pool.length);
 
     final columns = _resolveColumns(pool);
@@ -98,14 +102,14 @@ class _CompareScreenState extends State<CompareScreen> {
         if (showPicker)
           _ColumnDropdown(pool: pool, selected: _columns, onToggle: _toggle),
         if (columns.length < 2)
-          const Expanded(
+          Expanded(
             child: Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
-                  'בחרו לפחות 2 דירות להשוואה',
+                  l10n.compareScreen61e90252,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
@@ -392,32 +396,33 @@ class _BottomLineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final a = analysis;
     if (a.pickIdx < 0) {
       // Not enough data to recommend — say so, don't fake it.
       return _plain(
-        'אין מספיק נתונים להמלצה ברורה',
-        'חסרים מחיר/שטח או עוגן שוק לחלק מהדירות. גללו למטה להשוואה המלאה.',
+        l10n.compareScreen27eebc10,
+        l10n.compareScreen4ec49abd,
       );
     }
     final pick = a.props[a.pickIdx];
     final lines = <String>[];
 
     // 1) value vs market (the "am I overpaying?" answer)
-    lines.add(_valueLine(pick));
+    lines.add(_valueLine(context, pick));
     // 2) the real cost (the "rent isn't the real cost" answer), rentals only
     final cost = a.costs[a.pickIdx];
     if (cost != null) {
-      lines.add('עלות אמיתית ~₪${_thousands(cost.total)}/חודש '
-          '(כולל ארנונה וועד)');
+      lines.add(l10n.compareScreenFcb21fe2(_thousands(cost.total)) +
+          l10n.compareScreen46bf1369);
     }
     // 3) one honest caveat
-    final caveat = _caveat(a, a.pickIdx);
-    if (caveat != null) lines.add('לשים לב: $caveat');
+    final caveat = _caveat(context, a, a.pickIdx);
+    if (caveat != null) lines.add(l10n.compareScreenA8bb36b3(caveat));
 
     final matchNote = (a.matchIdx >= 0 && a.matchIdx != a.pickIdx)
-        ? 'אבל הכי מתאימה לך אישית: ${_where(a.props[a.matchIdx])}'
-            ' (${a.matches[a.matchIdx]}%) — אם התקציב פחות קריטי.'
+        ? l10n.compareScreenC25ab447(_where(a.props[a.matchIdx])) +
+            l10n.compareScreen332e33ea(a.matches[a.matchIdx]!)
         : null;
 
     return Container(
@@ -439,11 +444,11 @@ class _BottomLineCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(children: [
-            Text('🏆', style: TextStyle(fontSize: 20)),
-            SizedBox(width: 8),
-            Text('השורה התחתונה',
-                style: TextStyle(
+          Row(children: [
+            const Text('🏆', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 8),
+            Text(l10n.compareScreen2f883e47,
+                style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w900)),
@@ -491,15 +496,16 @@ class _BottomLineCard extends StatelessWidget {
     );
   }
 
-  String _valueLine(RentalProperty w) {
+  String _valueLine(BuildContext context, RentalProperty w) {
+    final l10n = AppLocalizations.of(context)!;
     final bm = belowMarket(w);
     final city = w.city.trim();
-    final where = city.isEmpty ? '' : ' ב$city';
-    if (bm == null) return 'המחיר סביר לגודל ולאזור';
+    final where = city.isEmpty ? '' : l10n.compareScreen08920749(city);
+    if (bm == null) return l10n.compareScreen651fe4ea;
     final pct = (bm * 100).round();
-    if (pct >= 2) return 'כ-$pct% מתחת למחיר השוק$where — מחיר טוב';
-    if (pct <= -2) return 'סביב מחיר השוק — התמורה הטובה בקבוצה';
-    return 'בדיוק במחיר השוק$where';
+    if (pct >= 2) return l10n.compareScreenE97266c1(pct, where);
+    if (pct <= -2) return l10n.compareScreen2514977c;
+    return l10n.compareScreenE036fa5f(where);
   }
 
   Widget _plain(String title, String body) => Container(
@@ -523,7 +529,8 @@ class _BottomLineCard extends StatelessWidget {
       );
 
   /// The single biggest thing the pick gives up to any other option.
-  String? _caveat(_Analysis a, int idx) {
+  String? _caveat(BuildContext context, _Analysis a, int idx) {
+    final l10n = AppLocalizations.of(context)!;
     final pick = a.props[idx];
     final others = [
       for (var i = 0; i < a.props.length; i++)
@@ -531,13 +538,14 @@ class _BottomLineCard extends StatelessWidget {
     ];
     // Bigger flat exists?
     if (others.any((o) => o.sizeM2 > pick.sizeM2 + 4)) {
-      return 'יש בהשוואה דירה מרווחת יותר';
+      return l10n.compareScreen41c2e13a;
     }
     // A premium feature the pick lacks but another has.
+    final featureLabels = _featureLabels(context);
     for (final f in _premiumFeatures) {
       if (!pick.featureFlags.isEnabled(f) &&
           others.any((o) => o.featureFlags.isEnabled(f))) {
-        return 'בלי ${_featureHe[f]} (יש באחת האחרות)';
+        return l10n.compareScreen7cb99b30(featureLabels[f]!);
       }
     }
     // A cheaper true cost exists?
@@ -547,7 +555,7 @@ class _BottomLineCard extends StatelessWidget {
           final c = _totalMonthly(o);
           return c != null && c < myCost - 100;
         })) {
-      return 'יש אופציה זולה יותר בעלות החודשית';
+      return l10n.compareScreenD948b41f;
     }
     return null;
   }
@@ -561,6 +569,7 @@ class _TrueCostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final a = analysis;
     final maxTotal = a.costs
         .whereType<MonthlyCostEstimate>()
@@ -574,18 +583,18 @@ class _TrueCostCard extends StatelessWidget {
 
     return _Section(
       icon: IconsaxPlusBold.wallet_3,
-      title: 'כמה זה יעלה לך באמת',
+      title: l10n.compareScreen5b4d6e83,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'שכר הדירה הוא לא העלות האמיתית — ארנונה וועד בית מוסיפים כל חודש.',
-            style: TextStyle(
+          Text(
+            l10n.compareScreen3b9ffcf8,
+            style: const TextStyle(
                 fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
           for (var i = 0; i < a.props.length; i++)
-            _costRow(a.props[i], a.costs[i], maxTotal,
+            _costRow(context, a.props[i], a.costs[i], maxTotal,
                 isCheapest: i == a.cheapestTotalIdx),
           if (revealsGap) ...[
             const SizedBox(height: 8),
@@ -601,9 +610,11 @@ class _TrueCostCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${_where(a.props[a.cheapestRentIdx])} נראית הכי זולה בשכר, '
-                    'אבל ${_where(a.props[a.cheapestTotalIdx])} זולה יותר בעלות '
-                    'החודשית הכוללת.',
+                    l10n.compareScreen35beed96(
+                            _where(a.props[a.cheapestRentIdx])) +
+                        l10n.compareScreenFc7a9430(
+                            _where(a.props[a.cheapestTotalIdx])) +
+                        l10n.compareScreen5706cd1b,
                     style: const TextStyle(
                         fontSize: 12,
                         height: 1.3,
@@ -619,8 +630,10 @@ class _TrueCostCard extends StatelessWidget {
     );
   }
 
-  Widget _costRow(RentalProperty p, MonthlyCostEstimate? c, int maxTotal,
+  Widget _costRow(
+      BuildContext context, RentalProperty p, MonthlyCostEstimate? c, int maxTotal,
       {required bool isCheapest}) {
+    final l10n = AppLocalizations.of(context)!;
     final total = c?.total ?? p.price;
     final frac = maxTotal > 0 ? (total / maxTotal).clamp(0.08, 1.0) : 1.0;
     final rentFrac = c != null && c.total > 0 ? c.rent / c.total : 1.0;
@@ -648,8 +661,8 @@ class _TrueCostCard extends StatelessWidget {
                   color: AppColors.success.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text('הזולה באמת',
-                    style: TextStyle(
+                child: Text(l10n.compareScreenCbde97ef,
+                    style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
                         color: AppColors.success)),
@@ -689,8 +702,8 @@ class _TrueCostCard extends StatelessWidget {
           if (c != null) ...[
             const SizedBox(height: 3),
             Text(
-              'שכ"ד ₪${_thousands(c.rent)} + ארנונה ~₪${_thousands(c.arnona)} '
-              '+ ועד ~₪${_thousands(c.vaad)}',
+              l10n.compareScreenCc3022d2(_thousands(c.rent), _thousands(c.arnona)) +
+                  l10n.compareScreenAab6709f(_thousands(c.vaad)),
               style: const TextStyle(
                   fontSize: 11, color: AppColors.textSecondary),
             ),
@@ -709,32 +722,34 @@ class _TradeOffCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final a = analysis;
     final pickIdx = a.pickIdx >= 0 ? a.pickIdx : 0;
     final pick = a.props[pickIdx];
 
     return _Section(
       icon: IconsaxPlusBold.arrow_swap_horizontal,
-      title: 'מה מוותרים',
+      title: l10n.compareScreenE1000003,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'לעומת ${_where(pick)} (ההמלצה) — מה כל אחת מהאחרות נותנת ומה מפסידים:',
+            l10n.compareScreenB05c14b6(_where(pick)),
             style: const TextStyle(
                 fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 10),
           for (var i = 0; i < a.props.length; i++)
-            if (i != pickIdx) _versusBlock(a, i, pickIdx),
+            if (i != pickIdx) _versusBlock(context, a, i, pickIdx),
         ],
       ),
     );
   }
 
-  Widget _versusBlock(_Analysis a, int i, int pickIdx) {
+  Widget _versusBlock(BuildContext context, _Analysis a, int i, int pickIdx) {
+    final l10n = AppLocalizations.of(context)!;
     final o = a.props[i];
-    final v = _versus(a, i, pickIdx);
+    final v = _versus(context, a, i, pickIdx);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -749,9 +764,9 @@ class _TradeOffCard extends StatelessWidget {
                 const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),
         if (v.better.isEmpty && v.worse.isEmpty)
-          const Text('דומה מאוד להמלצה — בלי הבדל מהותי.',
+          Text(l10n.compareScreen87ede2ed,
               style:
-                  TextStyle(fontSize: 12.5, color: AppColors.textSecondary))
+                  const TextStyle(fontSize: 12.5, color: AppColors.textSecondary))
         else ...[
           for (final b in v.better) _line(true, b),
           for (final w in v.worse) _line(false, w),
@@ -782,7 +797,8 @@ class _TradeOffCard extends StatelessWidget {
   /// What option [i] is better/worse at vs the pick — the head-to-head a seeker
   /// would otherwise have to work out in their head.
   ({List<String> better, List<String> worse}) _versus(
-      _Analysis a, int i, int pickIdx) {
+      BuildContext context, _Analysis a, int i, int pickIdx) {
+    final l10n = AppLocalizations.of(context)!;
     final o = a.props[i];
     final pick = a.props[pickIdx];
     final better = <String>[];
@@ -794,27 +810,29 @@ class _TradeOffCard extends StatelessWidget {
     if (co != null && cp != null && (co - cp).abs() >= 100) {
       final d = _thousands((co - cp).abs().round());
       (co < cp ? better : worse).add(co < cp
-          ? 'זולה ב-₪$d בחודש'
-          : 'יקרה ב-₪$d בחודש');
+          ? l10n.compareScreenD46b7e4d(d)
+          : l10n.compareScreenF17583c1(d));
     }
     // space
     if (o.sizeM2 > 0 && pick.sizeM2 > 0 && (o.sizeM2 - pick.sizeM2).abs() >= 4) {
       final d = (o.sizeM2 - pick.sizeM2).abs();
-      (o.sizeM2 > pick.sizeM2 ? better : worse)
-          .add(o.sizeM2 > pick.sizeM2 ? 'גדולה ב-$d מ"ר' : 'קטנה ב-$d מ"ר');
+      (o.sizeM2 > pick.sizeM2 ? better : worse).add(o.sizeM2 > pick.sizeM2
+          ? l10n.compareScreenF1897440(d)
+          : l10n.compareScreenE791ef57(d));
     }
     // rooms
     if (o.rooms > 0 && pick.rooms > 0 && (o.rooms - pick.rooms).abs() >= 0.5) {
       (o.rooms > pick.rooms ? better : worse).add(o.rooms > pick.rooms
-          ? 'יותר חדרים (${o.roomsLabel})'
-          : 'פחות חדרים (${o.roomsLabel})');
+          ? l10n.compareScreen5d0daead(o.roomsLabel)
+          : l10n.compareScreenE9e5b9ac(o.roomsLabel));
     }
     // features
+    final featureLabels = _featureLabels(context);
     for (final f in _premiumFeatures) {
       final oHas = o.featureFlags.isEnabled(f);
       final pHas = pick.featureFlags.isEnabled(f);
-      if (oHas && !pHas) better.add('עם ${_featureHe[f]}');
-      if (!oHas && pHas) worse.add('בלי ${_featureHe[f]}');
+      if (oHas && !pHas) better.add(l10n.compareScreenAe9d2da6(featureLabels[f]!));
+      if (!oHas && pHas) worse.add(l10n.compareScreenC88245ca(featureLabels[f]!));
     }
     // market value
     final bo = belowMarket(o);
@@ -822,15 +840,16 @@ class _TradeOffCard extends StatelessWidget {
     if (bo != null && bp != null && (bo - bp).abs() >= 0.03) {
       final pct = ((bo - bp).abs() * 100).round();
       (bo > bp ? better : worse).add(bo > bp
-          ? 'מחיר טוב יותר יחסית לשוק (ב-$pct%)'
-          : 'מחיר פחות טוב יחסית לשוק (ב-$pct%)');
+          ? l10n.compareScreen56d02b30(pct)
+          : l10n.compareScreen3bce9322(pct));
     }
     // personal match
     final mo = a.matches[i];
     final mp = a.matches[pickIdx];
     if (mo != null && mp != null && (mo - mp).abs() >= 5) {
-      (mo > mp ? better : worse)
-          .add(mo > mp ? 'התאמה גבוהה יותר לך ($mo%)' : 'התאמה נמוכה יותר ($mo%)');
+      (mo > mp ? better : worse).add(mo > mp
+          ? l10n.compareScreen7f897f38(mo)
+          : l10n.compareScreen95af2d2f(mo));
     }
 
     return (better: better.take(4).toList(), worse: worse.take(4).toList());
@@ -845,6 +864,7 @@ class _DetailsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Material(
       color: AppColors.surface,
       clipBehavior: Clip.antiAlias,
@@ -855,8 +875,8 @@ class _DetailsSection extends StatelessWidget {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          title: const Text('כל הפרטים להשוואה',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          title: Text(l10n.compareScreenE33e9eb9,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
           leading: const Icon(IconsaxPlusLinear.document_text,
               color: AppColors.textSecondary),
           childrenPadding: EdgeInsets.zero,
@@ -873,27 +893,33 @@ class _CompareTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final provider = analysis.provider;
     final properties = analysis.props;
     final rows = <_CompareRow>[
-      _CompareRow.number('מחיר',
+      _CompareRow.number(l10n.compareScreenCc097285,
           (p) => p.price > 0 ? p.price.toDouble() : null, (p) => p.priceLabel,
           best: _Best.min),
-      _CompareRow.number('₪ למ"ר', _perM2, _perM2Label, best: _Best.min),
-      _CompareRow.text('חדרים', (p) => p.roomsLabel),
-      _CompareRow.number('שטח',
+      _CompareRow.number(l10n.compareScreen1e7862a6, _perM2, _perM2Label,
+          best: _Best.min),
+      _CompareRow.text(l10n.compareScreenB50b3974, (p) => p.roomsLabel),
+      _CompareRow.number(l10n.compareScreen16f6bd25,
           (p) => p.sizeM2 > 0 ? p.sizeM2.toDouble() : null,
-          (p) => p.sizeM2 > 0 ? '${p.sizeM2} מ"ר' : '—',
+          (p) => p.sizeM2 > 0 ? l10n.compareScreenD8b6113c(p.sizeM2) : '—',
           best: _Best.max),
-      _CompareRow.text('קומה', _floorLabel),
-      _CompareRow.flag('מעלית', (p) => p.featureFlags.isEnabled('elevator')),
-      _CompareRow.flag('חניה', (p) => p.featureFlags.isEnabled('parking')),
-      _CompareRow.flag('מרפסת', (p) => p.featureFlags.isEnabled('balcony')),
-      _CompareRow.flag('ממ"ד', (p) => p.featureFlags.isEnabled('mamad')),
-      _CompareRow.text('מצב',
+      _CompareRow.text(l10n.compareScreen047e630b, _floorLabel),
+      _CompareRow.flag(l10n.compareScreen8d058056, l10n.compareScreen4175f994,
+          l10n.compareScreen21a2d9d6, (p) => p.featureFlags.isEnabled('elevator')),
+      _CompareRow.flag(l10n.compareScreenA9655ab3, l10n.compareScreen4175f994,
+          l10n.compareScreen21a2d9d6, (p) => p.featureFlags.isEnabled('parking')),
+      _CompareRow.flag(l10n.compareScreen86425fcf, l10n.compareScreen4175f994,
+          l10n.compareScreen21a2d9d6, (p) => p.featureFlags.isEnabled('balcony')),
+      _CompareRow.flag(l10n.compareScreenE1cca9ff, l10n.compareScreen4175f994,
+          l10n.compareScreen21a2d9d6, (p) => p.featureFlags.isEnabled('mamad')),
+      _CompareRow.text(l10n.compareScreenFcf022d8,
           (p) => p.condition.trim().isEmpty ? '—' : p.condition.trim()),
       _CompareRow.number(
-        'התאמה',
+        l10n.compareScreen206ee003,
         (p) => provider.displayMatchScore(p)?.toDouble(),
         (p) {
           final s = provider.displayMatchScore(p);
@@ -915,12 +941,16 @@ class _CompareTable extends StatelessWidget {
 // ── shared calc helpers ─────────────────────────────────────────────────────
 
 const _premiumFeatures = ['elevator', 'parking', 'balcony', 'mamad'];
-const _featureHe = {
-  'elevator': 'מעלית',
-  'parking': 'חניה',
-  'balcony': 'מרפסת',
-  'mamad': 'ממ"ד',
-};
+
+Map<String, String> _featureLabels(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return {
+    'elevator': l10n.compareScreen8d058056,
+    'parking': l10n.compareScreenA9655ab3,
+    'balcony': l10n.compareScreen86425fcf,
+    'mamad': l10n.compareScreenE1cca9ff,
+  };
+}
 
 double? _perM2(RentalProperty p) =>
     (p.sizeM2 <= 0 || p.price <= 0) ? null : p.price / p.sizeM2;
@@ -1002,6 +1032,7 @@ class _ColumnDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final full = selected.length >= CompareScreen.maxColumns;
     return Container(
       width: double.infinity,
@@ -1032,8 +1063,9 @@ class _ColumnDropdown extends StatelessWidget {
             Expanded(
               child: Text(
                 selected.isEmpty
-                    ? 'בחרו דירות להשוואה'
-                    : 'נבחרו ${selected.length}/${CompareScreen.maxColumns} דירות',
+                    ? l10n.compareScreenEf5ba2c7
+                    : l10n.compareScreen0975a98d(
+                        selected.length, CompareScreen.maxColumns),
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -1078,8 +1110,9 @@ class _CompareRow {
   }) =>
       _CompareRow._(l, display, numeric, null, best);
 
-  factory _CompareRow.flag(String l, bool Function(RentalProperty) f) =>
-      _CompareRow._(l, (p) => f(p) ? 'כן' : 'לא', null, f, _Best.none);
+  factory _CompareRow.flag(String l, String yes, String no,
+          bool Function(RentalProperty) f) =>
+      _CompareRow._(l, (p) => f(p) ? yes : no, null, f, _Best.none);
 }
 
 class _DataRow extends StatelessWidget {
@@ -1179,9 +1212,10 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final message = savedCount == 0
-        ? 'עדיין לא שמרתם דירות.\nשמרו לפחות 2 דירות כדי להשוות ביניהן.'
-        : 'שמרתם דירה אחת בלבד.\nשמרו עוד דירה כדי להשוות ביניהן.';
+        ? l10n.compareScreenF419307d
+        : l10n.compareScreen8833d8c9;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -1217,6 +1251,7 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final q = _q.trim().toLowerCase();
     final list = q.isEmpty
         ? widget.properties
@@ -1248,17 +1283,17 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
                     borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 12),
-              const Align(
+              Align(
                 alignment: Alignment.centerRight,
-                child: Text('הוספת דירה להשוואה',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+                child: Text(l10n.compareScreenAbca0fe8,
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 10),
               TextField(
                 autofocus: true,
                 onChanged: (v) => setState(() => _q = v),
                 decoration: InputDecoration(
-                  hintText: 'חיפוש לפי עיר / שכונה / כתובת…',
+                  hintText: l10n.compareScreenDd5b39ef,
                   prefixIcon: const Icon(IconsaxPlusLinear.search_normal_1),
                   filled: true,
                   fillColor: Colors.white,
@@ -1270,9 +1305,9 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
               const SizedBox(height: 8),
               Expanded(
                 child: list.isEmpty
-                    ? const Center(
-                        child: Text('אופס! לא נמצאו דירות תואמות',
-                            style: TextStyle(color: AppColors.textSecondary)))
+                    ? Center(
+                        child: Text(l10n.compareScreenEf52c1b3,
+                            style: const TextStyle(color: AppColors.textSecondary)))
                     : ListView.builder(
                         controller: scroll,
                         itemCount: list.length,
@@ -1287,8 +1322,8 @@ class _ComparePickerSheetState extends State<_ComparePickerSheet> {
                             title: Text(where,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600)),
-                            subtitle:
-                                Text('${p.priceLabel} · ${p.roomsLabel} חד׳'),
+                            subtitle: Text(
+                                l10n.compareScreen0c390fdc(p.priceLabel, p.roomsLabel)),
                             onTap: () => Navigator.of(context).pop(p),
                           );
                         },

@@ -1,5 +1,6 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -33,96 +34,106 @@ class _Criterion {
   final int defaultNumber;
 }
 
-const _occupationOptions = <String, String>{
-  'hightech': 'הייטק',
-  'healthcare': 'בריאות/רפואה',
-  'education': 'חינוך/הוראה',
-  'finance': 'פיננסים/בנקאות',
-  'law': 'משפטים',
-  'engineering': 'הנדסה',
-  'selfemployed': 'עצמאי/ת',
-  'public': 'שירות ציבורי',
-  'retail': 'מסחר/שירות',
-  'academia': 'אקדמיה',
-  'student': 'סטודנט/ית',
-  'other': 'אחר',
-};
+Map<String, String> _occupationOptions(AppLocalizations l10n) => {
+      'hightech': l10n.eligibilityEditorSheet40d56dee,
+      'healthcare': l10n.eligibilityEditorSheet6dfb51f1,
+      'education': l10n.eligibilityEditorSheet19981c32,
+      'finance': l10n.eligibilityEditorSheetEbfcd4cb,
+      'law': l10n.eligibilityEditorSheet4f8aded7,
+      'engineering': l10n.eligibilityEditorSheet453fe1ed,
+      'selfemployed': l10n.eligibilityEditorSheetE1cad55a,
+      'public': l10n.eligibilityEditorSheetCb481f30,
+      'retail': l10n.eligibilityEditorSheet2834587d,
+      'academia': l10n.eligibilityEditorSheet2157ec10,
+      'student': l10n.eligibilityEditorSheet42ed7e8d,
+      'other': l10n.eligibilityEditorSheetCdf4bce0,
+    };
 
-const _householdOptions = <String, String>{
-  'family': 'משפחה',
-  'single': 'רווק/ה',
-  'couple': 'זוג',
-  'student': 'סטודנט/ית',
-};
+Map<String, String> _householdOptions(AppLocalizations l10n) => {
+      'family': l10n.eligibilityEditorSheet926c043f,
+      'single': l10n.eligibilityEditorSheetB8d9266b,
+      'couple': l10n.eligibilityEditorSheet4df994d0,
+      'student': l10n.eligibilityEditorSheet42ed7e8d,
+    };
 
-const _lifeStageOptions = <String, String>{
-  'student': 'סטודנט/ית',
-  'young-professional': 'צעיר/ה מקצועי/ת',
-  'family': 'משפחה',
-  'senior': 'גיל הזהב',
-};
+Map<String, String> _lifeStageOptions(AppLocalizations l10n) => {
+      'student': l10n.eligibilityEditorSheet42ed7e8d,
+      'young-professional': l10n.eligibilityEditorSheetD663155d,
+      'family': l10n.eligibilityEditorSheet926c043f,
+      'senior': l10n.eligibilityEditorSheet0aa42aa1,
+    };
 
-const _moveInOptions = <String, String>{
-  'immediate': 'מיידי',
-  'month': 'עד חודש',
-  'quarter': 'עד 3 חודשים',
-};
+Map<String, String> _moveInOptions(AppLocalizations l10n) => {
+      'immediate': l10n.eligibilityEditorSheetD02986c3,
+      'month': l10n.eligibilityEditorSheetE9e8cbe3,
+      'quarter': l10n.eligibilityEditorSheetDe0def2d,
+    };
 
-const _catalog = <_Criterion>[
-  _Criterion('budgetMin', 'תקציב חודשי מינימלי של השוכר ≥', _EligInput.number,
-      unit: '₪', defaultNumber: 5000),
-  _Criterion('maxChildren', 'עד כמה ילדים', _EligInput.stepper,
-      min: 0, max: 5, defaultNumber: 2),
-  _Criterion('noPets', 'ללא חיית מחמד', _EligInput.boolean),
-  _Criterion('hasCar', 'יש רכב', _EligInput.boolean),
-  _Criterion('occupation', 'תחום עיסוק', _EligInput.multi,
-      options: _occupationOptions),
-  _Criterion('wfh', 'עובד/ת מרחוק', _EligInput.boolean),
-  _Criterion('household', 'סוג משק בית', _EligInput.multi,
-      options: _householdOptions),
-  _Criterion('lifeStage', 'שלב חיים', _EligInput.multi,
-      options: _lifeStageOptions),
-  _Criterion('oleh', 'עולה חדש', _EligInput.boolean),
-  _Criterion('minAge', 'גיל מינימלי', _EligInput.number, defaultNumber: 18),
-  _Criterion('maxAge', 'גיל מקסימלי', _EligInput.number, defaultNumber: 60),
-  _Criterion('accessibility', 'צורך בנגישות', _EligInput.boolean),
-  _Criterion('minRooms', 'מספר חדרים מבוקש (מינימום)', _EligInput.number,
-      defaultNumber: 3),
-  _Criterion('moveInWithin', 'זמינות כניסה', _EligInput.single,
-      options: _moveInOptions),
-];
+List<_Criterion> _catalog(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return <_Criterion>[
+    _Criterion('budgetMin', l10n.eligibilityEditorSheetB4d5170f,
+        _EligInput.number, unit: '₪', defaultNumber: 5000),
+    _Criterion('maxChildren', l10n.eligibilityEditorSheet976f97ac,
+        _EligInput.stepper, min: 0, max: 5, defaultNumber: 2),
+    _Criterion('noPets', l10n.eligibilityEditorSheetE70cb0b4, _EligInput.boolean),
+    _Criterion('hasCar', l10n.eligibilityEditorSheetCb3c47ce, _EligInput.boolean),
+    _Criterion('occupation', l10n.eligibilityEditorSheet15039c05, _EligInput.multi,
+        options: _occupationOptions(l10n)),
+    _Criterion('wfh', l10n.eligibilityEditorSheetF5203dea, _EligInput.boolean),
+    _Criterion('household', l10n.eligibilityEditorSheet2b9fb355, _EligInput.multi,
+        options: _householdOptions(l10n)),
+    _Criterion('lifeStage', l10n.eligibilityEditorSheetD308ff19, _EligInput.multi,
+        options: _lifeStageOptions(l10n)),
+    _Criterion('oleh', l10n.eligibilityEditorSheet5f3306da, _EligInput.boolean),
+    _Criterion('minAge', l10n.eligibilityEditorSheet8f9615bb, _EligInput.number,
+        defaultNumber: 18),
+    _Criterion('maxAge', l10n.eligibilityEditorSheetD5777fde, _EligInput.number,
+        defaultNumber: 60),
+    _Criterion(
+        'accessibility', l10n.eligibilityEditorSheetD83eff6a, _EligInput.boolean),
+    _Criterion('minRooms', l10n.eligibilityEditorSheetC3912164, _EligInput.number,
+        defaultNumber: 3),
+    _Criterion('moveInWithin', l10n.eligibilityEditorSheet29d40b0e,
+        _EligInput.single, options: _moveInOptions(l10n)),
+  ];
+}
 
 const _importanceLevels = <String>['must', 'important', 'prefer'];
 
-String _importanceLabel(String v) {
+String _importanceLabel(BuildContext context, String v) {
+  final l10n = AppLocalizations.of(context)!;
   switch (v) {
     case 'important':
-      return 'חשוב';
+      return l10n.eligibilityEditorSheetC476594d;
     case 'prefer':
-      return 'עדיף';
+      return l10n.eligibilityEditorSheet0d3d4125;
     default:
-      return 'חובה';
+      return l10n.eligibilityEditorSheet116f6cc8;
   }
 }
 
-String _importanceHelper(String v) {
+String _importanceHelper(BuildContext context, String v) {
+  final l10n = AppLocalizations.of(context)!;
   switch (v) {
     case 'important':
-      return 'מסנן רק מי שידוע שלא מתאים';
+      return l10n.eligibilityEditorSheetA1caeddf;
     case 'prefer':
-      return 'משפיע על הדירוג בלבד';
+      return l10n.eligibilityEditorSheet44ca4acb;
     default:
-      return 'מי שלא עונה או לא ידוע — לא יראה את הדירה';
+      return l10n.eligibilityEditorSheet03b2388e;
   }
 }
 
-/// One-line summary of the active rules, e.g. "3 קריטריונים · 1 חובה".
-String eligibilitySummaryLabel(EligibilityConfig config) {
+/// One-line summary of the active rules, e.g. "3 criteria · 1 required".
+String eligibilitySummaryLabel(BuildContext context, EligibilityConfig config) {
+  final l10n = AppLocalizations.of(context)!;
   final n = config.rules.length;
-  if (n == 0) return 'לא הוגדרו קריטריונים';
+  if (n == 0) return l10n.eligibilityEditorSheet9786995c;
   final musts = config.rules.where((r) => r.importance == 'must').length;
-  final base = '$n קריטריונים';
-  return musts > 0 ? '$base · $musts חובה' : base;
+  return musts > 0
+      ? l10n.eligibilityEditorSheetE4f4cb81(n, musts)
+      : l10n.eligibilityEditorSheetFf6c3b61(n);
 }
 
 /// Opens the eligibility editor as a modal sheet, pre-filled from [initial].
@@ -201,7 +212,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
   }
 
   _Criterion? _critFor(String key) {
-    for (final c in _catalog) {
+    for (final c in _catalog(context)) {
       if (c.key == key) return c;
     }
     return null;
@@ -258,7 +269,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
 
   List<EligibilityRule> _buildRules() {
     final rules = <EligibilityRule>[];
-    for (final crit in _catalog) {
+    for (final crit in _catalog(context)) {
       if (!_active.contains(crit.key)) continue;
       final importance = _importance[crit.key] ?? 'must';
       switch (crit.input) {
@@ -297,6 +308,8 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final catalog = _catalog(context);
     return Directionality(
       textDirection: Directionality.of(context),
       child: Padding(
@@ -316,23 +329,23 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'הגדרת קריטריונים מדויקים',
-                      style: TextStyle(
+                      l10n.eligibilityEditorSheet2d483b2c,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: AppColors.navy,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      'הפעל/י קריטריון, קבע/י את הערך ואת רמת הקשיחות שלו.',
-                      style: TextStyle(
+                      l10n.eligibilityEditorSheetD3b88de7,
+                      style: const TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
                         height: 1.4,
@@ -345,9 +358,9 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
               Flexible(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                  itemCount: _catalog.length,
+                  itemCount: catalog.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) => _buildCriterionTile(_catalog[i]),
+                  itemBuilder: (context, i) => _buildCriterionTile(catalog[i]),
                 ),
               ),
               _buildSaveBar(context),
@@ -521,22 +534,23 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
           ],
         );
       case _EligInput.boolean:
-        return const Text(
-          'קריטריון ללא ערך — נדרש שהשוכר יעמוד בו.',
-          style: TextStyle(
+        return Text(
+          AppLocalizations.of(context)!.eligibilityEditorSheetBb9a4c12,
+          style: const TextStyle(
               fontSize: 12, color: AppColors.textSecondary, height: 1.35),
         );
     }
   }
 
   Widget _buildImportanceSelector(_Criterion crit) {
+    final l10n = AppLocalizations.of(context)!;
     final current = _importance[crit.key] ?? 'must';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'רמת קשיחות',
-          style: TextStyle(
+        Text(
+          l10n.eligibilityEditorSheet20d4985f,
+          style: const TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
               color: AppColors.textSecondary),
@@ -564,7 +578,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
                       ),
                     ),
                     child: Text(
-                      _importanceLabel(level),
+                      _importanceLabel(context, level),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -582,7 +596,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
         ),
         const SizedBox(height: 6),
         Text(
-          _importanceHelper(current),
+          _importanceHelper(context, current),
           style: const TextStyle(
               fontSize: 11.5,
               color: AppColors.textSecondary,
@@ -593,6 +607,7 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
   }
 
   Widget _buildSaveBar(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final count = _active.length;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -607,8 +622,8 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
             Expanded(
               child: Text(
                 count == 0
-                    ? 'לא נבחרו קריטריונים'
-                    : '$count קריטריונים פעילים',
+                    ? l10n.eligibilityEditorSheet7c3236c7
+                    : l10n.eligibilityEditorSheet7d5e1b03(count),
                 style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -624,10 +639,10 @@ class _EligibilityEditorSheetState extends State<_EligibilityEditorSheet> {
                     borderRadius: BorderRadius.circular(14)),
               ),
               onPressed: () => Navigator.of(context).pop(_buildRules()),
-              child: const Text(
-                'שמירה',
+              child: Text(
+                l10n.eligibilityEditorSheetE6932339,
                 style:
-                    TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
             ),
           ],
@@ -726,6 +741,7 @@ class EligibilityEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -755,10 +771,10 @@ class EligibilityEntryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'סינון שוכרים לפי קריטריונים',
-                  style: TextStyle(
+                  l10n.eligibilityEditorSheet10ef20bd,
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     color: AppColors.navy,
@@ -770,10 +786,10 @@ class EligibilityEntryCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'הצג את הדירה רק לשוכרים שעונים על הקריטריונים',
-                  style: TextStyle(
+                  l10n.eligibilityEditorSheetCdb2baa7,
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: AppColors.navy,
@@ -789,11 +805,9 @@ class EligibilityEntryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'קריטריונים מעבר לתקציב/עיסוק מסתמכים על מידע שהשוכר עדיין '
-            'לא בהכרח מילא — ולכן חסימה קשיחה ("חובה") עלולה לצמצם מאוד את '
-            'מספר הרואים.',
-            style: TextStyle(
+          Text(
+            l10n.eligibilityEditorSheet7f538947,
+            style: const TextStyle(
               fontSize: 11.5,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
@@ -813,9 +827,9 @@ class EligibilityEntryCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14)),
               ),
               icon: const Icon(IconsaxPlusLinear.setting_4, size: 18),
-              label: const Text(
-                'הגדרת קריטריונים מדויקים',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              label: Text(
+                l10n.eligibilityEditorSheet2d483b2c,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
               ),
             ),
           ),
@@ -826,7 +840,7 @@ class EligibilityEntryCard extends StatelessWidget {
                   size: 15, color: AppColors.textSecondary),
               const SizedBox(width: 6),
               Text(
-                eligibilitySummaryLabel(config),
+                eligibilitySummaryLabel(context, config),
                 style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,

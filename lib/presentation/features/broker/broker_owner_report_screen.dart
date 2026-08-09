@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/safe_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -50,8 +51,10 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/report_${p.id}.png');
       await file.writeAsBytes(data.buffer.asUint8List());
+      if (!mounted) return;
       await Share.shareXFiles([XFile(file.path)],
-          text: 'דוח פעילות — ${p.address}');
+          text: AppLocalizations.of(context)!
+              .brokerOwnerReportScreen9e2251dc(p.address));
     } catch (_) {
       if (mounted) _sendToOwner(context, p);
     } finally {
@@ -63,13 +66,14 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
   Widget build(BuildContext context) {
     final properties = context.watch<DatingProvider>().myProperties;
     final selected = _resolveSelected(properties);
+    final l10n = AppLocalizations.of(context)!;
 
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.cloud,
         appBar: AppBar(
-          title: const Text('דוח פעילות לבעל הנכס'),
+          title: Text(l10n.brokerOwnerReportScreen4af427f3),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -84,7 +88,7 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _SectionLabel('בחרו נכס'),
+                      _SectionLabel(l10n.brokerOwnerReportScreen5a6b6baa),
                       const SizedBox(height: 10),
                       _PropertyPicker(
                         properties: properties,
@@ -103,13 +107,15 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _SectionLabel('סיכום פעילות · ${selected.address}'),
+                                _SectionLabel(l10n.brokerOwnerReportScreen80dfca38(
+                                    selected.address)),
                                 const SizedBox(height: 10),
                                 _MetricsGrid(property: selected),
                                 const SizedBox(height: 20),
-                                _SectionLabel('מה לשלוח לבעל הנכס'),
+                                _SectionLabel(l10n.brokerOwnerReportScreenD304ce53),
                                 const SizedBox(height: 10),
-                                _NarrativeCard(text: _narrative(selected)),
+                                _NarrativeCard(
+                                    text: _narrative(context, selected)),
                               ],
                             ),
                           ),
@@ -149,7 +155,7 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
     BuildContext context,
     RentalProperty property,
   ) async {
-    final report = _reportText(property);
+    final report = _reportText(context, property);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -161,62 +167,68 @@ class _BrokerOwnerReportScreenState extends State<BrokerOwnerReportScreen> {
 /// Maps the listing's real engagement counters into ordered, labelled rows.
 /// Honest about provenance: only fields the listing actually exposes are shown
 /// as numbers; anything unmeasured falls back to "—".
-List<_Metric> _metricsFor(RentalProperty property) {
+List<_Metric> _metricsFor(BuildContext context, RentalProperty property) {
+  final l10n = AppLocalizations.of(context)!;
   final s = property.marketSignals;
   String n(int value) => value > 0 ? _formatNumber(value) : '—';
   return [
-    _Metric('צפיות', n(s.views), IconsaxPlusLinear.eye),
-    _Metric('מתעניינים (לייקים)', n(s.likes), IconsaxPlusLinear.heart),
-    _Metric('שמירות', n(s.saves), IconsaxPlusLinear.archive),
-    _Metric('פניות ליצירת קשר', n(s.contactRequests), IconsaxPlusLinear.call),
-    _Metric('כניסות לעמוד הנכס', n(s.detailViews), IconsaxPlusLinear.document),
+    _Metric(l10n.brokerOwnerReportScreen48227f9c, n(s.views), IconsaxPlusLinear.eye),
+    _Metric(l10n.brokerOwnerReportScreenDaa11b47, n(s.likes), IconsaxPlusLinear.heart),
+    _Metric(l10n.brokerOwnerReportScreen066de4f8, n(s.saves), IconsaxPlusLinear.archive),
+    _Metric(l10n.brokerOwnerReportScreenD535641c, n(s.contactRequests),
+        IconsaxPlusLinear.call),
+    _Metric(l10n.brokerOwnerReportScreenA04be780, n(s.detailViews),
+        IconsaxPlusLinear.document),
     _Metric(
-      'צפייה אחרונה',
-      s.lastViewedAt == null ? '—' : _relativeDate(s.lastViewedAt!),
+      l10n.brokerOwnerReportScreenAc141b12,
+      s.lastViewedAt == null ? '—' : _relativeDate(context, s.lastViewedAt!),
       IconsaxPlusLinear.clock,
     ),
   ];
 }
 
-String _narrative(RentalProperty property) {
+String _narrative(BuildContext context, RentalProperty property) {
+  final l10n = AppLocalizations.of(context)!;
   final s = property.marketSignals;
   final parts = <String>[];
   if (s.views > 0) {
-    parts.add('הנכס נצפה ${_formatNumber(s.views)} פעמים');
+    parts.add(l10n.brokerOwnerReportScreen564551f8(_formatNumber(s.views)));
   }
   if (s.likes > 0) {
-    parts.add('${_formatNumber(s.likes)} מתעניינים סימנו אותו');
+    parts.add(l10n.brokerOwnerReportScreen958d9393(_formatNumber(s.likes)));
   }
   if (s.saves > 0) {
-    parts.add('${_formatNumber(s.saves)} שמרו אותו לעיון חוזר');
+    parts.add(l10n.brokerOwnerReportScreenFa6a4018(_formatNumber(s.saves)));
   }
   if (s.contactRequests > 0) {
-    parts.add('התקבלו ${_formatNumber(s.contactRequests)} פניות ליצירת קשר');
+    parts.add(l10n.brokerOwnerReportScreen825b0fd8(
+        _formatNumber(s.contactRequests)));
   }
 
   if (parts.isEmpty) {
-    return 'הנכס פורסם ופעיל במערכת. בשלב זה טרם נרשמה פעילות מדידה — '
-        'נמשיך לעקוב ונעדכן אותך בהמשך.';
+    return l10n.brokerOwnerReportScreenDf3d7596 +
+        l10n.brokerOwnerReportScreen9463334d;
   }
 
   final summary = parts.join(', ');
-  return 'עדכון על "${property.address}": $summary. אנחנו ממשיכים לקדם '
-      'את הנכס ונשמח לעדכן בכל התקדמות.';
+  return l10n.brokerOwnerReportScreenF0cf8eae(property.address, summary) +
+      l10n.brokerOwnerReportScreen85a17b3a;
 }
 
-String _reportText(RentalProperty property) {
+String _reportText(BuildContext context, RentalProperty property) {
+  final l10n = AppLocalizations.of(context)!;
   final lines = <String>[
-    'דוח פעילות — ${property.address}',
+    l10n.brokerOwnerReportScreenE707f57e(property.address),
     '${property.priceLabel} ${property.priceSuffixLabel} · '
-        '${property.roomsLabel} חדרים · ${property.sizeM2} מ"ר',
+        '${l10n.brokerOwnerReportScreenDb69622a(property.roomsLabel, property.sizeM2)}',
     '',
   ];
-  for (final metric in _metricsFor(property)) {
+  for (final metric in _metricsFor(context, property)) {
     lines.add('${metric.label}: ${metric.value}');
   }
   lines
     ..add('')
-    ..add(_narrative(property));
+    ..add(_narrative(context, property));
   if (property.url.trim().isNotEmpty) {
     lines
       ..add('')
@@ -321,7 +333,8 @@ class _PropertyTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${property.priceLabel} · ${property.roomsLabel} חדרים',
+                      '${property.priceLabel} · '
+                          '${AppLocalizations.of(context)!.brokerOwnerReportScreenD973da64(property.roomsLabel)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -353,7 +366,7 @@ class _MetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = _metricsFor(property);
+    final metrics = _metricsFor(context, property);
     final width = (MediaQuery.sizeOf(context).width - 36 - 12) / 2;
     return Wrap(
       spacing: 12,
@@ -462,9 +475,9 @@ class _SendButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onTap,
         icon: const Icon(IconsaxPlusBold.send_2, size: 24),
-        label: const Text(
-          'שלח כטקסט',
-          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+        label: Text(
+          AppLocalizations.of(context)!.brokerOwnerReportScreenFd67190d,
+          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
         ),
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -518,6 +531,7 @@ class _SendSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -542,9 +556,9 @@ class _SendSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'שליחת הדוח',
-                style: TextStyle(
+              Text(
+                l10n.brokerOwnerReportScreenC87bee7b,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                   color: AppColors.navy,
@@ -553,7 +567,7 @@ class _SendSheet extends StatelessWidget {
               const SizedBox(height: 14),
               _SheetAction(
                 icon: IconsaxPlusLinear.message_text,
-                label: 'שליחה ב-WhatsApp',
+                label: l10n.brokerOwnerReportScreenDe13d87a,
                 onTap: () async {
                   Navigator.of(context).pop();
                   await _shareVia(
@@ -561,14 +575,14 @@ class _SendSheet extends StatelessWidget {
                     Uri.parse(
                       'https://wa.me/?text=${Uri.encodeComponent(report)}',
                     ),
-                    'לא ניתן לפתוח את WhatsApp כרגע',
+                    l10n.brokerOwnerReportScreenC23278cd,
                   );
                 },
               ),
               const SizedBox(height: 10),
               _SheetAction(
                 icon: IconsaxPlusLinear.sms,
-                label: 'שליחה ב-SMS',
+                label: l10n.brokerOwnerReportScreen217e3171,
                 onTap: () async {
                   Navigator.of(context).pop();
                   await _shareVia(
@@ -577,20 +591,22 @@ class _SendSheet extends StatelessWidget {
                       scheme: 'sms',
                       queryParameters: <String, String>{'body': report},
                     ),
-                    'לא ניתן לפתוח SMS כרגע',
+                    l10n.brokerOwnerReportScreen12d7a7d4,
                   );
                 },
               ),
               const SizedBox(height: 10),
               _SheetAction(
                 icon: IconsaxPlusLinear.copy,
-                label: 'העתקת הדוח',
+                label: l10n.brokerOwnerReportScreenB4a9fdcf,
                 onTap: () async {
                   Navigator.of(context).pop();
                   await Clipboard.setData(ClipboardData(text: report));
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('הדוח הועתק')),
+                    SnackBar(
+                        content:
+                            Text(l10n.brokerOwnerReportScreen452f9d1a)),
                   );
                 },
               ),
@@ -681,6 +697,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -693,19 +710,19 @@ class _EmptyState extends StatelessWidget {
               color: AppColors.textDisabled,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'אין עדיין נכסים',
-              style: TextStyle(
+            Text(
+              l10n.brokerOwnerReportScreenC96fa39c,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'הוסיפו נכס כדי להפיק דוח פעילות לבעל הנכס.',
+            Text(
+              l10n.brokerOwnerReportScreen6dc67ee5,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
@@ -737,11 +754,12 @@ String _formatNumber(int value) {
   return '${value < 0 ? '-' : ''}$buffer';
 }
 
-String _relativeDate(DateTime when) {
+String _relativeDate(BuildContext context, DateTime when) {
+  final l10n = AppLocalizations.of(context)!;
   final diff = DateTime.now().difference(when);
-  if (diff.inMinutes < 60) return 'לפני פחות משעה';
-  if (diff.inHours < 24) return 'לפני ${diff.inHours} שעות';
-  if (diff.inDays == 1) return 'אתמול';
-  if (diff.inDays < 30) return 'לפני ${diff.inDays} ימים';
+  if (diff.inMinutes < 60) return l10n.brokerOwnerReportScreenA170171d;
+  if (diff.inHours < 24) return l10n.brokerOwnerReportScreenC46e717b(diff.inHours);
+  if (diff.inDays == 1) return l10n.brokerOwnerReportScreenBe285a01;
+  if (diff.inDays < 30) return l10n.brokerOwnerReportScreen0cfbdf39(diff.inDays);
   return '${when.day}.${when.month}.${when.year}';
 }

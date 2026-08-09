@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rent_ledger.dart';
 import 'package:dating_app/data/repositories/rent_ledger_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 /// Per-property monthly rent ledger, built for older landlords.
@@ -54,20 +55,23 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
   RentLedger? _ledger;
   bool _loading = true;
 
-  static const List<String> _hebrewMonths = [
-    'ינואר',
-    'פברואר',
-    'מרץ',
-    'אפריל',
-    'מאי',
-    'יוני',
-    'יולי',
-    'אוגוסט',
-    'ספטמבר',
-    'אוקטובר',
-    'נובמבר',
-    'דצמבר',
-  ];
+  List<String> _monthNames(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.rentTrackingScreenJanuary,
+      l10n.rentTrackingScreenFebruary,
+      l10n.rentTrackingScreenMarch,
+      l10n.rentTrackingScreenApril,
+      l10n.rentTrackingScreenMay,
+      l10n.rentTrackingScreenJune,
+      l10n.rentTrackingScreenJuly,
+      l10n.rentTrackingScreenAugust,
+      l10n.rentTrackingScreenSeptember,
+      l10n.rentTrackingScreenOctober,
+      l10n.rentTrackingScreenNovember,
+      l10n.rentTrackingScreenDecember,
+    ];
+  }
 
   @override
   void initState() {
@@ -86,7 +90,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
   }
 
   String _monthLabel(RentEntry e) =>
-      '${_hebrewMonths[(e.month - 1).clamp(0, 11)]} ${e.year}';
+      '${_monthNames(context)[(e.month - 1).clamp(0, 11)]} ${e.year}';
 
   String _shekel(int amount) => '₪${_thousands(amount)}';
 
@@ -144,27 +148,28 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
     if (current == null) return;
     final entry = current.entries[index];
     final ctrl = TextEditingController(text: entry.note ?? '');
+    final l10n = AppLocalizations.of(context)!;
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('הערה לחודש'),
+          title: Text(l10n.rentTrackingScreenNoteForMonth),
           content: TextField(
             controller: ctrl,
             autofocus: true,
             maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'למשל: שולם במזומן / הבטיח לשלם ב-15',
+            decoration: InputDecoration(
+              hintText: l10n.rentTrackingScreenNoteHint,
             ),
           ),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('ביטול')),
+                child: Text(l10n.rentTrackingScreenCancel)),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                child: const Text('שמירה')),
+                child: Text(l10n.rentTrackingScreenSave)),
           ],
         ),
       ),
@@ -191,6 +196,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
   Widget build(BuildContext context) {
     final ledger = _ledger;
     final bool isBroker = AppColors.isBrokerAccent;
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -199,7 +205,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
           backgroundColor: Colors.white,
           foregroundColor: AppColors.navy,
           elevation: 0,
-          title: const Text('מעקב תשלומים'),
+          title: Text(l10n.rentTrackingScreenTitle),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -220,7 +226,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
                     foregroundColor: Colors.white,
                     onPressed: _addNextMonth,
                     icon: const Icon(Icons.add),
-                    label: const Text('חודש נוסף'),
+                    label: Text(l10n.rentTrackingScreenAddMonth),
                   )
                 : null,
       ),
@@ -228,6 +234,7 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
   }
 
   Widget _buildList(RentLedger ledger) {
+    final l10n = AppLocalizations.of(context)!;
     final collected = ledger.collectedThisMonth();
     final debt = ledger.outstandingDebt();
     // Newest month first — most landlords care about the recent ones.
@@ -239,6 +246,8 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
           collectedLabel: _shekel(collected),
           debtLabel: _shekel(debt),
           hasDebt: debt > 0,
+          collectedTitle: l10n.rentTrackingScreenCollectedThisMonth,
+          debtTitle: l10n.rentTrackingScreenDebt,
         ),
         Expanded(
           child: ListView.separated(
@@ -257,6 +266,9 @@ class _RentTrackingScreenState extends State<RentTrackingScreen> {
                 note: entry.note,
                 onTap: () => _togglePaid(realIndex),
                 onEditNote: () => _editNote(realIndex),
+                paidLabel: l10n.rentTrackingScreenPaid,
+                unpaidLabel: l10n.rentTrackingScreenUnpaid,
+                noteTooltip: l10n.rentTrackingScreenNote,
               );
             },
           ),
@@ -272,12 +284,16 @@ class _SummaryHeader extends StatelessWidget {
     required this.collectedLabel,
     required this.debtLabel,
     required this.hasDebt,
+    required this.collectedTitle,
+    required this.debtTitle,
   });
 
   final String title;
   final String collectedLabel;
   final String debtLabel;
   final bool hasDebt;
+  final String collectedTitle;
+  final String debtTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +325,7 @@ class _SummaryHeader extends StatelessWidget {
             children: [
               Expanded(
                 child: _SummaryTile(
-                  label: 'נגבה החודש',
+                  label: collectedTitle,
                   value: collectedLabel,
                   color: AppColors.success,
                 ),
@@ -317,7 +333,7 @@ class _SummaryHeader extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _SummaryTile(
-                  label: 'חוב',
+                  label: debtTitle,
                   value: debtLabel,
                   color: hasDebt ? AppColors.coral : AppColors.success,
                 ),
@@ -383,6 +399,9 @@ class _MonthRow extends StatelessWidget {
     required this.paid,
     required this.overdue,
     required this.onTap,
+    required this.paidLabel,
+    required this.unpaidLabel,
+    required this.noteTooltip,
     this.note,
     this.onEditNote,
   });
@@ -394,6 +413,9 @@ class _MonthRow extends StatelessWidget {
   final VoidCallback onTap;
   final String? note;
   final VoidCallback? onEditNote;
+  final String paidLabel;
+  final String unpaidLabel;
+  final String noteTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -461,7 +483,7 @@ class _MonthRow extends StatelessWidget {
                       const SizedBox(width: 5),
                     ],
                     Text(
-                      paid ? 'שולם' : 'לא שולם',
+                      paid ? paidLabel : unpaidLabel,
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 14.5,
@@ -483,7 +505,7 @@ class _MonthRow extends StatelessWidget {
                     color: hasNote ? AppColors.primary : AppColors.textSecondary,
                     size: 22,
                   ),
-                  tooltip: 'הערה',
+                  tooltip: noteTooltip,
                 ),
               ],
             ],
@@ -528,7 +550,8 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isBroker = AppColors.isBrokerAccent;
     final primaryColor = isBroker ? Colors.black : AppColors.primary;
-    
+    final l10n = AppLocalizations.of(context)!;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
@@ -563,9 +586,9 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'עדיין לא עקבת אחרי תשלומים — נתחיל?',
-              style: TextStyle(
+            Text(
+              l10n.rentTrackingScreenNoTrackingYet,
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -586,9 +609,9 @@ class _EmptyState extends StatelessWidget {
                   elevation: 0,
                 ),
                 onPressed: onStart,
-                child: const Text(
-                  'התחל מעקב (12 חודשים)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.1),
+                child: Text(
+                  l10n.rentTrackingScreenStartTracking,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.1),
                 ),
               ),
             ),
@@ -655,6 +678,7 @@ class _PaymentTrackingHubScreenState extends State<PaymentTrackingHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -663,8 +687,8 @@ class _PaymentTrackingHubScreenState extends State<PaymentTrackingHubScreen> {
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.navy,
           elevation: 0,
-          title: const Text('מעקב תשלומים',
-              style: TextStyle(fontWeight: FontWeight.w900)),
+          title: Text(l10n.rentTrackingScreenTitle,
+              style: const TextStyle(fontWeight: FontWeight.w900)),
         ),
         body: FutureBuilder<List<_HubRow>>(
           future: _future,
@@ -674,11 +698,11 @@ class _PaymentTrackingHubScreenState extends State<PaymentTrackingHubScreen> {
             }
             final rows = snap.data!;
             if (rows.isEmpty) {
-              return const Center(
+              return Center(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('אין דירות למעקב. הוסיפו דירה כדי להתחיל.',
-                      style: TextStyle(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(l10n.rentTrackingScreenNoPropertiesToTrack,
+                      style: const TextStyle(
                           fontSize: 16, color: AppColors.textSecondary)),
                 ),
               );
@@ -722,16 +746,18 @@ class _HubCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Status + when-due, derived from the real ledger.
     final (label, color) = row.overdueCount > 0
-        ? ('${row.overdueCount} חודשים בפיגור', AppColors.coral)
+        ? (l10n.rentTrackingScreenMonthsOverdue(row.overdueCount), AppColors.coral)
         : row.paidThisMonth
-            ? ('שולם החודש', const Color(0xFF22C55E))
-            : ('ממתין לתשלום החודש', AppColors.warning);
+            ? (l10n.rentTrackingScreenPaidThisMonth, const Color(0xFF22C55E))
+            : (l10n.rentTrackingScreenAwaitingPaymentThisMonth, AppColors.warning);
     final now = DateTime.now();
     final dueLabel = row.paidThisMonth
-        ? 'החיוב הבא: 1 ב${_monthName(now.month % 12 + 1)}'
-        : 'לתשלום עד סוף ${_monthName(now.month)}';
+        ? l10n.rentTrackingScreenNextChargeOn(
+            _monthName(l10n, now.month % 12 + 1))
+        : l10n.rentTrackingScreenDueByEndOf(_monthName(l10n, now.month));
 
     return Material(
       color: AppColors.surface,
@@ -764,7 +790,7 @@ class _HubCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              Text('₪${row.rent} לחודש',
+              Text(l10n.rentTrackingScreenRentPerMonth('₪${row.rent}'),
                   style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -821,8 +847,18 @@ class _HubCard extends StatelessWidget {
     );
   }
 
-  static String _monthName(int m) => const [
-        'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי',
-        'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  static String _monthName(AppLocalizations l10n, int m) => [
+        l10n.rentTrackingScreenJanuary,
+        l10n.rentTrackingScreenFebruary,
+        l10n.rentTrackingScreenMarch,
+        l10n.rentTrackingScreenApril,
+        l10n.rentTrackingScreenMay,
+        l10n.rentTrackingScreenJune,
+        l10n.rentTrackingScreenJuly,
+        l10n.rentTrackingScreenAugust,
+        l10n.rentTrackingScreenSeptember,
+        l10n.rentTrackingScreenOctober,
+        l10n.rentTrackingScreenNovember,
+        l10n.rentTrackingScreenDecember,
       ][(m - 1) % 12];
 }

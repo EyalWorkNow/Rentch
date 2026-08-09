@@ -3,6 +3,7 @@ import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/contract_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/billing/checkout_webview_screen.dart';
 import 'package:dating_app/presentation/features/billing/payment_method_selector.dart';
 import 'package:dating_app/presentation/screens/contract_detail_screen.dart';
@@ -134,9 +135,11 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     );
     if (confirm != true || !mounted) return false;
 
+    final l10n = AppLocalizations.of(context)!;
     // Choose a payment method (card / Bit / Apple Pay / Google Pay).
     final group = await showPaymentMethodSheet(context,
-        amountLabel: '₪$_aiPriceShekel', subtitle: 'שיפור חוזה עם AI');
+        amountLabel: '₪$_aiPriceShekel',
+        subtitle: l10n.contractFormScreenCa38cedb);
     if (group == null || !mounted) return false;
 
     final provider = context.read<DatingProvider>();
@@ -146,7 +149,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     try {
       url = await AwsApiClient.instance.createOneOffCheckout(
         amountAgorot: _aiPriceShekel * 100,
-        description: 'שיפור חוזה עם AI — Rently',
+        description: l10n.contractFormScreenA7aa0554,
         product: 'contract',
         email: email,
         name: name,
@@ -157,7 +160,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     }
     if (!mounted) return false;
     if (url == null) {
-      _err('התשלום אינו זמין כרגע. נסו שוב מאוחר יותר.');
+      _err(l10n.contractFormScreen5ff8838c);
       return false;
     }
     final checkoutUrl = url; // promote to non-null for the closure
@@ -188,7 +191,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     if (!mounted) return;
     setState(() => _aiBusy = false);
     if (improved == null) {
-      _err('לא ניתן לשפר את החוזה כרגע. נסו שוב.');
+      _err(AppLocalizations.of(context)!.contractFormScreen0bf10733);
       return;
     }
     setState(() {
@@ -197,7 +200,9 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     });
     HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('החוזה שופר והותאם בעזרת AI ✨')),
+      SnackBar(
+          content:
+              Text(AppLocalizations.of(context)!.contractFormScreenC2278e7d)),
     );
   }
 
@@ -217,7 +222,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
   Future<void> _send() async {
     final rent = _asInt(_rentCtrl.text);
     if (rent <= 0) {
-      _err('יש להזין שכר דירה חודשי');
+      _err(AppLocalizations.of(context)!.contractFormScreenCbbabf55);
       return;
     }
     setState(() => _sending = true);
@@ -233,7 +238,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
     if (!mounted) return;
     setState(() => _sending = false);
     if (contract == null) {
-      _err('לא ניתן ליצור חוזה כרגע. נסו שוב.');
+      _err(AppLocalizations.of(context)!.contractFormScreen8e5a493e);
       return;
     }
     HapticFeedback.mediumImpact();
@@ -251,9 +256,10 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isAi = _template == ContractTemplateKind.aiTailored;
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('חוזה שכירות חדש')),
+      appBar: AppBar(title: Text(l10n.contractFormScreen64202d91)),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: SizedBox(
@@ -267,7 +273,9 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white))
                 : const Icon(IconsaxPlusLinear.document_text, size: 18),
-            label: Text(_sending ? 'שולח…' : 'שלח לחתימה'),
+            label: Text(_sending
+                ? l10n.contractFormScreenEdb89494
+                : l10n.contractFormScreenC1c55cf9),
           ),
         ),
       ),
@@ -279,13 +287,13 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             _card(
-              title: 'תנאי השכירות',
+              title: l10n.contractFormScreen1b58c9a0,
               icon: IconsaxPlusLinear.money_recive,
               children: [
-                _numberField(_rentCtrl, 'שכר דירה חודשי (₪)',
+                _numberField(_rentCtrl, l10n.contractFormScreen0ae58e28,
                     IconsaxPlusLinear.money),
                 const SizedBox(height: 12),
-                _numberField(_depositCtrl, 'פיקדון / ערבון (₪)',
+                _numberField(_depositCtrl, l10n.contractFormScreen99d1d056,
                     IconsaxPlusLinear.security),
                 _DepositLegalityNote(
                   deposit: _asInt(_depositCtrl.text),
@@ -293,8 +301,8 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                   termMonths: _durationMonths,
                 ),
                 const SizedBox(height: 18),
-                const Text('תקופת השכירות',
-                    style: TextStyle(
+                Text(l10n.contractFormScreenBdecb11c,
+                    style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary)),
@@ -323,7 +331,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                                   ? AppColors.primary
                                   : AppColors.borderLight),
                         ),
-                        child: Text('$m חודשים',
+                        child: Text(l10n.contractFormScreenBf1cf58d(m),
                             style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -347,8 +355,8 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                       children: [
                         RentlyCalendarIcon(),
                         const SizedBox(width: 12),
-                        const Text('תאריך כניסה',
-                            style: TextStyle(
+                        Text(l10n.contractFormScreenB7cdc163,
+                            style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w600)),
                         const Spacer(),
@@ -368,7 +376,7 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
 
             // ── Template + AI ─────────────────────────────────────────────────
             _card(
-              title: 'נוסח החוזה',
+              title: l10n.contractFormScreen67e27f00,
               icon: IconsaxPlusLinear.document_favorite,
               children: [
                 _StandardTemplateBadge(active: !isAi),
@@ -388,12 +396,12 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                       _fillStandardTemplate();
                     },
                     icon: const Icon(IconsaxPlusLinear.refresh, size: 16),
-                    label: const Text('חזרה לנוסח הסטנדרטי'),
+                    label: Text(l10n.contractFormScreen9e1017ad),
                   ),
                 ],
                 const SizedBox(height: 14),
-                const Text('טקסט החוזה',
-                    style: TextStyle(
+                Text(l10n.contractFormScreen30664b86,
+                    style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary)),
@@ -424,10 +432,10 @@ class _ContractFormScreenState extends State<ContractFormScreen> {
                 Icon(IconsaxPlusLinear.shield_tick,
                     size: 16, color: AppColors.primary),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'החוזה ייחתם בחתימה דיגיטלית מאובטחת מקצה לקצה. כל צד חותם במכשירו, וכל שינוי בתנאים יבטל חתימות קודמות.',
-                    style: TextStyle(
+                    l10n.contractFormScreen374bbbdf,
+                    style: const TextStyle(
                         fontSize: 12,
                         height: 1.5,
                         color: AppColors.textSecondary),
@@ -545,18 +553,18 @@ class _StandardTemplateBadge extends StatelessWidget {
                 size: 18, color: AppColors.primary),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('חוזה שכירות סטנדרטי',
-                    style: TextStyle(
+                Text(AppLocalizations.of(context)!.contractFormScreenE34604a7,
+                    style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
                         color: AppColors.navy)),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(StandardLeaseTemplate.credit,
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary)),
@@ -591,6 +599,7 @@ class _AiImproveTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -631,8 +640,8 @@ class _AiImproveTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Text('שפר עם AI',
-                          style: TextStyle(
+                      Text(l10n.contractFormScreenCbfee77a,
+                          style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
                               color: AppColors.navy)),
@@ -645,7 +654,8 @@ class _AiImproveTile extends StatelessWidget {
                             color: AppColors.superLike,
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text('פיצ׳ר בתשלום · $priceShekel₪',
+                          child: Text(
+                              l10n.contractFormScreen311875d1(priceShekel),
                               style: const TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w900,
@@ -659,8 +669,8 @@ class _AiImproveTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     busy
-                        ? 'מתאים את החוזה לנכס…'
-                        : 'מנסח ומתאים את החוזה לנכס ולתנאים בעזרת AI',
+                        ? l10n.contractFormScreen82a64993
+                        : l10n.contractFormScreen3750438e,
                     style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -803,6 +813,7 @@ class _PaywallSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -831,18 +842,17 @@ class _PaywallSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            const Text('שיפור החוזה בעזרת AI',
+            Text(l10n.contractFormScreenA78d435c,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: AppColors.navy)),
             const SizedBox(height: 6),
-            const Text(
-              'ה-AI ינסח מחדש ויתאים את החוזה לנכס ולתנאים שלכם — נוסח ברור, '
-              'מסודר וערוך בסעיפים, מבוסס על הנתונים בלבד.',
+            Text(
+              '${l10n.contractFormScreenF4a6089f}${l10n.contractFormScreenC0583fa2}',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 13, height: 1.5, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -858,8 +868,8 @@ class _PaywallSheet extends StatelessWidget {
                   Icon(IconsaxPlusLinear.tag,
                       size: 18, color: AppColors.primary),
                   const SizedBox(width: 10),
-                  const Text('פיצ׳ר בתשלום',
-                      style: TextStyle(
+                  Text(l10n.contractFormScreen99b411b6,
+                      style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: AppColors.navy)),
@@ -880,13 +890,13 @@ class _PaywallSheet extends StatelessWidget {
                 // hosted checkout WebView (see _showPaywall).
                 onPressed: () => Navigator.of(context).pop(true),
                 icon: const Icon(IconsaxPlusLinear.card, size: 18),
-                label: Text('המשך לתשלום $priceShekel ₪'),
+                label: Text(l10n.contractFormScreenFa001394(priceShekel)),
               ),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('לא עכשיו'),
+              child: Text(l10n.contractFormScreen98c8a5b8),
             ),
             const SizedBox(height: 4),
             const Text(

@@ -4,6 +4,7 @@ import 'package:dating_app/data/models/broker_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/broker_client_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/broker/broker_hot_matches_screen.dart';
 import 'package:dating_app/presentation/screens/property_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -79,13 +80,14 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
   // clients" fix. Picks name + first phone; criteria are filled in later per
   // client. Skips contacts whose number already exists in the book.
   Future<void> _importFromContacts() async {
+    final l10n = AppLocalizations.of(context)!;
     final status =
         await FlutterContacts.permissions.request(PermissionType.read);
     if (!mounted) return;
     if (status != PermissionStatus.granted &&
         status != PermissionStatus.limited) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('צריך הרשאת גישה לאנשי קשר כדי לייבא')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(l10n.brokerClientsScreenContactsPermissionNeeded)));
       return;
     }
     final contacts = await FlutterContacts.getAll(
@@ -97,8 +99,9 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
       ..sort((a, b) => (a.displayName ?? '').compareTo(b.displayName ?? ''));
     if (!mounted) return;
     if (pickable.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('לא נמצאו אנשי קשר עם מספר טלפון')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(l10n.brokerClientsScreenNoContactsWithPhoneFound)));
       return;
     }
     final selected = await showModalBottomSheet<List<Contact>>(
@@ -134,8 +137,8 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
     final added = toAdd.length;
     if (!mounted) return;
     setState(() => _clients = next);
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('יובאו $added אנשי קשר לפנקס')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.brokerClientsScreenContactsImported(added))));
   }
 
   void _openMatches(BrokerClient client) {
@@ -149,6 +152,7 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Rebuild on listing changes so the "X נכסים מתאימים" counts stay live.
     final properties = context.watch<DatingProvider>().allProperties;
     return Directionality(
@@ -156,14 +160,14 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('פנקס לקוחות'),
+          title: Text(l10n.brokerClientsScreenClientBook),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
           ),
           actions: [
             IconButton(
-              tooltip: 'ייבוא מאנשי קשר',
+              tooltip: l10n.brokerClientsScreenImportFromContacts,
               icon: const Icon(Icons.contacts_outlined),
               onPressed: _importFromContacts,
             ),
@@ -173,9 +177,9 @@ class _BrokerClientsScreenState extends State<BrokerClientsScreen> {
           backgroundColor: AppColors.primary,
           onPressed: () => _addOrEdit(),
           icon: const Icon(Icons.person_add_alt_1, color: Colors.white),
-          label: const Text(
-            'לקוח חדש',
-            style: TextStyle(
+          label: Text(
+            l10n.brokerClientsScreenNewClient,
+            style: const TextStyle(
                 color: Colors.white,
                 fontSize: 17,
                 fontWeight: FontWeight.bold),
@@ -236,6 +240,7 @@ class _HotMatchesStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final count = _hotCount;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -261,7 +266,7 @@ class _HotMatchesStrip extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'התאמות חמות',
+                        l10n.brokerClientsScreenHotMatches,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -271,8 +276,8 @@ class _HotMatchesStrip extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         count > 0
-                            ? '$count התאמות חזקות ממתינות'
-                            : 'נכסים שמתאימים ללקוחות שלך',
+                            ? l10n.brokerClientsScreenStrongMatchesWaiting(count)
+                            : l10n.brokerClientsScreenPropertiesThatFitClients,
                         style: TextStyle(
                             fontSize: 14, color: AppColors.textSecondary),
                       ),
@@ -318,19 +323,25 @@ class _ClientCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  String get _criteriaLine {
+  String _criteriaLine(AppLocalizations l10n) {
     final parts = <String>[];
-    parts.add(client.isSale ? 'מכירה' : 'השכרה');
+    parts.add(client.isSale
+        ? l10n.brokerClientsScreenSale
+        : l10n.brokerClientsScreenRent);
     if (client.areas.isNotEmpty) parts.add(client.areas.join(', '));
-    if (client.minRooms != null) parts.add('${_num(client.minRooms!)}+ חדרים');
+    if (client.minRooms != null) {
+      parts.add(l10n.brokerClientsScreenMinRoomsPlus(_num(client.minRooms!)));
+    }
     if (client.budgetMax != null) {
-      parts.add('עד ₪${_money(client.budgetMax!)}');
+      parts.add(
+          l10n.brokerClientsScreenBudgetUpTo('₪${_money(client.budgetMax!)}'));
     }
     return parts.join(' · ');
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(18),
@@ -360,16 +371,20 @@ class _ClientCard extends StatelessWidget {
                   ),
                   PopupMenuButton<String>(
                     onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('עריכה')),
-                      PopupMenuItem(value: 'delete', child: Text('מחיקה')),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                          value: 'edit',
+                          child: Text(l10n.brokerClientsScreenEdit)),
+                      PopupMenuItem(
+                          value: 'delete',
+                          child: Text(l10n.brokerClientsScreenDelete)),
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                _criteriaLine,
+                _criteriaLine(l10n),
                 style: const TextStyle(
                     fontSize: 15, color: AppColors.textSecondary),
               ),
@@ -417,8 +432,8 @@ class _ClientCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       matchCount > 0
-                          ? '$matchCount נכסים מתאימים'
-                          : 'אין נכסים מתאימים כרגע',
+                          ? l10n.brokerClientsScreenMatchingProperties(matchCount)
+                          : l10n.brokerClientsScreenNoMatchingPropertiesNow,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -447,6 +462,7 @@ class _ClientMatchesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -456,7 +472,7 @@ class _ClientMatchesScreen extends StatelessWidget {
           foregroundColor: AppColors.textPrimary,
           elevation: 0,
           title: Text(
-            'נכסים ל${client.name}',
+            l10n.brokerClientsScreenPropertiesForClient(client.name),
             style:
                 const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
@@ -466,8 +482,8 @@ class _ClientMatchesScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'אין כרגע נכסים שמתאימים לדרישות של ${client.name}.\n'
-                    'ברגע שתעלה נכס מתאים — הוא יופיע כאן.',
+                    '${l10n.brokerClientsScreenNoMatchingPropertiesForClient(client.name)}\n'
+                    '${l10n.brokerClientsScreenMatchWillAppearHere}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         fontSize: 17, color: AppColors.textSecondary),
@@ -492,6 +508,7 @@ class _MatchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final p = match.property;
     return Material(
       color: AppColors.surface,
@@ -544,7 +561,8 @@ class _MatchRow extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${p.priceLabel} ${p.priceSuffixLabel} · ${p.roomsLabel} חדרים',
+                l10n.brokerClientsScreenPriceRoomsSummary(
+                    p.priceLabel, p.priceSuffixLabel, p.roomsLabel),
                 style: const TextStyle(
                     fontSize: 15, color: AppColors.textSecondary),
               ),
@@ -632,7 +650,9 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
     final name = _name.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('נא להזין שם לקוח')),
+        SnackBar(
+            content: Text(
+                AppLocalizations.of(context)!.brokerClientsScreenEnterClientName)),
       );
       return;
     }
@@ -656,6 +676,7 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Padding(
@@ -683,13 +704,16 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  widget.client == null ? 'לקוח חדש' : 'עריכת לקוח',
+                  widget.client == null
+                      ? l10n.brokerClientsScreenNewClient
+                      : l10n.brokerClientsScreenEditClient,
                   style: const TextStyle(
                       fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                _field(_name, 'שם הלקוח'),
-                _field(_phone, 'טלפון', keyboard: TextInputType.phone),
+                _field(_name, l10n.brokerClientsScreenClientName),
+                _field(_phone, l10n.brokerClientsScreenPhone,
+                    keyboard: TextInputType.phone),
                 const SizedBox(height: 8),
                 _SegmentedType(
                   value: _transactionType,
@@ -699,21 +723,21 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
                 Row(
                   children: [
                     Expanded(
-                      child: _field(_budgetMin, 'תקציב מ-',
+                      child: _field(_budgetMin, l10n.brokerClientsScreenBudgetFrom,
                           keyboard: TextInputType.number),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _field(_budgetMax, 'תקציב עד',
+                      child: _field(_budgetMax, l10n.brokerClientsScreenBudgetTo,
                           keyboard: TextInputType.number),
                     ),
                   ],
                 ),
-                _field(_minRooms, 'מינימום חדרים',
+                _field(_minRooms, l10n.brokerClientsScreenMinRooms,
                     keyboard: TextInputType.number),
-                _field(_areas, 'אזורים (מופרדים בפסיק)'),
-                _field(_mustHaves, 'חובה שיכלול (מופרדים בפסיק)'),
-                _field(_notes, 'הערות', maxLines: 3),
+                _field(_areas, l10n.brokerClientsScreenAreasCommaSeparated),
+                _field(_mustHaves, l10n.brokerClientsScreenMustHaveCommaSeparated),
+                _field(_notes, l10n.brokerClientsScreenNotes, maxLines: 3),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 54,
@@ -725,9 +749,9 @@ class _ClientFormSheetState extends State<_ClientFormSheet> {
                       ),
                     ),
                     onPressed: _submit,
-                    child: const Text(
-                      'שמירה',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.brokerClientsScreenSave,
+                      style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.white),
@@ -814,11 +838,12 @@ class _SegmentedType extends StatelessWidget {
       );
     }
 
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
-        seg('rent', 'השכרה'),
+        seg('rent', l10n.brokerClientsScreenRent),
         const SizedBox(width: 12),
-        seg('sale', 'מכירה'),
+        seg('sale', l10n.brokerClientsScreenSale),
       ],
     );
   }
@@ -829,6 +854,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -838,16 +864,15 @@ class _EmptyState extends StatelessWidget {
             Icon(Icons.contacts_outlined,
                 size: 72, color: AppColors.primaryLight),
             const SizedBox(height: 16),
-            const Text(
-              'פנקס הלקוחות שלך ריק',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              l10n.brokerClientsScreenClientBookEmpty,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'הוסף לקוח עם מה שהוא מחפש, והאפליקציה תראה לך אילו '
-              'מהנכסים שלך מתאימים לו.',
+            Text(
+              l10n.brokerClientsScreenEmptyStateBody,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -882,6 +907,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final q = _q.trim();
     final list = q.isEmpty
         ? widget.contacts
@@ -914,12 +940,13 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Expanded(
-                    child: Text('בחירת אנשי קשר לייבוא',
-                        style: TextStyle(
+                  Expanded(
+                    child: Text(l10n.brokerClientsScreenSelectContactsToImport,
+                        style: const TextStyle(
                             fontSize: 19, fontWeight: FontWeight.bold)),
                   ),
-                  Text('${_selected.length} נבחרו',
+                  Text(
+                      l10n.brokerClientsScreenSelectedCount(_selected.length),
                       style: const TextStyle(color: AppColors.textSecondary)),
                 ],
               ),
@@ -927,7 +954,7 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
               TextField(
                 onChanged: (v) => setState(() => _q = v),
                 decoration: InputDecoration(
-                  hintText: 'חיפוש איש קשר…',
+                  hintText: l10n.brokerClientsScreenSearchContact,
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: Colors.white,
@@ -973,7 +1000,8 @@ class _ContactPickerSheetState extends State<_ContactPickerSheet> {
                         : () => Navigator.of(context).pop(widget.contacts
                             .where((c) => _selected.contains(c.id ?? ''))
                             .toList()),
-                    child: Text('ייבא ${_selected.length} לקוחות',
+                    child: Text(
+                        l10n.brokerClientsScreenImportClients(_selected.length),
                         style: const TextStyle(
                             fontSize: 17, fontWeight: FontWeight.bold)),
                   ),

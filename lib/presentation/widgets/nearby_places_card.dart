@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/search/nearby_relevance.dart';
 import 'package:dating_app/core/search/scenario_layers.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -242,10 +243,11 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     final count = showAll ? total : limit;
     final chips = [for (var i = 0; i < count; i++) _chip(i, i == sel)];
     final viewAll = total > limit ? _viewAllButton(!showAll, total - limit) : null;
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('מקומות בקרבה',
+        Text(l10n.nearbyPlacesCard29364e0f,
             style: const TextStyle(
                 fontSize: 15.5, fontWeight: FontWeight.w900, color: AppColors.navy)),
         const SizedBox(height: 10),
@@ -298,18 +300,21 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     foregroundColor: AppColors.primary,
                     disabledForegroundColor: AppColors.textSecondary.withOpacity(0.3),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.arrow_forward_ios_rounded, size: 13),
-                      SizedBox(width: 4),
-                      Text('הקודם', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 13),
+                      const SizedBox(width: 4),
+                      Text(l10n.nearbyPlacesCard7e6e0fb1, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                     ],
                   ),
                 ),
                 // Page Indicator
                 Text(
-                  'עמוד ${_currentPage + 1} מתוך ${(_sections[sel].$2.length / 10).ceil()}',
+                  l10n.nearbyPlacesCard4a3e7c17(
+                    _currentPage + 1,
+                    (_sections[sel].$2.length / 10).ceil(),
+                  ),
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
@@ -325,12 +330,12 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     foregroundColor: AppColors.primary,
                     disabledForegroundColor: AppColors.textSecondary.withOpacity(0.3),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('הבא', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_back_ios_rounded, size: 13),
+                      Text(l10n.nearbyPlacesCard5f9edf6e, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_back_ios_rounded, size: 13),
                     ],
                   ),
                 ),
@@ -354,7 +359,7 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                   border: Border.all(color: AppColors.primary),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text('ראה עוד מקומות בסביבה',
+                  Text(l10n.nearbyPlacesCard4745b1e9,
                       style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w800,
@@ -439,7 +444,9 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           border: Border.all(color: AppColors.primary),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(collapsed ? 'צפה בכולם (+$hidden)' : 'הצג פחות',
+          Text(collapsed
+                  ? AppLocalizations.of(context)!.nearbyPlacesCard9197afde(hidden)
+                  : AppLocalizations.of(context)!.nearbyPlacesCard6192614d,
               style: TextStyle(
                   fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
           const SizedBox(width: 4),
@@ -537,7 +544,8 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${places.length}${places.length >= 12 ? '+' : ''} · $radiusKm ק״מ',
+                    '${places.length}${places.length >= 12 ? '+' : ''}'
+                        '${AppLocalizations.of(context)!.nearbyPlacesCardC3e59a4e(radiusKm)}',
                     style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
@@ -570,49 +578,50 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
   }
 
   (IconData, String, int) _meta(NearbyKind kind) {
+    final l10n = AppLocalizations.of(context)!;
     switch (kind) {
       case NearbyKind.schools:
-        return (IconsaxPlusLinear.teacher, 'בתי ספר קרובים', 2);
+        return (IconsaxPlusLinear.teacher, l10n.nearbyPlacesCardCef7ef5e, 2);
       case NearbyKind.kindergartens:
-        return (IconsaxPlusLinear.emoji_happy, 'גנים קרובים', 2);
+        return (IconsaxPlusLinear.emoji_happy, l10n.nearbyPlacesCardD7b78a1f, 2);
       case NearbyKind.clinics:
-        return (IconsaxPlusLinear.hospital, 'קופות חולים קרובות', 5);
+        return (IconsaxPlusLinear.hospital, l10n.nearbyPlacesCard385087d3, 5);
       case NearbyKind.supermarkets:
-        return (IconsaxPlusLinear.shopping_cart, 'סופרים קרובים', 2);
+        return (IconsaxPlusLinear.shopping_cart, l10n.nearbyPlacesCard19a008ff, 2);
       case NearbyKind.parks:
-        return (IconsaxPlusLinear.tree, 'פארקים קרובים', 2);
+        return (IconsaxPlusLinear.tree, l10n.nearbyPlacesCardCdc11038, 2);
       case NearbyKind.pharmacies:
-        return (IconsaxPlusLinear.health, 'בתי מרקחת קרובים', 2);
+        return (IconsaxPlusLinear.health, l10n.nearbyPlacesCardEc7edb50, 2);
       case NearbyKind.playgrounds:
-        return (IconsaxPlusLinear.game, 'גני שעשועים קרובים', 2);
+        return (IconsaxPlusLinear.game, l10n.nearbyPlacesCard71ec0056, 2);
       case NearbyKind.dining:
-        return (IconsaxPlusLinear.reserve, 'מסעדות ובתי קפה קרובים', 2);
+        return (IconsaxPlusLinear.reserve, l10n.nearbyPlacesCard09b9bc6f, 2);
       case NearbyKind.gyms:
-        return (IconsaxPlusLinear.weight, 'חדרי כושר קרובים', 3);
+        return (IconsaxPlusLinear.weight, l10n.nearbyPlacesCard117e5860, 3);
       case NearbyKind.nightlife:
-        return (IconsaxPlusLinear.cup, 'ברים ופאבים קרובים', 2);
+        return (IconsaxPlusLinear.cup, l10n.nearbyPlacesCardD4ecbfa0, 2);
       case NearbyKind.synagogues:
-        return (IconsaxPlusLinear.buildings, 'בתי כנסת קרובים', 2);
+        return (IconsaxPlusLinear.buildings, l10n.nearbyPlacesCard7e72c9af, 2);
       case NearbyKind.culture:
-        return (IconsaxPlusLinear.gallery, 'מוסדות תרבות קרובים', 3);
+        return (IconsaxPlusLinear.gallery, l10n.nearbyPlacesCard21a17e0d, 3);
       case NearbyKind.hospitals:
-        return (IconsaxPlusLinear.heart, 'בתי חולים קרובים', 5);
+        return (IconsaxPlusLinear.heart, l10n.nearbyPlacesCard46be343a, 5);
       case NearbyKind.transit:
-        return (IconsaxPlusLinear.bus, 'תחנות רכבת ורק״ל קרובות', 2);
+        return (IconsaxPlusLinear.bus, l10n.nearbyPlacesCard07638922, 2);
       case NearbyKind.worship:
-        return (IconsaxPlusLinear.courthouse, 'מסגדים וכנסיות קרובים', 2);
+        return (IconsaxPlusLinear.courthouse, l10n.nearbyPlacesCardBb428196, 2);
       case NearbyKind.pools:
-        return (IconsaxPlusLinear.drop, 'בריכות ומרכזי ספורט', 3);
+        return (IconsaxPlusLinear.drop, l10n.nearbyPlacesCard34ff0c6c, 3);
       case NearbyKind.dogParks:
-        return (IconsaxPlusLinear.pet, 'גינות כלבים קרובות', 2);
+        return (IconsaxPlusLinear.pet, l10n.nearbyPlacesCard5290646f, 2);
       case NearbyKind.vets:
-        return (IconsaxPlusLinear.lifebuoy, 'וטרינרים קרובים', 3);
+        return (IconsaxPlusLinear.lifebuoy, l10n.nearbyPlacesCard6faa1286, 3);
       case NearbyKind.bikeShare:
-        return (IconsaxPlusLinear.routing, 'תחנות אופניים קרובות', 2);
+        return (IconsaxPlusLinear.routing, l10n.nearbyPlacesCard5b5ddf14, 2);
       case NearbyKind.coworking:
-        return (IconsaxPlusLinear.briefcase, 'חללי עבודה קרובים', 3);
+        return (IconsaxPlusLinear.briefcase, l10n.nearbyPlacesCard5d4c2d06, 3);
       case NearbyKind.parking:
-        return (IconsaxPlusLinear.car, 'חניונים קרובים', 2);
+        return (IconsaxPlusLinear.car, l10n.nearbyPlacesCard0a96eae3, 2);
     }
   }
 
@@ -667,7 +676,9 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
       case 'kindergarten':
         return p.sector.isEmpty ? p.stage : '${p.stage} · ${p.sector}';
       case 'clinic':
-        return p.sector.isEmpty ? 'מרפאה' : p.sector;
+        return p.sector.isEmpty
+            ? AppLocalizations.of(context)!.nearbyPlacesCard6278673e
+            : p.sector;
       case 'dining':
       case 'nightlife':
       case 'culture':
@@ -680,10 +691,15 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
     }
   }
 
-  String _distLabel(double km) =>
-      km < 1 ? '${(km * 1000).round()} מ׳' : '${km.toStringAsFixed(1)} ק״מ';
+  String _distLabel(double km) {
+    final l10n = AppLocalizations.of(context)!;
+    return km < 1
+        ? l10n.nearbyPlacesCardDcabfe76((km * 1000).round())
+        : l10n.nearbyPlacesCard0b2db321(km.toStringAsFixed(1));
+  }
 
   Future<void> _confirmOpenGoogle(String name) async {
+    final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -692,19 +708,19 @@ class _NearbyPlacesCardState extends State<NearbyPlacesCard> {
           backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('לפתוח בגוגל?',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-          content: Text('נחפש את «$name» בגוגל.',
+          title: Text(l10n.nearbyPlacesCard4f9b07b3,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+          content: Text(l10n.nearbyPlacesCardE927ed2c(name),
               style:
                   const TextStyle(color: AppColors.textSecondary, height: 1.4)),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('ביטול')),
+                child: Text(l10n.nearbyPlacesCardA7c55a8d)),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('חפש בגוגל'),
+              child: Text(l10n.nearbyPlacesCard95337767),
             ),
           ],
         ),

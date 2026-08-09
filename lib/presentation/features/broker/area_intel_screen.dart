@@ -1,4 +1,5 @@
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/core/govdata/gov_data.dart';
 import 'package:dating_app/core/insights/area_intelligence.dart';
 import 'package:dating_app/core/search/engine/feature_engineering.dart';
@@ -177,7 +178,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'לא הצלחתי לאתר את הכתובת. נסה לבחור מההשלמה או לכתוב עיר + רחוב.');
+      setState(() => _error = AppLocalizations.of(context)!.areaIntelScreen88218ec9);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -190,6 +191,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   static const double _radiusKm = 2.0;
 
   Future<List<_NearbyCategory>> _collectNearby(double lat, double lon) async {
+    final l10n = AppLocalizations.of(context)!;
     final ov = await OverpassPoiService.instance
         .nearby(lat, lon, radiusM: (_radiusKm * 1000).round());
 
@@ -209,29 +211,29 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
     }
 
     final defs = <List<Object>>[
-      ['transit', '🚉', 'תחבורה ציבורית',
+      ['transit', '🚉', l10n.areaIntelScreen91db7436,
           IsraelGeoIndex.transitStopsWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['schools', '🏫', 'בתי ספר',
+      ['schools', '🏫', l10n.areaIntelScreenFa8c72dc,
           IsraelGeoIndex.schoolsWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['kindergartens', '🧸', 'גני ילדים',
+      ['kindergartens', '🧸', l10n.areaIntelScreen00a5eaf2,
           IsraelGeoIndex.kindergartensWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['parks', '🌳', 'פארקים וגינות',
+      ['parks', '🌳', l10n.areaIntelScreen088f0923,
           IsraelGeoIndex.parksWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['dining', '☕', 'בתי קפה ומסעדות',
+      ['dining', '☕', l10n.areaIntelScreen9bd0d581,
           IsraelGeoIndex.diningWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['supermarkets', '🛒', 'סופרמרקטים וקניות',
+      ['supermarkets', '🛒', l10n.areaIntelScreen56721218,
           IsraelGeoIndex.supermarketsWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['health', '🏥', 'שירותי בריאות',
+      ['health', '🏥', l10n.areaIntelScreen9df69324,
           IsraelGeoIndex.clinicsWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['pharmacies', '💊', 'בתי מרקחת',
+      ['pharmacies', '💊', l10n.areaIntelScreen82e78f66,
           IsraelGeoIndex.pharmaciesWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['gyms', '🏋️', 'חדרי כושר וספורט',
+      ['gyms', '🏋️', l10n.areaIntelScreen22f8b507,
           IsraelGeoIndex.gymsWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['worship', '🕍', 'בתי כנסת ותפילה',
+      ['worship', '🕍', l10n.areaIntelScreen34df4e2b,
           IsraelGeoIndex.synagoguesWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['culture', '🎭', 'תרבות ופנאי',
+      ['culture', '🎭', l10n.areaIntelScreen39cfcba7,
           IsraelGeoIndex.cultureWithin(lat, lon, km: _radiusKm, cap: 120)],
-      ['playgrounds', '🛝', 'גני משחקים',
+      ['playgrounds', '🛝', l10n.areaIntelScreen289b784a,
           IsraelGeoIndex.playgroundsWithin(lat, lon, km: _radiusKm, cap: 120)],
     ];
     final cats = <_NearbyCategory>[];
@@ -245,8 +247,12 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
     return cats;
   }
 
-  static String _dist(double km) =>
-      km < 1 ? '${(km * 1000).round()} מ׳' : '${km.toStringAsFixed(1)} ק״מ';
+  String _dist(double km) {
+    final l10n = AppLocalizations.of(context)!;
+    return km < 1
+        ? l10n.areaIntelScreenDcabfe76((km * 1000).round())
+        : l10n.areaIntelScreen0b2db321(km.toStringAsFixed(1));
+  }
 
   // Tapping a place searches it on Google (name + city; unnamed → its category
   // + city), opening the browser/Google app.
@@ -262,12 +268,13 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const Text('אינטליגנציית אזור'),
+          title: Text(l10n.areaIntelScreenA8bb0310),
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(color: AppColors.divider, height: 1, thickness: 1),
@@ -294,9 +301,9 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                   child: Row(children: [
                     Icon(IconsaxPlusLinear.ranking_1, color: AppColors.primary, size: 20),
                     const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('דרג את כל האזורים בעיר לפי קהל יעד',
-                          style: TextStyle(
+                    Expanded(
+                      child: Text(l10n.areaIntelScreen51957dd6,
+                          style: const TextStyle(
                               fontSize: 13.5, fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary)),
                     ),
@@ -318,16 +325,16 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                 const SizedBox(height: 12),
                 _selectedFitCard(),
                 const SizedBox(height: 18),
-                _sectionTitle('עדשת השקעה'),
+                _sectionTitle(l10n.areaIntelScreen3fb539f2),
                 const SizedBox(height: 10),
                 _investmentCard(_profile!.investment),
                 const SizedBox(height: 18),
-                _sectionTitle('כל שכבות הנתונים במקום'),
+                _sectionTitle(l10n.areaIntelScreen93a4e30a),
                 const SizedBox(height: 10),
                 _layersCard(_profile!),
                 if (_nearby.isNotEmpty) ...[
                   const SizedBox(height: 18),
-                  _sectionTitle('מה יש בסביבה'),
+                  _sectionTitle(l10n.areaIntelScreenE752c7da),
                   const SizedBox(height: 10),
                   _nearbyCard(),
                 ],
@@ -339,29 +346,31 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
     );
   }
 
-  Widget _intro() => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
-        ),
-        child: Row(children: [
-          Icon(IconsaxPlusLinear.map_1, color: AppColors.primary, size: 24),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'הזן כתובת לבדיקת השקעה — ואקבל את כל הנתונים והשכבות של האזור, '
-              'ולמי הוא הכי מתאים. ככה תדע בדיוק איזה קהל לחפש ומה חוזק המקום.',
-              style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600),
-            ),
+  Widget _intro() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(children: [
+        Icon(IconsaxPlusLinear.map_1, color: AppColors.primary, size: 24),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            '${l10n.areaIntelScreen311b60d7}${l10n.areaIntelScreenFd7780b1}',
+            style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w600),
           ),
-        ]),
-      );
+        ),
+      ]),
+    );
+  }
 
   Widget _addressRow() => Autocomplete<_PlaceSuggestion>(
         displayStringForOption: (o) => o.label,
@@ -402,7 +411,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
               textInputAction: TextInputAction.search,
               onSubmitted: (t) => _analyze(null, t),
               decoration: InputDecoration(
-                hintText: 'כתובת: עיר + רחוב (למשל: תל אביב, דיזנגוף 100)',
+                hintText: AppLocalizations.of(context)!.areaIntelScreen863d9b56,
                 filled: true,
                 fillColor: Colors.white,
                 prefixIcon:
@@ -432,8 +441,8 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                       width: 20, height: 20,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
-                  : const Text('נתח',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                  : Text(AppLocalizations.of(context)!.areaIntelScreen0d4d229d,
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
             ),
           ),
         ]),
@@ -479,6 +488,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   }
 
   Widget _selectedFitCard() {
+    final l10n = AppLocalizations.of(context)!;
     final f = _fits.firstWhere((x) => x.persona.key == _selectedPersona,
         orElse: () => _fits.first);
     final color = f.pct >= 75
@@ -503,17 +513,17 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
             decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(999)),
-            child: Text('${f.pct}% התאמה',
+            child: Text(l10n.areaIntelScreen65430ae4(f.pct),
                 style: TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w900, color: color)),
           ),
         ]),
         const SizedBox(height: 12),
         if (f.reasons.isEmpty)
-          Text('האזור פחות מתאים לקהל הזה.',
+          Text(l10n.areaIntelScreen046ea325,
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13.5))
         else ...[
-          Text('למה זה עובד לקהל הזה:',
+          Text(l10n.areaIntelScreen4e635cc2,
               style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12.5, fontWeight: FontWeight.w700)),
@@ -538,6 +548,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   }
 
   Widget _investmentCard(InvestmentLens inv) {
+    final l10n = AppLocalizations.of(context)!;
     final scoreColor = inv.investmentScore >= 70
         ? AppColors.success
         : (inv.investmentScore >= 50 ? AppColors.primary : AppColors.warning);
@@ -552,8 +563,8 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         Row(children: [
           Icon(IconsaxPlusLinear.chart_21, color: scoreColor, size: 20),
           const SizedBox(width: 8),
-          const Text('ציון השקעה',
-              style: TextStyle(
+          Text(l10n.areaIntelScreen77eb6f43,
+              style: const TextStyle(
                   fontSize: 15, fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary)),
           const Spacer(),
@@ -568,15 +579,15 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
           ),
         ]),
         const SizedBox(height: 12),
-        _bar('ביקוש שכירות (קלות השכרה)', inv.rentability),
-        _bar('פוטנציאל השבחה (תשתית מתוכננת)', inv.appreciation),
+        _bar(l10n.areaIntelScreenDa192a5e, inv.rentability),
+        _bar(l10n.areaIntelScreen7c498f0a, inv.appreciation),
         if (inv.relativePriceTier != null)
-          _bar('רמת מחירים באזור (יחסי)', inv.relativePriceTier!),
+          _bar(l10n.areaIntelScreen9e3fdc13, inv.relativePriceTier!),
         if (inv.roughYieldPct != null) ...[
           const SizedBox(height: 8),
           Row(children: [
             Expanded(
-                child: Text('הערכת תשואה ברוטו',
+                child: Text(l10n.areaIntelScreenB5585865,
                     style: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary))),
@@ -589,8 +600,8 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         const SizedBox(height: 8),
         Text(
           inv.valuePerSqm2013 != null
-              ? 'רמת המחירים מבוססת על שווי הלמ״ס 2013 (₪${inv.valuePerSqm2013}/מ״ר) — מדד יחסי; התשואה הערכה גסה בלבד.'
-              : 'ביקוש והשבחה מנתונים עדכניים. אין נתוני שווי לאזור זה.',
+              ? l10n.areaIntelScreenA1448f5a(inv.valuePerSqm2013!)
+              : l10n.areaIntelScreen9b04c59d,
           style: TextStyle(
               fontSize: 11, height: 1.35, color: AppColors.textSecondary),
         ),
@@ -599,6 +610,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   }
 
   Widget _layersCard(AreaProfile p) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
@@ -608,16 +620,16 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
       ),
       child: Column(children: [
         if (p.sesCluster > 0)
-          _clusterRow('אשכול סוציו-אקונומי (בלוק)', p.sesCluster),
-        _bar('בטיחות (ברמת העיר)', p.safety),
-        _bar('מרכזיות', p.centrality),
-        _bar('תחבורה ציבורית', p.transit),
-        _bar('מוסדות חינוך', p.schools),
-        _bar('שירותי בריאות', p.health),
-        _bar('חיי לילה ובילוי', p.nightlife),
-        _bar('קרבה לתעסוקה', p.employment),
-        _bar('פארקים וירוק', p.parkAccess),
-        _bar('פוטנציאל השבחה', p.futureValue),
+          _clusterRow(l10n.areaIntelScreen96921b94, p.sesCluster),
+        _bar(l10n.areaIntelScreen45ddda67, p.safety),
+        _bar(l10n.areaIntelScreen096a70c8, p.centrality),
+        _bar(l10n.areaIntelScreen91db7436, p.transit),
+        _bar(l10n.areaIntelScreen984afc87, p.schools),
+        _bar(l10n.areaIntelScreen9df69324, p.health),
+        _bar(l10n.areaIntelScreenFae76235, p.nightlife),
+        _bar(l10n.areaIntelScreenA70625cf, p.employment),
+        _bar(l10n.areaIntelScreenB005f878, p.parkAccess),
+        _bar(l10n.areaIntelScreen2008eaf1, p.futureValue),
         const Divider(height: 22),
         _demographics(p),
       ]),
@@ -641,7 +653,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
           decoration: BoxDecoration(
               color: color.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(999)),
-          child: Text('$cluster מתוך 10',
+          child: Text(AppLocalizations.of(context)!.areaIntelScreenE5c70865(cluster),
               style: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w900, color: color)),
         ),
@@ -687,7 +699,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
     if (!p.demographicsAvailable) {
       return Row(children: [
         Expanded(
-          child: Text('נתוני דמוגרפיה אינם זמינים לאזור זה',
+          child: Text(AppLocalizations.of(context)!.areaIntelScreen459fac16,
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 12,
@@ -696,9 +708,10 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
         ),
       ]);
     }
+    final l10n = AppLocalizations.of(context)!;
     return Row(children: [
-      _demoStat('👶 ילדים (0-19)', p.childShare),
-      _demoStat('🧑 עובדים (20-64)', p.youngShare),
+      _demoStat(l10n.areaIntelScreen4089ef4b, p.childShare),
+      _demoStat(l10n.areaIntelScreen4d2868ec, p.youngShare),
       _demoStat('🌿 65+', p.seniorShare),
     ]);
   }
@@ -732,6 +745,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
   static const int _collapsedCount = 12;
 
   Widget _nearbyCategory(_NearbyCategory c) {
+    final l10n = AppLocalizations.of(context)!;
     final expanded = _expandedCats.contains(c.key);
     final shown =
         expanded ? c.places : c.places.take(_collapsedCount).toList();
@@ -795,7 +809,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                 decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(999)),
-                child: Text('+ $hidden נוספים · הצג הכל',
+                child: Text(l10n.areaIntelScreen3fcced86(hidden),
                     style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -811,7 +825,7 @@ class _AreaIntelScreenState extends State<AreaIntelScreen> {
                 decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: AppColors.borderLight)),
-                child: Text('הצג פחות',
+                child: Text(l10n.areaIntelScreen6192614d,
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

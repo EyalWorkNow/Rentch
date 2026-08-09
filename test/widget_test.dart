@@ -6,6 +6,7 @@ import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/compare_screen.dart';
 import 'package:dating_app/presentation/screens/landlord_properties_screen.dart';
 import 'package:flutter/material.dart';
@@ -69,6 +70,9 @@ void main() {
           ChangeNotifierProvider<DatingProvider>.value(
             value: provider,
             child: MaterialApp(
+              locale: const Locale('he'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               builder: (context, child) {
                 return Directionality(
                   textDirection: TextDirection.rtl,
@@ -127,7 +131,12 @@ void main() {
       await tester.pumpWidget(
         ChangeNotifierProvider<DatingProvider>.value(
           value: provider,
-          child: const MaterialApp(home: CompareScreen()),
+          child: const MaterialApp(
+            locale: Locale('he'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: CompareScreen(),
+          ),
         ),
       );
       await _pumpFrames(tester);

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -64,11 +65,16 @@ class _Row {
 }
 
 // 42 frames over 3 horizontal rows. stepDeg per row = 360 / frames.
-const _rows = <_Row>[
-  _Row('שורה אמצעית', 'החזק את הטלפון ישר (אנכית) וסובב סיבוב מלא במקום', 18),
-  _Row('שורה עליונה', 'הטה מעט כלפי מעלה (~30°) וסובב שוב סיבוב מלא', 12),
-  _Row('שורה תחתונה', 'הטה מעט כלפי מטה (~30°) וסובב שוב סיבוב מלא', 12),
-];
+// Built from BuildContext (localized titles/hints) rather than a top-level
+// const — see _rows(context) on the State below.
+List<_Row> _buildRows(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return <_Row>[
+    _Row(l10n.panoramaSweepCaptureE7f7e04b, l10n.panoramaSweepCapture5c22dd54, 18),
+    _Row(l10n.panoramaSweepCapture00ce3275, l10n.panoramaSweepCapture29b0747d, 12),
+    _Row(l10n.panoramaSweepCapture8dec33ce, l10n.panoramaSweepCapture69ed4717, 12),
+  ];
+}
 
 const _total = 42; // sum of _rows[].frames — keep in sync
 const _sampleEveryMs = 700; // timer fallback only (no gyro)
@@ -121,6 +127,8 @@ class _PanoramaSweepCaptureScreenState
   bool _gotGyro = false; // any gyro event ever seen
   final _yawNotifier = ValueNotifier<double>(0); // drives the live ring/hint
   final _lastFrameNotifier = ValueNotifier<String?>(null); // last captured frame path
+
+  List<_Row> get _rows => _buildRows(context);
 
   double get _stepDeg => 360 / _rows[_rowIndex].frames;
 
@@ -186,7 +194,8 @@ class _PanoramaSweepCaptureScreenState
         debugPrint('panorama controller dispose after init-fail: $e2');
       }
       if (mounted) {
-        setState(() => _error = 'לא ניתן לפתוח את המצלמה. בדוק הרשאות מצלמה.');
+        setState(() => _error =
+            AppLocalizations.of(context)!.panoramaSweepCapture62aa1e63);
       }
     }
   }
@@ -331,7 +340,7 @@ class _PanoramaSweepCaptureScreenState
       // coach them to keep turning instead of shipping a broken stitch.
       setState(() {
         _stitchError =
-            'צריך עוד תמונות כדי לבנות סיבוב שלם. סובב עוד קצת ונסה שוב.';
+            AppLocalizations.of(context)!.panoramaSweepCapture6b180872;
         _stitching = true;
       });
       return;
@@ -343,12 +352,13 @@ class _PanoramaSweepCaptureScreenState
   // the OpenCV stitch → poll until ready. Any failure surfaces a clear Hebrew
   // message + "נסה שוב"; it NEVER drops the user into the gallery or crashes.
   Future<void> _stitchAndReturn() async {
+    final l10n = AppLocalizations.of(context)!;
     // Stop the live camera work so encoding doesn't fight the uploads.
     setState(() {
       _running = false;
       _stitching = true;
       _stitchError = null;
-      _stitchMsg = 'מתחילים לבנות את הסיור...';
+      _stitchMsg = l10n.panoramaSweepCapture97f6b247;
     });
     final frames = List<String>.from(_frames);
     // Snapshot poses parallel to the frame snapshot so f{i} ↔ poses[i] survives
@@ -367,13 +377,14 @@ class _PanoramaSweepCaptureScreenState
         poses: poses,
       );
       if (job == null || job.uploadUrls.length < frames.length) {
-        _failStitch('לא הצלחנו להתחיל את העיבוד. בדוק את החיבור לאינטרנט.');
+        _failStitch(l10n.panoramaSweepCapture51e3560a);
         return;
       }
 
       for (var i = 0; i < frames.length; i++) {
         if (!mounted) return;
-        setState(() => _stitchMsg = 'מעלים תמונות... ${i + 1}/${frames.length}');
+        setState(() => _stitchMsg =
+            l10n.panoramaSweepCaptureE691fca8(i + 1, frames.length));
         // Retry a transient blip so one flaky frame doesn't discard the whole
         // capture (the loop is sequential — a single false previously aborted).
         var ok = false;
@@ -385,13 +396,13 @@ class _PanoramaSweepCaptureScreenState
               .uploadToPresignedUrl(job.uploadUrls[i], frames[i]);
         }
         if (!ok) {
-          _failStitch('ההעלאה נכשלה באמצע. בדוק את החיבור ונסה שוב.');
+          _failStitch(l10n.panoramaSweepCapture7c0fe1ba);
           return;
         }
       }
 
       if (!mounted) return;
-      setState(() => _stitchMsg = 'מחברים את התמונות לסיבוב מלא...');
+      setState(() => _stitchMsg = l10n.panoramaSweepCapture48d71813);
       await AwsApiClient.instance.startPanoramaStitch(job.jobId);
 
       // Poll until ready (or failed). OpenCV stitching of ~40 frames takes a
@@ -414,16 +425,16 @@ class _PanoramaSweepCaptureScreenState
         }
         if (status.status == 'failed') {
           _failStitch(status.error.isNotEmpty
-              ? 'העיבוד נכשל. נסה לצלם שוב, לאט ובאור טוב.'
-              : 'העיבוד נכשל. נסה לצלם שוב.');
+              ? l10n.panoramaSweepCaptureEc71e067
+              : l10n.panoramaSweepCapture99b858ac);
           return;
         }
-        setState(() => _stitchMsg = 'מחברים את התמונות לסיבוב מלא...');
+        setState(() => _stitchMsg = l10n.panoramaSweepCapture48d71813);
       }
-      _failStitch('העיבוד לוקח יותר מדי זמן. נסה שוב מאוחר יותר.');
+      _failStitch(l10n.panoramaSweepCaptureFd1988b1);
     } catch (e) {
       debugPrint('panorama stitch failed: $e');
-      _failStitch('משהו השתבש. בדוק את החיבור ונסה שוב.');
+      _failStitch(l10n.panoramaSweepCaptureF55e6e9c);
     }
   }
 
@@ -520,8 +531,8 @@ class _PanoramaSweepCaptureScreenState
                                   fontWeight: FontWeight.w900,
                                   height: 1.0)),
                           const SizedBox(height: 2),
-                          const Text('סגרת · מתוך 360°',
-                              style: TextStyle(
+                          Text(AppLocalizations.of(context)!.panoramaSweepCapture28a43c6d,
+                              style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700)),
@@ -632,7 +643,10 @@ class _PanoramaSweepCaptureScreenState
                       else
                         _hint(row.hint),
                       const SizedBox(height: 12),
-                      Text('${_frames.length}/$_total פריימים',
+                      Text(
+                          AppLocalizations.of(context)!
+                              .panoramaSweepCapture1b253920(
+                                  _frames.length, _total),
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -656,6 +670,7 @@ class _PanoramaSweepCaptureScreenState
   // and the clear retry screen if anything fails.
   Widget _stitchOverlay() {
     final hasError = _stitchError != null;
+    final l10n = AppLocalizations.of(context)!;
     return Positioned.fill(
       child: Container(
         color: Colors.black.withValues(alpha: 0.92),
@@ -674,7 +689,9 @@ class _PanoramaSweepCaptureScreenState
                 ),
                 const SizedBox(height: 22),
                 Text(
-                  hasError ? 'לא הצלחנו לבנות את הסיור' : 'בונים את הסיור שלך',
+                  hasError
+                      ? l10n.panoramaSweepCapture1dc38c15
+                      : l10n.panoramaSweepCaptureAa69b001,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white,
@@ -685,7 +702,7 @@ class _PanoramaSweepCaptureScreenState
                 Text(
                   hasError
                       ? _stitchError!
-                      : '$_stitchMsg\n\nאפשר להמתין כמה רגעים — אל תסגרו את המסך.',
+                      : l10n.panoramaSweepCapture28da4336(_stitchMsg),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white70, fontSize: 17, height: 1.5),
@@ -701,16 +718,16 @@ class _PanoramaSweepCaptureScreenState
                       ),
                       onPressed: _retryFromError,
                       icon: const Icon(IconsaxPlusBold.refresh),
-                      label: const Text('נסה שוב',
-                          style: TextStyle(
+                      label: Text(l10n.panoramaSweepCaptureC5ffac09,
+                          style: const TextStyle(
                               fontWeight: FontWeight.w800, fontSize: 18)),
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('סגור',
-                        style: TextStyle(color: Colors.white70, fontSize: 16)),
+                    child: Text(l10n.panoramaSweepCapture55247199,
+                        style: const TextStyle(color: Colors.white70, fontSize: 16)),
                   ),
                 ] else
                   const CircularProgressIndicator(color: Colors.white),
@@ -723,20 +740,22 @@ class _PanoramaSweepCaptureScreenState
   }
 
   String _coachText() {
+    final l10n = AppLocalizations.of(context)!;
     // Frames are grabbed when the phone is near-STILL, so coach stop-and-go:
     // turn a step, pause for the snap, repeat.
-    if (!_gotGyro) return 'סובב צעד · עצור · חזור על כך סביב';
-    if (_spinRate > _maxSpinDegPerSec) return 'עצור רגע כדי לצלם 🐢';
-    if (_yawDeg - _lastCaptureYaw >= _stepDeg) return 'יופי — עצור רגע';
-    return 'סובב צעד קטן והמשך';
+    if (!_gotGyro) return l10n.panoramaSweepCapture7512612e;
+    if (_spinRate > _maxSpinDegPerSec) return l10n.panoramaSweepCapture5b98f935;
+    if (_yawDeg - _lastCaptureYaw >= _stepDeg) return l10n.panoramaSweepCapture2086feda;
+    return l10n.panoramaSweepCaptureC73a59b7;
   }
 
   Widget _actionButton() {
+    final l10n = AppLocalizations.of(context)!;
     if (_running) {
       return _wideButton(
         filled: false,
         icon: IconsaxPlusLinear.pause,
-        text: 'עצור',
+        text: l10n.panoramaSweepCapture6a487da4,
         onTap: () => setState(() => _running = false),
       );
     }
@@ -744,7 +763,9 @@ class _PanoramaSweepCaptureScreenState
       return _wideButton(
         filled: true,
         icon: IconsaxPlusBold.camera,
-        text: _rowDone > 0 ? 'המשך שורה' : 'התחל ${_rows[_rowIndex].title}',
+        text: _rowDone > 0
+            ? l10n.panoramaSweepCaptureEdd587e1
+            : l10n.panoramaSweepCapture41e2bc7e(_rows[_rowIndex].title),
         onTap: _runRow,
       );
     }
@@ -753,14 +774,14 @@ class _PanoramaSweepCaptureScreenState
       return _wideButton(
         filled: true,
         icon: IconsaxPlusLinear.arrow_left_2,
-        text: 'המשך ל${_rows[_rowIndex + 1].title}',
+        text: l10n.panoramaSweepCapture3ccd2a1c(_rows[_rowIndex + 1].title),
         onTap: _nextRow,
       );
     }
     return _wideButton(
       filled: true,
       icon: IconsaxPlusLinear.tick_circle,
-      text: 'סיום',
+      text: l10n.panoramaSweepCaptureF600808f,
       onTap: _finish,
     );
   }
@@ -803,8 +824,8 @@ class _PanoramaSweepCaptureScreenState
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           ),
           onPressed: _finish,
-          child:
-              const Text('סיים', style: TextStyle(fontWeight: FontWeight.w700)),
+          child: Text(AppLocalizations.of(context)!.panoramaSweepCaptureC9e2125f,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       ],
     ]);
@@ -857,13 +878,13 @@ class _PanoramaSweepCaptureScreenState
             const Icon(IconsaxPlusLinear.camera_slash,
                 color: Colors.white54, size: 48),
             const SizedBox(height: 12),
-            Text(_error ?? 'שגיאת מצלמה',
+            Text(_error ?? AppLocalizations.of(context)!.panoramaSweepCapture4c53a96e,
                 style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('סגור'),
+              child: Text(AppLocalizations.of(context)!.panoramaSweepCapture55247199),
             ),
           ],
         ),

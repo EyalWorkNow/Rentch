@@ -17,6 +17,7 @@ import 'package:dating_app/core/search/engine/feature_engineering.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:provider/provider.dart';
@@ -66,13 +67,16 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
   String _lastQuestion = '';
   bool _messaged = false; // guard: send the landlord request once
 
-  static const _suggestions = <String>[
-    'מותר להחזיק חיות מחמד?',
-    'באיזו קומה הדירה?',
-    'יש תחבורה ציבורית קרובה?',
-    'יש חניה?',
-    'מתי אפשר להיכנס?',
-  ];
+  List<String> get _suggestions {
+    final l10n = AppLocalizations.of(context)!;
+    return <String>[
+      l10n.askRentlySheet68d09f0e,
+      l10n.askRentlySheet8147268b,
+      l10n.askRentlySheetE8be946e,
+      l10n.askRentlySheet6449ebed,
+      l10n.askRentlySheetBd196ab4,
+    ];
+  }
 
   @override
   void dispose() {
@@ -123,6 +127,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
     }
 
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _sending = false;
       if (answer != null && answer.trim().isNotEmpty) {
@@ -130,8 +135,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
       } else {
         // 3) Couldn't answer → offer the single CTA to ask the landlord.
         _messages.add(_AskMessage(
-          text: 'אין לי את המידע הזה על הדירה. אפשר לשלוח את השאלה '
-              'ישירות לבעל הנכס:',
+          text: l10n.askRentlySheet47f7f61f,
           fromUser: false,
           failed: true,
         ));
@@ -145,14 +149,14 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
     if (_messaged) return;
     _messaged = true;
     final provider = context.read<DatingProvider>();
-    final note = _lastQuestion.isNotEmpty ? _lastQuestion : 'שאלה על הדירה';
+    final l10n = AppLocalizations.of(context)!;
+    final note = _lastQuestion.isNotEmpty ? _lastQuestion : l10n.askRentlySheetD8ba43e9;
     await provider.requestToMessage(widget.property, note: note);
     if (!mounted) return;
     Navigator.of(context).maybePop();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      duration: Duration(milliseconds: 2800),
-      content: Text('השאלה נשלחה לבעל הנכס — תופיע אצלו תחת '
-          '"מבקשים לשלוח הודעה"'),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(milliseconds: 2800),
+      content: Text(l10n.askRentlySheet700de026),
     ));
   }
 
@@ -207,6 +211,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
 
   // Single CTA — appears only when a question couldn't be answered from the data.
   Widget _landlordCta() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: SizedBox(
@@ -219,8 +224,8 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
           ),
           onPressed: _sendToLandlord,
           icon: const Icon(Icons.send_rounded, size: 20),
-          label: const Text('שלח את השאלה לבעל הדירה',
-              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
+          label: Text(l10n.askRentlySheetD92c26c4,
+              style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
         ),
       ),
     );
@@ -237,6 +242,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
       );
 
   Widget _header(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 12, 14),
       child: Row(
@@ -256,9 +262,9 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'שאל את Rently',
-                  style: TextStyle(
+                Text(
+                  l10n.askRentlySheet18b1f617,
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: AppColors.ink,
@@ -266,8 +272,8 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
                 ),
                 Text(
                   widget.listingTitle.isNotEmpty
-                      ? 'שאלות על ${widget.listingTitle}'
-                      : 'שאלות על הנכס הזה',
+                      ? l10n.askRentlySheet6864774c(widget.listingTitle)
+                      : l10n.askRentlySheet3ad32172,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -283,7 +289,7 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
             onPressed: () => Navigator.of(context).maybePop(),
             icon: const Icon(IconsaxPlusLinear.close_circle,
                 color: AppColors.slate400),
-            tooltip: 'סגירה',
+            tooltip: l10n.askRentlySheetB728721f,
           ),
         ],
       ),
@@ -291,14 +297,15 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
   }
 
   Widget _emptyState() {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'אפשר לשאול אותי כל דבר על הדירה הזו — בעברית פשוטה. הנה כמה דוגמאות:',
-            style: TextStyle(
+          Text(
+            l10n.askRentlySheet108a7146,
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: AppColors.slate600,
@@ -343,9 +350,9 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
             ),
           ),
           const SizedBox(width: 10),
-          const Text(
-            'Rently חושב…',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context)!.askRentlySheet804a20ac,
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppColors.slate500,
@@ -381,15 +388,15 @@ class _AskRentlyBodyState extends State<_AskRentlyBody> {
                     fontWeight: FontWeight.w600,
                     color: AppColors.ink,
                   ),
-                  decoration: const InputDecoration(
-                    hintText: 'כתבו שאלה על הדירה…',
-                    hintStyle: TextStyle(
+                  decoration: InputDecoration(
+                    hintText: AppLocalizations.of(context)!.askRentlySheet3181ba76,
+                    hintStyle: const TextStyle(
                       color: AppColors.slate400,
                       fontWeight: FontWeight.w500,
                     ),
                     border: InputBorder.none,
                     contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                   ),
                 ),
               ),

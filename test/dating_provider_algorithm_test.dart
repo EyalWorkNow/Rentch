@@ -722,6 +722,7 @@ void main() {
       ChangeNotifierProvider<DatingProvider>.value(
         value: provider,
         child: const MaterialApp(
+          locale: Locale('he'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: ErikChatScreen(),

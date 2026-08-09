@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/widgets/signature_pad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,9 +34,10 @@ class ContractSignFlowScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('חתימה על החוזה')),
+      appBar: AppBar(title: Text(l10n.contractSignFlowScreenTitle)),
       body: Consumer<DatingProvider>(
         builder: (context, provider, _) {
           final contract = _find(provider);
@@ -59,17 +61,17 @@ class ContractSignFlowScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     _TermsCard(contract: contract),
                     const SizedBox(height: 14),
-                    const _SectionLabel('הצדדים והחתימות'),
+                    _SectionLabel(l10n.contractSignFlowScreenPartiesSection),
                     const SizedBox(height: 8),
                     _PartyRow(
-                      label: 'בעל הדירה',
+                      label: l10n.contractSignFlowScreenLandlord,
                       name: contract.landlordName,
                       signature: contract.landlordSignature,
                       isYou: isLandlord,
                     ),
                     const SizedBox(height: 8),
                     _PartyRow(
-                      label: 'השוכר/ת',
+                      label: l10n.contractSignFlowScreenTenantWithThe,
                       name: contract.tenantName,
                       signature: contract.tenantSignature,
                       isYou: !isLandlord,
@@ -102,11 +104,12 @@ class _ProgressStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final done = contract.isFullySigned;
     final terminal = contract.status == ContractStatus.cancelled ||
         contract.status == ContractStatus.declined;
 
-    final (label, sub, color, icon) = _state();
+    final (label, sub, color, icon) = _state(l10n);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -155,43 +158,45 @@ class _ProgressStrip extends StatelessWidget {
     );
   }
 
-  (String, String, Color, IconData) _state() {
+  (String, String, Color, IconData) _state(AppLocalizations l10n) {
     const green = AppColors.green;
     if (contract.status == ContractStatus.cancelled) {
-      return ('החוזה בוטל', '', AppColors.coral, Icons.cancel_outlined);
+      return (l10n.contractSignFlowScreenCancelled, '', AppColors.coral, Icons.cancel_outlined);
     }
     if (contract.status == ContractStatus.declined) {
-      return ('החוזה נדחה', '', AppColors.coral, Icons.cancel_outlined);
+      return (l10n.contractSignFlowScreenDeclined, '', AppColors.coral, Icons.cancel_outlined);
     }
     if (contract.isFullySigned) {
       return (
-        'הושלם — נחתם ע״י שני הצדדים',
-        'החוזה תקף וחתום דיגיטלית. ניתן לצפות בו בכל עת.',
+        l10n.contractSignFlowScreenCompletedTitle,
+        l10n.contractSignFlowScreenCompletedBody,
         green,
         Icons.verified_rounded,
       );
     }
     final mySigned = contract.signatureForRole(myRole) != null;
     if (mySigned) {
-      final other = myRole == 'landlord' ? 'השוכר/ת' : 'בעל הדירה';
+      final other = myRole == 'landlord'
+          ? l10n.contractSignFlowScreenTenantWithThe
+          : l10n.contractSignFlowScreenLandlord;
       return (
-        'חתמת — ממתין לחתימת $other',
-        'נשלחה התראה לצד השני. ברגע שיחתום/תחתום, החוזה יושלם.',
+        l10n.contractSignFlowScreenWaitingForOther(other),
+        l10n.contractSignFlowScreenWaitingForOtherBody,
         AppColors.primary,
         Icons.hourglass_bottom_rounded,
       );
     }
     if (contract.isLandlordSigned) {
       return (
-        'בעל הדירה חתם · ממתין לחתימתך',
-        'עברו על התנאים ולחצו "חתום" כדי להשלים את החוזה.',
+        l10n.contractSignFlowScreenLandlordSignedWaitingYou,
+        l10n.contractSignFlowScreenReviewToComplete,
         AppColors.primary,
         Icons.edit_document,
       );
     }
     return (
-      'ממתין לחתימה',
-      'עברו על התנאים ולחצו "חתום" כדי להתחיל.',
+      l10n.contractSignFlowScreenWaitingSignature,
+      l10n.contractSignFlowScreenReviewToStart,
       AppColors.primary,
       Icons.edit_document,
     );
@@ -210,13 +215,14 @@ class _Steps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
-        _dot(landlordSigned, 'בעל הדירה'),
+        _dot(landlordSigned, l10n.contractSignFlowScreenLandlord),
         _line(landlordSigned && tenantSigned),
-        _dot(tenantSigned, 'שוכר/ת'),
+        _dot(tenantSigned, l10n.contractSignFlowScreenTenant),
         _line(done),
-        _dot(done, 'הושלם'),
+        _dot(done, l10n.contractSignFlowScreenCompletedShort),
       ],
     );
   }
@@ -267,6 +273,7 @@ class _TermsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final c = contract;
     return Container(
       padding: const EdgeInsets.all(18),
@@ -278,21 +285,26 @@ class _TermsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(c.propertyTitle.isNotEmpty ? c.propertyTitle : 'נכס להשכרה',
+          Text(
+              c.propertyTitle.isNotEmpty
+                  ? c.propertyTitle
+                  : l10n.contractSignFlowScreenPropertyFallback,
               style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                   color: AppColors.navy)),
           const SizedBox(height: 14),
-          _row('שכר דירה חודשי', '₪${c.monthlyRent}'),
-          _row('פיקדון', c.deposit > 0 ? '₪${c.deposit}' : '—'),
-          _row('תקופה', '${c.durationMonths} חודשים'),
-          _row('כניסה', _d(c.startDate)),
-          _row('סיום', _d(c.endDate)),
+          _row(l10n.contractSignFlowScreenMonthlyRent, '₪${c.monthlyRent}'),
+          _row(l10n.contractSignFlowScreenDeposit,
+              c.deposit > 0 ? '₪${c.deposit}' : '—'),
+          _row(l10n.contractSignFlowScreenDuration,
+              l10n.contractSignFlowScreenDurationMonths(c.durationMonths)),
+          _row(l10n.contractSignFlowScreenMoveIn, _d(c.startDate)),
+          _row(l10n.contractSignFlowScreenEndDate, _d(c.endDate)),
           if (c.additionalTerms.trim().isNotEmpty) ...[
             const Divider(height: 24, color: AppColors.borderLight),
-            const Text('נוסח החוזה',
-                style: TextStyle(
+            Text(l10n.contractSignFlowScreenTermsText,
+                style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textSecondary)),
@@ -343,6 +355,7 @@ class _PartyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final sig = signature;
     final signed = sig != null;
     const green = AppColors.green;
@@ -388,7 +401,7 @@ class _PartyRow extends StatelessWidget {
                           color: AppColors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: Text('זה אתה',
+                        child: Text(l10n.contractSignFlowScreenThatsYou,
                             style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
@@ -405,8 +418,8 @@ class _PartyRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   signed
-                      ? _signedLine(sig)
-                      : 'ממתין לחתימה',
+                      ? _signedLine(l10n, sig)
+                      : l10n.contractSignFlowScreenWaitingSignature,
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -431,10 +444,11 @@ class _PartyRow extends StatelessWidget {
     );
   }
 
-  String _signedLine(ContractSignature sig) {
+  String _signedLine(AppLocalizations l10n, ContractSignature sig) {
     final when = sig.signedAt;
-    if (when == null) return 'נחתם';
-    return 'נחתם · ${when.day}/${when.month}/${when.year}';
+    if (when == null) return l10n.contractSignFlowScreenSigned;
+    return l10n.contractSignFlowScreenSignedOn(
+        '${when.day}/${when.month}/${when.year}');
   }
 }
 
@@ -455,6 +469,7 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(16, 6, 16, 12),
       child: SizedBox(
@@ -464,7 +479,9 @@ class _BottomBar extends StatelessWidget {
             ? FilledButton.icon(
                 onPressed: () => _openSignSheet(context),
                 icon: const Icon(IconsaxPlusLinear.edit, size: 18),
-                label: Text('חתום כ${isLandlord ? 'בעל הדירה' : 'שוכר/ת'}'),
+                label: Text(l10n.contractSignFlowScreenSignAsLabel(isLandlord
+                    ? l10n.contractSignFlowScreenLandlord
+                    : l10n.contractSignFlowScreenTenant)),
               )
             : OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).maybePop(),
@@ -477,9 +494,9 @@ class _BottomBar extends StatelessWidget {
                 label: Text(
                   alreadySignedByMe
                       ? (contract.isFullySigned
-                          ? 'החוזה הושלם'
-                          : 'חתמת · ממתין לצד השני')
-                      : 'חזרה',
+                          ? l10n.contractSignFlowScreenContractCompleted
+                          : l10n.contractSignFlowScreenSignedWaitingOther)
+                      : l10n.contractSignFlowScreenBack,
                 ),
               ),
       ),
@@ -507,7 +524,9 @@ class _BottomBar extends StatelessWidget {
     if (signed == true && context.mounted) {
       HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('החתימה נשמרה בהצלחה ✍️')),
+        SnackBar(
+            content: Text(
+                AppLocalizations.of(context)!.contractSignFlowScreenSignatureSaved)),
       );
     }
   }
@@ -538,7 +557,9 @@ class _SignSheetState extends State<_SignSheet> {
   Future<void> _confirm() async {
     if (widget.controller.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('יש לחתום במסגרת לפני האישור')),
+        SnackBar(
+            content: Text(AppLocalizations.of(context)!
+                .contractSignFlowScreenSignBeforeConfirm)),
       );
       return;
     }
@@ -555,6 +576,7 @@ class _SignSheetState extends State<_SignSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
@@ -574,17 +596,17 @@ class _SignSheetState extends State<_SignSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('חתימה דיגיטלית',
+              Text(l10n.contractSignFlowScreenDigitalSignature,
                   textAlign: TextAlign.right,
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
                       color: AppColors.navy)),
               const SizedBox(height: 4),
-              const Text('חתמו עם האצבע במסגרת למטה',
+              Text(l10n.contractSignFlowScreenSignWithFinger,
                   textAlign: TextAlign.right,
-                  style:
-                      TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 14),
               SignaturePad(controller: widget.controller),
               const SizedBox(height: 10),
@@ -593,7 +615,7 @@ class _SignSheetState extends State<_SignSheet> {
                   TextButton.icon(
                     onPressed: widget.controller.clear,
                     icon: const Icon(IconsaxPlusLinear.refresh, size: 16),
-                    label: const Text('נקה'),
+                    label: Text(l10n.contractSignFlowScreenClear),
                   ),
                   const Spacer(),
                 ],
@@ -610,7 +632,9 @@ class _SignSheetState extends State<_SignSheet> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white))
                       : const Icon(IconsaxPlusLinear.tick_circle, size: 18),
-                  label: Text(_busy ? 'חותם…' : 'אשר חתימה'),
+                  label: Text(_busy
+                      ? l10n.contractSignFlowScreenSigning
+                      : l10n.contractSignFlowScreenConfirmSignature),
                 ),
               ),
             ],
@@ -640,27 +664,31 @@ class _SectionLabel extends StatelessWidget {
 class _SecurityNote extends StatelessWidget {
   _SecurityNote();
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Icon(IconsaxPlusLinear.shield_tick,
-              size: 16, color: AppColors.primary),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'חתימה דיגיטלית מאובטחת (Ed25519). המפתח הפרטי נשמר במכשירך בלבד; '
-              'כל שינוי בתנאים מבטל חתימות שכבר נחתמו.',
-              style: TextStyle(
-                  fontSize: 11.5, height: 1.5, color: AppColors.textSecondary),
-            ),
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        Icon(IconsaxPlusLinear.shield_tick,
+            size: 16, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '${l10n.contractSignFlowScreenSecurityNotePart1}'
+            '${l10n.contractSignFlowScreenSecurityNotePart2}',
+            style: const TextStyle(
+                fontSize: 11.5, height: 1.5, color: AppColors.textSecondary),
           ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
   _EmptyState();
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -670,16 +698,16 @@ class _EmptyState extends StatelessWidget {
             Icon(IconsaxPlusLinear.document,
                 size: 48, color: AppColors.textDisabled),
             const SizedBox(height: 14),
-            const Text('החוזה לא נמצא',
-                style: TextStyle(
+            Text(l10n.contractSignFlowScreenNotFoundTitle,
+                style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                     color: AppColors.navy)),
             const SizedBox(height: 6),
-            const Text(
-              'נסו לרענן את הצ׳אט. אם בעל הדירה עדיין לא שלח חוזה — הוא יופיע כאן ברגע שיישלח.',
+            Text(
+              l10n.contractSignFlowScreenNotFoundBody,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 13, height: 1.5, color: AppColors.textSecondary),
             ),
           ],

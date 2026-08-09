@@ -3,6 +3,7 @@ import 'package:dating_app/core/ui/platform_fx.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/data/models/rental_contract.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -188,9 +189,9 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
     }
     if (matches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-              'חוזה נפתח מול שוכר שכבר נוצר אתו התאמה. קבלו תחילה התאמה לנכס.'),
+              AppLocalizations.of(context)!.landlordPropertiesScreenContractNeedsMatch),
         ),
       );
       return;
@@ -216,10 +217,11 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
     required List<RentalMatch> matches,
   }) async {
     if (existing != null) {
+      final l10n = AppLocalizations.of(context)!;
       final ok = await SwipeToConfirmSheet.show(
         context,
-        title: 'לשלוח חוזה?',
-        message: 'האם אתה בטוח שאתה רוצה לשלוח חוזה?',
+        title: l10n.landlordPropertiesScreenSendContractTitle,
+        message: l10n.landlordPropertiesScreenSendContractMessage,
       );
       if (!ok || !context.mounted) return;
       _openContract(context, existing: existing, matches: matches);
@@ -243,6 +245,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
   /// use Rently's standard template. Returns `true` for "ours", `false` for
   /// "own", or `null` if dismissed.
   Future<bool?> _askContractSource(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -256,10 +259,10 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'איך תרצה ליצור את החוזה?',
+              Text(
+                l10n.landlordPropertiesScreenContractSourceTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
@@ -268,16 +271,16 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
               const SizedBox(height: 18),
               _ContractSourceButton(
                 icon: IconsaxPlusLinear.shield_tick,
-                title: 'להשתמש בחוזה שלנו',
-                subtitle: 'חוזה סטנדרטי מטעם עורכי הדין של Rently',
+                title: l10n.landlordPropertiesScreenUseOurContract,
+                subtitle: l10n.landlordPropertiesScreenOurContractSubtitle,
                 filled: true,
                 onTap: () => Navigator.of(ctx).pop(true),
               ),
               const SizedBox(height: 12),
               _ContractSourceButton(
                 icon: IconsaxPlusLinear.edit_2,
-                title: 'ליצור חוזה משלך',
-                subtitle: 'מלא את התנאים בעצמך',
+                title: l10n.landlordPropertiesScreenCreateOwnContract,
+                subtitle: l10n.landlordPropertiesScreenOwnContractSubtitle,
                 filled: false,
                 onTap: () => Navigator.of(ctx).pop(false),
               ),
@@ -290,6 +293,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
 
   void _showSortSheet() {
     final hasActiveFilterOrSort = _activeFilter != 'all' || _sortBy != 'recent';
+    final l10n = AppLocalizations.of(context)!;
 
     showModalBottomSheet<void>(
       context: context,
@@ -299,20 +303,20 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
       ),
       builder: (ctx) {
         final sortOptions = [
-          ('recent', 'ברירת מחדל'),
-          ('price_asc', 'לפי מחיר עולה'),
-          ('price_desc', 'לפי מחיר יורד'),
-          ('rooms', 'לפי חדרים'),
+          ('recent', l10n.landlordPropertiesScreenSortDefault),
+          ('price_asc', l10n.landlordPropertiesScreenSortPriceAsc),
+          ('price_desc', l10n.landlordPropertiesScreenSortPriceDesc),
+          ('rooms', l10n.landlordPropertiesScreenSortRooms),
         ];
 
         final filterOptions = [
-          ('all', 'הכל'),
-          ('high_priority', 'עדיפות שיווקית (עד 6K)'),
-          ('luxury', 'נכסי יוקרה (10K+)'),
-          ('immediate', 'כניסה מיידית'),
-          ('large', 'דירות גדולות (4+ חדרים)'),
-          ('agency', 'בלעדיות (סוכנות)'),
-          ('private', 'פרטי (ללא תיווך)'),
+          ('all', l10n.landlordPropertiesScreenFilterAll),
+          ('high_priority', l10n.landlordPropertiesScreenFilterHighPriority),
+          ('luxury', l10n.landlordPropertiesScreenFilterLuxury),
+          ('immediate', l10n.landlordPropertiesScreenFilterImmediate),
+          ('large', l10n.landlordPropertiesScreenFilterLarge),
+          ('agency', l10n.landlordPropertiesScreenFilterAgency),
+          ('private', l10n.landlordPropertiesScreenFilterPrivate),
         ];
 
         return SafeArea(
@@ -324,10 +328,10 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'סינון ומיון נכסים',
-                        style: TextStyle(
+                        l10n.landlordPropertiesScreenFilterSortTitle,
+                        style: const TextStyle(
                           color: AppColors.navy,
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
@@ -340,14 +344,14 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                           Navigator.of(ctx).pop();
                           _resetSheetControls();
                         },
-                        child: const Text('איפוס'),
+                        child: Text(l10n.landlordPropertiesScreenReset),
                       ),
                   ],
                 ),
                 const SizedBox(height: 18),
-                const Text(
-                  'סינון לפי תגיות',
-                  style: TextStyle(
+                Text(
+                  l10n.landlordPropertiesScreenFilterByTags,
+                  style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -393,9 +397,9 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                   }).toList(),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'מיון לפי',
-                  style: TextStyle(
+                Text(
+                  l10n.landlordPropertiesScreenSortByLabel,
+                  style: const TextStyle(
                     color: AppColors.navy,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -448,6 +452,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         final allProperties = provider.myProperties;
         final filtered = _applyFiltersAndSort(allProperties);
         final isFiltered = _query.isNotEmpty || _activeFilter != 'all';
@@ -509,9 +514,9 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                     ),
                     if (_fabExpanded) ...[
                       const SizedBox(width: 4),
-                      const Text(
-                        'הוספה',
-                        style: TextStyle(
+                      Text(
+                        l10n.landlordPropertiesScreenAddLabel,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
@@ -577,7 +582,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                                           fontWeight: FontWeight.w700,
                                         ),
                                         decoration: InputDecoration(
-                                          hintText: 'חיפוש לפי כתובת, עיר...',
+                                          hintText: l10n.landlordPropertiesScreenSearchHint,
                                           hintStyle: TextStyle(
                                             fontSize: 14,
                                             color: AppColors.textSecondary
@@ -655,43 +660,43 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                           child: Row(
                             children: [
                               _FilterPill(
-                                label: 'הכל',
+                                label: l10n.landlordPropertiesScreenFilterAll,
                                 isSelected: _activeFilter == 'all',
                                 onTap: () => _setActiveFilter('all'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
-                                label: 'כניסה מיידית',
+                                label: l10n.landlordPropertiesScreenFilterImmediate,
                                 isSelected: _activeFilter == 'immediate',
                                 onTap: () => _setActiveFilter('immediate'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
-                                label: 'דירות גדולות',
+                                label: l10n.landlordPropertiesScreenPillLarge,
                                 isSelected: _activeFilter == 'large',
                                 onTap: () => _setActiveFilter('large'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
-                                label: 'פרטי',
+                                label: l10n.landlordPropertiesScreenPillPrivate,
                                 isSelected: _activeFilter == 'private',
                                 onTap: () => _setActiveFilter('private'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
-                                label: 'בלעדיות',
+                                label: l10n.landlordPropertiesScreenPillAgency,
                                 isSelected: _activeFilter == 'agency',
                                 onTap: () => _setActiveFilter('agency'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
-                                label: 'יוקרה',
+                                label: l10n.landlordPropertiesScreenPillLuxury,
                                 isSelected: _activeFilter == 'luxury',
                                 onTap: () => _setActiveFilter('luxury'),
                               ),
                               const SizedBox(width: 8),
                               _FilterPill(
-                                label: 'עד 6K',
+                                label: l10n.landlordPropertiesScreenPillHighPriority,
                                 isSelected: _activeFilter == 'high_priority',
                                 onTap: () => _setActiveFilter('high_priority'),
                               ),
@@ -707,7 +712,8 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
                           child: Align(
                             alignment: AlignmentDirectional.centerStart,
                             child: Text(
-                              '${filtered.length} מתוך ${allProperties.length} נכסים',
+                              l10n.landlordPropertiesScreenResultsCount(
+                                  filtered.length, allProperties.length),
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 12.5,
@@ -819,15 +825,16 @@ class _PropertyManageCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onContract;
 
-  /// Short Hebrew label for the property's contract state, or null if none.
-  String? get _contractStatusLabel {
+  /// Short label for the property's contract state, or null if none.
+  String? _contractStatusLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     switch (contractStatus) {
       case ContractStatus.draft:
-        return 'טיוטה';
+        return l10n.landlordPropertiesScreenContractDraft;
       case ContractStatus.sent:
-        return 'נשלח';
+        return l10n.landlordPropertiesScreenContractSent;
       case ContractStatus.signed:
-        return 'חתום ✓';
+        return l10n.landlordPropertiesScreenContractSigned;
       case ContractStatus.declined:
       case ContractStatus.cancelled:
       case null:
@@ -837,6 +844,8 @@ class _PropertyManageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final contractStatusLabel = _contractStatusLabel(context);
     final boostFrame = property.isUltraBoosted
         ? AppColors.amber
         : (property.isBoosted ? AppColors.primary : null);
@@ -909,27 +918,30 @@ class _PropertyManageCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 6),
                                 ] else if (property.isBoosted) ...[
-                                  const _GlassTag(
+                                  _GlassTag(
                                     icon: Icons.bolt_rounded,
-                                    label: 'מקודם',
+                                    label: l10n.landlordPropertiesScreenBoostedTag,
                                     accent: true,
                                   ),
                                   const SizedBox(width: 6),
                                 ],
                                 _GlassTag(
                                   icon: Icons.king_bed_outlined,
-                                  label: '${property.roomsLabel} חד׳',
+                                  label: l10n.landlordPropertiesScreenRoomsTag(
+                                      property.roomsLabel),
                                 ),
                                 const SizedBox(width: 6),
                                 _GlassTag(
                                   icon: Icons.space_dashboard_outlined,
-                                  label: '${property.sizeM2} מ״ר',
+                                  label: l10n.landlordPropertiesScreenSizeTag(
+                                      property.sizeM2),
                                 ),
-                                if (_contractStatusLabel != null) ...[
+                                if (contractStatusLabel != null) ...[
                                   const SizedBox(width: 6),
                                   _GlassTag(
                                     icon: Icons.description_outlined,
-                                    label: 'חוזה: $_contractStatusLabel',
+                                    label: l10n.landlordPropertiesScreenContractLabel(
+                                        contractStatusLabel),
                                   ),
                                 ],
                                 // Phase-3: look-alike target audience (renders
@@ -1051,9 +1063,10 @@ class _AudienceChipState extends State<_AudienceChip> {
   @override
   Widget build(BuildContext context) {
     if (_count <= 0) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     return _GlassTag(
       icon: Icons.track_changes_rounded,
-      label: '$_count קהל יעד',
+      label: l10n.landlordPropertiesScreenAudienceCount(_count),
     );
   }
 }
@@ -1245,6 +1258,7 @@ class _EmptyPropertiesState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -1265,19 +1279,19 @@ class _EmptyPropertiesState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'עדיין לא הוספת דירות',
-              style: TextStyle(
+            Text(
+              l10n.landlordPropertiesScreenEmptyTitle,
+              style: const TextStyle(
                 color: AppColors.navy,
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'הוסף נכס ראשון כדי להתחיל לקבל לייקים, מועמדים ושיחות.',
+            Text(
+              l10n.landlordPropertiesScreenEmptyBody,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 13.5,
                 height: 1.45,
@@ -1297,6 +1311,7 @@ class _EmptyFilteredState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -1317,20 +1332,20 @@ class _EmptyFilteredState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'לא נמצאו נכסים עם הסינון הזה',
+            Text(
+              l10n.landlordPropertiesScreenNoResultsTitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.navy,
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'נסה לשנות את פרמטרי החיפוש או לנקות את הפילטרים.',
+            Text(
+              l10n.landlordPropertiesScreenNoResultsBody,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 13.5,
                 height: 1.45,
@@ -1347,9 +1362,9 @@ class _EmptyFilteredState extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
               ),
-              child: const Text(
-                'נקה סינון',
-                style: TextStyle(
+              child: Text(
+                l10n.landlordPropertiesScreenClearFilters,
+                style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 14,
                 ),

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:dating_app/core/constants/app_colors.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/calendar/availability_calendar_screen.dart';
 import 'package:dating_app/data/models/availability_slot.dart';
 import 'package:dating_app/data/repositories/availability_repository.dart';
@@ -34,9 +35,10 @@ class LandlordDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
+        final l10n = AppLocalizations.of(context)!;
         final stats = provider.landlordStats;
         final profile = provider.tenantProfile;
-        final landlordName = profile?.name ?? 'בעל הדירה';
+        final landlordName = profile?.name ?? l10n.landlordDashboardScreenC6c7d5f7;
         final photoUrl = profile?.photoUrl ?? '';
         final properties = provider.myProperties;
         
@@ -181,6 +183,7 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final firstName = name.split(' ').first;
 
     return Row(
@@ -194,7 +197,7 @@ class _DashboardHeader extends StatelessWidget {
                 text: TextSpan(
                   children: [
                     TextSpan(
-                      text: 'שלום, ',
+                      text: l10n.landlordDashboardScreen235e6256,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 15,
@@ -215,8 +218,8 @@ class _DashboardHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 pendingCount > 0
-                    ? '$pendingCount מועמדים ממתינים לאישורך'
-                    : 'הכל מעודכן ותחת שליטה ✓',
+                    ? l10n.landlordDashboardScreen9c8fa644(pendingCount)
+                    : l10n.landlordDashboardScreen99884c14,
                 style: TextStyle(
                   color: pendingCount > 0
                       ? AppColors.primary
@@ -275,6 +278,7 @@ class _AssistantChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const ErikChatScreen()),
@@ -308,14 +312,14 @@ class _AssistantChip extends StatelessWidget {
                   ),
                 ],
               ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 20),
-            SizedBox(width: 7),
+            const Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 20),
+            const SizedBox(width: 7),
             Text(
-              'עוזר אישי',
-              style: TextStyle(
+              l10n.landlordDashboardScreenCce14f4f,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13.5,
                 fontWeight: FontWeight.w800,
@@ -345,12 +349,13 @@ class _SystemPerformanceGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'סיכום',
-          style: TextStyle(
+        Text(
+          l10n.landlordDashboardScreen80293f4c,
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 24,
             fontWeight: FontWeight.w800,
@@ -361,9 +366,9 @@ class _SystemPerformanceGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricCard(
-                title: 'סה״כ נכסים',
+                title: l10n.landlordDashboardScreen1b17721e,
                 value: propertiesCount.toDouble(),
-                unit: 'פעילים',
+                unit: l10n.landlordDashboardScreen17127579,
                 backgroundColor: Colors.white,
                 isPrice: false,
               ),
@@ -371,9 +376,9 @@ class _SystemPerformanceGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: 'הכנסה צפויה',
+                title: l10n.landlordDashboardScreen0b71fe76,
                 value: expectedRevenue,
-                unit: 'חודשי',
+                unit: l10n.landlordDashboardScreen3ec09dc0,
                 backgroundColor: Colors.white,
                 isPrice: true,
               ),
@@ -382,12 +387,12 @@ class _SystemPerformanceGrid extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _LargeProgressCard(
-          title: 'כמה מהמתעניינים הסכמתם להם',
+          title: l10n.landlordDashboardScreen94943464,
           progressValue: conversionRate / 100.0,
           conversionRate: conversionRate,
           statusText: pendingCount > 0
-              ? '$pendingCount ממתינים לאישור שלך'
-              : 'אין מועמדים שממתינים',
+              ? l10n.landlordDashboardScreenEd3747d9(pendingCount)
+              : l10n.landlordDashboardScreen8a106a06,
           icon: IconsaxPlusLinear.flash,
         ),
       ],
@@ -645,6 +650,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final double occupancyRate = widget.propertiesCount == 0
         ? 0.0
         : (widget.propertiesWithMatch / widget.propertiesCount)
@@ -674,9 +680,9 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'נכסים עם התאמה',
-                style: TextStyle(
+              Text(
+                l10n.landlordDashboardScreenEec75f83,
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
@@ -684,7 +690,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
               ),
               const SizedBox(height: 4),
               Text(
-                'מתוך ${widget.propertiesCount} נכסים פעילים',
+                l10n.landlordDashboardScreenBc2e631f(widget.propertiesCount),
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,
@@ -753,7 +759,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                'עם התאמה',
+                                l10n.landlordDashboardScreenB0164098,
                                 style: TextStyle(
                                   color: isHigh
                                       ? Colors.white.withValues(alpha: 0.95)
@@ -783,7 +789,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                 children: [
                   Expanded(
                     child: _ArcStatChip(
-                      label: 'עם התאמה',
+                      label: l10n.landlordDashboardScreenB0164098,
                       value: '${widget.propertiesWithMatch}',
                       color: AppColors.primary,
                     ),
@@ -791,7 +797,7 @@ class _OccupancyArcMeterState extends State<_OccupancyArcMeter> with SingleTicke
                   const SizedBox(width: 10),
                   Expanded(
                     child: _ArcStatChip(
-                      label: 'ממתינים',
+                      label: l10n.landlordDashboardScreenFa311e7d,
                       value: '${(widget.propertiesCount - widget.propertiesWithMatch).clamp(0, widget.propertiesCount)}',
                       color: AppColors.border,
                       textColor: AppColors.textSecondary,
@@ -935,16 +941,60 @@ class _WeeklyActivityChart extends StatefulWidget {
 
 class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
   int _selectedBarIndex = -1; // -1 = auto (today / current period)
-  int _selectedPeriod = 0; // 0=שבועי, 1=חודשי, 2=שנתי
+  int _selectedPeriod = 0; // 0=weekly, 1=monthly, 2=yearly
 
-  static const _periods = ['שבועי', 'חודשי', 'שנתי'];
-  static const _titleSuffix = ['השבוע', 'החודש', 'השנה'];
+  List<String> _periods(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.landlordDashboardScreen50296d4c,
+      l10n.landlordDashboardScreen3ec09dc0,
+      l10n.landlordDashboardScreen8951e6dc,
+    ];
+  }
 
-  static const _labels = [
-    ['א\'', 'ב\'', 'ג\'', 'ד\'', 'ה\'', 'ו\'', 'ש\''],
-    ['שב׳ 1', 'שב׳ 2', 'שב׳ 3', 'ש׳ 4'],
-    ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ', 'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'],
-  ];
+  List<String> _titleSuffix(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.landlordDashboardScreen43b23f14,
+      l10n.landlordDashboardScreenAf52bcd6,
+      l10n.landlordDashboardScreenBa6767e5,
+    ];
+  }
+
+  List<List<String>> _labels(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      [
+        l10n.landlordDashboardScreen270bf5ed,
+        l10n.landlordDashboardScreen8f61d08b,
+        l10n.landlordDashboardScreenAf1c561b,
+        l10n.landlordDashboardScreenC7179c6f,
+        l10n.landlordDashboardScreen5dee9138,
+        l10n.landlordDashboardScreen93aec056,
+        l10n.landlordDashboardScreenBda0900b,
+      ],
+      [
+        l10n.landlordDashboardScreenA6b97c1e,
+        l10n.landlordDashboardScreen9aff6d23,
+        l10n.landlordDashboardScreenF960defe,
+        l10n.landlordDashboardScreen04e8f590,
+      ],
+      [
+        l10n.landlordDashboardScreen19035156,
+        l10n.landlordDashboardScreen8cc85ded,
+        l10n.landlordDashboardScreenC0394ea3,
+        l10n.landlordDashboardScreenDc6b970f,
+        l10n.landlordDashboardScreen5fa88202,
+        l10n.landlordDashboardScreen477d76d2,
+        l10n.landlordDashboardScreenA1f2e9ed,
+        l10n.landlordDashboardScreen574d25b5,
+        l10n.landlordDashboardScreen5a24ce53,
+        l10n.landlordDashboardScreen4d43f4d5,
+        l10n.landlordDashboardScreen6f0a4de2,
+        l10n.landlordDashboardScreenD30ca257,
+      ],
+    ];
+  }
 
   // Demo data for guest mode
   static const _demoData = [
@@ -1003,8 +1053,9 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final currentData = _currentData();
-    final currentLabels = _labels[_selectedPeriod];
+    final currentLabels = _labels(context)[_selectedPeriod];
     final maxVal = currentData.isEmpty ? 1 : currentData.reduce((a, b) => a > b ? a : b);
     final totalInquiries = currentData.fold<int>(0, (s, v) => s + v);
     final avgPerPeriod = currentData.isEmpty ? 0.0 : totalInquiries / currentData.length;
@@ -1038,7 +1089,8 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'מתעניינים בנכסים שלך ${_titleSuffix[_selectedPeriod]}',
+                    l10n.landlordDashboardScreenA21a4640(
+                        _titleSuffix(context)[_selectedPeriod]),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1055,9 +1107,9 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                       color: AppColors.slate100,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text(
-                      'לייקים היום',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.landlordDashboardScreen7203ea03,
+                      style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1076,7 +1128,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: List.generate(_periods.length, (i) {
+                  children: List.generate(_periods(context).length, (i) {
                     final selected = i == _selectedPeriod;
                     return GestureDetector(
                       onTap: () {
@@ -1095,7 +1147,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          _periods[i],
+                          _periods(context)[i],
                           style: TextStyle(
                             color: selected ? Colors.white : AppColors.textSecondary,
                             fontSize: 11,
@@ -1117,9 +1169,9 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'סה״כ פניות',
-                    style: TextStyle(
+                  Text(
+                    l10n.landlordDashboardScreen4ff60e81,
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1127,7 +1179,7 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$totalInquiries פניות',
+                    l10n.landlordDashboardScreenE8a3f079(totalInquiries),
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 18,
@@ -1141,10 +1193,10 @@ class _WeeklyActivityChartState extends State<_WeeklyActivityChart> {
                 children: [
                   Text(
                     _selectedPeriod == 0
-                        ? 'ממוצע יומי'
+                        ? l10n.landlordDashboardScreen66b405bd
                         : _selectedPeriod == 1
-                            ? 'ממוצע שבועי'
-                            : 'ממוצע חודשי',
+                            ? l10n.landlordDashboardScreenAcc6e3d2
+                            : l10n.landlordDashboardScreenE679dd5d,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
@@ -1339,6 +1391,7 @@ class _BrokerToolsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // AppColors.primary/primaryDark are mutable (indigo for brokers) — read
     // here at build time; this widget must stay outside any const context.
     return GestureDetector(
@@ -1381,22 +1434,22 @@ class _BrokerToolsCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'כלי הסוכן',
-                    style: TextStyle(
+                    l10n.landlordDashboardScreen2074036b,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 19,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    'פנקס לקוחות, התאמות, פייפליין, צפיות ועוד',
-                    style: TextStyle(
+                    l10n.landlordDashboardScreen0a134a61,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -1424,6 +1477,7 @@ class _LandlordToolsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final firstProperty = properties.isNotEmpty ? properties.first : null;
 
     return Column(
@@ -1441,23 +1495,23 @@ class _LandlordToolsSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'כלים לבעל הדירה',
-                    style: TextStyle(
+                    l10n.landlordDashboardScreen299b769f,
+                    style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.3,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    'עזרה פשוטה לניהול הדירה — בלי כאב ראש',
-                    style: TextStyle(
+                    l10n.landlordDashboardScreenC7fa5680,
+                    style: const TextStyle(
                       color: AppColors.slate500,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -1474,8 +1528,8 @@ class _LandlordToolsSection extends StatelessWidget {
         _ToolTile(
           icon: IconsaxPlusLinear.map_1,
           color: AppColors.success,
-          title: 'אינטליגנציית אזור',
-          subtitle: 'כתובת → כל נתוני האזור ולמי הוא הכי מתאים להשקעה',
+          title: l10n.landlordDashboardScreenA8bb0310,
+          subtitle: l10n.landlordDashboardScreen4e175795,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AreaIntelScreen()),
           ),
@@ -1486,8 +1540,8 @@ class _LandlordToolsSection extends StatelessWidget {
           _ToolTile(
             icon: IconsaxPlusLinear.receipt_text,
             color: AppColors.primary,
-            title: 'מס הכנסה — בקלות',
-            subtitle: 'בדיקה מהירה אם צריך לשלם מס על השכירות',
+            title: l10n.landlordDashboardScreenAaafbb6b,
+            subtitle: l10n.landlordDashboardScreenDfd3460d,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => TaxHelperScreen(
@@ -1501,8 +1555,8 @@ class _LandlordToolsSection extends StatelessWidget {
         _ToolTile(
           icon: IconsaxPlusLinear.notification_bing,
           color: AppColors.coral,
-          title: 'תזכורות',
-          subtitle: 'שלא תשכח חידוש חוזה, תשלום או ביטוח',
+          title: l10n.landlordDashboardScreenCa25d18a,
+          subtitle: l10n.landlordDashboardScreen8b96a6ac,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const RemindersScreen()),
           ),
@@ -1511,10 +1565,10 @@ class _LandlordToolsSection extends StatelessWidget {
         _ToolTile(
           icon: IconsaxPlusLinear.wallet_money,
           color: AppColors.primaryDark,
-          title: 'מעקב תשלומים',
+          title: l10n.landlordDashboardScreen5308aa0d,
           subtitle: firstProperty == null
-              ? 'הוסיפו דירה כדי לעקוב אחרי תשלומי השכירות'
-              : 'בחרו דירה כדי לראות סטטוס, מועד תשלום והערות',
+              ? l10n.landlordDashboardScreen9fd83dca
+              : l10n.landlordDashboardScreen7e05b276,
           onTap: firstProperty == null
               ? null
               : () => Navigator.of(context).push(
@@ -1672,9 +1726,18 @@ class _CalendarCardState extends State<_CalendarCard>
   /// booked) → reload.
   bool _dependenciesReady = false;
 
-  static const _daysHeb = [
-    'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'
-  ];
+  List<String> _daysOfWeek(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.landlordDashboardScreenDae6b270,
+      l10n.landlordDashboardScreen47f34119,
+      l10n.landlordDashboardScreenDb0c22fc,
+      l10n.landlordDashboardScreenDa1dae77,
+      l10n.landlordDashboardScreenCe94cfff,
+      l10n.landlordDashboardScreen7e718908,
+      l10n.landlordDashboardScreen4203bd7e,
+    ];
+  }
 
   @override
   void initState() {
@@ -1723,20 +1786,22 @@ class _CalendarCardState extends State<_CalendarCard>
     });
   }
 
-  String _whenLabel(DateTime d) {
+  String _whenLabel(BuildContext context, DateTime d) {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final target = DateTime(d.year, d.month, d.day);
     final diff = target.difference(today).inDays;
+    final weekday = _daysOfWeek(context)[d.weekday % 7];
     final day = diff == 0
-        ? 'היום'
+        ? l10n.landlordDashboardScreen95d86d7f
         : diff == 1
-            ? 'מחר'
+            ? l10n.landlordDashboardScreen840835ac
             // Within a week the weekday name is unambiguous; beyond that add the
-            // date so "יום שלישי" 9 days out isn't confused with this Tuesday.
+            // date so "Tuesday" 9 days out isn't confused with this Tuesday.
             : diff < 7
-                ? 'יום ${_daysHeb[d.weekday % 7]}'
-                : 'יום ${_daysHeb[d.weekday % 7]} ${d.day}/${d.month}';
+                ? l10n.landlordDashboardScreen30744d51(weekday)
+                : l10n.landlordDashboardScreen2dd36976(weekday, d.day, d.month);
     final hh = d.hour.toString().padLeft(2, '0');
     final mm = d.minute.toString().padLeft(2, '0');
     return '$day · $hh:$mm';
@@ -1744,6 +1809,7 @@ class _CalendarCardState extends State<_CalendarCard>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // Subscribe to the provider so didChangeDependencies re-fires (and we
     // reload) whenever a viewing is booked via processViewingConfirms (SCHED-3).
     context.watch<DatingProvider>();
@@ -1754,17 +1820,17 @@ class _CalendarCardState extends State<_CalendarCard>
     final String title;
     final String subtitle;
     if (_loading) {
-      title = 'היומן שלי';
-      subtitle = 'טוען...';
+      title = l10n.landlordDashboardScreenD1b5aeb8;
+      subtitle = l10n.landlordDashboardScreen32fb9ba0;
     } else if (hasBooking) {
       final who = booked.bookedByName.trim().isEmpty
-          ? 'שוכר/ת'
+          ? l10n.landlordDashboardScreenF12b53ff
           : booked.bookedByName.trim();
-      title = 'צפייה הבאה · $who';
-      subtitle = _whenLabel(booked.start);
+      title = l10n.landlordDashboardScreen6db621c3(who);
+      subtitle = _whenLabel(context, booked.start);
     } else {
-      title = 'היומן שלי';
-      subtitle = 'אין צפיות מתוכננות · הוסף זמנים פנויים';
+      title = l10n.landlordDashboardScreenD1b5aeb8;
+      subtitle = l10n.landlordDashboardScreen7dec25c8;
     }
 
     return Material(

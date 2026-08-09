@@ -1,4 +1,5 @@
 import 'package:provider/provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
@@ -36,22 +37,43 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
 
   List<RentalProperty> _results = const [];
 
-  static const _cities = [
-    'תל אביב', 'ירושלים', 'רמת גן', 'גבעתיים', 'חיפה', 'נתניה', 'הרצליה', 'באר שבע',
-  ];
+  List<String> _cities(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.searchAssistantScreen2c1f2bbd,
+      l10n.searchAssistantScreen8e0dfe1e,
+      l10n.searchAssistantScreen2231ce66,
+      l10n.searchAssistantScreenEa980134,
+      l10n.searchAssistantScreenCa1cc213,
+      l10n.searchAssistantScreen092b4640,
+      l10n.searchAssistantScreen982e0598,
+      l10n.searchAssistantScreen35529032,
+    ];
+  }
 
   // label -> PropertyFeatureSet key
-  static const _amenityOptions = <MapEntry<String, String>>[
-    MapEntry('חניה', 'feat_parking'),
-    MapEntry('מרפסת', 'feat_balcony'),
-    MapEntry('מעלית', 'feat_elevator'),
-    MapEntry('מרוהט', 'feat_furnished'),
-    MapEntry('ממ״ד', 'feat_mamad'),
-    MapEntry('משופצת', 'feat_renovated'),
-    MapEntry('גינה', 'feat_garden'),
-  ];
+  List<MapEntry<String, String>> _amenityOptions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      MapEntry(l10n.searchAssistantScreenA9655ab3, 'feat_parking'),
+      MapEntry(l10n.searchAssistantScreen86425fcf, 'feat_balcony'),
+      MapEntry(l10n.searchAssistantScreen8d058056, 'feat_elevator'),
+      MapEntry(l10n.searchAssistantScreenD8e1feaf, 'feat_furnished'),
+      MapEntry(l10n.searchAssistantScreenFa8ed531, 'feat_mamad'),
+      MapEntry(l10n.searchAssistantScreen0bd4e294, 'feat_renovated'),
+      MapEntry(l10n.searchAssistantScreen27a4567b, 'feat_garden'),
+    ];
+  }
 
-  static const _vibes = ['שקט', 'תוסס', 'משפחתי', 'סטודנטיאלי'];
+  List<String> _vibes(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.searchAssistantScreen40d07087,
+      l10n.searchAssistantScreen07199e40,
+      l10n.searchAssistantScreen23625e37,
+      l10n.searchAssistantScreenC7b03503,
+    ];
+  }
 
   String _money(double v) => '₪${v.round().toString().replaceAllMapped(
         RegExp(r'(\d)(?=(\d{3})+$)'),
@@ -92,6 +114,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -102,7 +125,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
           centerTitle: true,
           iconTheme: IconThemeData(color: AppColors.textPrimary),
           title: Text(
-            'עוזר חיפוש חכם',
+            l10n.searchAssistantScreenE16edce8,
             style: TextStyle(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.bold,
@@ -113,7 +136,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
             if (_step != _Step.turn1 && _step != _Step.loading)
               TextButton(
                 onPressed: _reset,
-                child: Text('התחל מחדש',
+                child: Text(l10n.searchAssistantScreen6e04f4e9,
                     style: TextStyle(color: AppColors.textSecondary)),
               ),
           ],
@@ -256,23 +279,24 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   // ── Turn 1 ───────────────────────────────────────────────────────────────
 
   Widget _turn1() {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         _progress(0),
-        _bubble('בוא נמצא לך דירה מושלמת! איפה אתה מחפש, ומה התקציב החודשי?'),
+        _bubble(l10n.searchAssistantScreen3c34563c),
         _card(children: [
-          _label('עיר'),
+          _label(l10n.searchAssistantScreenB2136c90),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _cities
+            children: _cities(context)
                 .map((c) => _chip(c, _city == c,
                     () => setState(() => _city = _city == c ? null : c)))
                 .toList(),
           ),
           const SizedBox(height: 20),
-          _label('תקציב חודשי'),
+          _label(l10n.searchAssistantScreen4094ac8d),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -295,7 +319,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
             onChanged: (v) => setState(() => _budget = v),
           ),
           const SizedBox(height: 8),
-          _primaryButton('הבא →', _city == null ? null : () {
+          _primaryButton(l10n.searchAssistantScreen4ca22f8c, _city == null ? null : () {
             setState(() => _step = _Step.turn2);
           }),
         ]),
@@ -306,13 +330,14 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   // ── Turn 2 ───────────────────────────────────────────────────────────────
 
   Widget _turn2() {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         _progress(1),
-        _bubble('כמה מקום אתה צריך, ומה חובה שיהיה?'),
+        _bubble(l10n.searchAssistantScreen9c507ba2),
         _card(children: [
-          _label('מספר חדרים (מינימום)'),
+          _label(l10n.searchAssistantScreen5c2ad42a),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -332,11 +357,11 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          _label('מתקנים שחובה שיהיו'),
+          _label(l10n.searchAssistantScreen49bd69db),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _amenityOptions.map((e) {
+            children: _amenityOptions(context).map((e) {
               final on = _amenities.contains(e.value);
               return _chip(e.key, on, () {
                 setState(() =>
@@ -345,7 +370,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
             }).toList(),
           ),
           const SizedBox(height: 16),
-          _primaryButton('הבא →', () => setState(() => _step = _Step.turn3)),
+          _primaryButton(l10n.searchAssistantScreen4ca22f8c, () => setState(() => _step = _Step.turn3)),
         ]),
       ],
     );
@@ -369,23 +394,24 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   // ── Turn 3 ───────────────────────────────────────────────────────────────
 
   Widget _turn3() {
+    final l10n = AppLocalizations.of(context)!;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         _progress(2),
-        _bubble('כמעט סיימנו! איזו אווירת שכונה מתאימה לך?'),
+        _bubble(l10n.searchAssistantScreenDb600ba2),
         _card(children: [
-          _label('אופי השכונה'),
+          _label(l10n.searchAssistantScreen4e4d5acc),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _vibes
+            children: _vibes(context)
                 .map((v) => _chip(v, _vibe == v,
                     () => setState(() => _vibe = _vibe == v ? null : v)))
                 .toList(),
           ),
           const SizedBox(height: 16),
-          _primaryButton('סקירה →', () => setState(() => _step = _Step.confirm)),
+          _primaryButton(l10n.searchAssistantScreen892418bd, () => setState(() => _step = _Step.confirm)),
         ]),
       ],
     );
@@ -394,6 +420,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   // ── Confirm ──────────────────────────────────────────────────────────────
 
   Widget _confirm() {
+    final l10n = AppLocalizations.of(context)!;
     final rooms = _minRooms % 1 == 0
         ? _minRooms.toInt().toString()
         : _minRooms.toString();
@@ -401,27 +428,27 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
         _progress(3),
-        _bubble('מעולה! זה מה שאספתי. מוכן לחפש?'),
+        _bubble(l10n.searchAssistantScreen815a16e3),
         _card(children: [
-          _summaryRow('עיר', _city ?? 'הכל'),
-          _summaryRow('תקציב', '${_money(_budget.start)} – ${_money(_budget.end)}'),
-          _summaryRow('חדרים', '$rooms+'),
+          _summaryRow(l10n.searchAssistantScreenB2136c90, _city ?? l10n.searchAssistantScreen5f8fb8a5),
+          _summaryRow(l10n.searchAssistantScreen3bb32ddd, '${_money(_budget.start)} – ${_money(_budget.end)}'),
+          _summaryRow(l10n.searchAssistantScreenB50b3974, '$rooms+'),
           _summaryRow(
-              'מתקנים',
+              l10n.searchAssistantScreen9ff887ff,
               _amenities.isEmpty
                   ? '—'
-                  : _amenityOptions
+                  : _amenityOptions(context)
                       .where((e) => _amenities.contains(e.value))
                       .map((e) => e.key)
                       .join(', ')),
-          _summaryRow('אווירה', _vibe ?? '—'),
+          _summaryRow(l10n.searchAssistantScreen1212caa6, _vibe ?? '—'),
         ]),
         const SizedBox(height: 16),
-        _primaryButton('🔍 חפש עכשיו', _runSearch, color: AppColors.success),
+        _primaryButton(l10n.searchAssistantScreen5a7196d6, _runSearch, color: AppColors.success),
         const SizedBox(height: 10),
         TextButton(
           onPressed: _reset,
-          child: Text('התחל מחדש',
+          child: Text(l10n.searchAssistantScreen6e04f4e9,
               style: TextStyle(color: AppColors.textSecondary)),
         ),
       ],
@@ -457,7 +484,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
         children: [
           CircularProgressIndicator(color: AppColors.primary),
           const SizedBox(height: 16),
-          Text('מחפש דירות תואמות...',
+          Text(AppLocalizations.of(context)!.searchAssistantScreenD742723c,
               style: TextStyle(color: AppColors.textSecondary)),
         ],
       ),
@@ -467,6 +494,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   // ── Results ──────────────────────────────────────────────────────────────
 
   Widget _resultsView() {
+    final l10n = AppLocalizations.of(context)!;
     if (_results.isEmpty) {
       return Center(
         child: Padding(
@@ -477,17 +505,17 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
               Icon(Icons.search_off,
                   size: 64, color: AppColors.textDisabled),
               const SizedBox(height: 16),
-              Text('לא נמצאו דירות שתואמות',
+              Text(l10n.searchAssistantScreenCf4d2620,
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 18)),
               const SizedBox(height: 8),
-              Text('נסה להרחיב את התקציב או להסיר מתקנים',
+              Text(l10n.searchAssistantScreen284a2e22,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary)),
               const SizedBox(height: 24),
-              _primaryButton('שנה חיפוש', _reset),
+              _primaryButton(l10n.searchAssistantScreen231c0d9b, _reset),
             ],
           ),
         ),
@@ -501,14 +529,14 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('נמצאו ${_results.length} דירות',
+              Text(l10n.searchAssistantScreen1b999b46(_results.length),
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 18)),
               TextButton(
                   onPressed: _reset,
-                  child: Text('חיפוש חדש',
+                  child: Text(l10n.searchAssistantScreen2b387ae1,
                       style: TextStyle(color: AppColors.primary))),
             ],
           ),
@@ -525,6 +553,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
   }
 
   Widget _propertyCard(RentalProperty p) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
@@ -568,7 +597,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
                           color: AppColors.primaryLight2,
                           borderRadius: BorderRadius.circular(99),
                         ),
-                        child: Text('${p.roomsLabel} חד׳',
+                        child: Text(l10n.searchAssistantScreenC6efa96a(p.roomsLabel),
                             style: TextStyle(
                                 color: AppColors.primaryDark,
                                 fontWeight: FontWeight.bold,
@@ -586,7 +615,7 @@ class _SearchAssistantScreenState extends State<SearchAssistantScreen> {
                       Icon(Icons.verified,
                           size: 16, color: AppColors.success),
                       const SizedBox(width: 4),
-                      Text('מאומת',
+                      Text(l10n.searchAssistantScreen7de9ac58,
                           style: TextStyle(
                               color: AppColors.success,
                               fontSize: 12,

@@ -4,6 +4,7 @@ import 'package:dating_app/data/models/availability_slot.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/availability_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -63,12 +64,37 @@ class _AvailabilityCalendarScreenState
     });
   }
 
-  static const _heb = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-  static const _monthsHeb = [
-    '',
-    'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
-    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
-  ];
+  List<String> _weekdayNames(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      l10n.availabilityCalendarScreenDae6b270,
+      l10n.availabilityCalendarScreen47f34119,
+      l10n.availabilityCalendarScreenDb0c22fc,
+      l10n.availabilityCalendarScreenDa1dae77,
+      l10n.availabilityCalendarScreenCe94cfff,
+      l10n.availabilityCalendarScreen7e718908,
+      l10n.availabilityCalendarScreen4203bd7e,
+    ];
+  }
+
+  List<String> _monthNames(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      '',
+      l10n.availabilityCalendarScreen89d6e050,
+      l10n.availabilityCalendarScreenE974ea8b,
+      l10n.availabilityCalendarScreenC0394ea3,
+      l10n.availabilityCalendarScreenA1ac81be,
+      l10n.availabilityCalendarScreen5fa88202,
+      l10n.availabilityCalendarScreen4dee19aa,
+      l10n.availabilityCalendarScreenCf58b8a7,
+      l10n.availabilityCalendarScreen3551b598,
+      l10n.availabilityCalendarScreenD7106337,
+      l10n.availabilityCalendarScreen45ded998,
+      l10n.availabilityCalendarScreen712a2e4f,
+      l10n.availabilityCalendarScreen1774bb5f,
+    ];
+  }
 
   bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -90,9 +116,9 @@ class _AvailabilityCalendarScreenState
       initialDate: _selectedDay.isBefore(today) ? today : _selectedDay,
       firstDate: today,
       lastDate: DateTime(today.year + 1, today.month, today.day),
-      helpText: 'בחירת תאריך',
-      cancelText: 'ביטול',
-      confirmText: 'אישור',
+      helpText: AppLocalizations.of(context)!.availabilityCalendarScreen782f10b5,
+      cancelText: AppLocalizations.of(context)!.availabilityCalendarScreenA7c55a8d,
+      confirmText: AppLocalizations.of(context)!.availabilityCalendarScreenF21acb6a,
       builder: (ctx, child) => Directionality(
         textDirection: Directionality.of(context),
         child: Theme(
@@ -151,7 +177,26 @@ class _AvailabilityCalendarScreenState
   }
 
   // ── Tags ───────────────────────────────────────────────────────────────────
+  // Canonical (untranslated) tokens — persisted on-device and used for color
+  // matching. Display text is resolved separately via [tagLabel] so the stored
+  // value stays stable across languages.
   static const tagPresets = ['דחוף', 'בלעדי', 'טלפוני', 'גמיש'];
+
+  static String tagLabel(BuildContext context, String tag) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (tag) {
+      case 'דחוף':
+        return l10n.availabilityCalendarScreen0162a6e4;
+      case 'בלעדי':
+        return l10n.availabilityCalendarScreenEab14817;
+      case 'טלפוני':
+        return l10n.availabilityCalendarScreenEa57c7ab;
+      case 'גמיש':
+        return l10n.availabilityCalendarScreen9057aef3;
+      default:
+        return tag;
+    }
+  }
 
   static Color tagColor(String tag) {
     switch (tag) {
@@ -227,13 +272,18 @@ class _AvailabilityCalendarScreenState
     }
     if (!mounted) return;
     setState(() => _slots = next);
+    final l10n = AppLocalizations.of(context)!;
     if (added == 0) {
-      _toast(skipped > 0 ? 'כל החלונות כבר קיימים ביומן' : 'לא נוסף חלון');
+      _toast(skipped > 0
+          ? l10n.availabilityCalendarScreen88e6b612
+          : l10n.availabilityCalendarScreenB30a89dd);
     } else if (added == 1) {
-      _toast('נוסף חלון פנוי ✅');
+      _toast(l10n.availabilityCalendarScreen2baedd1e);
     } else {
-      _toast('נוספו $added חלונות פנויים ✅'
-          '${skipped > 0 ? ' · $skipped דילגו (חופפים)' : ''}');
+      _toast(l10n.availabilityCalendarScreen6ef11812(added) +
+          (skipped > 0
+              ? ' · ${l10n.availabilityCalendarScreenSkippedSuffix(skipped)}'
+              : ''));
     }
   }
 
@@ -264,32 +314,35 @@ class _AvailabilityCalendarScreenState
   // ── Remove ─────────────────────────────────────────────────────────────────
 
   Future<void> _confirmRemove(AvailabilitySlot s) async {
+    final l10n = AppLocalizations.of(context)!;
     // Booked = a real viewing. Guard against an accidental one-tap wipe, and
     // cancel its 1h-before reminder so it can't fire for a cancelled viewing.
     if (!s.isOpen) {
-      final who = s.bookedByName.trim().isEmpty ? 'השוכר/ת' : s.bookedByName.trim();
+      final who = s.bookedByName.trim().isEmpty
+          ? l10n.availabilityCalendarScreen9ad15d69
+          : s.bookedByName.trim();
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => Directionality(
           textDirection: Directionality.of(context),
           child: AlertDialog(
-            title: const Text('לבטל צפייה מאושרת?',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+            title: Text(l10n.availabilityCalendarScreenCdf3b5e1,
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
             content: Text(
-              'צפייה עם $who בשעה ${_time(s.start)} תוסר מהיומן והתזכורת תבוטל.',
+              l10n.availabilityCalendarScreenAf15dd19(who, _time(s.start)),
               style: const TextStyle(fontSize: 16, height: 1.4),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('חזרה',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                child: Text(l10n.availabilityCalendarScreen10a2352b,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('בטל צפייה',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                child: Text(l10n.availabilityCalendarScreen32e0e58c,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ],
           ),
@@ -302,7 +355,9 @@ class _AvailabilityCalendarScreenState
     final next = await _repo.delete(s.id);
     if (!mounted) return;
     setState(() => _slots = next);
-    _toast(s.isOpen ? 'החלון הוסר' : 'הצפייה בוטלה');
+    _toast(s.isOpen
+        ? l10n.availabilityCalendarScreen6b138e97
+        : l10n.availabilityCalendarScreen8fee2105);
   }
 
   Future<void> _call(String phone) async {
@@ -310,7 +365,8 @@ class _AvailabilityCalendarScreenState
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
-      _toast('לא ניתן לחייג');
+      if (!mounted) return;
+      _toast(AppLocalizations.of(context)!.availabilityCalendarScreen6b96632d);
     }
   }
 
@@ -333,7 +389,8 @@ class _AvailabilityCalendarScreenState
     final provider = context.watch<DatingProvider>();
     final bool isBroker = AppColors.isBrokerAccent;
     final primaryColor = isBroker ? Colors.black : AppColors.primary;
-    
+    final l10n = AppLocalizations.of(context)!;
+
     return Directionality(
       textDirection: Directionality.of(context),
       child: Theme(
@@ -359,8 +416,8 @@ class _AvailabilityCalendarScreenState
             ),
           ),
           centerTitle: true,
-          title: const Text('היומן שלי',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.navy, fontFamily: 'sf hebrew rounded')),
+          title: Text(l10n.availabilityCalendarScreenD1b5aeb8,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.navy, fontFamily: 'sf hebrew rounded')),
           actions: [
             GestureDetector(
               onTap: _pickAnyDate,
@@ -385,7 +442,7 @@ class _AvailabilityCalendarScreenState
                     const Icon(IconsaxPlusLinear.calendar, size: 16, color: AppColors.navy),
                     const SizedBox(width: 6),
                     Text(
-                      '${_monthsHeb[_stripStart.month]} ${_stripStart.year}',
+                      '${_monthNames(context)[_stripStart.month]} ${_stripStart.year}',
                       style: const TextStyle(
                         color: AppColors.navy,
                         fontSize: 14.5,
@@ -405,8 +462,8 @@ class _AvailabilityCalendarScreenState
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           icon: const Icon(IconsaxPlusLinear.add, size: 24),
-          label: const Text('הוסף זמן פנוי',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          label: Text(l10n.availabilityCalendarScreen914d0f2b,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -420,7 +477,7 @@ class _AvailabilityCalendarScreenState
                       controller: _searchCtrl,
                       onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
                       decoration: InputDecoration(
-                        hintText: 'חפשו צפיות וחלונות...',
+                        hintText: l10n.availabilityCalendarScreen1dcc1ebd,
                         hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 15),
                         suffixIcon: const Icon(IconsaxPlusLinear.search_normal, color: AppColors.textSecondary, size: 20),
                         filled: true,
@@ -540,8 +597,10 @@ class _AvailabilityCalendarScreenState
                       ),
                     ),
                     Row(children: [
-                      seg('יום', IconsaxPlusLinear.calendar_1, false),
-                      seg('כל הקרובים', IconsaxPlusLinear.task_square, true),
+                      seg(AppLocalizations.of(context)!.availabilityCalendarScreen459ead47,
+                          IconsaxPlusLinear.calendar_1, false),
+                      seg(AppLocalizations.of(context)!.availabilityCalendarScreen53703118,
+                          IconsaxPlusLinear.task_square, true),
                     ]),
                   ],
                 ),
@@ -574,7 +633,7 @@ class _AvailabilityCalendarScreenState
             final booked = onDay.where((s) => !s.isOpen).length;
             final open = onDay.where((s) => s.isOpen).length;
 
-            final String dayName = _heb[d.weekday % 7];
+            final String dayName = _weekdayNames(context)[d.weekday % 7];
             final String shortDayName = dayName.length > 2 ? dayName.substring(0, 2) : dayName;
 
             return GestureDetector(
@@ -685,9 +744,9 @@ class _AvailabilityCalendarScreenState
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
           child: Row(
             children: [
-              const Text(
-                'צפיות וחלונות להיום',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context)!.availabilityCalendarScreen81849937,
+                style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -755,6 +814,7 @@ class _AvailabilityCalendarScreenState
   }
 
   Widget _emptyDay() {
+    final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
       child: Column(
@@ -763,14 +823,14 @@ class _AvailabilityCalendarScreenState
           Icon(IconsaxPlusBold.calendar_add,
               size: 60, color: AppColors.slate300),
           const SizedBox(height: 14),
-          const Text('אין עדיין זמנים פנויים ביום הזה',
+          Text(l10n.availabilityCalendarScreenA59492de,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: AppColors.slate600)),
           const SizedBox(height: 6),
-          Text('הוסיפו חלון מהיר, או «הוסף זמן פנוי» למטה',
+          Text(l10n.availabilityCalendarScreenC5f10ba9,
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 15,
@@ -780,11 +840,11 @@ class _AvailabilityCalendarScreenState
           // Quick presets — one tap adds a 30-minute window.
           Row(
             children: [
-              _quickChip('בוקר', '10:00', 10),
+              _quickChip(l10n.availabilityCalendarScreenD741ca0e, '10:00', 10),
               const SizedBox(width: 10),
-              _quickChip('צהריים', '14:00', 14),
+              _quickChip(l10n.availabilityCalendarScreen300ea530, '14:00', 14),
               const SizedBox(width: 10),
-              _quickChip('ערב', '18:00', 18),
+              _quickChip(l10n.availabilityCalendarScreen33c5e69b, '18:00', 18),
             ],
           ),
         ],
@@ -854,8 +914,8 @@ class _AvailabilityCalendarScreenState
               Icon(IconsaxPlusBold.calendar_add,
                   size: 60, color: AppColors.slate300),
               const SizedBox(height: 14),
-              const Text('אין צפיות או חלונות קרובים',
-                  style: TextStyle(
+              Text(AppLocalizations.of(context)!.availabilityCalendarScreen57660599,
+                  style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                       color: AppColors.slate600)),
@@ -873,10 +933,11 @@ class _AvailabilityCalendarScreenState
   }
 
   Widget _slotCard(DatingProvider provider, AvailabilitySlot s) {
+    final l10n = AppLocalizations.of(context)!;
     final booked = !s.isOpen;
     final bool isBroker = AppColors.isBrokerAccent;
     final primaryColor = isBroker ? Colors.black : AppColors.primary;
-    
+
     final propLabel = _propertyLabel(provider, s.propertyId);
     final who = s.bookedByName.trim();
 
@@ -911,7 +972,11 @@ class _AvailabilityCalendarScreenState
                   children: [
                     Expanded(
                       child: Text(
-                        booked ? (who.isEmpty ? 'צפייה מאושרת' : who) : 'חלון צפייה פנוי',
+                        booked
+                            ? (who.isEmpty
+                                ? l10n.availabilityCalendarScreen94eb6af0
+                                : who)
+                            : l10n.availabilityCalendarScreen4958be48,
                         style: TextStyle(
                           color: textTitleColor,
                           fontSize: 17,
@@ -936,8 +1001,12 @@ class _AvailabilityCalendarScreenState
                 const SizedBox(height: 6),
                 Text(
                   booked
-                      ? (propLabel.isNotEmpty ? propLabel : 'פניית צפייה מתואמת')
-                      : (propLabel.isNotEmpty ? 'פנוי לצפייה ב$propLabel' : 'שוכרים יכולים לתאם מועד לצפייה'),
+                      ? (propLabel.isNotEmpty
+                          ? propLabel
+                          : l10n.availabilityCalendarScreenC24d48d2)
+                      : (propLabel.isNotEmpty
+                          ? l10n.availabilityCalendarScreen50c4a059(propLabel)
+                          : l10n.availabilityCalendarScreenC90c40a2),
                   style: TextStyle(
                     color: textSubtitleColor,
                     fontSize: 14,
@@ -957,11 +1026,15 @@ class _AvailabilityCalendarScreenState
                 if (booked)
                   Row(
                     children: [
-                      _avatar(who.isEmpty ? 'ש' : who, Colors.blue),
+                      _avatar(
+                          who.isEmpty
+                              ? l10n.availabilityCalendarScreenF604bef9
+                              : who,
+                          Colors.blue),
                       const SizedBox(width: 4),
-                      _avatar('סוכן', Colors.amber),
+                      _avatar(l10n.availabilityCalendarScreen7bbfbc12, Colors.amber),
                       const SizedBox(width: 4),
-                      _avatar('לקוח', Colors.teal),
+                      _avatar(l10n.availabilityCalendarScreen9c2118be, Colors.teal),
                     ],
                   )
                 else
@@ -972,13 +1045,13 @@ class _AvailabilityCalendarScreenState
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: AppColors.slate200, width: 0.8),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(IconsaxPlusLinear.clock, size: 12, color: AppColors.slate500),
-                        SizedBox(width: 4),
+                        const Icon(IconsaxPlusLinear.clock, size: 12, color: AppColors.slate500),
+                        const SizedBox(width: 4),
                         Text(
-                          'זמין להזמנה',
-                          style: TextStyle(color: AppColors.slate500, fontSize: 11, fontWeight: FontWeight.w700),
+                          l10n.availabilityCalendarScreenD16264b7,
+                          style: const TextStyle(color: AppColors.slate500, fontSize: 11, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
@@ -1007,7 +1080,7 @@ class _AvailabilityCalendarScreenState
                           color: booked ? Colors.white : AppColors.success,
                           size: 20,
                         ),
-                        tooltip: 'חיוג',
+                        tooltip: l10n.availabilityCalendarScreenD5bc848b,
                         onPressed: () => _call(s.bookedByPhone.trim()),
                       ),
                     const SizedBox(width: 8),
@@ -1019,7 +1092,9 @@ class _AvailabilityCalendarScreenState
                         color: booked ? Colors.white : AppColors.coral,
                         size: 22,
                       ),
-                      tooltip: booked ? 'בטל צפייה' : 'הסר חלון',
+                      tooltip: booked
+                          ? l10n.availabilityCalendarScreen32e0e58c
+                          : l10n.availabilityCalendarScreen7d165b83,
                       onPressed: () => _confirmRemove(s),
                     ),
                   ],
@@ -1114,7 +1189,7 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
     final t = await showTimePicker(
       context: context,
       initialTime: _time,
-      helpText: 'שעת התחלה של החלון הפנוי',
+      helpText: AppLocalizations.of(context)!.availabilityCalendarScreen9eba4851,
     );
     if (t != null) setState(() => _time = t);
   }
@@ -1128,7 +1203,9 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollCtrl) => Container(
+        builder: (context, scrollCtrl) {
+          final l10n = AppLocalizations.of(context)!;
+          return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1151,9 +1228,9 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                     Icon(IconsaxPlusBold.calendar_add,
                         color: AppColors.primary, size: 26),
                     const SizedBox(width: 10),
-                    const Text('חלון פנוי חדש',
-                        style:
-                            TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                    Text(AppLocalizations.of(context)!.availabilityCalendarScreenF29f462e,
+                        style: const TextStyle(
+                            fontSize: 21, fontWeight: FontWeight.w900)),
                   ],
                 ),
               ),
@@ -1162,7 +1239,7 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                   controller: scrollCtrl,
                   padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
                   children: [
-                    _label('שעת התחלה'),
+                    _label(l10n.availabilityCalendarScreen96d116f2),
                     GestureDetector(
                       onTap: _pickTime,
                       child: Container(
@@ -1184,7 +1261,7 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                                     fontWeight: FontWeight.w900,
                                     color: AppColors.navy)),
                             const Spacer(),
-                            Text('שינוי',
+                            Text(l10n.availabilityCalendarScreenE94abfe2,
                                 style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
@@ -1193,7 +1270,7 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                         ),
                       ),
                     ),
-                    _label('משך'),
+                    _label(l10n.availabilityCalendarScreenFc655797),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -1201,21 +1278,22 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                         for (final m in const [30, 45, 60, 90, 120])
                           _choice(
                             label: m < 60
-                                ? '$m דק׳'
-                                : '${m ~/ 60}${m % 60 == 0 ? '' : '.5'} שעות',
+                                ? l10n.availabilityCalendarScreenD5c2c3b6(m)
+                                : l10n.availabilityCalendarScreenF2ee1c96(
+                                    m % 60 == 0 ? '${m ~/ 60}' : '${m ~/ 60}.5'),
                             selected: _duration == m,
                             onTap: () => setState(() => _duration = m),
                           ),
                       ],
                     ),
                     if (widget.properties.isNotEmpty) ...[
-                      _label('דירה (רשות)'),
+                      _label(l10n.availabilityCalendarScreenE3a2d38d),
                       Wrap(
                         spacing: 10,
                         runSpacing: 10,
                         children: [
                           _choice(
-                            label: 'כל הדירות',
+                            label: l10n.availabilityCalendarScreen2d69e44a,
                             icon: IconsaxPlusLinear.category,
                             selected: _propertyId.isEmpty,
                             onTap: () => setState(() => _propertyId = ''),
@@ -1230,50 +1308,51 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                         ],
                       ),
                     ],
-                    _label('חזרה'),
+                    _label(l10n.availabilityCalendarScreenRepeatLabel),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: [
                         _choice(
-                            label: 'רק היום',
+                            label: l10n.availabilityCalendarScreen7d46f18c,
                             selected: _repeat == 'today',
                             onTap: () => setState(() => _repeat = 'today')),
                         _choice(
-                            label: 'כל השבוע',
+                            label: l10n.availabilityCalendarScreen3563f3df,
                             selected: _repeat == 'week',
                             onTap: () => setState(() => _repeat = 'week')),
                         _choice(
-                            label: 'ימי חול (א׳–ה׳)',
+                            label: l10n.availabilityCalendarScreen155f0dee,
                             selected: _repeat == 'weekdays',
                             onTap: () => setState(() => _repeat = 'weekdays')),
                         _choice(
-                            label: 'סופ״ש (ו׳–ש׳)',
+                            label: l10n.availabilityCalendarScreen404b7e24,
                             selected: _repeat == 'weekend',
                             onTap: () => setState(() => _repeat = 'weekend')),
                       ],
                     ),
-                    _label('תווית (רשות)'),
+                    _label(l10n.availabilityCalendarScreen017014f8),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
                       children: [
                         for (final t in _AvailabilityCalendarScreenState.tagPresets)
                           _choice(
-                            label: t,
+                            label: _AvailabilityCalendarScreenState.tagLabel(
+                                context, t),
                             color: _AvailabilityCalendarScreenState.tagColor(t),
                             selected: _tag == t,
                             onTap: () => setState(() => _tag = _tag == t ? '' : t),
                           ),
                       ],
                     ),
-                    _label('הערה (רשות)'),
+                    _label(l10n.availabilityCalendarScreen82b33733),
                     TextField(
                       controller: _noteCtrl,
                       maxLines: 2,
                       style: const TextStyle(fontSize: 16, color: AppColors.navy),
                       decoration: InputDecoration(
-                        hintText: 'לדוגמה: קומה 3, קוד בניין 1234',
+                        hintText: l10n.availabilityCalendarScreenF4c3f886,
                         hintStyle: TextStyle(
                             fontSize: 15, color: AppColors.slate400),
                         filled: true,
@@ -1325,8 +1404,8 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
                           ),
                         );
                       },
-                      child: const Text('הוסף ליומן',
-                          style: TextStyle(
+                      child: Text(l10n.availabilityCalendarScreenEcfe64b2,
+                          style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w900)),
                     ),
                   ),
@@ -1334,7 +1413,8 @@ class _NewSlotSheetState extends State<_NewSlotSheet> {
               ),
             ],
           ),
-        ),
+        );
+        },
       ),
     );
   }

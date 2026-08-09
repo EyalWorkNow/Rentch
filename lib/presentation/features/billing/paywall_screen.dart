@@ -1,6 +1,7 @@
 import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/billing/checkout_launcher.dart';
 import 'package:dating_app/presentation/features/billing/payment_method_selector.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -51,6 +52,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
   bool _success = false;
   final TextEditingController _coupon = TextEditingController();
 
+  AppLocalizations get _l10n => AppLocalizations.of(context)!;
+
   @override
   void dispose() {
     _coupon.dispose();
@@ -59,7 +62,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   int get _selectedAgorot =>
       _selectedPlan == 'annual' ? _annualAgorot : _monthlyAgorot;
-  String get _periodLabel => _selectedPlan == 'annual' ? ' / שנה' : ' / חודש';
+  String get _periodLabel =>
+      _selectedPlan == 'annual' ? _l10n.paywallScreenPerYear : _l10n.paywallScreenPerMonth;
   String get _amountLabel => '${_shekel(_selectedAgorot ~/ 100)}$_periodLabel';
 
   String _shekel(int amount) => '₪${_thousands(amount)}';
@@ -81,7 +85,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final group = await showPaymentMethodSheet(
       context,
       amountLabel: _amountLabel,
-      subtitle: 'מנוי ${_selectedPlan == 'annual' ? 'שנתי' : 'חודשי'} — RENTLY PRO',
+      subtitle: _l10n.paywallScreenSubscriptionSubtitle(
+        _selectedPlan == 'annual'
+            ? _l10n.paywallScreenAnnualLabel
+            : _l10n.paywallScreenMonthlyLabel,
+      ),
     );
     if (group == null || !mounted) return;
 
@@ -100,7 +108,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
       );
       if (!mounted) return;
       if (checkout == null) {
-        _snack('שגיאה בפתיחת התשלום. נסו שוב.');
+        _snack(_l10n.paywallScreenPaymentError);
         setState(() => _busy = false);
         return;
       }
@@ -121,12 +129,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
     } on AwsApiException catch (e) {
       if (!mounted) return;
       _snack(e.isUnauthorized
-          ? 'צריך להתחבר לחשבון כדי לרכוש מנוי — התחבר/י ונסה שוב.'
-          : 'שגיאה בפתיחת התשלום (${e.statusCode ?? '—'}). נסו שוב.');
+          ? _l10n.paywallScreenLoginRequired
+          : _l10n.paywallScreenPaymentErrorWithCode('${e.statusCode ?? '—'}'));
       setState(() => _busy = false);
     } catch (_) {
       if (!mounted) return;
-      _snack('שגיאה בפתיחת התשלום. נסו שוב.');
+      _snack(_l10n.paywallScreenPaymentError);
       setState(() => _busy = false);
     }
   }
@@ -148,7 +156,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    _snack('התשלום התקבל — הפעלת המנוי עשויה לקחת רגע. בדקו שוב בעוד מספר דקות.');
+    _snack(_l10n.paywallScreenEntitlementPending);
   }
 
   void _snack(String message) {
@@ -228,9 +236,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ],
           ),
           const SizedBox(height: 22),
-          const Text(
-            'סגרו שכירות מהר יותר.',
-            style: TextStyle(
+          Text(
+            _l10n.paywallScreenHeadline,
+            style: const TextStyle(
               color: AppColors.slate900,
               fontSize: 30,
               height: 1.1,
@@ -239,10 +247,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'RENTLY PRO נותן לדירה שלך את הבמה: יותר צופים, שוכרים מדויקים, '
-            'וכל הניהול במקום אחד — עד שהיא מושכרת.',
-            style: TextStyle(
+          Text(
+            _l10n.paywallScreenSubheadline,
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 15,
               height: 1.5,
@@ -302,11 +309,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
           children: [
             Expanded(
               child: _PlanCard(
-                title: 'חודשי',
+                title: _l10n.paywallScreenMonthlyLabel,
                 priceLine: _shekel(_monthlyAgorot ~/ 100),
-                periodLine: 'לחודש',
-                perMonthNote: 'חיוב חודשי · ביטול בכל עת',
-                boostsNote: '2 הקפצות בחודש',
+                periodLine: _l10n.paywallScreenPerMonthShort,
+                perMonthNote: _l10n.paywallScreenMonthlyBillingNote,
+                boostsNote: _l10n.paywallScreenMonthlyBoostsNote,
                 selected: _selectedPlan == 'monthly',
                 onTap: () => setState(() => _selectedPlan = 'monthly'),
               ),
@@ -314,14 +321,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _PlanCard(
-                title: 'שנתי',
+                title: _l10n.paywallScreenAnnualLabel,
                 priceLine: _shekel(_annualAgorot ~/ 100),
-                periodLine: 'לשנה · ₪37.50 לחודש',
-                perMonthNote: 'משלמים 10 חודשים, מקבלים 12',
-                boostsNote: '5 הקפצות בחודש',
+                periodLine: _l10n.paywallScreenAnnualPeriodLine,
+                perMonthNote: _l10n.paywallScreenAnnualBillingNote,
+                boostsNote: _l10n.paywallScreenAnnualBoostsNote,
                 selected: _selectedPlan == 'annual',
                 highlighted: true,
-                ribbon: 'המשתלם ביותר · חיסכון ${_shekel(_annualSavingAgorot ~/ 100)}',
+                ribbon: _l10n.paywallScreenAnnualRibbon(
+                    _shekel(_annualSavingAgorot ~/ 100)),
                 onTap: () => setState(() => _selectedPlan = 'annual'),
               ),
             ),
@@ -333,14 +341,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   // ── unified feature list ──────────────────────────────────────────────────────
   Widget _buildFeatureList() {
-    const features = <(IconData, String)>[
-      (IconsaxPlusBold.buildings_2, 'פרסום דירות ללא הגבלה'),
-      (IconsaxPlusBold.flash_1, 'הקפצות שמביאות יותר צופים לדירה'),
-      (IconsaxPlusBold.verify, 'תג "מאומת" — יותר אמון, יותר פניות'),
-      (IconsaxPlusBold.ranking_1, 'קדימות בתוצאות החיפוש של השוכרים'),
-      (IconsaxPlusBold.people, 'ניהול מועמדים, צ׳אט ותיאום סיורים במקום אחד'),
-      (IconsaxPlusBold.calendar_1, 'יומן זמינות אוטומטי לתיאום צפיות'),
-      (IconsaxPlusBold.chart_2, 'תובנות שוק ומחירון אזורי חכם'),
+    final features = <(IconData, String)>[
+      (IconsaxPlusBold.buildings_2, _l10n.paywallScreenFeatureUnlimitedListings),
+      (IconsaxPlusBold.flash_1, _l10n.paywallScreenFeatureBoosts),
+      (IconsaxPlusBold.verify, _l10n.paywallScreenFeatureVerifiedBadge),
+      (IconsaxPlusBold.ranking_1, _l10n.paywallScreenFeatureSearchPriority),
+      (IconsaxPlusBold.people, _l10n.paywallScreenFeatureCandidateManagement),
+      (IconsaxPlusBold.calendar_1, _l10n.paywallScreenFeatureCalendar),
+      (IconsaxPlusBold.chart_2, _l10n.paywallScreenFeatureMarketInsights),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -354,8 +362,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('כל מה שכלול בכל מסלול',
-                style: TextStyle(
+            Text(_l10n.paywallScreenAllPlansInclude,
+                style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
                     color: AppColors.slate900)),
@@ -393,18 +401,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   size: 22, color: AppColors.amberDark),
             ),
             const SizedBox(width: 13),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('צריך חשיפה מקסימלית?',
-                      style: TextStyle(
+                  Text(_l10n.paywallScreenUltraTeaserTitle,
+                      style: const TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w900,
                           color: AppColors.slate900)),
-                  SizedBox(height: 2),
-                  Text('הקפצת Ultra — פי 5 חשיפה, זמינה בכל דירה מ-₪50.',
-                      style: TextStyle(
+                  const SizedBox(height: 2),
+                  Text(_l10n.paywallScreenUltraTeaserBody,
+                      style: const TextStyle(
                           fontSize: 12.5,
                           height: 1.35,
                           fontWeight: FontWeight.w600,
@@ -421,8 +429,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
   // ── bottom CTA + coupon + trust ───────────────────────────────────────────────
   Widget _buildBottomCta() {
     final trialCopy = _selectedPlan == 'annual'
-        ? 'חיוב שנתי ${_shekel(_annualAgorot ~/ 100)}. ניתן לבטל בכל עת.'
-        : 'חיוב חודשי מתחדש ${_shekel(_monthlyAgorot ~/ 100)}. ניתן לבטל בכל עת.';
+        ? _l10n.paywallScreenAnnualBillingTrial(_shekel(_annualAgorot ~/ 100))
+        : _l10n
+            .paywallScreenMonthlyBillingTrial(_shekel(_monthlyAgorot ~/ 100));
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -462,8 +471,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     )
                   : Text(
                       _selectedPlan == 'annual'
-                          ? 'הצטרפות למסלול השנתי'
-                          : 'הצטרפות למסלול החודשי',
+                          ? _l10n.paywallScreenJoinAnnual
+                          : _l10n.paywallScreenJoinMonthly,
                       style: const TextStyle(
                           fontSize: 17, fontWeight: FontWeight.w900),
                     ),
@@ -479,12 +488,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(IconsaxPlusLinear.lock_1,
+            children: [
+              const Icon(IconsaxPlusLinear.lock_1,
                   size: 13, color: AppColors.textSecondary),
-              SizedBox(width: 5),
-              Text('תשלום מאובטח · קבלה נשלחת למייל',
-                  style: TextStyle(
+              const SizedBox(width: 5),
+              Text(_l10n.paywallScreenSecurePayment,
+                  style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600)),
@@ -522,11 +531,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   color: AppColors.slate900,
                   fontSize: 14,
                   fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: 'קוד קופון (אופציונלי)',
-                hintStyle: TextStyle(
+                hintText: _l10n.paywallScreenCouponHint,
+                hintStyle: const TextStyle(
                     color: Color(0xFF94A3B8),
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600),
@@ -541,11 +550,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   // ── success ("thank you") ────────────────────────────────────────────────────
   Widget _buildSuccess() {
-    const unlocked = [
-      (IconsaxPlusLinear.buildings_2, 'פרסום דירות ללא הגבלה'),
-      (IconsaxPlusLinear.flash_1, 'הקפצת מודעות (בוסט) לקידום בפיד'),
-      (IconsaxPlusLinear.verify, 'תג מאומת וקדימות בחיפוש'),
-      (IconsaxPlusLinear.magic_star, 'סינון שוכרים חכם ב-AI'),
+    final unlocked = [
+      (IconsaxPlusLinear.buildings_2, _l10n.paywallScreenFeatureUnlimitedListings),
+      (IconsaxPlusLinear.flash_1, _l10n.paywallScreenFeatureBoostListings),
+      (IconsaxPlusLinear.verify, _l10n.paywallScreenFeatureVerifiedAndPriority),
+      (IconsaxPlusLinear.magic_star, _l10n.paywallScreenFeatureAiFiltering),
     ];
     return SafeArea(
       child: Center(
@@ -591,8 +600,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-              const Text('תודה רבה!',
-                  style: TextStyle(
+              Text(_l10n.paywallScreenThankYou,
+                  style: const TextStyle(
                       color: AppColors.slate900,
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
@@ -601,8 +610,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('המנוי הופעל — ברוכים הבאים ל-',
-                      style: TextStyle(
+                  Text(_l10n.paywallScreenWelcomePrefix,
+                      style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600)),
@@ -656,12 +665,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
               const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(IconsaxPlusLinear.sms,
+                children: [
+                  const Icon(IconsaxPlusLinear.sms,
                       size: 15, color: Color(0xFF94A3B8)),
-                  SizedBox(width: 6),
-                  Text('קבלה נשלחה לכתובת המייל שלך',
-                      style: TextStyle(
+                  const SizedBox(width: 6),
+                  Text(_l10n.paywallScreenReceiptSent,
+                      style: const TextStyle(
                           color: Color(0xFF94A3B8),
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600)),
@@ -680,9 +689,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     elevation: 0,
                   ),
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('בואו נתחיל',
-                      style:
-                          TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                  child: Text(_l10n.paywallScreenLetsStart,
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w900)),
                 ),
               ),
             ],

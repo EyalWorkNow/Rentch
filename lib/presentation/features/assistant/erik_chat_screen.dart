@@ -7,6 +7,7 @@ import 'package:dating_app/core/services/property_draft_builder.dart';
 import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/assistant/erik_live_voice_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_capture_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
@@ -66,20 +67,20 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
 
   String get _storeKey => 'erik_transcript_$_uid';
 
-  static const _botName = 'עזרא';
+  String _botName(AppLocalizations l10n) => l10n.erikChatScreenBotName;
 
-  static const _greeting =
-      'שלום, נעים מאוד. קוראים לי עזרא ואני כאן כדי לעזור לך.\n'
-      'אפשר לספר לי על דירה שתרצה להשכיר ואבנה לך מודעה, לעזור לנסח תיאור, '
-      'לתמחר, או פשוט לענות על שאלות. מה שנוח לך — לכתוב או לדבר.';
+  String _greeting(AppLocalizations l10n) =>
+      '${l10n.erikChatScreenGreetingIntro}'
+      '${l10n.erikChatScreenGreetingBody1}'
+      '${l10n.erikChatScreenGreetingBody2}';
 
   // Concrete example prompts, shown as chips on the welcome message (like אתי).
-  static const _starters = [
-    'אני רוצה לפרסם דירה חדשה',
-    'עזור לי לנסח תיאור לדירה',
-    'מה כדאי לצלם בדירה?',
-    'איך לתמחר נכון?',
-  ];
+  List<String> _starters(AppLocalizations l10n) => [
+        l10n.erikChatScreenStarter1,
+        l10n.erikChatScreenStarter2,
+        l10n.erikChatScreenStarter3,
+        l10n.erikChatScreenStarter4,
+      ];
 
   @override
   void initState() {
@@ -116,12 +117,13 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
               )));
       }
     } catch (_) {}
-    if (_messages.isEmpty) {
+    if (_messages.isEmpty && mounted) {
+      final l10n = AppLocalizations.of(context)!;
       _messages.add(_ErikMsg(
           role: 'assistant',
-          text: _greeting,
+          text: _greeting(l10n),
           isWelcome: true,
-          chips: _starters));
+          chips: _starters(l10n)));
     }
     if (mounted) setState(() {});
     _jumpToEnd();
@@ -147,14 +149,15 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
   Future<void> _newConversation() async {
     HapticFeedback.selectionClick();
     _streamTimer?.cancel();
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _messages
         ..clear()
         ..add(_ErikMsg(
             role: 'assistant',
-            text: _greeting,
+            text: _greeting(l10n),
             isWelcome: true,
-            chips: _starters));
+            chips: _starters(l10n)));
       _draft = null;
       _photoUrls.clear();
       _busy = false;
@@ -182,7 +185,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
     if (!_service.isConfigured) {
       _finishBusy(_ErikMsg(
         role: 'assistant',
-        text: 'העוזר האישי אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר.',
+        text: AppLocalizations.of(context)!.erikChatScreenAssistantUnavailable,
       ));
       return;
     }
@@ -212,9 +215,10 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Erik chat failed: $e');
+      if (!mounted) return;
       _finishBusy(_ErikMsg(
         role: 'assistant',
-        text: 'סליחה, הייתה תקלה רגעית. אפשר לנסות שוב.',
+        text: AppLocalizations.of(context)!.erikChatScreenTransientError,
         canRetry: true,
         retryText: text,
       ));
@@ -289,6 +293,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
       final remoteUrl = await _storage.uploadToCloud(localPath);
       if (!mounted) return;
       final path = remoteUrl ?? localPath;
+      final l10n = AppLocalizations.of(context)!;
       // Just add the photo and let the draft card update live (it shows the new
       // count + keeps its publish button) — no chat spam, the card stays put so
       // the user can publish from the very same card. If there's no pending
@@ -299,25 +304,30 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
         if (_draft == null) {
           _messages.add(_ErikMsg(
             role: 'user',
-            text: video ? '🎥 סרטון נוסף' : '📷 תמונה נוספה',
+            text: video
+                ? l10n.erikChatScreenVideoAddedBubble
+                : l10n.erikChatScreenPhotoAddedBubble,
             mediaUrls: [path],
           ));
         }
       });
       _saveTranscript();
-      _snack(video ? 'סרטון נוסף ✓' : 'תמונה נוספה ✓ (${_photoUrls.length})');
+      _snack(video
+          ? l10n.erikChatScreenVideoAddedSnack
+          : l10n.erikChatScreenPhotoAddedSnack(_photoUrls.length));
       if (_draft == null) _scrollToEnd();
     } catch (e) {
       if (kDebugMode) debugPrint('Erik pickMedia failed: $e');
       if (mounted) {
         setState(() => _picking = false);
-        _snack('לא הצלחתי לצרף את הקובץ. אפשר לנסות שוב.');
+        _snack(AppLocalizations.of(context)!.erikChatScreenAttachFailed);
       }
     }
   }
 
   void _openMediaSheet() {
     HapticFeedback.selectionClick();
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -337,13 +347,16 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                     borderRadius: BorderRadius.circular(3)),
               ),
               const SizedBox(height: 16),
-              _mediaTile(IconsaxPlusBold.camera, 'צלם תמונה',
+              _mediaTile(IconsaxPlusBold.camera, l10n.erikChatScreenTakePhoto,
                   () => _pickMedia(ImageSource.camera)),
-              _mediaTile(IconsaxPlusBold.gallery, 'בחר מהגלריה',
+              _mediaTile(IconsaxPlusBold.gallery,
+                  l10n.erikChatScreenChooseFromGallery,
                   () => _pickMedia(ImageSource.gallery)),
-              _mediaTile(IconsaxPlusBold.video, 'סרטון מהגלריה',
+              _mediaTile(IconsaxPlusBold.video,
+                  l10n.erikChatScreenVideoFromGallery,
                   () => _pickMedia(ImageSource.gallery, video: true)),
-              _mediaTile(IconsaxPlusBold.rotate_left, 'סיור 360°', _capture360),
+              _mediaTile(IconsaxPlusBold.rotate_left,
+                  l10n.erikChatScreenTour360, _capture360),
             ],
           ),
         ),
@@ -362,7 +375,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
     );
     if (tour == null || tour.isEmpty || !mounted) return;
     setState(() => _panoramaTour = tour);
-    _snack('סיור 360° נוסף ✓');
+    _snack(AppLocalizations.of(context)!.erikChatScreenTour360Added);
   }
 
   Widget _mediaTile(IconData icon, String label, VoidCallback onTap) {
@@ -393,8 +406,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
       setState(() {
         _messages.add(_ErikMsg(
           role: 'assistant',
-          text:
-              'רק רגע — כדי לפרסם צריך לפחות תמונה אחת של הדירה. אפשר לצלם עכשיו או לבחור מהטלפון.',
+          text: AppLocalizations.of(context)!.erikChatScreenNeedPhotoToPublish,
         ));
       });
       _scrollToEnd();
@@ -417,6 +429,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
       }
       await provider.addLandlordProperty(property);
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       final addr = [
         property.street,
         property.streetNumber > 0 ? '${property.streetNumber}' : '',
@@ -432,9 +445,10 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
         }
         _messages.add(_ErikMsg(
           role: 'assistant',
-          text:
-              'מצוין! פרסמתי את הדירה שלך${addr.isNotEmpty ? ' ב$addr' : ''}, היא כבר באוויר. 🎉\n'
-              'אפשר להוסיף עוד תמונות בכל רגע מהמסך "הדירות שלי". אני כאן אם תצטרך עוד משהו.',
+          text: (addr.isNotEmpty
+                  ? l10n.erikChatScreenPublishedSuccessWithAddr(addr)
+                  : l10n.erikChatScreenPublishedSuccessNoAddr) +
+              l10n.erikChatScreenPublishedTip,
         ));
       });
       _saveTranscript();
@@ -443,7 +457,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
       if (kDebugMode) debugPrint('Erik publish failed: $e');
       if (!mounted) return;
       setState(() => _publishing = false);
-      _snack('הייתה בעיה בפרסום. אפשר לנסות שוב, או לערוך בטופס המלא.');
+      _snack(AppLocalizations.of(context)!.erikChatScreenPublishFailed);
     }
   }
 
@@ -492,6 +506,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -529,7 +544,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$_botName · העוזר האישי',
+                Text(l10n.erikChatScreenSubtitle(_botName(l10n)),
                     style: TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.bold,
@@ -541,7 +556,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                       decoration: const BoxDecoration(
                           color: AppColors.success, shape: BoxShape.circle)),
                   const SizedBox(width: 5),
-                  Text('כאן בשבילך',
+                  Text(l10n.erikChatScreenHereForYou,
                       style: TextStyle(
                           color: AppColors.textSecondary, fontSize: 11)),
                 ]),
@@ -550,7 +565,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
           ]),
           actions: [
             IconButton(
-              tooltip: 'שיחה קולית חיה',
+              tooltip: l10n.erikChatScreenLiveVoiceTooltip,
               icon: Icon(IconsaxPlusBold.microphone_2,
                   color: AppColors.primary, size: 24),
               onPressed: () {
@@ -561,7 +576,9 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
               },
             ),
             IconButton(
-              tooltip: _speakReplies ? 'הקראה פעילה' : 'הקראה כבויה',
+              tooltip: _speakReplies
+                  ? l10n.erikChatScreenReadAloudOn
+                  : l10n.erikChatScreenReadAloudOff,
               icon: Icon(
                   _speakReplies
                       ? IconsaxPlusBold.volume_high
@@ -571,11 +588,13 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
               onPressed: () {
                 HapticFeedback.selectionClick();
                 setState(() => _speakReplies = !_speakReplies);
-                _snack(_speakReplies ? 'עזרא יקריא את התשובות' : 'הקראה כבויה');
+                _snack(_speakReplies
+                    ? l10n.erikChatScreenReadAloudOnSnack
+                    : l10n.erikChatScreenReadAloudOff);
               },
             ),
             IconButton(
-              tooltip: 'שיחה חדשה',
+              tooltip: l10n.erikChatScreenNewConversation,
               icon: Icon(IconsaxPlusLinear.refresh_2,
                   color: AppColors.textSecondary, size: 24),
               onPressed: _newConversation,
@@ -703,7 +722,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
           side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        label: const Text('נסה שוב'),
+        label: Text(AppLocalizations.of(context)!.erikChatScreenRetry),
       ),
     );
   }
@@ -711,6 +730,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
   // ── Inline listing-draft preview card (light, אתי card language) ────────────
 
   Widget _draftCard(Map<String, dynamic> draft) {
+    final l10n = AppLocalizations.of(context)!;
     String s(String key) => (draft[key]?.toString().trim() ?? '');
     final street = s('street');
     final num = s('streetNumber');
@@ -718,11 +738,17 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
     final addr = [street, num, city].where((e) => e.isNotEmpty).join(' ');
     final rows = <(IconData, String)>[
       if (addr.isNotEmpty) (IconsaxPlusBold.location, addr),
-      if (s('rooms').isNotEmpty) (IconsaxPlusBold.home_2, '${s('rooms')} חדרים'),
-      if (s('sizeM2').isNotEmpty) (IconsaxPlusBold.maximize_4, '${s('sizeM2')} מ״ר'),
-      if (s('floor').isNotEmpty) (IconsaxPlusBold.buildings_2, 'קומה ${s('floor')}'),
-      if (s('price').isNotEmpty) (IconsaxPlusBold.money_recive, '₪${s('price')} לחודש'),
-      if (s('entryDate').isNotEmpty) (IconsaxPlusBold.calendar_1, 'כניסה: ${s('entryDate')}'),
+      if (s('rooms').isNotEmpty)
+        (IconsaxPlusBold.home_2, l10n.erikChatScreenRoomsSuffix(s('rooms'))),
+      if (s('sizeM2').isNotEmpty)
+        (IconsaxPlusBold.maximize_4, l10n.erikChatScreenSizeSuffix(s('sizeM2'))),
+      if (s('floor').isNotEmpty)
+        (IconsaxPlusBold.buildings_2, l10n.erikChatScreenFloorLabel(s('floor'))),
+      if (s('price').isNotEmpty)
+        (IconsaxPlusBold.money_recive, l10n.erikChatScreenPriceSuffix(s('price'))),
+      if (s('entryDate').isNotEmpty)
+        (IconsaxPlusBold.calendar_1,
+            l10n.erikChatScreenEntryLabel(s('entryDate'))),
     ];
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -754,7 +780,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                   color: AppColors.primary, size: 19),
             ),
             const SizedBox(width: 10),
-            Text('טיוטת מודעה מוכנה',
+            Text(l10n.erikChatScreenDraftReadyTitle,
                 style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 16.5,
@@ -806,8 +832,9 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                 Expanded(
                   child: Text(
                       _photoUrls.isEmpty
-                          ? 'הוסף תמונות של הדירה'
-                          : '${_photoUrls.length} תמונות · הוסף עוד',
+                          ? l10n.erikChatScreenAddPhotos
+                          : l10n.erikChatScreenPhotosCountAddMore(
+                              _photoUrls.length),
                       style: TextStyle(
                           color: _photoUrls.isEmpty
                               ? AppColors.primaryDark
@@ -841,7 +868,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                             height: 22,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2.4, color: Colors.white))
-                        : Text('פרסם עכשיו',
+                        : Text(l10n.erikChatScreenPublishNow,
                             style: TextStyle(
                                 color: AppColors.textOnPrimary,
                                 fontSize: 16,
@@ -866,7 +893,7 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                   Icon(IconsaxPlusLinear.edit_2,
                       color: AppColors.textSecondary, size: 18),
                   const SizedBox(width: 7),
-                  Text('עריכה',
+                  Text(l10n.erikChatScreenEdit,
                       style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 14.5,
@@ -983,8 +1010,9 @@ class _ErikChatScreenState extends State<ErikChatScreen> {
                     textInputAction: TextInputAction.newline,
                     textCapitalization: TextCapitalization.sentences,
                     style: const TextStyle(fontSize: 15),
-                    decoration: const InputDecoration(
-                      hintText: 'ספר לי במילים שלך...',
+                    decoration: InputDecoration(
+                      hintText: AppLocalizations.of(context)!
+                          .erikChatScreenInputHint,
                       isCollapsed: true,
                       contentPadding:
                           EdgeInsets.symmetric(horizontal: 8, vertical: 13),

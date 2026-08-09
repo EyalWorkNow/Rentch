@@ -2,6 +2,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/match_labels_repository.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/screens/message_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:dating_app/presentation/widgets/safe_media.dart';
@@ -13,14 +14,15 @@ import 'package:dating_app/presentation/widgets/rently_icon.dart';
 import 'package:provider/provider.dart';
 import 'package:dating_app/presentation/widgets/animations/micro_animations.dart';
 
-String _relativeTime(DateTime dt) {
+String _relativeTime(BuildContext context, DateTime dt) {
+  final l10n = AppLocalizations.of(context)!;
   final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 60) return 'לפני ${diff.inMinutes} דק׳';
-  if (diff.inHours < 24) return 'לפני ${diff.inHours} שע׳';
-  if (diff.inDays == 1) return 'אתמול';
-  if (diff.inDays < 7) return 'לפני ${diff.inDays} ימים';
-  if (diff.inDays < 14) return 'לפני שבוע';
-  return 'לפני ${(diff.inDays / 7).round()} שבועות';
+  if (diff.inMinutes < 60) return l10n.matchesScreenMinutesAgo(diff.inMinutes);
+  if (diff.inHours < 24) return l10n.matchesScreenHoursAgo(diff.inHours);
+  if (diff.inDays == 1) return l10n.matchesScreenYesterday;
+  if (diff.inDays < 7) return l10n.matchesScreenDaysAgo(diff.inDays);
+  if (diff.inDays < 14) return l10n.matchesScreenWeekAgo;
+  return l10n.matchesScreenWeeksAgo((diff.inDays / 7).round());
 }
 
 // ─── Filter chip descriptors ──────────────────────────────────────────────────
@@ -99,6 +101,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   void _showCardActions(RentalMatch match, RentalProperty property) {
     HapticFeedback.selectionClick();
     final existing = _labels[match.id];
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -114,8 +117,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
               ListTile(
                 leading: Icon(IconsaxPlusLinear.tag,
                     color: AppColors.primary),
-                title: Text(existing == null ? 'הוסף תגית פרטית' : 'ערוך תגית'),
-                subtitle: const Text('רק אתה רואה אותה — לא נחשפת למועמד'),
+                title: Text(existing == null
+                    ? l10n.matchesScreenAddPrivateTag
+                    : l10n.matchesScreenEditTag),
+                subtitle: Text(l10n.matchesScreenOnlyYouSeeTag),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showTagEditor(match.id);
@@ -125,7 +130,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 ListTile(
                   leading: Icon(IconsaxPlusLinear.tag_cross,
                       color: AppColors.textSecondary),
-                  title: const Text('הסר תגית'),
+                  title: Text(l10n.matchesScreenRemoveTag),
                   onTap: () async {
                     Navigator.pop(ctx);
                     await _labelsRepo.remove(match.id);
@@ -135,8 +140,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
               ListTile(
                 leading: Icon(IconsaxPlusLinear.close_circle,
                     color: AppColors.coral),
-                title: const Text('בטל התאמה',
-                    style: TextStyle(color: AppColors.coral)),
+                title: Text(l10n.matchesScreenUnmatch,
+                    style: const TextStyle(color: AppColors.coral)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmUnmatch(match);
@@ -151,6 +156,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   void _confirmUnmatch(RentalMatch match) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (dctx) => Directionality(
@@ -159,13 +165,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
           backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('לבטל את ההתאמה?'),
-          content: const Text(
-              'השיחה תוסר משני הצדדים ולא ניתן לשחזר אותה.'),
+          title: Text(l10n.matchesScreenConfirmUnmatchTitle),
+          content: Text(l10n.matchesScreenConfirmUnmatchBody),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(dctx),
-                child: const Text('חזרה')),
+                child: Text(l10n.matchesScreenGoBack)),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
               onPressed: () async {
@@ -174,7 +179,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 await _labelsRepo.remove(match.id);
                 if (mounted) setState(() => _labels.remove(match.id));
               },
-              child: const Text('בטל התאמה'),
+              child: Text(l10n.matchesScreenUnmatch),
             ),
           ],
         ),
@@ -187,6 +192,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
     final ctrl = TextEditingController(text: existing?.text ?? '');
     var color = existing?.color ?? _tagColors.first;
     const colors = _tagColors;
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -205,12 +211,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('תגית פרטית',
-                        style: TextStyle(
+                    Text(l10n.matchesScreenPrivateTag,
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
-                    Text('רק אתה רואה — המועמד לא נחשף לזה.',
-                        style: TextStyle(
+                    Text(l10n.matchesScreenPrivateTagHint,
+                        style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 13)),
                     const SizedBox(height: 14),
                     TextField(
@@ -218,7 +224,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       maxLength: 24,
                       autofocus: true,
                       decoration: InputDecoration(
-                        hintText: 'למשל: רציני מאוד / לבדוק ערבים',
+                        hintText: l10n.matchesScreenTagPlaceholder,
                         filled: true,
                         fillColor: AppColors.background,
                         border: OutlineInputBorder(
@@ -275,8 +281,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                           }
                           if (ctx.mounted) Navigator.pop(ctx);
                         },
-                        child: const Text('שמור תגית',
-                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        child: Text(l10n.matchesScreenSaveTag,
+                            style: const TextStyle(fontWeight: FontWeight.w800)),
                       ),
                     ),
                   ],
@@ -371,6 +377,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final allMatches = provider.matches;
@@ -447,7 +454,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                           requestPairs.isNotEmpty) ...[
                                         _MessagesSectionHeader(
                                           icon: Icons.mark_email_unread_outlined,
-                                          label: 'פניות בתשלום',
+                                          label: l10n.matchesScreenPaidInquiries,
                                           count: requestPairs.length,
                                         ),
                                         const SizedBox(height: 10),
@@ -476,7 +483,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                                           const SizedBox(height: 4),
                                           _MessagesSectionHeader(
                                             icon: Icons.chat_bubble_outline_rounded,
-                                            label: 'שיחות',
+                                            label: l10n.matchesScreenConversations,
                                             count: filtered.length,
                                           ),
                                           const SizedBox(height: 10),
@@ -600,7 +607,7 @@ class _RequestsToggle extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              'פניות בתשלום',
+              AppLocalizations.of(context)!.matchesScreenPaidInquiries,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -664,6 +671,7 @@ class _MatchesToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Column(
@@ -702,7 +710,7 @@ class _MatchesToolbar extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'חיפוש כתובת, עיר או הודעה...',
+                      hintText: l10n.matchesScreenSearchHint,
                       hintStyle: TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary.withValues(alpha: 0.72),
@@ -776,7 +784,7 @@ class _MatchesToolbar extends StatelessWidget {
                 child: Row(
                   children: [
                     _FilterPill(
-                      label: 'הכל',
+                      label: l10n.matchesScreenFilterAll,
                       isSelected: ageFilter == _kFilterAll &&
                           scheduleFilter == _kFilterAll,
                       onTap: () {
@@ -786,7 +794,7 @@ class _MatchesToolbar extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     _FilterPill(
-                      label: 'חדש',
+                      label: l10n.matchesScreenFilterNew,
                       isSelected: ageFilter == _kFilterNew,
                       onTap: () {
                         onAgeFilterChanged(_kFilterNew);
@@ -794,7 +802,7 @@ class _MatchesToolbar extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     _FilterPill(
-                      label: 'ישן',
+                      label: l10n.matchesScreenFilterOld,
                       isSelected: ageFilter == _kFilterOld,
                       onTap: () {
                         onAgeFilterChanged(_kFilterOld);
@@ -802,7 +810,7 @@ class _MatchesToolbar extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     _FilterPill(
-                      label: 'תואם למחר',
+                      label: l10n.matchesScreenFilterMatchesTomorrow,
                       isSelected: scheduleFilter == _kFilterTomorrow,
                       onTap: () {
                         onScheduleFilterChanged(
@@ -868,6 +876,7 @@ class _EmptyFilterResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -888,19 +897,19 @@ class _EmptyFilterResults extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'לא נמצאו תוצאות',
-              style: TextStyle(
+            Text(
+              l10n.matchesScreenNoResultsFound,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'לא נמצאו תוצאות עבור החיפוש הזה — נסה לשנות את הסינון.',
+            Text(
+              l10n.matchesScreenNoResultsForSearch,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 14,
                 height: 1.55,
@@ -910,7 +919,7 @@ class _EmptyFilterResults extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onClear,
               icon: const RentlyIcon(IconsaxPlusLinear.close_circle, size: 16),
-              label: const Text('נקה סינון'),
+              label: Text(l10n.matchesScreenClearFilter),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: BorderSide(color: AppColors.primary),
@@ -954,22 +963,23 @@ class _MatchCardState extends State<_MatchCard> {
   bool _isExpanded = false;
 
   ({String label, Color color, IconData icon}) _matchStage(RentalMatch match) {
+    final l10n = AppLocalizations.of(context)!;
     if (match.ownerSigned && match.tenantSigned) {
       return (
-        label: 'חתום',
+        label: l10n.matchesScreenSigned,
         color: AppColors.success,
         icon: IconsaxPlusLinear.tick_circle,
       );
     }
     if (match.contractSent) {
       return (
-        label: 'חוזה נשלח',
+        label: l10n.matchesScreenContractSent,
         color: AppColors.success,
         icon: IconsaxPlusLinear.document_text,
       );
     }
     return (
-      label: 'שיחה פתוחה',
+      label: l10n.matchesScreenOpenConversation,
       color: AppColors.primary,
       icon: IconsaxPlusLinear.message,
     );
@@ -977,6 +987,7 @@ class _MatchCardState extends State<_MatchCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final media = widget.property.primaryMedia;
     final lastMessage =
         widget.match.messages.isEmpty ? null : widget.match.messages.last;
@@ -1210,25 +1221,27 @@ class _MatchCardState extends State<_MatchCard> {
                       children: [
                         _MockupChip(
                           icon: IconsaxPlusLinear.home,
-                          label: '${widget.property.roomsLabel} חדרים',
+                          label: l10n.matchesScreenRoomsCount(
+                              widget.property.roomsLabel),
                         ),
                         const SizedBox(width: 8),
                         _MockupChip(
                           icon: IconsaxPlusLinear.maximize_3,
-                          label: '${widget.property.sizeM2} מ״ר',
+                          label: l10n.matchesScreenSquareMeters(
+                              widget.property.sizeM2),
                         ),
                         const SizedBox(width: 8),
                         _MockupChip(
                           icon: IconsaxPlusLinear.routing,
                           label: widget.property.features.firstOrNull ??
-                              'מעלית',
+                              l10n.matchesScreenElevator,
                         ),
                         const SizedBox(width: 8),
                         _MockupChip(
                           icon: IconsaxPlusLinear.wind,
                           label: widget.property.features.length > 1
                               ? widget.property.features[1]
-                              : 'ממוזגת',
+                              : l10n.matchesScreenAirConditioned,
                         ),
                       ],
                     ),
@@ -1296,7 +1309,7 @@ class _FreshnessBadge extends StatelessWidget {
         : match.createdAt;
     final isNew =
         DateTime.now().difference(match.createdAt) <= _kNewMatchWindow;
-    final timeLabel = _relativeTime(lastActivity);
+    final timeLabel = _relativeTime(context, lastActivity);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -1306,7 +1319,9 @@ class _FreshnessBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        isNew && match.messages.isEmpty ? 'חדש' : timeLabel,
+        isNew && match.messages.isEmpty
+            ? AppLocalizations.of(context)!.matchesScreenNew
+            : timeLabel,
         style: TextStyle(
           color: isNew ? AppColors.primary : AppColors.textSecondary,
           fontSize: 10,
@@ -1342,7 +1357,8 @@ class _LastMessagePreview extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              message?.text ?? 'שיחה חדשה מוכנה לפתיחה',
+              message?.text ??
+                  AppLocalizations.of(context)!.matchesScreenNewConversationReady,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -1406,6 +1422,7 @@ class _EmptyMatches extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1426,9 +1443,9 @@ class _EmptyMatches extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'עוד אין התאמות',
-              style: TextStyle(
+            Text(
+              l10n.matchesScreenNoMatchesYet,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
                 color: AppColors.navy,
@@ -1437,8 +1454,8 @@ class _EmptyMatches extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               isLandlord
-                  ? 'כשתאשר שוכרים מועמדים בסוויפים — ההתאמות יופיעו כאן.'
-                  : 'כשתאהב דירה ובעל הדירה יאשר אותך — ההתאמה תופיע כאן.',
+                  ? l10n.matchesScreenNoMatchesLandlordBody
+                  : l10n.matchesScreenNoMatchesTenantBody,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.textSecondary,

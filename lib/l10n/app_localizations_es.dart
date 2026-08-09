@@ -3465,4 +3465,3207 @@ class AppLocalizationsEs extends AppLocalizations {
   String searchChatScreen615d28b8(Object size) {
     return '$size m²';
   }
+
+  @override
+  String get areaIntelScreen88218ec9 =>
+      'No pude localizar la dirección. Prueba a elegir una sugerencia o escribe ciudad + calle.';
+
+  @override
+  String get areaIntelScreen91db7436 => 'Transporte público';
+
+  @override
+  String get areaIntelScreenFa8c72dc => 'Colegios';
+
+  @override
+  String get areaIntelScreen00a5eaf2 => 'Jardines de infancia';
+
+  @override
+  String get areaIntelScreen088f0923 => 'Parques y jardines';
+
+  @override
+  String get areaIntelScreen9bd0d581 => 'Cafeterías y restaurantes';
+
+  @override
+  String get areaIntelScreen56721218 => 'Supermercados y compras';
+
+  @override
+  String get areaIntelScreen9df69324 => 'Servicios de salud';
+
+  @override
+  String get areaIntelScreen82e78f66 => 'Farmacias';
+
+  @override
+  String get areaIntelScreen22f8b507 => 'Gimnasios y deporte';
+
+  @override
+  String get areaIntelScreen34df4e2b => 'Sinagogas y lugares de culto';
+
+  @override
+  String get areaIntelScreen39cfcba7 => 'Cultura y ocio';
+
+  @override
+  String get areaIntelScreen289b784a => 'Parques infantiles';
+
+  @override
+  String areaIntelScreenDcabfe76(Object meters) {
+    return '$meters m';
+  }
+
+  @override
+  String areaIntelScreen0b2db321(Object km) {
+    return '$km km';
+  }
+
+  @override
+  String get areaIntelScreenA8bb0310 => 'Inteligencia de zona';
+
+  @override
+  String get areaIntelScreen51957dd6 =>
+      'Clasifica todas las zonas de la ciudad según el público objetivo';
+
+  @override
+  String get areaIntelScreen3fb539f2 => 'Lente de inversión';
+
+  @override
+  String get areaIntelScreen93a4e30a => 'Todas las capas de datos del lugar';
+
+  @override
+  String get areaIntelScreenE752c7da => 'Qué hay cerca';
+
+  @override
+  String get areaIntelScreen311b60d7 =>
+      'Introduce una dirección para evaluarla como inversión — y obtén todos los datos y capas de la zona, ';
+
+  @override
+  String get areaIntelScreenFd7780b1 =>
+      'y a quién le conviene más. Así sabrás exactamente a qué público dirigirte y cuál es el punto fuerte del lugar.';
+
+  @override
+  String get areaIntelScreen863d9b56 =>
+      'Dirección: ciudad + calle (ej. Tel Aviv, Dizengoff 100)';
+
+  @override
+  String get areaIntelScreen0d4d229d => 'Analizar';
+
+  @override
+  String areaIntelScreen65430ae4(Object pct) {
+    return '$pct% de coincidencia';
+  }
+
+  @override
+  String get areaIntelScreen046ea325 =>
+      'Esta zona es menos adecuada para este público.';
+
+  @override
+  String get areaIntelScreen4e635cc2 => 'Por qué funciona para este público:';
+
+  @override
+  String get areaIntelScreen77eb6f43 => 'Puntuación de inversión';
+
+  @override
+  String get areaIntelScreenDa192a5e =>
+      'Demanda de alquiler (facilidad para alquilar)';
+
+  @override
+  String get areaIntelScreen7c498f0a =>
+      'Potencial de revalorización (infraestructura planificada)';
+
+  @override
+  String get areaIntelScreen9e3fdc13 => 'Nivel de precios relativo en la zona';
+
+  @override
+  String get areaIntelScreenB5585865 => 'Rentabilidad bruta estimada';
+
+  @override
+  String areaIntelScreenA1448f5a(Object value) {
+    return 'El nivel de precios se basa en la valoración de la Oficina Central de Estadística de 2013 (₪$value/m²) — un índice relativo; el rendimiento es solo una estimación aproximada.';
+  }
+
+  @override
+  String get areaIntelScreen9b04c59d =>
+      'La demanda y la revalorización provienen de datos actualizados. No hay datos de valoración disponibles para esta zona.';
+
+  @override
+  String get areaIntelScreen96921b94 => 'Clúster socioeconómico (manzana)';
+
+  @override
+  String get areaIntelScreen45ddda67 => 'Seguridad (a nivel ciudad)';
+
+  @override
+  String get areaIntelScreen096a70c8 => 'Centralidad';
+
+  @override
+  String get areaIntelScreen984afc87 => 'Instituciones educativas';
+
+  @override
+  String get areaIntelScreenFae76235 => 'Vida nocturna y entretenimiento';
+
+  @override
+  String get areaIntelScreenA70625cf => 'Cercanía al empleo';
+
+  @override
+  String get areaIntelScreenB005f878 => 'Parques y zonas verdes';
+
+  @override
+  String get areaIntelScreen2008eaf1 => 'Potencial de revalorización';
+
+  @override
+  String areaIntelScreenE5c70865(Object cluster) {
+    return '$cluster de 10';
+  }
+
+  @override
+  String get areaIntelScreen459fac16 =>
+      'No hay datos demográficos disponibles para esta zona';
+
+  @override
+  String get areaIntelScreen4089ef4b => '👶 Niños (0-19)';
+
+  @override
+  String get areaIntelScreen4d2868ec => '🧑 Edad activa (20-64)';
+
+  @override
+  String areaIntelScreen3fcced86(Object hidden) {
+    return '+$hidden más · Mostrar todo';
+  }
+
+  @override
+  String get areaIntelScreen6192614d => 'Mostrar menos';
+
+  @override
+  String get searchAssistantScreen2c1f2bbd => 'Tel Aviv';
+
+  @override
+  String get searchAssistantScreen8e0dfe1e => 'Jerusalén';
+
+  @override
+  String get searchAssistantScreen2231ce66 => 'Ramat Gan';
+
+  @override
+  String get searchAssistantScreenEa980134 => 'Givatayim';
+
+  @override
+  String get searchAssistantScreenCa1cc213 => 'Haifa';
+
+  @override
+  String get searchAssistantScreen092b4640 => 'Netanya';
+
+  @override
+  String get searchAssistantScreen982e0598 => 'Herzliya';
+
+  @override
+  String get searchAssistantScreen35529032 => 'Beersheba';
+
+  @override
+  String get searchAssistantScreenA9655ab3 => 'Aparcamiento';
+
+  @override
+  String get searchAssistantScreen86425fcf => 'Balcón';
+
+  @override
+  String get searchAssistantScreen8d058056 => 'Ascensor';
+
+  @override
+  String get searchAssistantScreenD8e1feaf => 'Amueblado';
+
+  @override
+  String get searchAssistantScreenFa8ed531 => 'Cuarto blindado (mamad)';
+
+  @override
+  String get searchAssistantScreen0bd4e294 => 'Renovado';
+
+  @override
+  String get searchAssistantScreen27a4567b => 'Jardín';
+
+  @override
+  String get searchAssistantScreen40d07087 => 'Tranquilo';
+
+  @override
+  String get searchAssistantScreen07199e40 => 'Animado';
+
+  @override
+  String get searchAssistantScreen23625e37 => 'Familiar';
+
+  @override
+  String get searchAssistantScreenC7b03503 => 'Estudiantil';
+
+  @override
+  String get searchAssistantScreenE16edce8 =>
+      'Asistente de búsqueda inteligente';
+
+  @override
+  String get searchAssistantScreen6e04f4e9 => 'Empezar de nuevo';
+
+  @override
+  String get searchAssistantScreen3c34563c =>
+      '¡Vamos a encontrarte el apartamento perfecto! ¿Dónde buscas y cuál es tu presupuesto mensual?';
+
+  @override
+  String get searchAssistantScreenB2136c90 => 'Ciudad';
+
+  @override
+  String get searchAssistantScreen4094ac8d => 'Presupuesto mensual';
+
+  @override
+  String get searchAssistantScreen4ca22f8c => 'Siguiente →';
+
+  @override
+  String get searchAssistantScreen9c507ba2 =>
+      '¿Cuánto espacio necesitas y qué es imprescindible?';
+
+  @override
+  String get searchAssistantScreen5c2ad42a => 'Número de habitaciones (mínimo)';
+
+  @override
+  String get searchAssistantScreen49bd69db => 'Comodidades imprescindibles';
+
+  @override
+  String get searchAssistantScreenDb600ba2 =>
+      '¡Casi terminamos! ¿Qué ambiente de barrio te conviene?';
+
+  @override
+  String get searchAssistantScreen4e4d5acc => 'Carácter del barrio';
+
+  @override
+  String get searchAssistantScreen892418bd => 'Resumen →';
+
+  @override
+  String get searchAssistantScreen815a16e3 =>
+      '¡Genial! Esto es lo que reuní. ¿Listo para buscar?';
+
+  @override
+  String get searchAssistantScreen5f8fb8a5 => 'Todos';
+
+  @override
+  String get searchAssistantScreen3bb32ddd => 'Presupuesto';
+
+  @override
+  String get searchAssistantScreenB50b3974 => 'Habitaciones';
+
+  @override
+  String get searchAssistantScreen9ff887ff => 'Comodidades';
+
+  @override
+  String get searchAssistantScreen1212caa6 => 'Ambiente';
+
+  @override
+  String get searchAssistantScreen5a7196d6 => '🔍 Buscar ahora';
+
+  @override
+  String get searchAssistantScreenD742723c =>
+      'Buscando apartamentos que coincidan...';
+
+  @override
+  String get searchAssistantScreenCf4d2620 =>
+      'No se encontraron apartamentos que coincidan';
+
+  @override
+  String get searchAssistantScreen284a2e22 =>
+      'Prueba a ampliar el presupuesto o quitar algunas comodidades';
+
+  @override
+  String get searchAssistantScreen231c0d9b => 'Cambiar búsqueda';
+
+  @override
+  String searchAssistantScreen1b999b46(Object count) {
+    return 'Se encontraron $count apartamentos';
+  }
+
+  @override
+  String get searchAssistantScreen2b387ae1 => 'Nueva búsqueda';
+
+  @override
+  String searchAssistantScreenC6efa96a(Object rooms) {
+    return '$rooms hab.';
+  }
+
+  @override
+  String get searchAssistantScreen7de9ac58 => 'Verificado';
+
+  @override
+  String get contractDetailScreenF5ee57a7 => 'Contrato de alquiler';
+
+  @override
+  String get contractDetailScreen32d6e691 => 'Vista previa del documento';
+
+  @override
+  String get contractDetailScreen62afb8c6 => 'Contrato no encontrado';
+
+  @override
+  String get contractDetailScreenC6c7d5f7 => 'Propietario';
+
+  @override
+  String get contractDetailScreen9ad15d69 => 'Inquilino';
+
+  @override
+  String contractDetailScreenC426dab3(Object role) {
+    return 'Firmar el contrato como $role';
+  }
+
+  @override
+  String get contractDetailScreenD346f1e3 =>
+      'El contrato ha sido firmado por ambas partes';
+
+  @override
+  String get contractDetailScreenD657b4d3 => 'El contrato fue rechazado';
+
+  @override
+  String get contractDetailScreen2f6e4f0e => 'El contrato fue cancelado';
+
+  @override
+  String get contractDetailScreen471364ef =>
+      'Esperando la firma de la otra parte';
+
+  @override
+  String get contractDetailScreen2d903955 => 'Esperando firmas';
+
+  @override
+  String get contractDetailScreen900c3a51 => 'Propiedad en alquiler';
+
+  @override
+  String get contractDetailScreen4dcdda0b => 'Alquiler mensual';
+
+  @override
+  String get contractDetailScreen6977f9a2 => 'Depósito';
+
+  @override
+  String get contractDetailScreen5c4ffbbc => 'Duración';
+
+  @override
+  String contractDetailScreenA68a769b(Object months) {
+    return '$months meses';
+  }
+
+  @override
+  String get contractDetailScreen2f6783cd => 'Entrada';
+
+  @override
+  String get contractDetailScreenF600808f => 'Finalización';
+
+  @override
+  String get contractDetailScreen2ef381ab => 'Cláusulas adicionales';
+
+  @override
+  String get contractDetailScreen500341b6 =>
+      'Firma digital segura (Ed25519). La clave privada permanece solo en el dispositivo; cualquier cambio en los términos invalida las firmas ya realizadas.';
+
+  @override
+  String get contractDetailScreen8c7ea078 => 'Firma guardada correctamente ✍️';
+
+  @override
+  String get contractDetailScreen8b7b9377 =>
+      'Debes firmar dentro del recuadro antes de confirmar';
+
+  @override
+  String get contractDetailScreenE6dfccf4 => 'Firma digital';
+
+  @override
+  String get contractDetailScreen07debd21 =>
+      'Firma con el dedo en el recuadro de abajo';
+
+  @override
+  String get contractDetailScreenE8b3a3d5 => 'Borrar';
+
+  @override
+  String get contractDetailScreen10d96dc9 => 'Firmando…';
+
+  @override
+  String get contractDetailScreen9c07f0d2 => 'Confirmar firma';
+
+  @override
+  String get contractDetailScreen711b15ac => 'Pendiente de firma';
+
+  @override
+  String get contractDetailScreenFbf77ab4 => 'Verificando…';
+
+  @override
+  String contractDetailScreen53a5fab1(Object dateStr) {
+    return 'Firma verificada$dateStr';
+  }
+
+  @override
+  String get contractDetailScreen2c47c991 => 'La firma no es válida';
+
+  @override
+  String get contractDetailScreen0db5078d => 'Vista previa del contrato';
+
+  @override
+  String get contractDetailScreenA858ff94 =>
+      'Contrato de arrendamiento residencial';
+
+  @override
+  String contractDetailScreenC627c4b8(Object date) {
+    return 'Firmado digitalmente · $date';
+  }
+
+  @override
+  String contractDetailScreen9d6224ee(
+      Object landlordName, Object propertyTitle, Object tenantName) {
+    return 'Este acuerdo se celebra y firma entre **$landlordName** (\"el Arrendador\") y **$tenantName** (\"el Arrendatario\"), en relación con el alquiler de la propiedad ubicada en $propertyTitle.';
+  }
+
+  @override
+  String get contractDetailScreenPropTitleFallback =>
+      'detallada a continuación';
+
+  @override
+  String get contractDetailScreenAece3836 => '1. Renta';
+
+  @override
+  String contractDetailScreen68bb0d6c(Object rent) {
+    return 'El Arrendatario pagará al Arrendador una renta mensual de ₪$rent, pagadera por adelantado antes del día 10 de cada mes.';
+  }
+
+  @override
+  String get contractDetailScreen00c967a0 => '2. Depósito';
+
+  @override
+  String contractDetailScreenBa3a4a53(Object deposit) {
+    return 'El Arrendatario depositará ante el Arrendador una fianza de ₪$deposit para garantizar el cumplimiento de sus obligaciones.';
+  }
+
+  @override
+  String get contractDetailScreen9502e7c7 => 'No se requiere depósito.';
+
+  @override
+  String get contractDetailScreenA63d0798 => '3. Duración del contrato';
+
+  @override
+  String contractDetailScreen06aba07e(
+      Object endDate, Object months, Object startDate) {
+    return 'La duración del contrato es de $months meses, desde el $startDate hasta el $endDate.';
+  }
+
+  @override
+  String get contractDetailScreenD798e5f6 =>
+      '4. Cláusulas y solicitudes especiales';
+
+  @override
+  String get contractDetailScreen5c629483 => 'Firmas de las partes';
+
+  @override
+  String get contractDetailScreen541e72da => 'El Arrendador';
+
+  @override
+  String get contractDetailScreenFd0ec7ac => 'El Arrendatario';
+
+  @override
+  String get contractDetailScreenA7ee13e0 => 'Firmado';
+
+  @override
+  String get contractDetailScreen0e43b875 => 'Pendiente';
+
+  @override
+  String get askRentlySheet68d09f0e => '¿Se permiten mascotas?';
+
+  @override
+  String get askRentlySheet8147268b => '¿En qué piso está el apartamento?';
+
+  @override
+  String get askRentlySheetE8be946e => '¿Hay transporte público cerca?';
+
+  @override
+  String get askRentlySheet6449ebed => '¿Hay estacionamiento?';
+
+  @override
+  String get askRentlySheetBd196ab4 => '¿Cuándo puedo mudarme?';
+
+  @override
+  String get askRentlySheet47f7f61f =>
+      'No tengo esa información sobre el apartamento. Puedes enviar la pregunta directamente al propietario:';
+
+  @override
+  String get askRentlySheetD8ba43e9 => 'Pregunta sobre el apartamento';
+
+  @override
+  String get askRentlySheet700de026 =>
+      'La pregunta se envió al propietario — le aparecerá bajo \"Solicitudes de mensaje\"';
+
+  @override
+  String get askRentlySheetD92c26c4 => 'Enviar la pregunta al propietario';
+
+  @override
+  String get askRentlySheet18b1f617 => 'Pregúntale a Rently';
+
+  @override
+  String askRentlySheet6864774c(Object listingTitle) {
+    return 'Preguntas sobre $listingTitle';
+  }
+
+  @override
+  String get askRentlySheet3ad32172 => 'Preguntas sobre esta propiedad';
+
+  @override
+  String get askRentlySheetB728721f => 'Cerrar';
+
+  @override
+  String get askRentlySheet108a7146 =>
+      'Puedes preguntarme cualquier cosa sobre este apartamento — en lenguaje sencillo. Aquí tienes algunos ejemplos:';
+
+  @override
+  String get askRentlySheet804a20ac => 'Rently está pensando…';
+
+  @override
+  String get askRentlySheet3181ba76 =>
+      'Escribe una pregunta sobre el apartamento…';
+
+  @override
+  String get availabilityCalendarScreenDae6b270 => 'domingo';
+
+  @override
+  String get availabilityCalendarScreen47f34119 => 'lunes';
+
+  @override
+  String get availabilityCalendarScreenDb0c22fc => 'martes';
+
+  @override
+  String get availabilityCalendarScreenDa1dae77 => 'miércoles';
+
+  @override
+  String get availabilityCalendarScreenCe94cfff => 'jueves';
+
+  @override
+  String get availabilityCalendarScreen7e718908 => 'viernes';
+
+  @override
+  String get availabilityCalendarScreen4203bd7e => 'sábado';
+
+  @override
+  String get availabilityCalendarScreen89d6e050 => 'enero';
+
+  @override
+  String get availabilityCalendarScreenE974ea8b => 'febrero';
+
+  @override
+  String get availabilityCalendarScreenC0394ea3 => 'marzo';
+
+  @override
+  String get availabilityCalendarScreenA1ac81be => 'abril';
+
+  @override
+  String get availabilityCalendarScreen5fa88202 => 'mayo';
+
+  @override
+  String get availabilityCalendarScreen4dee19aa => 'junio';
+
+  @override
+  String get availabilityCalendarScreenCf58b8a7 => 'julio';
+
+  @override
+  String get availabilityCalendarScreen3551b598 => 'agosto';
+
+  @override
+  String get availabilityCalendarScreenD7106337 => 'septiembre';
+
+  @override
+  String get availabilityCalendarScreen45ded998 => 'octubre';
+
+  @override
+  String get availabilityCalendarScreen712a2e4f => 'noviembre';
+
+  @override
+  String get availabilityCalendarScreen1774bb5f => 'diciembre';
+
+  @override
+  String get availabilityCalendarScreen782f10b5 => 'Elegir una fecha';
+
+  @override
+  String get availabilityCalendarScreenA7c55a8d => 'Cancelar';
+
+  @override
+  String get availabilityCalendarScreenF21acb6a => 'Confirmar';
+
+  @override
+  String get availabilityCalendarScreen0162a6e4 => 'Urgente';
+
+  @override
+  String get availabilityCalendarScreenEab14817 => 'Exclusivo';
+
+  @override
+  String get availabilityCalendarScreenEa57c7ab => 'Por teléfono';
+
+  @override
+  String get availabilityCalendarScreen9057aef3 => 'Flexible';
+
+  @override
+  String get availabilityCalendarScreen88e6b612 =>
+      'Todos esos horarios ya están en el calendario';
+
+  @override
+  String get availabilityCalendarScreenB30a89dd =>
+      'No se añadió ningún horario';
+
+  @override
+  String get availabilityCalendarScreen2baedd1e =>
+      'Horario disponible añadido ✅';
+
+  @override
+  String availabilityCalendarScreen6ef11812(Object added) {
+    return 'Se añadieron $added horarios disponibles ✅';
+  }
+
+  @override
+  String get availabilityCalendarScreen9ad15d69 => 'el/la inquilino/a';
+
+  @override
+  String get availabilityCalendarScreenCdf3b5e1 =>
+      '¿Cancelar la visita confirmada?';
+
+  @override
+  String availabilityCalendarScreenAf15dd19(Object time, Object who) {
+    return 'La visita con $who a las $time se eliminará del calendario y se cancelará el recordatorio.';
+  }
+
+  @override
+  String get availabilityCalendarScreen10a2352b => 'Volver';
+
+  @override
+  String get availabilityCalendarScreen32e0e58c => 'Cancelar visita';
+
+  @override
+  String get availabilityCalendarScreen6b138e97 => 'Horario eliminado';
+
+  @override
+  String get availabilityCalendarScreen8fee2105 => 'Visita cancelada';
+
+  @override
+  String get availabilityCalendarScreen6b96632d =>
+      'No se pudo realizar la llamada';
+
+  @override
+  String get availabilityCalendarScreenD1b5aeb8 => 'Mi calendario';
+
+  @override
+  String get availabilityCalendarScreen914d0f2b => 'Añadir horario disponible';
+
+  @override
+  String get availabilityCalendarScreen1dcc1ebd =>
+      'Buscar visitas y horarios...';
+
+  @override
+  String get availabilityCalendarScreen459ead47 => 'Día';
+
+  @override
+  String get availabilityCalendarScreen53703118 => 'Todo lo próximo';
+
+  @override
+  String get availabilityCalendarScreen81849937 => 'Visitas y horarios de hoy';
+
+  @override
+  String get availabilityCalendarScreenA59492de =>
+      'Aún no hay horarios disponibles para este día';
+
+  @override
+  String get availabilityCalendarScreenC5f10ba9 =>
+      'Añade un horario rápido, o toca «Añadir horario disponible» abajo';
+
+  @override
+  String get availabilityCalendarScreenD741ca0e => 'Mañana';
+
+  @override
+  String get availabilityCalendarScreen300ea530 => 'Mediodía';
+
+  @override
+  String get availabilityCalendarScreen33c5e69b => 'Tarde';
+
+  @override
+  String get availabilityCalendarScreen57660599 =>
+      'No hay visitas ni horarios próximos';
+
+  @override
+  String get availabilityCalendarScreen94eb6af0 => 'Visita confirmada';
+
+  @override
+  String get availabilityCalendarScreen4958be48 =>
+      'Horario de visita disponible';
+
+  @override
+  String get availabilityCalendarScreenC24d48d2 =>
+      'Solicitud de visita coordinada';
+
+  @override
+  String availabilityCalendarScreen50c4a059(Object propertyLabel) {
+    return 'Disponible para visitar en $propertyLabel';
+  }
+
+  @override
+  String get availabilityCalendarScreenC90c40a2 =>
+      'Los inquilinos pueden reservar un horario de visita';
+
+  @override
+  String get availabilityCalendarScreenF604bef9 => 'I';
+
+  @override
+  String get availabilityCalendarScreen7bbfbc12 => 'Agente';
+
+  @override
+  String get availabilityCalendarScreen9c2118be => 'Cliente';
+
+  @override
+  String get availabilityCalendarScreenD16264b7 => 'Disponible para reservar';
+
+  @override
+  String get availabilityCalendarScreenD5bc848b => 'Llamar';
+
+  @override
+  String get availabilityCalendarScreen7d165b83 => 'Eliminar horario';
+
+  @override
+  String get availabilityCalendarScreen9eba4851 =>
+      'Hora de inicio del horario disponible';
+
+  @override
+  String get availabilityCalendarScreenF29f462e => 'Nuevo horario disponible';
+
+  @override
+  String get availabilityCalendarScreen96d116f2 => 'Hora de inicio';
+
+  @override
+  String get availabilityCalendarScreenE94abfe2 => 'Cambiar';
+
+  @override
+  String get availabilityCalendarScreenFc655797 => 'Duración';
+
+  @override
+  String availabilityCalendarScreenD5c2c3b6(Object minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String availabilityCalendarScreenF2ee1c96(Object hours) {
+    return '$hours h';
+  }
+
+  @override
+  String get availabilityCalendarScreenE3a2d38d => 'Apartamento (opcional)';
+
+  @override
+  String get availabilityCalendarScreen2d69e44a => 'Todos los apartamentos';
+
+  @override
+  String get availabilityCalendarScreen7d46f18c => 'Solo hoy';
+
+  @override
+  String get availabilityCalendarScreen3563f3df => 'Toda la semana';
+
+  @override
+  String get availabilityCalendarScreen155f0dee =>
+      'Días laborables (dom.–jue.)';
+
+  @override
+  String get availabilityCalendarScreen404b7e24 => 'Fin de semana (vie.–sáb.)';
+
+  @override
+  String get availabilityCalendarScreen017014f8 => 'Etiqueta (opcional)';
+
+  @override
+  String get availabilityCalendarScreen82b33733 => 'Nota (opcional)';
+
+  @override
+  String get availabilityCalendarScreenF4c3f886 =>
+      'ej.: 3.er piso, código del edificio 1234';
+
+  @override
+  String get availabilityCalendarScreenEcfe64b2 => 'Añadir al calendario';
+
+  @override
+  String get availabilityCalendarScreenRepeatLabel => 'Repetición';
+
+  @override
+  String availabilityCalendarScreenSkippedSuffix(Object skipped) {
+    return '$skipped omitidos (se solapan)';
+  }
+
+  @override
+  String get eligibilityEditorSheet40d56dee => 'Tecnología';
+
+  @override
+  String get eligibilityEditorSheet6dfb51f1 => 'Salud/medicina';
+
+  @override
+  String get eligibilityEditorSheet19981c32 => 'Educación/enseñanza';
+
+  @override
+  String get eligibilityEditorSheetEbfcd4cb => 'Finanzas/banca';
+
+  @override
+  String get eligibilityEditorSheet4f8aded7 => 'Derecho';
+
+  @override
+  String get eligibilityEditorSheet453fe1ed => 'Ingeniería';
+
+  @override
+  String get eligibilityEditorSheetE1cad55a => 'Autónomo/a';
+
+  @override
+  String get eligibilityEditorSheetCb481f30 => 'Sector público';
+
+  @override
+  String get eligibilityEditorSheet2834587d => 'Comercio/servicios';
+
+  @override
+  String get eligibilityEditorSheet2157ec10 => 'Académico';
+
+  @override
+  String get eligibilityEditorSheet42ed7e8d => 'Estudiante';
+
+  @override
+  String get eligibilityEditorSheetCdf4bce0 => 'Otro';
+
+  @override
+  String get eligibilityEditorSheet926c043f => 'Familia';
+
+  @override
+  String get eligibilityEditorSheetB8d9266b => 'Soltero/a';
+
+  @override
+  String get eligibilityEditorSheet4df994d0 => 'Pareja';
+
+  @override
+  String get eligibilityEditorSheetD663155d => 'Joven profesional';
+
+  @override
+  String get eligibilityEditorSheet0aa42aa1 => 'Jubilados';
+
+  @override
+  String get eligibilityEditorSheetD02986c3 => 'Inmediato';
+
+  @override
+  String get eligibilityEditorSheetE9e8cbe3 => 'Dentro de un mes';
+
+  @override
+  String get eligibilityEditorSheetDe0def2d => 'Dentro de 3 meses';
+
+  @override
+  String get eligibilityEditorSheetB4d5170f =>
+      'Presupuesto mensual mínimo del inquilino ≥';
+
+  @override
+  String get eligibilityEditorSheet976f97ac => 'Número máximo de hijos';
+
+  @override
+  String get eligibilityEditorSheetE70cb0b4 => 'Sin mascotas';
+
+  @override
+  String get eligibilityEditorSheetCb3c47ce => 'Tiene coche';
+
+  @override
+  String get eligibilityEditorSheet15039c05 => 'Área de trabajo';
+
+  @override
+  String get eligibilityEditorSheetF5203dea => 'Teletrabajador/a';
+
+  @override
+  String get eligibilityEditorSheet2b9fb355 => 'Tipo de hogar';
+
+  @override
+  String get eligibilityEditorSheetD308ff19 => 'Etapa de vida';
+
+  @override
+  String get eligibilityEditorSheet5f3306da => 'Nuevo inmigrante';
+
+  @override
+  String get eligibilityEditorSheet8f9615bb => 'Edad mínima';
+
+  @override
+  String get eligibilityEditorSheetD5777fde => 'Edad máxima';
+
+  @override
+  String get eligibilityEditorSheetD83eff6a => 'Necesidades de accesibilidad';
+
+  @override
+  String get eligibilityEditorSheetC3912164 =>
+      'Número de habitaciones solicitado (mínimo)';
+
+  @override
+  String get eligibilityEditorSheet29d40b0e => 'Disponibilidad de mudanza';
+
+  @override
+  String get eligibilityEditorSheetC476594d => 'Importante';
+
+  @override
+  String get eligibilityEditorSheet0d3d4125 => 'Preferido';
+
+  @override
+  String get eligibilityEditorSheet116f6cc8 => 'Obligatorio';
+
+  @override
+  String get eligibilityEditorSheetA1caeddf =>
+      'Solo filtra a quienes se sabe que no son aptos';
+
+  @override
+  String get eligibilityEditorSheet44ca4acb => 'Solo afecta la clasificación';
+
+  @override
+  String get eligibilityEditorSheet03b2388e =>
+      'Quien no coincida o sea desconocido no verá el anuncio';
+
+  @override
+  String get eligibilityEditorSheet9786995c => 'No se han definido criterios';
+
+  @override
+  String eligibilityEditorSheetFf6c3b61(Object n) {
+    return '$n criterios';
+  }
+
+  @override
+  String eligibilityEditorSheetE4f4cb81(Object musts, Object n) {
+    return '$n criterios · $musts obligatorio(s)';
+  }
+
+  @override
+  String get eligibilityEditorSheet2d483b2c => 'Definir criterios precisos';
+
+  @override
+  String get eligibilityEditorSheetD3b88de7 =>
+      'Activa un criterio y define su valor y nivel de exigencia.';
+
+  @override
+  String get eligibilityEditorSheetBb9a4c12 =>
+      'Un criterio sin valor — el inquilino debe cumplirlo.';
+
+  @override
+  String get eligibilityEditorSheet20d4985f => 'Nivel de exigencia';
+
+  @override
+  String get eligibilityEditorSheet7c3236c7 =>
+      'No se han seleccionado criterios';
+
+  @override
+  String eligibilityEditorSheet7d5e1b03(Object count) {
+    return '$count criterios activos';
+  }
+
+  @override
+  String get eligibilityEditorSheetE6932339 => 'Guardar';
+
+  @override
+  String get eligibilityEditorSheet10ef20bd =>
+      'Filtrar inquilinos por criterios';
+
+  @override
+  String get eligibilityEditorSheetCdb2baa7 =>
+      'Mostrar el anuncio solo a los inquilinos que cumplen los criterios';
+
+  @override
+  String get eligibilityEditorSheet7f538947 =>
+      'Los criterios más allá del presupuesto/la ocupación dependen de información que el inquilino quizá aún no haya completado — por lo que un bloqueo estricto (\"Obligatorio\") podría reducir mucho el número de personas que ven el anuncio.';
+
+  @override
+  String get assistantScreenBe34f590 =>
+      'Hola, mucho gusto. Me llamo Ezra y estoy aquí para ayudarte.\nCuéntame en pocas palabras sobre el apartamento que quieres alquilar — dónde está, cuántas habitaciones tiene, y todo lo que quieras compartir. Con lo que me cuentes ya entenderé mucho, y solo preguntaré por lo que falte.\nPuedes hablarme o escribirme, como te resulte más cómodo.';
+
+  @override
+  String get assistantScreen6f3d21fa => 'Pensando...';
+
+  @override
+  String get assistantScreen378c0a57 => 'Ezra está hablando...';
+
+  @override
+  String get assistantScreen01036d5b => 'Escuchándote...';
+
+  @override
+  String get assistantScreenD8834f5a => 'Hola, soy Ezra';
+
+  @override
+  String get assistantScreen63169c60 =>
+      'Algo salió mal. Puedes intentarlo de nuevo.';
+
+  @override
+  String get assistantScreen581b78bc => 'Añadí una foto al anuncio';
+
+  @override
+  String get assistantScreenB6db02ff =>
+      'No pude añadir la foto. Inténtalo de nuevo.';
+
+  @override
+  String get assistantScreen594cce8f => 'Añadí un vídeo al anuncio';
+
+  @override
+  String get assistantScreenDf89d62b =>
+      'No pude añadir el vídeo. Inténtalo de nuevo.';
+
+  @override
+  String get assistantScreen5dd972a7 =>
+      'Un momento — para publicar necesitas al menos una foto del apartamento. Puedes tomarla ahora o elegir una de tu teléfono.';
+
+  @override
+  String assistantScreen07192f57(Object addr) {
+    return '¡Excelente! Publiqué tu anuncio en $addr, ya está disponible.';
+  }
+
+  @override
+  String get assistantScreen0ad71611 =>
+      '¡Excelente! Publiqué tu anuncio, ya está disponible.';
+
+  @override
+  String get assistantScreen76c2c7b1 =>
+      'Si quieres, puedes añadir más fotos en cualquier momento desde la pantalla \"Mis propiedades\".';
+
+  @override
+  String get assistantScreen539101b0 => 'Estoy aquí si necesitas algo más.';
+
+  @override
+  String get assistantScreen163e1f70 =>
+      'Lo siento, hubo un problema al publicar. Puedes intentarlo de nuevo o añadir fotos manualmente.';
+
+  @override
+  String get assistantScreen4dc83a95 => 'Ezra';
+
+  @override
+  String get assistantScreen154094c9 => 'Tu asistente personal';
+
+  @override
+  String get assistantScreenC16b3933 => 'Opciones';
+
+  @override
+  String get assistantScreenC9b9ffef =>
+      'Añadir contenido multimedia al anuncio';
+
+  @override
+  String get assistantScreen75705b64 =>
+      'Aún no has añadido fotos a este anuncio';
+
+  @override
+  String get assistantScreenFeddf7c6 => 'Hacer una foto';
+
+  @override
+  String get assistantScreenEed2fbf3 => 'Galería';
+
+  @override
+  String get assistantScreen26b77aa9 => 'Grabar un vídeo';
+
+  @override
+  String get assistantScreen4668a8a4 => 'Listo, continuar la conversación';
+
+  @override
+  String get assistantScreenAca7e84c => 'Publicar el borrador del anuncio';
+
+  @override
+  String get assistantScreen13e63c59 =>
+      'Ezra ya preparó un borrador — puedes publicarlo';
+
+  @override
+  String get assistantScreenC47bc8e5 => 'Añadir fotos';
+
+  @override
+  String get assistantScreen4610aeb4 => 'Toma o elige fotos para el anuncio';
+
+  @override
+  String get assistantScreen384e9c59 => 'Silenciar voz';
+
+  @override
+  String get assistantScreen1b571629 => 'Activar voz';
+
+  @override
+  String get assistantScreenFa9d4e0e => 'Ezra no hablará en voz alta';
+
+  @override
+  String get assistantScreenBfb2de50 => 'Ezra dirá sus respuestas en voz alta';
+
+  @override
+  String get assistantScreen82c40bcf => 'Nueva conversación';
+
+  @override
+  String get assistantScreenAb0463c4 => 'Borrar historial y empezar de nuevo';
+
+  @override
+  String assistantScreen80364adb(Object rooms) {
+    return '🚪  $rooms habitaciones';
+  }
+
+  @override
+  String assistantScreenE910996a(Object floor) {
+    return '🏢  Piso $floor';
+  }
+
+  @override
+  String assistantScreen8a8c75e3(Object price) {
+    return '💰  $price ₪/mes';
+  }
+
+  @override
+  String assistantScreen5f7c4ea0(Object size) {
+    return '📐  $size m²';
+  }
+
+  @override
+  String assistantScreenF534575e(Object date) {
+    return '📅  Mudanza: $date';
+  }
+
+  @override
+  String get assistantScreen87975ccc => 'Borrador de la propiedad';
+
+  @override
+  String assistantScreenA61a9170(Object count) {
+    return '$count fotos añadidas';
+  }
+
+  @override
+  String get assistantScreen2e6b8dd3 => 'Se necesita al menos una foto';
+
+  @override
+  String get assistantScreen2628dacb => 'Añadir o editar fotos';
+
+  @override
+  String get assistantScreen89ac1e56 => 'Publicando el anuncio...';
+
+  @override
+  String get assistantScreenF3db670c => 'Sí, publicar el anuncio';
+
+  @override
+  String get assistantScreenE4c51425 => 'Abrir edición completa';
+
+  @override
+  String get landlordDashboardScreenC6c7d5f7 => 'Propietario';
+
+  @override
+  String get landlordDashboardScreen235e6256 => 'Hola, ';
+
+  @override
+  String landlordDashboardScreen9c8fa644(Object pendingCount) {
+    return '$pendingCount candidatos esperando tu aprobación';
+  }
+
+  @override
+  String get landlordDashboardScreen99884c14 => 'Todo al día y bajo control ✓';
+
+  @override
+  String get landlordDashboardScreenCce14f4f => 'Asistente personal';
+
+  @override
+  String get landlordDashboardScreen80293f4c => 'Resumen';
+
+  @override
+  String get landlordDashboardScreen1b17721e => 'Total de propiedades';
+
+  @override
+  String get landlordDashboardScreen17127579 => 'activas';
+
+  @override
+  String get landlordDashboardScreen0b71fe76 => 'Ingreso esperado';
+
+  @override
+  String get landlordDashboardScreen3ec09dc0 => 'Mensual';
+
+  @override
+  String get landlordDashboardScreen94943464 =>
+      'Cuántos candidatos interesados has aprobado';
+
+  @override
+  String landlordDashboardScreenEd3747d9(Object pendingCount) {
+    return '$pendingCount esperando tu aprobación';
+  }
+
+  @override
+  String get landlordDashboardScreen8a106a06 => 'No hay candidatos esperando';
+
+  @override
+  String get landlordDashboardScreenEec75f83 => 'Propiedades con coincidencia';
+
+  @override
+  String landlordDashboardScreenBc2e631f(Object propertiesCount) {
+    return 'De $propertiesCount propiedades activas';
+  }
+
+  @override
+  String get landlordDashboardScreenB0164098 => 'Con coincidencia';
+
+  @override
+  String get landlordDashboardScreenFa311e7d => 'Pendientes';
+
+  @override
+  String get landlordDashboardScreen50296d4c => 'Semanal';
+
+  @override
+  String get landlordDashboardScreen8951e6dc => 'Anual';
+
+  @override
+  String get landlordDashboardScreen43b23f14 => 'esta semana';
+
+  @override
+  String get landlordDashboardScreenAf52bcd6 => 'este mes';
+
+  @override
+  String get landlordDashboardScreenBa6767e5 => 'este año';
+
+  @override
+  String get landlordDashboardScreen270bf5ed => 'D';
+
+  @override
+  String get landlordDashboardScreen8f61d08b => 'L';
+
+  @override
+  String get landlordDashboardScreenAf1c561b => 'M';
+
+  @override
+  String get landlordDashboardScreenC7179c6f => 'X';
+
+  @override
+  String get landlordDashboardScreen5dee9138 => 'J';
+
+  @override
+  String get landlordDashboardScreen93aec056 => 'V';
+
+  @override
+  String get landlordDashboardScreenBda0900b => 'S';
+
+  @override
+  String get landlordDashboardScreenA6b97c1e => 'Sem 1';
+
+  @override
+  String get landlordDashboardScreen9aff6d23 => 'Sem 2';
+
+  @override
+  String get landlordDashboardScreenF960defe => 'Sem 3';
+
+  @override
+  String get landlordDashboardScreen04e8f590 => 'Sem 4';
+
+  @override
+  String get landlordDashboardScreen19035156 => 'Ene';
+
+  @override
+  String get landlordDashboardScreen8cc85ded => 'Feb';
+
+  @override
+  String get landlordDashboardScreenC0394ea3 => 'Mar';
+
+  @override
+  String get landlordDashboardScreenDc6b970f => 'Abr';
+
+  @override
+  String get landlordDashboardScreen5fa88202 => 'May';
+
+  @override
+  String get landlordDashboardScreen477d76d2 => 'Jun';
+
+  @override
+  String get landlordDashboardScreenA1f2e9ed => 'Jul';
+
+  @override
+  String get landlordDashboardScreen574d25b5 => 'Ago';
+
+  @override
+  String get landlordDashboardScreen5a24ce53 => 'Sep';
+
+  @override
+  String get landlordDashboardScreen4d43f4d5 => 'Oct';
+
+  @override
+  String get landlordDashboardScreen6f0a4de2 => 'Nov';
+
+  @override
+  String get landlordDashboardScreenD30ca257 => 'Dic';
+
+  @override
+  String landlordDashboardScreenA21a4640(Object suffix) {
+    return 'Interés en tus propiedades $suffix';
+  }
+
+  @override
+  String get landlordDashboardScreen7203ea03 => 'Me gusta hoy';
+
+  @override
+  String get landlordDashboardScreen4ff60e81 => 'Total de consultas';
+
+  @override
+  String landlordDashboardScreenE8a3f079(Object totalInquiries) {
+    return '$totalInquiries consultas';
+  }
+
+  @override
+  String get landlordDashboardScreen66b405bd => 'Promedio diario';
+
+  @override
+  String get landlordDashboardScreenAcc6e3d2 => 'Promedio semanal';
+
+  @override
+  String get landlordDashboardScreenE679dd5d => 'Promedio mensual';
+
+  @override
+  String get landlordDashboardScreen2074036b => 'Herramientas del agente';
+
+  @override
+  String get landlordDashboardScreen0a134a61 =>
+      'Libro de clientes, coincidencias, pipeline, visitas y más';
+
+  @override
+  String get landlordDashboardScreen299b769f => 'Herramientas del propietario';
+
+  @override
+  String get landlordDashboardScreenC7fa5680 =>
+      'Ayuda sencilla para gestionar tu propiedad — sin dolores de cabeza';
+
+  @override
+  String get landlordDashboardScreenA8bb0310 => 'Inteligencia de zona';
+
+  @override
+  String get landlordDashboardScreen4e175795 =>
+      'Dirección → todos los datos de la zona y para quién es la mejor inversión';
+
+  @override
+  String get landlordDashboardScreenAaafbb6b =>
+      'Impuesto sobre la renta — de forma sencilla';
+
+  @override
+  String get landlordDashboardScreenDfd3460d =>
+      'Una comprobación rápida de si debes pagar impuestos sobre tu ingreso por alquiler';
+
+  @override
+  String get landlordDashboardScreenCa25d18a => 'Recordatorios';
+
+  @override
+  String get landlordDashboardScreen8b96a6ac =>
+      'Para que nunca te pierdas una renovación de contrato, un pago o un seguro';
+
+  @override
+  String get landlordDashboardScreen5308aa0d => 'Seguimiento de pagos';
+
+  @override
+  String get landlordDashboardScreen9fd83dca =>
+      'Agrega una propiedad para empezar a seguir los pagos de alquiler';
+
+  @override
+  String get landlordDashboardScreen7e05b276 =>
+      'Elige una propiedad para ver el estado, la fecha de vencimiento y las notas';
+
+  @override
+  String get landlordDashboardScreenDae6b270 => 'Domingo';
+
+  @override
+  String get landlordDashboardScreen47f34119 => 'Lunes';
+
+  @override
+  String get landlordDashboardScreenDb0c22fc => 'Martes';
+
+  @override
+  String get landlordDashboardScreenDa1dae77 => 'Miércoles';
+
+  @override
+  String get landlordDashboardScreenCe94cfff => 'Jueves';
+
+  @override
+  String get landlordDashboardScreen7e718908 => 'Viernes';
+
+  @override
+  String get landlordDashboardScreen4203bd7e => 'Sábado';
+
+  @override
+  String get landlordDashboardScreen95d86d7f => 'Hoy';
+
+  @override
+  String get landlordDashboardScreen840835ac => 'Mañana';
+
+  @override
+  String landlordDashboardScreen30744d51(Object weekday) {
+    return '$weekday';
+  }
+
+  @override
+  String landlordDashboardScreen2dd36976(
+      Object day, Object month, Object weekday) {
+    return '$weekday $day/$month';
+  }
+
+  @override
+  String get landlordDashboardScreenD1b5aeb8 => 'Mi calendario';
+
+  @override
+  String get landlordDashboardScreen32fb9ba0 => 'Cargando...';
+
+  @override
+  String get landlordDashboardScreenF12b53ff => 'Inquilino';
+
+  @override
+  String landlordDashboardScreen6db621c3(Object who) {
+    return 'Próxima visita · $who';
+  }
+
+  @override
+  String get landlordDashboardScreen7dec25c8 =>
+      'No hay visitas programadas · Agrega horarios disponibles';
+
+  @override
+  String get compareScreen724ef1bb => 'Comparar apartamentos';
+
+  @override
+  String get compareScreenBbabc52c => 'Buscar un apartamento para comparar';
+
+  @override
+  String get compareScreen61e90252 =>
+      'Selecciona al menos 2 apartamentos para comparar';
+
+  @override
+  String get compareScreen27eebc10 =>
+      'No hay suficientes datos para una recomendación clara';
+
+  @override
+  String get compareScreen4ec49abd =>
+      'A algunos anuncios les falta precio/tamaño o una referencia de mercado. Desplázate hacia abajo para ver la comparación completa.';
+
+  @override
+  String compareScreenFcb21fe2(Object total) {
+    return 'Costo real ~₪$total/mes ';
+  }
+
+  @override
+  String get compareScreen46bf1369 =>
+      '(incluye impuesto municipal y cuotas del edificio)';
+
+  @override
+  String compareScreenA8bb36b3(Object caveat) {
+    return 'Nota: $caveat';
+  }
+
+  @override
+  String compareScreenC25ab447(Object where) {
+    return 'Pero la mejor opción personal para ti: $where';
+  }
+
+  @override
+  String compareScreen332e33ea(Object pct) {
+    return ' ($pct%) — si el presupuesto es menos crítico.';
+  }
+
+  @override
+  String get compareScreen2f883e47 => 'En resumen';
+
+  @override
+  String compareScreen08920749(Object city) {
+    return ' en $city';
+  }
+
+  @override
+  String get compareScreen651fe4ea =>
+      'El precio es justo para el tamaño y la zona';
+
+  @override
+  String compareScreenE97266c1(Object pct, Object where) {
+    return 'Alrededor de $pct% por debajo del precio de mercado$where — un buen precio';
+  }
+
+  @override
+  String get compareScreen2514977c =>
+      'Cerca del precio de mercado — la mejor relación calidad-precio del grupo';
+
+  @override
+  String compareScreenE036fa5f(Object where) {
+    return 'Justo al precio de mercado$where';
+  }
+
+  @override
+  String get compareScreen41c2e13a =>
+      'Hay un apartamento más espacioso en la comparación';
+
+  @override
+  String compareScreen7cb99b30(Object feature) {
+    return 'Sin $feature (disponible en otro anuncio)';
+  }
+
+  @override
+  String get compareScreenD948b41f =>
+      'Hay una opción más barata en costo mensual';
+
+  @override
+  String get compareScreen5b4d6e83 => 'Cuánto te costará realmente';
+
+  @override
+  String get compareScreen3b9ffcf8 =>
+      'El alquiler no es el costo real — el impuesto municipal y las cuotas del edificio se suman cada mes.';
+
+  @override
+  String compareScreen35beed96(Object where) {
+    return '$where parece el más barato en alquiler, ';
+  }
+
+  @override
+  String compareScreenFc7a9430(Object where) {
+    return 'pero $where es más barato en el total ';
+  }
+
+  @override
+  String get compareScreen5706cd1b => 'mensual.';
+
+  @override
+  String get compareScreenCbde97ef => 'Realmente el más barato';
+
+  @override
+  String compareScreenCc3022d2(Object arnona, Object rent) {
+    return 'Alquiler ₪$rent + impuesto municipal ~₪$arnona ';
+  }
+
+  @override
+  String compareScreenAab6709f(Object vaad) {
+    return '+ cuotas del edificio ~₪$vaad';
+  }
+
+  @override
+  String get compareScreenE1000003 => 'Qué sacrificas';
+
+  @override
+  String compareScreenB05c14b6(Object where) {
+    return 'Comparado con $where (la recomendación) — qué te ofrece cada otra opción y qué perderías:';
+  }
+
+  @override
+  String get compareScreen87ede2ed =>
+      'Muy similar a la recomendación — sin diferencia significativa.';
+
+  @override
+  String compareScreenD46b7e4d(Object d) {
+    return '₪$d más barato al mes';
+  }
+
+  @override
+  String compareScreenF17583c1(Object d) {
+    return '₪$d más caro al mes';
+  }
+
+  @override
+  String compareScreenF1897440(Object d) {
+    return '$d m² más grande';
+  }
+
+  @override
+  String compareScreenE791ef57(Object d) {
+    return '$d m² más pequeño';
+  }
+
+  @override
+  String compareScreen5d0daead(Object rooms) {
+    return 'Más habitaciones ($rooms)';
+  }
+
+  @override
+  String compareScreenE9e5b9ac(Object rooms) {
+    return 'Menos habitaciones ($rooms)';
+  }
+
+  @override
+  String compareScreenAe9d2da6(Object feature) {
+    return 'Tiene $feature';
+  }
+
+  @override
+  String compareScreenC88245ca(Object feature) {
+    return 'Sin $feature';
+  }
+
+  @override
+  String compareScreen56d02b30(Object pct) {
+    return 'Mejor precio respecto al mercado (en $pct%)';
+  }
+
+  @override
+  String compareScreen3bce9322(Object pct) {
+    return 'Peor precio respecto al mercado (en $pct%)';
+  }
+
+  @override
+  String compareScreen7f897f38(Object mo) {
+    return 'Mayor coincidencia para ti ($mo%)';
+  }
+
+  @override
+  String compareScreen95af2d2f(Object mo) {
+    return 'Menor coincidencia ($mo%)';
+  }
+
+  @override
+  String get compareScreenE33e9eb9 => 'Todos los detalles comparados';
+
+  @override
+  String get compareScreenCc097285 => 'Precio';
+
+  @override
+  String get compareScreen1e7862a6 => '₪ por m²';
+
+  @override
+  String get compareScreenB50b3974 => 'Habitaciones';
+
+  @override
+  String get compareScreen16f6bd25 => 'Tamaño';
+
+  @override
+  String compareScreenD8b6113c(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String get compareScreen047e630b => 'Piso';
+
+  @override
+  String get compareScreen8d058056 => 'Ascensor';
+
+  @override
+  String get compareScreenA9655ab3 => 'Estacionamiento';
+
+  @override
+  String get compareScreen86425fcf => 'Balcón';
+
+  @override
+  String get compareScreenE1cca9ff => 'Cuarto de seguridad (Mamad)';
+
+  @override
+  String get compareScreenFcf022d8 => 'Estado';
+
+  @override
+  String get compareScreen206ee003 => 'Coincidencia';
+
+  @override
+  String get compareScreenEf5ba2c7 => 'Selecciona apartamentos para comparar';
+
+  @override
+  String compareScreen0975a98d(Object count, Object max) {
+    return '$count/$max apartamentos seleccionados';
+  }
+
+  @override
+  String get compareScreen4175f994 => 'Sí';
+
+  @override
+  String get compareScreen21a2d9d6 => 'No';
+
+  @override
+  String get compareScreenF419307d =>
+      'Aún no has guardado ningún apartamento.\nGuarda al menos 2 apartamentos para compararlos.';
+
+  @override
+  String get compareScreen8833d8c9 =>
+      'Solo has guardado un apartamento.\nGuarda otro para compararlos.';
+
+  @override
+  String get compareScreenAbca0fe8 => 'Agregar un apartamento para comparar';
+
+  @override
+  String get compareScreenDd5b39ef => 'Buscar por ciudad / barrio / dirección…';
+
+  @override
+  String get compareScreenEf52c1b3 =>
+      '¡Ups! No se encontraron apartamentos coincidentes';
+
+  @override
+  String compareScreen0c390fdc(Object price, Object rooms) {
+    return '$price · $rooms habitaciones';
+  }
+
+  @override
+  String get landlordPropertiesScreenContractNeedsMatch =>
+      'Un contrato se abre con un inquilino con el que ya tienes un match. Primero consigue un match para la propiedad.';
+
+  @override
+  String get landlordPropertiesScreenSendContractTitle =>
+      '¿Enviar el contrato?';
+
+  @override
+  String get landlordPropertiesScreenSendContractMessage =>
+      '¿Seguro que quieres enviar el contrato?';
+
+  @override
+  String get landlordPropertiesScreenContractSourceTitle =>
+      '¿Cómo te gustaría crear el contrato?';
+
+  @override
+  String get landlordPropertiesScreenUseOurContract => 'Usar nuestro contrato';
+
+  @override
+  String get landlordPropertiesScreenOurContractSubtitle =>
+      'Un contrato estándar de los abogados de Rently';
+
+  @override
+  String get landlordPropertiesScreenCreateOwnContract =>
+      'Crear tu propio contrato';
+
+  @override
+  String get landlordPropertiesScreenOwnContractSubtitle =>
+      'Completa tú mismo las condiciones';
+
+  @override
+  String get landlordPropertiesScreenSortDefault => 'Predeterminado';
+
+  @override
+  String get landlordPropertiesScreenSortPriceAsc => 'Precio: de menor a mayor';
+
+  @override
+  String get landlordPropertiesScreenSortPriceDesc =>
+      'Precio: de mayor a menor';
+
+  @override
+  String get landlordPropertiesScreenSortRooms => 'Por habitaciones';
+
+  @override
+  String get landlordPropertiesScreenFilterAll => 'Todo';
+
+  @override
+  String get landlordPropertiesScreenFilterHighPriority =>
+      'Prioridad de marketing (hasta 6K)';
+
+  @override
+  String get landlordPropertiesScreenFilterLuxury =>
+      'Propiedades de lujo (10K+)';
+
+  @override
+  String get landlordPropertiesScreenFilterImmediate => 'Entrada inmediata';
+
+  @override
+  String get landlordPropertiesScreenFilterLarge =>
+      'Apartamentos grandes (4+ habitaciones)';
+
+  @override
+  String get landlordPropertiesScreenFilterAgency => 'Exclusiva (agencia)';
+
+  @override
+  String get landlordPropertiesScreenFilterPrivate =>
+      'Particular (sin agencia)';
+
+  @override
+  String get landlordPropertiesScreenFilterSortTitle =>
+      'Filtrar y ordenar propiedades';
+
+  @override
+  String get landlordPropertiesScreenReset => 'Restablecer';
+
+  @override
+  String get landlordPropertiesScreenFilterByTags => 'Filtrar por etiquetas';
+
+  @override
+  String get landlordPropertiesScreenSortByLabel => 'Ordenar por';
+
+  @override
+  String get landlordPropertiesScreenAddLabel => 'Añadir';
+
+  @override
+  String get landlordPropertiesScreenSearchHint =>
+      'Buscar por dirección, ciudad...';
+
+  @override
+  String get landlordPropertiesScreenPillLarge => 'Apartamentos grandes';
+
+  @override
+  String get landlordPropertiesScreenPillPrivate => 'Particular';
+
+  @override
+  String get landlordPropertiesScreenPillAgency => 'Exclusiva';
+
+  @override
+  String get landlordPropertiesScreenPillLuxury => 'Lujo';
+
+  @override
+  String get landlordPropertiesScreenPillHighPriority => 'Hasta 6K';
+
+  @override
+  String landlordPropertiesScreenResultsCount(Object filtered, Object total) {
+    return '$filtered de $total propiedades';
+  }
+
+  @override
+  String get landlordPropertiesScreenContractDraft => 'Borrador';
+
+  @override
+  String get landlordPropertiesScreenContractSent => 'Enviado';
+
+  @override
+  String get landlordPropertiesScreenContractSigned => 'Firmado ✓';
+
+  @override
+  String get landlordPropertiesScreenBoostedTag => 'Impulsado';
+
+  @override
+  String landlordPropertiesScreenRoomsTag(Object rooms) {
+    return '$rooms hab.';
+  }
+
+  @override
+  String landlordPropertiesScreenSizeTag(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String landlordPropertiesScreenContractLabel(Object status) {
+    return 'Contrato: $status';
+  }
+
+  @override
+  String landlordPropertiesScreenAudienceCount(Object count) {
+    return '$count público objetivo';
+  }
+
+  @override
+  String get landlordPropertiesScreenEmptyTitle =>
+      'Aún no has añadido propiedades';
+
+  @override
+  String get landlordPropertiesScreenEmptyBody =>
+      'Añade tu primera propiedad para empezar a recibir likes, candidatos y conversaciones.';
+
+  @override
+  String get landlordPropertiesScreenNoResultsTitle =>
+      'No se encontraron propiedades con este filtro';
+
+  @override
+  String get landlordPropertiesScreenNoResultsBody =>
+      'Prueba a cambiar los parámetros de búsqueda o borrar los filtros.';
+
+  @override
+  String get landlordPropertiesScreenClearFilters => 'Borrar filtros';
+
+  @override
+  String get contractSignFlowScreenTitle => 'Firma del contrato';
+
+  @override
+  String get contractSignFlowScreenPartiesSection => 'Partes y firmas';
+
+  @override
+  String get contractSignFlowScreenLandlord => 'El propietario';
+
+  @override
+  String get contractSignFlowScreenTenantWithThe => 'El inquilino';
+
+  @override
+  String get contractSignFlowScreenCancelled => 'El contrato fue cancelado';
+
+  @override
+  String get contractSignFlowScreenDeclined => 'El contrato fue rechazado';
+
+  @override
+  String get contractSignFlowScreenCompletedTitle =>
+      'Completado: firmado por ambas partes';
+
+  @override
+  String get contractSignFlowScreenCompletedBody =>
+      'El contrato es válido y está firmado digitalmente. Puedes verlo en cualquier momento.';
+
+  @override
+  String contractSignFlowScreenWaitingForOther(Object other) {
+    return 'Has firmado: esperando la firma de $other';
+  }
+
+  @override
+  String get contractSignFlowScreenWaitingForOtherBody =>
+      'Se envió una notificación a la otra parte. En cuanto firme, el contrato quedará completo.';
+
+  @override
+  String get contractSignFlowScreenLandlordSignedWaitingYou =>
+      'El propietario ha firmado · esperando tu firma';
+
+  @override
+  String get contractSignFlowScreenReviewToComplete =>
+      'Revisa las condiciones y toca \"Firmar\" para completar el contrato.';
+
+  @override
+  String get contractSignFlowScreenWaitingSignature => 'Esperando firma';
+
+  @override
+  String get contractSignFlowScreenReviewToStart =>
+      'Revisa las condiciones y toca \"Firmar\" para empezar.';
+
+  @override
+  String get contractSignFlowScreenTenant => 'Inquilino';
+
+  @override
+  String get contractSignFlowScreenCompletedShort => 'Completado';
+
+  @override
+  String get contractSignFlowScreenPropertyFallback => 'Propiedad en alquiler';
+
+  @override
+  String get contractSignFlowScreenMonthlyRent => 'Alquiler mensual';
+
+  @override
+  String get contractSignFlowScreenDeposit => 'Depósito';
+
+  @override
+  String get contractSignFlowScreenDuration => 'Duración';
+
+  @override
+  String contractSignFlowScreenDurationMonths(Object months) {
+    return '$months meses';
+  }
+
+  @override
+  String get contractSignFlowScreenMoveIn => 'Entrada';
+
+  @override
+  String get contractSignFlowScreenEndDate => 'Fin';
+
+  @override
+  String get contractSignFlowScreenTermsText => 'Texto del contrato';
+
+  @override
+  String get contractSignFlowScreenThatsYou => 'Eres tú';
+
+  @override
+  String get contractSignFlowScreenSigned => 'Firmado';
+
+  @override
+  String contractSignFlowScreenSignedOn(Object date) {
+    return 'Firmado · $date';
+  }
+
+  @override
+  String contractSignFlowScreenSignAsLabel(Object role) {
+    return 'Firmar como $role';
+  }
+
+  @override
+  String get contractSignFlowScreenContractCompleted =>
+      'El contrato está completo';
+
+  @override
+  String get contractSignFlowScreenSignedWaitingOther =>
+      'Has firmado · esperando a la otra parte';
+
+  @override
+  String get contractSignFlowScreenBack => 'Atrás';
+
+  @override
+  String get contractSignFlowScreenSignatureSaved =>
+      'Firma guardada correctamente ✍️';
+
+  @override
+  String get contractSignFlowScreenSignBeforeConfirm =>
+      'Debes firmar dentro del recuadro antes de confirmar';
+
+  @override
+  String get contractSignFlowScreenDigitalSignature => 'Firma digital';
+
+  @override
+  String get contractSignFlowScreenSignWithFinger =>
+      'Firma con el dedo en el recuadro de abajo';
+
+  @override
+  String get contractSignFlowScreenClear => 'Borrar';
+
+  @override
+  String get contractSignFlowScreenSigning => 'Firmando…';
+
+  @override
+  String get contractSignFlowScreenConfirmSignature => 'Confirmar firma';
+
+  @override
+  String get contractSignFlowScreenSecurityNotePart1 =>
+      'Firma digital segura (Ed25519). La clave privada se guarda solo en tu dispositivo; ';
+
+  @override
+  String get contractSignFlowScreenSecurityNotePart2 =>
+      'cualquier cambio en las condiciones anula las firmas ya realizadas.';
+
+  @override
+  String get contractSignFlowScreenNotFoundTitle => 'Contrato no encontrado';
+
+  @override
+  String get contractSignFlowScreenNotFoundBody =>
+      'Intenta actualizar el chat. Si el propietario aún no ha enviado un contrato, aparecerá aquí en cuanto lo envíe.';
+
+  @override
+  String get erikChatScreenBotName => 'Ezra';
+
+  @override
+  String get erikChatScreenGreetingIntro =>
+      'Hola, encantado de conocerte. Me llamo Ezra y estoy aquí para ayudarte.\n';
+
+  @override
+  String get erikChatScreenGreetingBody1 =>
+      'Puedes contarme sobre un apartamento que quieras alquilar y te crearé un anuncio, te ayudaré a redactar una descripción, ';
+
+  @override
+  String get erikChatScreenGreetingBody2 =>
+      'fijar un precio, o simplemente responder preguntas. Lo que te resulte más cómodo: escribir o hablar.';
+
+  @override
+  String get erikChatScreenStarter1 => 'Quiero publicar un apartamento nuevo';
+
+  @override
+  String get erikChatScreenStarter2 =>
+      'Ayúdame a redactar una descripción del apartamento';
+
+  @override
+  String get erikChatScreenStarter3 =>
+      '¿Qué debería fotografiar en el apartamento?';
+
+  @override
+  String get erikChatScreenStarter4 => '¿Cómo fijo el precio correctamente?';
+
+  @override
+  String get erikChatScreenAssistantUnavailable =>
+      'El asistente personal no está disponible en este momento. Inténtalo de nuevo más tarde.';
+
+  @override
+  String get erikChatScreenTransientError =>
+      'Lo siento, hubo un fallo momentáneo. Puedes intentarlo de nuevo.';
+
+  @override
+  String get erikChatScreenVideoAddedBubble => '🎥 Video añadido';
+
+  @override
+  String get erikChatScreenPhotoAddedBubble => '📷 Foto añadida';
+
+  @override
+  String get erikChatScreenVideoAddedSnack => 'Video añadido ✓';
+
+  @override
+  String erikChatScreenPhotoAddedSnack(Object count) {
+    return 'Foto añadida ✓ ($count)';
+  }
+
+  @override
+  String get erikChatScreenAttachFailed =>
+      'No pude adjuntar el archivo. Puedes intentarlo de nuevo.';
+
+  @override
+  String get erikChatScreenTakePhoto => 'Tomar una foto';
+
+  @override
+  String get erikChatScreenChooseFromGallery => 'Elegir de la galería';
+
+  @override
+  String get erikChatScreenVideoFromGallery => 'Video de la galería';
+
+  @override
+  String get erikChatScreenTour360 => 'Tour 360°';
+
+  @override
+  String get erikChatScreenTour360Added => 'Tour 360° añadido ✓';
+
+  @override
+  String get erikChatScreenNeedPhotoToPublish =>
+      'Un momento: para publicar necesitas al menos una foto del apartamento. Puedes tomarla ahora o elegirla de tu teléfono.';
+
+  @override
+  String erikChatScreenPublishedSuccessWithAddr(Object addr) {
+    return '¡Genial! Publiqué tu anuncio en $addr, ya está en línea. 🎉\n';
+  }
+
+  @override
+  String get erikChatScreenPublishedSuccessNoAddr =>
+      '¡Genial! Publiqué tu anuncio, ya está en línea. 🎉\n';
+
+  @override
+  String get erikChatScreenPublishedTip =>
+      'Puedes añadir más fotos en cualquier momento desde la pantalla \"Mis propiedades\". Estoy aquí si necesitas algo más.';
+
+  @override
+  String get erikChatScreenPublishFailed =>
+      'Hubo un problema al publicar. Puedes intentarlo de nuevo o editarlo en el formulario completo.';
+
+  @override
+  String erikChatScreenSubtitle(Object botName) {
+    return '$botName · Asistente personal';
+  }
+
+  @override
+  String get erikChatScreenHereForYou => 'Aquí para ti';
+
+  @override
+  String get erikChatScreenLiveVoiceTooltip => 'Llamada de voz en vivo';
+
+  @override
+  String get erikChatScreenReadAloudOn => 'Lectura en voz alta activada';
+
+  @override
+  String get erikChatScreenReadAloudOff => 'Lectura en voz alta desactivada';
+
+  @override
+  String get erikChatScreenReadAloudOnSnack =>
+      'Ezra leerá las respuestas en voz alta';
+
+  @override
+  String get erikChatScreenNewConversation => 'Nueva conversación';
+
+  @override
+  String get erikChatScreenRetry => 'Intentar de nuevo';
+
+  @override
+  String erikChatScreenRoomsSuffix(Object rooms) {
+    return '$rooms habitaciones';
+  }
+
+  @override
+  String erikChatScreenSizeSuffix(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String erikChatScreenFloorLabel(Object floor) {
+    return 'Piso $floor';
+  }
+
+  @override
+  String erikChatScreenPriceSuffix(Object price) {
+    return '₪$price al mes';
+  }
+
+  @override
+  String erikChatScreenEntryLabel(Object entryDate) {
+    return 'Entrada: $entryDate';
+  }
+
+  @override
+  String get erikChatScreenDraftReadyTitle => 'Borrador de anuncio listo';
+
+  @override
+  String get erikChatScreenAddPhotos => 'Añade fotos del apartamento';
+
+  @override
+  String erikChatScreenPhotosCountAddMore(Object count) {
+    return '$count fotos · Añadir más';
+  }
+
+  @override
+  String get erikChatScreenPublishNow => 'Publicar ahora';
+
+  @override
+  String get erikChatScreenEdit => 'Editar';
+
+  @override
+  String get erikChatScreenInputHint => 'Cuéntame con tus propias palabras...';
+
+  @override
+  String get nearbyPlacesCard29364e0f => 'Lugares cercanos';
+
+  @override
+  String get nearbyPlacesCard7e6e0fb1 => 'Anterior';
+
+  @override
+  String nearbyPlacesCard4a3e7c17(Object page, Object total) {
+    return 'Página $page de $total';
+  }
+
+  @override
+  String get nearbyPlacesCard5f9edf6e => 'Siguiente';
+
+  @override
+  String get nearbyPlacesCard4745b1e9 => 'Ver más lugares cercanos';
+
+  @override
+  String nearbyPlacesCard9197afde(Object hidden) {
+    return 'Ver todo (+$hidden)';
+  }
+
+  @override
+  String get nearbyPlacesCard6192614d => 'Mostrar menos';
+
+  @override
+  String nearbyPlacesCardC3e59a4e(Object radiusKm) {
+    return ' · $radiusKm km';
+  }
+
+  @override
+  String get nearbyPlacesCardCef7ef5e => 'Colegios cercanos';
+
+  @override
+  String get nearbyPlacesCardD7b78a1f => 'Guarderías cercanas';
+
+  @override
+  String get nearbyPlacesCard385087d3 => 'Clínicas cercanas';
+
+  @override
+  String get nearbyPlacesCard19a008ff => 'Supermercados cercanos';
+
+  @override
+  String get nearbyPlacesCardCdc11038 => 'Parques cercanos';
+
+  @override
+  String get nearbyPlacesCardEc7edb50 => 'Farmacias cercanas';
+
+  @override
+  String get nearbyPlacesCard71ec0056 => 'Parques infantiles cercanos';
+
+  @override
+  String get nearbyPlacesCard09b9bc6f => 'Restaurantes y cafeterías cercanos';
+
+  @override
+  String get nearbyPlacesCard117e5860 => 'Gimnasios cercanos';
+
+  @override
+  String get nearbyPlacesCardD4ecbfa0 => 'Bares y pubs cercanos';
+
+  @override
+  String get nearbyPlacesCard7e72c9af => 'Sinagogas cercanas';
+
+  @override
+  String get nearbyPlacesCard21a17e0d => 'Centros culturales cercanos';
+
+  @override
+  String get nearbyPlacesCard46be343a => 'Hospitales cercanos';
+
+  @override
+  String get nearbyPlacesCard07638922 =>
+      'Estaciones de tren y tranvía cercanas';
+
+  @override
+  String get nearbyPlacesCardBb428196 => 'Mezquitas e iglesias cercanas';
+
+  @override
+  String get nearbyPlacesCard34ff0c6c => 'Piscinas y centros deportivos';
+
+  @override
+  String get nearbyPlacesCard5290646f => 'Parques para perros cercanos';
+
+  @override
+  String get nearbyPlacesCard6faa1286 => 'Veterinarios cercanos';
+
+  @override
+  String get nearbyPlacesCard5b5ddf14 =>
+      'Estaciones de bicicletas compartidas cercanas';
+
+  @override
+  String get nearbyPlacesCard5d4c2d06 => 'Espacios de coworking cercanos';
+
+  @override
+  String get nearbyPlacesCard0a96eae3 => 'Estacionamientos cercanos';
+
+  @override
+  String get nearbyPlacesCard6278673e => 'Clínica';
+
+  @override
+  String nearbyPlacesCardDcabfe76(Object m) {
+    return '$m m';
+  }
+
+  @override
+  String nearbyPlacesCard0b2db321(Object km) {
+    return '$km km';
+  }
+
+  @override
+  String get nearbyPlacesCard4f9b07b3 => '¿Abrir en Google?';
+
+  @override
+  String nearbyPlacesCardE927ed2c(Object name) {
+    return 'Buscaremos «$name» en Google.';
+  }
+
+  @override
+  String get nearbyPlacesCardA7c55a8d => 'Cancelar';
+
+  @override
+  String get nearbyPlacesCard95337767 => 'Buscar en Google';
+
+  @override
+  String get panoramaSweepCaptureE7f7e04b => 'Fila central';
+
+  @override
+  String get panoramaSweepCapture5c22dd54 =>
+      'Sostén el teléfono en vertical y gira un círculo completo en tu lugar';
+
+  @override
+  String get panoramaSweepCapture00ce3275 => 'Fila superior';
+
+  @override
+  String get panoramaSweepCapture29b0747d =>
+      'Inclina ligeramente hacia arriba (~30°) y gira un círculo completo de nuevo';
+
+  @override
+  String get panoramaSweepCapture8dec33ce => 'Fila inferior';
+
+  @override
+  String get panoramaSweepCapture69ed4717 =>
+      'Inclina ligeramente hacia abajo (~30°) y gira un círculo completo de nuevo';
+
+  @override
+  String get panoramaSweepCapture62aa1e63 =>
+      'No se pudo abrir la cámara. Comprueba los permisos de la cámara.';
+
+  @override
+  String get panoramaSweepCapture6b180872 =>
+      'Se necesitan más fotos para completar un giro completo. Gira un poco más e inténtalo de nuevo.';
+
+  @override
+  String get panoramaSweepCapture97f6b247 =>
+      'Comenzando a crear el recorrido...';
+
+  @override
+  String get panoramaSweepCapture51e3560a =>
+      'No pudimos iniciar el procesamiento. Comprueba tu conexión a internet.';
+
+  @override
+  String panoramaSweepCaptureE691fca8(Object i, Object total) {
+    return 'Subiendo fotos... $i/$total';
+  }
+
+  @override
+  String get panoramaSweepCapture7c0fe1ba =>
+      'La subida falló a mitad de camino. Comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get panoramaSweepCapture48d71813 =>
+      'Uniendo las fotos en un giro completo...';
+
+  @override
+  String get panoramaSweepCaptureEc71e067 =>
+      'Falló el procesamiento. Intenta grabar de nuevo, despacio y con buena luz.';
+
+  @override
+  String get panoramaSweepCapture99b858ac =>
+      'Falló el procesamiento. Intenta grabar de nuevo.';
+
+  @override
+  String get panoramaSweepCaptureFd1988b1 =>
+      'El procesamiento está tardando demasiado. Inténtalo de nuevo más tarde.';
+
+  @override
+  String get panoramaSweepCaptureF55e6e9c =>
+      'Algo salió mal. Comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get panoramaSweepCapture28a43c6d => 'Cerrado · de 360°';
+
+  @override
+  String panoramaSweepCapture1b253920(Object count, Object total) {
+    return '$count/$total fotogramas';
+  }
+
+  @override
+  String get panoramaSweepCapture1dc38c15 => 'No pudimos crear el recorrido';
+
+  @override
+  String get panoramaSweepCaptureAa69b001 => 'Creando tu recorrido';
+
+  @override
+  String panoramaSweepCapture28da4336(Object msg) {
+    return '$msg\n\nEsto puede tardar unos momentos — no cierres la pantalla.';
+  }
+
+  @override
+  String get panoramaSweepCaptureC5ffac09 => 'Inténtalo de nuevo';
+
+  @override
+  String get panoramaSweepCapture55247199 => 'Cerrar';
+
+  @override
+  String get panoramaSweepCapture7512612e => 'Gira un paso · detente · repite';
+
+  @override
+  String get panoramaSweepCapture5b98f935 =>
+      'Quédate quieto un momento para capturar 🐢';
+
+  @override
+  String get panoramaSweepCapture2086feda => 'Bien — quédate quieto un momento';
+
+  @override
+  String get panoramaSweepCaptureC73a59b7 => 'Gira un poco más y continúa';
+
+  @override
+  String get panoramaSweepCapture6a487da4 => 'Detener';
+
+  @override
+  String get panoramaSweepCaptureEdd587e1 => 'Continuar fila';
+
+  @override
+  String panoramaSweepCapture41e2bc7e(Object title) {
+    return 'Iniciar $title';
+  }
+
+  @override
+  String panoramaSweepCapture3ccd2a1c(Object title) {
+    return 'Continuar a $title';
+  }
+
+  @override
+  String get panoramaSweepCaptureF600808f => 'Finalizar';
+
+  @override
+  String get panoramaSweepCaptureC9e2125f => 'Listo';
+
+  @override
+  String get panoramaSweepCapture4c53a96e => 'Error de la cámara';
+
+  @override
+  String brokerOwnerReportScreen9e2251dc(Object address) {
+    return 'Informe de actividad — $address';
+  }
+
+  @override
+  String get brokerOwnerReportScreen4af427f3 =>
+      'Informe de actividad para el propietario';
+
+  @override
+  String get brokerOwnerReportScreen5a6b6baa => 'Elige una propiedad';
+
+  @override
+  String brokerOwnerReportScreen80dfca38(Object address) {
+    return 'Resumen de actividad · $address';
+  }
+
+  @override
+  String get brokerOwnerReportScreenD304ce53 => 'Qué enviar al propietario';
+
+  @override
+  String get brokerOwnerReportScreen48227f9c => 'Visitas';
+
+  @override
+  String get brokerOwnerReportScreenDaa11b47 => 'Interesados (me gusta)';
+
+  @override
+  String get brokerOwnerReportScreen066de4f8 => 'Guardados';
+
+  @override
+  String get brokerOwnerReportScreenD535641c => 'Solicitudes de contacto';
+
+  @override
+  String get brokerOwnerReportScreenA04be780 =>
+      'Visitas a la página de la propiedad';
+
+  @override
+  String get brokerOwnerReportScreenAc141b12 => 'Última visualización';
+
+  @override
+  String brokerOwnerReportScreen564551f8(Object count) {
+    return 'La propiedad fue vista $count veces';
+  }
+
+  @override
+  String brokerOwnerReportScreen958d9393(Object count) {
+    return '$count interesados lo marcaron con me gusta';
+  }
+
+  @override
+  String brokerOwnerReportScreenFa6a4018(Object count) {
+    return '$count lo guardaron para más tarde';
+  }
+
+  @override
+  String brokerOwnerReportScreen825b0fd8(Object count) {
+    return 'Se recibieron $count solicitudes de contacto';
+  }
+
+  @override
+  String get brokerOwnerReportScreenDf3d7596 =>
+      'La propiedad está publicada y activa en el sistema. Aún no se ha registrado actividad medible — ';
+
+  @override
+  String get brokerOwnerReportScreen9463334d =>
+      'seguiremos monitoreándola y te mantendremos informado.';
+
+  @override
+  String brokerOwnerReportScreenF0cf8eae(Object address, Object summary) {
+    return 'Actualización sobre \"$address\": $summary. Seguimos promocionando ';
+  }
+
+  @override
+  String get brokerOwnerReportScreen85a17b3a =>
+      'la propiedad y con gusto te informaremos de cualquier avance.';
+
+  @override
+  String brokerOwnerReportScreenE707f57e(Object address) {
+    return 'Informe de actividad — $address';
+  }
+
+  @override
+  String brokerOwnerReportScreenDb69622a(Object rooms, Object size) {
+    return '$rooms habitaciones · $size m²';
+  }
+
+  @override
+  String brokerOwnerReportScreenD973da64(Object rooms) {
+    return '$rooms habitaciones';
+  }
+
+  @override
+  String get brokerOwnerReportScreenFd67190d => 'Enviar como texto';
+
+  @override
+  String get brokerOwnerReportScreenC87bee7b => 'Enviar el informe';
+
+  @override
+  String get brokerOwnerReportScreenDe13d87a => 'Enviar por WhatsApp';
+
+  @override
+  String get brokerOwnerReportScreenC23278cd =>
+      'No se puede abrir WhatsApp en este momento';
+
+  @override
+  String get brokerOwnerReportScreen217e3171 => 'Enviar por SMS';
+
+  @override
+  String get brokerOwnerReportScreen12d7a7d4 =>
+      'No se pueden abrir los SMS en este momento';
+
+  @override
+  String get brokerOwnerReportScreenB4a9fdcf => 'Copiar el informe';
+
+  @override
+  String get brokerOwnerReportScreen452f9d1a => 'Informe copiado';
+
+  @override
+  String get brokerOwnerReportScreenC96fa39c => 'Aún no hay propiedades';
+
+  @override
+  String get brokerOwnerReportScreen6dc67ee5 =>
+      'Agrega una propiedad para generar un informe de actividad para el propietario.';
+
+  @override
+  String get brokerOwnerReportScreenA170171d => 'Hace menos de una hora';
+
+  @override
+  String brokerOwnerReportScreenC46e717b(Object hours) {
+    return 'Hace $hours horas';
+  }
+
+  @override
+  String get brokerOwnerReportScreenBe285a01 => 'Ayer';
+
+  @override
+  String brokerOwnerReportScreen0cfbdf39(Object days) {
+    return 'Hace $days días';
+  }
+
+  @override
+  String get contractFormScreenCa38cedb => 'Mejora del contrato con IA';
+
+  @override
+  String get contractFormScreenA7aa0554 =>
+      'Mejora del contrato con IA — Rently';
+
+  @override
+  String get contractFormScreen5ff8838c =>
+      'El pago no está disponible en este momento. Inténtalo de nuevo más tarde.';
+
+  @override
+  String get contractFormScreen0bf10733 =>
+      'No se puede mejorar el contrato en este momento. Inténtalo de nuevo.';
+
+  @override
+  String get contractFormScreenC2278e7d =>
+      'El contrato fue mejorado y personalizado con IA ✨';
+
+  @override
+  String get contractFormScreenCbbabf55 => 'Introduce el alquiler mensual';
+
+  @override
+  String get contractFormScreen8e5a493e =>
+      'No se puede crear el contrato en este momento. Inténtalo de nuevo.';
+
+  @override
+  String get contractFormScreen64202d91 => 'Nuevo contrato de alquiler';
+
+  @override
+  String get contractFormScreenEdb89494 => 'Enviando…';
+
+  @override
+  String get contractFormScreenC1c55cf9 => 'Enviar para firmar';
+
+  @override
+  String get contractFormScreen1b58c9a0 => 'Condiciones del alquiler';
+
+  @override
+  String get contractFormScreen0ae58e28 => 'Alquiler mensual (₪)';
+
+  @override
+  String get contractFormScreen99d1d056 => 'Depósito / garantía (₪)';
+
+  @override
+  String get contractFormScreenBdecb11c => 'Duración del alquiler';
+
+  @override
+  String contractFormScreenBf1cf58d(Object m) {
+    return '$m meses';
+  }
+
+  @override
+  String get contractFormScreenB7cdc163 => 'Fecha de entrada';
+
+  @override
+  String get contractFormScreen67e27f00 => 'Redacción del contrato';
+
+  @override
+  String get contractFormScreen9e1017ad => 'Volver a la redacción estándar';
+
+  @override
+  String get contractFormScreen30664b86 => 'Texto del contrato';
+
+  @override
+  String get contractFormScreen374bbbdf =>
+      'El contrato se firmará con una firma digital segura de extremo a extremo. Cada parte firma en su propio dispositivo, y cualquier cambio en las condiciones invalidará las firmas anteriores.';
+
+  @override
+  String get contractFormScreenE34604a7 => 'Contrato de alquiler estándar';
+
+  @override
+  String get contractFormScreenCbfee77a => 'Mejorar con IA';
+
+  @override
+  String contractFormScreen311875d1(Object price) {
+    return 'Función de pago · $price₪';
+  }
+
+  @override
+  String get contractFormScreen82a64993 =>
+      'Adaptando el contrato a la propiedad…';
+
+  @override
+  String get contractFormScreen3750438e =>
+      'Redacta y adapta el contrato a la propiedad y las condiciones con IA';
+
+  @override
+  String get contractFormScreenA78d435c => 'Mejorando el contrato con IA';
+
+  @override
+  String get contractFormScreenF4a6089f =>
+      'La IA reescribirá y adaptará el contrato a tu propiedad y condiciones — redacción clara, ';
+
+  @override
+  String get contractFormScreenC0583fa2 =>
+      'organizada en secciones, basada únicamente en tus datos.';
+
+  @override
+  String get contractFormScreen99b411b6 => 'Función de pago';
+
+  @override
+  String contractFormScreenFa001394(Object price) {
+    return 'Continuar al pago $price₪';
+  }
+
+  @override
+  String get contractFormScreen98c8a5b8 => 'Ahora no';
+
+  @override
+  String get paywallScreenPerYear => ' / año';
+
+  @override
+  String get paywallScreenPerMonth => ' / mes';
+
+  @override
+  String paywallScreenSubscriptionSubtitle(Object plan) {
+    return 'Suscripción $plan — RENTLY PRO';
+  }
+
+  @override
+  String get paywallScreenAnnualLabel => 'Anual';
+
+  @override
+  String get paywallScreenMonthlyLabel => 'Mensual';
+
+  @override
+  String get paywallScreenPaymentError =>
+      'Error al abrir el pago. Inténtalo de nuevo.';
+
+  @override
+  String get paywallScreenLoginRequired =>
+      'Debes iniciar sesión para comprar una suscripción — inicia sesión e inténtalo de nuevo.';
+
+  @override
+  String paywallScreenPaymentErrorWithCode(Object code) {
+    return 'Error al abrir el pago ($code). Inténtalo de nuevo.';
+  }
+
+  @override
+  String get paywallScreenEntitlementPending =>
+      'Pago recibido: la activación de la suscripción puede tardar un momento. Vuelve a comprobarlo en unos minutos.';
+
+  @override
+  String get paywallScreenHeadline => 'Cierra alquileres más rápido.';
+
+  @override
+  String get paywallScreenSubheadline =>
+      'RENTLY PRO pone tu piso en el centro de atención: más visitas, inquilinos más precisos y toda la gestión en un solo lugar, hasta que se alquile.';
+
+  @override
+  String get paywallScreenPerMonthShort => 'al mes';
+
+  @override
+  String get paywallScreenMonthlyBillingNote =>
+      'Facturación mensual · Cancela cuando quieras';
+
+  @override
+  String get paywallScreenMonthlyBoostsNote => '2 impulsos al mes';
+
+  @override
+  String get paywallScreenAnnualPeriodLine => 'al año · ₪37.50/mes';
+
+  @override
+  String get paywallScreenAnnualBillingNote => 'Paga 10 meses y recibe 12';
+
+  @override
+  String get paywallScreenAnnualBoostsNote => '5 impulsos al mes';
+
+  @override
+  String paywallScreenAnnualRibbon(Object savings) {
+    return 'El más rentable · Ahorra $savings';
+  }
+
+  @override
+  String get paywallScreenFeatureUnlimitedListings =>
+      'Publicación de propiedades ilimitada';
+
+  @override
+  String get paywallScreenFeatureBoosts =>
+      'Impulsos que atraen más visitas a tu propiedad';
+
+  @override
+  String get paywallScreenFeatureVerifiedBadge =>
+      'Insignia \"Verificado\": más confianza, más consultas';
+
+  @override
+  String get paywallScreenFeatureSearchPriority =>
+      'Prioridad en los resultados de búsqueda de los inquilinos';
+
+  @override
+  String get paywallScreenFeatureCandidateManagement =>
+      'Gestiona candidatos, chats y visitas programadas en un solo lugar';
+
+  @override
+  String get paywallScreenFeatureCalendar =>
+      'Calendario de disponibilidad automático para programar visitas';
+
+  @override
+  String get paywallScreenFeatureMarketInsights =>
+      'Información del mercado y precios inteligentes por zona';
+
+  @override
+  String get paywallScreenAllPlansInclude => 'Todo lo incluido en cada plan';
+
+  @override
+  String get paywallScreenUltraTeaserTitle =>
+      '¿Necesitas la máxima visibilidad?';
+
+  @override
+  String get paywallScreenUltraTeaserBody =>
+      'Impulso Ultra: 5 veces más visibilidad, disponible en cualquier propiedad desde ₪50.';
+
+  @override
+  String paywallScreenAnnualBillingTrial(Object amount) {
+    return 'Facturado anualmente $amount. Puedes cancelar cuando quieras.';
+  }
+
+  @override
+  String paywallScreenMonthlyBillingTrial(Object amount) {
+    return 'Se renueva mensualmente por $amount. Puedes cancelar cuando quieras.';
+  }
+
+  @override
+  String get paywallScreenJoinAnnual => 'Unirme al plan anual';
+
+  @override
+  String get paywallScreenJoinMonthly => 'Unirme al plan mensual';
+
+  @override
+  String get paywallScreenSecurePayment =>
+      'Pago seguro · Recibo enviado por correo electrónico';
+
+  @override
+  String get paywallScreenCouponHint => 'Código de cupón (opcional)';
+
+  @override
+  String get paywallScreenFeatureBoostListings =>
+      'Impulsos de anuncios para destacar en el feed';
+
+  @override
+  String get paywallScreenFeatureVerifiedAndPriority =>
+      'Insignia verificada y prioridad en la búsqueda';
+
+  @override
+  String get paywallScreenFeatureAiFiltering =>
+      'Filtrado inteligente de inquilinos con IA';
+
+  @override
+  String get paywallScreenThankYou => '¡Muchas gracias!';
+
+  @override
+  String get paywallScreenWelcomePrefix => 'Suscripción activada: bienvenido a';
+
+  @override
+  String get paywallScreenReceiptSent =>
+      'Se ha enviado un recibo a tu correo electrónico';
+
+  @override
+  String get paywallScreenLetsStart => 'Empecemos';
+
+  @override
+  String get rentTrackingScreenJanuary => 'enero';
+
+  @override
+  String get rentTrackingScreenFebruary => 'febrero';
+
+  @override
+  String get rentTrackingScreenMarch => 'marzo';
+
+  @override
+  String get rentTrackingScreenApril => 'abril';
+
+  @override
+  String get rentTrackingScreenMay => 'mayo';
+
+  @override
+  String get rentTrackingScreenJune => 'junio';
+
+  @override
+  String get rentTrackingScreenJuly => 'julio';
+
+  @override
+  String get rentTrackingScreenAugust => 'agosto';
+
+  @override
+  String get rentTrackingScreenSeptember => 'septiembre';
+
+  @override
+  String get rentTrackingScreenOctober => 'octubre';
+
+  @override
+  String get rentTrackingScreenNovember => 'noviembre';
+
+  @override
+  String get rentTrackingScreenDecember => 'diciembre';
+
+  @override
+  String get rentTrackingScreenNoteForMonth => 'Nota del mes';
+
+  @override
+  String get rentTrackingScreenNoteHint =>
+      'Ej.: Pagado en efectivo / Prometió pagar el día 15';
+
+  @override
+  String get rentTrackingScreenCancel => 'Cancelar';
+
+  @override
+  String get rentTrackingScreenSave => 'Guardar';
+
+  @override
+  String get rentTrackingScreenTitle => 'Seguimiento de pagos';
+
+  @override
+  String get rentTrackingScreenAddMonth => 'Añadir mes';
+
+  @override
+  String get rentTrackingScreenCollectedThisMonth => 'Cobrado este mes';
+
+  @override
+  String get rentTrackingScreenDebt => 'Deuda';
+
+  @override
+  String get rentTrackingScreenPaid => 'Pagado';
+
+  @override
+  String get rentTrackingScreenUnpaid => 'No pagado';
+
+  @override
+  String get rentTrackingScreenNote => 'Nota';
+
+  @override
+  String get rentTrackingScreenNoTrackingYet =>
+      'Todavía no has hecho seguimiento de pagos. ¿Empezamos?';
+
+  @override
+  String get rentTrackingScreenStartTracking =>
+      'Iniciar seguimiento (12 meses)';
+
+  @override
+  String get rentTrackingScreenNoPropertiesToTrack =>
+      'No hay propiedades para seguir. Añade una propiedad para empezar.';
+
+  @override
+  String rentTrackingScreenMonthsOverdue(Object count) {
+    return '$count meses de atraso';
+  }
+
+  @override
+  String get rentTrackingScreenPaidThisMonth => 'Pagado este mes';
+
+  @override
+  String get rentTrackingScreenAwaitingPaymentThisMonth =>
+      'Pendiente del pago de este mes';
+
+  @override
+  String rentTrackingScreenNextChargeOn(Object month) {
+    return 'Próximo cobro: el 1 de $month';
+  }
+
+  @override
+  String rentTrackingScreenDueByEndOf(Object month) {
+    return 'A pagar antes de que termine $month';
+  }
+
+  @override
+  String rentTrackingScreenRentPerMonth(Object rent) {
+    return '$rent/mes';
+  }
+
+  @override
+  String matchesScreenMinutesAgo(Object minutes) {
+    return 'hace $minutes min';
+  }
+
+  @override
+  String matchesScreenHoursAgo(Object hours) {
+    return 'hace $hours h';
+  }
+
+  @override
+  String get matchesScreenYesterday => 'Ayer';
+
+  @override
+  String matchesScreenDaysAgo(Object days) {
+    return 'hace $days días';
+  }
+
+  @override
+  String get matchesScreenWeekAgo => 'hace una semana';
+
+  @override
+  String matchesScreenWeeksAgo(Object weeks) {
+    return 'hace $weeks semanas';
+  }
+
+  @override
+  String get matchesScreenAddPrivateTag => 'Añadir etiqueta privada';
+
+  @override
+  String get matchesScreenEditTag => 'Editar etiqueta';
+
+  @override
+  String get matchesScreenOnlyYouSeeTag =>
+      'Solo tú puedes verla; el candidato no la ve';
+
+  @override
+  String get matchesScreenRemoveTag => 'Quitar etiqueta';
+
+  @override
+  String get matchesScreenUnmatch => 'Deshacer coincidencia';
+
+  @override
+  String get matchesScreenConfirmUnmatchTitle => '¿Deshacer esta coincidencia?';
+
+  @override
+  String get matchesScreenConfirmUnmatchBody =>
+      'La conversación se eliminará para ambas partes y no se podrá recuperar.';
+
+  @override
+  String get matchesScreenGoBack => 'Volver';
+
+  @override
+  String get matchesScreenPrivateTag => 'Etiqueta privada';
+
+  @override
+  String get matchesScreenPrivateTagHint =>
+      'Solo tú lo ves; el candidato no tiene acceso a esto.';
+
+  @override
+  String get matchesScreenTagPlaceholder => 'Ej.: Muy serio / Verificar avales';
+
+  @override
+  String get matchesScreenSaveTag => 'Guardar etiqueta';
+
+  @override
+  String get matchesScreenPaidInquiries => 'Consultas de pago';
+
+  @override
+  String get matchesScreenConversations => 'Conversaciones';
+
+  @override
+  String get matchesScreenSearchHint => 'Buscar dirección, ciudad o mensaje...';
+
+  @override
+  String get matchesScreenFilterAll => 'Todos';
+
+  @override
+  String get matchesScreenFilterNew => 'Nuevo';
+
+  @override
+  String get matchesScreenFilterOld => 'Antiguo';
+
+  @override
+  String get matchesScreenFilterMatchesTomorrow => 'Programado para mañana';
+
+  @override
+  String get matchesScreenNoResultsFound => 'No se encontraron resultados';
+
+  @override
+  String get matchesScreenNoResultsForSearch =>
+      'No hay resultados para esta búsqueda. Prueba a ajustar los filtros.';
+
+  @override
+  String get matchesScreenClearFilter => 'Borrar filtro';
+
+  @override
+  String get matchesScreenSigned => 'Firmado';
+
+  @override
+  String get matchesScreenContractSent => 'Contrato enviado';
+
+  @override
+  String get matchesScreenOpenConversation => 'Conversación abierta';
+
+  @override
+  String matchesScreenRoomsCount(Object rooms) {
+    return '$rooms habitaciones';
+  }
+
+  @override
+  String matchesScreenSquareMeters(Object size) {
+    return '$size m²';
+  }
+
+  @override
+  String get matchesScreenElevator => 'Ascensor';
+
+  @override
+  String get matchesScreenAirConditioned => 'Con aire acondicionado';
+
+  @override
+  String get matchesScreenNew => 'Nuevo';
+
+  @override
+  String get matchesScreenNewConversationReady =>
+      'Nueva conversación lista para empezar';
+
+  @override
+  String get matchesScreenNoMatchesYet => 'Aún no hay coincidencias';
+
+  @override
+  String get matchesScreenNoMatchesLandlordBody =>
+      'Cuando apruebes inquilinos candidatos al deslizar, las coincidencias aparecerán aquí.';
+
+  @override
+  String get matchesScreenNoMatchesTenantBody =>
+      'Cuando te guste un piso y el propietario te apruebe, la coincidencia aparecerá aquí.';
+
+  @override
+  String get brokerClientsScreenContactsPermissionNeeded =>
+      'Se necesita acceso a los contactos para importar';
+
+  @override
+  String get brokerClientsScreenNoContactsWithPhoneFound =>
+      'No se encontraron contactos con número de teléfono';
+
+  @override
+  String brokerClientsScreenContactsImported(Object count) {
+    return 'Se importaron $count contactos a la libreta';
+  }
+
+  @override
+  String get brokerClientsScreenClientBook => 'Libreta de clientes';
+
+  @override
+  String get brokerClientsScreenImportFromContacts =>
+      'Importar desde contactos';
+
+  @override
+  String get brokerClientsScreenNewClient => 'Nuevo cliente';
+
+  @override
+  String get brokerClientsScreenHotMatches => 'Coincidencias destacadas';
+
+  @override
+  String brokerClientsScreenStrongMatchesWaiting(Object count) {
+    return '$count coincidencias sólidas en espera';
+  }
+
+  @override
+  String get brokerClientsScreenPropertiesThatFitClients =>
+      'Propiedades que encajan con tus clientes';
+
+  @override
+  String get brokerClientsScreenSale => 'Venta';
+
+  @override
+  String get brokerClientsScreenRent => 'Alquiler';
+
+  @override
+  String brokerClientsScreenMinRoomsPlus(Object rooms) {
+    return '$rooms+ habitaciones';
+  }
+
+  @override
+  String brokerClientsScreenBudgetUpTo(Object amount) {
+    return 'Hasta $amount';
+  }
+
+  @override
+  String get brokerClientsScreenEdit => 'Editar';
+
+  @override
+  String get brokerClientsScreenDelete => 'Eliminar';
+
+  @override
+  String brokerClientsScreenMatchingProperties(Object count) {
+    return '$count propiedades coincidentes';
+  }
+
+  @override
+  String get brokerClientsScreenNoMatchingPropertiesNow =>
+      'No hay propiedades coincidentes por ahora';
+
+  @override
+  String brokerClientsScreenPropertiesForClient(Object name) {
+    return 'Propiedades para $name';
+  }
+
+  @override
+  String brokerClientsScreenNoMatchingPropertiesForClient(Object name) {
+    return 'Actualmente no hay propiedades que coincidan con los requisitos de $name.';
+  }
+
+  @override
+  String get brokerClientsScreenMatchWillAppearHere =>
+      'En cuanto subas una propiedad que coincida, aparecerá aquí.';
+
+  @override
+  String brokerClientsScreenPriceRoomsSummary(
+      Object price, Object rooms, Object suffix) {
+    return '$price $suffix · $rooms habitaciones';
+  }
+
+  @override
+  String get brokerClientsScreenEnterClientName =>
+      'Introduce el nombre del cliente';
+
+  @override
+  String get brokerClientsScreenEditClient => 'Editar cliente';
+
+  @override
+  String get brokerClientsScreenClientName => 'Nombre del cliente';
+
+  @override
+  String get brokerClientsScreenPhone => 'Teléfono';
+
+  @override
+  String get brokerClientsScreenBudgetFrom => 'Presupuesto desde';
+
+  @override
+  String get brokerClientsScreenBudgetTo => 'Presupuesto hasta';
+
+  @override
+  String get brokerClientsScreenMinRooms => 'Mínimo de habitaciones';
+
+  @override
+  String get brokerClientsScreenAreasCommaSeparated =>
+      'Zonas (separadas por comas)';
+
+  @override
+  String get brokerClientsScreenMustHaveCommaSeparated =>
+      'Debe incluir (separado por comas)';
+
+  @override
+  String get brokerClientsScreenNotes => 'Notas';
+
+  @override
+  String get brokerClientsScreenSave => 'Guardar';
+
+  @override
+  String get brokerClientsScreenClientBookEmpty =>
+      'Tu libreta de clientes está vacía';
+
+  @override
+  String get brokerClientsScreenEmptyStateBody =>
+      'Añade un cliente con lo que busca, y la app te mostrará cuáles de tus propiedades le encajan.';
+
+  @override
+  String get brokerClientsScreenSelectContactsToImport =>
+      'Seleccionar contactos para importar';
+
+  @override
+  String brokerClientsScreenSelectedCount(Object count) {
+    return '$count seleccionados';
+  }
+
+  @override
+  String get brokerClientsScreenSearchContact => 'Buscar contacto…';
+
+  @override
+  String brokerClientsScreenImportClients(Object count) {
+    return 'Importar $count clientes';
+  }
 }
