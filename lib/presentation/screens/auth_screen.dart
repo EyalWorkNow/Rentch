@@ -4039,22 +4039,26 @@ class _InteractiveRoleButtonState extends State<_InteractiveRoleButton>
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            widget.label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.2,
-              shadows: widget.isPrimary
-                  ? [
-                      Shadow(
-                        color: Colors.black.withValues(alpha: 0.16),
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ]
-                  : null,
+          Flexible(
+            child: Text(
+              widget.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+                shadows: widget.isPrimary
+                    ? [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.16),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ]
+                    : null,
+              ),
             ),
           ),
         ],
