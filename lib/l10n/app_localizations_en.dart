@@ -11750,4 +11750,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get propertyDetailScreenListingRemoved =>
       'This listing has been removed and is no longer available';
+
+  @override
+  String get propertyDetailScreenDescription => 'Description';
 }

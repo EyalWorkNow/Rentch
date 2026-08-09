@@ -1256,6 +1256,7 @@ class _FakePropertyRepository extends PropertyRepository {
     required String ownerUserId,
     PropertyRecordStatus status = PropertyRecordStatus.active,
     String? expectedUpdatedAt,
+    bool isCreate = false,
   }) async =>
       const PropertySaveResult.ok();
 

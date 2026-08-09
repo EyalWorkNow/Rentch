@@ -3239,6 +3239,40 @@ class DatingProvider extends ChangeNotifier {
   // still happens immediately (so the UI updates without waiting on the
   // network), but is ROLLED BACK if the server write fails, and the caller
   // now gets an honest answer to gate its success/error feedback on.
+  // The landlord's own property list previously only ever synced from the
+  // server at COLD APP START (via _bindFirebaseIdentity, called only from
+  // initialize()/restoreAuthenticatedSession) — a property created, edited,
+  // or deleted on ANOTHER surface (the website's publisher portal, or
+  // another device) while this app instance was already running (even just
+  // backgrounded, not killed — a very common pattern) never showed up until
+  // a full relaunch. Call this whenever the landlord opens/refreshes their
+  // properties screen. Reconciles (adds/updates/REMOVES) rather than just
+  // merge-adding, so an edit or delete made elsewhere is actually reflected
+  // here too — safe because property writes are now awaited, not fire-and-
+  // forget (see addLandlordProperty), so anything genuinely in
+  // _customProperties for this owner should already exist server-side.
+  //
+  // Deliberately conservative on failure/ambiguity: loadPropertiesByOwner
+  // returns an empty list both when the request genuinely failed AND when
+  // the landlord genuinely has zero properties (it can't distinguish them),
+  // so an empty result skips reconciliation entirely rather than risk
+  // wiping a real list on a transient network hiccup — the one edge case
+  // this doesn't fix is "landlord deletes their LAST property via the
+  // website," which stays stale until relaunch, same as before.
+  Future<void> refreshMyProperties() async {
+    final uid = _currentOwnerUserId;
+    if (uid.isEmpty) return;
+    final ownerProps = await _rentalDataService.loadPropertiesByOwner(uid);
+    if (ownerProps.isEmpty) return;
+    final serverIds = ownerProps.map((p) => p.id).toSet();
+    final others =
+        _customProperties.where((p) => !_belongsToCurrentLandlord(p)).toList();
+    _customProperties = [...others, ...ownerProps];
+    _invalidateCatalogCache();
+    await _persist();
+    notifyListeners();
+  }
+
   Future<bool> addLandlordProperty(
     RentalProperty property, {
     PropertyRecordStatus status = PropertyRecordStatus.active,
@@ -3249,7 +3283,9 @@ class DatingProvider extends ChangeNotifier {
     await _persist();
     notifyListeners();
     final result = await _propertyRepository.saveProperty(ownedProperty,
-        ownerUserId: ownedProperty.ownerUserId, status: status);
+        ownerUserId: ownedProperty.ownerUserId,
+        status: status,
+        isCreate: true);
     if (result.isRealFailure) {
       if (kDebugMode) {
         debugPrint(

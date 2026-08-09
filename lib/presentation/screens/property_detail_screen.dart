@@ -1366,6 +1366,19 @@ class _ParitySections extends StatelessWidget {
     }
     children.add(const SizedBox(height: 26));
 
+    // ── Description ─────────────────────────────────────────────────────
+    // Was captured (website's Ezra publisher flow always sends it) but had
+    // no field in the app's model at all — silently dropped, never shown
+    // anywhere. Now modeled (RentalProperty.description) and surfaced here.
+    if (property.description.trim().isNotEmpty) {
+      children.add(_header(l10n.propertyDetailScreenDescription, IconsaxPlusLinear.document_text));
+      children.add(Text(
+        property.description.trim(),
+        style: TextStyle(fontSize: 14.5, height: 1.5, color: _onSurface.withValues(alpha: 0.85)),
+      ));
+      children.add(const SizedBox(height: 26));
+    }
+
     // ── Key features / amenities ──────────────────────────────────────────
     if (property.features.isNotEmpty) {
       children.add(_header(l10n.propertyDetailScreen64680a66, IconsaxPlusLinear.flash_1));

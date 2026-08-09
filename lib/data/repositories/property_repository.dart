@@ -78,6 +78,16 @@ class PropertyRepository {
     // CREATE (there's nothing to conflict with yet). The server rejects with
     // 409/conflict if the stored row has changed since.
     String? expectedUpdatedAt,
+    // Every save used to go through PUT (tables.upsertRow) regardless of
+    // whether the property was brand new — which meant the server's
+    // isNewListing-gated pipeline (smart-tag/embedding/price-badge
+    // enrichment, the 3-free-listing paywall quota check, and instant
+    // saved-search push alerts to matching tenants) NEVER ran for any
+    // listing ever created through this app. A genuine create now goes
+    // through POST (tables.createRow) so that pipeline actually fires.
+    // Edits still use PUT (preserves the optimistic-locking/billing-pause
+    // protections that only exist on that path).
+    bool isCreate = false,
   }) async {
     if (!isConfigured) {
       return const PropertySaveResult.rejected(
@@ -104,19 +114,27 @@ class PropertyRepository {
     }
 
     try {
+      final data = _propertyToRow(
+        property,
+        ownerUserId: ownerUserId,
+        status: status,
+        expectedUpdatedAt: expectedUpdatedAt,
+      );
       await _breaker.call(
         () => RetryPolicy.transient.execute(
-          () => tables.upsertRow(
-            databaseId: appwriteDatabaseId,
-            tableId: _tableId,
-            rowId: _rowId(property.id),
-            data: _propertyToRow(
-              property,
-              ownerUserId: ownerUserId,
-              status: status,
-              expectedUpdatedAt: expectedUpdatedAt,
-            ),
-          ),
+          () => isCreate
+              ? tables.createRow(
+                  databaseId: appwriteDatabaseId,
+                  tableId: _tableId,
+                  rowId: _rowId(property.id),
+                  data: data,
+                )
+              : tables.upsertRow(
+                  databaseId: appwriteDatabaseId,
+                  tableId: _tableId,
+                  rowId: _rowId(property.id),
+                  data: data,
+                ),
         ),
       );
       return const PropertySaveResult.ok();
@@ -259,6 +277,7 @@ class PropertyRepository {
       'condition': property.condition,
       'ownerName': property.ownerName,
       'agencyListing': property.agencyListing,
+      'description': property.description,
 
       // ── Features — two representations ────────────────────────────────────
       // 1) JSON blob (backward-compatible read path in rental_data_service)

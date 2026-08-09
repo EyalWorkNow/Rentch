@@ -20386,6 +20386,12 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'הדירה הזו הוסרה ואינה זמינה עוד'**
   String get propertyDetailScreenListingRemoved;
+
+  /// No description provided for @propertyDetailScreenDescription.
+  ///
+  /// In he, this message translates to:
+  /// **'תיאור'**
+  String get propertyDetailScreenDescription;
 }
 
 class _AppLocalizationsDelegate

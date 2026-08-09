@@ -253,6 +253,7 @@ class RentalDataService {
       'condition': data['condition']?.toString() ?? '',
       'ownerName': data['ownerName']?.toString() ?? 'בעל הנכס',
       'agencyListing': _asBool(data['agencyListing']),
+      'description': data['description']?.toString() ?? '',
       'features': features,
       'featureLabels': featureLabels,
       'media': media,

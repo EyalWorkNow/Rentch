@@ -3426,5 +3426,6 @@
   "panoramaCaptureScreenAiTwoPhotoProgress": "יוצר את ה-360° המלא…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "צריך לבחור בדיוק 2 תמונות פנורמה",
   "panoramaCaptureScreenAiTwoPhotoFailed": "היצירה נכשלה, נסו שוב",
-  "propertyDetailScreenListingRemoved": "הדירה הזו הוסרה ואינה זמינה עוד"
+  "propertyDetailScreenListingRemoved": "הדירה הזו הוסרה ואינה זמינה עוד",
+  "propertyDetailScreenDescription": "תיאור"
 }

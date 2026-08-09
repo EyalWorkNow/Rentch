@@ -3378,5 +3378,6 @@
   "panoramaCaptureScreenAiTwoPhotoProgress": "Generando la 360° completa…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "Elige exactamente 2 fotos panorámicas",
   "panoramaCaptureScreenAiTwoPhotoFailed": "Error al generar, inténtalo de nuevo",
-  "propertyDetailScreenListingRemoved": "Este anuncio ha sido eliminado y ya no está disponible"
+  "propertyDetailScreenListingRemoved": "Este anuncio ha sido eliminado y ya no está disponible",
+  "propertyDetailScreenDescription": "Descripción"
 }

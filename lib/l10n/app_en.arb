@@ -3378,5 +3378,6 @@
   "panoramaCaptureScreenAiTwoPhotoProgress": "Generating the full 360°…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "Please pick exactly 2 panorama photos",
   "panoramaCaptureScreenAiTwoPhotoFailed": "Generation failed, please try again",
-  "propertyDetailScreenListingRemoved": "This listing has been removed and is no longer available"
+  "propertyDetailScreenListingRemoved": "This listing has been removed and is no longer available",
+  "propertyDetailScreenDescription": "Description"
 }

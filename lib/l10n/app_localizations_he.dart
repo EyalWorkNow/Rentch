@@ -11528,4 +11528,7 @@ class AppLocalizationsHe extends AppLocalizations {
   @override
   String get propertyDetailScreenListingRemoved =>
       'הדירה הזו הוסרה ואינה זמינה עוד';
+
+  @override
+  String get propertyDetailScreenDescription => 'תיאור';
 }

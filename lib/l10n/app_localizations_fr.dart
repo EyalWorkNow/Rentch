@@ -11924,4 +11924,7 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get propertyDetailScreenListingRemoved =>
       'Cette annonce a été supprimée et n\'est plus disponible';
+
+  @override
+  String get propertyDetailScreenDescription => 'Description';
 }

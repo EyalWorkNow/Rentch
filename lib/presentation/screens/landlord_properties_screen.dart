@@ -50,7 +50,11 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
     _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addObserver(this);
     // On opening the owner's properties, re-check any background 3D scans so a
-    // KIRI reconstruction that finished while away gets attached to its listing.
+    // KIRI reconstruction that finished while away gets attached to its listing,
+    // AND re-sync from the server — this list previously only ever refreshed at
+    // COLD APP START, so a property created/edited/deleted on another surface
+    // (the website's publisher portal, another device) while the app was just
+    // backgrounded (not killed) never showed up until a full relaunch.
     WidgetsBinding.instance.addPostFrameCallback((_) => _finalizeScans());
   }
 
@@ -64,6 +68,7 @@ class _LandlordPropertiesScreenState extends State<LandlordPropertiesScreen>
     final provider = context.read<DatingProvider>();
     unawaited(provider.refreshScanProcessingCache());
     unawaited(provider.finalizePendingScans());
+    unawaited(provider.refreshMyProperties());
   }
 
   void _scrollListener() {

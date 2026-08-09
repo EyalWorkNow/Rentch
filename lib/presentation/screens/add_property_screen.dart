@@ -6434,6 +6434,10 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         condition: _condition,
         ownerName: widget.property.ownerName,
         agencyListing: _agencyListing,
+        // No editing UI for this yet (app-side) — preserve whatever the
+        // property already had (e.g. set via the website) rather than
+        // silently wiping it back to empty on every app-side edit.
+        description: widget.property.description,
         features: _selectedFeatures.toList(),
         publishChannels: _publishChannels.toList(),
         media: media,

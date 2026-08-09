@@ -1943,6 +1943,26 @@ export const handler = async (event) => {
         if (tableKey === 'persona') {
           return await putPersonaVersioned(table, writeId, body);
         }
+        // Every users PUT was a blind full-item replace — any writer that
+        // doesn't happen to include EVERY field (role, discoverable, etc.)
+        // silently wipes whatever a DIFFERENT writer previously set. This
+        // was a live risk the moment more than one surface writes to the
+        // same uid's row (e.g. the website's publisher portal writing
+        // name/photo on sign-in would blank out the role/discoverable the
+        // app already set). Merge over the existing row instead — a caller
+        // only ever intends to set the fields it actually sends.
+        if (tableKey === 'users') {
+          const existingUser = await ddb.send(
+            new GetCommand({ TableName: table.name, Key: { id: writeId } }),
+          );
+          // Mutate in place (body is const, but objects are mutable) — only
+          // fill in fields the caller didn't send; never override what it did.
+          if (existingUser.Item) {
+            for (const [k, v] of Object.entries(existingUser.Item)) {
+              if (!(k in body)) body[k] = v;
+            }
+          }
+        }
         const putResult = await putItem(table, writeId, body,
           tableKey === 'properties' ? { preserveFrom: existingProperty } : undefined);
         // Removing a single photo/video during an edit never deleted its S3

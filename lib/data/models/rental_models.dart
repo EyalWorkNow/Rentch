@@ -898,6 +898,7 @@ class RentalProperty {
     required this.condition,
     required this.ownerName,
     required this.agencyListing,
+    this.description = '',
     required List<String> features,
     PropertyFeatureSet? featureFlags,
     List<String>? publishChannels,
@@ -968,6 +969,12 @@ class RentalProperty {
   final String condition;
   final String ownerName;
   final bool agencyListing;
+
+  /// Free-text description. The website's publisher/Ezra flow has always
+  /// collected and sent this, but the app never modeled it at all — silently
+  /// dropped on every website-created/edited listing (used server-side only
+  /// for smart-tag enrichment input, never surfaced to any reader).
+  final String description;
   final List<String> features;
   final PropertyFeatureSet featureFlags;
 
@@ -1129,6 +1136,7 @@ class RentalProperty {
     String? condition,
     String? ownerName,
     bool? agencyListing,
+    String? description,
     List<String>? features,
     List<String>? publishChannels,
     PropertyFeatureSet? featureFlags,
@@ -1177,6 +1185,7 @@ class RentalProperty {
       condition: condition ?? this.condition,
       ownerName: ownerName ?? this.ownerName,
       agencyListing: agencyListing ?? this.agencyListing,
+      description: description ?? this.description,
       features: features ?? this.features,
       publishChannels: publishChannels ?? this.publishChannels,
       featureFlags: featureFlags ?? this.featureFlags,
@@ -1299,6 +1308,7 @@ class RentalProperty {
       condition: json['condition'] as String? ?? '',
       ownerName: json['ownerName'] as String? ?? 'בעל הנכס',
       agencyListing: _asBoolFlag(json['agencyListing']),
+      description: json['description']?.toString() ?? '',
       features: resolvedFeatures,
       publishChannels: _decodeStringListValue(json['publishChannels']),
       featureFlags: featureFlags,
@@ -1377,6 +1387,7 @@ class RentalProperty {
       'condition': condition,
       'ownerName': ownerName,
       'agencyListing': agencyListing,
+      'description': description,
       'features': featureFlags.toJson(),
       'publishChannels': publishChannels,
       'featureLabels': features,

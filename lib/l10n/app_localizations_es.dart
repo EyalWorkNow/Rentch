@@ -11890,4 +11890,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get propertyDetailScreenListingRemoved =>
       'Este anuncio ha sido eliminado y ya no está disponible';
+
+  @override
+  String get propertyDetailScreenDescription => 'Descripción';
 }

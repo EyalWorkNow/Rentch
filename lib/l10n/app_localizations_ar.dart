@@ -11651,4 +11651,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get propertyDetailScreenListingRemoved =>
       'تمت إزالة هذا العقار ولم يعد متاحًا';
+
+  @override
+  String get propertyDetailScreenDescription => 'الوصف';
 }

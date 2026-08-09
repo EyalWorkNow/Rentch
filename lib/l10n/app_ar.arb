@@ -3378,5 +3378,6 @@
   "panoramaCaptureScreenAiTwoPhotoProgress": "جارٍ إنشاء صورة 360° الكاملة…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "الرجاء اختيار صورتين بانوراميتين بالضبط",
   "panoramaCaptureScreenAiTwoPhotoFailed": "فشل الإنشاء، يرجى المحاولة مرة أخرى",
-  "propertyDetailScreenListingRemoved": "تمت إزالة هذا العقار ولم يعد متاحًا"
+  "propertyDetailScreenListingRemoved": "تمت إزالة هذا العقار ولم يعد متاحًا",
+  "propertyDetailScreenDescription": "الوصف"
 }
