@@ -3230,7 +3230,16 @@ class DatingProvider extends ChangeNotifier {
   // [status] defaults to active. Pass [PropertyRecordStatus.draft] when
   // creating an incomplete property (e.g. during registration) so consent
   // enforcement is skipped for drafts and applied only on active listings.
-  Future<void> addLandlordProperty(
+  // Returns whether the property actually landed on the server. Previously
+  // fire-and-forget (unawaited): the UI showed "published successfully" and
+  // navigated away regardless of whether the write really succeeded, with no
+  // retry/reconciliation — a transient network failure or rejected write
+  // silently vanished, and the landlord had no idea their listing was never
+  // actually live anywhere but their own device. The optimistic local add
+  // still happens immediately (so the UI updates without waiting on the
+  // network), but is ROLLED BACK if the server write fails, and the caller
+  // now gets an honest answer to gate its success/error feedback on.
+  Future<bool> addLandlordProperty(
     RentalProperty property, {
     PropertyRecordStatus status = PropertyRecordStatus.active,
   }) async {
@@ -3238,17 +3247,21 @@ class DatingProvider extends ChangeNotifier {
     _customProperties = [..._customProperties, ownedProperty];
     _invalidateCatalogCache();
     await _persist();
-    unawaited(
-      _propertyRepository
-          .saveProperty(ownedProperty,
-              ownerUserId: ownedProperty.ownerUserId, status: status)
-          .then((result) {
-        if (!result.isOk && kDebugMode) {
-          debugPrint(
-              'addLandlordProperty: remote rejected — ${result.userMessage}');
-        }
-      }),
-    );
+    notifyListeners();
+    final result = await _propertyRepository.saveProperty(ownedProperty,
+        ownerUserId: ownedProperty.ownerUserId, status: status);
+    if (result.isRealFailure) {
+      if (kDebugMode) {
+        debugPrint(
+            'addLandlordProperty: remote rejected — ${result.userMessage}');
+      }
+      _customProperties =
+          _customProperties.where((p) => p.id != ownedProperty.id).toList();
+      _invalidateCatalogCache();
+      await _persist();
+      notifyListeners();
+      return false;
+    }
     AppEvents.instance.log(
       UserEventType.propertyAdded,
       propertyId: ownedProperty.id,
@@ -3258,42 +3271,58 @@ class DatingProvider extends ChangeNotifier {
         'status': status.name,
       },
     );
-    notifyListeners();
+    return true;
   }
 
-  Future<void> updateLandlordProperty(RentalProperty updated) async {
+  // See addLandlordProperty's doc — same await-and-report-honestly fix, same
+  // rollback-on-failure. Also closes a second bug: previously this early-
+  // returned `void` when the property no longer existed locally (e.g. it was
+  // just deleted elsewhere), so a caller editing a stale/deleted property saw
+  // NO signal that nothing happened and showed "saved successfully" anyway.
+  Future<bool> updateLandlordProperty(RentalProperty updated) async {
     final existing = _customPropertyById(updated.id);
-    if (existing == null || !_belongsToCurrentLandlord(existing)) return;
+    if (existing == null || !_belongsToCurrentLandlord(existing)) return false;
     final ownedProperty = _ownedByCurrentLandlord(updated);
     _customProperties = _customProperties
         .map((p) => p.id == ownedProperty.id ? ownedProperty : p)
         .toList();
     _invalidateCatalogCache();
     await _persist();
-    unawaited(
-      _propertyRepository
-          .saveProperty(
-            ownedProperty,
-            ownerUserId: ownedProperty.ownerUserId,
-            status: ownedProperty.isActive
-                ? PropertyRecordStatus.active
-                : PropertyRecordStatus.paused,
-          )
-          .then((result) {
-        if (!result.isOk && kDebugMode) {
-          debugPrint(
-              'updateLandlordProperty: remote rejected — ${result.userMessage}');
-        }
-      }),
+    notifyListeners();
+    final result = await _propertyRepository.saveProperty(
+      ownedProperty,
+      ownerUserId: ownedProperty.ownerUserId,
+      status: ownedProperty.isActive
+          ? PropertyRecordStatus.active
+          : PropertyRecordStatus.paused,
     );
+    if (result.isRealFailure) {
+      if (kDebugMode) {
+        debugPrint(
+            'updateLandlordProperty: remote rejected — ${result.userMessage}');
+      }
+      _customProperties = _customProperties
+          .map((p) => p.id == existing.id ? existing : p)
+          .toList();
+      _invalidateCatalogCache();
+      await _persist();
+      notifyListeners();
+      return false;
+    }
     AppEvents.instance
         .log(UserEventType.propertyUpdated, propertyId: ownedProperty.id);
-    notifyListeners();
+    return true;
   }
 
-  Future<void> removeLandlordProperty(String propertyId) async {
+  // See addLandlordProperty's doc — same fix. On failure the property (and
+  // its base-catalog copy) is restored rather than staying "deleted" locally
+  // while still live server-side, which previously could make a property
+  // silently "resurrect" on the next reload with no explanation.
+  Future<bool> removeLandlordProperty(String propertyId) async {
     final existing = _customPropertyById(propertyId);
-    if (existing == null || !_belongsToCurrentLandlord(existing)) return;
+    if (existing == null || !_belongsToCurrentLandlord(existing)) return false;
+    final previousCustomProperties = _customProperties;
+    final previousBaseProperties = _baseProperties;
     _customProperties =
         _customProperties.where((p) => p.id != propertyId).toList();
     // Also drop the copy that lives in the PUBLIC base catalog — otherwise the
@@ -3305,12 +3334,26 @@ class DatingProvider extends ChangeNotifier {
     // Drop it from the browse/search cache immediately so seekers stop seeing it.
     AppCache.instance.propertyPages.clear();
     await _persist();
+    notifyListeners();
     // SOFT delete: keep the row in the DB (audit/history) but flip its status off
     // 'active' so apartment-seekers no longer see it in search/discovery.
-    unawaited(_propertyRepository.saveProperty(existing,
+    final result = await _propertyRepository.saveProperty(existing,
         ownerUserId: existing.ownerUserId,
-        status: PropertyRecordStatus.removed));
-    notifyListeners();
+        status: PropertyRecordStatus.removed);
+    if (result.isRealFailure) {
+      if (kDebugMode) {
+        debugPrint(
+            'removeLandlordProperty: remote rejected — ${result.userMessage}');
+      }
+      _customProperties = previousCustomProperties;
+      _baseProperties = previousBaseProperties;
+      _invalidateCatalogCache();
+      AppCache.instance.propertyPages.clear();
+      await _persist();
+      notifyListeners();
+      return false;
+    }
+    return true;
   }
 
   // Stamp a boost window on a listing IN MEMORY right after a successful server

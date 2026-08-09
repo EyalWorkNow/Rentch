@@ -20380,6 +20380,12 @@ abstract class AppLocalizations {
   /// In he, this message translates to:
   /// **'היצירה נכשלה, נסו שוב'**
   String get panoramaCaptureScreenAiTwoPhotoFailed;
+
+  /// No description provided for @propertyDetailScreenListingRemoved.
+  ///
+  /// In he, this message translates to:
+  /// **'הדירה הזו הוסרה ואינה זמינה עוד'**
+  String get propertyDetailScreenListingRemoved;
 }
 
 class _AppLocalizationsDelegate

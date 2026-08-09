@@ -11647,4 +11647,8 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get panoramaCaptureScreenAiTwoPhotoFailed =>
       'فشل الإنشاء، يرجى المحاولة مرة أخرى';
+
+  @override
+  String get propertyDetailScreenListingRemoved =>
+      'تمت إزالة هذا العقار ولم يعد متاحًا';
 }

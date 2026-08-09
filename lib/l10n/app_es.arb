@@ -3377,5 +3377,6 @@
   "panoramaCaptureScreenAiTwoPhotoHint": "Sube 2 fotos panorámicas de la misma habitación desde ángulos distintos: la IA completa el hueco entre ellas para crear una 360° completa, sin cambiar lo que aparece en las fotos",
   "panoramaCaptureScreenAiTwoPhotoProgress": "Generando la 360° completa…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "Elige exactamente 2 fotos panorámicas",
-  "panoramaCaptureScreenAiTwoPhotoFailed": "Error al generar, inténtalo de nuevo"
+  "panoramaCaptureScreenAiTwoPhotoFailed": "Error al generar, inténtalo de nuevo",
+  "propertyDetailScreenListingRemoved": "Este anuncio ha sido eliminado y ya no está disponible"
 }

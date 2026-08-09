@@ -11524,4 +11524,8 @@ class AppLocalizationsHe extends AppLocalizations {
 
   @override
   String get panoramaCaptureScreenAiTwoPhotoFailed => 'היצירה נכשלה, נסו שוב';
+
+  @override
+  String get propertyDetailScreenListingRemoved =>
+      'הדירה הזו הוסרה ואינה זמינה עוד';
 }

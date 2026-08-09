@@ -3377,5 +3377,6 @@
   "panoramaCaptureScreenAiTwoPhotoHint": "Upload 2 panorama photos of the same room from different angles — AI completes the gap between them into a full 360°, without changing what's in the photos",
   "panoramaCaptureScreenAiTwoPhotoProgress": "Generating the full 360°…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "Please pick exactly 2 panorama photos",
-  "panoramaCaptureScreenAiTwoPhotoFailed": "Generation failed, please try again"
+  "panoramaCaptureScreenAiTwoPhotoFailed": "Generation failed, please try again",
+  "propertyDetailScreenListingRemoved": "This listing has been removed and is no longer available"
 }

@@ -936,11 +936,57 @@ class _MessageScreenState extends State<MessageScreen> {
 
         final property = provider.propertyById(match.propertyId);
         if (property == null) {
+          // The property behind this match is gone (deleted, or not yet in
+          // this device's cache) — previously this locked the tenant out of
+          // the ENTIRE conversation with a bare "not found" screen: no
+          // history, no way to see what was already said. The messages
+          // themselves belong to the MATCH, not the property, so they're
+          // still available — show them read-only instead of nothing.
+          final tenantName = provider.tenantProfile?.name ??
+              AppLocalizations.of(context)!.messageScreenFd0ec7ac;
           return Scaffold(
             backgroundColor: _bg,
-            body: Center(
-                child:
-                    Text(AppLocalizations.of(context)!.messageScreen6f11e9ea)),
+            appBar: AppBar(
+              backgroundColor: _bg,
+              elevation: 0,
+              title: Text(AppLocalizations.of(context)!.messageScreen6f11e9ea,
+                  style: const TextStyle(fontSize: 15)),
+            ),
+            body: match.messages.isEmpty
+                ? Center(
+                    child: Text(
+                        AppLocalizations.of(context)!.messageScreen6f11e9ea))
+                : ListView.builder(
+                    reverse: true,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: match.messages.length,
+                    itemBuilder: (context, i) {
+                      final msg =
+                          match.messages[match.messages.length - 1 - i];
+                      final isTenant = msg.sender == tenantName;
+                      return Align(
+                        alignment: isTenant
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.75),
+                          decoration: BoxDecoration(
+                            color: isTenant
+                                ? AppColors.primary.withValues(alpha: 0.12)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(msg.text,
+                              style: const TextStyle(fontSize: 14)),
+                        ),
+                      );
+                    },
+                  ),
           );
         }
 

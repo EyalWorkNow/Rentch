@@ -817,7 +817,10 @@ class _PropertyManageCard extends StatelessWidget {
   final RentalProperty property;
   final int matchCount;
   final ContractStatus? contractStatus;
-  final VoidCallback onRemove;
+  // Future<bool>: removeLandlordProperty now reports whether the delete
+  // actually landed on the server (see dating_provider.dart) so this button
+  // can show an honest error instead of assuming success.
+  final Future<bool> Function() onRemove;
   final VoidCallback onEdit;
   final VoidCallback onBoost;
 
@@ -1075,7 +1078,15 @@ class _PropertyManageCard extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed == true) onRemove();
+    if (confirmed != true) return;
+    final deleted = await onRemove();
+    if (!deleted && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(milliseconds: 3000),
+        content: Text(AppLocalizations.of(context)!.addPropertyScreen79286e19),
+        backgroundColor: AppColors.coral,
+      ));
+    }
   }
 }
 

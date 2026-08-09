@@ -11920,4 +11920,8 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get panoramaCaptureScreenAiTwoPhotoFailed =>
       'Échec de la génération, veuillez réessayer';
+
+  @override
+  String get propertyDetailScreenListingRemoved =>
+      'Cette annonce a été supprimée et n\'est plus disponible';
 }

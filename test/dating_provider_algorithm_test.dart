@@ -7,6 +7,7 @@ import 'package:dating_app/core/matching/ranked_lead.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
 import 'package:dating_app/data/repositories/property_likes_repository.dart';
+import 'package:dating_app/data/repositories/property_repository.dart';
 import 'package:dating_app/data/repositories/review_repository.dart';
 import 'package:dating_app/data/repositories/user_repository.dart';
 import 'package:dating_app/l10n/app_localizations.dart';
@@ -748,6 +749,11 @@ void main() {
     final provider = DatingProvider(
       rentalDataService: _FakeRentalDataService(const []),
       localStorageService: _MemoryLocalStorageService(),
+      // addLandlordProperty now awaits the remote write and rolls back the
+      // optimistic local add on a genuine failure (see PropertyRepository.
+      // isRealFailure) — without this fake, the real PropertyRepository would
+      // attempt an actual network call in the test environment and fail.
+      propertyRepository: _FakePropertyRepository(),
     );
 
     await provider.initialize();
@@ -1238,6 +1244,22 @@ class _FakeUserRepository extends UserRepository {
   Future<TenantProfile?> getProfile(String userId) async {
     return profiles[userId];
   }
+}
+
+class _FakePropertyRepository extends PropertyRepository {
+  @override
+  bool get isConfigured => true;
+
+  @override
+  Future<PropertySaveResult> saveProperty(
+    RentalProperty property, {
+    required String ownerUserId,
+    PropertyRecordStatus status = PropertyRecordStatus.active,
+  }) async =>
+      const PropertySaveResult.ok();
+
+  @override
+  Future<bool> deleteProperty(String propertyId) async => true;
 }
 
 class _FakeRentalDataService extends RentalDataService {

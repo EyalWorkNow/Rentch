@@ -1243,9 +1243,22 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         setState(() => _isSaving = true);
       }
 
-      await provider.addLandlordProperty(property);
+      final published = await provider.addLandlordProperty(property);
 
       if (!mounted) return;
+      if (!published) {
+        // addLandlordProperty now actually awaits the server write and rolls
+        // back its optimistic local add on failure — previously this call
+        // was fire-and-forget and this success path ran unconditionally,
+        // showing "published" even when the listing never made it to the
+        // server (and existed only on this device until the next reload).
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreen79286e19),
+          backgroundColor: AppColors.coral,
+        ));
+        return;
+      }
       // Auto-score the listing (our engine, verified signals) and show it back.
       final score = ListingScore.basic(property);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -6455,9 +6468,22 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         createdAt: widget.property.createdAt,
       );
 
-      await context.read<DatingProvider>().updateLandlordProperty(updated);
+      final saved =
+          await context.read<DatingProvider>().updateLandlordProperty(updated);
 
       if (!mounted) return;
+      if (!saved) {
+        // updateLandlordProperty now actually reports failure — including the
+        // case where the property no longer exists locally (e.g. deleted
+        // elsewhere while this stale edit screen was still open) — instead of
+        // this success toast/pop running unconditionally on a no-op write.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(milliseconds: 3000),
+          content: Text(AppLocalizations.of(context)!.addPropertyScreen069e6d9c),
+          backgroundColor: AppColors.coral,
+        ));
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(milliseconds: 2500),
@@ -6702,10 +6728,22 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             ),
           );
           if (confirmed == true) {
-            await provider.removeLandlordProperty(widget.property.id);
-            if (mounted) {
-              navigator.pop();
+            final deleted =
+                await provider.removeLandlordProperty(widget.property.id);
+            if (!mounted) return;
+            if (!deleted) {
+              // removeLandlordProperty now reports failure honestly (and
+              // restores the property locally on rollback) instead of always
+              // popping back as if the delete succeeded.
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                duration: const Duration(milliseconds: 3000),
+                content:
+                    Text(AppLocalizations.of(context)!.addPropertyScreen79286e19),
+                backgroundColor: AppColors.coral,
+              ));
+              return;
             }
+            navigator.pop();
           }
         },
       ),

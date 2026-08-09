@@ -3377,5 +3377,6 @@
   "panoramaCaptureScreenAiTwoPhotoHint": "ارفع صورتين بانوراميتين لنفس الغرفة من زاويتين مختلفتين — يكمل الذكاء الاصطناعي الفجوة بينهما لإنشاء صورة 360° كاملة، دون تغيير ما هو موجود في الصور",
   "panoramaCaptureScreenAiTwoPhotoProgress": "جارٍ إنشاء صورة 360° الكاملة…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "الرجاء اختيار صورتين بانوراميتين بالضبط",
-  "panoramaCaptureScreenAiTwoPhotoFailed": "فشل الإنشاء، يرجى المحاولة مرة أخرى"
+  "panoramaCaptureScreenAiTwoPhotoFailed": "فشل الإنشاء، يرجى المحاولة مرة أخرى",
+  "propertyDetailScreenListingRemoved": "تمت إزالة هذا العقار ولم يعد متاحًا"
 }

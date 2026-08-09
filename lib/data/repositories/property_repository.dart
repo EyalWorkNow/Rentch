@@ -27,6 +27,15 @@ class PropertySaveResult {
 
   bool get isOk => rejection == null;
 
+  // notConfigured means there's no remote to sync to at all (offline/demo/
+  // unconfigured environment) — the app is explicitly designed to work
+  // local-only in that case (guest mode, syncRemote:false saves, etc.), so a
+  // caller deciding whether to roll back an optimistic local write and show
+  // an error should NOT treat this the same as a genuine attempted-and-failed
+  // write (writeFailed) or a real policy gate (consent). Those DO mean "we
+  // tried to reach the server and it said no" and should roll back + report.
+  bool get isRealFailure => !isOk && rejection != PropertySaveRejection.notConfigured;
+
   // Human-readable message for display in the UI.
   String? get userMessage {
     return switch (rejection) {

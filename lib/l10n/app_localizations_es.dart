@@ -11886,4 +11886,8 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get panoramaCaptureScreenAiTwoPhotoFailed =>
       'Error al generar, inténtalo de nuevo';
+
+  @override
+  String get propertyDetailScreenListingRemoved =>
+      'Este anuncio ha sido eliminado y ya no está disponible';
 }

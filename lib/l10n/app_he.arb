@@ -3425,5 +3425,6 @@
   "panoramaCaptureScreenAiTwoPhotoHint": "העלו 2 תמונות פנורמה של אותו חדר מזוויות שונות — ה-AI ישלים את הפער ביניהן לכדי 360° מלא, בלי לשנות את מה שבתמונות",
   "panoramaCaptureScreenAiTwoPhotoProgress": "יוצר את ה-360° המלא…",
   "panoramaCaptureScreenAiTwoPhotoNeedTwo": "צריך לבחור בדיוק 2 תמונות פנורמה",
-  "panoramaCaptureScreenAiTwoPhotoFailed": "היצירה נכשלה, נסו שוב"
+  "panoramaCaptureScreenAiTwoPhotoFailed": "היצירה נכשלה, נסו שוב",
+  "propertyDetailScreenListingRemoved": "הדירה הזו הוסרה ואינה זמינה עוד"
 }

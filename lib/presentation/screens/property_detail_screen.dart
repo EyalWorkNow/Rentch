@@ -337,6 +337,38 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final l10n = AppLocalizations.of(context)!;
+        // Landlord viewing their OWN listing's preview: if the app already
+        // knows it's gone, myProperties is authoritative (unlike the general
+        // catalog, which can miss it just from pagination/caching, not
+        // necessarily deletion) — don't silently freeze on the construction-
+        // time snapshot forever with fully "live" Edit/Boost/Share buttons for
+        // a listing that no longer exists (this screen has no lifecycle/
+        // route-resume hook to notice a deletion that happened elsewhere).
+        if (widget.isLandlordPreview &&
+            !provider.myProperties.any((m) => m.id == widget.property.id)) {
+          return Scaffold(
+            appBar: AppBar(title: Text(widget.property.address)),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.home_outlined,
+                        size: 56, color: AppColors.textDisabled),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.propertyDetailScreenListingRemoved,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 16, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         final p = provider.propertyById(widget.property.id) ?? widget.property;
         final media = p.media;
         final hasVirtualTour =

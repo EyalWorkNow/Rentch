@@ -11746,4 +11746,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get panoramaCaptureScreenAiTwoPhotoFailed =>
       'Generation failed, please try again';
+
+  @override
+  String get propertyDetailScreenListingRemoved =>
+      'This listing has been removed and is no longer available';
 }
