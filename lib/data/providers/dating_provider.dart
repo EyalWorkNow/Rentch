@@ -805,12 +805,31 @@ class DatingProvider extends ChangeNotifier {
   }
   List<SearchArea> get searchAreas => _searchAreas;
   List<AppReview> get tenantReviews => const []; // reviews feature removed
-  List<RentalMatch> get matches => isLandlord
-      ? _matches.where((match) {
-          final property = propertyById(match.propertyId);
-          return property != null && _belongsToCurrentLandlord(property);
-        }).toList(growable: false)
-      : _matches;
+  // Tenant side previously had NO per-user filter at all (unlike the landlord
+  // branch below) — whatever sat in the in-memory _matches list was shown
+  // verbatim. Combined with the device-scoped remote-state issue fixed in
+  // forgetDeviceRemoteState, this meant one tenant's private match/chat list
+  // could show up under a different tenant account on the same device. Uses
+  // the same matchId "match-<propertyId>~<tenantUid>" convention already
+  // relied on by _matchedTenantsFor — RentalMatch carries no dedicated uid
+  // field to filter on otherwise.
+  List<RentalMatch> get matches {
+    if (isLandlord) {
+      return _matches.where((match) {
+        final property = propertyById(match.propertyId);
+        return property != null && _belongsToCurrentLandlord(property);
+      }).toList(growable: false);
+    }
+    final myUid = _tenantProfile?.id;
+    if (myUid == null || myUid.isEmpty) return _matches;
+    return _matches.where((match) {
+      final sep = match.id.lastIndexOf('~');
+      // No parseable uid suffix (legacy/demo id) — can't determine ownership,
+      // fall back to showing it rather than risk hiding a real match.
+      if (sep < 0) return true;
+      return match.id.substring(sep + 1) == myUid;
+    }).toList(growable: false);
+  }
   int get likesCount => _likedPropertyIds.length;
   Set<String> get likedPropertyIds => _likedPropertyIds;
   int get passedCount => _passedPropertyIds.length;
@@ -2793,7 +2812,10 @@ class DatingProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     AppEvents.instance.log(UserEventType.sessionEnded);
-    await _localStorageService.clearAppState();
+    // Rotates the device-pinned remote-state row (see forgetDeviceRemoteState)
+    // so the next account signed in on this device can never inherit this
+    // account's synced profile/matches/saved-properties.
+    await _localStorageService.forgetDeviceRemoteState();
     _customProperties = [];
     _invalidateCatalogCache();
     _userRole = 'tenant';
@@ -2879,8 +2901,11 @@ class DatingProvider extends ChangeNotifier {
       await _userRepository.deleteProfile(userId);
     }
 
-    // 3. Clear all local state and end any residual session.
-    await _localStorageService.clearAppState();
+    // 3. Clear all local state and end any residual session — same
+    //    device-pinned remote-state rotation as logout() (see
+    //    forgetDeviceRemoteState), even more important here since the
+    //    account itself is gone and can never come back to overwrite it.
+    await _localStorageService.forgetDeviceRemoteState();
     try {
       await auth?.signOut();
     } catch (_) {}

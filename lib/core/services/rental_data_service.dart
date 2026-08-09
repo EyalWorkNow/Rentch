@@ -265,6 +265,16 @@ class RentalDataService {
           .map((item) => item['url'] as String)
           .toList(),
       'transactionType': data['transactionType']?.toString() ?? 'rent',
+      // Pass the real status through so RentalProperty.fromJson's own
+      // status-aware isActive derivation (removed/paused/rented/draft →
+      // inactive) takes over — this map previously omitted 'status' entirely
+      // and computed isActive as `status != 'paused'` ONLY, so a landlord's
+      // own 'draft' or 'rented' listing was miscomputed as active: shown with
+      // a green "active" dot and wrongly counted toward the free-tier
+      // 3-listing publish cap (add_property_screen.dart's quota check reads
+      // isActive), sometimes blocking a landlord from publishing a listing
+      // they were actually entitled to.
+      'status': data['status']?.toString(),
       'isActive': data['status']?.toString() != 'paused',
       'model3d': _decodeJsonMap(data['model3d']),
       'legal': _decodeJsonMap(data['legal']),

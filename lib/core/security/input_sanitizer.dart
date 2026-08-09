@@ -10,14 +10,19 @@ class InputSanitizer {
   // ── Text inputs ──────────────────────────────────────────────────────────────
 
   static String sanitizeText(String input, {int maxLength = 500}) {
-    return input
+    // The end index MUST come from the CLEANED string's own length, not the
+    // original input's — if any control character was stripped, the cleaned
+    // string is shorter than input.trim().length, and clamping against the
+    // wrong (larger) length threw a RangeError on ordinary pasted text
+    // containing e.g. a stray control character, blocking the caller (e.g.
+    // publishing a property) with an unexplained generic error.
+    final cleaned = input
         // Remove null bytes (potential injection vector)
         .replaceAll('\x00', '')
         // Remove most control characters except newline, tab, carriage return
         .replaceAll(RegExp(r'[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]'), '')
-        .trim()
-        // Enforce max length after cleaning
-        .substring(0, input.trim().length.clamp(0, maxLength));
+        .trim();
+    return cleaned.substring(0, cleaned.length.clamp(0, maxLength));
   }
 
   static String sanitizeName(String name) {

@@ -536,10 +536,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       );
 
       if (!_scanService.isConfigured) {
-        setState(() {
-          _scanTourDraft = captured;
-          _isScanSubmitting = false;
-        });
+        // Do NOT set _scanTourDraft here — the scan backend isn't configured,
+        // so this local-only capture ('captured' status) will never be
+        // uploaded/processed. Setting it anyway used to silently win over an
+        // already-published, working panorama tour at save time (see _save()'s
+        // virtualTour precedence) — a dead-end attempt would discard a real
+        // tour with zero warning. Just report the failure; leave any existing
+        // tour draft untouched.
+        setState(() => _isScanSubmitting = false);
         _showMediaError(
           AppLocalizations.of(context)!.addPropertyScreen5ef6e641,
         );
@@ -740,7 +744,16 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         folderName: 'property_verification_videos',
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
-      final videoUrl = remoteUrl ?? localPath;
+      // Same silent local-path fallback as photo/video picking above — on
+      // upload failure this used to still mark the listing "verified" with a
+      // device-local (unreachable off-device) video URL and no error shown.
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        if (!mounted) return;
+        setState(() => _isCapturingVerification = false);
+        _showMediaError(AppLocalizations.of(context)!.addPropertyScreencc83e982);
+        return;
+      }
+      final videoUrl = remoteUrl;
       final capturedAt = DateTime.now().toUtc();
       if (!mounted) return;
       setState(() {
@@ -1170,7 +1183,17 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         publishChannels: _publishChannels.toList(),
         media: media,
         transactionType: transactionType,
-        virtualTour: _scanTourDraft ?? _virtualTourDraft,
+        // A bare local-only scan capture ('captured' status — picked but
+        // never actually submitted/uploaded) must NOT silently discard an
+        // existing, working virtualTour: only let the scan draft win once it
+        // has genuinely progressed (queued/uploading/processing/ready/failed
+        // — real submitted intent), otherwise fall back to whichever tour
+        // already existed (see the scan-capture fix above for the dead-end
+        // 'not configured' case this also protects against).
+        virtualTour:
+            (_scanTourDraft != null && _scanTourDraft!.status != PropertyTourStatus.captured)
+                ? _scanTourDraft
+                : (_virtualTourDraft ?? _scanTourDraft),
         model3d: _model3dDraft,
         panoramaTour: _panoramaTourDraft,
         legal: legal,
@@ -5913,7 +5936,17 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         folderName: 'property_photos',
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
-      _assignPickedMedia(remoteUrl ?? localPath, PropertyMediaType.image);
+      // Unlike the add-flow's version of this method, this fell back to the
+      // device-local file path on ANY upload failure (expired presign, S3
+      // error, offline, rate-limit throttle) with no error shown — the photo
+      // looked fine on the editing device (local paths still render there)
+      // but was a broken image everywhere else (other devices, the website,
+      // search) since the local path means nothing off-device.
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        _showMediaError(AppLocalizations.of(context)!.addPropertyScreenc7a300bf);
+        return;
+      }
+      _assignPickedMedia(remoteUrl, PropertyMediaType.image);
     } on StorageException catch (error) {
       _showMediaError(error.message);
     }
@@ -5935,7 +5968,12 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         folderName: 'property_videos',
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
-      _assignPickedMedia(remoteUrl ?? localPath, PropertyMediaType.video);
+      // Same silent local-path fallback bug as _pickPropertyImage above.
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        _showMediaError(AppLocalizations.of(context)!.addPropertyScreencc83e982);
+        return;
+      }
+      _assignPickedMedia(remoteUrl, PropertyMediaType.video);
     } on StorageException catch (error) {
       _showMediaError(error.message);
     }
@@ -5990,10 +6028,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       );
 
       if (!_scanService.isConfigured) {
-        setState(() {
-          _scanTourDraft = captured;
-          _isScanSubmitting = false;
-        });
+        // Do NOT set _scanTourDraft here — the scan backend isn't configured,
+        // so this local-only capture ('captured' status) will never be
+        // uploaded/processed. Setting it anyway used to silently win over an
+        // already-published, working panorama tour at save time (see _save()'s
+        // virtualTour precedence) — a dead-end attempt would discard a real
+        // tour with zero warning. Just report the failure; leave any existing
+        // tour draft untouched.
+        setState(() => _isScanSubmitting = false);
         _showMediaError(
           AppLocalizations.of(context)!.addPropertyScreen5ef6e641,
         );
@@ -6116,7 +6158,16 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         folderName: 'property_verification_videos',
       );
       final remoteUrl = await _storageService.uploadToCloud(localPath);
-      final videoUrl = remoteUrl ?? localPath;
+      // Same silent local-path fallback as photo/video picking above — on
+      // upload failure this used to still mark the listing "verified" with a
+      // device-local (unreachable off-device) video URL and no error shown.
+      if (remoteUrl == null || remoteUrl.isEmpty) {
+        if (!mounted) return;
+        setState(() => _isCapturingVerification = false);
+        _showMediaError(AppLocalizations.of(context)!.addPropertyScreencc83e982);
+        return;
+      }
+      final videoUrl = remoteUrl;
       final capturedAt = DateTime.now().toUtc();
       if (!mounted) return;
       setState(() {
@@ -6374,7 +6425,17 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         publishChannels: _publishChannels.toList(),
         media: media,
         transactionType: transactionType,
-        virtualTour: _scanTourDraft ?? _virtualTourDraft,
+        // A bare local-only scan capture ('captured' status — picked but
+        // never actually submitted/uploaded) must NOT silently discard an
+        // existing, working virtualTour: only let the scan draft win once it
+        // has genuinely progressed (queued/uploading/processing/ready/failed
+        // — real submitted intent), otherwise fall back to whichever tour
+        // already existed (see the scan-capture fix above for the dead-end
+        // 'not configured' case this also protects against).
+        virtualTour:
+            (_scanTourDraft != null && _scanTourDraft!.status != PropertyTourStatus.captured)
+                ? _scanTourDraft
+                : (_virtualTourDraft ?? _scanTourDraft),
         model3d: _model3dDraft,
         panoramaTour: _panoramaTourDraft,
         legal: legal,

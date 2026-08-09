@@ -136,6 +136,36 @@ class LocalStorageService {
     await _deleteStateLocal(preferences);
   }
 
+  // The remote-state row id is scoped to this DEVICE (persisted in
+  // SharedPreferences, reused across every account that ever signs in on it)
+  // — logout previously only cleared the LOCAL cache, never this remote row
+  // or its device-pinned id. A logged-out user's synced profile/matches/
+  // saved-properties stayed in that row; if the next account on this device
+  // hydrated before the outgoing user's own logout-triggered re-sync (or the
+  // re-sync itself never fully lands, e.g. app killed mid-logout), the new
+  // account could inherit the previous one's data. Best-effort delete the row
+  // AND drop the device-pinned id so the next account starts a genuinely
+  // fresh remote-state slot with nothing to inherit from, rather than relying
+  // on timing for the overwrite-on-logout to win the race.
+  Future<void> forgetDeviceRemoteState() async {
+    final preferences = await SharedPreferences.getInstance();
+    await _deleteStateLocal(preferences);
+    if (!AppConfig.canUseRemoteState) return;
+    final existingId = preferences.getString(_remoteStateIdKey);
+    if (existingId != null && existingId.isNotEmpty) {
+      try {
+        await tables.deleteRow(
+          databaseId: appwriteDatabaseId,
+          tableId: appwriteAppStateCollectionId,
+          rowId: existingId,
+        );
+      } catch (error) {
+        _logRemoteError('forget-device-delete', error);
+      }
+    }
+    await preferences.remove(_remoteStateIdKey);
+  }
+
   Map<String, dynamic>? _decodeState(String? rawState) {
     if (rawState == null || rawState.isEmpty) {
       return null;

@@ -1020,6 +1020,17 @@ class _PropertyManageCard extends StatelessWidget {
                           icon: IconsaxPlusLinear.edit_2,
                           onTap: onEdit,
                         ),
+                        const SizedBox(width: 8),
+                        // onRemove was passed into this card from day one but
+                        // never actually wired to a visible action — the only
+                        // reachable delete path was inside the Edit screen.
+                        // Same confirm-dialog copy/style as that screen's own
+                        // delete button (add_property_screen.dart) so the UX
+                        // is consistent wherever a landlord deletes a listing.
+                        _GlassAction(
+                          icon: IconsaxPlusLinear.trash,
+                          onTap: () => _confirmRemove(context),
+                        ),
                       ],
                     ),
                   ),
@@ -1030,6 +1041,41 @@ class _PropertyManageCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmRemove(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          AppLocalizations.of(context)!.addPropertyScreeneb255ed5,
+          style:
+              const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900),
+        ),
+        content: Text(
+          AppLocalizations.of(context)!.addPropertyScreendb2a79db(property.address),
+          style: const TextStyle(color: AppColors.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(context)!.addPropertyScreena7c55a8d,
+                style: const TextStyle(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.coral,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(AppLocalizations.of(context)!.addPropertyScreen10666b28),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onRemove();
   }
 }
 
