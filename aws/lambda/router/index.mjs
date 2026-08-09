@@ -2018,7 +2018,10 @@ async function isThreadMember(matchId, uid) {
 
 async function getOne(table, id) {
   const r = await ddb.send(new GetCommand({ TableName: table.name, Key: { id } }));
-  return r.Item ? json(200, r.Item) : json(404, {});
+  // pageBody() (list/query path) strips the internal embedding vector via
+  // stripInternal — this single-item GET (property detail, share preview,
+  // etc.) shipped it raw forever, the one path stripInternal never covered.
+  return r.Item ? json(200, stripInternal(r.Item)) : json(404, {});
 }
 
 // Aggregate count of rows matching the GSI filter (e.g. all likes/views for a
@@ -2948,7 +2951,12 @@ async function handleSearchKnn(event) {
       scored.push({ ...p, semanticSim: cosineSim(vec, emb) });
     }
     scored.sort((a, b) => b.semanticSim - a.semanticSim);
-    return json(200, { results: scored.slice(0, topK) });
+    // scored[i] still carries the raw 768-float embedding it was matched
+    // against (spread from `p` above) — this endpoint bypasses pageBody/
+    // stripInternal entirely, so every knn search response shipped the full
+    // internal ranking vector to the client. Strip it same as every other
+    // property response.
+    return json(200, { results: scored.slice(0, topK).map(stripInternal) });
   } catch (e) {
     console.warn('search/knn failed:', e.message);
     return json(200, { results: [] });
@@ -3330,6 +3338,7 @@ async function deleteItem(table, tableKey, id, callerUid) {
   //    conversation or lead just by guessing the id.
   //  • property_likes — only the tenant who owns the like may delete it.
   // Other tables have no verified owner field; they remain authenticated-only.
+  let deletedProperty = null;
   if (tableKey === 'users' || tableKey === 'persona') {
     if (id !== callerUid) return json(403, { message: 'Forbidden' });
   } else if (tableKey === 'properties') {
@@ -3338,6 +3347,7 @@ async function deleteItem(table, tableKey, id, callerUid) {
     );
     const owner = existing.Item?.ownerUserId;
     if (owner && owner !== callerUid) return json(403, { message: 'Forbidden' });
+    deletedProperty = existing.Item || null;
   } else if (tableKey === 'matches') {
     if (!(await isThreadMember(id, callerUid))) return json(403, { message: 'Forbidden' });
   } else if (tableKey === 'property_likes') {
@@ -3349,7 +3359,92 @@ async function deleteItem(table, tableKey, id, callerUid) {
   }
 
   await ddb.send(new DeleteCommand({ TableName: table.name, Key: { id } }));
+  // Deleting a property previously only removed the DynamoDB row — every
+  // photo/video/floor-plan/360-tour it referenced stayed in S3 forever (a
+  // storage-cost leak, and previously-public URLs stayed live/guessable
+  // indefinitely). Best-effort cleanup, fire-and-forget-safe (awaited so
+  // Lambda doesn't get frozen mid-cleanup, but every failure is swallowed —
+  // an S3 issue must never turn a successful delete into an error response).
+  if (deletedProperty) {
+    await cleanupPropertyMedia(deletedProperty).catch(() => {});
+  }
   return json(200, { id, deleted: true });
+}
+
+// Recursively collects every string that looks like an http(s) URL out of an
+// arbitrary parsed JSON value — used instead of hand-modeling each nested
+// media/tour/model3d shape (which have already drifted across schema
+// versions, per the legacy-format audit) so cleanup stays robust to shape
+// changes: any URL anywhere in these blobs gets a deletion attempt.
+function collectHttpUrlsDeep(value, out) {
+  if (typeof value === 'string') {
+    if (/^https?:\/\//i.test(value)) out.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const v of value) collectHttpUrlsDeep(v, out);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const v of Object.values(value)) collectHttpUrlsDeep(v, out);
+  }
+}
+
+// Strict host-checked S3 key resolver for cleanup purposes — deliberately
+// NOT reusing keyFromS3Url, which only strips a bucket-name PATH PREFIX and
+// never checks the URL's HOST. Media/tour JSON blobs can legitimately contain
+// external URLs (e.g. a third-party tour viewer link); without a real host
+// check, an external URL whose path coincidentally matches a real object key
+// in OUR bucket would resolve to that key and get deleted. Returns null for
+// anything not unambiguously one of our own S3 object URLs.
+function ourS3KeyFromUrl(url) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  if (!S3_BUCKET) return null;
+  const host = u.hostname;
+  const path = decodeURIComponent(u.pathname).replace(/^\/+/, '');
+  // Virtual-hosted-style: <bucket>.s3[.<region>].amazonaws.com/<key>
+  if (host === `${S3_BUCKET}.s3.amazonaws.com` || host.startsWith(`${S3_BUCKET}.s3.`)) {
+    return isSafeStorageKey(path) ? path : null;
+  }
+  // Path-style: s3[.<region>].amazonaws.com/<bucket>/<key> — only ours if the
+  // path actually starts with OUR bucket name, not just any bucket's.
+  const isS3PathHost = host === 's3.amazonaws.com' ||
+    (host.startsWith('s3.') && host.endsWith('.amazonaws.com'));
+  if (isS3PathHost && path.startsWith(`${S3_BUCKET}/`)) {
+    const key = path.slice(S3_BUCKET.length + 1);
+    return isSafeStorageKey(key) ? key : null;
+  }
+  return null;
+}
+
+function tryParseJson(raw) {
+  if (typeof raw !== 'string' || !raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+// Best-effort S3 cleanup for a deleted property: media/virtualTour/
+// panoramaTour/model3d are stored as JSON-blob strings (property_repository.
+// dart's _propertyToRow) — parse each, pull out every URL, resolve it to an
+// S3 key, and delete. Never throws (caller treats this as fire-and-forget).
+async function cleanupPropertyMedia(item) {
+  const urls = new Set();
+  for (const field of ['media', 'virtualTour', 'panoramaTour', 'model3d']) {
+    const parsed = tryParseJson(item[field]);
+    if (parsed) collectHttpUrlsDeep(parsed, urls);
+  }
+  if (typeof item.verificationVideoUrl === 'string' && item.verificationVideoUrl) {
+    urls.add(item.verificationVideoUrl);
+  }
+  const keys = new Set();
+  for (const url of urls) {
+    const key = ourS3KeyFromUrl(url);
+    if (key) keys.add(key);
+  }
+  await Promise.all([...keys].map((key) =>
+    s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key })).catch(() => {}),
+  ));
 }
 
 function castFilter(v) {
