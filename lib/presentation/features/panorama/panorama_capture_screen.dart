@@ -7,6 +7,7 @@ import 'package:dating_app/core/constants/app_colors.dart';
 import 'package:dating_app/core/services/aws_client.dart';
 import 'package:dating_app/core/services/pending_pano_store.dart';
 import 'package:dating_app/data/models/panorama_tour.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_align_screen.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_map_placement.dart';
 import 'package:dating_app/presentation/features/panorama/panorama_pole_capture.dart';
@@ -104,7 +105,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     String? autoLabel,
   }) async {
     // Bulk imports pass an autoLabel so the landlord isn't prompted per image.
-    final label = autoLabel ?? await _askLabel('נקודה ${_nodes.length + 1}');
+    final label = autoLabel ??
+        await _askLabel(AppLocalizations.of(context)!
+            .panoramaCaptureScreen697a231c(_nodes.length + 1));
     if (label == null || !mounted) return;
 
     setState(() => _busy = true);
@@ -120,8 +123,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (!mounted) return;
     if (url == null || url.isEmpty) {
       setState(() => _busy = false);
-      _toast('ההעלאה נכשלה — בדוק את החיבור ונסה שוב. '
-          'הסיור חייב להיות מועלה כדי שאחרים יוכלו לצפות.');
+      _toast('${AppLocalizations.of(context)!.panoramaCaptureScreenAb3cfabf} '
+          '${AppLocalizations.of(context)!.panoramaCaptureScreenD0700135}');
       return;
     }
     setState(() => _busy = false);
@@ -168,7 +171,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
     if (result == null || !mounted) return;
 
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    final label = await _askLabel(AppLocalizations.of(context)!
+        .panoramaCaptureScreen697a231c(_nodes.length + 1));
     if (label == null || !mounted) return;
     await _addNode(
       url: result.imageUrl,
@@ -189,7 +193,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     );
     if (result == null || !mounted) return;
 
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    final label = await _askLabel(AppLocalizations.of(context)!
+        .panoramaCaptureScreen697a231c(_nodes.length + 1));
     if (label == null || !mounted) return;
     // Already uploaded + stitched by the video screen — add it directly.
     await _addNode(
@@ -211,7 +216,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     // screen already showed its own clear message, so just return quietly.
     if (result == null || !mounted) return;
 
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    final label = await _askLabel(AppLocalizations.of(context)!
+        .panoramaCaptureScreen697a231c(_nodes.length + 1));
     if (label == null || !mounted) return;
     // The panorama is already uploaded by the sweep screen — add it directly.
     await _addNode(
@@ -250,7 +256,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         contentType: 'image/jpeg',
         haov: 360,
         vaov: vaov,
-        autoLabel: 'נקודה ${_nodes.length + 1}',
+        autoLabel: AppLocalizations.of(context)!
+            .panoramaCaptureScreen697a231c(_nodes.length + 1),
       );
     }
   }
@@ -309,8 +316,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
             children: [
               const Text('✨', style: TextStyle(fontSize: 40)),
               const SizedBox(height: 12),
-              const Text('יוצרים 360° עם AI',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 19)),
+              Text(AppLocalizations.of(context)!.panoramaCaptureScreen72c7832d,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900, fontSize: 19)),
               const SizedBox(height: 16),
               CircularProgressIndicator(color: AppColors.primary),
               const SizedBox(height: 16),
@@ -322,8 +330,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                         color: AppColors.textSecondary, fontSize: 15, height: 1.4)),
               ),
               const SizedBox(height: 6),
-              const Text('אל תסגרו את המסך',
-                  style: TextStyle(color: AppColors.textDisabled, fontSize: 12)),
+              Text(AppLocalizations.of(context)!.panoramaCaptureScreenD003cb8f,
+                  style: const TextStyle(
+                      color: AppColors.textDisabled, fontSize: 12)),
             ],
           ),
         ),
@@ -339,21 +348,23 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('שפר רצפה ותקרה',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-        content: const Text(
-          'לפנורמה אופקית אין תקרה ורצפה אמיתיות. אפשר להוסיף אותן בשתי תמונות '
-          'נוספות — צילום אחד כלפי מטה (רצפה) ואחד כלפי מעלה (תקרה). זה לא חובה.',
-          style: TextStyle(color: AppColors.slate600, height: 1.4),
+        title: Text(AppLocalizations.of(context)!.panoramaCaptureScreenAd3883c5,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+        content: Text(
+          '${AppLocalizations.of(context)!.panoramaCaptureScreenA2c1fdee} '
+          '${AppLocalizations.of(context)!.panoramaCaptureScreenD7c5685a}',
+          style: const TextStyle(color: AppColors.slate600, height: 1.4),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('דלג')),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaCaptureScreen80a413c5)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('שפר'),
+            child: Text(
+                AppLocalizations.of(context)!.panoramaCaptureScreen1dea3904),
           ),
         ],
       ),
@@ -374,7 +385,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     required double vaov,
     required double fallbackHaov,
   }) async {
-    final label = await _askLabel('נקודה ${_nodes.length + 1}');
+    final label = await _askLabel(AppLocalizations.of(context)!
+        .panoramaCaptureScreen697a231c(_nodes.length + 1));
     if (label == null || !mounted) return false;
 
     setState(() => _busy = true);
@@ -384,7 +396,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       if (stripUrl == null || stripUrl.isEmpty) {
         if (mounted) {
           setState(() => _busy = false);
-          _toast('ההעלאה נכשלה — בדוק את החיבור ונסה שוב.');
+          _toast(AppLocalizations.of(context)!.panoramaCaptureScreenD19efaee);
         }
         return true; // upload failed entirely; don't double-add a plain strip.
       }
@@ -446,15 +458,16 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
             backgroundColor: Colors.white,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('כיוון הפנורמה',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            title: Text(
+                AppLocalizations.of(context)!.panoramaCaptureScreen14d51828,
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'הסיבוב מכסה כ-${haov.round()}° לרוחב · ${vaov.round()}° לגובה. '
-                  'אם האופק נראה מתוח, כוונן את שדה הראייה האנכי.',
+                  '${AppLocalizations.of(context)!.panoramaCaptureScreen9a48fd71(haov.round(), vaov.round())} '
+                  '${AppLocalizations.of(context)!.panoramaCaptureScreen5067aec2}',
                   style: const TextStyle(color: AppColors.slate600, height: 1.4),
                 ),
                 const SizedBox(height: 8),
@@ -472,13 +485,15 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('ביטול')),
+                  child: Text(AppLocalizations.of(context)!
+                      .panoramaCaptureScreenA7c55a8d)),
               FilledButton(
                 style:
                     FilledButton.styleFrom(backgroundColor: AppColors.primary),
                 onPressed: () =>
                     Navigator.pop(ctx, (haov: haovFor(vaov), vaov: vaov)),
-                child: const Text('הוסף'),
+                child: Text(AppLocalizations.of(context)!
+                    .panoramaCaptureScreenCf0a5531),
               ),
             ],
           );
@@ -497,7 +512,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
 
   Future<void> _renameNode(int i) async {
     if (i < 0 || i >= _nodes.length) return;
-    final current = _nodes[i].label.isNotEmpty ? _nodes[i].label : 'נקודה ${i + 1}';
+    final current = _nodes[i].label.isNotEmpty
+        ? _nodes[i].label
+        : AppLocalizations.of(context)!.panoramaCaptureScreenFdb5ed3b(i + 1);
     final name = await _askLabel(current);
     if (name == null || name.isEmpty || !mounted) return;
     setState(() => _nodes[i] = _nodes[i].copyWith(label: name));
@@ -513,7 +530,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (i < 0 || i >= _nodes.length) return;
     final node = _nodes[i];
     if (node.isLocal) {
-      _toast('צריך חיבור לאינטרנט — הפנורמה עדיין לא הועלתה.');
+      _toast(AppLocalizations.of(context)!.panoramaCaptureScreenA8eed50d);
       return;
     }
     await _startEnhance(node.id, showModal: true);
@@ -523,19 +540,42 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // version generated FROM the current 360, the original untouched. Pick a mode,
   // confirm, then generate. Only offered on a full 360 (the ✨-complete action
   // covers partial panos).
-  static const List<({String v, String label, String emoji, String desc})>
-      _variantOptions = [
-    (v: 'tidy', label: 'מסודר', emoji: '🧹', desc: 'מסדר ומנקה — אותם רהיטים, בלי בלגן'),
-    (v: 'day', label: 'יום', emoji: '☀️', desc: 'תאורת יום טבעית ובהירה'),
-    (v: 'evening', label: 'ערב', emoji: '🌇', desc: 'אור ערב חמים ורך'),
-    (v: 'night', label: 'לילה', emoji: '🌙', desc: 'תאורת לילה נעימה'),
-  ];
+  List<({String v, String label, String emoji, String desc})> _variantOptions(
+      BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      (
+        v: 'tidy',
+        label: l10n.panoramaCaptureScreen6a9d0f75,
+        emoji: '🧹',
+        desc: l10n.panoramaCaptureScreen58e6f595
+      ),
+      (
+        v: 'day',
+        label: l10n.panoramaCaptureScreen459ead47,
+        emoji: '☀️',
+        desc: l10n.panoramaCaptureScreenD8673be3
+      ),
+      (
+        v: 'evening',
+        label: l10n.panoramaCaptureScreen33c5e69b,
+        emoji: '🌇',
+        desc: l10n.panoramaCaptureScreen97980be4
+      ),
+      (
+        v: 'night',
+        label: l10n.panoramaCaptureScreen042937b7,
+        emoji: '🌙',
+        desc: l10n.panoramaCaptureScreenEa2edff1
+      ),
+    ];
+  }
 
   Future<void> _pickAndCreateVariant(int i) async {
     if (i < 0 || i >= _nodes.length) return;
     final node = _nodes[i];
     if (node.isLocal) {
-      _toast('צריך חיבור לאינטרנט — ה-360 עדיין לא הועלה.');
+      _toast(AppLocalizations.of(context)!.panoramaCaptureScreenD83a2d00);
       return;
     }
     final choice =
@@ -548,17 +588,21 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 18, 20, 6),
-              child: Text('יצירת גרסה חדשה של ה-360',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaCaptureScreen5500a985,
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w800)),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Text('ה-AI ייצור גרסה חדשה מה-360 הקיים — אותו חלל בדיוק, בלי לשנות את המקור.',
-                  style: TextStyle(fontSize: 13, color: Colors.black54)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaCaptureScreen0cead38e,
+                  style:
+                      const TextStyle(fontSize: 13, color: Colors.black54)),
             ),
-            for (final o in _variantOptions)
+            for (final o in _variantOptions(context))
               ListTile(
                 leading: Text(o.emoji, style: const TextStyle(fontSize: 24)),
                 title: Text(o.label,
@@ -576,17 +620,20 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('ליצור גרסת «${choice.label}»?'),
+        title: Text(AppLocalizations.of(context)!
+            .panoramaCaptureScreen4c9ebaa8(choice.label)),
         content: Text(
-            'ה-AI ייצור גרסת ${choice.label} מה-360 הקיים (${choice.desc}). '
-            'המקור יישאר, והגרסה תתווסף לבחירה. ~1–2 דקות.'),
+            '${AppLocalizations.of(context)!.panoramaCaptureScreen4b00b946(choice.label, choice.desc)} '
+            '${AppLocalizations.of(context)!.panoramaCaptureScreenB35f7f9d}'),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('ביטול')),
+              child: Text(AppLocalizations.of(context)!
+                  .panoramaCaptureScreenA7c55a8d)),
           FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('צור גרסה')),
+              child: Text(AppLocalizations.of(context)!
+                  .panoramaCaptureScreen39a68952)),
         ],
       ),
     );
@@ -602,7 +649,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     final node = _nodeById(nodeId);
     if (node == null || node.isLocal) return;
 
-    final msg = ValueNotifier<String>('מתחילים…');
+    final msg =
+        ValueNotifier<String>(AppLocalizations.of(context)!.panoramaCaptureScreen0bd7fa52);
     _showAiProgress(msg);
     var modalOpen = true;
     void closeModal() {
@@ -620,7 +668,7 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         variant: variant,
       );
       if (jobId == null) {
-        _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
+        _toast(AppLocalizations.of(context)!.panoramaCaptureScreenB43c22a7);
         return;
       }
       await PendingPanoStore.instance.add(PendingPano(
@@ -628,11 +676,12 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
           nodeId: nodeId,
           submittedAt: DateTime.now(),
           label: label));
-      msg.value = 'ה-AI מייצר גרסת «$label»… (1–2 דקות)';
+      msg.value = AppLocalizations.of(context)!
+          .panoramaCaptureScreenC2459607(label);
       await AwsApiClient.instance.startAiPanoramaGenerate(jobId);
       await _pollEnhanceJob(jobId, nodeId, showedModal: true, label: label);
     } catch (_) {
-      _toast('שגיאה ביצירת הגרסה. נסו שוב.');
+      _toast(AppLocalizations.of(context)!.panoramaCaptureScreen89984c0b);
     } finally {
       closeModal();
       if (mounted) setState(() => _enhancing.remove(nodeId));
@@ -658,7 +707,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     }
 
     if (showModal) {
-      msg = ValueNotifier<String>('מתחילים…');
+      msg = ValueNotifier<String>(
+          AppLocalizations.of(context)!.panoramaCaptureScreen0bd7fa52);
       _showAiProgress(msg);
       modalOpen = true;
     }
@@ -669,18 +719,22 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         srcUrl: node.imageUrl,
       );
       if (jobId == null) {
-        if (showModal) _toast('לא הצלחנו להתחיל. בדקו את החיבור לאינטרנט.');
+        if (showModal) {
+          _toast(AppLocalizations.of(context)!.panoramaCaptureScreenB43c22a7);
+        }
         return;
       }
       // Persist BEFORE starting so a crash between start and the first poll is
       // still recoverable on the next capture-screen open.
       await PendingPanoStore.instance
           .add(PendingPano(jobId: jobId, nodeId: nodeId, submittedAt: DateTime.now()));
-      msg?.value = 'ה-AI משלים תקרה, רצפה וסוגר 360°… (1–2 דקות)';
+      msg?.value = AppLocalizations.of(context)!.panoramaCaptureScreenAa1f33f0;
       await AwsApiClient.instance.startEnhancePanorama(jobId);
       await _pollEnhanceJob(jobId, nodeId, showedModal: showModal);
     } catch (_) {
-      if (showModal) _toast('שגיאה בהשלמה. נסו שוב.');
+      if (showModal) {
+        _toast(AppLocalizations.of(context)!.panoramaCaptureScreenFc915d44);
+      }
     } finally {
       closeModal();
       if (mounted) setState(() => _enhancing.remove(nodeId));
@@ -692,7 +746,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
   // original stays as 'מקור'). Leaving the screen ends the loop WITHOUT dropping
   // the persisted record, so a later resume can finish the job.
   Future<void> _pollEnhanceJob(String jobId, String nodeId,
-      {bool showedModal = false, String label = 'משופר ✨'}) async {
+      {bool showedModal = false, String? label}) async {
+    final resolvedLabel =
+        label ?? AppLocalizations.of(context)!.panoramaCaptureScreenB0e9d3bb;
     for (var t = 0; t < 150; t++) {
       await Future<void>.delayed(const Duration(seconds: 2));
       if (!mounted) return; // record kept → resumed on re-entry
@@ -704,15 +760,23 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         if (i < 0) return; // node deleted while enhancing
         setState(() => _nodes[i] = _nodes[i].addVersion(
               PanoVersion(
-                  imageUrl: s.imageUrl, haov: 360, vaov: 180, source: label),
+                  imageUrl: s.imageUrl,
+                  haov: 360,
+                  vaov: 180,
+                  source: resolvedLabel),
             ));
-        final name = _nodes[i].label.isNotEmpty ? _nodes[i].label : 'הנקודה';
-        _toast('נוספה גרסה «$label» ל־$name — אפשר להשוות ולבחור');
+        final name = _nodes[i].label.isNotEmpty
+            ? _nodes[i].label
+            : AppLocalizations.of(context)!.panoramaCaptureScreen8eff85d1;
+        _toast(AppLocalizations.of(context)!
+            .panoramaCaptureScreenF705a69a(resolvedLabel, name));
         return;
       }
       if (s.status == 'failed') {
         await PendingPanoStore.instance.remove(jobId);
-        if (showedModal) _toast('ההשלמה נכשלה. נסו שוב.');
+        if (showedModal) {
+          _toast(AppLocalizations.of(context)!.panoramaCaptureScreenC23eaaed);
+        }
         return;
       }
     }
@@ -733,7 +797,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       unawaited(() async {
         try {
           await _pollEnhanceJob(p.jobId, p.nodeId,
-              label: p.label ?? 'משופר ✨');
+              label: p.label ??
+                  AppLocalizations.of(context)!.panoramaCaptureScreenB0e9d3bb);
         } finally {
           if (mounted) setState(() => _enhancing.remove(p.nodeId));
         }
@@ -746,7 +811,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     PanoramaPsvTourView.open(
       context,
       PropertyPanoramaTour(nodes: [node.copyWith(hotspots: const [])]),
-      title: node.label.isNotEmpty ? node.label : 'תצוגה מקדימה',
+      title: node.label.isNotEmpty
+          ? node.label
+          : AppLocalizations.of(context)!.panoramaCaptureScreenE95c9328,
     );
   }
 
@@ -836,13 +903,13 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     if (i < 0 || i >= _nodes.length) return;
     final updated = _nodes[i].toggleVersionHidden(v);
     if (identical(updated, _nodes[i])) {
-      _toast('חייבת להישאר לפחות גרסה אחת גלויה לדיירים');
+      _toast(AppLocalizations.of(context)!.panoramaCaptureScreen37a89df9);
       return;
     }
     setState(() => _nodes[i] = updated);
     _toast(updated.allVersions[v].hidden
-        ? 'הגרסה תוסתר מהדיירים 👁️'
-        : 'הגרסה תוצג לדיירים 👁️');
+        ? AppLocalizations.of(context)!.panoramaCaptureScreen61ba7a35
+        : AppLocalizations.of(context)!.panoramaCaptureScreen650bbb14);
   }
 
   Future<String?> _askLabel(String fallback) async {
@@ -852,8 +919,8 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('שם הנקודה',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+        title: Text(AppLocalizations.of(context)!.panoramaCaptureScreen2fc385cb,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -862,14 +929,22 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
               controller: ctrl,
               autofocus: true,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(hintText: 'לדוגמה: סלון, מטבח'),
+              decoration: InputDecoration(
+                  hintText: AppLocalizations.of(context)!
+                      .panoramaCaptureScreen6c61aa23),
               onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 6,
               children: [
-                for (final s in ['סלון', 'מטבח', 'חדר שינה', 'מרפסת', 'חדר רחצה'])
+                for (final s in [
+                  AppLocalizations.of(context)!.panoramaCaptureScreenC8bdd6d8,
+                  AppLocalizations.of(context)!.panoramaCaptureScreenF5ed1ccb,
+                  AppLocalizations.of(context)!.panoramaCaptureScreen9c1d4cb5,
+                  AppLocalizations.of(context)!.panoramaCaptureScreen86425fcf,
+                  AppLocalizations.of(context)!.panoramaCaptureScreen9e01255f,
+                ])
                   ActionChip(
                     label: Text(s),
                     onPressed: () => Navigator.pop(ctx, s),
@@ -881,11 +956,13 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('ביטול')),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaCaptureScreenA7c55a8d)),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('הוסף'),
+            child: Text(
+                AppLocalizations.of(context)!.panoramaCaptureScreenCf0a5531),
           ),
         ],
       ),
@@ -897,15 +974,16 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('צילום סיור 360°'),
+        title: Text(AppLocalizations.of(context)!.panoramaCaptureScreenD8508142),
         backgroundColor: AppColors.background,
         actions: [
           if (_nodes.length >= 2)
             TextButton(
-              onPressed: () =>
-                  PanoramaPsvTourView.open(context, _buildTour(),
-                      title: 'תצוגה מקדימה'),
-              child: const Text('תצוגה מקדימה'),
+              onPressed: () => PanoramaPsvTourView.open(context, _buildTour(),
+                  title:
+                      AppLocalizations.of(context)!.panoramaCaptureScreenE95c9328),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaCaptureScreenE95c9328),
             ),
         ],
       ),
@@ -914,9 +992,12 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
           _Instructions(),
           Expanded(
             child: _nodes.isEmpty
-                ? const Center(
-                    child: Text('עוד לא הוספת נקודות',
-                        style: TextStyle(color: AppColors.textSecondary)),
+                ? Center(
+                    child: Text(
+                        AppLocalizations.of(context)!
+                            .panoramaCaptureScreen1eca445a,
+                        style:
+                            const TextStyle(color: AppColors.textSecondary)),
                   )
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -959,8 +1040,10 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white))
                       : const Icon(IconsaxPlusBold.camera, size: 22),
-                  label: const Text('הוסף פנורמה',
-                      style: TextStyle(
+                  label: Text(
+                      AppLocalizations.of(context)!
+                          .panoramaCaptureScreenD58171d2,
+                      style: const TextStyle(
                           fontWeight: FontWeight.w800, fontSize: 17)),
                 ),
               ),
@@ -978,7 +1061,9 @@ class _PanoramaCaptureScreenState extends State<PanoramaCaptureScreen> {
                         backgroundColor: AppColors.navy,
                         padding: const EdgeInsets.symmetric(vertical: 14)),
                     onPressed: () => Navigator.of(context).pop(_buildTour()),
-                    child: Text('שמור סיור (${_nodes.length} נקודות)',
+                    child: Text(
+                        AppLocalizations.of(context)!
+                            .panoramaCaptureScreen053844ab(_nodes.length),
                         style: const TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 15)),
                   ),
@@ -1008,17 +1093,18 @@ class _Instructions extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: RichText(
-              text: const TextSpan(
-                style: TextStyle(
+              text: TextSpan(
+                style: const TextStyle(
                     color: AppColors.navy, fontSize: 15, height: 1.5),
                 children: [
                   TextSpan(
-                      text: 'בכל חדר מוסיפים נקודה אחת — והן מתחברות לסיור אחד.\n',
-                      style: TextStyle(fontWeight: FontWeight.w900)),
+                      text: AppLocalizations.of(context)!
+                          .panoramaCaptureScreen775260b6,
+                      style: const TextStyle(fontWeight: FontWeight.w900)),
                   TextSpan(
                       text:
-                          'הקישו «הוסף פנורמה» למטה. פנורמה חלקית? הקישו ✨ ליד הנקודה '
-                          'וה-AI ישלים אותה ל-360° מלא (תקרה, רצפה וסגירה).'),
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreenE9b1d1d9}'
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreen2a10542a}'),
                 ],
               ),
             ),
@@ -1076,13 +1162,13 @@ class _NodeTile extends StatelessWidget {
           // Version picker — appears once the node has more than one 360 render
           // (e.g. מקור + משופר). Lets the landlord compare and pick, so enhance
           // is reversible.
-          if (node.hasMultipleVersions) _versionBar(),
+          if (node.hasMultipleVersions) _versionBar(context),
         ],
       ),
     );
   }
 
-  Widget _versionBar() {
+  Widget _versionBar(BuildContext context) {
     final versions = node.allVersions;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -1101,7 +1187,8 @@ class _NodeTile extends StatelessWidget {
                       child: _VersionChip(
                         label: versions[v].source.isNotEmpty
                             ? versions[v].source
-                            : 'גרסה ${v + 1}',
+                            : AppLocalizations.of(context)!
+                                .panoramaCaptureScreenE9ccd807(v + 1),
                         selected: v == node.activeVersion,
                         hidden: versions[v].hidden,
                         onTap: () => onSelectVersion(v),
@@ -1113,8 +1200,8 @@ class _NodeTile extends StatelessWidget {
             ),
           ),
           // Hint: what long-press does (curate what tenants see).
-          const Text('החזק להסתרה מדיירים',
-              style: TextStyle(
+          Text(AppLocalizations.of(context)!.panoramaCaptureScreenF6d5f6da,
+              style: const TextStyle(
                   color: AppColors.textDisabled,
                   fontSize: 10,
                   fontWeight: FontWeight.w600)),
@@ -1156,7 +1243,11 @@ class _NodeTile extends StatelessWidget {
             ],
           ),
         ),
-        title: Text(node.label.isNotEmpty ? node.label : 'נקודה ${index + 1}',
+        title: Text(
+            node.label.isNotEmpty
+                ? node.label
+                : AppLocalizations.of(context)!
+                    .panoramaCaptureScreenA76ca737(index + 1),
             style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Row(children: [
           Icon(
@@ -1173,8 +1264,13 @@ class _NodeTile extends StatelessWidget {
           Expanded(
             child: Text(
                 enhancing
-                    ? 'משלים ל-360° מלא…'
-                    : (_isFull ? '360° מלא · גרור לסידור' : 'חלקי · אפשר להשלים ל-360°'),
+                    ? AppLocalizations.of(context)!
+                        .panoramaCaptureScreen0225260e
+                    : (_isFull
+                        ? AppLocalizations.of(context)!
+                            .panoramaCaptureScreenC8c52240
+                        : AppLocalizations.of(context)!
+                            .panoramaCaptureScreen230ace13),
                 style: TextStyle(
                     color: _isFull && !enhancing
                         ? AppColors.textSecondary
@@ -1204,7 +1300,8 @@ class _NodeTile extends StatelessWidget {
               IconButton(
                 icon: const Text('✨', style: TextStyle(fontSize: 17)),
                 onPressed: onEnhance,
-                tooltip: 'השלם ל-360° מלא',
+                tooltip:
+                    AppLocalizations.of(context)!.panoramaCaptureScreen464c43bd,
                 visualDensity: VisualDensity.compact,
               )
             // A full 360 → offer AI variants (tidy / lighting) of the same space.
@@ -1213,21 +1310,24 @@ class _NodeTile extends StatelessWidget {
                 icon: Icon(Icons.palette_outlined,
                     color: AppColors.primary, size: 20),
                 onPressed: onCreateVariant,
-                tooltip: 'צור גרסה (תאורה / מסודר)',
+                tooltip:
+                    AppLocalizations.of(context)!.panoramaCaptureScreen1fe26eef,
                 visualDensity: VisualDensity.compact,
               ),
             IconButton(
               icon: Icon(IconsaxPlusLinear.edit_2,
                   color: AppColors.primary, size: 20),
               onPressed: onRename,
-              tooltip: 'שנה שם',
+              tooltip:
+                  AppLocalizations.of(context)!.panoramaCaptureScreen022436d7,
               visualDensity: VisualDensity.compact,
             ),
             IconButton(
               icon: const Icon(IconsaxPlusLinear.trash,
                   color: AppColors.coral, size: 20),
               onPressed: onDelete,
-              tooltip: 'מחק',
+              tooltip:
+                  AppLocalizations.of(context)!.panoramaCaptureScreen09b6bcca,
               visualDensity: VisualDensity.compact,
             ),
             ReorderableDragStartListener(
@@ -1333,7 +1433,8 @@ class _PanoramaGuideScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
-        title: const Text('איך מצלמים סיור 360°'),
+        title: Text(
+            AppLocalizations.of(context)!.panoramaCaptureScreenA9c0709b),
       ),
       body: SafeArea(
         child: Column(
@@ -1355,21 +1456,22 @@ class _PanoramaGuideScreen extends StatelessWidget {
                           size: 64, color: AppColors.primary),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
-                      'הוסיפו סיור 360° אמיתי לדירה',
+                    Text(
+                      AppLocalizations.of(context)!
+                          .panoramaCaptureScreen7f356fd5,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 23,
                           color: AppColors.navy),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'יש לכם פנורמת 360°? העלו אותה מהגלריה. אין? צלמו פנורמה '
-                      'רגילה במצב הפנורמה של המצלמה (אפשר כמה חדרים) — ונחבר אותן '
-                      'לסיור אחד. ה-AI ילטש ויסגור את התקרה והרצפה על הסיור האמיתי.',
+                    Text(
+                      '${AppLocalizations.of(context)!.panoramaCaptureScreenD8b30001}'
+                      '${AppLocalizations.of(context)!.panoramaCaptureScreenE07d1602}'
+                      '${AppLocalizations.of(context)!.panoramaCaptureScreen646f9c41}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 16,
                           height: 1.4,
                           color: AppColors.textSecondary),
@@ -1378,26 +1480,32 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     _GuideStep(
                       number: '1',
                       icon: IconsaxPlusBold.camera,
-                      title: 'צלמו פנורמה',
+                      title:
+                          AppLocalizations.of(context)!
+                              .panoramaCaptureScreen937dff93,
                       body:
-                          'פתחו את מצב הפנורמה (Panorama) של המצלמה וסובבו לאט '
-                          'סיבוב מלא בחדר. אפשר לצלם פנורמה לכל חדר.',
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreenFef19f89}'
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreenB8305c59}',
                     ),
                     _GuideStep(
                       number: '2',
                       icon: IconsaxPlusBold.gallery,
-                      title: 'העלו וחברו',
+                      title:
+                          AppLocalizations.of(context)!
+                              .panoramaCaptureScreen05bd939b,
                       body:
-                          'העלו את הפנורמות מהגלריה — אם יש כמה, הן יתחברו לסיור '
-                          'אחד שאפשר להסתובב בו בין החדרים.',
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreenE2a1867b}'
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreenD063c9f0}',
                     ),
                     _GuideStep(
                       number: '3',
                       icon: IconsaxPlusBold.magic_star,
-                      title: 'AI מלטש (אופציונלי)',
+                      title:
+                          AppLocalizations.of(context)!
+                              .panoramaCaptureScreen66a982e7,
                       body:
-                          'על הסיור האמיתי אפשר להפעיל AI שישלים תקרה ורצפה, ינקה '
-                          'ויציע גרסת תאורה — בלי להמציא חדרים.',
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreenEf21ffb3}'
+                          '${AppLocalizations.of(context)!.panoramaCaptureScreen920edc38}',
                       isLast: true,
                     ),
                   ],
@@ -1418,17 +1526,21 @@ class _PanoramaGuideScreen extends StatelessWidget {
                   onPressed: () =>
                       Navigator.of(context).pop(_CaptureChoice.gallery),
                   icon: const Icon(IconsaxPlusBold.gallery, size: 22),
-                  label: const Text('העלה פנורמות מהגלריה',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                  label: Text(
+                      AppLocalizations.of(context)!
+                          .panoramaCaptureScreen327cb6de,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 18)),
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('אפשר לבחור כמה פנורמות — הן יתחברו לסיור אחד',
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                  AppLocalizations.of(context)!.panoramaCaptureScreenB75f8588,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary)),
             ),
             // SECONDARY paths — capture in-app, or stitch several partial phone
             // panoramas into one full 360°.
@@ -1447,8 +1559,10 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     ),
                     onPressed: null, // disabled
                     icon: const Icon(IconsaxPlusBold.camera, size: 19),
-                    label: const Text('צלם באפליקציה (בקרוב)',
-                        style: TextStyle(
+                    label: Text(
+                        AppLocalizations.of(context)!
+                            .panoramaCaptureScreenA1494fbb,
+                        style: const TextStyle(
                             fontWeight: FontWeight.w700, fontSize: 13)),
                   ),
                 ),
@@ -1463,8 +1577,10 @@ class _PanoramaGuideScreen extends StatelessWidget {
                     onPressed: () =>
                         Navigator.of(context).pop(_CaptureChoice.arranged),
                     icon: const Icon(IconsaxPlusBold.mirror, size: 19),
-                    label: const Text('חבר לתמונה אחת',
-                        style: TextStyle(
+                    label: Text(
+                        AppLocalizations.of(context)!
+                            .panoramaCaptureScreen07586a4c,
+                        style: const TextStyle(
                             fontWeight: FontWeight.w700, fontSize: 14.5)),
                   ),
                 ),

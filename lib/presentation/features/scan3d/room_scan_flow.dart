@@ -8,6 +8,7 @@ import 'package:dating_app/core/services/pending_scan_store.dart';
 import 'package:dating_app/core/services/roomplan_service.dart';
 import 'package:dating_app/data/models/scan3d_job.dart';
 import 'package:dating_app/data/models/scanned_room.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/scan3d/scan3d_viewer.dart';
 
 // ScannedRoom now lives in the data layer so the persisted PropertyModel3d can
@@ -157,6 +158,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: PopScope(
@@ -170,9 +172,9 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
             backgroundColor: AppColors.background,
             elevation: 0,
             foregroundColor: AppColors.navy,
-            title: const Text(
-              'סריקת חדרים בתלת-מימד',
-              style: TextStyle(
+            title: Text(
+              l10n.roomScanFlow9049b05d,
+              style: const TextStyle(
                 color: AppColors.navy,
                 fontWeight: FontWeight.w900,
                 fontSize: 18,
@@ -190,10 +192,9 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                     children: [
-                      const Text(
-                        'סורקים חדר אחרי חדר. כל חדר נשמר באיכות גבוהה, וכולם '
-                        'מחוברים יחד לסיור תלת-מימדי של הדירה.',
-                        style: TextStyle(
+                      Text(
+                        '${l10n.roomScanFlow0d99078b}${l10n.roomScanFlowE7aea75e}',
+                        style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 15,
                           height: 1.5,
@@ -201,7 +202,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
                       ),
                       const SizedBox(height: 20),
                       if (_rooms.isEmpty)
-                        _emptyState()
+                        _emptyState(l10n)
                       else
                         ..._rooms.asMap().entries.map(
                               (e) => _RoomCard(
@@ -213,7 +214,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
                     ],
                   ),
                 ),
-                _bottomBar(),
+                _bottomBar(l10n),
               ],
             ),
           ),
@@ -222,7 +223,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       decoration: BoxDecoration(
@@ -234,9 +235,9 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
           Icon(Icons.view_in_ar_rounded,
               size: 56, color: AppColors.primary),
           const SizedBox(height: 14),
-          const Text(
-            'עוד לא נסרקו חדרים',
-            style: TextStyle(
+          Text(
+            l10n.roomScanFlowDf2e3b66,
+            style: const TextStyle(
               color: AppColors.navy,
               fontSize: 17,
               fontWeight: FontWeight.w900,
@@ -244,9 +245,9 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
-          const Text(
-            'לחצו על "הוספת חדר" כדי להתחיל',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          Text(
+            l10n.roomScanFlow47a4cbbf,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
             textAlign: TextAlign.center,
           ),
         ],
@@ -254,7 +255,7 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
     );
   }
 
-  Widget _bottomBar() {
+  Widget _bottomBar(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: const BoxDecoration(
@@ -265,14 +266,14 @@ class _RoomScanFlowScreenState extends State<RoomScanFlowScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _BigButton(
-            label: 'הוספת חדר',
+            label: l10n.roomScanFlow5a5e46b8,
             icon: Icons.add_rounded,
             onTap: _addRoom,
           ),
           if (_rooms.isNotEmpty) ...[
             const SizedBox(height: 10),
             _BigButton(
-              label: 'סיימתי (${_rooms.length} חדרים)',
+              label: l10n.roomScanFlow6b609163(_rooms.length),
               icon: Icons.check_rounded,
               filled: false,
               onTap: _done,
@@ -297,6 +298,7 @@ class _RoomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final viewable = room.hasViewableAsset;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -338,7 +340,7 @@ class _RoomCard extends StatelessWidget {
                         size: 14, color: AppColors.success),
                     const SizedBox(width: 4),
                     Text(
-                      viewable ? 'מוכן לצפייה' : 'נסרק',
+                      viewable ? l10n.roomScanFlowDcc3a16f : l10n.roomScanFlowA30bf1a9,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 13,
@@ -354,13 +356,13 @@ class _RoomCard extends StatelessWidget {
               onPressed: onPreview,
               icon: Icon(Icons.play_circle_fill_rounded,
                   color: AppColors.primary, size: 30),
-              tooltip: 'צפייה',
+              tooltip: l10n.roomScanFlow750be052,
             ),
           IconButton(
             onPressed: onRemove,
             icon: const Icon(Icons.delete_outline_rounded,
                 color: AppColors.coral, size: 24),
-            tooltip: 'מחיקה',
+            tooltip: l10n.roomScanFlow7c8173fa,
           ),
         ],
       ),
@@ -424,7 +426,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'הסריקה המהירה נכשלה. אפשר לנסות את הסריקה עם הצילום במקום.';
+        _error = AppLocalizations.of(context)!.roomScanFlowA78ba1c3;
       });
     }
   }
@@ -469,8 +471,8 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
     }
     if (!job.isReady) {
       setState(() => _error =
-          'בניית החדר נכשלה. נסו לצלם סרטון שוב באור טוב, תוך כדי הליכה '
-          'איטית בחדר — לא להסתובב במקום.');
+          '${AppLocalizations.of(context)!.roomScanFlowDd0b1d27}'
+          '${AppLocalizations.of(context)!.roomScanFlow9aebce63}');
       return;
     }
 
@@ -480,7 +482,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
     // landlord dismisses the name sheet we keep the room with a default name
     // (they can rename it) instead of silently discarding the scan.
     final roomName = (named == null || named.trim().isEmpty)
-        ? 'חדר ${widget.roomNumber}'
+        ? AppLocalizations.of(context)!.roomScanFlow48cddcd0(widget.roomNumber)
         : named.trim();
     Navigator.of(context).pop(
       ScannedRoom(
@@ -501,17 +503,17 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
         builder: (_) => Directionality(
           textDirection: Directionality.of(context),
           child: AlertDialog(
-            title: const Text('הסריקה ממשיכה ברקע',
-                style: TextStyle(fontWeight: FontWeight.w900)),
-            content: const Text(
-              'בניית החדר לוקחת קצת יותר זמן. אפשר להמשיך — נוסיף את החדר לנכס '
-              'אוטומטית ברגע שהוא מוכן, גם אם תצאו מהמסך.',
-              style: TextStyle(fontSize: 15, height: 1.4),
+            title: Text(AppLocalizations.of(context)!.roomScanFlow22b2a582,
+                style: const TextStyle(fontWeight: FontWeight.w900)),
+            content: Text(
+              '${AppLocalizations.of(context)!.roomScanFlow26ddb26d}'
+              '${AppLocalizations.of(context)!.roomScanFlowE50dd7a2}',
+              style: const TextStyle(fontSize: 15, height: 1.4),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('הבנתי'),
+                child: Text(AppLocalizations.of(context)!.roomScanFlow5e9909a0),
               ),
             ],
           ),
@@ -524,17 +526,17 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
       builder: (_) => Directionality(
         textDirection: Directionality.of(context),
         child: AlertDialog(
-          title: const Text('התכונה תיפתח בקרוב',
-              style: TextStyle(fontWeight: FontWeight.w900)),
-          content: const Text(
-            'סריקת התלת-מימד עדיין לא פעילה בחשבון הזה. בקרוב תוכלו לסרוק '
-            'את הדירה חדר-חדר.',
-            style: TextStyle(fontSize: 15, height: 1.4),
+          title: Text(AppLocalizations.of(context)!.roomScanFlowC1053462,
+              style: const TextStyle(fontWeight: FontWeight.w900)),
+          content: Text(
+            '${AppLocalizations.of(context)!.roomScanFlow3b8e87c3}'
+            '${AppLocalizations.of(context)!.roomScanFlow824a4b58}',
+            style: const TextStyle(fontSize: 15, height: 1.4),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('הבנתי'),
+              child: Text(AppLocalizations.of(context)!.roomScanFlow5e9909a0),
             ),
           ],
         ),
@@ -544,6 +546,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -553,7 +556,7 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
           elevation: 0,
           foregroundColor: AppColors.navy,
           title: Text(
-            'חדר ${widget.roomNumber}',
+            l10n.roomScanFlow48cddcd0(widget.roomNumber),
             style: const TextStyle(
               color: AppColors.navy,
               fontWeight: FontWeight.w900,
@@ -564,9 +567,9 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              const Text(
-                'איך תרצו לסרוק את החדר?',
-                style: TextStyle(
+              Text(
+                l10n.roomScanFlow87e9bce3,
+                style: const TextStyle(
                   color: AppColors.navy,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
@@ -579,9 +582,8 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
               ],
               if (widget.supportsRoomPlan)
                 _OptionCard(
-                  title: 'סריקה מהירה (אייפון Pro)',
-                  subtitle:
-                      'מעבירים את הטלפון לאט סביב החדר. מוכן תוך כמה שניות.',
+                  title: l10n.roomScanFlow6e238cd1,
+                  subtitle: l10n.roomScanFlowD9e43328,
                   icon: Icons.bolt_rounded,
                   highlighted: true,
                   busy: _busy,
@@ -589,10 +591,9 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
                 ),
               if (widget.supportsRoomPlan) const SizedBox(height: 12),
               _OptionCard(
-                title: 'סריקה עם סרטון (מתקדם)',
+                title: l10n.roomScanFlow814b4b51,
                 subtitle:
-                    'מצלמים סרטון תוך כדי הליכה איטית בחדר, ואנחנו בונים '
-                    'אותו בתלת-מימד. האיכות תלויה בצילום — נדריך אתכם צעד-צעד.',
+                    '${l10n.roomScanFlow480cd36b}${l10n.roomScanFlow161d5837}',
                 icon: Icons.videocam_rounded,
                 highlighted: !widget.supportsRoomPlan,
                 busy: false,
@@ -632,14 +633,15 @@ class _SingleRoomCaptureScreenState extends State<_SingleRoomCaptureScreen> {
     );
   }
 
-  static String _friendlyRoomPlanError(RoomPlanException e) {
+  String _friendlyRoomPlanError(RoomPlanException e) {
+    final l10n = AppLocalizations.of(context)!;
     switch (e.code) {
       case 'unsupported':
-        return 'המכשיר הזה לא תומך בסריקה המהירה. אפשר לסרוק עם הצילום.';
+        return l10n.roomScanFlowFea48952;
       case 'scan_busy':
-        return 'סריקה כבר פעילה. נסו שוב בעוד רגע.';
+        return l10n.roomScanFlowA143b471;
       default:
-        return 'הסריקה המהירה נכשלה. אפשר לנסות שוב או לסרוק עם הצילום.';
+        return l10n.roomScanFlow666d07c4;
     }
   }
 }
@@ -726,8 +728,8 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
       setState(() => _cam = ctrl);
     } catch (_) {
       if (mounted) {
-        setState(() => _error =
-            'לא ניתן לפתוח את המצלמה. בדקו שאישרתם גישה למצלמה ונסו שוב.');
+        setState(() =>
+            _error = AppLocalizations.of(context)!.roomScanFlow0456e9f5);
       }
     }
   }
@@ -747,8 +749,8 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
       _listenMotion();
     } catch (_) {
       if (mounted) {
-        setState(() => _error =
-            'לא הצלחנו להתחיל הקלטה. נסו שוב, ובדקו שיש מקום פנוי בטלפון.');
+        setState(() =>
+            _error = AppLocalizations.of(context)!.roomScanFlow07c6ea97);
       }
     }
   }
@@ -811,7 +813,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
       if (!mounted) return;
       setState(() {
         _stopping = false;
-        _error = 'שמירת הסרטון נכשלה. נסו לצלם שוב.';
+        _error = AppLocalizations.of(context)!.roomScanFlow2e7c798b;
       });
     }
   }
@@ -876,6 +878,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
   }
 
   Widget _errorView() {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Center(
         child: Padding(
@@ -894,7 +897,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
               ),
               const SizedBox(height: 20),
               _BigButton(
-                label: 'נסו שוב',
+                label: l10n.roomScanFlow8c634e7d,
                 icon: Icons.refresh_rounded,
                 onTap: () {
                   setState(() => _error = null);
@@ -904,9 +907,9 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'חזרה',
-                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                child: Text(
+                  l10n.roomScanFlow10a2352b,
+                  style: const TextStyle(color: Colors.white70, fontSize: 15),
                 ),
               ),
             ],
@@ -917,6 +920,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
   }
 
   Widget _topGuide() {
+    final l10n = AppLocalizations.of(context)!;
     return Positioned(
       top: 0,
       left: 0,
@@ -930,9 +934,9 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
         ),
         child: Column(
           children: [
-            const Text(
-              'צלמו תוך כדי הליכה איטית',
-              style: TextStyle(
+            Text(
+              l10n.roomScanFlow6adc6ba3,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -941,9 +945,8 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
             const SizedBox(height: 6),
             Text(
               _recording
-                  ? 'המשיכו ללכת לאט סביב החדר — אל תסתובבו במקום'
-                  : 'הקיפו את החדר והרהיטים תוך כדי הליכה איטית. '
-                      'אל תסתובבו במקום. כ-10–40 שניות, באור טוב.',
+                  ? l10n.roomScanFlowE75f74eb
+                  : '${l10n.roomScanFlowB47f0996}${l10n.roomScanFlow31a6628a}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                   color: Colors.white70, fontSize: 14, height: 1.4),
@@ -957,15 +960,15 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
                   color: AppColors.coral,
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.slow_motion_video_rounded,
+                    const Icon(Icons.slow_motion_video_rounded,
                         color: Colors.white, size: 18),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
-                      'לאט יותר',
-                      style: TextStyle(
+                      l10n.roomScanFlowA4e445a8,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
@@ -982,6 +985,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
   }
 
   Widget _bottomControls() {
+    final l10n = AppLocalizations.of(context)!;
     final canFinish = _recording && _reachedMin && !_stopping;
     return Positioned(
       bottom: 0,
@@ -1015,7 +1019,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
                     const SizedBox(width: 8),
                   ],
                   Text(
-                    _recording ? _fmt(_elapsed) : 'מוכנים לצילום',
+                    _recording ? _fmt(_elapsed) : l10n.roomScanFlow38abfe79,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -1028,7 +1032,7 @@ class _GuidedVideoCaptureScreenState extends State<_GuidedVideoCaptureScreen> {
             if (_recording && !_reachedMin) ...[
               const SizedBox(height: 8),
               Text(
-                'המשיכו עוד מעט (לפחות ${_minDuration.inSeconds} שניות)',
+                l10n.roomScanFlow1378e918(_minDuration.inSeconds),
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
             ],
@@ -1158,6 +1162,7 @@ class _PreCaptureSteps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       color: Colors.black.withValues(alpha: 0.82),
       child: SafeArea(
@@ -1169,20 +1174,20 @@ class _PreCaptureSteps extends StatelessWidget {
                 child: ListView(
                   children: [
                     const SizedBox(height: 4),
-                    const Text(
-                      'איך לצלם סריקת חדר טובה',
+                    Text(
+                      l10n.roomScanFlow61451131,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'סריקה מתקדמת. האיכות תלויה בצילום — קחו את הזמן.',
+                    Text(
+                      l10n.roomScanFlow2b81583a,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 15,
                         height: 1.4,
@@ -1198,27 +1203,26 @@ class _PreCaptureSteps extends StatelessWidget {
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: AppColors.coral, width: 2),
                       ),
-                      child: const Column(
+                      child: Column(
                         children: [
-                          Icon(Icons.directions_walk_rounded,
+                          const Icon(Icons.directions_walk_rounded,
                               color: Colors.white, size: 46),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Text(
-                            'הליכו לאט בחדר — אל תסתובבו במקום!',
+                            l10n.roomScanFlow1850a1a2,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 19,
                               fontWeight: FontWeight.w900,
                               height: 1.35,
                             ),
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
-                            'הקיפו את החדר והרהיטים תוך כדי הליכה. '
-                            'סיבוב במקום (כמו פנורמה) הורס את התלת-מימד.',
+                            '${l10n.roomScanFlowDff3d215}${l10n.roomScanFlow0547a915}',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               height: 1.4,
@@ -1231,34 +1235,34 @@ class _PreCaptureSteps extends StatelessWidget {
 
                     _StepRow(
                       icon: Icons.loop_rounded,
-                      text: 'הקיפו את החדר והרהיטים — צלמו מכמה כיוונים',
+                      text: l10n.roomScanFlow0bbdefc1,
                     ),
                     _StepRow(
                       icon: Icons.timelapse_rounded,
-                      text: 'שמרו חפיפה — תנועה רציפה ואיטית, בלי קפיצות',
+                      text: l10n.roomScanFlowBacd6c42,
                     ),
                     _StepRow(
                       icon: Icons.wb_sunny_rounded,
-                      text: 'תאורה טובה, בלי תזוזות מהירות',
+                      text: l10n.roomScanFlow9486adab,
                     ),
                     _StepRow(
                       icon: Icons.timer_rounded,
-                      text: 'משך הצילום: כ-10 עד 40 שניות',
+                      text: l10n.roomScanFlow1950d47d,
                     ),
                   ],
                 ),
               ),
               _BigButton(
-                label: 'הבנתי, מתחילים',
+                label: l10n.roomScanFlow308645b1,
                 icon: Icons.videocam_rounded,
                 onTap: onStart,
               ),
               const SizedBox(height: 6),
               TextButton(
                 onPressed: onCancel,
-                child: const Text(
-                  'ביטול',
-                  style: TextStyle(color: Colors.white70, fontSize: 15),
+                child: Text(
+                  l10n.roomScanFlowA7c55a8d,
+                  style: const TextStyle(color: Colors.white70, fontSize: 15),
                 ),
               ),
             ],
@@ -1328,7 +1332,7 @@ class _CloudReconstructScreen extends StatefulWidget {
 }
 
 class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
-  String _stage = 'מעלים את הסרטון…';
+  late String _stage;
   bool _failed = false;
   String _failMessage = '';
   // Set once KIRI accepts the job: from this point the reconstruction continues
@@ -1339,6 +1343,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
   @override
   void initState() {
     super.initState();
+    _stage = AppLocalizations.of(context)!.roomScanFlow99a47392;
     _run();
   }
 
@@ -1355,13 +1360,16 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
       // message rather than silently uploading a 72MB raw clip that 403s out.
       var files = widget.files;
       if (files.isNotEmpty) {
-        if (mounted) setState(() => _stage = 'מכינים את הסרטון…');
+        if (mounted) {
+          setState(() =>
+              _stage = AppLocalizations.of(context)!.roomScanFlow01b0a145);
+        }
         final prepared = await _prepareVideo(files.first);
         if (prepared == null) {
           if (!mounted) return;
           setState(() {
             _failed = true;
-            _failMessage = 'לא הצלחנו להכין את הסרטון — נסו שוב.';
+            _failMessage = AppLocalizations.of(context)!.roomScanFlow9f0b5118;
           });
           return;
         }
@@ -1409,7 +1417,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
       if (!mounted) return;
       setState(() {
         _failed = true;
-        _failMessage = 'משהו השתבש. נסו שוב.';
+        _failMessage = AppLocalizations.of(context)!.roomScanFlow7544bafb;
       });
     }
   }
@@ -1451,24 +1459,25 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
     return null;
   }
 
-  static String _failMessageFor(Kiri3dException e) {
+  String _failMessageFor(Kiri3dException e) {
+    final l10n = AppLocalizations.of(context)!;
     final code = e.statusCode;
     // runScan tags upload failures with "Failed to upload capture …": a 403/401
     // here is an EXPIRED/rejected presigned S3 PUT (not an app-auth gate), a 5xx
     // is S3 server trouble, and a null code means the PUT never reached a server.
     if (e.message.contains('upload')) {
       if (code == 403 || code == 401) {
-        return 'פג תוקף ההעלאה. נסו שוב — הפעם זה יעלה מהר יותר.';
+        return l10n.roomScanFlowAdcb2cfd;
       }
       if (code != null && code >= 500) {
-        return 'תקלת שרת בהעלאה. נסו שוב עוד רגע.';
+        return l10n.roomScanFlowE70ac353;
       }
-      return 'ההעלאה נכשלה בגלל החיבור. בדקו את האינטרנט ונסו שוב.';
+      return l10n.roomScanFlow26def34f;
     }
     // Otherwise the code comes from OUR API (createJob/start): 401/403 = auth,
     // 503 = not-yet-configured → feature gate.
     if (e.isUnauthorized || code == 503) {
-      return 'התכונה תיפתח בקרוב.';
+      return l10n.roomScanFlow300d9689;
     }
     // Every exception that reaches here is PRE-reconstruction (job creation or
     // KIRI submission), so it is NEVER about the user's video — refilming can't
@@ -1476,20 +1485,21 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
     // other create/start failure is a SERVICE issue: say so honestly instead of
     // blaming the capture. (Genuine bad-video failures surface separately, as a
     // non-ready terminal job → the "film again" message in _startCloudCapture.)
-    return 'השירות אינו זמין כרגע. נסו שוב עוד מספר דקות — הצילום שלכם תקין.';
+    return l10n.roomScanFlow00bc930c;
   }
 
-  static String _stageLabel(Scan3dStatus status) {
+  String _stageLabel(Scan3dStatus status) {
+    final l10n = AppLocalizations.of(context)!;
     switch (status) {
       case Scan3dStatus.created:
       case Scan3dStatus.uploading:
-        return 'מעלים את הסרטון…';
+        return l10n.roomScanFlow99a47392;
       case Scan3dStatus.processing:
-        return 'בונים את החדר בתלת-מימד… כמה דקות';
+        return l10n.roomScanFlow759375ce;
       case Scan3dStatus.ready:
-        return 'כמעט מוכן…';
+        return l10n.roomScanFlow896799e7;
       case Scan3dStatus.failed:
-        return 'נכשל';
+        return l10n.roomScanFlow898d60f3;
     }
   }
 
@@ -1512,6 +1522,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
   }
 
   Widget _progressView() {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1537,9 +1548,8 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         const SizedBox(height: 12),
         Text(
           _submitted
-              ? 'הסריקה ממשיכה ברקע — אפשר לעזוב את המסך. '
-                  'המודל יופיע על הדירה כשיהיה מוכן (כמה דקות).'
-              : 'אפשר להשאיר את המסך פתוח. אנחנו מודיעים כשמוכן.',
+              ? '${l10n.roomScanFlow8ee8ef51}${l10n.roomScanFlow0014a7cc}'
+              : l10n.roomScanFlowB412b4d4,
           textAlign: TextAlign.center,
           style: const TextStyle(
               color: Colors.white70, fontSize: 15, height: 1.4),
@@ -1547,7 +1557,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         if (_submitted) ...[
           const SizedBox(height: 28),
           _BigButton(
-            label: 'המשך ברקע',
+            label: l10n.roomScanFlow5ebf63d5,
             icon: Icons.check_rounded,
             filled: false,
             onTap: () {
@@ -1579,7 +1589,7 @@ class _CloudReconstructScreenState extends State<_CloudReconstructScreen> {
         ),
         const SizedBox(height: 28),
         _BigButton(
-          label: 'חזרה',
+          label: AppLocalizations.of(context)!.roomScanFlow10a2352b,
           icon: Icons.arrow_forward_rounded,
           onTap: () => Navigator.of(context).pop(),
         ),
@@ -1751,87 +1761,90 @@ Future<bool?> _showConsentSheet(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => Directionality(
-      textDirection: Directionality.of(context),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Icon(Icons.privacy_tip_rounded,
-                  color: AppColors.primary, size: 48),
-              const SizedBox(height: 16),
-              const Text(
-                'לפני שמתחילים לסרוק',
-                style: TextStyle(
-                  color: AppColors.navy,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'הסריקה מצלמת את פנים הדירה. הסריקה תוצג לשוכרים מתעניינים '
-                'ועשויה להישמר אצלנו. אל תצלמו מסמכים אישיים או דברים שאתם '
-                'לא רוצים להראות.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 16,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _BigButton(
-                label: 'הבנתי, אפשר להתחיל',
-                icon: Icons.check_rounded,
-                onTap: () => Navigator.of(ctx).pop(true),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text(
-                  'לא עכשיו',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 15,
+    builder: (ctx) {
+      final l10n = AppLocalizations.of(context)!;
+      return Directionality(
+        textDirection: Directionality.of(context),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderLight,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 22),
+                Icon(Icons.privacy_tip_rounded,
+                    color: AppColors.primary, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.roomScanFlowDb00bbc5,
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${l10n.roomScanFlow72a231e3}${l10n.roomScanFlow4181010d}'
+                  '${l10n.roomScanFlow3998aa13}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _BigButton(
+                  label: l10n.roomScanFlow86690080,
+                  icon: Icons.check_rounded,
+                  onTap: () => Navigator.of(ctx).pop(true),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(
+                    l10n.roomScanFlow98c8a5b8,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 
 /// Asks the user to name the room. Returns the chosen name or null on cancel.
 Future<String?> showRoomNameSheet(BuildContext context) {
-  const suggestions = [
-    'סלון',
-    'מטבח',
-    'חדר שינה',
-    'חדר ילדים',
-    'חדר רחצה',
-    'מרפסת',
-    'פינת אוכל',
-    'מסדרון',
+  final l10n = AppLocalizations.of(context)!;
+  final suggestions = [
+    l10n.roomScanFlowC8bdd6d8,
+    l10n.roomScanFlowF5ed1ccb,
+    l10n.roomScanFlow9c1d4cb5,
+    l10n.roomScanFlow76fd685b,
+    l10n.roomScanFlow9e01255f,
+    l10n.roomScanFlow86425fcf,
+    l10n.roomScanFlow71b2324b,
+    l10n.roomScanFlow0744519a,
   ];
   final controller = TextEditingController();
 
@@ -1869,9 +1882,9 @@ Future<String?> showRoomNameSheet(BuildContext context) {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'איך לקרוא לחדר?',
-                    style: TextStyle(
+                  Text(
+                    l10n.roomScanFlow28944cb8,
+                    style: const TextStyle(
                       color: AppColors.navy,
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -1913,7 +1926,7 @@ Future<String?> showRoomNameSheet(BuildContext context) {
                     textAlign: TextAlign.right,
                     style: const TextStyle(fontSize: 16),
                     decoration: InputDecoration(
-                      hintText: 'או הקלידו שם אחר',
+                      hintText: l10n.roomScanFlow3e705bfd,
                       filled: true,
                       fillColor: AppColors.background,
                       border: OutlineInputBorder(
@@ -1925,11 +1938,12 @@ Future<String?> showRoomNameSheet(BuildContext context) {
                   ),
                   const SizedBox(height: 16),
                   _BigButton(
-                    label: 'שמירה',
+                    label: l10n.roomScanFlowE6932339,
                     icon: Icons.check_rounded,
                     onTap: () {
                       final name = controller.text.trim();
-                      Navigator.of(ctx).pop(name.isEmpty ? 'חדר' : name);
+                      Navigator.of(ctx)
+                          .pop(name.isEmpty ? l10n.roomScanFlow463d28e8 : name);
                     },
                   ),
                 ],

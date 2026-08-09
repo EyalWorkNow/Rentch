@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:dating_app/data/models/broker_design_models.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
 import 'package:dating_app/presentation/screens/add_property_screen.dart';
 import 'package:dating_app/presentation/screens/auth_screen.dart';
@@ -62,22 +63,23 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('מחיקת חשבון',
+        title: Text(l10n.profileScreenC157595f,
             style:
                 TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
-        content: const Text(
-          'פעולה זו תמחק לצמיתות את החשבון ואת כל הנתונים שלך. לא ניתן לבטל פעולה זו.',
+        content: Text(
+          l10n.profileScreenE36a3231,
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ביטול',
+            child: Text(l10n.profileScreenA7c55a8d,
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           FilledButton(
@@ -87,7 +89,7 @@ class ProfileScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('מחק חשבון'),
+            child: Text(l10n.profileScreen7f088d47),
           ),
         ],
       ),
@@ -113,8 +115,8 @@ class ProfileScreen extends StatelessWidget {
         try {
           await provider.deleteAccount(reauthPassword: password);
         } on ReauthRequiredException {
-          messenger.showSnackBar(const SnackBar(
-            content: Text('הסיסמה שגויה. נסו שוב למחוק את החשבון.'),
+          messenger.showSnackBar(SnackBar(
+            content: Text(l10n.profileScreenC42327c3),
           ));
           return;
         } catch (_) {}
@@ -126,10 +128,9 @@ class ProfileScreen extends StatelessWidget {
         return;
       }
       // OAuth (Google/Apple): re-login then retry.
-      messenger.showSnackBar(const SnackBar(
-        duration: Duration(milliseconds: 3500),
-        content: Text(
-            'מטעמי אבטחה יש להתחבר מחדש ולאחר מכן למחוק את החשבון.'),
+      messenger.showSnackBar(SnackBar(
+        duration: const Duration(milliseconds: 3500),
+        content: Text(l10n.profileScreen1b956723),
       ));
       try {
         await GoogleAuthService().signOut();
@@ -153,21 +154,22 @@ class ProfileScreen extends StatelessWidget {
   /// deleting an email/password account. Returns the entered password, or null
   /// if the user cancels.
   Future<String?> _promptDeletePassword(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('אישור מחיקה',
+        title: Text(l10n.profileScreen333bc31f,
             style:
                 TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'מטעמי אבטחה הזינו את הסיסמה כדי להשלים את מחיקת החשבון.',
+            Text(
+              l10n.profileScreenA86fe9b7,
               style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 14),
@@ -177,7 +179,7 @@ class ProfileScreen extends StatelessWidget {
               autofocus: true,
               textDirection: TextDirection.ltr,
               decoration: InputDecoration(
-                hintText: 'סיסמה',
+                hintText: l10n.profileScreen0b490b5e,
                 filled: true,
                 fillColor: AppColors.background,
                 border: OutlineInputBorder(
@@ -191,7 +193,7 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('ביטול',
+            child: Text(l10n.profileScreenA7c55a8d,
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           FilledButton(
@@ -201,7 +203,7 @@ class ProfileScreen extends StatelessWidget {
                   RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('מחק חשבון'),
+            child: Text(l10n.profileScreen7f088d47),
           ),
         ],
       ),
@@ -209,22 +211,23 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('יציאה מהחשבון',
+        title: Text(l10n.profileScreen98225d9b,
             style:
                 TextStyle(color: AppColors.navy, fontWeight: FontWeight.w900)),
-        content: const Text(
-          'האם אתה בטוח שברצונך לצאת?',
+        content: Text(
+          l10n.profileScreen57f87b60,
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ביטול',
+            child: Text(l10n.profileScreenA7c55a8d,
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           FilledButton(
@@ -234,7 +237,7 @@ class ProfileScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('יציאה'),
+            child: Text(l10n.profileScreenB939061e),
           ),
         ],
       ),
@@ -259,6 +262,7 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<DatingProvider>(
       builder: (context, provider, _) {
         final profile = provider.tenantProfile;
@@ -322,9 +326,9 @@ class ProfileScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'הפרופיל שלי',
-                          style: TextStyle(
+                        Text(
+                          l10n.profileScreenBba6fed3,
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
                             color: AppColors.slate900,
@@ -446,7 +450,7 @@ class ProfileScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                hasName ? displayName : 'הוסף שם',
+                                hasName ? displayName : l10n.profileScreenC6d4a01f,
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
@@ -482,9 +486,9 @@ class ProfileScreen extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'שוכר',
-                            style: TextStyle(
+                          Text(
+                            l10n.profileScreenC4b9553a,
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.slate500,
@@ -515,9 +519,9 @@ class ProfileScreen extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'שלמות הפרופיל שלי',
-                                style: TextStyle(
+                              Text(
+                                l10n.profileScreenA5545289,
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.slate900,
@@ -556,7 +560,7 @@ class ProfileScreen extends StatelessWidget {
                         Expanded(
                           child: _MockupStatBox(
                             count: provider.likesCount.toString(),
-                            label: 'אהבתי',
+                            label: l10n.profileScreen38bf5edd,
                             icon: IconsaxPlusBold.heart,
                             color: AppColors.primary,
                           ),
@@ -565,7 +569,7 @@ class ProfileScreen extends StatelessWidget {
                         Expanded(
                           child: _MockupStatBox(
                             count: provider.matchesCount.toString(),
-                            label: 'התאמות',
+                            label: l10n.profileScreen61f6102d,
                             icon: IconsaxPlusBold.messages_2,
                             color: AppColors.coral,
                           ),
@@ -574,7 +578,7 @@ class ProfileScreen extends StatelessWidget {
                         Expanded(
                           child: _MockupStatBox(
                             count: provider.passedCount.toString(),
-                            label: 'דילגתי',
+                            label: l10n.profileScreen2d3a2bbf,
                             icon: Icons.close_rounded,
                             color: AppColors.slate500,
                           ),
@@ -584,9 +588,9 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     // Search Preferences Grouped Container
-                    const Text(
-                      'הגדרות',
-                      style: TextStyle(
+                    Text(
+                      l10n.profileScreen47cfdefb,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: AppColors.slate900,
@@ -610,9 +614,9 @@ class ProfileScreen extends StatelessWidget {
                         children: [
                           _PreferenceTile(
                             icon: IconsaxPlusLinear.money,
-                            label: 'תקציב מקסימלי',
+                            label: l10n.profileScreen0ee38ad3,
                             value: isDemoProfile
-                                ? 'הוסף תקציב'
+                                ? l10n.profileScreen59655c38
                                 : _fmt(profile.budgetMax),
                             isEmpty: isDemoProfile,
                             onTap: () => _showBudgetSheet(context, provider, profile),
@@ -620,19 +624,23 @@ class ProfileScreen extends StatelessWidget {
                           const _SettingsDivider(),
                           _PreferenceTile(
                             icon: IconsaxPlusLinear.building,
-                            label: 'מספר חדרים',
+                            label: l10n.profileScreen4f4cd24f,
                             value: isDemoProfile
-                                ? 'הוסף מספר חדרים'
-                                : '${profile.desiredRooms % 1 == 0 ? profile.desiredRooms.toInt() : profile.desiredRooms} חדרים',
+                                ? l10n.profileScreen4dd6d196
+                                : l10n.profileScreenAcbce023(
+                                    profile.desiredRooms % 1 == 0
+                                        ? profile.desiredRooms.toInt().toString()
+                                        : profile.desiredRooms.toString(),
+                                  ),
                             isEmpty: isDemoProfile,
                             onTap: () => _showRoomsSheet(context, provider, profile),
                           ),
                           const _SettingsDivider(),
                           _PreferenceTile(
                             icon: IconsaxPlusLinear.calendar,
-                            label: 'מועד כניסה',
+                            label: l10n.profileScreen1399cd87,
                             value: isDemoProfile || profile.moveInWindow.isEmpty
-                                ? 'הוסף מועד כניסה'
+                                ? l10n.profileScreen7448c23e
                                 : profile.moveInWindow,
                             isEmpty:
                                 isDemoProfile || profile.moveInWindow.isEmpty,
@@ -657,14 +665,14 @@ class ProfileScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                RentlyIcon(IconsaxPlusLinear.user,
+                                const RentlyIcon(IconsaxPlusLinear.user,
                                     size: 18, color: AppColors.slate500),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'עליי',
-                                  style: TextStyle(
+                                  l10n.profileScreen55578847,
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.slate900,
@@ -698,7 +706,7 @@ class ProfileScreen extends StatelessWidget {
                         children: [
                           _ActionRow(
                             icon: IconsaxPlusLinear.logout,
-                            label: 'יציאה מהחשבון',
+                            label: l10n.profileScreen98225d9b,
                             onTap: () => _confirmLogout(context),
                             isDestructive: true,
                           ),
@@ -708,7 +716,7 @@ class ProfileScreen extends StatelessWidget {
                           // Understated (normal dark row, not a loud CTA).
                           _ActionRow(
                             icon: IconsaxPlusLinear.trash,
-                            label: 'מחיקת חשבון',
+                            label: l10n.profileScreenC157595f,
                             onTap: () => _confirmDeleteAccount(context),
                           ),
                         ],
@@ -787,6 +795,7 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final profile = widget.profile;
     final photos = profile.photoUrls;
     final badge = _badgeDetail(profile.importantDetails);
@@ -804,15 +813,15 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
         fontSize: 18,
         fontWeight: FontWeight.w800,
       ),
-      title: const Text('הפרופיל שלי'),
+      title: Text(l10n.profileScreenBba6fed3),
       actions: [
         TextButton.icon(
           onPressed: widget.onEdit,
           icon: const RentlyIcon(IconsaxPlusLinear.edit,
               color: Colors.white, size: 16),
-          label: const Text(
-            'עריכה',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          label: Text(
+            l10n.profileScreen39fe2593,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           ),
           style: TextButton.styleFrom(
             backgroundColor: AppColors.primary,
@@ -1012,7 +1021,10 @@ class _ProfileSliverHeaderState extends State<_ProfileSliverHeader> {
                             size: 14, color: Colors.white60),
                         const SizedBox(width: 5),
                         Text(
-                          'תקציב עד ${_fmt(profile.budgetMax)} • ${profile.desiredRooms} חדרים',
+                          l10n.profileScreen5a82f3ec(
+                            _fmt(profile.budgetMax),
+                            profile.desiredRooms.toString(),
+                          ),
                           style: const TextStyle(
                             color: Colors.white70,
                             fontWeight: FontWeight.w600,
@@ -1080,6 +1092,7 @@ class _StatsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1097,7 +1110,7 @@ class _StatsBar extends StatelessWidget {
               icon: IconsaxPlusLinear.heart,
               color: AppColors.primary,
               value: likes.toString(),
-              label: 'אהבתי',
+              label: l10n.profileScreen38bf5edd,
               isFirst: true,
             ),
             VerticalDivider(
@@ -1109,7 +1122,7 @@ class _StatsBar extends StatelessWidget {
               icon: IconsaxPlusLinear.message,
               color: AppColors.superLike,
               value: matches.toString(),
-              label: 'התאמות',
+              label: l10n.profileScreen61f6102d,
             ),
             VerticalDivider(
               width: 1,
@@ -1120,7 +1133,7 @@ class _StatsBar extends StatelessWidget {
               icon: IconsaxPlusLinear.close_circle,
               color: AppColors.coral,
               value: passed.toString(),
-              label: 'דילגתי',
+              label: l10n.profileScreen2d3a2bbf,
               isLast: true,
             ),
           ],
@@ -1533,10 +1546,10 @@ class _LandlordProfileScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
-        'פרופיל',
-        style: TextStyle(
+        AppLocalizations.of(context)!.profileScreenE1ea2811,
+        style: const TextStyle(
           color: AppColors.textPrimary,
           fontSize: 22,
           fontWeight: FontWeight.w900,
@@ -1547,6 +1560,7 @@ class _LandlordProfileScreen extends StatelessWidget {
 
   Widget _buildProfileCard(
       BuildContext context, String tenantName, String email, String photoUrl) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1625,7 +1639,7 @@ class _LandlordProfileScreen extends StatelessWidget {
                             size: 12, color: BrandPalette.broker.primary),
                         const SizedBox(width: 4),
                         Text(
-                          'מתווך נדל״ן',
+                          l10n.profileScreen4343d576,
                           style: TextStyle(
                             color: BrandPalette.broker.primary,
                             fontSize: 11,
@@ -1676,6 +1690,7 @@ class _LandlordProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProBanner(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1695,9 +1710,9 @@ class _LandlordProfileScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
-                'שדרג ל-PRO',
-                style: TextStyle(
+              Text(
+                l10n.profileScreen71bf8698,
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
@@ -1722,9 +1737,9 @@ class _LandlordProfileScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'שדרג לגרסת הפרו של Rently לקבלת נתונים חיים עשירים יותר, התאמות ללא הגבלה ועוד פיצ\'רים מתקדמים.',
-            style: TextStyle(
+          Text(
+            l10n.profileScreen44721f36,
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -1738,9 +1753,9 @@ class _LandlordProfileScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    duration: Duration(milliseconds: 2500),
-                    content: Text('תכונה זו תהיה זמינה בקרוב!'),
+                  SnackBar(
+                    duration: const Duration(milliseconds: 2500),
+                    content: Text(l10n.profileScreen95ef5abd),
                   ),
                 );
               },
@@ -1752,9 +1767,9 @@ class _LandlordProfileScreen extends StatelessWidget {
                 ),
               ),
               icon: const Icon(Icons.star, color: Colors.white, size: 18),
-              label: const Text(
-                'שדרג עכשיו',
-                style: TextStyle(
+              label: Text(
+                l10n.profileScreenD46cea8d,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -1768,6 +1783,7 @@ class _LandlordProfileScreen extends StatelessWidget {
   }
 
   Widget _buildSettingsGroup(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1785,7 +1801,7 @@ class _LandlordProfileScreen extends StatelessWidget {
         children: [
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.user,
-            label: 'פרטי חשבון',
+            label: l10n.profileScreen6aa35146,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                   settings: const RouteSettings(name: 'EditProfileScreen'),
@@ -1796,7 +1812,7 @@ class _LandlordProfileScreen extends StatelessWidget {
             const _SettingsDivider(),
             _ProfileMenuItem(
               icon: IconsaxPlusLinear.house_2,
-              label: 'הדירות שלי · שיתוף לינק',
+              label: l10n.profileScreenD24cae31,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   settings: const RouteSettings(name: 'OwnerListingsScreen'),
@@ -1813,7 +1829,7 @@ class _LandlordProfileScreen extends StatelessWidget {
             const _SettingsDivider(),
             _ProfileMenuItem(
               icon: IconsaxPlusLinear.color_swatch,
-              label: 'מיתוג ותבניות',
+              label: l10n.profileScreen325e6814,
               color: BrandPalette.broker.primary,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -1825,17 +1841,18 @@ class _LandlordProfileScreen extends StatelessWidget {
           const _SettingsDivider(),
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.setting_2,
-            label: 'הגדרות',
+            label: l10n.profileScreen47cfdefb,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => _SettingsSubPage(
-                    title: 'הגדרות',
+                    title: l10n.profileScreen47cfdefb,
                     items: [
-                      const _SubPageSettingItem(
+                      _SubPageSettingItem(
                         icon: IconsaxPlusLinear.notification,
-                        title: 'התראות בנייד',
-                        subtitle: 'קבל עדכונים בזמן אמת על מכשירך',
+                        title: l10n.profileScreen48918f07,
+                        switchKey: _SettingsSubPageState.kNotifSwitchKey,
+                        subtitle: l10n.profileScreen8b61b51f,
                         isSwitch: true,
                       ),
                       // (Removed the "email notifications" and "tenant-inquiries"
@@ -1844,8 +1861,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                       // toggle above is the real FCM push control.)
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.trash,
-                        title: 'מחיקת חשבון',
-                        subtitle: 'מחק את החשבון והמידע שלך לצמיתות',
+                        title: l10n.profileScreenC157595f,
+                        subtitle: l10n.profileScreen0d9638f2,
                         color: Colors.red.shade700,
                         onTap: onDeleteAccount,
                       ),
@@ -1862,17 +1879,17 @@ class _LandlordProfileScreen extends StatelessWidget {
           const _SettingsDivider(),
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.info_circle,
-            label: 'תמיכה ועזרה',
+            label: l10n.profileScreen69129dd5,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => _SettingsSubPage(
-                    title: 'תמיכה ועזרה',
+                    title: l10n.profileScreen69129dd5,
                     items: [
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.message_question,
-                        title: 'מרכז עזרה ומדריכים',
-                        subtitle: 'שאלות נפוצות ומאמרי תמיכה',
+                        title: l10n.profileScreenA6866ac6,
+                        subtitle: l10n.profileScreenB2dfd8d3,
                         onTap: () => launchUrl(
                           Uri.parse('https://rently.app/help'),
                           mode: LaunchMode.externalApplication,
@@ -1880,8 +1897,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                       ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.call_calling,
-                        title: 'צור קשר עם התמיכה',
-                        subtitle: 'אנחנו כאן לעזור 24/7',
+                        title: l10n.profileScreen2d8ad04f,
+                        subtitle: l10n.profileScreen3a95de8e,
                         onTap: () => launchUrl(
                           Uri.parse('mailto:support@rently.app'),
                           mode: LaunchMode.externalApplication,
@@ -1889,8 +1906,8 @@ class _LandlordProfileScreen extends StatelessWidget {
                       ),
                       _SubPageSettingItem(
                         icon: IconsaxPlusLinear.document_text,
-                        title: 'תנאי שימוש ומדיניות',
-                        subtitle: 'הסכם שימוש ושמירה על פרטיות',
+                        title: l10n.profileScreenE3467f8d,
+                        subtitle: l10n.profileScreenC281b27a,
                         onTap: () => launchUrl(
                           Uri.parse('https://rently.app/privacy'),
                           mode: LaunchMode.externalApplication,
@@ -1908,6 +1925,7 @@ class _LandlordProfileScreen extends StatelessWidget {
   }
 
   Widget _buildSystemActions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1925,7 +1943,7 @@ class _LandlordProfileScreen extends StatelessWidget {
         children: [
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.logout,
-            label: 'יציאה מהחשבון',
+            label: l10n.profileScreen98225d9b,
             color: AppColors.coral,
             onTap: onLogout,
           ),
@@ -1936,7 +1954,7 @@ class _LandlordProfileScreen extends StatelessWidget {
           // dominating the profile.
           _ProfileMenuItem(
             icon: IconsaxPlusLinear.trash,
-            label: 'מחיקת חשבון',
+            label: l10n.profileScreenC157595f,
             color: AppColors.textSecondary,
             onTap: onDeleteAccount,
           ),
@@ -1947,12 +1965,14 @@ class _LandlordProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tenantName = profile.name.isNotEmpty ? profile.name : 'בעל דירה';
+    final l10n = AppLocalizations.of(context)!;
+    final tenantName =
+        profile.name.isNotEmpty ? profile.name : l10n.profileScreen098791db;
     String email = '';
     try {
       email = FirebaseAuth.instance.currentUser?.email ?? '';
     } catch (_) {}
-    if (email.isEmpty) email = 'לא מחובר';
+    if (email.isEmpty) email = l10n.profileScreenE2a5bbff;
     final photoUrl = profile.photoUrl;
 
     return Scaffold(
@@ -2019,19 +2039,20 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
       );
 
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             detected == null
-                ? 'הלוגו נוסף. לא זוהו צבעים ברורים, אפשר לבחור פלטה ידנית.'
-                : 'הלוגו נוסף והצבעים זוהו מהתמונה.',
+                ? l10n.profileScreen8f262efa
+                : l10n.profileScreenE174e0f8,
           ),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('לא ניתן לקרוא את קובץ הלוגו.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.profileScreenF1546a8a)),
       );
     } finally {
       if (mounted) setState(() => _detectingLogoColors = false);
@@ -2139,7 +2160,7 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    'מיתוג ותבניות זמינים לחשבון מתווך נדל״ן בלבד.',
+                    AppLocalizations.of(context)!.profileScreenE735a48b,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.textSecondary,
@@ -2183,7 +2204,7 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
                   ),
                   const SizedBox(height: 16),
                   _BrandingSectionShell(
-                    title: 'עמוד דירה',
+                    title: AppLocalizations.of(context)!.profileScreen85ff8164,
                     child: Column(
                       children: BrokerPropertyTemplate.values
                           .map(
@@ -2204,7 +2225,7 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
                   ),
                   const SizedBox(height: 16),
                   _BrandingSectionShell(
-                    title: 'שיחות',
+                    title: AppLocalizations.of(context)!.profileScreenE537a4bf,
                     child: Column(
                       children: BrokerChatTemplate.values
                           .map(
@@ -2222,7 +2243,7 @@ class _BrokerBrandingScreenState extends State<BrokerBrandingScreen> {
                   ),
                   const SizedBox(height: 16),
                   _BrandingSectionShell(
-                    title: 'צבעים',
+                    title: AppLocalizations.of(context)!.profileScreen41048395,
                     child: Column(
                       children: _brokerColorPresets
                           .map(
@@ -2298,11 +2319,11 @@ class _BrokerBrandingHeader extends StatelessWidget {
             ),
           ),
         ),
-        const Expanded(
+        Expanded(
           child: Text(
-            'מיתוג ותבניות',
+            AppLocalizations.of(context)!.profileScreen325e6814,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 21,
               fontWeight: FontWeight.w900,
@@ -2439,8 +2460,9 @@ class _BrokerLogoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return _BrandingSectionShell(
-      title: 'לוגו',
+      title: l10n.profileScreen7fc76d74,
       child: Row(
         children: [
           _BrokerLogoPreview(
@@ -2454,7 +2476,7 @@ class _BrokerLogoCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  detecting ? 'מזהה צבעים...' : 'לוגו משרד',
+                  detecting ? l10n.profileScreenCec705ac : l10n.profileScreenFf919bb4,
                   style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 15,
@@ -2463,7 +2485,7 @@ class _BrokerLogoCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  branding.hasLogo ? 'משויך לתבניות הנכס והשיחה' : 'לא נבחר',
+                  branding.hasLogo ? l10n.profileScreenCaefa344 : l10n.profileScreenB5a8875e,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12.5,
@@ -3098,7 +3120,11 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
   // The mobile-notifications toggle is a REAL, consent-driven control: it starts
   // from the actual OS permission (never pre-enabled) and turning it on triggers
   // the system permission prompt (App Review 4.5.4).
-  static const _kNotifTitle = 'התראות בנייד';
+  //
+  // NOTE: this is a stable, non-displayed identity key (not the localized
+  // display title) so matching/persistence keeps working regardless of the
+  // app's current language.
+  static const kNotifSwitchKey = 'mobile_notifications';
   bool _notifBusy = false; // guards against a rapid re-toggle racing an in-flight request
 
   @override
@@ -3106,13 +3132,13 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
     super.initState();
     _switchStates = {
       for (final item in widget.items)
-        if (item.isSwitch) item.title: item.initialSwitchValue
+        if (item.isSwitch) item.switchKey: item.initialSwitchValue
     };
     _loadNotifStatus();
     _loadPersistedSwitches();
   }
 
-  static String _prefKey(String title) => 'setting_switch_$title';
+  static String _prefKey(String key) => 'setting_switch_$key';
 
   // Non-notification switches (email/tenant-inquiry/biometric) persist their
   // state so a toggle isn't lost on reopen. (The notification toggle is driven
@@ -3122,9 +3148,9 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
       final prefs = await SharedPreferences.getInstance();
       final updates = <String, bool>{};
       for (final item in widget.items) {
-        if (!item.isSwitch || item.title == _kNotifTitle) continue;
-        final v = prefs.getBool(_prefKey(item.title));
-        if (v != null) updates[item.title] = v;
+        if (!item.isSwitch || item.switchKey == kNotifSwitchKey) continue;
+        final v = prefs.getBool(_prefKey(item.switchKey));
+        if (v != null) updates[item.switchKey] = v;
       }
       if (updates.isNotEmpty && mounted) {
         setState(() => _switchStates.addAll(updates));
@@ -3132,15 +3158,15 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
     } catch (_) {/* fail-soft */}
   }
 
-  Future<void> _persistSwitch(String title, bool val) async {
+  Future<void> _persistSwitch(String key, bool val) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefKey(title), val);
+      await prefs.setBool(_prefKey(key), val);
     } catch (_) {/* fail-soft */}
   }
 
   bool get _hasNotifToggle =>
-      widget.items.any((i) => i.isSwitch && i.title == _kNotifTitle);
+      widget.items.any((i) => i.isSwitch && i.switchKey == kNotifSwitchKey);
 
   Future<void> _loadNotifStatus() async {
     if (!_hasNotifToggle) return;
@@ -3148,17 +3174,18 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
       final s = await FirebaseMessaging.instance.getNotificationSettings();
       final on = s.authorizationStatus == AuthorizationStatus.authorized ||
           s.authorizationStatus == AuthorizationStatus.provisional;
-      if (mounted) setState(() => _switchStates[_kNotifTitle] = on);
+      if (mounted) setState(() => _switchStates[kNotifSwitchKey] = on);
     } catch (_) {/* fail-soft: leave OFF */}
   }
 
   Future<void> _onNotifToggle(bool val) async {
+    final l10n = AppLocalizations.of(context)!;
     if (_notifBusy) return; // ignore taps while a request is in flight
     if (!val) {
       // Notifications can't be revoked programmatically — reflect OFF and point
       // the user to iOS Settings.
-      if (mounted) setState(() => _switchStates[_kNotifTitle] = false);
-      _hintOpenSettings('כדי לכבות התראות, עברו להגדרות המכשיר → Rently → התראות.');
+      if (mounted) setState(() => _switchStates[kNotifSwitchKey] = false);
+      _hintOpenSettings(l10n.profileScreen1426bd1d);
       return;
     }
     _notifBusy = true;
@@ -3168,12 +3195,12 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
       );
       final on = s.authorizationStatus == AuthorizationStatus.authorized ||
           s.authorizationStatus == AuthorizationStatus.provisional;
-      if (mounted) setState(() => _switchStates[_kNotifTitle] = on);
+      if (mounted) setState(() => _switchStates[kNotifSwitchKey] = on);
       if (!on) {
-        _hintOpenSettings('התראות חסומות. אפשר להפעיל דרך הגדרות המכשיר → Rently → התראות.');
+        _hintOpenSettings(l10n.profileScreenB4adfb38);
       }
     } catch (_) {
-      if (mounted) setState(() => _switchStates[_kNotifTitle] = false);
+      if (mounted) setState(() => _switchStates[kNotifSwitchKey] = false);
     } finally {
       _notifBusy = false;
     }
@@ -3311,16 +3338,16 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                               ),
                               if (item.isSwitch)
                                 Switch.adaptive(
-                                  value: _switchStates[item.title] ?? false,
+                                  value: _switchStates[item.switchKey] ?? false,
                                   activeColor: AppColors.primary,
                                   onChanged: (val) {
-                                    if (item.title == _kNotifTitle) {
+                                    if (item.switchKey == kNotifSwitchKey) {
                                       _onNotifToggle(val);
                                     } else {
                                       setState(() {
-                                        _switchStates[item.title] = val;
+                                        _switchStates[item.switchKey] = val;
                                       });
-                                      _persistSwitch(item.title, val);
+                                      _persistSwitch(item.switchKey, val);
                                     }
                                   },
                                 )
@@ -3341,11 +3368,11 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  'צבע ערכת נושא ראשי',
-                  style: TextStyle(
+                  AppLocalizations.of(context)!.profileScreenC4ea00be,
+                  style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -3417,11 +3444,11 @@ class _SettingsSubPageState extends State<_SettingsSubPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  'שפת האפליקציה',
-                  style: TextStyle(
+                  AppLocalizations.of(context)!.profileScreenF48e9723,
+                  style: const TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -3535,7 +3562,8 @@ class _SubPageSettingItem {
     this.initialSwitchValue = false, // never pre-enable a toggle (App Review 4.5.4)
     this.onTap,
     this.color,
-  });
+    String? switchKey,
+  }) : _switchKey = switchKey;
 
   final IconData icon;
   final String title;
@@ -3544,6 +3572,12 @@ class _SubPageSettingItem {
   final bool initialSwitchValue;
   final VoidCallback? onTap;
   final Color? color;
+  final String? _switchKey;
+
+  // A stable, locale-independent identity for switch persistence/matching.
+  // Falls back to [title] for items that don't pass one explicitly (fine as
+  // long as that title isn't localized/variable).
+  String get switchKey => _switchKey ?? title;
 }
 
 class _SettingsTile extends StatelessWidget {
@@ -3846,12 +3880,13 @@ void _showBudgetSheet(BuildContext context, DatingProvider provider, TenantProfi
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) {
+      final l10n = AppLocalizations.of(context)!;
       final controller = TextEditingController(
         text: profile.budgetMax > 0 ? profile.budgetMax.toString() : '',
       );
       return _DirectInputSheet(
-        title: 'תקציב מקסימלי',
-        subtitle: 'הגדר תקציב נוח עבורך לחיפוש דירה',
+        title: l10n.profileScreen0ee38ad3,
+        subtitle: l10n.profileScreen53f730a2,
         inputWidget: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
@@ -3861,7 +3896,7 @@ void _showBudgetSheet(BuildContext context, DatingProvider provider, TenantProfi
           decoration: InputDecoration(
             prefixText: '₪ ',
             prefixStyle: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.slate900),
-            hintText: 'לדוגמה: 5,000',
+            hintText: l10n.profileScreenAceccce7,
             hintStyle: TextStyle(fontSize: 20, color: Colors.grey.shade400),
             border: InputBorder.none,
           ),
@@ -3889,9 +3924,10 @@ void _showRoomsSheet(BuildContext context, DatingProvider provider, TenantProfil
 
       return StatefulBuilder(
         builder: (context, setModalState) {
+          final l10n = AppLocalizations.of(context)!;
           return _DirectInputSheet(
-            title: 'מספר חדרים רצוי',
-            subtitle: 'בחר את מספר החדרים המבוקש בדירה',
+            title: l10n.profileScreen3cea2aff,
+            subtitle: l10n.profileScreen4b363fac,
             inputWidget: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -3959,6 +3995,7 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
 
       return StatefulBuilder(
         builder: (context, setModalState) {
+          final l10n = AppLocalizations.of(context)!;
           final activeBucket = moveInBucketOf(selectedValue);
           final isExactDate =
               RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(selectedValue);
@@ -4007,8 +4044,8 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
           }
 
           return _DirectInputSheet(
-            title: 'מועד כניסה רצוי',
-            subtitle: 'בחר מתי תרצה להיכנס לדירה החדשה',
+            title: l10n.profileScreen894cf122,
+            subtitle: l10n.profileScreen03a71964,
             inputWidget: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -4026,8 +4063,10 @@ void _showMoveInSheet(BuildContext context, DatingProvider provider, TenantProfi
                   isSelected: isExactDate,
                   leadingIcon: Icons.calendar_today_outlined,
                   label: pickedDate != null
-                      ? 'תאריך מדויק · ${pickedDate.day}/${pickedDate.month}/${pickedDate.year}'
-                      : 'בחר תאריך מדויק',
+                      ? l10n.profileScreen2e708e78(
+                          '${pickedDate.day}/${pickedDate.month}/${pickedDate.year}',
+                        )
+                      : l10n.profileScreen0db427ca,
                   onTap: () async {
                     final now = DateTime.now();
                     final base = DateTime(now.year, now.month, now.day);
@@ -4141,9 +4180,9 @@ class _DirectInputSheet extends StatelessWidget {
                     ),
                   ),
                   onPressed: onSave,
-                  child: const Text(
-                    'שמירה',
-                    style: TextStyle(
+                  child: Text(
+                    AppLocalizations.of(context)!.profileScreenE6932339,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,

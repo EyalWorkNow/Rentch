@@ -7,6 +7,7 @@ import 'package:dating_app/core/services/storage_service.dart';
 import 'package:dating_app/data/models/profile_tags.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
@@ -56,38 +57,64 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // UI + backend allowlist. Key (English) is what we store on
   // searchProfile.occupation; the Hebrew label is shown to the tenant. Order is
   // presentation-only.
-  static const List<(String, String)> _occupationOptions = [
-    ('hightech', 'הייטק'),
-    ('healthcare', 'בריאות/רפואה'),
-    ('education', 'חינוך/הוראה'),
-    ('finance', 'פיננסים/בנקאות'),
-    ('law', 'משפטים'),
-    ('engineering', 'הנדסה'),
-    ('selfemployed', 'עצמאי/ת'),
-    ('public', 'שירות ציבורי'),
-    ('retail', 'מסחר/שירות'),
-    ('academia', 'אקדמיה'),
-    ('student', 'סטודנט/ית'),
-    ('other', 'אחר'),
+  // Keys only, used for validating stored values (no BuildContext available at
+  // that point in initState). Labels are localized in the option lists below.
+  static const List<String> _occupationKeys = [
+    'hightech',
+    'healthcare',
+    'education',
+    'finance',
+    'law',
+    'engineering',
+    'selfemployed',
+    'public',
+    'retail',
+    'academia',
+    'student',
+    'other',
   ];
 
+  List<(String, String)> _occupationOptions(AppLocalizations l10n) => [
+        ('hightech', l10n.editProfileScreen40d56dee),
+        ('healthcare', l10n.editProfileScreen6dfb51f1),
+        ('education', l10n.editProfileScreen19981c32),
+        ('finance', l10n.editProfileScreenEbfcd4cb),
+        ('law', l10n.editProfileScreen4f8aded7),
+        ('engineering', l10n.editProfileScreen453fe1ed),
+        ('selfemployed', l10n.editProfileScreenE1cad55a),
+        ('public', l10n.editProfileScreenCb481f30),
+        ('retail', l10n.editProfileScreen2834587d),
+        ('academia', l10n.editProfileScreen2157ec10),
+        ('student', l10n.editProfileScreen42ed7e8d),
+        ('other', l10n.editProfileScreenCdf4bce0),
+      ];
+
   // Household type vocabulary — LOCKED to the gate's `household` allowlist. Store
-  // the English key on searchProfile.household; show the Hebrew label.
-  static const List<(String, String)> _householdOptions = [
-    ('family', 'משפחה'),
-    ('single', 'רווק/ה'),
-    ('couple', 'זוג'),
-    ('student', 'סטודנט/ית'),
-  ];
+  // the English key on searchProfile.household; show the localized label.
+  static const List<String> _householdKeys = ['family', 'single', 'couple', 'student'];
+
+  List<(String, String)> _householdOptions(AppLocalizations l10n) => [
+        ('family', l10n.editProfileScreen926c043f),
+        ('single', l10n.editProfileScreenB8d9266b),
+        ('couple', l10n.editProfileScreen4df994d0),
+        ('student', l10n.editProfileScreen42ed7e8d),
+      ];
 
   // Life-stage vocabulary — LOCKED to the gate's `lifeStage` allowlist. Note the
   // hyphen in 'young-professional' (backend key is exact).
-  static const List<(String, String)> _lifeStageOptions = [
-    ('student', 'סטודנט/ית'),
-    ('young-professional', 'צעיר/ה מקצועי/ת'),
-    ('family', 'משפחה'),
-    ('senior', 'גיל הזהב'),
+  static const List<String> _lifeStageKeys = [
+    'student',
+    'young-professional',
+    'family',
+    'senior',
   ];
+
+  List<(String, String)> _lifeStageOptions(AppLocalizations l10n) => [
+        ('student', l10n.editProfileScreen42ed7e8d),
+        ('young-professional', l10n.editProfileScreenD663155d),
+        ('family', l10n.editProfileScreen926c043f),
+        ('senior', l10n.editProfileScreen0aa42aa1),
+      ];
 
   static const List<double> _roomOptions = [
     1.0,
@@ -168,20 +195,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _urgency = p.urgency;
     // Pre-fill occupation from the saved profile; only keep it if it's a known
     // vocabulary key (guards against stale/legacy values).
-    _occupation = _occupationOptions.any((o) => o.$1 == p.occupation)
-        ? p.occupation
-        : null;
+    _occupation = _occupationKeys.contains(p.occupation) ? p.occupation : null;
     _numChildren = p.numChildren;
     _hasPets = p.hasPets;
     _hasCar = p.hasCar;
     _wfh = p.wfh;
     // Keep the stored key only if it's a known vocabulary value.
-    _household = _householdOptions.any((o) => o.$1 == p.household)
-        ? p.household
-        : null;
-    _lifeStage = _lifeStageOptions.any((o) => o.$1 == p.lifeStage)
-        ? p.lifeStage
-        : null;
+    _household = _householdKeys.contains(p.household) ? p.household : null;
+    _lifeStage = _lifeStageKeys.contains(p.lifeStage) ? p.lifeStage : null;
     _isOleh = p.isOleh;
     _age = p.age;
     _accessibilityNeed = p.accessibilityNeed;
@@ -239,6 +260,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _showPhotoPicker() {
     HapticFeedback.selectionClick();
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -260,9 +282,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const Text(
-                'הוספת תמונה',
-                style: TextStyle(
+              Text(
+                l10n.editProfileScreen6f212e0c,
+                style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w900,
                   color: AppColors.navy,
@@ -274,7 +296,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Expanded(
                     child: _SourceButton(
                       icon: IconsaxPlusLinear.camera,
-                      label: 'מצלמה',
+                      label: l10n.editProfileScreenA7dc1317,
                       onTap: () => _pickPhoto(ImageSource.camera),
                     ),
                   ),
@@ -282,7 +304,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Expanded(
                     child: _SourceButton(
                       icon: IconsaxPlusLinear.gallery,
-                      label: 'גלריה',
+                      label: l10n.editProfileScreenEed2fbf3,
                       onTap: () => _pickPhoto(ImageSource.gallery),
                     ),
                   ),
@@ -379,7 +401,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      _showError('יש להזין שם');
+      _showError(AppLocalizations.of(context)!.editProfileScreen11374f97);
       return;
     }
 
@@ -497,18 +519,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // silently without the user seeing the result — the sheet shows the transcript
   // live and the applied fields land in the visible form.
   Future<void> _startVoiceFill() async {
+    final l10n = AppLocalizations.of(context)!;
     final ok = await _assistant.initSpeech();
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('לא ניתן לגשת למיקרופון להקלטה'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.editProfileScreenCd1de569),
       ));
       return;
     }
     final isLandlord = context.read<DatingProvider>().isLandlord;
     final example = isLandlord
-        ? 'למשל: "קוראים לי דוד, אני משכיר דירת 3 חדרים משופצת בתל אביב, כניסה מיידית".'
-        : 'למשל: "אני זוג צעיר, תקציב עד 6000, מחפשים 3 חדרים".';
+        ? l10n.editProfileScreen0a09c347
+        : l10n.editProfileScreen4c2bbd0e;
     var transcript = '';
     var listening = true;
     var started = false;
@@ -563,8 +586,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           color: AppColors.primary, size: 34),
                     ),
                     const SizedBox(height: 16),
-                    const Text('ספרו לי על עצמכם',
-                        style: TextStyle(
+                    Text(l10n.editProfileScreen23e917ce,
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 6),
                     Text(
@@ -583,7 +606,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Text(
-                        transcript.isEmpty ? 'מקשיב…' : transcript,
+                        transcript.isEmpty
+                            ? l10n.editProfileScreen4dd9aa9e
+                            : transcript,
                         style: TextStyle(
                           fontSize: 15,
                           color: transcript.isEmpty
@@ -601,8 +626,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: finish,
-                        child: const Text('סיימתי',
-                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        child: Text(l10n.editProfileScreenFa317bab,
+                            style: const TextStyle(fontWeight: FontWeight.w800)),
                       ),
                     ),
                   ],
@@ -616,6 +641,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _applyVoiceFill(String transcript) {
+    final l10n = AppLocalizations.of(context)!;
     final isLandlord = context.read<DatingProvider>().isLandlord;
     final q = SmartSearch.parse(transcript);
     final filled = <String>[];
@@ -624,22 +650,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final existing = _bioCtrl.text.trim();
       _bioCtrl.text =
           existing.isEmpty ? transcript.trim() : '$existing\n${transcript.trim()}';
-      filled.add('תיאור');
+      filled.add(l10n.editProfileScreen927492f8);
       // Budget/rooms are tenant search fields — only fill them for a tenant.
       if (!isLandlord) {
         if (q.maxPrice != null && q.maxPrice! > 0) {
           _budget = q.maxPrice!;
-          filled.add('תקציב');
+          filled.add(l10n.editProfileScreen3bb32ddd);
         }
         final rooms = q.minRooms ?? q.maxRooms;
         if (rooms != null && rooms > 0) {
           _rooms = rooms;
-          filled.add('חדרים');
+          filled.add(l10n.editProfileScreenB50b3974);
         }
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('מולא אוטומטית: ${filled.join(" · ")}'),
+      content: Text(l10n.editProfileScreenBe969b6a(filled.join(" · "))),
       duration: const Duration(milliseconds: 2200),
     ));
   }
@@ -649,6 +675,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isLandlord = context.read<DatingProvider>().isLandlord;
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
       bottomNavigationBar: SafeArea(
@@ -666,9 +693,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18)),
                   ),
-                  child: const Text(
-                    'שמור שינויים',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  child: Text(
+                    l10n.editProfileScreen4722b300,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -701,9 +728,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               style: TextButton.styleFrom(
                                 foregroundColor: Colors.white,
                               ),
-                              child: const Text(
-                                'שמור',
-                                style: TextStyle(
+                              child: Text(
+                                l10n.editProfileScreenF50251bc,
+                                style: const TextStyle(
                                     fontWeight: FontWeight.w800, fontSize: 14),
                               ),
                             ),
@@ -732,7 +759,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // 1. Personal details
                     _FormSection(
-                      title: 'פרטים אישיים',
+                      title: l10n.editProfileScreen34499357,
                       icon: IconsaxPlusLinear.profile_circle,
                       child: Column(
                         children: [
@@ -742,8 +769,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: InputDecoration(
-                              labelText: isLandlord ? 'שם מלא / שם העסק' : 'שם מלא',
-                              hintText: isLandlord ? 'שם פרטי ומשפחה או שם העסק' : 'שם וכינוי',
+                              labelText: isLandlord
+                                  ? l10n.editProfileScreen07164c16
+                                  : l10n.editProfileScreenCbdaff61,
+                              hintText: isLandlord
+                                  ? l10n.editProfileScreen25badb07
+                                  : l10n.editProfileScreen54d48e8d,
                               labelStyle: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w600),
@@ -781,8 +812,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: InputDecoration(
-                              labelText: isLandlord ? 'עליי / על הנכסים' : 'עליי',
-                              hintText: isLandlord ? 'תאר/י את עצמך או את הדירות שלך לשוכרים פוטנציאליים...' : 'תאר/י את עצמך לבעלי דירות...',
+                              labelText: isLandlord
+                                  ? l10n.editProfileScreenC2c8f68d
+                                  : l10n.editProfileScreen55578847,
+                              hintText: isLandlord
+                                  ? l10n.editProfileScreenC7ee65be
+                                  : l10n.editProfileScreen444064c0,
                               alignLabelWithHint: true,
                               labelStyle: const TextStyle(
                                   color: AppColors.textSecondary,
@@ -815,7 +850,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (!isLandlord) ...[
                     // 2. Apartment preferences
                     _FormSection(
-                      title: 'העדפות דירה',
+                      title: l10n.editProfileScreenCe71d2c4,
                       icon: IconsaxPlusLinear.building,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -831,7 +866,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                'תקציב מקסימאלי: ₪${_budget.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+                                l10n.editProfileScreenBa921622(
+                                    '₪${_budget.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}'),
                                 style: TextStyle(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w900,
@@ -877,8 +913,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 20),
 
                           // Rooms label
-                          const Text(
-                            'מספר חדרים',
+                          Text(
+                            l10n.editProfileScreen4f4cd24f,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -937,8 +973,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 20),
 
                           // Move-in label
-                          const Text(
-                            'מועד כניסה',
+                          Text(
+                            l10n.editProfileScreen1399cd87,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -990,8 +1026,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 22),
 
                           // Urgency label
-                          const Text(
-                            'רמת דחיפות',
+                          Text(
+                            l10n.editProfileScreenD722c8f1,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1044,8 +1080,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Monthly income — drives the affordability strip on
                           // each listing. Optional; left blank hides the band.
-                          const Text(
-                            'הכנסה חודשית (ברוטו)',
+                          Text(
+                            l10n.editProfileScreen906a606b,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1062,14 +1098,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             style: const TextStyle(
                                 color: AppColors.navy, fontSize: 15),
                             decoration: _fieldDecoration(
-                              hint: 'לדוגמה: 12000',
+                              hint: l10n.editProfileScreenC5de89b4,
                               icon: IconsaxPlusLinear.wallet_money,
                               suffixText: '₪',
                             ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'נשתמש בזה רק כדי לחשב עבורך אם השכירות נוחה לתקציב. לא מוצג לבעלי הדירות.',
+                          Text(
+                            l10n.editProfileScreenC990c62b,
                             style: TextStyle(
                               fontSize: 11.5,
                               height: 1.4,
@@ -1082,8 +1118,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Work address — geocoded into coords to show "מרחק
                           // מהעבודה" in the match breakdown. Optional.
-                          const Text(
-                            'כתובת מקום העבודה',
+                          Text(
+                            l10n.editProfileScreenA0e7a6a6,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1097,14 +1133,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 color: AppColors.navy, fontSize: 15),
                             decoration: _fieldDecoration(
                               hint: _workLat != null
-                                  ? 'מיקום עבודה נשמר — הקלד/י לעדכון'
-                                  : 'רחוב, עיר',
+                                  ? l10n.editProfileScreen52cf0c87
+                                  : l10n.editProfileScreenD007fbf4,
                               icon: IconsaxPlusLinear.location,
                             ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'נחשב לפי זה את המרחק מהעבודה לכל דירה בהסבר "למה ההתאמה הזו".',
+                          Text(
+                            l10n.editProfileScreen9260c178,
                             style: TextStyle(
                               fontSize: 11.5,
                               height: 1.4,
@@ -1118,8 +1154,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           // Occupation — the tenant's work field. Some listings
                           // are gated by a landlord occupation criterion; picking
                           // one here lets those listings surface for the tenant.
-                          const Text(
-                            'עיסוק / תחום עבודה',
+                          Text(
+                            l10n.editProfileScreen4c5cb46d,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1130,7 +1166,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _occupationOptions.map((opt) {
+                            children: _occupationOptions(l10n).map((opt) {
                               final selected = opt.$1 == _occupation;
                               return GestureDetector(
                                 onTap: () {
@@ -1167,8 +1203,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             }).toList(),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'עוזר לנו להתאים דירות שבעל הדירה ייעד לתחום עיסוק מסוים.',
+                          Text(
+                            l10n.editProfileScreenE8225963,
                             style: TextStyle(
                               fontSize: 11.5,
                               height: 1.4,
@@ -1181,8 +1217,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Number of children — some listings are gated on
                           // household size. Chips 0..5+; null leaves it unset.
-                          const Text(
-                            'מספר ילדים',
+                          Text(
+                            l10n.editProfileScreenB215e719,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1238,7 +1274,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           // Pet + car — כן/לא toggles. Pushed to the eligibility
                           // gate (car is inverted to `carFree` on the backend).
                           _YesNoRow(
-                            label: 'יש חיית מחמד?',
+                            label: l10n.editProfileScreen1aa7f6ea,
                             value: _hasPets,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1247,7 +1283,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           const SizedBox(height: 14),
                           _YesNoRow(
-                            label: 'יש רכב?',
+                            label: l10n.editProfileScreenFfea5e3d,
                             value: _hasCar,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1258,7 +1294,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Remote work — 1:1 to the gate's `wfh` criterion.
                           _YesNoRow(
-                            label: 'עובד/ת מרחוק?',
+                            label: l10n.editProfileScreenD5720480,
                             value: _wfh,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1269,7 +1305,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // New immigrant — 1:1 to the gate's `isOleh` criterion.
                           _YesNoRow(
-                            label: 'עולה חדש/ה?',
+                            label: l10n.editProfileScreenFf8d8205,
                             value: _isOleh,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1280,7 +1316,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Accessibility — 1:1 to the gate's `accessibilityNeed`.
                           _YesNoRow(
-                            label: 'צריך/ה נגישות?',
+                            label: l10n.editProfileScreen698a21fc,
                             value: _accessibilityNeed,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1292,7 +1328,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           // Smoking — snapshotted so the landlord's "מעשן" filter
                           // can act on it.
                           _YesNoRow(
-                            label: 'מעשן/ת?',
+                            label: l10n.editProfileScreenFe644535,
                             value: _smoker,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1303,7 +1339,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Guarantor — backs the landlord's "ערבות" filter.
                           _YesNoRow(
-                            label: 'יש ערב/ערבות?',
+                            label: l10n.editProfileScreen8fdaf5a6,
                             value: _hasGuarantor,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1314,7 +1350,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Income proof — backs the "אסמכתאות הכנסה" filter.
                           _YesNoRow(
-                            label: 'אישור הכנסה מוכן?',
+                            label: l10n.editProfileScreen15cf10e0,
                             value: _incomeProofReady,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1325,8 +1361,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // ── Lifestyle / religious fit (Israeli-market
                           // deal-breakers) — help landlords & roommates match.
-                          const Text('אורח חיים',
-                              style: TextStyle(
+                          Text(l10n.editProfileScreen7778a202,
+                              style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.navy)),
@@ -1352,7 +1388,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 16),
 
                           _YesNoRow(
-                            label: 'שומר/ת שבת?',
+                            label: l10n.editProfileScreen02ab4d70,
                             value: _shabbatObservant,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1361,7 +1397,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           const SizedBox(height: 14),
                           _YesNoRow(
-                            label: 'שומר/ת כשרות?',
+                            label: l10n.editProfileScreen341816bd,
                             value: _keepsKosher,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1372,8 +1408,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Pet type — refines "יש חיה?" with the signal
                           // landlords fear (a big/barking dog vs a cat).
-                          const Text('חיית מחמד',
-                              style: TextStyle(
+                          Text(l10n.editProfileScreenAeee4760,
+                              style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.navy)),
@@ -1403,7 +1439,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 16),
 
                           _YesNoRow(
-                            label: 'מארח/ת אורחים הרבה?',
+                            label: l10n.editProfileScreen50590a34,
                             value: _hostsGuests,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1412,7 +1448,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           const SizedBox(height: 14),
                           _YesNoRow(
-                            label: 'מנגן/ת בכלי נגינה בבית?',
+                            label: l10n.editProfileScreenA9e328da,
                             value: _playsInstrument,
                             onChanged: (v) {
                               HapticFeedback.selectionClick();
@@ -1423,8 +1459,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Desired lease length (months) — backs the landlord's
                           // "משך שכירות מבוקש" filter. Chips; tap again to clear.
-                          const Text(
-                            'משך שכירות מבוקש (חודשים)',
+                          Text(
+                            l10n.editProfileScreenDe2ce149,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1475,8 +1511,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           const SizedBox(height: 20),
 
                           // Household type — chips storing the English key.
-                          const Text(
-                            'סוג משק בית',
+                          Text(
+                            l10n.editProfileScreen2b9fb355,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1487,7 +1523,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _householdOptions.map((opt) {
+                            children: _householdOptions(l10n).map((opt) {
                               final selected = opt.$1 == _household;
                               return GestureDetector(
                                 onTap: () {
@@ -1528,8 +1564,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                           // Life stage — chips storing the English key
                           // ('young-professional' keeps its hyphen).
-                          const Text(
-                            'שלב חיים',
+                          Text(
+                            l10n.editProfileScreenD308ff19,
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -1540,7 +1576,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _lifeStageOptions.map((opt) {
+                            children: _lifeStageOptions(l10n).map((opt) {
                               final selected = opt.$1 == _lifeStage;
                               return GestureDetector(
                                 onTap: () {
@@ -1582,10 +1618,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           // Age — stepper; backs minAge/maxAge on the gate.
                           Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'גיל',
-                                  style: TextStyle(
+                                  l10n.editProfileScreenE5aeca16,
+                                  style: const TextStyle(
                                     fontSize: 13,
                                     color: AppColors.textSecondary,
                                     fontWeight: FontWeight.w600,
@@ -1612,13 +1648,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // 3. Important details / tags for landlords/seekers
                     _FormSection(
-                      title: isLandlord ? 'תגיות לשוכרים' : 'תגיות לבעלי דירות',
+                      title: isLandlord
+                          ? l10n.editProfileScreen8aacfb1c
+                          : l10n.editProfileScreen13a5a4e5,
                       icon: IconsaxPlusLinear.tag,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'בחר/י תגיות שמתארות אותך והעדפותיך. סמן/י תגית כ"דיל ברייקר" כדי שנציג התאמות שעונות עליה בלבד.',
+                          Text(
+                            l10n.editProfileScreenC46f005c,
                             style: TextStyle(
                               fontSize: 12.5,
                               height: 1.5,
@@ -1670,7 +1708,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             icon: const RentlyIcon(IconsaxPlusLinear.add,
                                 size: 14),
                             label: Text(
-                              _details.isEmpty ? 'הוסף תגיות' : 'ערוך תגיות',
+                              _details.isEmpty
+                                  ? l10n.editProfileScreenDe8f0bd9
+                                  : l10n.editProfileScreen9a99432b,
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700, fontSize: 13),
                             ),
@@ -1691,6 +1731,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // ─── Photo header ────────────────────────────────────────────────────────────
 
   Widget _buildPhotoHeader() {
+    final l10n = AppLocalizations.of(context)!;
     final hasPhotos = _photos.isNotEmpty;
     return SizedBox(
       height: 340,
@@ -1712,15 +1753,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         if (entry.isUploading)
                           Container(
                             color: Colors.black.withValues(alpha: 0.35),
-                            child: const Center(
+                            child: Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  CircularProgressIndicator(
+                                  const CircularProgressIndicator(
                                       color: Colors.white),
-                                  SizedBox(height: 10),
-                                  Text('מעלה תמונה…',
-                                      style: TextStyle(
+                                  const SizedBox(height: 10),
+                                  Text(l10n.editProfileScreenAeaa4b94,
+                                      style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w600)),
                                 ],
@@ -1749,9 +1790,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         color: AppColors.primary.withValues(alpha: 0.6),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'אין תמונות עדיין',
-                        style: TextStyle(
+                      Text(
+                        l10n.editProfileScreenA677a5bc,
+                        style: const TextStyle(
                             color: Colors.white70, fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -1826,7 +1867,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             size: 13, color: Colors.white),
                         const SizedBox(width: 5),
                         Text(
-                          '${_photos.length} תמונות',
+                          l10n.editProfileScreenF45f8154(_photos.length),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -1854,15 +1895,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        RentlyIcon(IconsaxPlusLinear.edit_2,
+                        const RentlyIcon(IconsaxPlusLinear.edit_2,
                             size: 14, color: Colors.white),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
-                          'ניהול תמונות',
-                          style: TextStyle(
+                          l10n.editProfileScreen41087aea,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
@@ -1963,6 +2004,7 @@ class _PhotoManagerSheet extends StatefulWidget {
 class _PhotoManagerSheetState extends State<_PhotoManagerSheet> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       maxChildSize: 0.92,
@@ -1990,9 +2032,9 @@ class _PhotoManagerSheetState extends State<_PhotoManagerSheet> {
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                 child: Row(
                   children: [
-                    const Text(
-                      'תמונות פרופיל',
-                      style: TextStyle(
+                    Text(
+                      l10n.editProfileScreen723670d1,
+                      style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: AppColors.navy,
@@ -2000,7 +2042,7 @@ class _PhotoManagerSheetState extends State<_PhotoManagerSheet> {
                     ),
                     const Spacer(),
                     Text(
-                      '${widget.photos.length}/6 תמונות',
+                      l10n.editProfileScreenD20e0579(widget.photos.length),
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -2067,6 +2109,7 @@ class _PhotoCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       height: 80,
@@ -2111,7 +2154,7 @@ class _PhotoCell extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      'תמונה ראשית',
+                      l10n.editProfileScreenCcfc5019,
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 11,
@@ -2120,26 +2163,26 @@ class _PhotoCell extends StatelessWidget {
                     ),
                   ),
                 if (entry.isUploading)
-                  const Text(
-                    'מעלה…',
-                    style: TextStyle(
+                  Text(
+                    l10n.editProfileScreen750f8cfb,
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
                     ),
                   )
                 else if (entry.remoteUrl != null)
-                  const Text(
-                    'נשמרה בענן',
-                    style: TextStyle(
+                  Text(
+                    l10n.editProfileScreen9fbea32c,
+                    style: const TextStyle(
                       color: AppColors.success,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   )
                 else
-                  const Text(
-                    'מקומית בלבד',
-                    style: TextStyle(
+                  Text(
+                    l10n.editProfileScreen29fbeb03,
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
                     ),
@@ -2174,6 +2217,7 @@ class _AddPhotoCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: onTap,
       key: key,
@@ -2194,9 +2238,9 @@ class _AddPhotoCell extends StatelessWidget {
           children: [
             RentlyIcon(IconsaxPlusLinear.add,
                 color: AppColors.primary, size: 20),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
-              'הוספת תמונה',
+              l10n.editProfileScreen6f212e0c,
               style: TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
@@ -2312,6 +2356,7 @@ class _YesNoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         Expanded(
@@ -2327,9 +2372,10 @@ class _YesNoRow extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         // Tapping the already-selected option clears it back to unset.
-        _chip('כן', value == true, () => onChanged(value == true ? null : true)),
+        _chip(l10n.editProfileScreen4175f994, value == true,
+            () => onChanged(value == true ? null : true)),
         const SizedBox(width: 8),
-        _chip('לא', value == false,
+        _chip(l10n.editProfileScreen21a2d9d6, value == false,
             () => onChanged(value == false ? null : false)),
       ],
     );
@@ -2583,6 +2629,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final categories =
         ProfileTagCatalog.forRole(isLandlord: widget.isLandlord);
     final query = _query.trim();
@@ -2605,13 +2652,13 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    'בחירת תגיות',
-                    style: TextStyle(
+                    l10n.editProfileScreen92348990,
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                       color: AppColors.navy,
@@ -2627,7 +2674,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                   onChanged: (v) => setState(() => _query = v),
                   style: const TextStyle(color: AppColors.navy, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'חיפוש תגית…',
+                    hintText: l10n.editProfileScreen3a8d68b7,
                     prefixIcon: const Icon(IconsaxPlusLinear.search_normal_1,
                         size: 18, color: AppColors.textSecondary),
                     isDense: true,
@@ -2661,12 +2708,12 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                       ..._buildCategory(category, query),
                     if (categories.every((c) =>
                         _matchingTags(c, query).isEmpty))
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Text(
-                          'לא נמצאו תגיות תואמות',
+                          l10n.editProfileScreen2ad885eb,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: const TextStyle(color: AppColors.textSecondary),
                         ),
                       ),
                   ],
@@ -2686,7 +2733,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                           borderRadius: BorderRadius.circular(16)),
                     ),
                     child: Text(
-                      'סיום (${widget.selected.length})',
+                      l10n.editProfileScreenD062fbae(widget.selected.length),
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w800),
                     ),
@@ -2792,7 +2839,7 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    'דיל ברייקר',
+                    AppLocalizations.of(context)!.editProfileScreen5d3f75a3,
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -2817,6 +2864,7 @@ class _VoiceFillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2842,16 +2890,16 @@ class _VoiceFillButton extends StatelessWidget {
                     color: AppColors.primary, size: 22),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('מילוי מהיר בהקלטה',
-                        style: TextStyle(
+                    Text(l10n.editProfileScreen68766725,
+                        style: const TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 14.5)),
-                    SizedBox(height: 2),
-                    Text('ספרו על עצמכם ואמלא את הפרטים אוטומטית',
-                        style: TextStyle(
+                    const SizedBox(height: 2),
+                    Text(l10n.editProfileScreenD2a896e3,
+                        style: const TextStyle(
                             color: AppColors.textSecondary, fontSize: 12)),
                   ],
                 ),

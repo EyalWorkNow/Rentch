@@ -2,6 +2,7 @@ import 'package:dating_app/core/services/local_storage.dart';
 import 'package:dating_app/core/services/rental_data_service.dart';
 import 'package:dating_app/data/models/rental_models.dart';
 import 'package:dating_app/data/providers/dating_provider.dart';
+import 'package:dating_app/l10n/app_localizations.dart';
 import 'package:dating_app/presentation/features/user/profile/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +39,9 @@ void main() {
         ChangeNotifierProvider<DatingProvider>.value(
           value: provider,
           child: MaterialApp(
+            locale: const Locale('he'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: EditProfileScreen(profile: testProfile),
             ),

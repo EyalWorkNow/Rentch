@@ -9861,4 +9861,1220 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get brokerViewingsScreen7c8173fa => 'Eliminar';
+
+  @override
+  String get editProfileScreen40d56dee => 'Tecnología';
+
+  @override
+  String get editProfileScreen6dfb51f1 => 'Salud/Medicina';
+
+  @override
+  String get editProfileScreen19981c32 => 'Educación/Docencia';
+
+  @override
+  String get editProfileScreenEbfcd4cb => 'Finanzas/Banca';
+
+  @override
+  String get editProfileScreen4f8aded7 => 'Derecho';
+
+  @override
+  String get editProfileScreen453fe1ed => 'Ingeniería';
+
+  @override
+  String get editProfileScreenE1cad55a => 'Autónomo/a';
+
+  @override
+  String get editProfileScreenCb481f30 => 'Sector público';
+
+  @override
+  String get editProfileScreen2834587d => 'Comercio/Servicios';
+
+  @override
+  String get editProfileScreen2157ec10 => 'Ámbito académico';
+
+  @override
+  String get editProfileScreen42ed7e8d => 'Estudiante';
+
+  @override
+  String get editProfileScreenCdf4bce0 => 'Otro';
+
+  @override
+  String get editProfileScreen926c043f => 'Familia';
+
+  @override
+  String get editProfileScreenB8d9266b => 'Soltero/a';
+
+  @override
+  String get editProfileScreen4df994d0 => 'Pareja';
+
+  @override
+  String get editProfileScreenD663155d => 'Joven profesional';
+
+  @override
+  String get editProfileScreen0aa42aa1 => 'Edad dorada';
+
+  @override
+  String get editProfileScreen6f212e0c => 'Añadir foto';
+
+  @override
+  String get editProfileScreenA7dc1317 => 'Cámara';
+
+  @override
+  String get editProfileScreenEed2fbf3 => 'Galería';
+
+  @override
+  String get editProfileScreen11374f97 => 'Por favor, introduce un nombre';
+
+  @override
+  String get editProfileScreenCd1de569 =>
+      'No se puede acceder al micrófono para grabar';
+
+  @override
+  String get editProfileScreen0a09c347 =>
+      'Por ejemplo: \"Me llamo David, alquilo un piso renovado de 3 habitaciones en Tel Aviv, entrada inmediata\".';
+
+  @override
+  String get editProfileScreen4c2bbd0e =>
+      'Por ejemplo: \"Somos una pareja joven, presupuesto hasta 6000, buscamos 3 habitaciones\".';
+
+  @override
+  String get editProfileScreen23e917ce => 'Cuéntame sobre ti';
+
+  @override
+  String get editProfileScreen4dd9aa9e => 'Escuchando…';
+
+  @override
+  String get editProfileScreenFa317bab => 'Listo';
+
+  @override
+  String get editProfileScreen927492f8 => 'Descripción';
+
+  @override
+  String get editProfileScreen3bb32ddd => 'Presupuesto';
+
+  @override
+  String get editProfileScreenB50b3974 => 'Habitaciones';
+
+  @override
+  String editProfileScreenBe969b6a(Object fields) {
+    return 'Rellenado automáticamente: $fields';
+  }
+
+  @override
+  String get editProfileScreen4722b300 => 'Guardar cambios';
+
+  @override
+  String get editProfileScreenF50251bc => 'Guardar';
+
+  @override
+  String get editProfileScreen34499357 => 'Datos personales';
+
+  @override
+  String get editProfileScreen07164c16 =>
+      'Nombre completo / Nombre de la empresa';
+
+  @override
+  String get editProfileScreenCbdaff61 => 'Nombre completo';
+
+  @override
+  String get editProfileScreen25badb07 =>
+      'Nombre y apellido, o nombre de la empresa';
+
+  @override
+  String get editProfileScreen54d48e8d => 'Nombre y apodo';
+
+  @override
+  String get editProfileScreenC2c8f68d => 'Sobre mí / Sobre las propiedades';
+
+  @override
+  String get editProfileScreen55578847 => 'Sobre mí';
+
+  @override
+  String get editProfileScreenC7ee65be =>
+      'Descríbete a ti mismo o tus pisos a los posibles inquilinos...';
+
+  @override
+  String get editProfileScreen444064c0 => 'Descríbete a los propietarios...';
+
+  @override
+  String get editProfileScreenCe71d2c4 => 'Preferencias de vivienda';
+
+  @override
+  String editProfileScreenBa921622(Object amount) {
+    return 'Presupuesto máximo: $amount';
+  }
+
+  @override
+  String get editProfileScreen4f4cd24f => 'Número de habitaciones';
+
+  @override
+  String get editProfileScreen1399cd87 => 'Fecha de entrada';
+
+  @override
+  String get editProfileScreenD722c8f1 => 'Nivel de urgencia';
+
+  @override
+  String get editProfileScreen906a606b => 'Ingresos mensuales (brutos)';
+
+  @override
+  String get editProfileScreenC5de89b4 => 'Por ejemplo: 12000';
+
+  @override
+  String get editProfileScreenC990c62b =>
+      'Solo lo usaremos para calcular si el alquiler se ajusta a tu presupuesto. No se muestra a los propietarios.';
+
+  @override
+  String get editProfileScreenA0e7a6a6 => 'Dirección del trabajo';
+
+  @override
+  String get editProfileScreen52cf0c87 =>
+      'Ubicación de trabajo guardada — escribe para actualizar';
+
+  @override
+  String get editProfileScreenD007fbf4 => 'Calle, ciudad';
+
+  @override
+  String get editProfileScreen9260c178 =>
+      'Usaremos esto para calcular la distancia al trabajo de cada piso en la explicación \"por qué esta coincidencia\".';
+
+  @override
+  String get editProfileScreen4c5cb46d => 'Ocupación / Área de trabajo';
+
+  @override
+  String get editProfileScreenE8225963 =>
+      'Nos ayuda a mostrarte pisos que el propietario ha destinado a una ocupación específica.';
+
+  @override
+  String get editProfileScreenB215e719 => 'Número de hijos';
+
+  @override
+  String get editProfileScreen1aa7f6ea => '¿Tienes mascota?';
+
+  @override
+  String get editProfileScreenFfea5e3d => '¿Tienes coche?';
+
+  @override
+  String get editProfileScreenD5720480 => '¿Trabajas de forma remota?';
+
+  @override
+  String get editProfileScreenFf8d8205 => '¿Eres inmigrante reciente?';
+
+  @override
+  String get editProfileScreen698a21fc => '¿Necesitas accesibilidad?';
+
+  @override
+  String get editProfileScreenFe644535 => '¿Fumas?';
+
+  @override
+  String get editProfileScreen8fdaf5a6 => '¿Tienes aval?';
+
+  @override
+  String get editProfileScreen15cf10e0 => '¿Justificante de ingresos listo?';
+
+  @override
+  String get editProfileScreen7778a202 => 'Estilo de vida';
+
+  @override
+  String get editProfileScreen02ab4d70 => '¿Observante del Shabat?';
+
+  @override
+  String get editProfileScreen341816bd => '¿Mantienes el kosher?';
+
+  @override
+  String get editProfileScreenAeee4760 => 'Mascota';
+
+  @override
+  String get editProfileScreen50590a34 => '¿Recibes invitados a menudo?';
+
+  @override
+  String get editProfileScreenA9e328da =>
+      '¿Tocas un instrumento musical en casa?';
+
+  @override
+  String get editProfileScreenDe2ce149 =>
+      'Duración de alquiler deseada (meses)';
+
+  @override
+  String get editProfileScreen2b9fb355 => 'Tipo de hogar';
+
+  @override
+  String get editProfileScreenD308ff19 => 'Etapa de vida';
+
+  @override
+  String get editProfileScreenE5aeca16 => 'Edad';
+
+  @override
+  String get editProfileScreen8aacfb1c => 'Etiquetas para inquilinos';
+
+  @override
+  String get editProfileScreen13a5a4e5 => 'Etiquetas para propietarios';
+
+  @override
+  String get editProfileScreenC46f005c =>
+      'Elige etiquetas que te describan a ti y a tus preferencias. Marca una etiqueta como \"factor decisivo\" para mostrar solo coincidencias que la cumplan.';
+
+  @override
+  String get editProfileScreenDe8f0bd9 => 'Añadir etiquetas';
+
+  @override
+  String get editProfileScreen9a99432b => 'Editar etiquetas';
+
+  @override
+  String get editProfileScreenAeaa4b94 => 'Subiendo foto…';
+
+  @override
+  String get editProfileScreenA677a5bc => 'Aún no hay fotos';
+
+  @override
+  String editProfileScreenF45f8154(Object count) {
+    return '$count fotos';
+  }
+
+  @override
+  String get editProfileScreen41087aea => 'Gestionar fotos';
+
+  @override
+  String get editProfileScreen723670d1 => 'Fotos de perfil';
+
+  @override
+  String editProfileScreenD20e0579(Object count) {
+    return '$count/6 fotos';
+  }
+
+  @override
+  String get editProfileScreenCcfc5019 => 'Foto principal';
+
+  @override
+  String get editProfileScreen750f8cfb => 'Subiendo…';
+
+  @override
+  String get editProfileScreen9fbea32c => 'Guardada en la nube';
+
+  @override
+  String get editProfileScreen29fbeb03 => 'Solo local';
+
+  @override
+  String get editProfileScreen4175f994 => 'Sí';
+
+  @override
+  String get editProfileScreen21a2d9d6 => 'No';
+
+  @override
+  String get editProfileScreen92348990 => 'Seleccionar etiquetas';
+
+  @override
+  String get editProfileScreen3a8d68b7 => 'Buscar etiqueta…';
+
+  @override
+  String get editProfileScreen2ad885eb =>
+      'No se encontraron etiquetas coincidentes';
+
+  @override
+  String editProfileScreenD062fbae(Object count) {
+    return 'Finalizar ($count)';
+  }
+
+  @override
+  String get editProfileScreen5d3f75a3 => 'Factor decisivo';
+
+  @override
+  String get editProfileScreen68766725 => 'Rellenado rápido por voz';
+
+  @override
+  String get editProfileScreenD2a896e3 =>
+      'Cuéntanos sobre ti y rellenaremos los detalles automáticamente';
+
+  @override
+  String panoramaCaptureScreen697a231c(Object nodeNumber) {
+    return 'Punto $nodeNumber';
+  }
+
+  @override
+  String get panoramaCaptureScreenAb3cfabf =>
+      'Error al subir — comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get panoramaCaptureScreenD0700135 =>
+      'El recorrido debe subirse para que otros puedan verlo.';
+
+  @override
+  String get panoramaCaptureScreen72c7832d =>
+      'Creando una vista de 360° con IA';
+
+  @override
+  String get panoramaCaptureScreenD003cb8f => 'No cierres la pantalla';
+
+  @override
+  String get panoramaCaptureScreenAd3883c5 => 'Mejorar el suelo y el techo';
+
+  @override
+  String get panoramaCaptureScreenA2c1fdee =>
+      'Una panorámica horizontal no tiene techo ni suelo reales. Puedes añadirlos con dos';
+
+  @override
+  String get panoramaCaptureScreenD7c5685a =>
+      'fotos adicionales: una hacia abajo (suelo) y otra hacia arriba (techo). Es opcional.';
+
+  @override
+  String get panoramaCaptureScreen80a413c5 => 'Omitir';
+
+  @override
+  String get panoramaCaptureScreen1dea3904 => 'Mejorar';
+
+  @override
+  String get panoramaCaptureScreenD19efaee =>
+      'Error al subir — comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get panoramaCaptureScreen14d51828 => 'Orientación de la panorámica';
+
+  @override
+  String panoramaCaptureScreen9a48fd71(Object haov, Object vaov) {
+    return 'El barrido cubre aproximadamente $haov° de ancho · $vaov° de alto.';
+  }
+
+  @override
+  String get panoramaCaptureScreen5067aec2 =>
+      'Si el horizonte se ve estirado, ajusta el campo de visión vertical.';
+
+  @override
+  String get panoramaCaptureScreenA7c55a8d => 'Cancelar';
+
+  @override
+  String get panoramaCaptureScreenCf0a5531 => 'Añadir';
+
+  @override
+  String panoramaCaptureScreenFdb5ed3b(Object nodeNumber) {
+    return 'Punto $nodeNumber';
+  }
+
+  @override
+  String get panoramaCaptureScreenA8eed50d =>
+      'Se necesita conexión a internet: la panorámica aún no se ha subido.';
+
+  @override
+  String get panoramaCaptureScreen6a9d0f75 => 'Ordenado';
+
+  @override
+  String get panoramaCaptureScreen58e6f595 =>
+      'Ordena y limpia: mismos muebles, sin desorden';
+
+  @override
+  String get panoramaCaptureScreen459ead47 => 'Día';
+
+  @override
+  String get panoramaCaptureScreenD8673be3 => 'Luz de día natural y brillante';
+
+  @override
+  String get panoramaCaptureScreen33c5e69b => 'Tarde';
+
+  @override
+  String get panoramaCaptureScreen97980be4 => 'Luz de tarde cálida y suave';
+
+  @override
+  String get panoramaCaptureScreen042937b7 => 'Noche';
+
+  @override
+  String get panoramaCaptureScreenEa2edff1 => 'Iluminación nocturna acogedora';
+
+  @override
+  String get panoramaCaptureScreenD83a2d00 =>
+      'Se necesita conexión a internet: el 360 aún no se ha subido.';
+
+  @override
+  String get panoramaCaptureScreen5500a985 => 'Crear una nueva versión del 360';
+
+  @override
+  String get panoramaCaptureScreen0cead38e =>
+      'La IA creará una nueva versión a partir del 360 existente: el mismo espacio exacto, sin modificar el original.';
+
+  @override
+  String panoramaCaptureScreen4c9ebaa8(Object variantLabel) {
+    return '¿Crear una versión «$variantLabel»?';
+  }
+
+  @override
+  String panoramaCaptureScreen4b00b946(
+      Object variantDesc, Object variantLabel) {
+    return 'La IA creará una versión $variantLabel a partir del 360 existente ($variantDesc).';
+  }
+
+  @override
+  String get panoramaCaptureScreenB35f7f9d =>
+      'El original se mantiene y la versión se añadirá como opción. ~1-2 minutos.';
+
+  @override
+  String get panoramaCaptureScreen39a68952 => 'Crear versión';
+
+  @override
+  String get panoramaCaptureScreen0bd7fa52 => 'Comenzando…';
+
+  @override
+  String get panoramaCaptureScreenB43c22a7 =>
+      'No pudimos empezar. Comprueba tu conexión a internet.';
+
+  @override
+  String panoramaCaptureScreenC2459607(Object label) {
+    return 'La IA está generando la versión «$label»… (1-2 minutos)';
+  }
+
+  @override
+  String get panoramaCaptureScreen89984c0b =>
+      'Error al crear la versión. Inténtalo de nuevo.';
+
+  @override
+  String get panoramaCaptureScreenAa1f33f0 =>
+      'La IA está completando el techo, el suelo y cerrando el 360°… (1-2 minutos)';
+
+  @override
+  String get panoramaCaptureScreenFc915d44 =>
+      'Error al completarlo. Inténtalo de nuevo.';
+
+  @override
+  String get panoramaCaptureScreenB0e9d3bb => 'Mejorado ✨';
+
+  @override
+  String get panoramaCaptureScreen8eff85d1 => 'el punto';
+
+  @override
+  String panoramaCaptureScreenF705a69a(Object label, Object nodeName) {
+    return 'Se añadió la versión «$label» a $nodeName: puedes comparar y elegir';
+  }
+
+  @override
+  String get panoramaCaptureScreenC23eaaed =>
+      'No se pudo completar. Inténtalo de nuevo.';
+
+  @override
+  String get panoramaCaptureScreenE95c9328 => 'Vista previa';
+
+  @override
+  String get panoramaCaptureScreen37a89df9 =>
+      'Al menos una versión debe permanecer visible para los inquilinos';
+
+  @override
+  String get panoramaCaptureScreen61ba7a35 =>
+      'La versión se ocultará a los inquilinos 👁️';
+
+  @override
+  String get panoramaCaptureScreen650bbb14 =>
+      'La versión se mostrará a los inquilinos 👁️';
+
+  @override
+  String get panoramaCaptureScreen2fc385cb => 'Nombre del punto';
+
+  @override
+  String get panoramaCaptureScreen6c61aa23 => 'Por ejemplo: salón, cocina';
+
+  @override
+  String get panoramaCaptureScreenC8bdd6d8 => 'Salón';
+
+  @override
+  String get panoramaCaptureScreenF5ed1ccb => 'Cocina';
+
+  @override
+  String get panoramaCaptureScreen9c1d4cb5 => 'Dormitorio';
+
+  @override
+  String get panoramaCaptureScreen86425fcf => 'Balcón';
+
+  @override
+  String get panoramaCaptureScreen9e01255f => 'Baño';
+
+  @override
+  String get panoramaCaptureScreenD8508142 => 'Capturar un recorrido de 360°';
+
+  @override
+  String get panoramaCaptureScreen1eca445a => 'Aún no has añadido puntos';
+
+  @override
+  String get panoramaCaptureScreenD58171d2 => 'Añadir panorámica';
+
+  @override
+  String panoramaCaptureScreen053844ab(Object count) {
+    return 'Guardar recorrido ($count puntos)';
+  }
+
+  @override
+  String get panoramaCaptureScreen775260b6 =>
+      'Añade un punto por habitación: se conectarán en un solo recorrido.\n';
+
+  @override
+  String get panoramaCaptureScreenE9b1d1d9 =>
+      'Toca «Añadir panorámica» abajo. ¿Panorámica parcial? Toca ✨ junto al punto ';
+
+  @override
+  String get panoramaCaptureScreen2a10542a =>
+      'y la IA la completará a un 360° completo (techo, suelo y cierre).';
+
+  @override
+  String panoramaCaptureScreenE9ccd807(Object versionNumber) {
+    return 'Versión $versionNumber';
+  }
+
+  @override
+  String get panoramaCaptureScreenF6d5f6da =>
+      'Mantén pulsado para ocultar a los inquilinos';
+
+  @override
+  String panoramaCaptureScreenA76ca737(Object nodeNumber) {
+    return 'Punto $nodeNumber';
+  }
+
+  @override
+  String get panoramaCaptureScreen0225260e => 'Completando a un 360° completo…';
+
+  @override
+  String get panoramaCaptureScreenC8c52240 =>
+      '360° completo · Arrastra para reordenar';
+
+  @override
+  String get panoramaCaptureScreen230ace13 =>
+      'Parcial · Se puede completar a 360°';
+
+  @override
+  String get panoramaCaptureScreen464c43bd => 'Completar a un 360° completo';
+
+  @override
+  String get panoramaCaptureScreen1fe26eef =>
+      'Crear versión (iluminación / orden)';
+
+  @override
+  String get panoramaCaptureScreen022436d7 => 'Cambiar nombre';
+
+  @override
+  String get panoramaCaptureScreen09b6bcca => 'Eliminar';
+
+  @override
+  String get panoramaCaptureScreenA9c0709b =>
+      'Cómo capturar un recorrido de 360°';
+
+  @override
+  String get panoramaCaptureScreen7f356fd5 =>
+      'Añade un recorrido de 360° real al piso';
+
+  @override
+  String get panoramaCaptureScreenD8b30001 =>
+      '¿Tienes una panorámica de 360°? Súbela desde tu galería. ¿No tienes? Toma una panorámica ';
+
+  @override
+  String get panoramaCaptureScreenE07d1602 =>
+      'normal con el modo panorámico de la cámara (varias habitaciones está bien) y las uniremos ';
+
+  @override
+  String get panoramaCaptureScreen646f9c41 =>
+      'en un solo recorrido. La IA pulirá y cerrará el techo y el suelo en el recorrido real.';
+
+  @override
+  String get panoramaCaptureScreen937dff93 => 'Toma una panorámica';
+
+  @override
+  String get panoramaCaptureScreenFef19f89 =>
+      'Abre el modo Panorámica de la cámara y gira despacio ';
+
+  @override
+  String get panoramaCaptureScreenB8305c59 =>
+      'una vuelta completa en la habitación. Puedes tomar una panorámica de cada habitación.';
+
+  @override
+  String get panoramaCaptureScreen05bd939b => 'Sube y conecta';
+
+  @override
+  String get panoramaCaptureScreenE2a1867b =>
+      'Sube las panorámicas desde tu galería: si hay varias, se conectarán en un recorrido ';
+
+  @override
+  String get panoramaCaptureScreenD063c9f0 =>
+      'por el que se puede caminar entre las habitaciones.';
+
+  @override
+  String get panoramaCaptureScreen66a982e7 => 'Retoque con IA (opcional)';
+
+  @override
+  String get panoramaCaptureScreenEf21ffb3 =>
+      'En el recorrido real puedes activar una IA que complete el techo y el suelo, limpie ';
+
+  @override
+  String get panoramaCaptureScreen920edc38 =>
+      'y sugiera una versión de iluminación, sin inventar habitaciones.';
+
+  @override
+  String get panoramaCaptureScreenA1494fbb =>
+      'Capturar en la app (próximamente)';
+
+  @override
+  String get panoramaCaptureScreen07586a4c => 'Unir en una sola imagen';
+
+  @override
+  String get panoramaCaptureScreenB75f8588 =>
+      'Puedes elegir varias panorámicas: se conectarán en un solo recorrido';
+
+  @override
+  String get panoramaCaptureScreen327cb6de =>
+      'Subir panorámicas desde la galería';
+
+  @override
+  String get profileScreenC157595f => 'Eliminar cuenta';
+
+  @override
+  String get profileScreenE36a3231 =>
+      'Esta acción eliminará permanentemente tu cuenta y todos tus datos. Esta acción no se puede deshacer.';
+
+  @override
+  String get profileScreenA7c55a8d => 'Cancelar';
+
+  @override
+  String get profileScreen7f088d47 => 'Eliminar cuenta';
+
+  @override
+  String get profileScreenC42327c3 =>
+      'Contraseña incorrecta. Vuelve a intentar eliminar tu cuenta.';
+
+  @override
+  String get profileScreen1b956723 =>
+      'Por motivos de seguridad, vuelve a iniciar sesión y luego elimina tu cuenta.';
+
+  @override
+  String get profileScreen333bc31f => 'Confirmar eliminación';
+
+  @override
+  String get profileScreenA86fe9b7 =>
+      'Por motivos de seguridad, introduce tu contraseña para completar la eliminación de la cuenta.';
+
+  @override
+  String get profileScreen0b490b5e => 'Contraseña';
+
+  @override
+  String get profileScreen98225d9b => 'Cerrar sesión';
+
+  @override
+  String get profileScreen57f87b60 => '¿Seguro que quieres cerrar sesión?';
+
+  @override
+  String get profileScreenB939061e => 'Salir';
+
+  @override
+  String get profileScreenBba6fed3 => 'Mi perfil';
+
+  @override
+  String get profileScreenC6d4a01f => 'Agregar nombre';
+
+  @override
+  String get profileScreenC4b9553a => 'Inquilino';
+
+  @override
+  String get profileScreenA5545289 => 'Progreso de mi perfil';
+
+  @override
+  String get profileScreen38bf5edd => 'Me gusta';
+
+  @override
+  String get profileScreen61f6102d => 'Coincidencias';
+
+  @override
+  String get profileScreen2d3a2bbf => 'Omitidos';
+
+  @override
+  String get profileScreen47cfdefb => 'Configuración';
+
+  @override
+  String get profileScreen0ee38ad3 => 'Presupuesto máximo';
+
+  @override
+  String get profileScreen59655c38 => 'Agregar presupuesto';
+
+  @override
+  String get profileScreen4f4cd24f => 'Número de habitaciones';
+
+  @override
+  String get profileScreen4dd6d196 => 'Agregar número de habitaciones';
+
+  @override
+  String profileScreenAcbce023(Object rooms) {
+    return '$rooms habitaciones';
+  }
+
+  @override
+  String get profileScreen1399cd87 => 'Fecha de entrada';
+
+  @override
+  String get profileScreen7448c23e => 'Agregar fecha de entrada';
+
+  @override
+  String get profileScreen55578847 => 'Sobre mí';
+
+  @override
+  String get profileScreen39fe2593 => 'Editar';
+
+  @override
+  String profileScreen5a82f3ec(Object budget, Object rooms) {
+    return 'Presupuesto hasta $budget • $rooms habitaciones';
+  }
+
+  @override
+  String get profileScreenE1ea2811 => 'Perfil';
+
+  @override
+  String get profileScreen4343d576 => 'Agente inmobiliario';
+
+  @override
+  String get profileScreen71bf8698 => 'Actualizar a PRO';
+
+  @override
+  String get profileScreen44721f36 =>
+      'Actualiza a Rently PRO para obtener datos en vivo más completos, coincidencias ilimitadas y más funciones avanzadas.';
+
+  @override
+  String get profileScreen95ef5abd => '¡Esta función estará disponible pronto!';
+
+  @override
+  String get profileScreenD46cea8d => 'Actualizar ahora';
+
+  @override
+  String get profileScreen6aa35146 => 'Datos de la cuenta';
+
+  @override
+  String get profileScreenD24cae31 => 'Mis propiedades · Compartir enlace';
+
+  @override
+  String get profileScreen325e6814 => 'Marca y plantillas';
+
+  @override
+  String get profileScreen48918f07 => 'Notificaciones móviles';
+
+  @override
+  String get profileScreen8b61b51f =>
+      'Recibe actualizaciones en tiempo real en tu dispositivo';
+
+  @override
+  String get profileScreen69129dd5 => 'Soporte y ayuda';
+
+  @override
+  String get profileScreenA6866ac6 => 'Centro de ayuda y guías';
+
+  @override
+  String get profileScreenB2dfd8d3 =>
+      'Preguntas frecuentes y artículos de soporte';
+
+  @override
+  String get profileScreen2d8ad04f => 'Contactar con soporte';
+
+  @override
+  String get profileScreen3a95de8e =>
+      'Estamos aquí para ayudarte las 24 horas, los 7 días';
+
+  @override
+  String get profileScreenE3467f8d => 'Términos de uso y política';
+
+  @override
+  String get profileScreenC281b27a =>
+      'Acuerdo de uso y protección de la privacidad';
+
+  @override
+  String get profileScreen098791db => 'Propietario';
+
+  @override
+  String get profileScreenE2a5bbff => 'No conectado';
+
+  @override
+  String get profileScreen8f262efa =>
+      'Logo añadido. No se detectaron colores claros; puedes elegir una paleta manualmente.';
+
+  @override
+  String get profileScreenE174e0f8 =>
+      'Logo añadido y colores detectados a partir de la imagen.';
+
+  @override
+  String get profileScreenF1546a8a => 'No se pudo leer el archivo del logo.';
+
+  @override
+  String get profileScreenE735a48b =>
+      'La marca y las plantillas solo están disponibles para cuentas de agente inmobiliario.';
+
+  @override
+  String get profileScreen85ff8164 => 'Página de la propiedad';
+
+  @override
+  String get profileScreenE537a4bf => 'Chats';
+
+  @override
+  String get profileScreen41048395 => 'Colores';
+
+  @override
+  String get profileScreen7fc76d74 => 'Logo';
+
+  @override
+  String get profileScreenCec705ac => 'Detectando colores...';
+
+  @override
+  String get profileScreenFf919bb4 => 'Logo de la oficina';
+
+  @override
+  String get profileScreenCaefa344 =>
+      'Aplicado a las plantillas de propiedad y chat';
+
+  @override
+  String get profileScreenB5a8875e => 'No seleccionado';
+
+  @override
+  String get profileScreen1426bd1d =>
+      'Para desactivar las notificaciones, ve a Ajustes del dispositivo → Rently → Notificaciones.';
+
+  @override
+  String get profileScreenB4adfb38 =>
+      'Las notificaciones están bloqueadas. Puedes activarlas desde Ajustes del dispositivo → Rently → Notificaciones.';
+
+  @override
+  String get profileScreenC4ea00be => 'Color principal del tema';
+
+  @override
+  String get profileScreenF48e9723 => 'Idioma de la aplicación';
+
+  @override
+  String get profileScreen53f730a2 =>
+      'Define un presupuesto cómodo para tu búsqueda de apartamento';
+
+  @override
+  String get profileScreenAceccce7 => 'Por ejemplo: 5.000';
+
+  @override
+  String get profileScreen3cea2aff => 'Número de habitaciones deseado';
+
+  @override
+  String get profileScreen4b363fac =>
+      'Elige el número de habitaciones que deseas en el apartamento';
+
+  @override
+  String get profileScreen894cf122 => 'Fecha de entrada deseada';
+
+  @override
+  String get profileScreen03a71964 =>
+      'Elige cuándo te gustaría mudarte al nuevo apartamento';
+
+  @override
+  String profileScreen2e708e78(Object date) {
+    return 'Fecha exacta · $date';
+  }
+
+  @override
+  String get profileScreen0db427ca => 'Elegir fecha exacta';
+
+  @override
+  String get profileScreenE6932339 => 'Guardar';
+
+  @override
+  String get profileScreen0d9638f2 =>
+      'Elimina tu cuenta e información de forma permanente';
+
+  @override
+  String get roomScanFlow9049b05d => 'Escaneo 3D de habitaciones';
+
+  @override
+  String get roomScanFlow0d99078b =>
+      'Escanea habitación por habitación. Cada habitación se guarda en alta calidad, y todas están ';
+
+  @override
+  String get roomScanFlowE7aea75e =>
+      'conectadas entre sí en un recorrido 3D del apartamento.';
+
+  @override
+  String get roomScanFlowDf2e3b66 =>
+      'Aún no se ha escaneado ninguna habitación';
+
+  @override
+  String get roomScanFlow47a4cbbf => 'Toca \"Añadir habitación\" para empezar';
+
+  @override
+  String get roomScanFlow5a5e46b8 => 'Añadir habitación';
+
+  @override
+  String roomScanFlow6b609163(Object count) {
+    return 'Listo ($count habitaciones)';
+  }
+
+  @override
+  String get roomScanFlowDcc3a16f => 'Listo para ver';
+
+  @override
+  String get roomScanFlowA30bf1a9 => 'Escaneado';
+
+  @override
+  String get roomScanFlow750be052 => 'Ver';
+
+  @override
+  String get roomScanFlow7c8173fa => 'Eliminar';
+
+  @override
+  String get roomScanFlowA78ba1c3 =>
+      'El escaneo rápido falló. Puedes probar el escaneo con video en su lugar.';
+
+  @override
+  String get roomScanFlowDd0b1d27 =>
+      'No se pudo construir la habitación. Intenta grabar otro video con buena luz, caminando ';
+
+  @override
+  String get roomScanFlow9aebce63 =>
+      'lentamente por la habitación — no gires en el mismo sitio.';
+
+  @override
+  String roomScanFlow48cddcd0(Object number) {
+    return 'Habitación $number';
+  }
+
+  @override
+  String get roomScanFlow22b2a582 => 'El escaneo continúa en segundo plano';
+
+  @override
+  String get roomScanFlow26ddb26d =>
+      'Construir la habitación está tardando un poco más. Puedes continuar — añadiremos la habitación a la propiedad ';
+
+  @override
+  String get roomScanFlowE50dd7a2 =>
+      'automáticamente en cuanto esté lista, incluso si sales de esta pantalla.';
+
+  @override
+  String get roomScanFlow5e9909a0 => 'Entendido';
+
+  @override
+  String get roomScanFlowC1053462 => 'Esta función estará disponible pronto';
+
+  @override
+  String get roomScanFlow3b8e87c3 =>
+      'El escaneo 3D aún no está activo en esta cuenta. Pronto podrás escanear ';
+
+  @override
+  String get roomScanFlow824a4b58 =>
+      'el apartamento habitación por habitación.';
+
+  @override
+  String get roomScanFlow87e9bce3 => '¿Cómo quieres escanear la habitación?';
+
+  @override
+  String get roomScanFlow6e238cd1 => 'Escaneo rápido (iPhone Pro)';
+
+  @override
+  String get roomScanFlowD9e43328 =>
+      'Mueve el teléfono lentamente por la habitación. Listo en unos segundos.';
+
+  @override
+  String get roomScanFlow814b4b51 => 'Escaneo con video (avanzado)';
+
+  @override
+  String get roomScanFlow480cd36b =>
+      'Graba un video mientras caminas lentamente por la habitación, y nosotros construimos ';
+
+  @override
+  String get roomScanFlow161d5837 =>
+      'en 3D. La calidad depende de la grabación — te guiaremos paso a paso.';
+
+  @override
+  String get roomScanFlowFea48952 =>
+      'Este dispositivo no admite el escaneo rápido. Puedes escanear con video.';
+
+  @override
+  String get roomScanFlowA143b471 =>
+      'Ya hay un escaneo en curso. Inténtalo de nuevo en un momento.';
+
+  @override
+  String get roomScanFlow666d07c4 =>
+      'El escaneo rápido falló. Puedes intentarlo de nuevo o escanear con video.';
+
+  @override
+  String get roomScanFlow0456e9f5 =>
+      'No se pudo abrir la cámara. Verifica que hayas concedido acceso a la cámara e inténtalo de nuevo.';
+
+  @override
+  String get roomScanFlow07c6ea97 =>
+      'No se pudo iniciar la grabación. Inténtalo de nuevo y verifica que tu teléfono tenga espacio libre.';
+
+  @override
+  String get roomScanFlow2e7c798b =>
+      'No se pudo guardar el video. Intenta grabar de nuevo.';
+
+  @override
+  String get roomScanFlow8c634e7d => 'Inténtalo de nuevo';
+
+  @override
+  String get roomScanFlow10a2352b => 'Atrás';
+
+  @override
+  String get roomScanFlow6adc6ba3 => 'Graba mientras caminas lentamente';
+
+  @override
+  String get roomScanFlowE75f74eb =>
+      'Sigue caminando lentamente por la habitación — no gires en el mismo sitio';
+
+  @override
+  String get roomScanFlowB47f0996 =>
+      'Camina lentamente alrededor de la habitación y los muebles. ';
+
+  @override
+  String get roomScanFlow31a6628a =>
+      'No gires en el mismo sitio. Unos 10–40 segundos, con buena luz.';
+
+  @override
+  String get roomScanFlowA4e445a8 => 'Más despacio';
+
+  @override
+  String get roomScanFlow38abfe79 => 'Listo para grabar';
+
+  @override
+  String roomScanFlow1378e918(Object seconds) {
+    return 'Continúa un poco más (al menos $seconds segundos)';
+  }
+
+  @override
+  String get roomScanFlow61451131 =>
+      'Cómo grabar un buen escaneo de habitación';
+
+  @override
+  String get roomScanFlow2b81583a =>
+      'Escaneo avanzado. La calidad depende de la grabación — tómate tu tiempo.';
+
+  @override
+  String get roomScanFlow1850a1a2 =>
+      'Camina lentamente por la habitación — ¡no gires en el mismo sitio!';
+
+  @override
+  String get roomScanFlowDff3d215 =>
+      'Camina alrededor de la habitación y los muebles. ';
+
+  @override
+  String get roomScanFlow0547a915 =>
+      'Girar en el mismo sitio (como en una panorámica) arruina el resultado 3D.';
+
+  @override
+  String get roomScanFlow0bbdefc1 =>
+      'Recorre la habitación y los muebles — graba desde varios ángulos';
+
+  @override
+  String get roomScanFlowBacd6c42 =>
+      'Mantén superposición — movimiento continuo y lento, sin saltos';
+
+  @override
+  String get roomScanFlow9486adab =>
+      'Buena iluminación, sin movimientos rápidos';
+
+  @override
+  String get roomScanFlow1950d47d =>
+      'Duración de la grabación: entre 10 y 40 segundos aproximadamente';
+
+  @override
+  String get roomScanFlow308645b1 => 'Entendido, empecemos';
+
+  @override
+  String get roomScanFlowA7c55a8d => 'Cancelar';
+
+  @override
+  String get roomScanFlow99a47392 => 'Subiendo el video…';
+
+  @override
+  String get roomScanFlow01b0a145 => 'Preparando el video…';
+
+  @override
+  String get roomScanFlow9f0b5118 =>
+      'No se pudo preparar el video — inténtalo de nuevo.';
+
+  @override
+  String get roomScanFlow7544bafb => 'Algo salió mal. Inténtalo de nuevo.';
+
+  @override
+  String get roomScanFlowAdcb2cfd =>
+      'La subida caducó. Inténtalo de nuevo — esta vez se subirá más rápido.';
+
+  @override
+  String get roomScanFlowE70ac353 =>
+      'Ocurrió un problema del servidor durante la subida. Inténtalo de nuevo en un momento.';
+
+  @override
+  String get roomScanFlow26def34f =>
+      'La subida falló por un problema de conexión. Verifica tu internet e inténtalo de nuevo.';
+
+  @override
+  String get roomScanFlow300d9689 => 'Esta función estará disponible pronto.';
+
+  @override
+  String get roomScanFlow00bc930c =>
+      'El servicio no está disponible en este momento. Inténtalo de nuevo en unos minutos — tu grabación está bien.';
+
+  @override
+  String get roomScanFlow759375ce =>
+      'Construyendo la habitación en 3D… unos minutos';
+
+  @override
+  String get roomScanFlow896799e7 => 'Casi listo…';
+
+  @override
+  String get roomScanFlow898d60f3 => 'Fallido';
+
+  @override
+  String get roomScanFlow8ee8ef51 =>
+      'El escaneo continúa en segundo plano — puedes salir de esta pantalla. ';
+
+  @override
+  String get roomScanFlow0014a7cc =>
+      'El modelo aparecerá en la propiedad cuando esté listo (unos minutos).';
+
+  @override
+  String get roomScanFlowB412b4d4 =>
+      'Puedes dejar esta pantalla abierta. Te avisaremos cuando esté listo.';
+
+  @override
+  String get roomScanFlow5ebf63d5 => 'Continuar en segundo plano';
+
+  @override
+  String get roomScanFlowDb00bbc5 => 'Antes de empezar a escanear';
+
+  @override
+  String get roomScanFlow72a231e3 =>
+      'El escaneo filma el interior del apartamento. Se mostrará a los inquilinos interesados ';
+
+  @override
+  String get roomScanFlow4181010d =>
+      'y puede quedar almacenado por nosotros. No filmes documentos personales ni cosas que ';
+
+  @override
+  String get roomScanFlow3998aa13 => 'no quieras mostrar.';
+
+  @override
+  String get roomScanFlow86690080 => 'Entendido, empecemos';
+
+  @override
+  String get roomScanFlow98c8a5b8 => 'Ahora no';
+
+  @override
+  String get roomScanFlowC8bdd6d8 => 'Sala de estar';
+
+  @override
+  String get roomScanFlowF5ed1ccb => 'Cocina';
+
+  @override
+  String get roomScanFlow9c1d4cb5 => 'Dormitorio';
+
+  @override
+  String get roomScanFlow76fd685b => 'Habitación infantil';
+
+  @override
+  String get roomScanFlow9e01255f => 'Baño';
+
+  @override
+  String get roomScanFlow86425fcf => 'Balcón';
+
+  @override
+  String get roomScanFlow71b2324b => 'Comedor';
+
+  @override
+  String get roomScanFlow0744519a => 'Pasillo';
+
+  @override
+  String get roomScanFlow28944cb8 => '¿Cómo quieres llamar a la habitación?';
+
+  @override
+  String get roomScanFlow3e705bfd => 'O escribe otro nombre';
+
+  @override
+  String get roomScanFlowE6932339 => 'Guardar';
+
+  @override
+  String get roomScanFlow463d28e8 => 'Habitación';
 }
