@@ -1687,6 +1687,19 @@ export const handler = async (event) => {
             return json(200, { items: [], hasMore: false, lastKey: null });
           }
         }
+        // Same IDOR class, different door: the ?status=… GSI query path (used
+        // by the public tenant feed for status=active) has NO owner scoping at
+        // all — unlike the ?ownerUserId=… path just above. Querying any
+        // non-public status (draft/paused/removed/rented) let ANY authenticated
+        // caller bulk-page through every landlord's private/unpublished
+        // listings, up to 500 per request. Only 'active' may be queried without
+        // proving ownership; any other status requires ?ownerUserId=<callerUid>
+        // (already enforced above) to even reach this point.
+        if (tableKey === 'properties' && query.status && query.status !== 'active') {
+          if (!query.ownerUserId) {
+            return json(200, { items: [], hasMore: false, lastKey: null });
+          }
+        }
         {
           const listed = await listItems(table, query);
           // Attach server-side ranking signals to each property so the client can
@@ -1768,13 +1781,29 @@ export const handler = async (event) => {
         // tags + enrichment + instant saved-search alerts run exactly once. All
         // of this is fail-soft: an enrichment hiccup never blocks the publish.
         let isNewListing = false;
+        let existingItem = null;
         if (tableKey === 'properties' && writeId) {
           try {
             const existing = await ddb.send(new GetCommand({
               TableName: table.name, Key: { id: writeId },
             }));
-            isNewListing = !existing.Item;
+            existingItem = existing.Item || null;
+            isNewListing = !existingItem;
           } catch { /* lookup failed → treat as existing/edit: fail CLOSED for enrichment (don't re-enrich/re-alert an edit) AND fail OPEN for the paywall (never block a legit edit or 500 a publish — the Phase-3 cron reconciles any listing that slips through) */ isNewListing = false; }
+          // POST had NO ownership check at all — unlike PUT/DELETE, which both
+          // reject a caller that doesn't own an EXISTING row. Since the client
+          // always upserts via the same call for create-or-edit, a POST whose
+          // id happens to already exist (a guessed/known id, or a genuine
+          // update sent as POST) must be gated exactly like PUT: an existing
+          // row with a different owner is FORBIDDEN, never silently re-parented
+          // by stampOwner. Only a genuinely-new (no existing row) write skips
+          // this, since there is no owner to conflict with yet.
+          if (existingItem) {
+            const existingOwner = existingItem.ownerUserId;
+            if (existingOwner && existingOwner !== callerUid) {
+              return json(403, { message: 'Forbidden' });
+            }
+          }
           if (isNewListing) {
             // PAYWALL: a landlord may keep 3 active properties free; the 4th
             // needs an active subscription. Authoritative server-side gate (the
@@ -1793,7 +1822,8 @@ export const handler = async (event) => {
           }
         }
 
-        const written = await putItem(table, writeId, body);
+        const written = await putItem(table, writeId, body,
+          tableKey === 'properties' ? { preserveFrom: existingItem } : undefined);
         // SCALE: keep the denormalized popularity counter on the property row
         // current with an atomic ADD, so the feed never has to COUNT-query.
         if (written.statusCode === 200 &&
@@ -1819,12 +1849,27 @@ export const handler = async (event) => {
         // line) unconditionally forces body.ownerUserId to the CALLER, so an
         // unguarded PUT would silently re-parent another landlord's listing
         // to the attacker instead of just failing. Same check DELETE uses.
+        let existingProperty = null;
         if (tableKey === 'properties' && id) {
           const existing = await ddb.send(
             new GetCommand({ TableName: table.name, Key: { id } }),
           );
-          const owner = existing.Item?.ownerUserId;
+          existingProperty = existing.Item || null;
+          const owner = existingProperty?.ownerUserId;
           if (owner && owner !== callerUid) return json(403, { message: 'Forbidden' });
+          // A property the billing cron paused for exceeding the free-tier
+          // limit (pausedByBilling set) must NOT be silently reactivated by an
+          // ordinary edit — the client's RentalProperty always sends
+          // status:'active' by default (property_repository.dart), so any
+          // routine price/description edit on a billing-paused listing would
+          // otherwise flip it straight back to active, bypassing the paywall
+          // entirely. Still allow moving it to 'removed'/'draft'/'paused' —
+          // only block resurrecting it to 'active'/'rented'.
+          if (existingProperty?.pausedByBilling &&
+              (body.status === 'active' || body.status === 'rented' || body.status == null)) {
+            body.status = 'paused';
+            body.pausedByBilling = existingProperty.pausedByBilling;
+          }
         }
         stampOwner(tableKey, body, callerUid);
         // For users & persona the row id IS the uid — never let a caller PUT to
@@ -1836,7 +1881,8 @@ export const handler = async (event) => {
         if (tableKey === 'persona') {
           return await putPersonaVersioned(table, writeId, body);
         }
-        return await putItem(table, writeId, body);
+        return await putItem(table, writeId, body,
+          tableKey === 'properties' ? { preserveFrom: existingProperty } : undefined);
       }
       case 'DELETE':
         return await deleteItem(table, tableKey, id, callerUid);
@@ -2942,9 +2988,56 @@ function parseCursor(cursor) {
   }
 }
 
-async function putItem(table, id, body) {
+// Server-computed properties fields the client's RentalProperty model never
+// round-trips (embedding/smartTags/priceBadge/etc. — see enrichListingOnCreate
+// — plus boost/ranking fields written by separate targeted UpdateCommands).
+// Every property write is a full PutCommand replace, so without this, ANY
+// client edit silently deletes them: an edited listing drops out of semantic
+// search entirely (embedding gone), loses a paid boost, its price-badge, etc.
+const PROPERTY_SERVER_ONLY_FIELDS = [
+  'embedding', 'embeddingDim', 'embeddingModel',
+  'gush', 'helka', 'smartTags', 'neighborhoodScore', 'priceBadge',
+  'boostedUntil', 'boostTier', 'rankFeatures', 'abVariant',
+];
+
+// Ed25519 SPKI DER prefix (RFC 8410) — Node's crypto module needs a full SPKI
+// key, but the client (lib/core/services/signature_service.dart) only ever
+// shares the raw 32-byte public key. Wrapping it in this fixed prefix is the
+// standard way to hand a raw Ed25519 key to Node's crypto.createPublicKey.
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+
+// Verifies a contract signature the same way SignatureService.verify() does
+// client-side (Ed25519 over a base64 SHA-256 hash) — see contractSign, which
+// previously stored whatever `sig` blob the client posted with NO
+// cryptographic check at all, making "signed" purely client-side theater.
+function verifyContractSignature(signedHashBase64, signatureBase64, publicKeyBase64) {
+  try {
+    const rawKey = Buffer.from(String(publicKeyBase64 || ''), 'base64');
+    if (rawKey.length !== 32) return false;
+    const publicKey = crypto.createPublicKey({
+      key: Buffer.concat([ED25519_SPKI_PREFIX, rawKey]),
+      format: 'der', type: 'spki',
+    });
+    const message = Buffer.from(String(signedHashBase64 || ''), 'base64');
+    const signature = Buffer.from(String(signatureBase64 || ''), 'base64');
+    if (!message.length || !signature.length) return false;
+    return crypto.verify(null, message, publicKey, signature);
+  } catch {
+    return false;
+  }
+}
+
+async function putItem(table, id, body, opts) {
   if (!id) return json(400, { message: 'Missing id' });
   const item = { ...body, id };
+  const preserveFrom = opts?.preserveFrom;
+  if (preserveFrom) {
+    for (const field of PROPERTY_SERVER_ONLY_FIELDS) {
+      if (item[field] === undefined && preserveFrom[field] !== undefined) {
+        item[field] = preserveFrom[field];
+      }
+    }
+  }
   coerceGsiKeyTypes(table, item);
   await ddb.send(new PutCommand({ TableName: table.name, Item: item }));
   return json(200, item);
@@ -6386,6 +6479,18 @@ async function contractCreate(event) {
       return json(403, { message: 'Forbidden' });
     }
   }
+  // A second POST with the same id was a plain PutCommand with no existence/
+  // state check — anyone able to call this endpoint again for an id that's
+  // already SIGNED could silently overwrite the agreed terms (price, deposit,
+  // duration) while the contract still reads as "signed", since signatures
+  // aren't invalidated on overwrite either. Once a contract has ANY signature,
+  // it's immutable via this route — create a new contract instead of editing.
+  const priorForId = await ddb.send(new GetCommand({
+    TableName: CONTRACTS_TABLE, Key: { id },
+  }));
+  if (priorForId.Item?.landlordSignature || priorForId.Item?.tenantSignature) {
+    return json(409, { message: 'Contract already signed — cannot be modified.' });
+  }
   const now = new Date().toISOString();
   const item = { ...body, id, createdAt: body.createdAt || now, updatedAt: now };
   await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
@@ -6473,21 +6578,43 @@ async function contractSign(event, cid) {
   if (role === 'tenant' && item.tenantUserId !== uid) {
     return json(403, { message: 'not the tenant of this contract' });
   }
+  // Previously accepted ANY sig blob the client posted with zero
+  // cryptographic verification — "signed" was purely a client-side claim.
+  // Now: (1) the signature must actually be a valid Ed25519 signature by the
+  // claimed public key, and (2) it must be over THIS contract's own
+  // content hash (set once at creation, now immutable post-signature — see
+  // contractCreate's CAS guard), not some other/stale value the client hands
+  // us — otherwise a party could "sign" terms that were later changed.
+  const signedHash = String(sig.signedHash || '');
+  if (!signedHash || signedHash !== item.contentHash) {
+    return json(400, { message: 'signedHash does not match the contract content' });
+  }
+  if (!verifyContractSignature(signedHash, sig.signature, sig.publicKey)) {
+    return json(400, { message: 'invalid signature' });
+  }
   sig.signerUserId = uid; // the backend records who actually signed
-  if (role === 'landlord') item.landlordSignature = sig;
-  else item.tenantSignature = sig;
-  if (item.landlordSignature && item.tenantSignature) item.status = 'signed';
-  item.updatedAt = new Date().toISOString();
-  await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: item }));
+  // Re-fetch immediately before write to shrink (not eliminate without a
+  // transactional CAS) the window where both parties signing near-
+  // simultaneously could clobber each other's just-written signature with a
+  // stale full-item PutCommand.
+  const fresh = await ddb.send(new GetCommand({
+    TableName: CONTRACTS_TABLE, Key: { id: cid },
+  }));
+  const latest = fresh.Item || item;
+  if (role === 'landlord') latest.landlordSignature = sig;
+  else latest.tenantSignature = sig;
+  if (latest.landlordSignature && latest.tenantSignature) latest.status = 'signed';
+  latest.updatedAt = new Date().toISOString();
+  await ddb.send(new PutCommand({ TableName: CONTRACTS_TABLE, Item: latest }));
 
   // Contract signed → tell the OTHER party that this signer just signed.
   // Fire-and-forget; never blocks the response. The body distinguishes a
   // fully-signed contract from one still awaiting the counterpart's signature.
-  const other = role === 'landlord' ? item.tenantUserId : item.landlordUserId;
+  const other = role === 'landlord' ? latest.tenantUserId : latest.landlordUserId;
   const signerName = (sig.signerName
-    || (role === 'landlord' ? item.landlordName : item.tenantName) || 'הצד השני');
+    || (role === 'landlord' ? latest.landlordName : latest.tenantName) || 'הצד השני');
   if (other && other !== uid) {
-    const fullySigned = item.status === 'signed';
+    const fullySigned = latest.status === 'signed';
     await notify(
       other,
       'contract_signed',
@@ -6498,7 +6625,7 @@ async function contractSign(event, cid) {
       { contractId: String(cid) },
     );
   }
-  return json(200, { item });
+  return json(200, { item: latest });
 }
 
 async function contractCancel(event, cid) {
