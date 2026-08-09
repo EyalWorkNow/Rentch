@@ -2734,6 +2734,10 @@ class DatingProvider extends ChangeNotifier {
     return _firebaseAuthOrNull?.currentUser != null;
   }
 
+  // Bumped every time a REAL (non-anonymous) sign-in binds successfully — see
+  // _ensureAnonymousFirebaseSession for why this exists.
+  int _authGeneration = 0;
+
   FirebaseAuth? get _firebaseAuthOrNull {
     if (Firebase.apps.isEmpty) return null;
     try {
@@ -2746,6 +2750,21 @@ class DatingProvider extends ChangeNotifier {
   Future<void> _ensureAnonymousFirebaseSession() async {
     final auth = _firebaseAuthOrNull;
     if (auth == null) return;
+    // BUG THIS GUARDS AGAINST: this call is fire-and-forget from guest mode /
+    // cold start and can still be in flight (native signInAnonymously has no
+    // real cancellation) when the user completes a REAL sign-in (Google/email)
+    // in the meantime. Firebase's signInAnonymously() unconditionally replaces
+    // currentUser on success — so a stale anonymous call landing AFTER a real
+    // sign-in silently swaps the active session back to a fresh anonymous UID.
+    // Every subsequent network call mints its JWT from currentUser at request
+    // time, so uploads (e.g. new properties) get stamped under that orphan
+    // anonymous UID while the app's local state still shows the real user's
+    // data — properties then vanish on the next server-truth reload. Fix:
+    // snapshot the auth generation before waiting, and if a real sign-in bound
+    // while we waited, discard this stale anonymous session immediately —
+    // signed-out-and-401ing on the next call is a visible, recoverable failure,
+    // unlike silently writing data under the wrong owner.
+    final genBefore = _authGeneration;
     try {
       if (auth.currentUser == null) {
         // 10-second cap: on a slow/offline simulator signInAnonymously can
@@ -2754,6 +2773,9 @@ class DatingProvider extends ChangeNotifier {
         await auth
             .signInAnonymously()
             .timeout(const Duration(seconds: 10));
+        if (_authGeneration != genBefore) {
+          await auth.signOut();
+        }
       }
     } catch (_) {}
   }
@@ -2994,6 +3016,10 @@ class DatingProvider extends ChangeNotifier {
     final previousOwnerUserId = _currentOwnerUserId;
     final uid = _firebaseAuthOrNull?.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
+    // Every caller of this function binds a REAL sign-in (Google/email/
+    // session-restore, never anonymous) — bump so any anonymous session still
+    // in flight from earlier knows to discard itself if it lands afterward.
+    _authGeneration++;
 
     // Load the user's EXISTING profile from the backend first, so a returning
     // user gets their saved data instead of a fresh local default (and so we
