@@ -1237,7 +1237,15 @@ class RentalProperty {
     final parsedEntryDate = json['entryDate']?.toString() ?? '';
     final parsedTransactionType =
         _parseTransactionType(json['transactionType']);
-    final parsedVirtualTour = _parseVirtualTour(json['virtualTour']);
+    // A legacy pre-virtualTour schema (still written by aws/lambda/tour-
+    // notifier's cron via a flat UpdateExpression: tourStatus/tourViewerUrl,
+    // never the nested object) left some rows with the tour genuinely marked
+    // ready server-side but json['virtualTour'] empty/absent — the tour could
+    // never show as ready client-side, silently and permanently, even though
+    // both sides believed they'd done their job. Fall back to reconstructing
+    // it from the flat fields when the nested blob has nothing.
+    final parsedVirtualTour =
+        _parseVirtualTour(json['virtualTour']) ?? _virtualTourFromFlatFields(json);
     final parsedModel3d = _parseModel3d(json['model3d']);
 
     // Record status (write path stores `status`; model exposes `isActive`). A
@@ -1299,13 +1307,20 @@ class RentalProperty {
       isActive: resolvedActive,
       designTemplate: json['designTemplate']?.toString() ?? '',
       designAccent: _optionalInt(json['designAccent']) ?? 0,
+      // A genuinely missing createdAt used to fall back to a FABRICATED date
+      // (hash-derived, 0-29 days old) — ~27% of legacy rows with no real
+      // timestamp landed inside the 252h isNewListing window purely by hash
+      // coincidence, showing a "New" badge and an inflated freshness/recency
+      // score for listings that could be years old. isNewListing and every
+      // recency-scoring call site already handle createdAt == null correctly
+      // (treat as unknown → not new / neutral fallback), so leave it null
+      // instead of inventing a plausible-looking lie.
       createdAt: _optionalDate(
-            json['createdAt'] ??
-                json['postedAt'] ??
-                json['uploadedAt'] ??
-                json[r'$createdAt'],
-          ) ??
-          _generateDeterministicMockDate(json['id']?.toString() ?? ''),
+        json['createdAt'] ??
+            json['postedAt'] ??
+            json['uploadedAt'] ??
+            json[r'$createdAt'],
+      ),
       boostedUntil: _optionalDate(json['boostedUntil']),
       boostTier: _parseBoostTier(json['boostTier']),
       priceBadge: MarketPriceBadge.fromJson(json['priceBadge']),
@@ -3232,6 +3247,26 @@ PropertyVirtualTour? _parseVirtualTour(Object? value) {
   return null;
 }
 
+// Reconstructs a tour from the legacy flat tourStatus/tourViewerUrl/
+// tourProvider fields when the nested virtualTour blob is empty — see the
+// call site in fromJson for why this schema still needs to be tolerated.
+PropertyVirtualTour? _virtualTourFromFlatFields(Map<String, dynamic> json) {
+  final statusRaw = json['tourStatus']?.toString();
+  final viewerUrl = json['tourViewerUrl']?.toString() ?? '';
+  if (statusRaw == null || statusRaw.isEmpty) return null;
+  final status = PropertyTourStatus.values.firstWhere(
+    (s) => s.name == statusRaw,
+    orElse: () => PropertyTourStatus.none,
+  );
+  if (status == PropertyTourStatus.none && viewerUrl.isEmpty) return null;
+  return PropertyVirtualTour(
+    id: json['tourEid']?.toString() ?? json['id']?.toString() ?? '',
+    provider: json['tourProvider']?.toString() ?? '',
+    status: status,
+    viewerUrl: viewerUrl,
+  );
+}
+
 PropertyModel3d? _parseModel3d(Object? value) {
   if (value == null) return null;
   if (value is Map<String, dynamic>) {
@@ -3419,15 +3454,6 @@ DateTime? _optionalDate(Object? value) {
         asEpoch >= 1000000000000 ? asEpoch : asEpoch * 1000);
   }
   return DateTime.tryParse(s);
-}
-
-DateTime _generateDeterministicMockDate(String id) {
-  final hash = id.hashCode.abs();
-  // Distribute the listing age between 0 and 29 days.
-  // If hash % 30 < 8, age is < 8 days, which is within the 10.5 days window.
-  final daysAgo = hash % 30;
-  final hoursAgo = hash % 24;
-  return DateTime.now().subtract(Duration(days: daysAgo, hours: hoursAgo));
 }
 
 bool _asBoolFlag(Object? value) {

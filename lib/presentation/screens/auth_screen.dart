@@ -2129,36 +2129,20 @@ class _RegisterFlowState extends State<_RegisterFlow> {
       // explicit — this keeps the role authoritative on relaunch and matches
       // the social-signup paths (which also pass explicit: true).
       await provider.setUserRole(_role, explicit: true);
-      final city = _cityCtrl.text.trim();
-      if (_role == 'landlord' && city.isNotEmpty) {
-        // Registration creates a draft skeleton — no consent required for drafts.
-        // The landlord completes the listing (and accepts terms) in AddPropertyScreen.
-        await provider.addLandlordProperty(
-          RentalProperty(
-            id: 'prop-${DateTime.now().millisecondsSinceEpoch}',
-            url: '',
-            price: 0,
-            rooms: _propRooms,
-            sizeM2: 0,
-            floor: '0',
-            totalFloors: '0',
-            city: city,
-            neighborhood: '',
-            street: '',
-            streetNumber: 0,
-            lat: 32.0853,
-            lon: 34.7818,
-            propertyType: 'דירה',
-            entryDate: 'גמיש',
-            condition: 'טוב',
-            ownerName: name,
-            agencyListing: false,
-            features: List.unmodifiable(_propFeatures),
-            media: const [],
-          ),
-          status: PropertyRecordStatus.draft,
-        );
-      }
+      // NOTE: this used to create a zero-price/no-photos placeholder property
+      // row here ("the landlord completes it in AddPropertyScreen" per the
+      // old comment), but nothing ever actually linked back to THIS row's id
+      // — AddPropertyScreen always generates its own fresh id when the
+      // landlord later publishes a real listing (auth_screen.dart's id was
+      // 'prop-<ts>', AddPropertyScreen's is 'custom-<ts>', and initialDraft
+      // only carries scalar field values, never an id) — so the placeholder
+      // was orphaned forever: permanent zero-price/photo-less litter in the
+      // landlord's own property list, counted in their inventory for nothing.
+      // Removed rather than left creating dead rows; city/_propRooms/
+      // _propFeatures picked here aren't threaded anywhere yet — a real
+      // "resume my onboarding draft in AddPropertyScreen" flow would need to
+      // pass them through onDone and wire the dashboard's add-property entry
+      // point to pick them up, which is a product feature, not a bug fix.
       if (mounted) {
         _showSuccessSheet();
       }
